@@ -1,0 +1,53 @@
+Metadata-Version: 2.1
+Name: tinytim
+Version: 1.11.0
+Summary: Pure Python data table functions.
+Home-page: https://github.com/eddiethedean/tinytim
+Author: Odos Matthews
+Author-email: odosmatthews@gmail.com
+License: MIT
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE.md
+Requires-Dist: dictanykey (>=0.0.5)
+Requires-Dist: hasattrs (>=0.0.2)
+
+# TinyTim
+
+A pure python package used to process a table of data stored in a dict.
+
+## Description
+
+Use TinyTim instead of Pandas to process your data if you do not want to install Pandas and its many dependencies.
+TinyTim has no dependencies outside Python.
+
+## Getting Started
+
+### Dependencies
+
+* Python>=3.6
+
+### Installing
+
+* pip install tinytim
+
+### Executing program
+
+* How to run the program
+* Step-by-step bullets
+```
+Example code to come.
+```
+
+## Authors
+
+Contributors names and contact info
+
+Odos Matthews: odosmatthews@gmail.com
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE.md file for details

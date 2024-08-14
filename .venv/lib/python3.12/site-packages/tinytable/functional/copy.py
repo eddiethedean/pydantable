@@ -1,0 +1,1 @@
+from tinytim.copy import copy_table, deepcopy_table

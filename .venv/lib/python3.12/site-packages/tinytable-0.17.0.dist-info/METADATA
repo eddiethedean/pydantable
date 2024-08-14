@@ -1,0 +1,20 @@
+Metadata-Version: 2.1
+Name: tinytable
+Version: 0.17.0
+Summary: Pure Python lite version of Pandas DataFrame.
+Home-page: https://github.com/eddiethedean/tinytable
+Author: Odos Matthews
+Author-email: odosmatthews@gmail.com
+License: MIT
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.7
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE.md
+Requires-Dist: tinytim (>=1.9.6)
+Requires-Dist: openpyxl
+Requires-Dist: tabulate
+Requires-Dist: sqlite-utils
+Requires-Dist: hasattrs
+
