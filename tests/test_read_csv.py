@@ -18,7 +18,11 @@ class Ages(pydantic.BaseModel):
 
 def test_read_csv() -> None:
     tbl: Table = PeopleTable.read_csv('tests/data/people.csv')
-    assert tbl.data == {'id': [1, 2, 3], 'name': ['Odos', 'Kayla', 'Dexter'], 'age': [38, 31, 2]}
+    assert tbl.data == {
+        'id': [1, 2, 3],
+        'name': ['Odos', 'Kayla', 'Dexter'],
+        'age': [38, 31, 2]
+    }
 
 
 def test_validation() -> None:
