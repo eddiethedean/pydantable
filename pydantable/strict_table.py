@@ -1,3 +1,4 @@
+from typing import Any, Generator
 import tinytim as tt
 from tabulate import tabulate
 import pydantic
@@ -27,9 +28,9 @@ class PydanTable:
         self._i += 1
         return row
 
-    def itervalues(self):
+    def itervalues(self) -> Generator[tuple[Any, ...], Any, None]:
         for row in self:
-            yield (value[1] for value in row)
+            yield tuple(value[1] for value in row)
 
     def __repr__(self):
         return f'{self.model.__name__} {self.__class__.__name__}{"\n"}' + tabulate(

@@ -1,11 +1,11 @@
 import pydantic
 import pytest
 from tinytable.table import Table
-from pydantable import table
+from pydantable import base
 from pydantable.errors import ValidationErrors
 
 
-class PeopleTable(table.BaseTableModel):
+class PeopleTable(base.BaseTableModel):
     id: int
     name: str
     age: int
@@ -28,4 +28,4 @@ def test_read_csv() -> None:
 def test_validation() -> None:
     tbl = Table({'id': ['1', '2'], 'age': ['Six', '99']})
     with pytest.raises(ValidationErrors):
-        table.validate_table(tbl, Ages)
+        base.validate_table(tbl, Ages)

@@ -1,66 +1,56 @@
-from __future__ import annotations
-import typing as _t
-import pydantic as _pydantic
-import tinytable as _tt
-import tinytable.csv
-import tinytim.rows
-
-from pydantable import errors
 
 
-def validate_row(
-    row: dict,
-    model: _t.Type[_pydantic.BaseModel]
-) -> dict:
-    return dict(model.model_validate(dict(row)))
+class PydanTable:
+    """
+    A table of pydantic model rows.
 
+    Use Cases
+    ---------
+    ETL with built in validation
+    Extract/validate -> Transform/validate -> Load
 
-def validate_table(
-    table: _tt.Table,
-    model: _t.Type[_pydantic.BaseModel]
-) -> _tt.Table:
-    out_table: _tt.Table = table.copy()
-    validation_errors: list[dict] = []
-    errored = False
-    for i, row in table.iterrows():
-        try:
-            validated_row: dict = validate_row(dict(row), model)
-            if not errored:
-                out_table[i] = validated_row
-        except _pydantic.ValidationError as e:
-            validation_errors.extend(e.errors())
-            errored = True
-    if validation_errors:
-        grouped_errors: list[dict] = errors.group_errors(validation_errors)
-        raise errors.ValidationErrors(grouped_errors)
-    return out_table
+    1. Write pydantic model for data source
+    2. Etract - Read data source into PydanTable
+    3. Transform - Migrations/updates/inserts
+    4. Check new generated pydantic model for output data
+    4. Load - Push data to SQL/CSV/NoSQL
+
     
+    Tied to a a single pydantic model that can change with column changes (migrations)
+    Migrations always result in a new PydanTable.
 
-class BaseTableModel(_pydantic.BaseModel):
-    # TODO: Add __init__ for reading dict
-    
-    @classmethod
-    def read_csv(cls, path: str) -> _tt.Table:
-        tbl: _tt.Table = _tt.read_csv(path)
-        return validate_table(tbl, cls)
-    
-    @classmethod
-    def read_dict(cls, d: dict[str, _t.Sequence]) -> _tt.Table:
-        tbl = _tt.Table(d)
-        return validate_table(tbl, cls)
-    
-    @classmethod
-    def read_excel(cls, path: str, sheet_name: str | None = None) -> _tt.Table:
-        tbl: _tt.Table = _tt.read_excel(path, sheet_name)
-        return validate_table(tbl, cls)
-    
-    @classmethod
-    def read_sqlite(cls, path: str, table_name: str) -> _tt.Table:
-        tbl: _tt.Table = _tt.read_sqlite(path, table_name)
-        return validate_table(tbl, cls)
-        
-    @classmethod
-    def read_csv_chunks(cls, path: str, chunksize: int) -> _t.Generator[_tt.Table, None, None]:
-        for d_chunk in tinytable.csv.chunk_csv_file(path, chunksize):
-            tbl = _tt.Table(d_chunk)
-            yield validate_table(tbl, cls)
+    Migrations
+    ----------
+    + Add New Column - name, type, data or default
+    + Drop Column
+    + Change Column type - cast values
+    + Change Column name
+    + Add or Drop contraint - unique
+    + Joins
+
+    Each row can be changed but is validated against the pydantic model.
+    Non-migrations are done in place.
+
+    Updates
+    -------
+    Update row values
+    Update column values - rollback on validation error or skip
+
+    Inserts
+    -------
+    Insert new row
+    Bulk insert rows - rollback on validation error or skip
+
+    Selects
+    -------
+    Read row my index
+    Read index slice of table
+    Iterate over rows
+
+    Read
+    ----
+    read csv - full or chunks
+    read sql table - full or chunks
+    read iterable of dicts
+    read iterable of tuples - with column names
+    """
