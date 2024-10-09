@@ -1,14 +1,12 @@
 import typing as _t
 import csv
 
-import pydantic
-
-from pydantable.results.dictionary import DictResult
-from pydantable.writers import csv as csv_writers
-from pydantable.validators import dictionary
+from pydantable.generators.dicts.base import chain
+from pydantable.generators.dicts.validators import dicts as validators
+from pydantable.results import dicts as dict_results
 
 
-class CSVDictReader:
+class CSVDictReader(chain.ChainBase, validators.ValidatorMixin):
     def __init__(
         self,
         csv_file: _t.Iterable[str],
@@ -45,10 +43,10 @@ class CSVDictReader:
     def __iter__(self) -> _t.Self:
         return self
 
-    def __next__(self) -> DictResult:
+    def __next__(self) -> dict_results.DictResult:
         return self.read()
 
-    def read(self) -> DictResult:
+    def read(self) -> dict_results.DictResult:
         try:
             row: dict = next(self.reader)
         except StopIteration as se:
@@ -56,9 +54,3 @@ class CSVDictReader:
         except Exception as e:
             return e
         return row
-
-    def validator(self, model: pydantic.BaseModel) -> dictionary.DictValidator:
-        return dictionary.DictValidator(self, model)
-
-    def writer(self, csv_file: 'SupportsWrite[str]') -> csv_writers.CSVDictWriter:
-        return csv_writers.CSVDictWriter(self, csv_file)

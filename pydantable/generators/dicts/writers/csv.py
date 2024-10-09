@@ -2,27 +2,24 @@ from collections.abc import Mapping
 import typing as _t
 import csv
 
+from pydantable.generators.dicts.base import chain, iter
+from pydantable.results import dicts
 
-from pydantable.results.dictionary import MappingResult
 
-
-class CSVDictWriter:
+class CSVDictWriter(iter.BaseIter, chain.ChainBase):
     def __init__(
         self,
-        data: _t.Iterator[MappingResult],
-        csv_file: 'SupportsWrite[str]',
+        data: _t.Iterator[dicts.MappingResult],
+        csv_file: _t.IO,
         add_headers: bool = True
     ) -> None:
-        self.data: _t.Iterator[MappingResult] = data
-        self.file: 'SupportsWrite[str]' = csv_file
+        super().__init__(data)
+        self.file: _t.IO = csv_file
         self.writer: csv.DictWriter | None = None
         self.add_headers: bool = add_headers
 
-    def __iter__(self) -> _t.Self:
-        return self
-
-    def __next__(self) -> MappingResult:
-        result: MappingResult = next(self.data)
+    def __next__(self) -> dicts.MappingResult:
+        result: dicts.MappingResult = super().__next__()
         if isinstance(result, Mapping):
             if self.writer is None:
                     self._start_writer(result)
@@ -36,7 +33,7 @@ class CSVDictWriter:
         if self.add_headers:
             self.writer.writeheader()
             
-    def write(self, row: Mapping) -> MappingResult:
+    def write(self, row: Mapping) -> dicts.MappingResult:
         if self.writer is None:
             raise ValueError('writer is not initialized')
         try:
