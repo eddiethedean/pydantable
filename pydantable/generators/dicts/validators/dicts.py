@@ -6,12 +6,15 @@ import pydantic
 
 from pydantable.generators.dicts.base import chain
 from pydantable.generators.dicts.base import iter
+from pydantable.generators.dicts.writers import csv as csv_writers
 from pydantable.results import dicts as dict_results
 
 
-
-
-class DictValidator(iter.BaseIter, chain.ChainBase):
+class DictValidator(
+    iter.BaseIter,
+    chain.ChainBase,
+    csv_writers.CSVWriterMixin
+):
     def __init__(
         self,
         data: _t.Iterator[dict_results.MappingResult],
