@@ -5,4 +5,5 @@ from pydantable.strict_table import PydanTable
 from pydantable import csv
 from pydantable.generators.dicts.readers.csv import CSVDictReader
 from pydantable.generators.dicts.validators.dicts import DictValidator
+from pydantable.generators.dicts.transformers.dicts import DictTransformer
 from pydantable.generators.dicts.writers.csv import CSVDictWriter

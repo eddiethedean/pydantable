@@ -1,13 +1,10 @@
 import typing as _t
 import csv
 
-from pydantable.generators.dicts.base import chain
-from pydantable.generators.dicts.validators import dicts as validators
-from pydantable.results import dicts as dict_results
-from pydantable.generators.dicts.base import iter
+from pydantable.results import dicts as results
 
 
-class CSVDictReader(iter.BaseIter, chain.ChainBase, validators.ValidatorMixin):
+class CSVDictReader(results.DictResultsGenerator):
     def __init__(
         self,
         csv_file: _t.Iterable[str],
@@ -15,7 +12,6 @@ class CSVDictReader(iter.BaseIter, chain.ChainBase, validators.ValidatorMixin):
         restkey: str | None = None,
         restval: str | None = None,
         dialect: str = "excel",
-        mode: iter.ReturnMode = iter.ReturnMode.PASSIVE,
         *,
         delimiter: str = ",",
         quotechar: str | None = '"',
@@ -26,7 +22,7 @@ class CSVDictReader(iter.BaseIter, chain.ChainBase, validators.ValidatorMixin):
         quoting: int = 0,
         strict: bool = False
     ) -> None:
-        self.reader = csv.DictReader(
+        self.data = csv.DictReader(
             csv_file,
             fieldnames,
             restkey,
@@ -41,19 +37,6 @@ class CSVDictReader(iter.BaseIter, chain.ChainBase, validators.ValidatorMixin):
             quoting=quoting,
             strict=strict
         )
-        super().__init__(self.reader, mode)
-    
-    def __iter__(self) -> _t.Self:
-        return self
 
-    def __next__(self) -> dict_results.MappingResult:
-        return self.read()
-
-    def read(self) -> dict_results.MappingResult:
-        try:
-            row: dict = next(self.reader)
-        except StopIteration as se:
-            raise se
-        except Exception as e:
-            return self.filter_error(e)
-        return row
+    def process(self, result: dict) -> dict:
+        return result

@@ -1,60 +1,19 @@
 import typing as _t
-from collections.abc import Mapping
-from abc import ABC, abstractmethod
 
 import pydantic
 
-from pydantable.generators.dicts.base import chain
-from pydantable.generators.dicts.base import iter
-from pydantable.generators.dicts.writers import csv as csv_writers
-from pydantable.results import dicts as dict_results
+from pydantable.results import dicts as results
 
 
-class DictValidator(
-    iter.BaseIter,
-    chain.ChainBase,
-    csv_writers.CSVWriterMixin
-):
+class DictValidator(results.MappingResultsGenerator):
     def __init__(
         self,
-        data: _t.Iterator[dict_results.MappingResult],
-        model: pydantic.BaseModel,
-        mode: iter.ReturnMode = iter.ReturnMode.PASSIVE
+        data: _t.Iterator[results.MappingResult],
+        model: pydantic.BaseModel
     ) -> None:
-        super().__init__(data, mode)
+        self.data: _t.Iterator[results.MappingResult] = data
         self.model: pydantic.BaseModel = model
-        self.mode: iter.ReturnMode = mode
 
-    def __next__(self) -> dict_results.MappingResult:
-        result: dict_results.MappingResult = super().__next__()
-        if isinstance(result, Mapping):
-            return self.validate(result)
-        if isinstance(result, Exception):
-            return self.filter_error(result)
-  
-    def validate(
-        self,
-        row: dict_results.MappingResult
-    ) -> dict_results.MappingResult:
-        try:
-            validated_model: pydantic.BaseModel = self.model.model_validate(row)
-        except pydantic.ValidationError as e:
-            return self.filter_error(e)
+    def process(self, result: results.MappingResult) -> dict:
+        validated_model: pydantic.BaseModel = self.model.model_validate(result)
         return validated_model.model_dump()
-
-
-class ValidatorMixin(ABC):
-    @abstractmethod
-    def __iter__(self) -> _t.Self:
-        ...
-
-    @abstractmethod
-    def __next__(self) -> dict_results.MappingResult:
-        ...
-
-    def validator(
-        self,
-        model: pydantic.BaseModel,
-        mode: iter.ReturnMode = iter.ReturnMode.PASSIVE
-    ) -> DictValidator:
-        return DictValidator(self, model, mode)
