@@ -1,9 +1,9 @@
 import typing as _t
 from dataclasses import dataclass
-
+from collections import defaultdict
 
 @dataclass
-class DictPipe:
+class DictPipe(_t.Generator):
     transformer_class: _t.Type
     validator_class: _t.Type
     writer_class: _t.Type
@@ -34,3 +34,21 @@ class DictPipe:
             self.validator_class,
             self.writer_class
         )
+    
+    def tolist(self) -> list[dict]:
+        return list(self)
+    
+    def todict(self) -> dict[str, list]:
+        out = defaultdict(list)
+        for result in self:
+            if isinstance(result, _t.Mapping):
+                for key, value in result.items():
+                    out[key].append(value)
+        return dict(out)
+    
+    def totuples(self) -> list[tuple]:
+        out = []
+        for result in self:
+            if isinstance(result, _t.Mapping):
+                out.append(tuple(result.values()))
+        return out
