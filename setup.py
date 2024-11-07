@@ -7,8 +7,8 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name="pydantable",
-    version="0.2.0",
-    description="Python package that uses pydantic to store data in a data table.",
+    version="0.3.1",
+    description="Python package that uses pydantic to validate data in a data table.",
     long_description=README,
     long_description_content_type="text/markdown",
     url="https://github.com/eddiethedean/pydantable",
