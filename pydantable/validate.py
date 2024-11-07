@@ -8,7 +8,7 @@ Record = dict | pydantic.BaseModel
 Json = str | bytes | bytearray
 
 
-class ErrorOption:
+class ErrorOption(StrEnum):
     RETURN = 'return'
     RAISE = 'raise'
     SKIP = 'skip'
@@ -35,7 +35,7 @@ def validate_record(
     raise_errors: bool = False
 ) -> RecordValidationResult:
     try:
-        validated_record = model.model_validate(
+        validated_record: pydantic.BaseModel = model.model_validate(
             record, from_attributes=from_attributes, strict=strict
         )
     except pydantic.ValidationError as e:
@@ -54,7 +54,7 @@ def validate_records(
     error_option: ErrorOption = ErrorOption.RETURN
 ) -> _t.Generator[RecordValidationResult, None, None]:
     for record in records:
-        result = validate_record(
+        result: RecordValidationResult = validate_record(
             record, model,
             from_attributes=from_attributes,
             strict=strict,
@@ -73,7 +73,7 @@ def validate_json(
     raise_errors: bool = False
 ) -> JsonValidationResult:
     try:
-        validated_record = model.model_validate_json(
+        validated_record: pydantic.BaseModel = model.model_validate_json(
             json, strict=strict
         )
     except pydantic.ValidationError as e:
@@ -91,7 +91,7 @@ def validate_jsons(
     error_option: ErrorOption = ErrorOption.RETURN
 ) -> _t.Generator[JsonValidationResult, None, None]:
     for record in records:
-        result = validate_json(
+        result: JsonValidationResult = validate_json(
             record, model,
             strict=strict,
             raise_errors=error_option == ErrorOption.RAISE
@@ -109,6 +109,7 @@ def validate(
     strict: bool | None = None,
     error_option: ErrorOption = ErrorOption.RETURN
 ) -> _t.Generator[RecordValidationResult | JsonValidationResult, None, None]:
+    result: RecordValidationResult | JsonValidationResult
     for record in records:
         if isinstance(record, Json):
             result = validate_json(
