@@ -4,7 +4,7 @@ from enum import StrEnum
 import pydantic
 
 
-Record = dict | pydantic.BaseModel
+Record = dict[str, _t.Any] | pydantic.BaseModel
 Json = str | bytes | bytearray
 
 
