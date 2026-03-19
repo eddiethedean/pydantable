@@ -27,7 +27,7 @@ Python API → Typed AST → Rust Planner → Rust Polars Engine
 ### Phase 2
 
 -   Expression typing system
--   Nullability tracking
+-   Nullability tracking + `propagate_nulls` semantics
 
 ### Phase 3
 

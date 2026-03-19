@@ -13,8 +13,9 @@ def test_expression_arithmetic_eval_and_inferred_dtype():
     assert expr.dtype is int
     assert expr.referenced_columns() == {"age"}
 
-    ctx = df.to_dict()
-    assert expr.eval(ctx) == [40, 60]
+    df2 = df.with_columns(age2=expr)
+    result = df2.collect()
+    assert result["age2"] == [40, 60]
 
 
 def test_expression_comparison_eval():
@@ -23,8 +24,9 @@ def test_expression_comparison_eval():
     assert isinstance(cond, CompareOp)
     assert cond.dtype is bool
 
-    ctx = df.to_dict()
-    assert cond.eval(ctx) == [False, True]
+    df2 = df.with_columns(cond=cond)
+    result = df2.collect()
+    assert result["cond"] == [False, True]
 
 
 def test_columnref_is_typed():

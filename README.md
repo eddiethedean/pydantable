@@ -10,7 +10,7 @@ can be validated and typed end-to-end.
 This release provides:
 - Typed DataFrames core (`DataFrame[Schema]`) with runtime schema enforcement (low-level API)
 - A typed expression AST with operator overloads (`df.age * 2`, `df.age > 10`, ...)
-- `select()`, `with_columns()`, `filter()`, and a pure-Python `collect()`
+- `select()`, `with_columns()`, `filter()`, and `collect()` execution
 
 Public API direction (next step): `DataFrameModel` as a SQLModel-like wrapper that:
 - represents the whole DataFrame
@@ -18,8 +18,8 @@ Public API direction (next step): `DataFrameModel` as a SQLModel-like wrapper th
 - supports both input formats (columns and rows)
 - returns new model types for every transformation (schema migration)
 
-Rust planner/execution and Rust Polars integration are stubbed for now; attempting
-to use `collect(engine="rust")` will raise `NotImplementedError`.
+`collect()` executes in the Rust core for the currently supported skeleton
+operations.
 
 ## Installation
 
@@ -29,20 +29,20 @@ From this repo:
 pip install .
 ```
 
-`pip install .` will build the Rust extension via `maturin` when toolchains are
-available. Pure-Python execution still works even if the extension is not
-present (as long as you use the default `collect()`).
+`pip install .` builds the Rust extension via `maturin` when toolchains are
+available. The current skeleton requires the Rust extension for expression
+typing and `collect()`.
 
 ## Quick start
 
 ```python
-from pydantable import DataFrameModel
+from pydantable import DataFrame, Schema
 
-class UserDF(DataFrameModel):
+class User(Schema):
     id: int
     age: int
 
-df = UserDF({"id": [1, 2], "age": [20, 30]})
+df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
 
 df2 = df.with_columns(age2=df.age * 2)
 df3 = df2.select("id", "age2")
@@ -50,6 +50,23 @@ df4 = df3.filter(df3.age2 > 40)
 result = df4.collect()
 print(result)  # {"id": [2], "age2": [60]}
 ```
+
+## Supported Expression Dtypes (skeleton)
+Rust enforces expression typing (at AST-build time) and executes expressions
+with the following supported dtypes:
+- `int`, `float`, `bool`, `str`
+
+Null semantics are SQL-like (`propagate_nulls`):
+- arithmetic: `NULL` + anything yields `NULL`
+- comparisons: if either side is `NULL`, the result is `NULL` (typed as `Optional[bool]`)
+- `filter(condition)`: keeps rows where the condition evaluates to exactly `True`; drops rows where the condition is `False` or `NULL`
+
+These rules are enforced by the Rust core so that derived schemas and runtime
+values stay aligned.
+
+`Optional[T]` fields in your schema are supported:
+- DataFrame input accepts `None` values for `Optional[T]`
+- derived schemas produced by `select()` / `with_columns()` / `filter()` propagate nullability through expression result types
 
 See the `DataFrameModel` design spec: `docs/DATAFRAMEMODEL.md`.
 

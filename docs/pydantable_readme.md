@@ -19,22 +19,22 @@ The intended user-facing interface is `DataFrameModel`, a class that:
 
 Full spec: `docs/DATAFRAMEMODEL.md`.
 
-## Example (target interface)
+## Example (current API)
 
 ```python
-from pydantable import DataFrameModel
+from pydantable import DataFrame, Schema
 
-class UserDF(DataFrameModel):
+class User(Schema):
     id: int
     age: int
 
-df = UserDF({"id": [1, 2], "age": [20, 30]})
+df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
 df2 = df.with_columns(age2=df.age * 2)
 df3 = df2.select("id", "age2")
 df4 = df3.filter(df3.age2 > 40)
 
-# later: row-wise materialization for FastAPI
-# rows: list[UserDF.RowModel] = df4.rows()
+result = df4.collect()
+print(result)  # {"id": [2], "age2": [60]}
 ```
 
 ## Current Repository Status
@@ -42,6 +42,24 @@ df4 = df3.filter(df3.age2 > 40)
 In the `0.4.0` skeleton, the implementation you can run today is the lower-level
 API: `DataFrame[Schema]` + typed expressions. `DataFrameModel` is the next DX layer
 on top of that.
+
+### Supported Expression Dtypes + Null Semantics (skeleton)
+Rust enforces expression typing (at AST-build time) and executes expressions
+with supported dtypes: `int`, `float`, `bool`, `str`.
+
+Null semantics are SQL-like (`propagate_nulls`):
+- arithmetic: `NULL` + anything yields `NULL`
+- comparisons: if either side is `NULL`, the result is `NULL` (typed as `Optional[bool]`)
+- `filter(condition)`: keeps rows where the condition evaluates to exactly `True`; drops rows where the condition is `False` or `NULL`
+
+These rules are implemented in the Rust core so derived schemas and runtime
+values stay aligned.
+
+`Optional[T]` handling:
+- schema fields annotated as `Optional[T]` accept `None` values at DataFrame
+  construction time
+- derived schemas produced by `select()` / `with_columns()` / `filter()`
+  propagate nullability through expression result types
 
 ## Roadmap
 

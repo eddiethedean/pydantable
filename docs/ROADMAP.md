@@ -61,7 +61,7 @@ Deliverables:
 - `Expr` class / AST for typed expression building
 - Column references and literals for query building
 - Arithmetic and comparison operators
-- Type inference rules (and nullability propagation planned)
+- Type inference rules (and nullability propagation)
 - Validation errors when expressions reference non-existent columns
 
 ## Phase 3: Basic Transformations

@@ -103,6 +103,36 @@ The expression system must:
 - infer result dtypes (for `with_columns`)
 - propagate the new schema into the *returned* DataFrameModel type
 
+## Typed Dtypes + Null Semantics (skeleton contract)
+
+Supported expression dtypes (for the current skeleton): `int`, `float`, `bool`,
+and `str`.
+
+Null semantics are SQL-like (`propagate_nulls`):
+
+- arithmetic: if either operand is `NULL`, the result is `NULL`
+- comparisons: if either operand is `NULL`, the result is `NULL` (typed as
+  `Optional[bool]`)
+- `filter(condition)`: keeps rows where the condition evaluates to exactly `True`;
+  drops rows where the condition is `False` or `NULL`
+
+`Optional[T]` handling:
+
+- schema fields annotated as `Optional[T]` accept `None` values at DataFrame
+  construction time
+- derived schemas produced by `select()` / `with_columns()` / `filter()`
+  propagate nullability through expression result types
+
+Error timing expectations:
+
+- invalid expressions fail early when the expression AST is built (during
+  operator overloads / literal coercion)
+- `filter()` validates that the condition expression is typed as `bool` or
+  `Optional[bool]` before execution
+
+In the current Rust-first skeleton, these checks are enforced in the Rust
+core (PyO3) during AST construction, before any execution happens.
+
 In practice, a DataFrameModel instance (and/or its generated `RowModel`) should expose
 typed column references, while still avoiding the “row vs dataframe attribute” confusion.
 

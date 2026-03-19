@@ -1,15 +1,66 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, Iterable, List, Mapping, Sequence, Set, Type, TypeVar, Union, cast
+from typing import Any, Dict, Generic, Iterable, List, Mapping, Optional, Sequence, Set, Type, TypeVar, Union, cast, get_args, get_origin
 
 from pydantic import BaseModel
 
-from .backend import execute_plan_rust
 from .expressions import ColumnRef, Expr, Literal
 from .schema import make_derived_schema_type, schema_field_types, validate_columns_strict
 
+
+def _load_rust_core() -> Any:
+    try:
+        from . import _core as rust_core  # type: ignore
+
+        return rust_core
+    except ImportError:
+        return None
+
+
+_RUST_CORE = _load_rust_core()
+
+
+def _require_rust_core() -> Any:
+    if _RUST_CORE is None:
+        raise NotImplementedError("Rust extension is required for DataFrame execution.")
+    return _RUST_CORE
+
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
+
+_NoneType = type(None)
+
+_SUPPORTED_BASE_TYPES = (int, float, bool, str)
+
+
+def _is_bool_or_nullable_bool(dtype: Any) -> bool:
+    """
+    Return True if `dtype` is either `bool` or `Optional[bool]` / `Union[bool, None]`.
+    """
+    if dtype is bool:
+        return True
+    origin = get_origin(dtype)
+    if origin is Union:
+        args = tuple(get_args(dtype))
+        if len(args) == 2 and _NoneType in args and bool in args:
+            return True
+    return False
+
+
+def _base_type_from_nullable(dtype: Any) -> Any:
+    """
+    Extract the base scalar type from either `T` or `Optional[T]` / `Union[T, None]`.
+    """
+    if dtype in _SUPPORTED_BASE_TYPES:
+        return dtype
+    origin = get_origin(dtype)
+    if origin is Union:
+        args = tuple(get_args(dtype))
+        if len(args) == 2 and _NoneType in args:
+            base = args[0] if args[1] is _NoneType else args[1]
+            if base in _SUPPORTED_BASE_TYPES:
+                return base
+    raise TypeError(f"Unsupported (non-nullable or nullable) dtype: {dtype!r}")
 
 
 @dataclass(frozen=True)
@@ -59,9 +110,10 @@ class DataFrame(Generic[SchemaT]):
         root_data = validate_columns_strict(data, self._schema_type)
         self._root_data: Dict[str, list[Any]] = root_data
         self._root_schema_type: Type[BaseModel] = self._schema_type
-        self._plan: List[object] = []
         self._current_schema_type: Type[BaseModel] = self._schema_type
         self._current_field_types = schema_field_types(self._current_schema_type)
+        # Rust owns expression typing, logical planning, and execution.
+        self._rust_plan = _require_rust_core().make_plan(self.schema_fields())
 
     @classmethod
     def _from_plan(
@@ -70,14 +122,14 @@ class DataFrame(Generic[SchemaT]):
         root_data: Dict[str, list[Any]],
         root_schema_type: Type[BaseModel],
         current_schema_type: Type[BaseModel],
-        plan: List[object],
+        rust_plan: Any,
     ) -> "DataFrame[Any]":
         obj = cls.__new__(cls)
         obj._root_data = root_data
         obj._root_schema_type = root_schema_type
-        obj._plan = plan
         obj._current_schema_type = current_schema_type
         obj._current_field_types = schema_field_types(current_schema_type)
+        obj._rust_plan = rust_plan
         obj._schema_type = None
         return cast("DataFrame[Any]", obj)
 
@@ -100,108 +152,86 @@ class DataFrame(Generic[SchemaT]):
         raise AttributeError(item)
 
     def with_columns(self, **new_columns: Union[Expr, Any]) -> "DataFrame[Any]":
-        inferred: Dict[str, Any] = dict(self._current_field_types)
-        exprs: Dict[str, Expr] = {}
+        rust = _require_rust_core()
+        rust_columns: Dict[str, Any] = {}
 
         for name, value in new_columns.items():
-            expr = value if isinstance(value, Expr) else Literal(value=value, dtype=type(value))
-            referenced = expr.referenced_columns()
-            missing = sorted(referenced - set(self._current_field_types.keys()))
-            if missing:
-                raise ValueError(
-                    f"Expression for {name!r} references unknown columns: {missing}"
-                )
+            if isinstance(value, Expr):
+                rust_columns[name] = value._rust_expr
+            else:
+                rust_columns[name] = rust.make_literal(value=value)
 
-            inferred[name] = getattr(expr, "dtype", object)
-            exprs[name] = expr
-
+        rust_plan = rust.plan_with_columns(self._rust_plan, rust_columns)
+        derived_fields = rust_plan.schema_fields()
         derived_schema_type = make_derived_schema_type(
-            self._current_schema_type, inferred
+            self._current_schema_type, derived_fields
         )
+
         return self._from_plan(
             root_data=self._root_data,
             root_schema_type=self._root_schema_type,
             current_schema_type=derived_schema_type,
-            plan=self._plan + [WithColumnsStep(columns=exprs)],
+            rust_plan=rust_plan,
         )
 
     def select(self, *cols: Union[str, ColumnRef]) -> "DataFrame[Any]":
+        rust = _require_rust_core()
+
         selected: List[str] = []
         for col in cols:
             if isinstance(col, str):
                 selected.append(col)
-            elif isinstance(col, ColumnRef):
-                selected.append(col.name)
+            elif isinstance(col, Expr):
+                referenced = col.referenced_columns()
+                if len(referenced) != 1:
+                    raise TypeError(
+                        "select() accepts column names or a ColumnRef expression."
+                    )
+                selected.append(next(iter(referenced)))
             else:
                 raise TypeError("select() accepts column names or ColumnRef objects.")
 
-        missing = sorted(set(selected) - set(self._current_field_types.keys()))
-        if missing:
-            raise KeyError(f"Unknown columns in select(): {missing}")
-
-        inferred = {name: self._current_field_types[name] for name in selected}
+        rust_plan = rust.plan_select(self._rust_plan, selected)
+        derived_fields = rust_plan.schema_fields()
         derived_schema_type = make_derived_schema_type(
-            self._current_schema_type, inferred
+            self._current_schema_type, derived_fields
         )
         return self._from_plan(
             root_data=self._root_data,
             root_schema_type=self._root_schema_type,
             current_schema_type=derived_schema_type,
-            plan=self._plan + [SelectStep(columns=selected)],
+            rust_plan=rust_plan,
         )
 
     def filter(self, condition: Expr) -> "DataFrame[Any]":
+        rust = _require_rust_core()
+
         if not isinstance(condition, Expr):
             raise TypeError("filter(condition) expects an Expr.")
 
-        referenced = condition.referenced_columns()
-        missing = sorted(referenced - set(self._current_field_types.keys()))
-        if missing:
-            raise ValueError(
-                f"Filter expression references unknown columns: {missing}"
-            )
-
-        # Skeleton does not enforce `bool` dtype at runtime strictly.
+        rust_plan = rust.plan_filter(self._rust_plan, condition._rust_expr)
         return self._from_plan(
             root_data=self._root_data,
             root_schema_type=self._root_schema_type,
             current_schema_type=self._current_schema_type,
-            plan=self._plan + [FilterStep(condition=condition)],
+            rust_plan=rust_plan,
         )
 
-    def collect(self, *, engine: str = "python") -> Dict[str, list[Any]]:
+    def collect(self, *, engine: str = "rust") -> Dict[str, list[Any]]:
         """
         Materialize this typed logical DataFrame into Python column data.
+
+        Execution is owned by Rust.
         """
+        if engine != "rust":
+            raise NotImplementedError(
+                "The Rust-first build executes collect() in Rust only."
+            )
 
-        if engine == "python":
-            return self._collect_python()
-        if engine == "rust":
-            return cast(Dict[str, list[Any]], execute_plan_rust(self._plan, self._root_data))
-        raise ValueError(f"Unknown engine {engine!r}. Expected 'python' or 'rust'.")
-
-    def _collect_python(self) -> Dict[str, list[Any]]:
-        data: Dict[str, list[Any]] = dict(self._root_data)
-
-        for step in self._plan:
-            if isinstance(step, SelectStep):
-                data = {name: data[name] for name in step.columns}
-            elif isinstance(step, FilterStep):
-                mask = step.condition.eval(data)
-                if not all(isinstance(v, bool) for v in mask):
-                    raise TypeError("Filter condition must evaluate to booleans.")
-                data = {
-                    name: [v for v, m in zip(vals, mask) if m]
-                    for name, vals in data.items()
-                }
-            elif isinstance(step, WithColumnsStep):
-                for name, expr in step.columns.items():
-                    data[name] = expr.eval(data)
-            else:
-                raise RuntimeError(f"Unknown plan step type: {type(step)!r}")
-
-        return data
+        rust = _require_rust_core()
+        result = rust.execute_plan(self._rust_plan, self._root_data)
+        return result
 
     def to_dict(self) -> Dict[str, list[Any]]:
-        return self.collect(engine="python")
+        return self.collect(engine="rust")
 

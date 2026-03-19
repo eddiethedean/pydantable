@@ -14,7 +14,7 @@ def test_with_columns_and_collect_python():
     df2 = df.with_columns(age2=df.age * 2)
     assert df2.schema_fields()["age2"] is int
 
-    result = df2.collect(engine="python")
+    result = df2.collect()
     assert result == {"id": [1, 2], "age": [20, 30], "age2": [40, 60]}
 
 
@@ -31,7 +31,7 @@ def test_select_and_filter():
 
 def test_with_columns_rejects_unknown_referenced_columns():
     df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
-    with pytest.raises(ValueError, match="references unknown columns"):
+    with pytest.raises(ValueError, match="references unknown column"):
         df.with_columns(
             bad=df.col("age") + 1,
             missing=ColumnRef(name="missing", dtype=int) + 1,

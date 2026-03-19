@@ -19,36 +19,19 @@ def schema_field_types(schema_type: Type[BaseModel]) -> Dict[str, Any]:
     """
     Extract `field_name -> python_type` from a Pydantic model.
 
-    Note: for Optional[T] / Union[T, None], we return T (nullability tracking is
-    planned for later versions).
+    Notes:
+    - We preserve Optional[T] / Union[T, None] in the returned annotation types so
+      expression typing can propagate nullability into derived schemas.
+    - This skeleton intentionally supports only a small set of expression dtypes;
+      runtime validation of DataFrame column values is delegated to Pydantic.
     """
 
     # Pydantic v2: `model_fields` holds `FieldInfo` with `.annotation`.
     field_types: Dict[str, Any] = {}
     for name, field in schema_type.model_fields.items():
         annotation = field.annotation
-        field_types[name] = _strip_optional(annotation)
+        field_types[name] = annotation
     return field_types
-
-
-def _strip_optional(annotation: Any) -> Any:
-    """
-    Convert `Optional[T]` / `Union[T, None]` into `T`.
-
-    We ignore nullability at this skeleton stage.
-    """
-
-    # Avoid heavy typing imports; use runtime checks only.
-    origin = getattr(annotation, "__origin__", None)
-    if origin is None:
-        return annotation
-
-    args = getattr(annotation, "__args__", ())
-    if len(args) == 2 and type(None) in args:  # noqa: E721
-        return args[0] if args[1] is type(None) else args[1]
-
-    # Non-trivial unions are kept as-is for now.
-    return annotation
 
 
 def validate_columns_strict(

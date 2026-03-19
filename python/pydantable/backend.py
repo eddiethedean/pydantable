@@ -26,17 +26,17 @@ def execute_plan_rust(plan: Any, data: Any) -> Any:
     """
     Execute a typed logical plan via Rust.
 
-    In `0.4.0` this is intentionally a stub and will raise a clear error.
+    `plan` is expected to be the Rust `PyPlan` handle produced by the logical
+    plan constructors, and `data` is the root column dictionary.
     """
 
     if _RUST_CORE is None:
         raise NotImplementedError(
-            "Rust execution is not available. Build the extension with maturin."
+            "Rust extension is not available. Build the PyO3 module so `pydantable._core` can be imported."
         )
 
     if not hasattr(_RUST_CORE, "execute_plan"):
         raise NotImplementedError("Rust extension does not implement `execute_plan`.")
 
-    # The Rust stub will currently raise NotImplementedError.
     return _RUST_CORE.execute_plan(plan, data)
 
