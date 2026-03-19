@@ -37,3 +37,9 @@ def test_with_columns_rejects_unknown_referenced_columns():
             missing=ColumnRef(name="missing", dtype=int) + 1,
         )
 
+
+def test_select_requires_at_least_one_column():
+    df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
+    with pytest.raises(ValueError, match="requires at least one column"):
+        df.select()
+

@@ -40,7 +40,13 @@ Spec: `docs/DATAFRAMEMODEL.md`.
   - AST-build-time error timing verified for invalid expression combinations
   - derived schema dtype/nullability propagation validated in chained transformations
   - comprehensive expression and `DataFrameModel` parity tests expanded
-- Phase 3+: pending
+- Phase 3: completed
+  - transformation contract locked for `select()`, `with_columns()`, `filter()`
+  - `with_columns()` replacement semantics verified for name collisions
+  - derived schema migration guarantees validated through chained transforms
+  - row-input vs column-input transformation parity coverage added
+  - MVP test matrix completed for Phase 3 transformation guarantees
+- Phase 4+: pending
 
 ## Phase 0: Repo Setup
 
@@ -89,17 +95,17 @@ Goals:
 - Transformations migrate the model type (new derived `DataFrameModel`s)
 
 Deliverables:
-- `select()`
-- `with_columns()`
-- `filter()`
-- Schema migration rules:
-  - `select()` produces a projection-derived schema
-  - `with_columns()` produces a schema-derived type with **collision replacement**
-  - `filter()` preserves schema, changes row values
-- Unit tests for:
-  - both input formats
-  - schema propagation through transformations
-  - correct replacement semantics for `with_columns`
+- [x] `select()`
+- [x] `with_columns()`
+- [x] `filter()`
+- [x] Schema migration rules:
+  - [x] `select()` produces a projection-derived schema
+  - [x] `with_columns()` produces a schema-derived type with **collision replacement**
+  - [x] `filter()` preserves schema, changes row values
+- [x] Unit tests for:
+  - [x] both input formats
+  - [x] schema propagation through transformations
+  - [x] correct replacement semantics for `with_columns`
 
 ## Phase 4: Logical Plan (Rust)
 

@@ -188,6 +188,8 @@ In the current repository skeleton:
 - a per-row `RowModel` is generated
 - transformation methods return derived `DataFrameModel` subclasses with
   migrated schema
+- basic transformation guarantees are locked for MVP (`select`, `with_columns`,
+  `filter`, collision replacement, and input-format parity)
 
 ## Roadmap implications
 

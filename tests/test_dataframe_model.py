@@ -66,3 +66,40 @@ def test_dataframe_model_chained_schema_migration_dtypes():
     assert schema["age2"] == Optional[int]
     assert schema["flag"] == Optional[bool]
 
+
+def test_dataframe_model_with_columns_collision_replacement_semantics():
+    df = UserDF({"id": [1, 2, 3], "age": [10, None, 20]})
+    df2 = df.with_columns(age=df.age + 1)
+    assert df2.schema_fields()["age"] == Optional[int]
+    assert df2.collect() == {"id": [1, 2, 3], "age": [11, None, 21]}
+
+
+def test_dataframe_model_filter_preserves_schema_changes_rows_only():
+    df = UserDF({"id": [1, 2, 3], "age": [10, None, 30]})
+    before = df.schema_fields()
+    df2 = df.filter(df.age > 20)
+    after = df2.schema_fields()
+    assert before == after
+    assert df2.collect() == {"id": [3], "age": [30]}
+
+
+def test_dataframe_model_row_vs_column_input_transformation_parity():
+    row_df = UserDF([{"id": 1, "age": 10}, {"id": 2, "age": None}, {"id": 3, "age": 30}])
+    col_df = UserDF({"id": [1, 2, 3], "age": [10, None, 30]})
+
+    row_df2 = row_df.with_columns(age2=row_df.age + 1)
+    row_out = (
+        row_df2
+        .filter(row_df2.age2 > 20)
+        .select("id", "age2")
+        .collect()
+    )
+    col_df2 = col_df.with_columns(age2=col_df.age + 1)
+    col_out = (
+        col_df2
+        .filter(col_df2.age2 > 20)
+        .select("id", "age2")
+        .collect()
+    )
+    assert row_out == col_out == {"id": [3], "age2": [31]}
+

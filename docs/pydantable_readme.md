@@ -51,6 +51,11 @@ Phase 2 is complete for the expression system:
 - reflected arithmetic is supported (e.g. `2 + df.age`)
 - AST-build-time failures are enforced for invalid operator combinations
 
+Phase 3 is complete for basic transformations:
+- `select()`, `with_columns()`, and `filter()` behavior is locked
+- `with_columns()` replacement semantics are verified for collisions
+- schema migration and row-input/column-input parity are validated through tests
+
 ### Supported Expression Dtypes + Null Semantics (skeleton)
 Rust enforces expression typing (at AST-build time) and executes expressions
 with supported dtypes: `int`, `float`, `bool`, `str`.

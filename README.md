@@ -34,6 +34,7 @@ This release provides:
 - supports both input formats (columns and rows)
 - wraps `select()`, `with_columns()`, and `filter()`
 - has Phase 2 expression parity with `DataFrame[Schema]` (including reflected arithmetic like `2 + df.age`)
+- has Phase 3 transformation guarantees (schema migration, collision replacement, and input-format parity)
 
 `collect()` executes in the Rust core for the currently supported skeleton
 operations.
@@ -77,6 +78,11 @@ Phase 2 expression system status:
 - parity verified across `DataFrameModel` and lower-level `DataFrame[Schema]`
 - invalid combinations fail at AST-build time with typed errors
 - derived schema nullability/dtypes are validated through chained transforms
+
+Phase 3 transformation status:
+- `select()`, `with_columns()`, and `filter()` transformation contract is locked
+- `with_columns()` collision replacement semantics are verified
+- row-input and column-input transformation parity is validated
 
 Null semantics are SQL-like (`propagate_nulls`):
 - arithmetic: `NULL` + anything yields `NULL`

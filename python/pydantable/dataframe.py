@@ -176,6 +176,8 @@ class DataFrame(Generic[SchemaT]):
 
     def select(self, *cols: Union[str, ColumnRef]) -> "DataFrame[Any]":
         rust = _require_rust_core()
+        if not cols:
+            raise ValueError("select() requires at least one column.")
 
         selected: List[str] = []
         for col in cols:

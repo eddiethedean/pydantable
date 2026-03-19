@@ -179,6 +179,12 @@ In the current Rust-first design:
 This keeps FastAPI handlers predictable: many category errors are raised before
 query execution.
 
+Phase 3 (basic transformations) is complete:
+
+- `select()`, `with_columns()`, and `filter()` behavior is locked
+- `with_columns()` replacement semantics are deterministic for collisions
+- row-input and column-input transformation parity is validated
+
 ## Practical pattern for services
 
 For larger apps, a clean split is:
