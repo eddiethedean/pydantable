@@ -1,1 +1,0 @@
-from tinytim.validate import data_columns_same_len
