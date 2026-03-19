@@ -106,6 +106,7 @@ See:
 - `docs/FASTAPI.md` for full FastAPI integration examples
 - `docs/DATAFRAMEMODEL.md` for the `DataFrameModel` design spec
 - `docs/WHY_NOT_POLARS.md` for positioning and trade-offs vs Polars
+- `docs/DEVELOPER.md` for local setup and contribution workflow
 
 ## Project Roadmap
 
