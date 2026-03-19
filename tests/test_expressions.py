@@ -35,3 +35,13 @@ def test_columnref_is_typed():
     assert isinstance(age_col, ColumnRef)
     assert age_col.dtype is int
 
+
+def test_reflected_arithmetic_ops_supported():
+    df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
+    df2 = df.with_columns(a=2 + df.age, b=100 - df.age, c=3 * df.age, d=60 / df.age)
+    out = df2.collect()
+    assert out["a"] == [22, 32]
+    assert out["b"] == [80, 70]
+    assert out["c"] == [60, 90]
+    assert out["d"] == [3.0, 2.0]
+

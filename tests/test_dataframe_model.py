@@ -51,3 +51,18 @@ def test_dataframe_model_row_input_rejects_bad_item_type():
     with pytest.raises(TypeError, match="sequence of mapping objects"):
         UserDF([1, 2, 3])  # type: ignore[arg-type]
 
+
+def test_dataframe_model_parity_with_dataframe_core_expression_behavior():
+    # DataFrameModel should expose the same expression typing behavior.
+    df = UserDF({"id": [1, 2], "age": [20, 30]})
+    with pytest.raises(TypeError, match="requires numeric operands"):
+        _ = df.age + "x"
+
+
+def test_dataframe_model_chained_schema_migration_dtypes():
+    df = UserDF({"id": [1, 2, 3], "age": [20, None, 30]})
+    df2 = df.with_columns(age2=df.age + 1, flag=df.age > 21)
+    schema = df2.schema_fields()
+    assert schema["age2"] == Optional[int]
+    assert schema["flag"] == Optional[bool]
+

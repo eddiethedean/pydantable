@@ -34,7 +34,13 @@ Spec: `docs/DATAFRAMEMODEL.md`.
   - both column-input and row-input formats supported (row input normalized to columns)
   - `DataFrameModel` wrappers for `select()`, `with_columns()`, `filter()` added
   - tests added for input formats, normalization, and schema behavior
-- Phase 2+: pending
+- Phase 2: completed
+  - expression behavior parity verified between `DataFrameModel` and `DataFrame[Schema]`
+  - reflected arithmetic operator support added (`literal <op> column`)
+  - AST-build-time error timing verified for invalid expression combinations
+  - derived schema dtype/nullability propagation validated in chained transformations
+  - comprehensive expression and `DataFrameModel` parity tests expanded
+- Phase 3+: pending
 
 ## Phase 0: Repo Setup
 
@@ -70,11 +76,11 @@ Goals:
 - Expression typing drives derived schema migration
 
 Deliverables:
-- `Expr` class / AST for typed expression building
-- Column references and literals for query building
-- Arithmetic and comparison operators
-- Type inference rules (and nullability propagation)
-- Validation errors when expressions reference non-existent columns
+- [x] `Expr` class / AST for typed expression building
+- [x] Column references and literals for query building
+- [x] Arithmetic and comparison operators
+- [x] Type inference rules (and nullability propagation)
+- [x] Validation errors when expressions reference non-existent columns
 
 ## Phase 3: Basic Transformations
 
