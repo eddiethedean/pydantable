@@ -67,6 +67,12 @@ Phase 4 boundary contract:
 .venv/bin/maturin build --release
 ```
 
+### Run the Phase 5 execution baseline benchmark
+
+```bash
+.venv/bin/python benchmarks/phase5_collect_baseline.py
+```
+
 ### Build/install extension in editable flow
 
 Usually handled by `pip install -e .`. If you need a fresh wheel install:

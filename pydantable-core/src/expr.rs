@@ -5,6 +5,9 @@ use pyo3::types::{PyAny, PyDict, PyList, PyString};
 
 use crate::dtype::{py_value_to_dtype, BaseType, DTypeDesc};
 
+#[cfg(feature = "polars_engine")]
+use polars::prelude::{col, lit, Expr as PolarsExpr, Null};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ArithOp {
     Add,
@@ -501,6 +504,61 @@ impl ExprNode {
                 }
 
                 Ok(out)
+            }
+        }
+    }
+
+    #[cfg(feature = "polars_engine")]
+    pub fn to_polars_expr(&self) -> PyResult<PolarsExpr> {
+        match self {
+            ExprNode::ColumnRef { name, .. } => Ok(col(name)),
+            ExprNode::Literal { value, dtype } => match value {
+                Some(LiteralValue::Int(i)) => Ok(lit(*i)),
+                Some(LiteralValue::Float(f)) => Ok(lit(*f)),
+                Some(LiteralValue::Bool(b)) => Ok(lit(*b)),
+                Some(LiteralValue::Str(s)) => Ok(lit(s.clone())),
+                None => {
+                    let null_expr = lit(Null {});
+                    match dtype.base {
+                        Some(BaseType::Int) => Ok(null_expr.cast(polars::prelude::DataType::Int64)),
+                        Some(BaseType::Float) => {
+                            Ok(null_expr.cast(polars::prelude::DataType::Float64))
+                        }
+                        Some(BaseType::Bool) => {
+                            Ok(null_expr.cast(polars::prelude::DataType::Boolean))
+                        }
+                        Some(BaseType::Str) => {
+                            Ok(null_expr.cast(polars::prelude::DataType::String))
+                        }
+                        None => Ok(null_expr),
+                    }
+                }
+            },
+            ExprNode::BinaryOp {
+                op, left, right, ..
+            } => {
+                let l = left.to_polars_expr()?;
+                let r = right.to_polars_expr()?;
+                match op {
+                    ArithOp::Add => Ok(l + r),
+                    ArithOp::Sub => Ok(l - r),
+                    ArithOp::Mul => Ok(l * r),
+                    ArithOp::Div => Ok(l / r),
+                }
+            }
+            ExprNode::CompareOp {
+                op, left, right, ..
+            } => {
+                let l = left.to_polars_expr()?;
+                let r = right.to_polars_expr()?;
+                match op {
+                    CmpOp::Eq => Ok(l.eq(r)),
+                    CmpOp::Ne => Ok(l.neq(r)),
+                    CmpOp::Lt => Ok(l.lt(r)),
+                    CmpOp::Le => Ok(l.lt_eq(r)),
+                    CmpOp::Gt => Ok(l.gt(r)),
+                    CmpOp::Ge => Ok(l.gt_eq(r)),
+                }
             }
         }
     }

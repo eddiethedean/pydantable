@@ -52,7 +52,12 @@ Spec: `docs/DATAFRAMEMODEL.md`.
   - remaining `select()` arity validation moved into Rust logical-plan validation
   - Rust-originated transformation errors standardized and preserved through thin Python wrappers
   - Rust-side plan contract tests and Python metadata-flow integration tests added
-- Phase 5+: pending
+- Phase 5: completed (initial execution engine milestone)
+  - Rust Polars-backed `collect()` execution path wired for `select`, `with_columns`, and `filter`
+  - Python API boundary preserved for `DataFrameModel` and `DataFrame[Schema]`
+  - integration coverage added for input-format parity and derived-schema correctness
+  - baseline benchmark harness added for execution pipeline timing
+- Phase 6+: pending
 
 ## Phase 0: Repo Setup
 
@@ -130,10 +135,10 @@ Goals:
 - Execute queries via Rust Polars
 
 Deliverables:
-- LogicalPlan -> Rust Polars LazyFrame conversion
-- `collect()`
-- Integration tests and performance benchmarks
-- Correctness for both input formats and derived schema results
+- [x] LogicalPlan -> Rust Polars LazyFrame conversion
+- [x] `collect()`
+- [x] Integration tests and performance benchmarks
+- [x] Correctness for both input formats and derived schema results
 
 ## Phase 6: Advanced Operations
 

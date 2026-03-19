@@ -19,7 +19,7 @@ dependencies = [
 manifest-path = "pydantable-core/Cargo.toml"
 module-name = "pydantable._core"
 python-source = "python"
-features = ["pyo3/extension-module"]
+features = ["pyo3/extension-module", "polars_engine"]
 
 [tool.ruff]
 target-version = "py39"

@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 [features]
 # Keep the skeleton lightweight: Polars is only pulled in when explicitly
 # enabled later (e.g. when we implement the Rust logical plan execution).
-default = []
+default = ["polars_engine"]
 polars_engine = ["dep:polars"]
 
 [dependencies]

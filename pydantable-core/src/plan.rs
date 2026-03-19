@@ -6,6 +6,11 @@ use pyo3::types::{PyAny, PyDict, PyList};
 use crate::dtype::{dtype_to_descriptor_py, dtype_to_python_type, DTypeDesc};
 use crate::expr::{ExprNode, LiteralValue};
 
+#[cfg(feature = "polars_engine")]
+use polars::prelude::{
+    col, DataFrame, DataType, IntoLazy, LazyFrame, NamedFrom, NewChunkedArray, PolarsError, Series,
+};
+
 #[derive(Clone, Debug)]
 pub enum PlanStep {
     Select { columns: Vec<String> },
@@ -221,6 +226,23 @@ pub fn plan_filter(plan: &PlanInner, condition: ExprNode) -> PyResult<PlanInner>
 }
 
 pub fn execute_plan(py: Python<'_>, plan: &PlanInner, root_data: &Bound<'_, PyAny>) -> PyResult<PyObject> {
+    #[cfg(feature = "polars_engine")]
+    {
+        return execute_plan_polars(py, plan, root_data);
+    }
+
+    #[cfg(not(feature = "polars_engine"))]
+    {
+        execute_plan_rowwise(py, plan, root_data)
+    }
+}
+
+#[cfg(not(feature = "polars_engine"))]
+fn execute_plan_rowwise(
+    py: Python<'_>,
+    plan: &PlanInner,
+    root_data: &Bound<'_, PyAny>,
+) -> PyResult<PyObject> {
     let mut ctx = root_data_to_ctx(py, &plan.root_schema, root_data)?;
     let mut n = ctx_len(&ctx)?;
 
@@ -272,6 +294,185 @@ pub fn execute_plan(py: Python<'_>, plan: &PlanInner, root_data: &Bound<'_, PyAn
         out_dict.set_item(name, py_list)?;
     }
 
+    Ok(out_dict.into_py(py))
+}
+
+#[cfg(feature = "polars_engine")]
+fn polars_err(e: PolarsError) -> PyErr {
+    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Polars execution error: {e}"))
+}
+
+#[cfg(feature = "polars_engine")]
+fn root_data_to_polars_df(
+    root_schema: &HashMap<String, DTypeDesc>,
+    root_data: &Bound<'_, PyAny>,
+) -> PyResult<DataFrame> {
+    let dict: &Bound<'_, PyDict> = root_data.downcast()?;
+
+    let mut series_list: Vec<Series> = Vec::new();
+    for (name, dtype) in root_schema.iter() {
+        let values_any = dict.get_item(name)?.ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "Root data missing required column '{}'.",
+                name
+            ))
+        })?;
+        let list: &Bound<'_, PyList> = values_any.downcast()?;
+
+        let s = match dtype.base {
+            Some(crate::dtype::BaseType::Int) => {
+                let mut v: Vec<Option<i64>> = Vec::with_capacity(list.len());
+                for item in list.iter() {
+                    if item.is_none() {
+                        v.push(None);
+                    } else {
+                        v.push(Some(item.extract::<i64>()?));
+                    }
+                }
+                Series::new(name.as_str().into(), v)
+            }
+            Some(crate::dtype::BaseType::Float) => {
+                let mut v: Vec<Option<f64>> = Vec::with_capacity(list.len());
+                for item in list.iter() {
+                    if item.is_none() {
+                        v.push(None);
+                    } else {
+                        v.push(Some(item.extract::<f64>()?));
+                    }
+                }
+                Series::new(name.as_str().into(), v)
+            }
+            Some(crate::dtype::BaseType::Bool) => {
+                let mut v: Vec<Option<bool>> = Vec::with_capacity(list.len());
+                for item in list.iter() {
+                    if item.is_none() {
+                        v.push(None);
+                    } else {
+                        v.push(Some(item.extract::<bool>()?));
+                    }
+                }
+                Series::new(name.as_str().into(), v)
+            }
+            Some(crate::dtype::BaseType::Str) => {
+                let mut v: Vec<Option<String>> = Vec::with_capacity(list.len());
+                for item in list.iter() {
+                    if item.is_none() {
+                        v.push(None);
+                    } else {
+                        v.push(Some(item.extract::<String>()?));
+                    }
+                }
+                Series::new(name.as_str().into(), v)
+            }
+            None => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Root schema cannot have unknown-base dtype.",
+                ))
+            }
+        };
+        series_list.push(s);
+    }
+
+    DataFrame::new(series_list.into_iter().map(Into::into).collect()).map_err(polars_err)
+}
+
+#[cfg(feature = "polars_engine")]
+fn apply_steps_to_lazy(mut lf: LazyFrame, steps: &[PlanStep]) -> PyResult<LazyFrame> {
+    for step in steps.iter() {
+        match step {
+            PlanStep::Select { columns } => {
+                let exprs = columns.iter().map(|name| col(name)).collect::<Vec<_>>();
+                lf = lf.select(exprs);
+            }
+            PlanStep::WithColumns { columns } => {
+                let mut exprs = Vec::with_capacity(columns.len());
+                for (name, expr) in columns.iter() {
+                    let pe = expr.to_polars_expr()?.alias(name);
+                    exprs.push(pe);
+                }
+                lf = lf.with_columns(exprs);
+            }
+            PlanStep::Filter { condition } => {
+                // SQL-like null semantics for filter: keep exactly True; drop False/NULL.
+                let cond = condition
+                    .to_polars_expr()?
+                    .fill_null(polars::prelude::lit(false));
+                lf = lf.filter(cond);
+            }
+        }
+    }
+    Ok(lf)
+}
+
+#[cfg(feature = "polars_engine")]
+fn series_to_py_list(
+    py: Python<'_>,
+    series: &Series,
+    dtype: DTypeDesc,
+) -> PyResult<PyObject> {
+    let mut values: Vec<PyObject> = Vec::with_capacity(series.len());
+    match dtype.base {
+        Some(crate::dtype::BaseType::Int) => {
+            let casted = series.cast(&DataType::Int64).map_err(polars_err)?;
+            for item in casted.i64().map_err(polars_err)?.into_iter() {
+                match item {
+                    Some(v) => values.push(v.into_py(py)),
+                    None => values.push(py.None()),
+                }
+            }
+        }
+        Some(crate::dtype::BaseType::Float) => {
+            let casted = series.cast(&DataType::Float64).map_err(polars_err)?;
+            for item in casted.f64().map_err(polars_err)?.into_iter() {
+                match item {
+                    Some(v) => values.push(v.into_py(py)),
+                    None => values.push(py.None()),
+                }
+            }
+        }
+        Some(crate::dtype::BaseType::Bool) => {
+            let casted = series.cast(&DataType::Boolean).map_err(polars_err)?;
+            for item in casted.bool().map_err(polars_err)?.into_iter() {
+                match item {
+                    Some(v) => values.push(v.into_py(py)),
+                    None => values.push(py.None()),
+                }
+            }
+        }
+        Some(crate::dtype::BaseType::Str) => {
+            let casted = series.cast(&DataType::String).map_err(polars_err)?;
+            for item in casted.str().map_err(polars_err)?.into_iter() {
+                match item {
+                    Some(v) => values.push(v.into_py(py)),
+                    None => values.push(py.None()),
+                }
+            }
+        }
+        None => {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Output schema cannot have unknown-base dtype.",
+            ))
+        }
+    }
+    Ok(PyList::new_bound(py, values).into_py(py))
+}
+
+#[cfg(feature = "polars_engine")]
+fn execute_plan_polars(py: Python<'_>, plan: &PlanInner, root_data: &Bound<'_, PyAny>) -> PyResult<PyObject> {
+    let df = root_data_to_polars_df(&plan.root_schema, root_data)?;
+    let lf = apply_steps_to_lazy(df.lazy(), &plan.steps)?;
+    let out_df = lf.collect().map_err(polars_err)?;
+
+    let out_dict = PyDict::new_bound(py);
+    for (name, dtype) in plan.schema.iter() {
+        let col = out_df
+            .column(name)
+            .map_err(polars_err)?
+            .as_materialized_series()
+            .clone();
+        let py_list = series_to_py_list(py, &col, *dtype)?;
+        out_dict.set_item(name, py_list)?;
+    }
     Ok(out_dict.into_py(py))
 }
 

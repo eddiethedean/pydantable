@@ -90,6 +90,11 @@ Phase 4 logical-plan status:
 - Python derived schema migration consumes Rust metadata descriptors (`base`, `nullable`)
 - plan/schema contract is validated with Rust-side and Python integration tests
 
+Phase 5 execution-engine status:
+- `collect()` now executes through Rust Polars LazyFrame lowering for `select`, `with_columns`, and `filter`
+- `DataFrameModel` and `DataFrame[Schema]` API behavior is preserved at the Python boundary
+- integration parity tests and a baseline benchmark harness are included
+
 Null semantics are SQL-like (`propagate_nulls`):
 - arithmetic: `NULL` + anything yields `NULL`
 - comparisons: if either side is `NULL`, the result is `NULL` (typed as `Optional[bool]`)
