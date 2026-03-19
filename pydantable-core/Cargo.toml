@@ -1,0 +1,13 @@
+[package]
+name = "pydantable-core"
+version = "0.4.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "pydantable_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.23.4", features = ["extension-module"] }
+

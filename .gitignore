@@ -1,12 +1,41 @@
-notebooks/
-data/
-pydantable.egg-info/
-pydantable/__pycache__/
-dist/
-build/
-.vscode/
-.ipynb_checkpoints/
+# Python
 __pycache__/
-tests/__pycache__/
+*.py[cod]
+*.so
+*.pyd
+*.dll
+*.dylib
+.Python
+venv/
+.venv/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Rust
+/target/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
 .DS_Store
-.venv
+
+# Secrets & misc
+.env
+.env.*
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.benchmarks/
+*.whl
+*.egg
+.cache/
+/.cache/
+
