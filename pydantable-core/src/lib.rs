@@ -12,6 +12,7 @@ use crate::plan::{
     plan_filter as plan_filter_inner,
     plan_select as plan_select_inner,
     plan_with_columns as plan_with_columns_inner,
+    schema_descriptors_as_py,
     schema_fields_as_py,
     PlanInner,
 };
@@ -45,6 +46,10 @@ pub struct PyPlan {
 impl PyPlan {
     fn schema_fields(&self, py: Python<'_>) -> PyResult<PyObject> {
         schema_fields_as_py(py, &self.inner.schema)
+    }
+
+    fn schema_descriptors(&self, py: Python<'_>) -> PyResult<PyObject> {
+        schema_descriptors_as_py(py, &self.inner.schema)
     }
 
     fn execute(&self, py: Python<'_>, root_data: &Bound<'_, PyAny>) -> PyResult<PyObject> {

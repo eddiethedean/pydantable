@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Mapping, Type
+from typing import Any, Dict, Mapping, Optional, Type
 
 from pydantic import BaseModel, ConfigDict, TypeAdapter, create_model
 
@@ -92,4 +92,36 @@ def make_derived_schema_type(
         **{name: (t, ...) for name, t in field_types.items()},
     )
     return derived
+
+
+def dtype_descriptor_to_annotation(descriptor: Mapping[str, Any]) -> Any:
+    """
+    Convert a Rust dtype descriptor into a Python type annotation.
+
+    Descriptor format:
+    - {"base": "int" | "float" | "bool" | "str", "nullable": bool}
+    """
+    base = descriptor.get("base")
+    nullable = bool(descriptor.get("nullable", False))
+
+    base_map: Dict[str, Any] = {
+        "int": int,
+        "float": float,
+        "bool": bool,
+        "str": str,
+    }
+    if base not in base_map:
+        raise TypeError(f"Unsupported Rust dtype descriptor base: {base!r}")
+
+    py_t = base_map[base]
+    if nullable:
+        return Optional[py_t]
+    return py_t
+
+
+def schema_from_descriptors(descriptors: Mapping[str, Mapping[str, Any]]) -> Dict[str, Any]:
+    """
+    Convert rust plan schema descriptors into field annotations map.
+    """
+    return {name: dtype_descriptor_to_annotation(d) for name, d in descriptors.items()}
 

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
 
-use crate::dtype::{dtype_to_python_type, DTypeDesc};
+use crate::dtype::{dtype_to_descriptor_py, dtype_to_python_type, DTypeDesc};
 use crate::expr::{ExprNode, LiteralValue};
 
 #[derive(Clone, Debug)]
@@ -43,6 +43,18 @@ pub fn schema_fields_as_py(py: Python<'_>, schema: &HashMap<String, DTypeDesc>) 
     for (name, dtype) in schema.iter() {
         let t = dtype_to_python_type(py, *dtype)?;
         dict.set_item(name, t)?;
+    }
+    Ok(dict.into_py(py))
+}
+
+pub fn schema_descriptors_as_py(
+    py: Python<'_>,
+    schema: &HashMap<String, DTypeDesc>,
+) -> PyResult<PyObject> {
+    let dict = pyo3::types::PyDict::new_bound(py);
+    for (name, dtype) in schema.iter() {
+        let d = dtype_to_descriptor_py(py, *dtype)?;
+        dict.set_item(name, d)?;
     }
     Ok(dict.into_py(py))
 }
@@ -96,6 +108,12 @@ pub fn root_data_to_ctx(
 }
 
 pub fn plan_select(plan: &PlanInner, columns: Vec<String>) -> PyResult<PlanInner> {
+    if columns.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "select() requires at least one column.",
+        ));
+    }
+
     for c in columns.iter() {
         if !plan.schema.contains_key(c) {
             return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
@@ -255,5 +273,41 @@ pub fn execute_plan(py: Python<'_>, plan: &PlanInner, root_data: &Bound<'_, PyAn
     }
 
     Ok(out_dict.into_py(py))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dtype::{BaseType, DTypeDesc};
+
+    #[test]
+    fn plan_select_rejects_empty_projection() {
+        let mut schema = HashMap::new();
+        schema.insert("id".to_string(), DTypeDesc::non_nullable(BaseType::Int));
+        let plan = make_plan(schema);
+        let err = plan_select(&plan, Vec::new()).unwrap_err();
+        assert!(err.to_string().contains("requires at least one column"));
+    }
+
+    #[test]
+    fn schema_descriptors_encode_base_and_nullable() {
+        Python::with_gil(|py| {
+            let mut schema = HashMap::new();
+            schema.insert("id".to_string(), DTypeDesc::non_nullable(BaseType::Int));
+            schema.insert("age".to_string(), DTypeDesc::nullable(BaseType::Int));
+            let obj = schema_descriptors_as_py(py, &schema).unwrap();
+            let dict = obj.bind(py).downcast::<PyDict>().unwrap();
+
+            let id = dict.get_item("id").unwrap().unwrap();
+            let age = dict.get_item("age").unwrap().unwrap();
+            assert_eq!(id.get_item("base").unwrap().extract::<String>().unwrap(), "int");
+            assert!(!id.get_item("nullable").unwrap().extract::<bool>().unwrap());
+            assert_eq!(
+                age.get_item("base").unwrap().extract::<String>().unwrap(),
+                "int"
+            );
+            assert!(age.get_item("nullable").unwrap().extract::<bool>().unwrap());
+        });
+    }
 }
 

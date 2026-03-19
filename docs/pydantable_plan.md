@@ -34,12 +34,13 @@ Python API → Typed AST → Rust Planner → Rust Polars Engine
 ### Phase 3 (completed)
 
 -   Rust integration (PyO3)
--   Logical plan validation and schema migration metadata
+-   Transformation contract lock (`select`, `with_columns`, `filter`)
 
-### Phase 4 (completed skeleton)
+### Phase 4 (completed)
 
--   Rust execution path for current skeleton operations
--   Polars backend integration remains roadmap work for broader coverage
+-   Rust-owned logical-plan validation contract hardening
+-   Python<->Rust schema metadata boundary standardized via descriptors (`base`, `nullable`)
+-   Rust unit tests + Python integration tests for metadata flow
 
 ### Phase 5 (next)
 

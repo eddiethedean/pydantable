@@ -67,6 +67,17 @@ def test_dataframe_model_chained_schema_migration_dtypes():
     assert schema["flag"] == Optional[bool]
 
 
+def test_rust_schema_descriptors_flow_into_derived_model_types():
+    df = UserDF({"id": [1, 2], "age": [20, None]})
+    df2 = df.with_columns(age2=df.age + 1, flag=df.age > 10)
+    # Validate descriptor contract from rust and python mapping.
+    desc = df2._df._rust_plan.schema_descriptors()
+    assert desc["age2"] == {"base": "int", "nullable": True}
+    assert desc["flag"] == {"base": "bool", "nullable": True}
+    assert df2.schema_fields()["age2"] == Optional[int]
+    assert df2.schema_fields()["flag"] == Optional[bool]
+
+
 def test_dataframe_model_with_columns_collision_replacement_semantics():
     df = UserDF({"id": [1, 2, 3], "age": [10, None, 20]})
     df2 = df.with_columns(age=df.age + 1)

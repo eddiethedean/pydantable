@@ -6,7 +6,12 @@ from typing import Any, Dict, Generic, Iterable, List, Mapping, Optional, Sequen
 from pydantic import BaseModel
 
 from .expressions import ColumnRef, Expr, Literal
-from .schema import make_derived_schema_type, schema_field_types, validate_columns_strict
+from .schema import (
+    make_derived_schema_type,
+    schema_field_types,
+    schema_from_descriptors,
+    validate_columns_strict,
+)
 
 
 def _load_rust_core() -> Any:
@@ -162,7 +167,7 @@ class DataFrame(Generic[SchemaT]):
                 rust_columns[name] = rust.make_literal(value=value)
 
         rust_plan = rust.plan_with_columns(self._rust_plan, rust_columns)
-        derived_fields = rust_plan.schema_fields()
+        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
@@ -176,9 +181,6 @@ class DataFrame(Generic[SchemaT]):
 
     def select(self, *cols: Union[str, ColumnRef]) -> "DataFrame[Any]":
         rust = _require_rust_core()
-        if not cols:
-            raise ValueError("select() requires at least one column.")
-
         selected: List[str] = []
         for col in cols:
             if isinstance(col, str):
@@ -194,7 +196,7 @@ class DataFrame(Generic[SchemaT]):
                 raise TypeError("select() accepts column names or ColumnRef objects.")
 
         rust_plan = rust.plan_select(self._rust_plan, selected)
-        derived_fields = rust_plan.schema_fields()
+        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )

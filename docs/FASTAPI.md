@@ -175,6 +175,8 @@ In the current Rust-first design:
 - invalid expression type combinations fail when building the expression AST
   (during operator overloads)
 - invalid `filter()` condition types fail before execution
+- invalid `select()` projections (for example, empty projections) fail from Rust
+  logical-plan validation before execution
 
 This keeps FastAPI handlers predictable: many category errors are raised before
 query execution.
@@ -184,6 +186,12 @@ Phase 3 (basic transformations) is complete:
 - `select()`, `with_columns()`, and `filter()` behavior is locked
 - `with_columns()` replacement semantics are deterministic for collisions
 - row-input and column-input transformation parity is validated
+
+Phase 4 (logical-plan boundary hardening) is complete:
+
+- Rust is authoritative for plan validation and migration metadata
+- Python derives output model annotations from Rust schema descriptors
+- behavior compatibility is preserved for existing FastAPI transformation flows
 
 ## Practical pattern for services
 

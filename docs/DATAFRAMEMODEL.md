@@ -137,6 +137,13 @@ Error timing expectations:
 In the current Rust-first skeleton, these checks are enforced in the Rust
 core (PyO3) during AST construction, before any execution happens.
 
+Phase 4 contract note:
+
+- logical-plan validation ownership remains on Rust for transformation-time checks
+- schema migration metadata crossing Python/Rust uses an explicit descriptor
+  contract (`{"base": "...", "nullable": ...}`) before Python rebuilds
+  annotations for derived `DataFrameModel` types
+
 In practice, a `DataFrameModel` instance (and/or its generated `RowModel`)
 exposes typed column references while still avoiding the "row vs dataframe
 attribute" confusion.
@@ -190,6 +197,8 @@ In the current repository skeleton:
   migrated schema
 - basic transformation guarantees are locked for MVP (`select`, `with_columns`,
   `filter`, collision replacement, and input-format parity)
+- schema migration boundary now consumes Rust schema descriptors for derived
+  type reconstruction (Phase 4)
 
 ## Roadmap implications
 

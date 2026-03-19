@@ -46,7 +46,13 @@ Spec: `docs/DATAFRAMEMODEL.md`.
   - derived schema migration guarantees validated through chained transforms
   - row-input vs column-input transformation parity coverage added
   - MVP test matrix completed for Phase 3 transformation guarantees
-- Phase 4+: pending
+- Phase 4: completed
+  - Rust schema metadata contract locked with explicit descriptor format (`base`, `nullable`)
+  - Python derived-schema construction now consumes Rust descriptors at the boundary
+  - remaining `select()` arity validation moved into Rust logical-plan validation
+  - Rust-originated transformation errors standardized and preserved through thin Python wrappers
+  - Rust-side plan contract tests and Python metadata-flow integration tests added
+- Phase 5+: pending
 
 ## Phase 0: Repo Setup
 
@@ -114,9 +120,9 @@ Goals:
 - Keep schema migration metadata aligned with Python-visible `DataFrameModel` types
 
 Deliverables:
-- Rust `Schema` / `Expr` / `LogicalPlan` representation
-- Python -> Rust plan conversion with schema/migration metadata
-- Rust unit tests
+- [x] Rust `Schema` / `Expr` / `LogicalPlan` representation
+- [x] Python -> Rust plan conversion with schema/migration metadata
+- [x] Rust unit tests
 
 ## Phase 5: Execution Engine
 

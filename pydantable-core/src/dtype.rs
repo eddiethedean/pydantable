@@ -185,3 +185,17 @@ pub fn dtype_to_python_type(py: Python<'_>, dtype: DTypeDesc) -> PyResult<PyObje
     }
 }
 
+pub fn dtype_to_descriptor_py(py: Python<'_>, dtype: DTypeDesc) -> PyResult<PyObject> {
+    let dict = pyo3::types::PyDict::new_bound(py);
+    let base = match dtype.base {
+        Some(BaseType::Int) => "int",
+        Some(BaseType::Float) => "float",
+        Some(BaseType::Bool) => "bool",
+        Some(BaseType::Str) => "str",
+        None => "unknown",
+    };
+    dict.set_item("base", base)?;
+    dict.set_item("nullable", dtype.nullable)?;
+    Ok(dict.into_py(py))
+}
+

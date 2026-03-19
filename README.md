@@ -35,6 +35,7 @@ This release provides:
 - wraps `select()`, `with_columns()`, and `filter()`
 - has Phase 2 expression parity with `DataFrame[Schema]` (including reflected arithmetic like `2 + df.age`)
 - has Phase 3 transformation guarantees (schema migration, collision replacement, and input-format parity)
+- has Phase 4 logical-plan boundary guarantees (Rust-owned plan validation + schema metadata contract)
 
 `collect()` executes in the Rust core for the currently supported skeleton
 operations.
@@ -83,6 +84,11 @@ Phase 3 transformation status:
 - `select()`, `with_columns()`, and `filter()` transformation contract is locked
 - `with_columns()` collision replacement semantics are verified
 - row-input and column-input transformation parity is validated
+
+Phase 4 logical-plan status:
+- Rust is the source of truth for remaining transformation-time validation (`select` projection arity included)
+- Python derived schema migration consumes Rust metadata descriptors (`base`, `nullable`)
+- plan/schema contract is validated with Rust-side and Python integration tests
 
 Null semantics are SQL-like (`propagate_nulls`):
 - arithmetic: `NULL` + anything yields `NULL`

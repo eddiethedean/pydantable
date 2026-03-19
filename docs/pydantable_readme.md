@@ -56,6 +56,11 @@ Phase 3 is complete for basic transformations:
 - `with_columns()` replacement semantics are verified for collisions
 - schema migration and row-input/column-input parity are validated through tests
 
+Phase 4 is complete for logical-plan boundary hardening:
+- Rust now owns the remaining transformation-time validation contract
+- Python schema migration consumes Rust schema descriptors (`base`, `nullable`)
+- Rust-side plan tests and Python metadata-flow integration tests are in place
+
 ### Supported Expression Dtypes + Null Semantics (skeleton)
 Rust enforces expression typing (at AST-build time) and executes expressions
 with supported dtypes: `int`, `float`, `bool`, `str`.
