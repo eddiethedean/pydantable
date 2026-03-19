@@ -1,11 +1,12 @@
 # DataFrameModel (SQLModel-like)
 
-This doc describes the intended *public* API direction for `pydantable`: a `DataFrameModel`
-class that represents the **whole DataFrame** while exposing a **per-row Pydantic model**
+This doc describes the `DataFrameModel` public API for `pydantable`: a container
+that represents the **whole DataFrame** while exposing a **per-row Pydantic model**
 for FastAPI integration and row-level validation.
 
-The goal is to keep the query-building/typing story (`select`, `with_columns`, `filter`)
-while making DataFrames feel native in typical Pydantic/FastAPI workflows.
+The goal is to keep the query-building/typing story (`select`, `with_columns`,
+`filter`) while making DataFrames feel native in typical Pydantic/FastAPI
+workflows.
 
 ## Terms
 
@@ -27,9 +28,9 @@ class UserDF(DataFrameModel):
     age: int
 ```
 
-From this definition, `DataFrameModel` generates (conceptually):
+From this definition, `DataFrameModel` generates:
 - `UserDF.RowModel`: a Pydantic model for a single row
-- the typed expression “column objects” used by query building
+- a schema-backed typed dataframe wrapper used for query building and execution
 
 ## Input formats (both supported)
 
@@ -55,12 +56,13 @@ df2 = UserDF([
 
 This format is ideal for REST/JSON APIs and works naturally with FastAPI.
 
-### Implementation note
+### Current implementation note
 
-Internally, row-format inputs should be transposed into a column dictionary before building
-the logical plan (and before storing the “current schema”).
+Internally, row-format inputs are transposed into a column dictionary before
+building the logical plan (and before storing the current schema).
 
-Row validation should use the generated `RowModel` so that errors point to concrete row fields.
+Row validation uses the generated `RowModel` so errors point to concrete row
+fields.
 
 ## Transformations always return new models
 
@@ -133,8 +135,9 @@ Error timing expectations:
 In the current Rust-first skeleton, these checks are enforced in the Rust
 core (PyO3) during AST construction, before any execution happens.
 
-In practice, a DataFrameModel instance (and/or its generated `RowModel`) should expose
-typed column references, while still avoiding the “row vs dataframe attribute” confusion.
+In practice, a `DataFrameModel` instance (and/or its generated `RowModel`)
+exposes typed column references while still avoiding the "row vs dataframe
+attribute" confusion.
 
 ## FastAPI integration
 
@@ -173,16 +176,16 @@ should be able to produce:
 
 This is the “bridge” between columnar execution and Pydantic row semantics.
 
-## How this maps to the current skeleton
+## Current skeleton status
 
-In the existing repository skeleton, you currently build typed dataframes via:
+In the current repository skeleton:
 
-- `DataFrame[SchemaType]`
-
-The `DataFrameModel` interface is expected to be a thin public wrapper over that concept:
-- `DataFrameModel` subclasses define the schema annotations
+- `DataFrameModel` is available as the primary FastAPI-facing API
+- `DataFrame[SchemaType]` remains available as the lower-level API
+- `DataFrameModel` subclasses define schema annotations
 - a per-row `RowModel` is generated
-- transformation methods return new `DataFrameModel` subclasses with derived schema
+- transformation methods return derived `DataFrameModel` subclasses with
+  migrated schema
 
 ## Roadmap implications
 

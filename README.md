@@ -1,22 +1,38 @@
 # Pydantable
 
-**Strongly-typed DataFrames for Python, powered by Rust.**
+**The dataframe layer built for FastAPI + Pydantic services.**
 
-Pydantable combines Pydantic schemas with a query engine so DataFrame operations
-can be validated and typed end-to-end.
+Pydantable gives you typed dataframe transformations with Rust execution, while
+keeping your Pydantic models as the source of truth for API contracts and
+validation.
+
+## Why Pydantable
+
+- **FastAPI-native contracts**: Use Pydantic schemas to define request/response types and dataframe shape in one place.
+- **Safer transformations**: Column typing, nullability, and expression errors are checked early (at AST build time).
+- **Performance-ready core**: Execute plans in Rust without giving up Python ergonomics.
+
+## Best Fit
+
+Pydantable is ideal for teams building FastAPI backends that need:
+
+- typed data pipelines between API boundaries and business logic
+- schema-safe transformations that evolve cleanly over time
+- high performance execution with a Python-first developer experience
 
 ## Status (v0.4.0 skeleton)
 
 This release provides:
-- Typed DataFrames core (`DataFrame[Schema]`) with runtime schema enforcement (low-level API)
+- `DataFrameModel` as the primary FastAPI-facing API
+- Typed DataFrames core (`DataFrame[Schema]`) as the lower-level API
 - A typed expression AST with operator overloads (`df.age * 2`, `df.age > 10`, ...)
 - `select()`, `with_columns()`, `filter()`, and `collect()` execution
 
-Public API direction (next step): `DataFrameModel` as a SQLModel-like wrapper that:
+`DataFrameModel` currently:
 - represents the whole DataFrame
 - generates a per-row Pydantic model for FastAPI
 - supports both input formats (columns and rows)
-- returns new model types for every transformation (schema migration)
+- wraps `select()`, `with_columns()`, and `filter()`
 
 `collect()` executes in the Rust core for the currently supported skeleton
 operations.
@@ -36,13 +52,13 @@ typing and `collect()`.
 ## Quick start
 
 ```python
-from pydantable import DataFrame, Schema
+from pydantable import DataFrameModel
 
-class User(Schema):
+class User(DataFrameModel):
     id: int
     age: int
 
-df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
+df = User({"id": [1, 2], "age": [20, 30]})
 
 df2 = df.with_columns(age2=df.age * 2)
 df3 = df2.select("id", "age2")
@@ -68,7 +84,10 @@ values stay aligned.
 - DataFrame input accepts `None` values for `Optional[T]`
 - derived schemas produced by `select()` / `with_columns()` / `filter()` propagate nullability through expression result types
 
-See the `DataFrameModel` design spec: `docs/DATAFRAMEMODEL.md`.
+See:
+- `docs/FASTAPI.md` for full FastAPI integration examples
+- `docs/DATAFRAMEMODEL.md` for the `DataFrameModel` design spec
+- `docs/WHY_NOT_POLARS.md` for positioning and trade-offs vs Polars
 
 ## Project Roadmap
 

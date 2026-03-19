@@ -18,28 +18,30 @@ Python API → Typed AST → Rust Planner → Rust Polars Engine
 
 ## Phases
 
-### Phase 1 (MVP)
+### Phase 1 (completed)
 
--   Schema definition (Pydantic + native)
--   DataFrame\[Schema\]
--   select, filter, with_columns
+-   `DataFrameModel` base abstraction
+-   per-row `RowModel` generation
+-   dual input formats (column dict + row list) with normalization
+-   wrappers for `select`, `filter`, `with_columns`
+-   `DataFrame[Schema]` retained as lower-level API
 
-### Phase 2
+### Phase 2 (completed)
 
--   Expression typing system
+-   Rust-backed expression typing/AST build-time validation
 -   Nullability tracking + `propagate_nulls` semantics
 
-### Phase 3
+### Phase 3 (completed)
 
 -   Rust integration (PyO3)
--   Logical plan validation
+-   Logical plan validation and schema migration metadata
 
-### Phase 4
+### Phase 4 (completed skeleton)
 
--   Rust Polars backend execution
--   Lazy execution
+-   Rust execution path for current skeleton operations
+-   Polars backend integration remains roadmap work for broader coverage
 
-### Phase 5
+### Phase 5 (next)
 
 -   Advanced ops (join, groupby)
 -   Performance optimization

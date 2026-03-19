@@ -1,13 +1,13 @@
 # Pydantable
 
-**Strongly-typed DataFrames for Python, powered by Rust.**
+**The dataframe layer built for FastAPI + Pydantic services.**
 
 Pydantable enforces schemas and tracks types through transformations, with a
 SQLModel-like developer experience that integrates cleanly with FastAPI.
 
 ## Public API Direction
 
-The intended user-facing interface is `DataFrameModel`, a class that:
+The current primary FastAPI-facing API is `DataFrameModel`, a class that:
 
 - represents the *whole DataFrame*
 - generates a per-row Pydantic `RowModel` for request/response typing
@@ -17,18 +17,21 @@ The intended user-facing interface is `DataFrameModel`, a class that:
 - returns a new model type for every transformation (schema migration)
 - uses replacement semantics for `with_columns` name collisions
 
-Full spec: `docs/DATAFRAMEMODEL.md`.
+See:
+- `docs/DATAFRAMEMODEL.md` for the DataFrameModel contract
+- `docs/FASTAPI.md` for end-to-end FastAPI examples
+- `docs/WHY_NOT_POLARS.md` for positioning vs Polars
 
-## Example (current API)
+## Example (current primary FastAPI-facing API)
 
 ```python
-from pydantable import DataFrame, Schema
+from pydantable import DataFrameModel
 
-class User(Schema):
+class User(DataFrameModel):
     id: int
     age: int
 
-df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
+df = User({"id": [1, 2], "age": [20, 30]})
 df2 = df.with_columns(age2=df.age * 2)
 df3 = df2.select("id", "age2")
 df4 = df3.filter(df3.age2 > 40)
@@ -39,9 +42,9 @@ print(result)  # {"id": [2], "age2": [60]}
 
 ## Current Repository Status
 
-In the `0.4.0` skeleton, the implementation you can run today is the lower-level
-API: `DataFrame[Schema]` + typed expressions. `DataFrameModel` is the next DX layer
-on top of that.
+In the `0.4.0` skeleton, `DataFrameModel` is available as the primary
+FastAPI-facing API, backed by the same typed expression and Rust execution core
+as the lower-level `DataFrame[Schema]` API.
 
 ### Supported Expression Dtypes + Null Semantics (skeleton)
 Rust enforces expression typing (at AST-build time) and executes expressions

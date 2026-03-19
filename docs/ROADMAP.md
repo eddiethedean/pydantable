@@ -25,6 +25,17 @@ Spec: `docs/DATAFRAMEMODEL.md`.
 - Beta: end of Phase 6
 - v1.0.0: end of Phase 7
 
+## Progress Snapshot (current)
+
+- Phase 0: completed
+- Phase 1: completed
+  - `DataFrameModel` base class added
+  - generated per-row `RowModel` added
+  - both column-input and row-input formats supported (row input normalized to columns)
+  - `DataFrameModel` wrappers for `select()`, `with_columns()`, `filter()` added
+  - tests added for input formats, normalization, and schema behavior
+- Phase 2+: pending
+
 ## Phase 0: Repo Setup
 
 Goals:
@@ -43,12 +54,13 @@ Goals:
 - Provide the `DataFrameModel` container abstraction
 
 Deliverables:
-- `Schema` base class and strict runtime schema validation logic
-- `DataFrameModel`:
-  - generates a per-row Pydantic `RowModel`
-  - accepts both row-input and column-input formats
-  - normalizes input internally into column form
-- `DataFrameModel` is the primary user entrypoint (FastAPI-friendly)
+- [x] `Schema` base class and strict runtime schema validation logic
+- [x] `DataFrameModel`:
+  - [x] generates a per-row Pydantic `RowModel`
+  - [x] accepts both row-input and column-input formats
+  - [x] normalizes input internally into column form
+- [x] `DataFrameModel` wrapper supports `select()`, `with_columns()`, `filter()`
+- [x] `DataFrameModel` is the primary user entrypoint (FastAPI-friendly)
 
 ## Phase 2: Expression System
 
