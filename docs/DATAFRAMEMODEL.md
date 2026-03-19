@@ -104,6 +104,8 @@ The expression system must:
 - validate that referenced columns exist in the *current* schema
 - infer result dtypes (for `with_columns`)
 - propagate the new schema into the *returned* DataFrameModel type
+- keep parity with the lower-level `DataFrame[Schema]` expression behavior
+  (including reflected arithmetic such as `2 + df.age`)
 
 ## Typed Dtypes + Null Semantics (skeleton contract)
 

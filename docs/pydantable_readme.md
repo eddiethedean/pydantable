@@ -46,6 +46,11 @@ In the `0.4.0` skeleton, `DataFrameModel` is available as the primary
 FastAPI-facing API, backed by the same typed expression and Rust execution core
 as the lower-level `DataFrame[Schema]` API.
 
+Phase 2 is complete for the expression system:
+- expression behavior parity is validated between `DataFrameModel` and `DataFrame[Schema]`
+- reflected arithmetic is supported (e.g. `2 + df.age`)
+- AST-build-time failures are enforced for invalid operator combinations
+
 ### Supported Expression Dtypes + Null Semantics (skeleton)
 Rust enforces expression typing (at AST-build time) and executes expressions
 with supported dtypes: `int`, `float`, `bool`, `str`.

@@ -33,6 +33,7 @@ This release provides:
 - generates a per-row Pydantic model for FastAPI
 - supports both input formats (columns and rows)
 - wraps `select()`, `with_columns()`, and `filter()`
+- has Phase 2 expression parity with `DataFrame[Schema]` (including reflected arithmetic like `2 + df.age`)
 
 `collect()` executes in the Rust core for the currently supported skeleton
 operations.
@@ -71,6 +72,11 @@ print(result)  # {"id": [2], "age2": [60]}
 Rust enforces expression typing (at AST-build time) and executes expressions
 with the following supported dtypes:
 - `int`, `float`, `bool`, `str`
+
+Phase 2 expression system status:
+- parity verified across `DataFrameModel` and lower-level `DataFrame[Schema]`
+- invalid combinations fail at AST-build time with typed errors
+- derived schema nullability/dtypes are validated through chained transforms
 
 Null semantics are SQL-like (`propagate_nulls`):
 - arithmetic: `NULL` + anything yields `NULL`
