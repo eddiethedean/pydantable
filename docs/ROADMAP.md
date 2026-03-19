@@ -97,10 +97,10 @@ Deliverables:
 ## Phase 5: Execution Engine
 
 Goals:
-- Execute queries via Polars
+- Execute queries via Rust Polars
 
 Deliverables:
-- LogicalPlan -> Polars LazyFrame conversion
+- LogicalPlan -> Rust Polars LazyFrame conversion
 - `collect()`
 - Integration tests and performance benchmarks
 - Correctness for both input formats and derived schema results

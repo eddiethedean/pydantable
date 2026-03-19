@@ -8,7 +8,7 @@ can be validated and typed end-to-end.
 ## Status (v0.4.0 skeleton)
 
 This release provides:
-- Typed DataFrames (`DataFrame[Schema]`) with runtime schema enforcement
+- Typed DataFrames core (`DataFrame[Schema]`) with runtime schema enforcement (low-level API)
 - A typed expression AST with operator overloads (`df.age * 2`, `df.age > 10`, ...)
 - `select()`, `with_columns()`, `filter()`, and a pure-Python `collect()`
 
@@ -18,7 +18,7 @@ Public API direction (next step): `DataFrameModel` as a SQLModel-like wrapper th
 - supports both input formats (columns and rows)
 - returns new model types for every transformation (schema migration)
 
-Rust planner/execution and Polars integration are stubbed for now; attempting
+Rust planner/execution and Rust Polars integration are stubbed for now; attempting
 to use `collect(engine="rust")` will raise `NotImplementedError`.
 
 ## Installation

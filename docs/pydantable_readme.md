@@ -47,7 +47,7 @@ on top of that.
 
 -   MVP schema + expressions
 -   Rust backend and logical planning
--   Polars execution engine
+-   Rust Polars execution engine
 -   Advanced query operations
 
 ## License

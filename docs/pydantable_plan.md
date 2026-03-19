@@ -9,12 +9,12 @@ Pydantic schemas with a Rust execution engine.
 
 -   Enforce schemas at runtime
 -   Provide type-safe transformations
--   Integrate with Polars for performance
+-   Integrate with Rust Polars for performance
 -   Track schema through all operations
 
 ## Architecture
 
-Python API → Typed AST → Rust Planner → Polars Engine
+Python API → Typed AST → Rust Planner → Rust Polars Engine
 
 ## Phases
 
@@ -36,7 +36,7 @@ Python API → Typed AST → Rust Planner → Polars Engine
 
 ### Phase 4
 
--   Polars backend execution
+-   Rust Polars backend execution
 -   Lazy execution
 
 ### Phase 5

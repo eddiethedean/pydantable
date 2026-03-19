@@ -8,6 +8,13 @@ publish = false
 name = "pydantable_core"
 crate-type = ["cdylib"]
 
+[features]
+# Keep the skeleton lightweight: Polars is only pulled in when explicitly
+# enabled later (e.g. when we implement the Rust logical plan execution).
+default = []
+polars_engine = ["dep:polars"]
+
 [dependencies]
 pyo3 = { version = "0.23.4", features = ["extension-module"] }
+polars = { version = "0.53.0", optional = true }
 

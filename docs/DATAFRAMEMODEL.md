@@ -41,8 +41,8 @@ From this definition, `DataFrameModel` generates (conceptually):
 df1 = UserDF({"id": [1, 2], "age": [20, 30]})
 ```
 
-This format is ideal for analytic/calc workflows because it matches columnar engines
-(`polars`, Rust execution).
+This format is ideal for analytic/calc workflows because it matches Rust-side
+columnar execution (`Rust Polars`).
 
 ### Row format
 
