@@ -166,6 +166,7 @@ Progress note:
   - Added end-to-end Polars-style workflow examples for join/groupby, reshape, and time-series operations.
   - Added lightweight performance guardrail tests for join, groupby, reshape, and window transforms.
   - Completed final docs pass with migration notes and consolidated contract references.
+  - Added PySpark select-transformation parity wrappers (`withColumn`, `withColumns`, `withColumnRenamed`, `withColumnsRenamed`, `toDF`, `transform`) and typed projection helper (`select_typed`), while explicitly keeping SQL-string `selectExpr` out of scope.
 
 ## Suggested execution order
 

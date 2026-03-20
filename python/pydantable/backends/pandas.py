@@ -5,10 +5,10 @@ from .polars import PolarsBackend
 
 class PandasBackend(PolarsBackend):
     """
-    Optional `pandas` interface backend.
+    Backend tag for the pandas-named interface module.
 
-    For now this is a fallback executor that uses the existing Rust/Polars
-    engine, while keeping an explicit backend boundary for future replacement.
+    Execution uses the same Rust core (Polars engine) as the default backend;
+    the `pandas` name only selects dispatch/identity in the Python layer.
     """
 
     name = "pandas"

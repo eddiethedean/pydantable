@@ -20,7 +20,7 @@ Status definitions:
 | Window/time | `Expr.over`, `rolling_agg`, `group_by_dynamic(...).agg(...)` | Implemented | Includes time-like support and parity smoke coverage. |
 | Temporal typing | `datetime`, `date`, `duration` (+ nullable) | Implemented | End-to-end descriptor roundtrip and execution materialization paths. |
 | Performance | Guardrails for major transforms | Implemented | Lightweight regression checks in test suite. |
-| Ecosystem | Optional interfaces `pandas` and `pyspark` | Implemented | Delegated through backend boundary and parity smoke tests. |
+| Ecosystem | Optional interfaces `pandas` and `pyspark` | Implemented | Alternate import/naming surfaces; execution is the same Rust core as default (not native pandas/Spark). |
 
 ## Remaining parity gaps
 

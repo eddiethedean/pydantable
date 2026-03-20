@@ -25,10 +25,42 @@ from pydantable.pyspark import DataFrameModel  # pyspark interface
 These interfaces keep the same typed API and contracts, while selecting a
 different backend name in the Python dispatch layer.
 
-## Current status
+### PySpark interface selection
 
-In this skeleton/refactor stage, `pandas`/`pyspark` interfaces currently use the
-existing Rust/Polars execution core as a fallback executor. The backend
-boundary is in place so real pandas/pyspark lowering can be added
-incrementally.
+You can select the PySpark interface in two equivalent ways:
+
+```python
+from pydantable.pyspark import DataFrameModel
+```
+
+```python
+import os
+os.environ["PYDANTABLE_BACKEND"] = "pyspark"
+from pydantable import DataFrameModel
+```
+
+The PySpark interface supports the same currently implemented operation
+families as default exports:
+
+- core transforms (`select`, `with_columns`, `filter`, `sort`, `unique`, slicing)
+- null/type transforms (`fill_null`, `drop_nulls`, `cast`, null predicates)
+- joins and group-by aggregations
+- reshape (`melt`/`unpivot`, `pivot`)
+- rolling and dynamic window operations
+- temporal columns/literals (`datetime`, `date`, `duration`, including nullable)
+- PySpark-style select wrappers (`withColumn`, `withColumns`, `withColumnRenamed`,
+  `withColumnsRenamed`, `toDF`, `transform`, `select_typed`)
+
+`selectExpr` SQL-string projection is intentionally out of scope for the typed
+interface. Use typed expressions with `select_typed(...)` instead.
+
+## Execution model for `pandas` / `pyspark` modules
+
+The `pydantable.pandas` and `pydantable.pyspark` modules are **naming/import
+variants** of the same typed API. They set a backend tag for Python dispatch
+and tests; **all backends execute on the Rust core** (Polars engine). Pydantable
+does not run native pandas or Apache Spark for those entrypoints.
+
+Semantics are defined by `docs/INTERFACE_CONTRACT.md`, independent of selected
+interface module.
 

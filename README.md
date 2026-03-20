@@ -51,9 +51,15 @@ Then:
 from pydantable import DataFrameModel
 ```
 
-### Current status
+### `pandas` / `pyspark` interface modules
 
-`pydantable.pandas` / `pydantable.pyspark` currently keep the typed API boundary in place, but execution still falls back to the existing Rust/Polars engine. This lets you validate contract equivalence while incrementally replacing the executors later.
+`pydantable.pandas` and `pydantable.pyspark` are **alternate import surfaces**
+(pandas- or PySpark-style naming where applicable). Execution is always the
+**Rust core** (Polars engine); pydantable does not run native pandas or Spark
+for those modules.
+
+For PySpark-style projection helpers (`withColumn`, `withColumnRenamed`, `toDF`,
+`transform`, `select_typed`), see `docs/PYSPARK_INTERFACE.md`.
 
 See:
 
@@ -126,6 +132,7 @@ typing and `collect()`.
 - `docs/ROADMAP.md` for project phases
 - `docs/PARITY_SCORECARD.md` for parity coverage status
 - `docs/POLARS_WORKFLOWS.md` for end-to-end Polars-style workflows
+- `docs/PYSPARK_INTERFACE.md` for PySpark interface usage and status
 
 ## License
 

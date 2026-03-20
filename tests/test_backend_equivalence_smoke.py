@@ -400,3 +400,36 @@ def test_backend_equivalence_temporal_columns_and_literals(backend_mod: str) -> 
     d_out = d_df.filter(d_df.ts > datetime(2024, 1, 1, 12, 0, 0)).collect()
     b_out = b_df.filter(b_df.ts > datetime(2024, 1, 1, 12, 0, 0)).collect()
     assert_table_eq_sorted(d_out, b_out, keys=["id"])
+
+
+def test_pyspark_select_wrapper_equivalence_to_default() -> None:
+    pyspark_mod = importlib.import_module("pydantable.pyspark")
+    PySparkDataFrameModel = pyspark_mod.DataFrameModel
+
+    class UserDefault(PolarsDataFrameModel):
+        id: int
+        age: int | None
+        name: str
+
+    class UserPySpark(PySparkDataFrameModel):
+        id: int
+        age: int | None
+        name: str
+
+    payload = {"id": [1, 2], "age": [10, None], "name": ["a", "b"]}
+    default_df = UserDefault(payload)
+    pyspark_df = UserPySpark(payload)
+
+    default_out = (
+        default_df.with_columns(age2=default_df.age * 2)
+        .rename({"name": "name_new"})
+        .select("id", "name_new", "age2")
+        .collect()
+    )
+    pyspark_out = (
+        pyspark_df.withColumn("age2", pyspark_df.age * 2)
+        .withColumnRenamed("name", "name_new")
+        .select_typed("id", "name_new", "age2")
+        .collect()
+    )
+    assert_table_eq_sorted(default_out, pyspark_out, keys=["id"])

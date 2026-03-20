@@ -2,6 +2,9 @@
 
 These examples mirror common Polars workflows using typed `pydantable` APIs.
 
+For the same patterns through the PySpark import surface, use
+`from pydantable.pyspark import DataFrameModel` (see `docs/PYSPARK_INTERFACE.md`).
+
 ## 1) Join + enrich + aggregate
 
 ```python
