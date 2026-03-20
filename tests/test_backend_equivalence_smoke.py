@@ -100,3 +100,45 @@ def test_backend_equivalence_join_and_groupby_all_null_semantics(
     default_group_out = default_grouped.collect()
     backend_group_out = backend_grouped.collect()
     assert_table_eq_sorted(default_group_out, backend_group_out, keys=["id"])
+
+
+@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_backend_equivalence_p1_unary_and_concat(backend_mod: str) -> None:
+    backend = importlib.import_module(backend_mod)
+    BackendDataFrameModel = backend.DataFrameModel
+
+    class UserDefault(PolarsDataFrameModel):
+        id: int
+        age: int | None
+
+    class UserBackend(BackendDataFrameModel):
+        id: int
+        age: int | None
+
+    payload = {"id": [3, 1, 2, 2], "age": [30, None, 20, 20]}
+    default_df = UserDefault(payload)
+    backend_df = UserBackend(payload)
+
+    default_out = (
+        default_df.sort("id")
+        .unique(subset=["id", "age"])
+        .rename({"age": "years"})
+        .slice(1, 2)
+        .collect()
+    )
+    backend_out = (
+        backend_df.sort("id")
+        .unique(subset=["id", "age"])
+        .rename({"age": "years"})
+        .slice(1, 2)
+        .collect()
+    )
+    assert_table_eq_sorted(default_out, backend_out, keys=["id"])
+
+    default_cat = PolarsDataFrameModel.concat(
+        [default_df.select("id"), default_df.select("id")], how="vertical"
+    ).collect()
+    backend_cat = BackendDataFrameModel.concat(
+        [backend_df.select("id"), backend_df.select("id")], how="vertical"
+    ).collect()
+    assert_table_eq_sorted(default_cat, backend_cat, keys=["id"])

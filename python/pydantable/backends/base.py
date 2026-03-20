@@ -36,3 +36,12 @@ class Backend(Protocol):
         by: Sequence[str],
         aggregations: Any,
     ) -> tuple[Any, Any]: ...
+
+    def execute_concat(
+        self,
+        left_plan: Any,
+        left_root_data: Any,
+        right_plan: Any,
+        right_root_data: Any,
+        how: str,
+    ) -> tuple[Any, Any]: ...

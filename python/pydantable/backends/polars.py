@@ -56,3 +56,20 @@ class PolarsBackend(Backend):
             list(by),
             aggregations,
         )
+
+    def execute_concat(
+        self,
+        left_plan: Any,
+        left_root_data: Any,
+        right_plan: Any,
+        right_root_data: Any,
+        how: str,
+    ) -> tuple[Any, Any]:
+        rust = _require_rust_core()
+        return rust.execute_concat(
+            left_plan,
+            left_root_data,
+            right_plan,
+            right_root_data,
+            how,
+        )

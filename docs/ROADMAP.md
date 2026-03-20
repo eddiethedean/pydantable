@@ -3,6 +3,9 @@
 This document tracks implementation phases for `pydantable` starting at `0.4.0`
 and targeting `v1.0.0`.
 
+For detailed method-by-method Polars parity planning, see:
+`docs/POLARS_TRANSFORMATIONS_ROADMAP.md`.
+
 ## Key interface direction: `DataFrameModel`
 
 The public API is intended to be SQLModel-like:

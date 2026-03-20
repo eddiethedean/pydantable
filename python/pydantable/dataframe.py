@@ -238,6 +238,119 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
+    def sort(
+        self, *by: str | ColumnRef, descending: bool | Sequence[bool] = False
+    ) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        keys: list[str] = []
+        for key in by:
+            if isinstance(key, str):
+                keys.append(key)
+            elif isinstance(key, Expr):
+                referenced = key.referenced_columns()
+                if len(referenced) != 1:
+                    raise TypeError(
+                        "sort() accepts column names or a ColumnRef expression."
+                    )
+                keys.append(next(iter(referenced)))
+            else:
+                raise TypeError("sort() accepts column names or ColumnRef objects.")
+
+        desc = (
+            [descending] * len(keys)
+            if isinstance(descending, bool)
+            else list(descending)
+        )
+        rust_plan = rust.plan_sort(self._rust_plan, keys, desc)
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def unique(
+        self,
+        subset: Sequence[str] | None = None,
+        *,
+        keep: str = "first",
+    ) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        rust_plan = rust.plan_unique(
+            self._rust_plan, None if subset is None else list(subset), keep
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def distinct(
+        self,
+        subset: Sequence[str] | None = None,
+        *,
+        keep: str = "first",
+    ) -> DataFrame[Any]:
+        return self.unique(subset=subset, keep=keep)
+
+    def drop(self, *columns: str | ColumnRef) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        selected: list[str] = []
+        for col in columns:
+            if isinstance(col, str):
+                selected.append(col)
+            elif isinstance(col, Expr):
+                referenced = col.referenced_columns()
+                if len(referenced) != 1:
+                    raise TypeError(
+                        "drop() accepts column names or a ColumnRef expression."
+                    )
+                selected.append(next(iter(referenced)))
+            else:
+                raise TypeError("drop() accepts column names or ColumnRef objects.")
+        rust_plan = rust.plan_drop(self._rust_plan, selected)
+        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def rename(self, columns: Mapping[str, str]) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        rust_plan = rust.plan_rename(self._rust_plan, dict(columns))
+        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def slice(self, offset: int, length: int) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        rust_plan = rust.plan_slice(self._rust_plan, int(offset), int(length))
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def head(self, n: int = 5) -> DataFrame[Any]:
+        return self.slice(0, n)
+
+    def tail(self, n: int = 5) -> DataFrame[Any]:
+        return self.slice(-n, n)
+
     def join(
         self,
         other: DataFrame[Any],
@@ -308,6 +421,42 @@ class DataFrame(Generic[SchemaT]):
 
     def to_dict(self) -> dict[str, list[Any]]:
         return self.collect()
+
+    @classmethod
+    def concat(
+        cls,
+        dfs: Sequence[DataFrame[Any]],
+        *,
+        how: str = "vertical",
+    ) -> DataFrame[Any]:
+        if len(dfs) < 2:
+            raise ValueError("concat() requires at least two DataFrame inputs.")
+        base = dfs[0]
+        backend = get_backend(base._backend)
+        out_data = base._root_data
+        out_schema_type = base._current_schema_type
+        out_plan = base._rust_plan
+        for df in dfs[1:]:
+            if df._backend != base._backend:
+                raise ValueError(
+                    "concat between different backends is not supported yet."
+                )
+            out_data, schema_descriptors = backend.execute_concat(
+                out_plan,
+                out_data,
+                df._rust_plan,
+                df._root_data,
+                how,
+            )
+            derived_fields = schema_from_descriptors(schema_descriptors)
+            out_schema_type = make_derived_schema_type(out_schema_type, derived_fields)
+            out_plan = _require_rust_core().make_plan(derived_fields)
+        return cls._from_plan(
+            root_data=out_data,
+            root_schema_type=out_schema_type,
+            current_schema_type=out_schema_type,
+            rust_plan=out_plan,
+        )
 
 
 class GroupedDataFrame:

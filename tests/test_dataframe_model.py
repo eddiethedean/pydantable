@@ -142,3 +142,25 @@ def test_row_model_rejects_extra_fields():
     row_model = UserDF.row_model()
     with pytest.raises(ValidationError):
         row_model.model_validate({"id": 1, "age": None, "extra": "x"})
+
+
+def test_p1_dataframe_model_methods_and_concat():
+    df = UserDF({"id": [3, 1, 2, 2], "age": [30, None, 20, 20]})
+
+    sorted_df = df.sort("id")
+    assert sorted_df.collect()["id"] == [1, 2, 2, 3]
+
+    unique_df = sorted_df.unique(subset=["id", "age"])
+    assert unique_df.collect() == {"id": [1, 2, 3], "age": [None, 20, 30]}
+
+    renamed = unique_df.rename({"age": "years"})
+    assert set(renamed.schema_fields().keys()) == {"id", "years"}
+    assert renamed.schema_fields()["years"] == int | None
+    assert renamed.slice(1, 2).collect() == {"id": [2, 3], "years": [20, 30]}
+    assert renamed.head(1).collect() == {"id": [1], "years": [None]}
+    assert renamed.tail(1).collect() == {"id": [3], "years": [30]}
+
+    first = renamed.select("id")
+    second = renamed.select("id")
+    cat = DataFrameModel.concat([first, second], how="vertical")
+    assert cat.collect() == {"id": [1, 2, 3, 1, 2, 3]}

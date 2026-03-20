@@ -10,11 +10,12 @@ use crate::expr::{exprnode_to_serializable, ExprNode};
 use crate::expr::LiteralValue;
 
 #[cfg(feature = "polars_engine")]
-use polars::lazy::dsl::{col, lit};
+use polars::lazy::dsl::{col, lit, Expr as PolarsExpr};
 #[cfg(feature = "polars_engine")]
 use polars::prelude::{
     BooleanChunked, DataFrame, DataType, Float64Chunked, Int64Chunked, IntoColumn, IntoLazy,
-    IntoSeries, JoinArgs, JoinType, LazyFrame, NewChunkedArray, PolarsError, Series, StringChunked,
+    IntoSeries, JoinArgs, JoinType, LazyFrame, NewChunkedArray, PolarsError, Series,
+    SortMultipleOptions, StringChunked, UniqueKeepStrategy,
 };
 
 #[derive(Clone, Debug)]
@@ -22,6 +23,21 @@ pub enum PlanStep {
     Select { columns: Vec<String> },
     WithColumns { columns: HashMap<String, ExprNode> },
     Filter { condition: ExprNode },
+    Sort {
+        by: Vec<String>,
+        descending: Vec<bool>,
+    },
+    Unique {
+        subset: Option<Vec<String>>,
+        keep: String,
+    },
+    Rename {
+        columns: HashMap<String, String>,
+    },
+    Slice {
+        offset: i64,
+        length: usize,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -63,6 +79,25 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
             PlanStep::Filter { condition } => {
                 step_out.set_item("kind", "filter")?;
                 step_out.set_item("condition", exprnode_to_serializable(py, condition)?)?;
+            }
+            PlanStep::Sort { by, descending } => {
+                step_out.set_item("kind", "sort")?;
+                step_out.set_item("by", by)?;
+                step_out.set_item("descending", descending)?;
+            }
+            PlanStep::Unique { subset, keep } => {
+                step_out.set_item("kind", "unique")?;
+                step_out.set_item("subset", subset)?;
+                step_out.set_item("keep", keep)?;
+            }
+            PlanStep::Rename { columns } => {
+                step_out.set_item("kind", "rename")?;
+                step_out.set_item("columns", columns)?;
+            }
+            PlanStep::Slice { offset, length } => {
+                step_out.set_item("kind", "slice")?;
+                step_out.set_item("offset", offset)?;
+                step_out.set_item("length", length)?;
             }
         }
         steps.append(step_out)?;
@@ -289,6 +324,146 @@ pub fn plan_filter(plan: &PlanInner, condition: ExprNode) -> PyResult<PlanInner>
     })
 }
 
+pub fn plan_sort(plan: &PlanInner, by: Vec<String>, descending: Vec<bool>) -> PyResult<PlanInner> {
+    if by.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "sort(by=...) requires at least one key.",
+        ));
+    }
+    if !descending.is_empty() && descending.len() != by.len() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "sort(descending=...) must be empty or the same length as by.",
+        ));
+    }
+    for key in by.iter() {
+        if !plan.schema.contains_key(key) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "sort() unknown key '{}'.",
+                key
+            )));
+        }
+    }
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::Sort { by, descending });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: plan.schema.clone(),
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_unique(
+    plan: &PlanInner,
+    subset: Option<Vec<String>>,
+    keep: String,
+) -> PyResult<PlanInner> {
+    if let Some(keys) = subset.as_ref() {
+        if keys.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "unique(subset=...) cannot be empty.",
+            ));
+        }
+        for key in keys.iter() {
+            if !plan.schema.contains_key(key) {
+                return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                    "unique() unknown subset column '{}'.",
+                    key
+                )));
+            }
+        }
+    }
+    match keep.as_str() {
+        "first" | "last" | "any" => {}
+        other => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "unique(keep=...) unsupported value '{}'. Use one of: first, last, any.",
+                other
+            )))
+        }
+    }
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::Unique { subset, keep });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: plan.schema.clone(),
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_drop(plan: &PlanInner, columns: Vec<String>) -> PyResult<PlanInner> {
+    if columns.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "drop(...) requires at least one column.",
+        ));
+    }
+    let mut new_schema = plan.schema.clone();
+    for col in columns.iter() {
+        if !new_schema.contains_key(col) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "drop() unknown column '{}'.",
+                col
+            )));
+        }
+        new_schema.remove(col);
+    }
+    if new_schema.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "drop(...) cannot remove all columns.",
+        ));
+    }
+    let mut new_steps = plan.steps.clone();
+    let kept = new_schema.keys().cloned().collect::<Vec<_>>();
+    new_steps.push(PlanStep::Select { columns: kept });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: new_schema,
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_rename(plan: &PlanInner, columns: HashMap<String, String>) -> PyResult<PlanInner> {
+    if columns.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "rename(...) requires at least one mapping.",
+        ));
+    }
+    let mut new_schema = plan.schema.clone();
+    for (old, new) in columns.iter() {
+        if !plan.schema.contains_key(old) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "rename() unknown column '{}'.",
+                old
+            )));
+        }
+        if old != new && new_schema.contains_key(new) && !columns.contains_key(new) {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "rename() target '{}' already exists.",
+                new
+            )));
+        }
+        let dtype = *plan.schema.get(old).unwrap();
+        new_schema.remove(old);
+        new_schema.insert(new.clone(), dtype);
+    }
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::Rename { columns });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: new_schema,
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_slice(plan: &PlanInner, offset: i64, length: usize) -> PyResult<PlanInner> {
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::Slice { offset, length });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: plan.schema.clone(),
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
 pub fn execute_plan(
     py: Python<'_>,
     plan: &PlanInner,
@@ -339,6 +514,82 @@ fn execute_plan_rowwise(
                 for (_, col) in ctx.iter_mut() {
                     let new_col = keep.iter().map(|&i| col[i].clone()).collect();
                     *col = new_col;
+                }
+                n = ctx_len(&ctx)?;
+            }
+            PlanStep::Sort { by, descending } => {
+                let mut idx: Vec<usize> = (0..n).collect();
+                let mut desc_flags = descending.clone();
+                if desc_flags.is_empty() {
+                    desc_flags = vec![false; by.len()];
+                }
+                idx.sort_by(|a, b| {
+                    use std::cmp::Ordering;
+                    for (k_i, key) in by.iter().enumerate() {
+                        let av = &ctx[key][*a];
+                        let bv = &ctx[key][*b];
+                        let ord = match (av, bv) {
+                            (None, None) => Ordering::Equal,
+                            (None, Some(_)) => Ordering::Greater,
+                            (Some(_), None) => Ordering::Less,
+                            (Some(LiteralValue::Int(x)), Some(LiteralValue::Int(y))) => x.cmp(y),
+                            (Some(LiteralValue::Float(x)), Some(LiteralValue::Float(y))) => {
+                                x.partial_cmp(y).unwrap_or(Ordering::Equal)
+                            }
+                            (Some(LiteralValue::Bool(x)), Some(LiteralValue::Bool(y))) => x.cmp(y),
+                            (Some(LiteralValue::Str(x)), Some(LiteralValue::Str(y))) => x.cmp(y),
+                            _ => Ordering::Equal,
+                        };
+                        if ord != Ordering::Equal {
+                            return if desc_flags[k_i] { ord.reverse() } else { ord };
+                        }
+                    }
+                    Ordering::Equal
+                });
+                for (_, col) in ctx.iter_mut() {
+                    let new_col = idx.iter().map(|i| col[*i].clone()).collect();
+                    *col = new_col;
+                }
+                n = ctx_len(&ctx)?;
+            }
+            PlanStep::Unique { subset, keep: _ } => {
+                use std::collections::HashSet;
+                let keys = subset.clone().unwrap_or_else(|| ctx.keys().cloned().collect());
+                let mut seen: HashSet<String> = HashSet::new();
+                let mut keep_idx: Vec<usize> = Vec::new();
+                for i in 0..n {
+                    let mut sig = String::new();
+                    for key in keys.iter() {
+                        sig.push_str(&format!("{:?}|", ctx[key][i]));
+                    }
+                    if !seen.contains(&sig) {
+                        seen.insert(sig);
+                        keep_idx.push(i);
+                    }
+                }
+                for (_, col) in ctx.iter_mut() {
+                    let new_col = keep_idx.iter().map(|&i| col[i].clone()).collect();
+                    *col = new_col;
+                }
+                n = ctx_len(&ctx)?;
+            }
+            PlanStep::Rename { columns } => {
+                for (old, new) in columns.iter() {
+                    if let Some(values) = ctx.remove(old) {
+                        ctx.insert(new.clone(), values);
+                    }
+                }
+                n = ctx_len(&ctx)?;
+            }
+            PlanStep::Slice { offset, length } => {
+                let start = if *offset < 0 {
+                    n.saturating_sub(offset.unsigned_abs() as usize)
+                } else {
+                    (*offset) as usize
+                };
+                let end = std::cmp::min(start.saturating_add(*length), n);
+                for (_, col) in ctx.iter_mut() {
+                    *col = col[start..end].to_vec();
                 }
                 n = ctx_len(&ctx)?;
             }
@@ -476,6 +727,36 @@ fn apply_steps_to_lazy(mut lf: LazyFrame, steps: &[PlanStep]) -> PyResult<LazyFr
                 // SQL-like null semantics for filter: keep exactly True; drop False/NULL.
                 let cond = condition.to_polars_expr()?.fill_null(lit(false));
                 lf = lf.filter(cond);
+            }
+            PlanStep::Sort { by, descending } => {
+                let exprs = by.iter().map(col).collect::<Vec<PolarsExpr>>();
+                let mut desc = descending.clone();
+                if desc.is_empty() {
+                    desc = vec![false; by.len()];
+                }
+                lf = lf.sort_by_exprs(
+                    exprs,
+                    SortMultipleOptions::new().with_order_descending_multi(desc),
+                );
+            }
+            PlanStep::Unique { subset, keep } => {
+                let keep_strategy = match keep.as_str() {
+                    "first" => UniqueKeepStrategy::First,
+                    "last" => UniqueKeepStrategy::Last,
+                    _ => UniqueKeepStrategy::Any,
+                };
+                let subset_exprs = subset
+                    .clone()
+                    .map(|v| v.into_iter().map(col).collect::<Vec<PolarsExpr>>());
+                lf = lf.unique_stable_generic(subset_exprs, keep_strategy);
+            }
+            PlanStep::Rename { columns } => {
+                let old = columns.keys().cloned().collect::<Vec<_>>();
+                let new = columns.values().cloned().collect::<Vec<_>>();
+                lf = lf.rename(old, new, true);
+            }
+            PlanStep::Slice { offset, length } => {
+                lf = lf.slice(*offset, *length as u32);
             }
         }
     }
@@ -904,6 +1185,82 @@ pub fn execute_groupby_agg_polars(
             series_to_py_list(py, &col, *dtype)?
         };
 
+        out_dict.set_item(name, py_list)?;
+    }
+    let desc = schema_descriptors_as_py(py, &out_schema)?;
+    Ok((out_dict.into_py(py), desc))
+}
+
+#[cfg(feature = "polars_engine")]
+pub fn execute_concat_polars(
+    py: Python<'_>,
+    left_plan: &PlanInner,
+    left_root_data: &Bound<'_, PyAny>,
+    right_plan: &PlanInner,
+    right_root_data: &Bound<'_, PyAny>,
+    how: String,
+) -> PyResult<(PyObject, PyObject)> {
+    let left_df = root_data_to_polars_df(&left_plan.root_schema, left_root_data)?;
+    let right_df = root_data_to_polars_df(&right_plan.root_schema, right_root_data)?;
+    let left_out = apply_steps_to_lazy(left_df.lazy(), &left_plan.steps)?
+        .collect()
+        .map_err(polars_err)?;
+    let right_out = apply_steps_to_lazy(right_df.lazy(), &right_plan.steps)?
+        .collect()
+        .map_err(polars_err)?;
+
+    let out_df = match how.as_str() {
+        "vertical" => {
+            if left_out.get_column_names() != right_out.get_column_names() {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "concat(vertical) requires both inputs to have identical columns.",
+                ));
+            }
+            let mut df = left_out.clone();
+            df.vstack_mut(&right_out).map_err(polars_err)?;
+            df
+        }
+        "horizontal" => {
+            for c in right_out.get_column_names_owned().iter() {
+                if left_out.get_column_names_owned().contains(c) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "concat(horizontal) duplicate column '{}' not supported.",
+                        c
+                    )));
+                }
+            }
+            let mut df = left_out.clone();
+            df.hstack_mut(right_out.columns()).map_err(polars_err)?;
+            df
+        }
+        other => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Unsupported concat how '{}'. Use one of: vertical, horizontal.",
+                other
+            )))
+        }
+    };
+
+    let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
+    for name in out_df.get_column_names().iter() {
+        if let Some(d) = left_plan.schema.get(name.as_str()) {
+            out_schema.insert(name.to_string(), *d);
+        } else if let Some(d) = right_plan.schema.get(name.as_str()) {
+            out_schema.insert(name.to_string(), *d);
+        } else {
+            let s = out_df.column(name).map_err(polars_err)?.as_materialized_series();
+            out_schema.insert(name.to_string(), dtype_from_polars(s.dtype())?);
+        }
+    }
+
+    let out_dict = PyDict::new_bound(py);
+    for (name, dtype) in out_schema.iter() {
+        let col = out_df
+            .column(name)
+            .map_err(polars_err)?
+            .as_materialized_series()
+            .clone();
+        let py_list = series_to_py_list(py, &col, *dtype)?;
         out_dict.set_item(name, py_list)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;

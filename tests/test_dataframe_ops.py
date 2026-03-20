@@ -61,3 +61,46 @@ def test_with_columns_none_requires_destination_type() -> None:
     df = DataFrame[UserNullable]({"id": [1, 2], "age": [20, 30]})
     with pytest.raises(TypeError, match=r"cannot infer destination type"):
         df.with_columns(new=None)
+
+
+def test_p1_sort_unique_drop_rename_slice_concat() -> None:
+    class UserNullable(Schema):
+        id: int
+        age: int | None
+        country: str
+
+    df = DataFrame[UserNullable](
+        {
+            "id": [3, 1, 2, 2],
+            "age": [30, None, 20, 20],
+            "country": ["CA", "US", "US", "US"],
+        }
+    )
+
+    sorted_df = df.sort("id")
+    assert sorted_df.collect()["id"] == [1, 2, 2, 3]
+
+    unique_df = sorted_df.unique(subset=["id", "age", "country"])
+    assert unique_df.collect()["id"] == [1, 2, 3]
+
+    dropped = unique_df.drop("country")
+    assert set(dropped.schema_fields().keys()) == {"id", "age"}
+
+    renamed = dropped.rename({"age": "years"})
+    assert set(renamed.schema_fields().keys()) == {"id", "years"}
+    assert renamed.schema_fields()["years"] == int | None
+
+    sliced = renamed.slice(1, 2)
+    assert sliced.collect() == {"id": [2, 3], "years": [20, 30]}
+    assert renamed.head(2).collect() == {"id": [1, 2], "years": [None, 20]}
+    assert renamed.tail(2).collect() == {"id": [2, 3], "years": [20, 30]}
+
+    left = renamed.select("id")
+    right = renamed.select("id")
+    vcat = DataFrame.concat([left, right], how="vertical")
+    assert vcat.collect() == {"id": [1, 2, 3, 1, 2, 3]}
+
+    left_h = renamed.select("id")
+    right_h = renamed.select("years")
+    hcat = DataFrame.concat([left_h, right_h], how="horizontal")
+    assert hcat.collect() == {"id": [1, 2, 3], "years": [None, 20, 30]}

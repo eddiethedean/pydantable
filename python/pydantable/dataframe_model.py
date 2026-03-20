@@ -176,6 +176,36 @@ class DataFrameModel:
     def filter(self, condition: Any) -> DataFrameModel:
         return self._from_dataframe(self._df.filter(condition))
 
+    def sort(
+        self, *by: Any, descending: bool | Sequence[bool] = False
+    ) -> DataFrameModel:
+        return self._from_dataframe(self._df.sort(*by, descending=descending))
+
+    def unique(
+        self, subset: Sequence[str] | None = None, *, keep: str = "first"
+    ) -> DataFrameModel:
+        return self._from_dataframe(self._df.unique(subset=subset, keep=keep))
+
+    def distinct(
+        self, subset: Sequence[str] | None = None, *, keep: str = "first"
+    ) -> DataFrameModel:
+        return self._from_dataframe(self._df.distinct(subset=subset, keep=keep))
+
+    def drop(self, *columns: Any) -> DataFrameModel:
+        return self._from_dataframe(self._df.drop(*columns))
+
+    def rename(self, columns: Mapping[str, str]) -> DataFrameModel:
+        return self._from_dataframe(self._df.rename(columns))
+
+    def slice(self, offset: int, length: int) -> DataFrameModel:
+        return self._from_dataframe(self._df.slice(offset, length))
+
+    def head(self, n: int = 5) -> DataFrameModel:
+        return self._from_dataframe(self._df.head(n))
+
+    def tail(self, n: int = 5) -> DataFrameModel:
+        return self._from_dataframe(self._df.tail(n))
+
     def join(
         self,
         other: DataFrameModel,
@@ -204,6 +234,19 @@ class DataFrameModel:
     @classmethod
     def schema_model(cls) -> type[Schema]:
         return cls._SchemaModel
+
+    @classmethod
+    def concat(
+        cls,
+        dfs: Sequence[DataFrameModel],
+        *,
+        how: str = "vertical",
+    ) -> DataFrameModel:
+        if len(dfs) < 2:
+            raise ValueError("concat() requires at least two DataFrameModel inputs.")
+        if not all(isinstance(df, DataFrameModel) for df in dfs):
+            raise TypeError("concat() expects a sequence of DataFrameModel objects.")
+        return cls._from_dataframe(DataFrame.concat([df._df for df in dfs], how=how))
 
 
 class GroupedDataFrameModel:
