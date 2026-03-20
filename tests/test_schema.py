@@ -1,7 +1,6 @@
 import pytest
-from pydantic import ValidationError
-
 from pydantable import DataFrame, Schema
+from pydantic import ValidationError
 
 
 class User(Schema):
@@ -32,4 +31,3 @@ def test_dataframe_construction_type_validation():
 def test_dataframe_construction_length_mismatch():
     with pytest.raises(ValueError, match="All columns must have the same length"):
         DataFrame[User]({"id": [1, 2], "age": [1]})
-

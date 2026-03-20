@@ -6,4 +6,3 @@ from .schema import Schema
 __all__ = ["DataFrame", "DataFrameModel", "Expr", "Schema"]
 
 __version__ = "0.4.0"
-

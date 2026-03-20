@@ -1,11 +1,14 @@
-import pytest
 from typing import Optional, Union, get_args, get_origin
 
+import pytest
 from pydantable import DataFrame, Schema
 
 
 def _is_optional_of(dtype, base_type) -> bool:
-    return get_origin(dtype) is Union and set(get_args(dtype)) == {base_type, type(None)}
+    return get_origin(dtype) is Union and set(get_args(dtype)) == {
+        base_type,
+        type(None),
+    }
 
 
 class UserNullable(Schema):
@@ -75,4 +78,3 @@ def test_chained_transformations_preserve_nullable_schema_types():
     df4 = df3.filter(df3.age2 > 25)
     assert _is_optional_of(df4.schema_fields()["age2"], int)
     assert df4.to_dict() == {"id": [3], "age2": [31]}
-

@@ -1,5 +1,4 @@
 import pytest
-
 from pydantable import DataFrame, Schema
 from pydantable.expressions import ColumnRef
 
@@ -42,4 +41,3 @@ def test_select_requires_at_least_one_column():
     df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
     with pytest.raises(ValueError, match="requires at least one column"):
         df.select()
-

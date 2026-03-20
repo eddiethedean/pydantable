@@ -5,18 +5,13 @@ mod expr;
 mod plan;
 
 use crate::dtype::{dtype_to_python_type, py_annotation_to_dtype, DTypeDesc};
-use crate::expr::{op_symbol_to_arith, op_symbol_to_cmp, ArithOp, CmpOp, ExprNode, ExprHandle};
+use crate::expr::{op_symbol_to_arith, op_symbol_to_cmp, ArithOp, CmpOp, ExprHandle, ExprNode};
 use crate::plan::{
     execute_groupby_agg_polars as execute_groupby_agg_inner,
-    execute_join_polars as execute_join_inner,
-    execute_plan as execute_plan_inner,
-    make_plan as make_plan_inner,
-    plan_filter as plan_filter_inner,
-    plan_select as plan_select_inner,
-    plan_with_columns as plan_with_columns_inner,
-    schema_descriptors_as_py,
-    schema_fields_as_py,
-    PlanInner,
+    execute_join_polars as execute_join_inner, execute_plan as execute_plan_inner,
+    make_plan as make_plan_inner, plan_filter as plan_filter_inner,
+    plan_select as plan_select_inner, plan_with_columns as plan_with_columns_inner,
+    schema_descriptors_as_py, schema_fields_as_py, PlanInner,
 };
 
 #[pyclass]
@@ -65,7 +60,11 @@ fn rust_version() -> &'static str {
 }
 
 #[pyfunction]
-fn make_column_ref(py: Python<'_>, name: String, dtype_annotation: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
+fn make_column_ref(
+    py: Python<'_>,
+    name: String,
+    dtype_annotation: &Bound<'_, PyAny>,
+) -> PyResult<PyExpr> {
     let dtype: DTypeDesc = py_annotation_to_dtype(py, dtype_annotation)?;
     if dtype.base.is_none() {
         return Err(pyo3::exceptions::PyTypeError::new_err(
@@ -119,7 +118,11 @@ fn plan_select(plan: &PyPlan, columns: Vec<String>) -> PyResult<PyPlan> {
 }
 
 #[pyfunction]
-fn plan_with_columns(py: Python<'_>, plan: &PyPlan, columns: &Bound<'_, PyAny>) -> PyResult<PyPlan> {
+fn plan_with_columns(
+    py: Python<'_>,
+    plan: &PyPlan,
+    columns: &Bound<'_, PyAny>,
+) -> PyResult<PyPlan> {
     let dict: &Bound<'_, pyo3::types::PyDict> = columns.downcast()?;
     let mut cols: std::collections::HashMap<String, ExprNode> = std::collections::HashMap::new();
     for (k, v) in dict.iter() {
@@ -216,4 +219,3 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(plan_filter, m)?)?;
     Ok(())
 }
-

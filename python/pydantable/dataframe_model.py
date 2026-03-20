@@ -2,29 +2,34 @@ from __future__ import annotations
 
 import sys
 import typing
-from typing import Any, Dict, Mapping, Sequence, Type, cast
+from collections.abc import Mapping, Sequence
+from typing import Any, cast
 
 from pydantic import BaseModel, create_model
 
 from .dataframe import DataFrame
-from .schema import Schema, schema_field_types
+from .schema import Schema
 
 
-def _field_defs_from_annotations(annotations: Mapping[str, Any]) -> Dict[str, tuple[Any, Any]]:
+def _field_defs_from_annotations(
+    annotations: Mapping[str, Any],
+) -> dict[str, tuple[Any, Any]]:
     return {name: (dtype, ...) for name, dtype in annotations.items()}
 
 
 def _normalize_input(
     *,
     data: Mapping[str, Any] | Sequence[Mapping[str, Any]],
-    row_model: Type[BaseModel],
-) -> Dict[str, list[Any]]:
+    row_model: type[BaseModel],
+) -> dict[str, list[Any]]:
     expected_fields = list(row_model.model_fields.keys())
 
     if isinstance(data, Mapping):
         # Columnar input path; downstream DataFrame strict validation handles
         # required/extra keys, length, and value type checks.
-        return {k: list(v) if isinstance(v, (list, tuple)) else v for k, v in data.items()}  # type: ignore[return-value]
+        return {
+            k: list(v) if isinstance(v, (list, tuple)) else v for k, v in data.items()
+        }  # type: ignore[return-value]
 
     if isinstance(data, Sequence):
         rows = list(data)
@@ -37,7 +42,7 @@ def _normalize_input(
                 raise TypeError("Row input must be a sequence of mapping objects.")
             normalized_rows.append(row_model.model_validate(row))
 
-        columns: Dict[str, list[Any]] = {name: [] for name in expected_fields}
+        columns: dict[str, list[Any]] = {name: [] for name in expected_fields}
         for row in normalized_rows:
             row_dict = row.model_dump()
             for name in expected_fields:
@@ -57,8 +62,8 @@ class DataFrameModel:
     - composes the existing `DataFrame[Schema]` engine
     """
 
-    RowModel: Type[BaseModel]
-    _SchemaModel: Type[Schema]
+    RowModel: type[BaseModel]
+    _SchemaModel: type[Schema]
     _df: DataFrame[Any]
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
@@ -72,7 +77,7 @@ class DataFrameModel:
         eval_ns.update(globalns)
 
         raw_annotations = dict(getattr(cls, "__dict__", {}).get("__annotations__", {}))
-        annotations: Dict[str, Any] = {}
+        annotations: dict[str, Any] = {}
         for field_name, field_type in raw_annotations.items():
             if isinstance(field_type, str):
                 annotations[field_name] = eval(field_type, eval_ns, eval_ns)
@@ -93,12 +98,19 @@ class DataFrameModel:
             **field_defs,
         )
 
-    def __init__(self, data: Mapping[str, Any] | Sequence[Mapping[str, Any]], *, strict: bool = True):
+    def __init__(
+        self,
+        data: Mapping[str, Any] | Sequence[Mapping[str, Any]],
+        *,
+        strict: bool = True,
+    ):
         normalized = _normalize_input(data=data, row_model=self.RowModel)
         self._df = DataFrame[self._SchemaModel](normalized, strict=strict)
 
     @classmethod
-    def _derived_model_type(cls, field_types: Mapping[str, Any]) -> Type["DataFrameModel"]:
+    def _derived_model_type(
+        cls, field_types: Mapping[str, Any]
+    ) -> type[DataFrameModel]:
         name = f"{cls.__name__}Derived"
         annotations = dict(field_types)
         # Inherit from the originating subclass for better DX/autocomplete and
@@ -108,22 +120,22 @@ class DataFrameModel:
             (cls,),
             {"__annotations__": annotations, "__module__": cls.__module__},
         )
-        return cast(Type["DataFrameModel"], derived)
+        return cast("type[DataFrameModel]", derived)
 
     @classmethod
-    def _from_dataframe(cls, df: DataFrame[Any]) -> "DataFrameModel":
+    def _from_dataframe(cls, df: DataFrame[Any]) -> DataFrameModel:
         derived_type = cls._derived_model_type(df.schema_fields())
         obj = derived_type.__new__(derived_type)
         obj._df = df
         return obj
 
-    def schema_fields(self) -> Dict[str, Any]:
+    def schema_fields(self) -> dict[str, Any]:
         return self._df.schema_fields()
 
-    def collect(self) -> Dict[str, list[Any]]:
+    def collect(self) -> dict[str, list[Any]]:
         return self._df.collect()
 
-    def to_dict(self) -> Dict[str, list[Any]]:
+    def to_dict(self) -> dict[str, list[Any]]:
         return self._df.to_dict()
 
     def rows(self) -> list[BaseModel]:
@@ -153,28 +165,30 @@ class DataFrameModel:
         """
         return [row.model_dump() for row in self.rows()]
 
-    def select(self, *cols: Any) -> "DataFrameModel":
+    def select(self, *cols: Any) -> DataFrameModel:
         return self._from_dataframe(self._df.select(*cols))
 
-    def with_columns(self, **new_columns: Any) -> "DataFrameModel":
+    def with_columns(self, **new_columns: Any) -> DataFrameModel:
         return self._from_dataframe(self._df.with_columns(**new_columns))
 
-    def filter(self, condition: Any) -> "DataFrameModel":
+    def filter(self, condition: Any) -> DataFrameModel:
         return self._from_dataframe(self._df.filter(condition))
 
     def join(
         self,
-        other: "DataFrameModel",
+        other: DataFrameModel,
         *,
         on: str | Sequence[str],
         how: str = "inner",
         suffix: str = "_right",
-    ) -> "DataFrameModel":
+    ) -> DataFrameModel:
         if not isinstance(other, DataFrameModel):
             raise TypeError("join(other=...) expects another DataFrameModel instance.")
-        return self._from_dataframe(self._df.join(other._df, on=on, how=how, suffix=suffix))
+        return self._from_dataframe(
+            self._df.join(other._df, on=on, how=how, suffix=suffix)
+        )
 
-    def group_by(self, *keys: Any) -> "GroupedDataFrameModel":
+    def group_by(self, *keys: Any) -> GroupedDataFrameModel:
         return GroupedDataFrameModel(self._df.group_by(*keys), self.__class__)
 
     def __getattr__(self, item: str) -> Any:
@@ -182,19 +196,18 @@ class DataFrameModel:
         return getattr(self._df, item)
 
     @classmethod
-    def row_model(cls) -> Type[BaseModel]:
+    def row_model(cls) -> type[BaseModel]:
         return cls.RowModel
 
     @classmethod
-    def schema_model(cls) -> Type[Schema]:
+    def schema_model(cls) -> type[Schema]:
         return cls._SchemaModel
 
 
 class GroupedDataFrameModel:
-    def __init__(self, grouped_df: Any, model_type: Type[DataFrameModel]) -> None:
+    def __init__(self, grouped_df: Any, model_type: type[DataFrameModel]) -> None:
         self._grouped_df = grouped_df
         self._model_type = model_type
 
     def agg(self, **aggregations: Any) -> DataFrameModel:
         return self._model_type._from_dataframe(self._grouped_df.agg(**aggregations))
-

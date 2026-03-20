@@ -1,7 +1,6 @@
 from typing import Optional
 
 import pytest
-
 from pydantable import DataFrame, DataFrameModel
 from pydantable.schema import Schema
 
@@ -58,7 +57,9 @@ def test_phase6_groupby_agg_count_sum_mean():
     df = DataFrame[UserSchema]({"id": [1, 1, 2, 2], "age": [10, None, 20, 30]})
     out = (
         df.group_by("id")
-        .agg(age_count=("count", "age"), age_sum=("sum", "age"), age_mean=("mean", "age"))
+        .agg(
+            age_count=("count", "age"), age_sum=("sum", "age"), age_mean=("mean", "age")
+        )
         .collect()
     )
     got = sorted(zip(out["id"], out["age_count"], out["age_sum"], out["age_mean"]))

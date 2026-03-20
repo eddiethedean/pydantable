@@ -1,5 +1,5 @@
 from pydantable import DataFrame, Schema
-from pydantable.expressions import CompareOp, ColumnRef
+from pydantable.expressions import ColumnRef, CompareOp
 
 
 class User(Schema):
@@ -44,4 +44,3 @@ def test_reflected_arithmetic_ops_supported():
     assert out["b"] == [80, 70]
     assert out["c"] == [60, 90]
     assert out["d"] == [3.0, 2.0]
-

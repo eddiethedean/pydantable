@@ -1,17 +1,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, Iterable, List, Mapping, Optional, Sequence, Set, Type, TypeVar, Union, cast, get_args, get_origin
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    TypeVar,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+)
 
 from pydantic import BaseModel
 
-from .expressions import ColumnRef, Expr, Literal
+from .expressions import ColumnRef, Expr
 from .schema import (
     make_derived_schema_type,
     schema_field_types,
     schema_from_descriptors,
     validate_columns_strict,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 
 def _load_rust_core() -> Any:
@@ -30,6 +42,7 @@ def _require_rust_core() -> Any:
     if _RUST_CORE is None:
         raise NotImplementedError("Rust extension is required for DataFrame execution.")
     return _RUST_CORE
+
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
@@ -70,7 +83,7 @@ def _base_type_from_nullable(dtype: Any) -> Any:
 
 @dataclass(frozen=True)
 class SelectStep:
-    columns: List[str]
+    columns: list[str]
 
 
 @dataclass(frozen=True)
@@ -80,7 +93,7 @@ class FilterStep:
 
 @dataclass(frozen=True)
 class WithColumnsStep:
-    columns: Dict[str, Expr]
+    columns: dict[str, Expr]
 
 
 class DataFrame(Generic[SchemaT]):
@@ -94,9 +107,9 @@ class DataFrame(Generic[SchemaT]):
     - Pure-Python `collect()` execution for now.
     """
 
-    _schema_type: Type[BaseModel] | None = None
+    _schema_type: type[BaseModel] | None = None
 
-    def __class_getitem__(cls, schema_type: Any) -> Type["DataFrame[Any]"]:
+    def __class_getitem__(cls, schema_type: Any) -> type[DataFrame[Any]]:
         if not isinstance(schema_type, type) or not issubclass(schema_type, BaseModel):
             raise TypeError("DataFrame[Schema] expects a Pydantic BaseModel type.")
 
@@ -107,15 +120,17 @@ class DataFrame(Generic[SchemaT]):
 
     def __init__(self, data: Mapping[str, Sequence[Any]], *, strict: bool = True):
         if self._schema_type is None:
-            raise TypeError("Use DataFrame[SchemaType](data) to construct a typed DataFrame.")
+            raise TypeError(
+                "Use DataFrame[SchemaType](data) to construct a typed DataFrame."
+            )
 
         if not strict:
             raise NotImplementedError("Non-strict mode is not implemented in 0.4.0.")
 
         root_data = validate_columns_strict(data, self._schema_type)
-        self._root_data: Dict[str, list[Any]] = root_data
-        self._root_schema_type: Type[BaseModel] = self._schema_type
-        self._current_schema_type: Type[BaseModel] = self._schema_type
+        self._root_data: dict[str, list[Any]] = root_data
+        self._root_schema_type: type[BaseModel] = self._schema_type
+        self._current_schema_type: type[BaseModel] = self._schema_type
         self._current_field_types = schema_field_types(self._current_schema_type)
         # Rust owns expression typing, logical planning, and execution.
         self._rust_plan = _require_rust_core().make_plan(self.schema_fields())
@@ -124,11 +139,11 @@ class DataFrame(Generic[SchemaT]):
     def _from_plan(
         cls,
         *,
-        root_data: Dict[str, list[Any]],
-        root_schema_type: Type[BaseModel],
-        current_schema_type: Type[BaseModel],
+        root_data: dict[str, list[Any]],
+        root_schema_type: type[BaseModel],
+        current_schema_type: type[BaseModel],
         rust_plan: Any,
-    ) -> "DataFrame[Any]":
+    ) -> DataFrame[Any]:
         obj = cls.__new__(cls)
         obj._root_data = root_data
         obj._root_schema_type = root_schema_type
@@ -139,10 +154,10 @@ class DataFrame(Generic[SchemaT]):
         return cast("DataFrame[Any]", obj)
 
     @property
-    def schema_type(self) -> Type[BaseModel]:
+    def schema_type(self) -> type[BaseModel]:
         return self._current_schema_type
 
-    def schema_fields(self) -> Dict[str, Any]:
+    def schema_fields(self) -> dict[str, Any]:
         return dict(self._current_field_types)
 
     def col(self, name: str) -> ColumnRef:
@@ -156,9 +171,9 @@ class DataFrame(Generic[SchemaT]):
             return self.col(item)
         raise AttributeError(item)
 
-    def with_columns(self, **new_columns: Union[Expr, Any]) -> "DataFrame[Any]":
+    def with_columns(self, **new_columns: Expr | Any) -> DataFrame[Any]:
         rust = _require_rust_core()
-        rust_columns: Dict[str, Any] = {}
+        rust_columns: dict[str, Any] = {}
 
         for name, value in new_columns.items():
             if isinstance(value, Expr):
@@ -179,9 +194,9 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
-    def select(self, *cols: Union[str, ColumnRef]) -> "DataFrame[Any]":
+    def select(self, *cols: str | ColumnRef) -> DataFrame[Any]:
         rust = _require_rust_core()
-        selected: List[str] = []
+        selected: list[str] = []
         for col in cols:
             if isinstance(col, str):
                 selected.append(col)
@@ -207,7 +222,7 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
-    def filter(self, condition: Expr) -> "DataFrame[Any]":
+    def filter(self, condition: Expr) -> DataFrame[Any]:
         rust = _require_rust_core()
 
         if not isinstance(condition, Expr):
@@ -223,12 +238,12 @@ class DataFrame(Generic[SchemaT]):
 
     def join(
         self,
-        other: "DataFrame[Any]",
+        other: DataFrame[Any],
         *,
-        on: Union[str, Sequence[str]],
+        on: str | Sequence[str],
         how: str = "inner",
         suffix: str = "_right",
-    ) -> "DataFrame[Any]":
+    ) -> DataFrame[Any]:
         rust = _require_rust_core()
         if not isinstance(other, DataFrame):
             raise TypeError("join(other=...) expects another DataFrame.")
@@ -243,7 +258,9 @@ class DataFrame(Generic[SchemaT]):
             suffix,
         )
         derived_fields = schema_from_descriptors(schema_descriptors)
-        derived_schema_type = make_derived_schema_type(self._current_schema_type, derived_fields)
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
         rust_plan = rust.make_plan(derived_fields)
         return self._from_plan(
             root_data=joined_data,
@@ -252,21 +269,25 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
-    def group_by(self, *keys: Union[str, ColumnRef]) -> "GroupedDataFrame":
-        selected: List[str] = []
+    def group_by(self, *keys: str | ColumnRef) -> GroupedDataFrame:
+        selected: list[str] = []
         for key in keys:
             if isinstance(key, str):
                 selected.append(key)
             elif isinstance(key, Expr):
                 referenced = key.referenced_columns()
                 if len(referenced) != 1:
-                    raise TypeError("group_by() accepts column names or ColumnRef expressions.")
+                    raise TypeError(
+                        "group_by() accepts column names or ColumnRef expressions."
+                    )
                 selected.append(next(iter(referenced)))
             else:
-                raise TypeError("group_by() accepts column names or ColumnRef expressions.")
+                raise TypeError(
+                    "group_by() accepts column names or ColumnRef expressions."
+                )
         return GroupedDataFrame(self, selected)
 
-    def collect(self, *, engine: str = "rust") -> Dict[str, list[Any]]:
+    def collect(self, *, engine: str = "rust") -> dict[str, list[Any]]:
         """
         Materialize this typed logical DataFrame into Python column data.
 
@@ -281,7 +302,7 @@ class DataFrame(Generic[SchemaT]):
         result = rust.execute_plan(self._rust_plan, self._root_data)
         return result
 
-    def to_dict(self) -> Dict[str, list[Any]]:
+    def to_dict(self) -> dict[str, list[Any]]:
         return self.collect(engine="rust")
 
 
@@ -290,13 +311,16 @@ class GroupedDataFrame:
         self._df = df
         self._keys = list(keys)
 
-    def agg(self, **aggregations: Union[tuple[str, str], tuple[str, ColumnRef]]) -> DataFrame[Any]:
+    def agg(
+        self, **aggregations: tuple[str, str] | tuple[str, ColumnRef]
+    ) -> DataFrame[Any]:
         rust = _require_rust_core()
-        agg_specs: Dict[str, tuple[str, str]] = {}
+        agg_specs: dict[str, tuple[str, str]] = {}
         for out_name, spec in aggregations.items():
             if not isinstance(spec, tuple) or len(spec) != 2:
                 raise TypeError(
-                    "agg() expects specs like output_name=('sum'|'mean'|'count', column)."
+                    "agg() expects specs like "
+                    "output_name=('sum'|'mean'|'count', column)."
                 )
             op, col_spec = spec
             if not isinstance(op, str):
@@ -306,17 +330,23 @@ class GroupedDataFrame:
             elif isinstance(col_spec, Expr):
                 referenced = col_spec.referenced_columns()
                 if len(referenced) != 1:
-                    raise TypeError("Aggregation column must reference exactly one column.")
+                    raise TypeError(
+                        "Aggregation column must reference exactly one column."
+                    )
                 in_col = next(iter(referenced))
             else:
-                raise TypeError("Aggregation column must be a column name or ColumnRef.")
+                raise TypeError(
+                    "Aggregation column must be a column name or ColumnRef."
+                )
             agg_specs[out_name] = (op, in_col)
 
         grouped_data, schema_descriptors = rust.execute_groupby_agg(
             self._df._rust_plan, self._df._root_data, self._keys, agg_specs
         )
         derived_fields = schema_from_descriptors(schema_descriptors)
-        derived_schema_type = make_derived_schema_type(self._df._current_schema_type, derived_fields)
+        derived_schema_type = make_derived_schema_type(
+            self._df._current_schema_type, derived_fields
+        )
         rust_plan = rust.make_plan(derived_fields)
         return self._df._from_plan(
             root_data=grouped_data,
@@ -324,4 +354,3 @@ class GroupedDataFrame:
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
         )
-

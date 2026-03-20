@@ -9,9 +9,9 @@ use crate::dtype::{py_value_to_dtype, BaseType, DTypeDesc};
 #[cfg(feature = "polars_engine")]
 use polars::lazy::dsl::{col, lit, Expr as PolarsExpr};
 #[cfg(feature = "polars_engine")]
-use polars::prelude::{DataType, Null};
-#[cfg(feature = "polars_engine")]
 use polars::prelude::Literal;
+#[cfg(feature = "polars_engine")]
+use polars::prelude::{DataType, Null};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ArithOp {
@@ -96,15 +96,16 @@ impl ExprNode {
         let inferred_base = match (left.base, right.base) {
             (Some(a), Some(b)) => {
                 // Only numeric base types are valid here.
-                let valid = matches!((a, b), (BaseType::Int, BaseType::Int | BaseType::Float)
-                    | (BaseType::Float, BaseType::Int | BaseType::Float));
+                let valid = matches!(
+                    (a, b),
+                    (BaseType::Int, BaseType::Int | BaseType::Float)
+                        | (BaseType::Float, BaseType::Int | BaseType::Float)
+                );
                 if !valid {
-                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        format!(
-                            "Arithmetic operator requires numeric operands; got {:?} and {:?}.",
-                            a, b
-                        ),
-                    ));
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+                        "Arithmetic operator requires numeric operands; got {:?} and {:?}.",
+                        a, b
+                    )));
                 }
                 match (a, b) {
                     (BaseType::Int, BaseType::Int) => Some(BaseType::Int),
@@ -165,9 +166,11 @@ impl ExprNode {
                     _ => unreachable!(),
                 };
 
-                let allowed = (matches!((lb, rb), (BaseType::Int, BaseType::Int | BaseType::Float)
-                    | (BaseType::Float, BaseType::Int | BaseType::Float))
-                    || (lb == BaseType::Bool && rb == BaseType::Bool)
+                let allowed = (matches!(
+                    (lb, rb),
+                    (BaseType::Int, BaseType::Int | BaseType::Float)
+                        | (BaseType::Float, BaseType::Int | BaseType::Float)
+                ) || (lb == BaseType::Bool && rb == BaseType::Bool)
                     || (lb == BaseType::Str && rb == BaseType::Str));
 
                 if !allowed {
@@ -269,11 +272,12 @@ impl ExprNode {
     ) -> PyResult<Vec<Option<LiteralValue>>> {
         match self {
             ExprNode::ColumnRef { name, .. } => {
-                let col = ctx
-                    .get(name)
-                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
-                        format!("Unknown column '{}' during expression evaluation.", name),
-                    ))?;
+                let col = ctx.get(name).ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                        "Unknown column '{}' during expression evaluation.",
+                        name
+                    ))
+                })?;
                 Ok(col.clone())
             }
             ExprNode::Literal { value, .. } => {
@@ -285,7 +289,12 @@ impl ExprNode {
                     Ok((0..n).map(|_| Some(lit.clone())).collect())
                 }
             }
-            ExprNode::BinaryOp { op, left, right, dtype } => {
+            ExprNode::BinaryOp {
+                op,
+                left,
+                right,
+                dtype,
+            } => {
                 let lvals = left.eval(ctx, n)?;
                 let rvals = right.eval(ctx, n)?;
                 let mut out: Vec<Option<LiteralValue>> = Vec::with_capacity(n);
@@ -330,8 +339,12 @@ impl ExprNode {
                                         (ai as f64, bi as f64)
                                     }
                                     (LiteralValue::Float(af), LiteralValue::Float(bf)) => (af, bf),
-                                    (LiteralValue::Int(ai), LiteralValue::Float(bf)) => (ai as f64, bf),
-                                    (LiteralValue::Float(af), LiteralValue::Int(bi)) => (af, bi as f64),
+                                    (LiteralValue::Int(ai), LiteralValue::Float(bf)) => {
+                                        (ai as f64, bf)
+                                    }
+                                    (LiteralValue::Float(af), LiteralValue::Int(bi)) => {
+                                        (af, bi as f64)
+                                    }
                                     _ => {
                                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                                             "Typed arithmetic expected numeric operands for float result.",
@@ -358,7 +371,9 @@ impl ExprNode {
 
                 Ok(out)
             }
-            ExprNode::CompareOp { op, left, right, .. } => {
+            ExprNode::CompareOp {
+                op, left, right, ..
+            } => {
                 let lvals = left.eval(ctx, n)?;
                 let rvals = right.eval(ctx, n)?;
                 let mut out: Vec<Option<LiteralValue>> = Vec::with_capacity(n);
@@ -384,7 +399,10 @@ impl ExprNode {
                                                 LiteralValue::Int(i) => i as f64,
                                                 LiteralValue::Float(f) => f,
                                                 _ => {
-                                                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
                                                         "Typed equality expected numeric operands.",
                                                     ));
                                                 }
@@ -393,7 +411,10 @@ impl ExprNode {
                                                 LiteralValue::Int(i) => i as f64,
                                                 LiteralValue::Float(f) => f,
                                                 _ => {
-                                                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
                                                         "Typed equality expected numeric operands.",
                                                     ));
                                                 }
@@ -404,7 +425,10 @@ impl ExprNode {
                                             let ab = match va {
                                                 LiteralValue::Bool(b) => b,
                                                 _ => {
-                                                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
                                                         "Typed equality expected bool operands.",
                                                     ));
                                                 }
@@ -412,7 +436,10 @@ impl ExprNode {
                                             let bb = match vb {
                                                 LiteralValue::Bool(b) => b,
                                                 _ => {
-                                                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
                                                         "Typed equality expected bool operands.",
                                                     ));
                                                 }
@@ -423,7 +450,10 @@ impl ExprNode {
                                             let as_ = match va {
                                                 LiteralValue::Str(s) => s,
                                                 _ => {
-                                                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
                                                         "Typed equality expected str operands.",
                                                     ));
                                                 }
@@ -431,7 +461,10 @@ impl ExprNode {
                                             let bs_ = match vb {
                                                 LiteralValue::Str(s) => s,
                                                 _ => {
-                                                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
                                                         "Typed equality expected str operands.",
                                                     ));
                                                 }
@@ -439,67 +472,85 @@ impl ExprNode {
                                             as_ == bs_
                                         }
                                     };
-                                    if *op == CmpOp::Eq { eq } else { !eq }
+                                    if *op == CmpOp::Eq {
+                                        eq
+                                    } else {
+                                        !eq
+                                    }
                                 }
-                                CmpOp::Lt | CmpOp::Le | CmpOp::Gt | CmpOp::Ge => match effective_base {
-                                    BaseType::Int | BaseType::Float => {
-                                        let af = match va {
-                                            LiteralValue::Int(i) => i as f64,
-                                            LiteralValue::Float(f) => f,
-                                            _ => {
-                                                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                                                    "Typed ordering expected numeric operands.",
-                                                ));
+                                CmpOp::Lt | CmpOp::Le | CmpOp::Gt | CmpOp::Ge => {
+                                    match effective_base {
+                                        BaseType::Int | BaseType::Float => {
+                                            let af = match va {
+                                                LiteralValue::Int(i) => i as f64,
+                                                LiteralValue::Float(f) => f,
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed ordering expected numeric operands.",
+                                                    ));
+                                                }
+                                            };
+                                            let bf = match vb {
+                                                LiteralValue::Int(i) => i as f64,
+                                                LiteralValue::Float(f) => f,
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed ordering expected numeric operands.",
+                                                    ));
+                                                }
+                                            };
+                                            match op {
+                                                CmpOp::Lt => af < bf,
+                                                CmpOp::Le => af <= bf,
+                                                CmpOp::Gt => af > bf,
+                                                CmpOp::Ge => af >= bf,
+                                                _ => unreachable!(),
                                             }
-                                        };
-                                        let bf = match vb {
-                                            LiteralValue::Int(i) => i as f64,
-                                            LiteralValue::Float(f) => f,
-                                            _ => {
-                                                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                                                    "Typed ordering expected numeric operands.",
-                                                ));
-                                            }
-                                        };
-                                        match op {
-                                            CmpOp::Lt => af < bf,
-                                            CmpOp::Le => af <= bf,
-                                            CmpOp::Gt => af > bf,
-                                            CmpOp::Ge => af >= bf,
-                                            _ => unreachable!(),
                                         }
-                                    }
-                                    BaseType::Str => {
-                                        let as_ = match va {
-                                            LiteralValue::Str(s) => s,
-                                            _ => {
-                                                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                                                    "Typed ordering expected str operands.",
-                                                ));
+                                        BaseType::Str => {
+                                            let as_ = match va {
+                                                LiteralValue::Str(s) => s,
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed ordering expected str operands.",
+                                                    ));
+                                                }
+                                            };
+                                            let bs_ = match vb {
+                                                LiteralValue::Str(s) => s,
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed ordering expected str operands.",
+                                                    ));
+                                                }
+                                            };
+                                            match op {
+                                                CmpOp::Lt => as_ < bs_,
+                                                CmpOp::Le => as_ <= bs_,
+                                                CmpOp::Gt => as_ > bs_,
+                                                CmpOp::Ge => as_ >= bs_,
+                                                _ => unreachable!(),
                                             }
-                                        };
-                                        let bs_ = match vb {
-                                            LiteralValue::Str(s) => s,
-                                            _ => {
-                                                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                                                    "Typed ordering expected str operands.",
-                                                ));
-                                            }
-                                        };
-                                        match op {
-                                            CmpOp::Lt => as_ < bs_,
-                                            CmpOp::Le => as_ <= bs_,
-                                            CmpOp::Gt => as_ > bs_,
-                                            CmpOp::Ge => as_ >= bs_,
-                                            _ => unreachable!(),
                                         }
-                                    }
-                                    _ => {
-                                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                        _ => {
+                                            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                                             "Ordering operand types not supported by typed skeleton.",
                                         ));
+                                        }
                                     }
-                                },
+                                }
                                 _ => unreachable!(),
                             };
 
@@ -634,4 +685,3 @@ pub fn op_symbol_to_cmp(op: &str) -> PyResult<CmpOp> {
         ))),
     }
 }
-

@@ -3,14 +3,13 @@ from __future__ import annotations
 from typing import Optional
 
 import pytest
-from pydantic import ValidationError
-
 from pydantable import DataFrameModel
+from pydantic import ValidationError
 
 
 class UserDF(DataFrameModel):
     id: int
-    age: Optional[int]
+    age: int | None
 
 
 def test_dataframe_model_column_input_happy_path():
@@ -95,23 +94,15 @@ def test_dataframe_model_filter_preserves_schema_changes_rows_only():
 
 
 def test_dataframe_model_row_vs_column_input_transformation_parity():
-    row_df = UserDF([{"id": 1, "age": 10}, {"id": 2, "age": None}, {"id": 3, "age": 30}])
+    row_df = UserDF(
+        [{"id": 1, "age": 10}, {"id": 2, "age": None}, {"id": 3, "age": 30}]
+    )
     col_df = UserDF({"id": [1, 2, 3], "age": [10, None, 30]})
 
     row_df2 = row_df.with_columns(age2=row_df.age + 1)
-    row_out = (
-        row_df2
-        .filter(row_df2.age2 > 20)
-        .select("id", "age2")
-        .collect()
-    )
+    row_out = row_df2.filter(row_df2.age2 > 20).select("id", "age2").collect()
     col_df2 = col_df.with_columns(age2=col_df.age + 1)
-    col_out = (
-        col_df2
-        .filter(col_df2.age2 > 20)
-        .select("id", "age2")
-        .collect()
-    )
+    col_out = col_df2.filter(col_df2.age2 > 20).select("id", "age2").collect()
     assert row_out == col_out == {"id": [3], "age2": [31]}
 
 
@@ -142,4 +133,3 @@ def test_rows_and_to_dicts_materialize_derived_schema():
         {"id": 1, "age": 20, "age2": 21},
         {"id": 2, "age": None, "age2": None},
     ]
-

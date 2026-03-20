@@ -52,10 +52,7 @@ fn is_py_type(obj: &Bound<'_, PyAny>, expected: &str) -> bool {
         .unwrap_or(false)
 }
 
-pub fn py_annotation_to_dtype(
-    py: Python<'_>,
-    dtype_obj: &Bound<'_, PyAny>,
-) -> PyResult<DTypeDesc> {
+pub fn py_annotation_to_dtype(py: Python<'_>, dtype_obj: &Bound<'_, PyAny>) -> PyResult<DTypeDesc> {
     // Handle direct supported scalar annotations.
     //
     // Pydantic schema annotations typically come through as actual Python classes
@@ -198,4 +195,3 @@ pub fn dtype_to_descriptor_py(py: Python<'_>, dtype: DTypeDesc) -> PyResult<PyOb
     dict.set_item("nullable", dtype.nullable)?;
     Ok(dict.into_py(py))
 }
-

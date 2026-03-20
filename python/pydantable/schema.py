@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Mapping, Optional, Type
+from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import BaseModel, ConfigDict, TypeAdapter, create_model
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 class Schema(BaseModel):
@@ -15,7 +18,7 @@ class Schema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-def schema_field_types(schema_type: Type[BaseModel]) -> Dict[str, Any]:
+def schema_field_types(schema_type: type[BaseModel]) -> dict[str, Any]:
     """
     Extract `field_name -> python_type` from a Pydantic model.
 
@@ -27,7 +30,7 @@ def schema_field_types(schema_type: Type[BaseModel]) -> Dict[str, Any]:
     """
 
     # Pydantic v2: `model_fields` holds `FieldInfo` with `.annotation`.
-    field_types: Dict[str, Any] = {}
+    field_types: dict[str, Any] = {}
     for name, field in schema_type.model_fields.items():
         annotation = field.annotation
         field_types[name] = annotation
@@ -35,8 +38,8 @@ def schema_field_types(schema_type: Type[BaseModel]) -> Dict[str, Any]:
 
 
 def validate_columns_strict(
-    data: Mapping[str, Any], schema_type: Type[BaseModel]
-) -> Dict[str, list[Any]]:
+    data: Mapping[str, Any], schema_type: type[BaseModel]
+) -> dict[str, list[Any]]:
     """
     Validate that `data` matches `schema_type` and return normalized columns.
 
@@ -55,7 +58,7 @@ def validate_columns_strict(
     if extra:
         raise ValueError(f"Unknown columns for schema: {extra}")
 
-    normalized: Dict[str, list[Any]] = {}
+    normalized: dict[str, list[Any]] = {}
     lengths = set()
     for name, expected_type in field_types.items():
         col = data[name]
@@ -71,14 +74,16 @@ def validate_columns_strict(
         normalized[name] = values
 
     if len(lengths) != 1:
-        raise ValueError(f"All columns must have the same length; got {sorted(lengths)}")
+        raise ValueError(
+            f"All columns must have the same length; got {sorted(lengths)}"
+        )
 
     return normalized
 
 
 def make_derived_schema_type(
-    base_schema_type: Type[BaseModel], field_types: Mapping[str, Any]
-) -> Type[BaseModel]:
+    base_schema_type: type[BaseModel], field_types: Mapping[str, Any]
+) -> type[BaseModel]:
     """
     Create a new Pydantic model type for derived DataFrames.
     """
@@ -104,7 +109,7 @@ def dtype_descriptor_to_annotation(descriptor: Mapping[str, Any]) -> Any:
     base = descriptor.get("base")
     nullable = bool(descriptor.get("nullable", False))
 
-    base_map: Dict[str, Any] = {
+    base_map: dict[str, Any] = {
         "int": int,
         "float": float,
         "bool": bool,
@@ -119,9 +124,10 @@ def dtype_descriptor_to_annotation(descriptor: Mapping[str, Any]) -> Any:
     return py_t
 
 
-def schema_from_descriptors(descriptors: Mapping[str, Mapping[str, Any]]) -> Dict[str, Any]:
+def schema_from_descriptors(
+    descriptors: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
     """
     Convert rust plan schema descriptors into field annotations map.
     """
     return {name: dtype_descriptor_to_annotation(d) for name, d in descriptors.items()}
-

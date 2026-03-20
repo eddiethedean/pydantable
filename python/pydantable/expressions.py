@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Set
+from typing import Any
 
 
 def _load_rust_core() -> Any:
@@ -37,22 +37,22 @@ class Expr:  # type: ignore[override]
     def dtype(self) -> Any:
         return self._rust_expr.dtype
 
-    def referenced_columns(self) -> Set[str]:
+    def referenced_columns(self) -> set[str]:
         return set(self._rust_expr.referenced_columns())
 
-    def _coerce_other(self, other: Any) -> "Expr":
+    def _coerce_other(self, other: Any) -> Expr:
         if isinstance(other, Expr):
             return other
         return Literal(value=other)
 
-    def _binary(self, op_symbol: str, other: Any) -> "Expr":
+    def _binary(self, op_symbol: str, other: Any) -> Expr:
         other_expr = self._coerce_other(other)
         rust_expr = _require_rust_core().binary_op(
             op_symbol, self._rust_expr, other_expr._rust_expr
         )
         return BinaryOp(rust_expr=rust_expr)
 
-    def _binary_reflected(self, op_symbol: str, other: Any) -> "Expr":
+    def _binary_reflected(self, op_symbol: str, other: Any) -> Expr:
         # `other <op> self`
         left_expr = self._coerce_other(other)
         rust_expr = _require_rust_core().binary_op(
@@ -60,7 +60,7 @@ class Expr:  # type: ignore[override]
         )
         return BinaryOp(rust_expr=rust_expr)
 
-    def _compare(self, op_symbol: str, other: Any) -> "Expr":
+    def _compare(self, op_symbol: str, other: Any) -> Expr:
         other_expr = self._coerce_other(other)
         rust_expr = _require_rust_core().compare_op(
             op_symbol, self._rust_expr, other_expr._rust_expr
@@ -68,47 +68,47 @@ class Expr:  # type: ignore[override]
         return CompareOp(rust_expr=rust_expr)
 
     # Arithmetic
-    def __add__(self, other: Any) -> "Expr":
+    def __add__(self, other: Any) -> Expr:
         return self._binary("+", other)
 
-    def __sub__(self, other: Any) -> "Expr":
+    def __sub__(self, other: Any) -> Expr:
         return self._binary("-", other)
 
-    def __mul__(self, other: Any) -> "Expr":
+    def __mul__(self, other: Any) -> Expr:
         return self._binary("*", other)
 
-    def __truediv__(self, other: Any) -> "Expr":
+    def __truediv__(self, other: Any) -> Expr:
         return self._binary("/", other)
 
-    def __radd__(self, other: Any) -> "Expr":
+    def __radd__(self, other: Any) -> Expr:
         return self._binary_reflected("+", other)
 
-    def __rsub__(self, other: Any) -> "Expr":
+    def __rsub__(self, other: Any) -> Expr:
         return self._binary_reflected("-", other)
 
-    def __rmul__(self, other: Any) -> "Expr":
+    def __rmul__(self, other: Any) -> Expr:
         return self._binary_reflected("*", other)
 
-    def __rtruediv__(self, other: Any) -> "Expr":
+    def __rtruediv__(self, other: Any) -> Expr:
         return self._binary_reflected("/", other)
 
     # Comparisons
-    def __eq__(self, other: Any) -> "Expr":  # type: ignore[override]
+    def __eq__(self, other: Any) -> Expr:  # type: ignore[override]
         return self._compare("==", other)
 
-    def __ne__(self, other: Any) -> "Expr":  # type: ignore[override]
+    def __ne__(self, other: Any) -> Expr:  # type: ignore[override]
         return self._compare("!=", other)
 
-    def __lt__(self, other: Any) -> "Expr":
+    def __lt__(self, other: Any) -> Expr:
         return self._compare("<", other)
 
-    def __le__(self, other: Any) -> "Expr":
+    def __le__(self, other: Any) -> Expr:
         return self._compare("<=", other)
 
-    def __gt__(self, other: Any) -> "Expr":
+    def __gt__(self, other: Any) -> Expr:
         return self._compare(">", other)
 
-    def __ge__(self, other: Any) -> "Expr":
+    def __ge__(self, other: Any) -> Expr:
         return self._compare(">=", other)
 
 
@@ -137,4 +137,3 @@ class BinaryOp(Expr):  # type: ignore[override]
 class CompareOp(Expr):  # type: ignore[override]
     def __init__(self, *, rust_expr: Any):
         super().__init__(rust_expr=rust_expr)
-

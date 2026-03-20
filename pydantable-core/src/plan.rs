@@ -10,9 +10,8 @@ use crate::expr::{ExprNode, LiteralValue};
 use polars::lazy::dsl::{col, lit};
 #[cfg(feature = "polars_engine")]
 use polars::prelude::{
-    BooleanChunked, DataFrame, DataType, Float64Chunked, IntoLazy, Int64Chunked, JoinArgs,
-    JoinType, IntoColumn, IntoSeries, LazyFrame, NewChunkedArray, PolarsError, Series,
-    StringChunked,
+    BooleanChunked, DataFrame, DataType, Float64Chunked, Int64Chunked, IntoColumn, IntoLazy,
+    IntoSeries, JoinArgs, JoinType, LazyFrame, NewChunkedArray, PolarsError, Series, StringChunked,
 };
 
 #[derive(Clone, Debug)]
@@ -30,12 +29,11 @@ pub struct PlanInner {
 }
 
 fn ctx_len(ctx: &HashMap<String, Vec<Option<LiteralValue>>>) -> PyResult<usize> {
-    ctx.values()
-        .next()
-        .map(|v| v.len())
-        .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyValueError, _>(
+    ctx.values().next().map(|v| v.len()).ok_or_else(|| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(
             "Cannot execute plan with an empty input context.",
-        ))
+        )
+    })
 }
 
 pub fn make_plan(schema: HashMap<String, DTypeDesc>) -> PlanInner {
@@ -47,7 +45,10 @@ pub fn make_plan(schema: HashMap<String, DTypeDesc>) -> PlanInner {
     }
 }
 
-pub fn schema_fields_as_py(py: Python<'_>, schema: &HashMap<String, DTypeDesc>) -> PyResult<PyObject> {
+pub fn schema_fields_as_py(
+    py: Python<'_>,
+    schema: &HashMap<String, DTypeDesc>,
+) -> PyResult<PyObject> {
     let dict = pyo3::types::PyDict::new_bound(py);
     for (name, dtype) in schema.iter() {
         let t = dtype_to_python_type(py, *dtype)?;
@@ -99,8 +100,12 @@ pub fn root_data_to_ctx(
                     Some(crate::dtype::BaseType::Float) => {
                         LiteralValue::Float(item.extract::<f64>()?)
                     }
-                    Some(crate::dtype::BaseType::Bool) => LiteralValue::Bool(item.extract::<bool>()?),
-                    Some(crate::dtype::BaseType::Str) => LiteralValue::Str(item.extract::<String>()?),
+                    Some(crate::dtype::BaseType::Bool) => {
+                        LiteralValue::Bool(item.extract::<bool>()?)
+                    }
+                    Some(crate::dtype::BaseType::Str) => {
+                        LiteralValue::Str(item.extract::<String>()?)
+                    }
                     None => {
                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                             "Root schema cannot have unknown-base dtype.",
@@ -164,8 +169,7 @@ pub fn plan_with_columns(
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                     "Expression for '{}' references unknown column '{}'. Available columns: [{}].",
                     name,
-                    c
-                    ,
+                    c,
                     available.join(", ")
                 )));
             }
@@ -223,8 +227,7 @@ pub fn plan_filter(plan: &PlanInner, condition: ExprNode) -> PyResult<PlanInner>
             available.sort();
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                 "Filter expression references unknown column '{}'. Available columns: [{}].",
-                c
-                ,
+                c,
                 available.join(", ")
             )));
         }
@@ -240,7 +243,11 @@ pub fn plan_filter(plan: &PlanInner, condition: ExprNode) -> PyResult<PlanInner>
     })
 }
 
-pub fn execute_plan(py: Python<'_>, plan: &PlanInner, root_data: &Bound<'_, PyAny>) -> PyResult<PyObject> {
+pub fn execute_plan(
+    py: Python<'_>,
+    plan: &PlanInner,
+    root_data: &Bound<'_, PyAny>,
+) -> PyResult<PyObject> {
     #[cfg(feature = "polars_engine")]
     {
         return execute_plan_polars(py, plan, root_data);
@@ -357,10 +364,8 @@ fn root_data_to_polars_df(
                         v.push(Some(item.extract::<f64>()?));
                     }
                 }
-                let ca: Float64Chunked = Float64Chunked::from_iter_options(
-                    name.as_str().into(),
-                    v.into_iter(),
-                );
+                let ca: Float64Chunked =
+                    Float64Chunked::from_iter_options(name.as_str().into(), v.into_iter());
                 ca.into_series()
             }
             Some(crate::dtype::BaseType::Bool) => {
@@ -385,10 +390,8 @@ fn root_data_to_polars_df(
                         v.push(Some(item.extract::<String>()?));
                     }
                 }
-                let ca: StringChunked = StringChunked::from_iter_options(
-                    name.as_str().into(),
-                    v.into_iter(),
-                );
+                let ca: StringChunked =
+                    StringChunked::from_iter_options(name.as_str().into(), v.into_iter());
                 ca.into_series()
             }
             None => {
@@ -434,11 +437,7 @@ fn apply_steps_to_lazy(mut lf: LazyFrame, steps: &[PlanStep]) -> PyResult<LazyFr
 }
 
 #[cfg(feature = "polars_engine")]
-fn series_to_py_list(
-    py: Python<'_>,
-    series: &Series,
-    dtype: DTypeDesc,
-) -> PyResult<PyObject> {
+fn series_to_py_list(py: Python<'_>, series: &Series, dtype: DTypeDesc) -> PyResult<PyObject> {
     let mut values: Vec<PyObject> = Vec::with_capacity(series.len());
     match dtype.base {
         Some(crate::dtype::BaseType::Int) => {
@@ -487,7 +486,11 @@ fn series_to_py_list(
 }
 
 #[cfg(feature = "polars_engine")]
-fn execute_plan_polars(py: Python<'_>, plan: &PlanInner, root_data: &Bound<'_, PyAny>) -> PyResult<PyObject> {
+fn execute_plan_polars(
+    py: Python<'_>,
+    plan: &PlanInner,
+    root_data: &Bound<'_, PyAny>,
+) -> PyResult<PyObject> {
     let df = root_data_to_polars_df(&plan.root_schema, root_data)?;
     let lf = apply_steps_to_lazy(df.lazy(), &plan.steps)?;
     let out_df = lf.collect().map_err(polars_err)?;
@@ -616,7 +619,10 @@ pub fn execute_join_polars(
     // Build schema descriptors from actual output dtypes.
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
     for col_name in out_df.get_column_names() {
-        let s = out_df.column(col_name).map_err(polars_err)?.as_materialized_series();
+        let s = out_df
+            .column(col_name)
+            .map_err(polars_err)?
+            .as_materialized_series();
         let mut d = dtype_from_polars(s.dtype())?;
         d.nullable = s.null_count() > 0;
         out_schema.insert(col_name.to_string(), d);
@@ -696,7 +702,10 @@ pub fn execute_groupby_agg_polars(
                         "sum() requires known-base numeric dtype.",
                     )
                 })?;
-                if !matches!(base, crate::dtype::BaseType::Int | crate::dtype::BaseType::Float) {
+                if !matches!(
+                    base,
+                    crate::dtype::BaseType::Int | crate::dtype::BaseType::Float
+                ) {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "sum() requires int or float input columns.",
                     ));
@@ -716,7 +725,10 @@ pub fn execute_groupby_agg_polars(
                         "mean() requires known-base numeric dtype.",
                     )
                 })?;
-                if !matches!(base, crate::dtype::BaseType::Int | crate::dtype::BaseType::Float) {
+                if !matches!(
+                    base,
+                    crate::dtype::BaseType::Int | crate::dtype::BaseType::Float
+                ) {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "mean() requires int or float input columns.",
                     ));
@@ -785,7 +797,10 @@ mod tests {
 
             let id = dict.get_item("id").unwrap().unwrap();
             let age = dict.get_item("age").unwrap().unwrap();
-            assert_eq!(id.get_item("base").unwrap().extract::<String>().unwrap(), "int");
+            assert_eq!(
+                id.get_item("base").unwrap().extract::<String>().unwrap(),
+                "int"
+            );
             assert!(!id.get_item("nullable").unwrap().extract::<bool>().unwrap());
             assert_eq!(
                 age.get_item("base").unwrap().extract::<String>().unwrap(),
@@ -795,4 +810,3 @@ mod tests {
         });
     }
 }
-

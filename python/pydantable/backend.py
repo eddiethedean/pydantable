@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 
-def _load_rust_core() -> Optional[Any]:
+def _load_rust_core() -> Any | None:
     """
     Import the compiled Rust extension module (if available).
 
@@ -32,11 +32,11 @@ def execute_plan_rust(plan: Any, data: Any) -> Any:
 
     if _RUST_CORE is None:
         raise NotImplementedError(
-            "Rust extension is not available. Build the PyO3 module so `pydantable._core` can be imported."
+            "Rust extension is not available. "
+            "Build the PyO3 module so `pydantable._core` can be imported."
         )
 
     if not hasattr(_RUST_CORE, "execute_plan"):
         raise NotImplementedError("Rust extension does not implement `execute_plan`.")
 
     return _RUST_CORE.execute_plan(plan, data)
-
