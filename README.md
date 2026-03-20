@@ -67,6 +67,8 @@ from pydantable import DataFrameModel
 See:
 
 - `docs/BACKENDS.md`
+- `docs/PANDAS_UI.md` — pandas-style `assign` / `merge` / `head` / grouped shortcuts
+- `docs/PYSPARK_UI.md` — Spark-like `DataFrame` names and `pyspark.sql` façade
 - `docs/INTERFACE_CONTRACT.md`
 
 ## Quick Start

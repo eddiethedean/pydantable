@@ -42,29 +42,18 @@ CI installs `pandas` for the Python test job so backend equivalence tests run.
 
 ## Pandas-flavored API (`from pydantable.pandas import ...`)
 
-The `pydantable.pandas` module adds pandas-like names on top of the same typed
-engine:
-
-- `assign(**kwargs)` — same as `with_columns` (no pandas callables/Series)
-- `merge(...)` — maps to `join` (`suffixes[1]` → `suffix`; no `left_on` /
-  `right_on` / `indicator` / `validate` yet)
-- `columns`, `shape`, `empty`, `dtypes`, `head` / `tail` (eager), `__getitem__`
-  for `str` or `list[str]`
-- `group_by(...).sum(...)` / `.mean(...)` / `.count(...)` as shortcuts to
-  `agg(...)`
-
-Not supported (use typed `filter(Expr)` instead):
-
-- string `query()`
-- index / `loc` / `iloc`
-- arbitrary `assign` callables or `pandas.Series` values
+See **[Pandas UI](PANDAS_UI.md)** for full detail. In short, `pydantable.pandas`
+adds pandas-like names (`assign`, `merge`, `head`/`tail`, grouped `sum`/`mean`/`count`,
+introspection properties, `__getitem__`) on the same typed engine. String `query()`,
+`loc`/`iloc`, assign callables, and `pandas.Series` column values are not supported.
 
 ## PySpark interface module
 
 `pydantable.pyspark` keeps the typed API boundary; execution still uses the
 Rust/Polars core until a PySpark executor is wired.
 
-See **[PySpark parity matrix](PYSPARK_PARITY.md)** for API coverage vs Apache Spark.
+See **[PySpark UI](PYSPARK_UI.md)** for DataFrame / `DataFrameModel` aliases and
+**[PySpark parity matrix](PYSPARK_PARITY.md)** for API coverage vs Apache Spark.
 
 ### PySpark SQL-style façade (`pydantable.pyspark.sql`)
 
@@ -85,12 +74,13 @@ from pydantable.pyspark.sql import Column, IntegerType, StructType
 - **DataFrame ergonomics** on `pydantable.pyspark.DataFrame` /
   `DataFrameModel`: `withColumn`, `where`, `filter`, `select`, `orderBy`/`sort`,
   `limit`, `drop`, `distinct`, `withColumnRenamed`, `dropDuplicates` (all-column
-  only), `columns`, `schema`, and `__getitem__` with `str` / `list[str]`.
-  `union` / `unionAll` raise until concat is implemented.
+  only; `subset=` raises), `columns`, `schema`, and `__getitem__` with `str` /
+  `list[str]`. `union` / `unionAll` follow the core planner (may raise until
+  vertical concat is fully implemented).
 
-- **`functions`**: `lit`, typed `col`, `isnull` / `isnotnull`, `coalesce`;
-  aggregate names (`sum`, `avg`, …) raise with a hint to use `group_by().agg`;
-  `when` is still not implemented (needs Rust conditional expressions).
+- **`functions`**: `lit`, typed `col`, `isnull` / `isnotnull`, `coalesce`, `when` /
+  `otherwise`, `cast`, `between`, `isin`, `concat`, `substring`, `length`;
+  aggregate names (`sum`, `avg`, …) raise with a hint to use `group_by().agg`.
 
 There is no `SparkSession`, SQL string execution, `Window`, or interop with the
 `pyspark` package unless added later.

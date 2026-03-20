@@ -3,6 +3,9 @@
 This matrix compares **Apache Spark** `pyspark.sql` concepts to **pydantable**’s
 facade. It is not a guarantee of behavioral identity with Spark.
 
+For how to import and use the PySpark-style `DataFrame` and `sql` package, see
+**[PySpark UI](PYSPARK_UI.md)**.
+
 | Spark API area | Pydantable status | Notes |
 |----------------|-------------------|--------|
 | `SparkSession`, `spark.sql(...)` | **Out of scope** | No distributed engine or SQL parser in pydantable. |
