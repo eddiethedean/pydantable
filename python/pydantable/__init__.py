@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from . import pandas as pandas
 from . import pyspark as pyspark
@@ -8,6 +9,8 @@ from .expressions import Expr
 from .schema import Schema
 
 _backend = os.getenv("PYDANTABLE_BACKEND", "polars").lower()
+DataFrame: Any
+DataFrameModel: Any
 if _backend == "pandas":
     from .pandas import DataFrame, DataFrameModel
 elif _backend == "pyspark":

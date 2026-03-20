@@ -12,4 +12,3 @@ class PySparkBackend(PolarsBackend):
     """
 
     name = "pyspark"
-

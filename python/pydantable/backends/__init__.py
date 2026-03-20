@@ -23,4 +23,3 @@ def get_backend(name: str | None) -> Backend:
     except KeyError as e:
         known = ", ".join(sorted(_BACKENDS.keys()))
         raise ValueError(f"Unknown backend {name!r}. Known backends: {known}.") from e
-

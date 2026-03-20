@@ -249,9 +249,7 @@ class DataFrame(Generic[SchemaT]):
         if not isinstance(other, DataFrame):
             raise TypeError("join(other=...) expects another DataFrame.")
         if getattr(other, "_backend", "polars") != getattr(self, "_backend", "polars"):
-            raise ValueError(
-                "join between different backends is not supported yet."
-            )
+            raise ValueError("join between different backends is not supported yet.")
         keys = [on] if isinstance(on, str) else list(on)
 
         backend = get_backend(self._backend)

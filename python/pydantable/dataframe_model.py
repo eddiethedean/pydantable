@@ -43,8 +43,8 @@ def _normalize_input(
             normalized_rows.append(row_model.model_validate(row))
 
         columns: dict[str, list[Any]] = {name: [] for name in expected_fields}
-        for row in normalized_rows:
-            row_dict = row.model_dump()
+        for model_row in normalized_rows:
+            row_dict = model_row.model_dump()
             for name in expected_fields:
                 columns[name].append(row_dict[name])
         return columns
@@ -88,12 +88,12 @@ class DataFrameModel:
             raise TypeError("DataFrameModel subclasses must define annotated fields.")
 
         field_defs = _field_defs_from_annotations(annotations)
-        cls.RowModel = create_model(  # type: ignore[call-arg]
+        cls.RowModel = create_model(  # type: ignore[call-overload]
             f"{cls.__name__}RowModel",
             __base__=Schema,
             **field_defs,
         )
-        cls._SchemaModel = create_model(  # type: ignore[call-arg]
+        cls._SchemaModel = create_model(  # type: ignore[call-overload]
             f"{cls.__name__}Schema",
             __base__=Schema,
             **field_defs,
@@ -106,9 +106,8 @@ class DataFrameModel:
         strict: bool = True,
     ):
         normalized = _normalize_input(data=data, row_model=self.RowModel)
-        self._df = self._dataframe_cls[self._SchemaModel](
-            normalized, strict=strict
-        )
+        dataframe_cls = cast("Any", self._dataframe_cls)
+        self._df = dataframe_cls[self._SchemaModel](normalized, strict=strict)
 
     @classmethod
     def _derived_model_type(

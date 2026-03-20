@@ -655,13 +655,17 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             };
             dict.set_item("value", value_obj)?;
         }
-        ExprNode::BinaryOp { op, left, right, .. } => {
+        ExprNode::BinaryOp {
+            op, left, right, ..
+        } => {
             dict.set_item("kind", "binary_op")?;
             dict.set_item("op", arith_op_to_str(op))?;
             dict.set_item("left", exprnode_to_serializable(py, left)?)?;
             dict.set_item("right", exprnode_to_serializable(py, right)?)?;
         }
-        ExprNode::CompareOp { op, left, right, .. } => {
+        ExprNode::CompareOp {
+            op, left, right, ..
+        } => {
             dict.set_item("kind", "compare_op")?;
             dict.set_item("op", cmp_op_to_str(op))?;
             dict.set_item("left", exprnode_to_serializable(py, left)?)?;

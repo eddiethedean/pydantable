@@ -8,15 +8,15 @@ mod plan;
 
 use crate::dtype::{dtype_to_python_type, py_annotation_to_dtype, DTypeDesc};
 use crate::expr::{
-    exprnode_to_serializable, op_symbol_to_arith, op_symbol_to_cmp, ArithOp, CmpOp,
-    ExprHandle, ExprNode,
+    exprnode_to_serializable, op_symbol_to_arith, op_symbol_to_cmp, ArithOp, CmpOp, ExprHandle,
+    ExprNode,
 };
 use crate::plan::{
     execute_groupby_agg_polars as execute_groupby_agg_inner,
     execute_join_polars as execute_join_inner, execute_plan as execute_plan_inner,
     make_plan as make_plan_inner, plan_filter as plan_filter_inner,
     plan_select as plan_select_inner, plan_with_columns as plan_with_columns_inner,
-    schema_descriptors_as_py, schema_fields_as_py, PlanInner, planinner_to_serializable,
+    planinner_to_serializable, schema_descriptors_as_py, schema_fields_as_py, PlanInner,
 };
 
 #[pyclass]

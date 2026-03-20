@@ -7,9 +7,7 @@ from conftest import assert_table_eq_sorted
 from pydantable import DataFrameModel as PolarsDataFrameModel
 
 
-@pytest.mark.parametrize(
-    "backend_mod", ["pydantable.pandas", "pydantable.pyspark"]
-)
+@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
 def test_backend_equivalence_select_with_columns_filter_collect(
     backend_mod: str,
 ) -> None:
@@ -29,22 +27,16 @@ def test_backend_equivalence_select_with_columns_filter_collect(
     default_df = UserDefault(payload)
     backend_df = UserBackend(payload)
 
-    default_df2 = (
-        default_df.with_columns(age2=default_df.age * 2).select("id", "age2")
-    )
+    default_df2 = default_df.with_columns(age2=default_df.age * 2).select("id", "age2")
     default_out = default_df2.filter(default_df2.age2 > 10).collect()
 
-    backend_df2 = backend_df.with_columns(age2=backend_df.age * 2).select(
-        "id", "age2"
-    )
+    backend_df2 = backend_df.with_columns(age2=backend_df.age * 2).select("id", "age2")
     backend_out = backend_df2.filter(backend_df2.age2 > 10).collect()
 
     assert_table_eq_sorted(default_out, backend_out, keys=["id"])
 
 
-@pytest.mark.parametrize(
-    "backend_mod", ["pydantable.pandas", "pydantable.pyspark"]
-)
+@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
 def test_backend_equivalence_join_and_groupby_all_null_semantics(
     backend_mod: str,
 ) -> None:
@@ -86,12 +78,8 @@ def test_backend_equivalence_join_and_groupby_all_null_semantics(
     backend_left = LeftBackend(left_payload)
     backend_right = RightBackend(right_payload)
 
-    default_joined = default_left.join(
-        default_right, on="id", how="inner", suffix="_r"
-    )
-    backend_joined = backend_left.join(
-        backend_right, on="id", how="inner", suffix="_r"
-    )
+    default_joined = default_left.join(default_right, on="id", how="inner", suffix="_r")
+    backend_joined = backend_left.join(backend_right, on="id", how="inner", suffix="_r")
 
     default_join_out = default_joined.collect()
     backend_join_out = backend_joined.collect()
@@ -112,4 +100,3 @@ def test_backend_equivalence_join_and_groupby_all_null_semantics(
     default_group_out = default_grouped.collect()
     backend_group_out = backend_grouped.collect()
     assert_table_eq_sorted(default_group_out, backend_group_out, keys=["id"])
-

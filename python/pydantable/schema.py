@@ -91,7 +91,7 @@ def make_derived_schema_type(
     # Make derived schemas strict by inheriting from our `Schema` base.
     # If the user passed a custom BaseModel subclass, we still want strict
     # `extra="forbid"` behavior.
-    derived = create_model(  # type: ignore[call-arg]
+    derived = create_model(  # type: ignore[call-overload]
         f"{base_schema_type.__name__}Derived",
         __base__=Schema,
         **{name: (t, ...) for name, t in field_types.items()},

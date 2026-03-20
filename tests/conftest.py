@@ -21,9 +21,7 @@ def sort_rows_by_keys(
     n = len(next(iter(table.values())))
     order = list(range(n))
     order.sort(
-        key=lambda i: tuple(
-            _sort_key_for_value(table[k][i]) for k in keys
-        ),
+        key=lambda i: tuple(_sort_key_for_value(table[k][i]) for k in keys),
     )
 
     out: dict[str, list[Any]] = {}
@@ -46,4 +44,3 @@ def assert_table_eq_sorted(
 def _keys_for_sort() -> list[str]:
     # Small fixture for future reuse.
     return ["id"]
-

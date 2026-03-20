@@ -31,10 +31,7 @@ pub struct PlanInner {
     pub root_schema: HashMap<String, DTypeDesc>,
 }
 
-pub fn planinner_to_serializable(
-    py: Python<'_>,
-    inner: &PlanInner,
-) -> PyResult<PyObject> {
+pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<PyObject> {
     let out = PyDict::new_bound(py);
     out.set_item("version", 1)?;
 
@@ -65,10 +62,7 @@ pub fn planinner_to_serializable(
             }
             PlanStep::Filter { condition } => {
                 step_out.set_item("kind", "filter")?;
-                step_out.set_item(
-                    "condition",
-                    exprnode_to_serializable(py, condition)?,
-                )?;
+                step_out.set_item("condition", exprnode_to_serializable(py, condition)?)?;
             }
         }
         steps.append(step_out)?;

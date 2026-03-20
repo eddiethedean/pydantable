@@ -56,4 +56,3 @@ html_theme = "sphinx_rtd_theme"
 # The API pages are generated via autosummary; some of them may not be
 # reachable from the main navigation automatically during generation.
 suppress_warnings = ["toc.not_included"]
-

@@ -84,9 +84,7 @@ def test_join_collision_suffixes_all_non_key_overlaps() -> None:
         age: int | None
 
     left = DataFrame[Left]({"id": [2, 1], "score": [20, 10], "age": [200, 100]})
-    right = DataFrame[Right](
-        {"id": [2, 1], "score": [200, 100], "age": [2000, 1000]}
-    )
+    right = DataFrame[Right]({"id": [2, 1], "score": [200, 100], "age": [2000, 1000]})
 
     joined = left.join(right, on="id", how="inner", suffix="_r")
     out = joined.collect()
@@ -101,4 +99,3 @@ def test_join_collision_suffixes_all_non_key_overlaps() -> None:
         },
         keys=["id"],
     )
-

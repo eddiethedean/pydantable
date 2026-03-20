@@ -64,4 +64,3 @@ def test_all_null_group_preserves_nullable_aggregate_schema() -> None:
     assert schema["age_sum"] == Optional[int]
     assert schema["age_mean"] == Optional[float]
     assert schema["age_count"] is int
-

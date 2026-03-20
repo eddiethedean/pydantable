@@ -36,4 +36,3 @@ class Backend(Protocol):
         by: Sequence[str],
         aggregations: Any,
     ) -> tuple[Any, Any]: ...
-

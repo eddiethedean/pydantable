@@ -56,4 +56,3 @@ class PolarsBackend(Backend):
             list(by),
             aggregations,
         )
-
