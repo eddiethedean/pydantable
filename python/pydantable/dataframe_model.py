@@ -224,14 +224,23 @@ class DataFrameModel:
         self,
         other: DataFrameModel,
         *,
-        on: str | Sequence[str],
+        on: str | Sequence[str] | None = None,
+        left_on: Any = None,
+        right_on: Any = None,
         how: str = "inner",
         suffix: str = "_right",
     ) -> DataFrameModel:
         if not isinstance(other, DataFrameModel):
             raise TypeError("join(other=...) expects another DataFrameModel instance.")
         return self._from_dataframe(
-            self._df.join(other._df, on=on, how=how, suffix=suffix)
+            self._df.join(
+                other._df,
+                on=on,
+                left_on=left_on,
+                right_on=right_on,
+                how=how,
+                suffix=suffix,
+            )
         )
 
     def group_by(self, *keys: Any) -> GroupedDataFrameModel:

@@ -396,7 +396,9 @@ class DataFrame(Generic[SchemaT]):
         self,
         other: DataFrame[Any],
         *,
-        on: str | Sequence[str],
+        on: str | Sequence[str] | None = None,
+        left_on: str | Expr | Sequence[str | Expr] | None = None,
+        right_on: str | Expr | Sequence[str | Expr] | None = None,
         how: str = "inner",
         suffix: str = "_right",
     ) -> DataFrame[Any]:
@@ -404,7 +406,54 @@ class DataFrame(Generic[SchemaT]):
             raise TypeError("join(other=...) expects another DataFrame.")
         if getattr(other, "_backend", "polars") != getattr(self, "_backend", "polars"):
             raise ValueError("join between different backends is not supported yet.")
-        keys = [on] if isinstance(on, str) else list(on)
+        if on is not None and (left_on is not None or right_on is not None):
+            raise ValueError(
+                "join() use either on=... or left_on=/right_on=..., not both."
+            )
+
+        def _resolve_keys(keys: str | Expr | Sequence[str | Expr] | None) -> list[str]:
+            if keys is None:
+                return []
+            raw: list[str | Expr] = (
+                [keys] if isinstance(keys, (str, Expr)) else list(keys)
+            )
+            out: list[str] = []
+            for key in raw:
+                if isinstance(key, str):
+                    out.append(key)
+                elif isinstance(key, Expr):
+                    referenced = key.referenced_columns()
+                    if len(referenced) != 1:
+                        raise TypeError(
+                            "join expression keys must reference exactly one column."
+                        )
+                    out.append(next(iter(referenced)))
+                else:
+                    raise TypeError(
+                        "join keys must be str, Expr, or sequences thereof."
+                    )
+            return out
+
+        if on is not None:
+            left_keys = [on] if isinstance(on, str) else list(on)
+            right_keys = list(left_keys)
+        else:
+            left_keys = _resolve_keys(left_on)
+            right_keys = _resolve_keys(right_on)
+
+        if how == "cross":
+            if left_keys or right_keys:
+                raise ValueError("cross join does not accept on/left_on/right_on keys.")
+        else:
+            if not left_keys or not right_keys:
+                raise ValueError(
+                    "join() requires on=... or both left_on=... "
+                    "and right_on=... for non-cross joins."
+                )
+            if len(left_keys) != len(right_keys):
+                raise ValueError(
+                    "join() left_on and right_on must have the same length."
+                )
 
         backend = get_backend(self._backend)
         joined_data, schema_descriptors = backend.execute_join(
@@ -412,7 +461,8 @@ class DataFrame(Generic[SchemaT]):
             self._root_data,
             other._rust_plan,
             other._root_data,
-            keys,
+            left_keys,
+            right_keys,
             how,
             suffix,
         )

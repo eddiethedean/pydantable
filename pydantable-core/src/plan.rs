@@ -11,9 +11,9 @@ use crate::expr::{exprnode_to_serializable, ExprNode};
 use polars::lazy::dsl::{col, lit, Expr as PolarsExpr};
 #[cfg(feature = "polars_engine")]
 use polars::prelude::{
-    BooleanChunked, DataFrame, DataType, FillNullStrategy, Float64Chunked, Int64Chunked,
-    IntoColumn, IntoLazy, IntoSeries, JoinArgs, JoinType, LazyFrame, NewChunkedArray, PolarsError,
-    Series, SortMultipleOptions, StringChunked, UniqueKeepStrategy,
+    BooleanChunked, CrossJoin, DataFrame, DataType, FillNullStrategy, Float64Chunked, Int64Chunked,
+    IntoColumn, IntoLazy, IntoSeries, JoinArgs, JoinType, LazyFrame, MaintainOrderJoin,
+    NewChunkedArray, PolarsError, Series, SortMultipleOptions, StringChunked, UniqueKeepStrategy,
 };
 
 #[derive(Clone, Debug)]
@@ -1154,22 +1154,38 @@ pub fn execute_join_polars(
     left_root_data: &Bound<'_, PyAny>,
     right_plan: &PlanInner,
     right_root_data: &Bound<'_, PyAny>,
-    on: Vec<String>,
+    left_on: Vec<String>,
+    right_on: Vec<String>,
     how: String,
     suffix: String,
 ) -> PyResult<(PyObject, PyObject)> {
-    if on.is_empty() {
+    let is_cross = how == "cross";
+    let is_semi = how == "semi";
+    let is_anti = how == "anti";
+    if !is_cross && (left_on.is_empty() || right_on.is_empty()) {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
             "join(on=...) requires at least one join key.",
         ));
     }
-    for key in on.iter() {
+    if !is_cross && left_on.len() != right_on.len() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "join() left and right join key lists must have the same length.",
+        ));
+    }
+    if is_cross && (!left_on.is_empty() || !right_on.is_empty()) {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "cross join does not accept join keys.",
+        ));
+    }
+    for key in left_on.iter() {
         if !left_plan.schema.contains_key(key) {
             return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
                 "join() unknown left join key '{}'.",
                 key
             )));
         }
+    }
+    for key in right_on.iter() {
         if !right_plan.schema.contains_key(key) {
             return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
                 "join() unknown right join key '{}'.",
@@ -1181,12 +1197,15 @@ pub fn execute_join_polars(
     let join_type = match how.as_str() {
         "inner" => JoinType::Inner,
         "left" => JoinType::Left,
+        "right" => JoinType::Right,
         "full" | "outer" => JoinType::Full,
+        "semi" | "anti" => JoinType::Left,
+        "cross" => JoinType::Cross,
         other => {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Unsupported join how '{}'. Use one of: inner, left, full.",
-                other
-            )))
+            "Unsupported join how '{}'. Use one of: inner, left, full, right, semi, anti, cross.",
+            other
+        )))
         }
     };
 
@@ -1201,9 +1220,15 @@ pub fn execute_join_polars(
     // - right join keys are dropped (joined on same-name keys)
     let mut right_select = Vec::new();
     for name in right_plan.schema.keys() {
+        if is_semi || is_anti {
+            if right_on.contains(name) {
+                right_select.push(col(name));
+            }
+            continue;
+        }
         // The join operation needs the right-side join keys to still exist in the
         // LazyFrame at join time.
-        if on.contains(name) {
+        if right_on.contains(name) {
             right_select.push(col(name));
             continue;
         }
@@ -1215,35 +1240,75 @@ pub fn execute_join_polars(
             right_select.push(col(name));
         }
     }
+    if is_semi || is_anti {
+        right_select.push(lit(1i64).alias("__pydantable_join_marker"));
+    }
     if !right_select.is_empty() {
         right_lf = right_lf.select(right_select);
-    } else {
-        right_lf = right_lf.select([col(on[0].as_str())]);
+    } else if !is_cross && !right_on.is_empty() {
+        right_lf = right_lf.select([col(right_on[0].as_str())]);
     }
 
-    let key_exprs = on.iter().map(col).collect::<Vec<_>>();
-    let joined = left_lf.join(
-        right_lf,
-        key_exprs.clone(),
-        key_exprs,
-        JoinArgs::new(join_type),
-    );
-    let out_df = joined.collect().map_err(polars_err)?;
+    let out_df = if is_cross {
+        let left_df = left_lf.collect().map_err(polars_err)?;
+        let right_df = right_lf.collect().map_err(polars_err)?;
+        left_df
+            .cross_join(
+                &right_df,
+                Some(suffix.clone().into()),
+                None,
+                MaintainOrderJoin::Left,
+            )
+            .map_err(polars_err)?
+    } else {
+        let left_key_exprs = left_on.iter().map(col).collect::<Vec<_>>();
+        let right_key_exprs = right_on.iter().map(col).collect::<Vec<_>>();
+        let mut joined = left_lf.join(
+            right_lf,
+            left_key_exprs,
+            right_key_exprs,
+            JoinArgs::new(join_type.clone()),
+        );
+        if is_semi {
+            joined = joined
+                .filter(col("__pydantable_join_marker").is_not_null())
+                .select(left_plan.schema.keys().map(col).collect::<Vec<_>>());
+        } else if is_anti {
+            joined = joined
+                .filter(col("__pydantable_join_marker").is_null())
+                .select(left_plan.schema.keys().map(col).collect::<Vec<_>>());
+        }
+        joined.collect().map_err(polars_err)?
+    };
 
     // Build schema descriptors from actual output dtypes.
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
+    if is_semi || is_anti {
+        out_schema = left_plan.schema.clone();
+    }
     for col_name in out_df.get_column_names() {
+        if is_semi || is_anti {
+            continue;
+        }
         let col_name_str = col_name.as_str();
         // Preserve nullable semantics from the input schemas instead of
         // inferring them from observed output nulls. This keeps
         // `Optional[T]` stable across joins even when the matched rows
         // happen to contain no nulls.
         let out_desc = if let Some(left_d) = left_plan.schema.get(col_name_str) {
-            *left_d
+            let mut d = *left_d;
+            if matches!(join_type, JoinType::Right | JoinType::Full) {
+                d.nullable = true;
+            }
+            d
         } else if let Some(stripped) = col_name_str.strip_suffix(suffix.as_str()) {
             // Collision columns from the right are renamed with the suffix.
             if let Some(right_d) = right_plan.schema.get(stripped) {
-                *right_d
+                let mut d = *right_d;
+                if matches!(join_type, JoinType::Left | JoinType::Full) {
+                    d.nullable = true;
+                }
+                d
             } else {
                 let s = out_df
                     .column(col_name)
@@ -1252,7 +1317,11 @@ pub fn execute_join_polars(
                 dtype_from_polars(s.dtype())?
             }
         } else if let Some(right_d) = right_plan.schema.get(col_name_str) {
-            *right_d
+            let mut d = *right_d;
+            if matches!(join_type, JoinType::Left | JoinType::Full) {
+                d.nullable = true;
+            }
+            d
         } else {
             let s = out_df
                 .column(col_name)

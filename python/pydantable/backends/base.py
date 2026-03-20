@@ -24,7 +24,8 @@ class Backend(Protocol):
         left_root_data: Any,
         right_plan: Any,
         right_root_data: Any,
-        on: Sequence[str],
+        left_on: Sequence[str],
+        right_on: Sequence[str],
         how: str,
         suffix: str,
     ) -> tuple[Any, Any]: ...

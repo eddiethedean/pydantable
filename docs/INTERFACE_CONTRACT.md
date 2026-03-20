@@ -17,6 +17,8 @@ row position. The project test-suite uses sorted comparisons to enforce this.
 ### Join keys
 - `join(on=...)` requires at least one join key.
 - `on` must reference a column that exists on both sides.
+- `join(left_on=..., right_on=...)` supports column names or single-column expressions.
+- `cross` joins do not accept `on`/`left_on`/`right_on`.
 
 ### Collision handling
 - Column name collisions introduced by the right-hand side are resolved by
@@ -26,6 +28,10 @@ row position. The project test-suite uses sorted comparisons to enforce this.
 
 In other words: collisions on non-key columns become `"<name><suffix>"` for the
 right side, while join key columns remain singletons.
+
+### Supported join kinds
+- `inner`, `left`, `full`, `right`, `semi`, `anti`, `cross`
+- `semi`/`anti` return only left-side columns.
 
 ## Null semantics
 

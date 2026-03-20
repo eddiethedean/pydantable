@@ -180,3 +180,63 @@ def test_backend_equivalence_p2_fill_drop_cast_null_predicates(
         .collect()
     )
     assert_table_eq_sorted(default_out, backend_out, keys=["id"])
+
+
+@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_backend_equivalence_p3_join_variants_and_expr_keys(backend_mod: str) -> None:
+    backend = importlib.import_module(backend_mod)
+    BackendDataFrameModel = backend.DataFrameModel
+
+    class LeftDefault(PolarsDataFrameModel):
+        id: int
+        age: int | None
+        score: int
+
+    class RightDefault(PolarsDataFrameModel):
+        id: int
+        age: int | None
+        country: str
+        score: int
+
+    class LeftBackend(BackendDataFrameModel):
+        id: int
+        age: int | None
+        score: int
+
+    class RightBackend(BackendDataFrameModel):
+        id: int
+        age: int | None
+        country: str
+        score: int
+
+    left_payload = {"id": [1, 2], "age": [10, None], "score": [10, 20]}
+    right_payload = {
+        "id": [2, 3],
+        "age": [None, 30],
+        "country": ["US", "CA"],
+        "score": [200, 300],
+    }
+
+    d_left = LeftDefault(left_payload)
+    d_right = RightDefault(right_payload)
+    b_left = LeftBackend(left_payload)
+    b_right = RightBackend(right_payload)
+
+    for how in ["right", "semi", "anti", "cross"]:
+        if how == "cross":
+            d_out = d_left.join(d_right, how=how).collect()
+            b_out = b_left.join(b_right, how=how).collect()
+        else:
+            d_out = d_left.join(d_right, on="id", how=how).collect()
+            b_out = b_left.join(b_right, on="id", how=how).collect()
+        assert_table_eq_sorted(
+            d_out, b_out, keys=["id"] if "id" in d_out else list(d_out.keys())[:1]
+        )
+
+    d_expr = d_left.join(
+        d_right, left_on=d_left.id, right_on=d_right.id, how="inner"
+    ).collect()
+    b_expr = b_left.join(
+        b_right, left_on=b_left.id, right_on=b_right.id, how="inner"
+    ).collect()
+    assert_table_eq_sorted(d_expr, b_expr, keys=["id"])

@@ -70,13 +70,19 @@ Progress note:
 Goal: complete mainstream join variants.
 
 Deliverables:
-- [ ] join types: `left`, `inner`, `full`, `right`, `semi`, `anti`, `cross`
-- [ ] expression-based join keys
-- [ ] stricter duplicate-column + suffix policy docs
+- [x] join types: `left`, `inner`, `full`, `right`, `semi`, `anti`, `cross`
+- [x] expression-based join keys
+- [x] stricter duplicate-column + suffix policy docs
 
 Validation:
-- [ ] Join contract suite for each join type
-- [ ] Schema descriptor tests for nullable behavior by join type
+- [x] Join contract suite for each join type
+- [x] Schema descriptor tests for nullable behavior by join type
+
+Progress note:
+- Implemented on branch `v0.5.0`:
+  - Rust join execution now supports `right`, `semi`, `anti`, and `cross`
+  - expression-based join keys supported through Python -> PyO3 -> Rust path
+  - join collision/suffix policy documented and enforced with expanded contract tests
 
 ## Phase P4: Aggregation and group-by parity
 

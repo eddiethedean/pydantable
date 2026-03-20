@@ -279,7 +279,8 @@ fn execute_join(
     left_root_data: &Bound<'_, PyAny>,
     right_plan: &PyPlan,
     right_root_data: &Bound<'_, PyAny>,
-    on: Vec<String>,
+    left_on: Vec<String>,
+    right_on: Vec<String>,
     how: String,
     suffix: String,
 ) -> PyResult<(PyObject, PyObject)> {
@@ -289,7 +290,8 @@ fn execute_join(
         left_root_data,
         &right_plan.inner,
         right_root_data,
-        on,
+        left_on,
+        right_on,
         how,
         suffix,
     )
