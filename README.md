@@ -1,44 +1,101 @@
 # Pydantable
 
-**The dataframe layer built for FastAPI + Pydantic services.**
+**Typed dataframe transformations for FastAPI + Pydantic services, powered by a Rust execution core.**
 
-Pydantable gives you typed dataframe transformations with Rust execution, while
-keeping your Pydantic models as the source of truth for API contracts and
-validation.
+Pydantable keeps your Pydantic schemas as the source of truth for:
 
-## Why Pydantable
+- column types + nullability (`Optional[T]`)
+- expression validity (type errors fail early during AST building)
+- derived schema migration through chained transforms
 
-- **FastAPI-native contracts**: Use Pydantic schemas to define request/response types and dataframe shape in one place.
-- **Safer transformations**: Column typing, nullability, and expression errors are checked early (at AST build time).
-- **Performance-ready core**: Execute plans in Rust without giving up Python ergonomics.
+Execution is dispatched through a backend boundary (default: Polars-style contract), with optional interface modules for `pandas` and `pyspark`.
 
-## Best Fit
+## What You Get
 
-Pydantable is ideal for teams building FastAPI backends that need:
+Typed, schema-safe transforms:
 
-- typed data pipelines between API boundaries and business logic
-- schema-safe transformations that evolve cleanly over time
-- high performance execution with a Python-first developer experience
+- `DataFrameModel.with_columns(...)`
+- `DataFrameModel.select(...)`
+- `DataFrameModel.filter(...)`
+- `DataFrameModel.join(...)`
+- `DataFrameModel.group_by(...).agg(...)`
+- `DataFrameModel.collect()` for materialization into Python column data
+- `DataFrameModel.rows()` and `DataFrameModel.to_dicts()` for row-wise materialization
 
-## Status (v0.4.0 skeleton)
+## Backend Boundary (Polars-style by default)
 
-This release provides:
-- `DataFrameModel` as the primary FastAPI-facing API
-- Typed DataFrames core (`DataFrame[Schema]`) as the lower-level API
-- A typed expression AST with operator overloads (`df.age * 2`, `df.age > 10`, ...)
-- `select()`, `with_columns()`, `filter()`, and `collect()` execution
+Pydantable’s *default* exported interface emulates a Polars-style dataframe contract:
 
-`DataFrameModel` currently:
-- represents the whole DataFrame
-- generates a per-row Pydantic model for FastAPI
-- supports both input formats (columns and rows)
-- wraps `select()`, `with_columns()`, and `filter()`
-- has Phase 2 expression parity with `DataFrame[Schema]` (including reflected arithmetic like `2 + df.age`)
-- has Phase 3 transformation guarantees (schema migration, collision replacement, and input-format parity)
-- has Phase 4 logical-plan boundary guarantees (Rust-owned plan validation + schema metadata contract)
+- join collision handling via `suffix` for right-side non-key columns
+- SQL-like null propagation rules for arithmetic/comparisons/filter
+- ordering is not a stable API guarantee (tests compare deterministically on keys)
 
-`collect()` executes in the Rust core for the currently supported skeleton
-operations.
+### Select an interface module (import-based)
+
+```python
+from pydantable.pandas import DataFrameModel as PandasDataFrameModel
+from pydantable.pyspark import DataFrameModel as PySparkDataFrameModel
+from pydantable import DataFrameModel as DefaultDataFrameModel
+```
+
+### Select the backend at import time (env-var based)
+
+```python
+import os
+os.environ["PYDANTABLE_BACKEND"] = "polars"  # or "pandas" / "pyspark"
+```
+
+Then:
+
+```python
+from pydantable import DataFrameModel
+```
+
+### Current status
+
+`pydantable.pandas` / `pydantable.pyspark` currently keep the typed API boundary in place, but execution still falls back to the existing Rust/Polars engine. This lets you validate contract equivalence while incrementally replacing the executors later.
+
+See:
+
+- `docs/BACKENDS.md`
+- `docs/INTERFACE_CONTRACT.md`
+
+## Quick Start
+
+```python
+from pydantable import DataFrameModel
+
+class User(DataFrameModel):
+    id: int
+    age: int | None
+
+df = User({"id": [1, 2], "age": [20, None]})
+
+df2 = df.with_columns(age2=df.age * 2)
+df3 = df2.select("id", "age2")
+df4 = df3.filter(df3.age2 > 10)
+
+result = df4.collect()
+print(result)  # {"id": [1], "age2": [40]}
+```
+
+## Semantics Contract (high level)
+
+Null semantics are SQL-like (`propagate_nulls`):
+
+- arithmetic: `NULL` + anything yields `NULL`
+- comparisons: if either side is `NULL`, the comparison result is `NULL`
+- `filter(condition)`: keeps rows where the condition evaluates to exactly `True`
+
+Collision + ordering are explicit:
+
+- `with_columns(...)` uses collision replacement semantics for deterministic schema evolution
+- `join(..., suffix=...)` renames right-side non-key overlaps with the suffix
+- `collect()` row order is not guaranteed; compare by key columns when needed
+
+For the full contract details:
+
+- `docs/INTERFACE_CONTRACT.md`
 
 ## Installation
 
@@ -52,71 +109,19 @@ pip install .
 available. The current skeleton requires the Rust extension for expression
 typing and `collect()`.
 
-## Quick start
+## Development & CI
 
-```python
-from pydantable import DataFrameModel
+- Lint: `ruff check .`
+- Tests: `pytest -q`
+- CI runs the same test suite across backend selections via `PYDANTABLE_BACKEND`.
 
-class User(DataFrameModel):
-    id: int
-    age: int
+## Docs
 
-df = User({"id": [1, 2], "age": [20, 30]})
-
-df2 = df.with_columns(age2=df.age * 2)
-df3 = df2.select("id", "age2")
-df4 = df3.filter(df3.age2 > 40)
-result = df4.collect()
-print(result)  # {"id": [2], "age2": [60]}
-```
-
-## Supported Expression Dtypes (skeleton)
-Rust enforces expression typing (at AST-build time) and executes expressions
-with the following supported dtypes:
-- `int`, `float`, `bool`, `str`
-
-Phase 2 expression system status:
-- parity verified across `DataFrameModel` and lower-level `DataFrame[Schema]`
-- invalid combinations fail at AST-build time with typed errors
-- derived schema nullability/dtypes are validated through chained transforms
-
-Phase 3 transformation status:
-- `select()`, `with_columns()`, and `filter()` transformation contract is locked
-- `with_columns()` collision replacement semantics are verified
-- row-input and column-input transformation parity is validated
-
-Phase 4 logical-plan status:
-- Rust is the source of truth for remaining transformation-time validation (`select` projection arity included)
-- Python derived schema migration consumes Rust metadata descriptors (`base`, `nullable`)
-- plan/schema contract is validated with Rust-side and Python integration tests
-
-Phase 5 execution-engine status:
-- `collect()` now executes through Rust Polars LazyFrame lowering for `select`, `with_columns`, and `filter`
-- `DataFrameModel` and `DataFrame[Schema]` API behavior is preserved at the Python boundary
-- integration parity tests and a baseline benchmark harness are included
-
-Null semantics are SQL-like (`propagate_nulls`):
-- arithmetic: `NULL` + anything yields `NULL`
-- comparisons: if either side is `NULL`, the result is `NULL` (typed as `Optional[bool]`)
-- `filter(condition)`: keeps rows where the condition evaluates to exactly `True`; drops rows where the condition is `False` or `NULL`
-
-These rules are enforced by the Rust core so that derived schemas and runtime
-values stay aligned.
-
-`Optional[T]` fields in your schema are supported:
-- DataFrame input accepts `None` values for `Optional[T]`
-- derived schemas produced by `select()` / `with_columns()` / `filter()` propagate nullability through expression result types
-
-See:
-- `docs/FASTAPI.md` for full FastAPI integration examples
-- `docs/BACKENDS.md` for how to import alternative backend interfaces
-- `docs/DATAFRAMEMODEL.md` for the `DataFrameModel` design spec
-- `docs/WHY_NOT_POLARS.md` for positioning and trade-offs vs Polars
+- `docs/DATAFRAMEMODEL.md` for the `DataFrameModel` contract/design spec
+- `docs/FASTAPI.md` for end-to-end FastAPI integration examples
+- `docs/WHY_NOT_POLARS.md` for positioning + trade-offs
 - `docs/DEVELOPER.md` for local setup and contribution workflow
-
-## Project Roadmap
-
-See `docs/ROADMAP.md`.
+- `docs/ROADMAP.md` for project phases
 
 ## License
 
