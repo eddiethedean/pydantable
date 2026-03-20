@@ -12,13 +12,14 @@ use crate::expr::{
     ExprNode,
 };
 use crate::plan::{
-    execute_concat_polars as execute_concat_inner, execute_groupby_agg_polars as execute_groupby_agg_inner,
+    execute_concat_polars as execute_concat_inner,
+    execute_groupby_agg_polars as execute_groupby_agg_inner,
     execute_join_polars as execute_join_inner, execute_plan as execute_plan_inner,
     make_plan as make_plan_inner, plan_drop as plan_drop_inner, plan_filter as plan_filter_inner,
     plan_rename as plan_rename_inner, plan_select as plan_select_inner,
     plan_slice as plan_slice_inner, plan_sort as plan_sort_inner, plan_unique as plan_unique_inner,
-    plan_with_columns as plan_with_columns_inner,
-    planinner_to_serializable, schema_descriptors_as_py, schema_fields_as_py, PlanInner,
+    plan_with_columns as plan_with_columns_inner, planinner_to_serializable,
+    schema_descriptors_as_py, schema_fields_as_py, PlanInner,
 };
 
 #[pyclass]
@@ -180,11 +181,7 @@ fn plan_drop(plan: &PyPlan, columns: Vec<String>) -> PyResult<PyPlan> {
 }
 
 #[pyfunction]
-fn plan_rename(
-    _py: Python<'_>,
-    plan: &PyPlan,
-    columns: &Bound<'_, PyAny>,
-) -> PyResult<PyPlan> {
+fn plan_rename(_py: Python<'_>, plan: &PyPlan, columns: &Bound<'_, PyAny>) -> PyResult<PyPlan> {
     let dict: &Bound<'_, pyo3::types::PyDict> = columns.downcast()?;
     let mut cols: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     for (k, v) in dict.iter() {

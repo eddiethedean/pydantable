@@ -20,9 +20,15 @@ use polars::prelude::{
 
 #[derive(Clone, Debug)]
 pub enum PlanStep {
-    Select { columns: Vec<String> },
-    WithColumns { columns: HashMap<String, ExprNode> },
-    Filter { condition: ExprNode },
+    Select {
+        columns: Vec<String>,
+    },
+    WithColumns {
+        columns: HashMap<String, ExprNode>,
+    },
+    Filter {
+        condition: ExprNode,
+    },
     Sort {
         by: Vec<String>,
         descending: Vec<bool>,
@@ -554,7 +560,9 @@ fn execute_plan_rowwise(
             }
             PlanStep::Unique { subset, keep: _ } => {
                 use std::collections::HashSet;
-                let keys = subset.clone().unwrap_or_else(|| ctx.keys().cloned().collect());
+                let keys = subset
+                    .clone()
+                    .unwrap_or_else(|| ctx.keys().cloned().collect());
                 let mut seen: HashSet<String> = HashSet::new();
                 let mut keep_idx: Vec<usize> = Vec::new();
                 for i in 0..n {
@@ -1248,7 +1256,10 @@ pub fn execute_concat_polars(
         } else if let Some(d) = right_plan.schema.get(name.as_str()) {
             out_schema.insert(name.to_string(), *d);
         } else {
-            let s = out_df.column(name).map_err(polars_err)?.as_materialized_series();
+            let s = out_df
+                .column(name)
+                .map_err(polars_err)?
+                .as_materialized_series();
             out_schema.insert(name.to_string(), dtype_from_polars(s.dtype())?);
         }
     }
