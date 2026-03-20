@@ -159,10 +159,14 @@ pub fn plan_with_columns(
         let referenced = expr.referenced_columns();
         for c in referenced.iter() {
             if !plan.schema.contains_key(c) {
+                let mut available: Vec<String> = plan.schema.keys().cloned().collect();
+                available.sort();
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Expression for '{}' references unknown column '{}'.",
+                    "Expression for '{}' references unknown column '{}'. Available columns: [{}].",
                     name,
                     c
+                    ,
+                    available.join(", ")
                 )));
             }
         }
@@ -204,7 +208,10 @@ pub fn plan_filter(plan: &PlanInner, condition: ExprNode) -> PyResult<PlanInner>
     let cond_dtype = condition.dtype();
     if cond_dtype.base != Some(crate::dtype::BaseType::Bool) {
         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-            "filter(condition) expects condition typed as bool or Optional[bool].",
+            format!(
+                "filter(condition) expects condition typed as bool or Optional[bool]. Got base={:?} nullable={}.",
+                cond_dtype.base, cond_dtype.nullable
+            ),
         ));
     }
 
@@ -212,9 +219,13 @@ pub fn plan_filter(plan: &PlanInner, condition: ExprNode) -> PyResult<PlanInner>
     let referenced = condition.referenced_columns();
     for c in referenced.iter() {
         if !plan.schema.contains_key(c) {
+            let mut available: Vec<String> = plan.schema.keys().cloned().collect();
+            available.sort();
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Filter expression references unknown column '{}'.",
+                "Filter expression references unknown column '{}'. Available columns: [{}].",
                 c
+                ,
+                available.join(", ")
             )));
         }
     }

@@ -1,0 +1,17 @@
+site_name: Pydantable
+docs_dir: docs
+site_dir: site
+use_directory_urls: false
+
+theme: mkdocs
+
+nav:
+  - Home: index.md
+  - DataFrameModel Contract: DATAFRAMEMODEL.md
+  - FastAPI Integration: FASTAPI.md
+  - Roadmap: ROADMAP.md
+  - Developer Guide: DEVELOPER.md
+  - Why Not Polars: WHY_NOT_POLARS.md
+  - Plan Document: pydantable_plan.md
+  - README: pydantable_readme.md
+

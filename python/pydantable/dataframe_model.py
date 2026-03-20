@@ -101,7 +101,13 @@ class DataFrameModel:
     def _derived_model_type(cls, field_types: Mapping[str, Any]) -> Type["DataFrameModel"]:
         name = f"{cls.__name__}Derived"
         annotations = dict(field_types)
-        derived = type(name, (DataFrameModel,), {"__annotations__": annotations})
+        # Inherit from the originating subclass for better DX/autocomplete and
+        # to ensure generated `RowModel` / `Schema` types are aligned.
+        derived = type(
+            name,
+            (cls,),
+            {"__annotations__": annotations, "__module__": cls.__module__},
+        )
         return cast(Type["DataFrameModel"], derived)
 
     @classmethod
@@ -119,6 +125,33 @@ class DataFrameModel:
 
     def to_dict(self) -> Dict[str, list[Any]]:
         return self._df.to_dict()
+
+    def rows(self) -> list[BaseModel]:
+        """
+        Materialize this DataFrame into a list of per-row Pydantic models.
+
+        This is intended as the row-wise bridge for FastAPI response
+        serialization workflows.
+        """
+        data = self.collect()
+        if not data:
+            return []
+
+        n = len(next(iter(data.values())))
+        out: list[BaseModel] = []
+        for i in range(n):
+            row_dict = {name: col[i] for name, col in data.items()}
+            out.append(self.RowModel.model_validate(row_dict))
+        return out
+
+    def to_dicts(self) -> list[dict[str, Any]]:
+        """
+        Return JSON-friendly row dictionaries.
+
+        Uses the generated `RowModel` so field aliases / defaults are
+        respected consistently with Pydantic.
+        """
+        return [row.model_dump() for row in self.rows()]
 
     def select(self, *cols: Any) -> "DataFrameModel":
         return self._from_dataframe(self._df.select(*cols))

@@ -14,6 +14,9 @@ dependencies = [
     "typing-extensions>=4.7",
 ]
 
+[project.optional-dependencies]
+docs = ["mkdocs"]
+
 [tool.maturin]
 # Builds `pydantable._core` from the Rust crate in `pydantable-core/`.
 manifest-path = "pydantable-core/Cargo.toml"

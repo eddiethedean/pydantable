@@ -114,3 +114,32 @@ def test_dataframe_model_row_vs_column_input_transformation_parity():
     )
     assert row_out == col_out == {"id": [3], "age2": [31]}
 
+
+def test_rows_materializes_row_models_with_nulls():
+    df = UserDF({"id": [1, 2], "age": [20, None]})
+    rows = df.rows()
+
+    assert len(rows) == 2
+    assert isinstance(rows[0], UserDF.row_model())
+    assert rows[0].id == 1
+    assert rows[0].age == 20
+
+    assert isinstance(rows[1], UserDF.row_model())
+    assert rows[1].id == 2
+    assert rows[1].age is None
+
+
+def test_rows_and_to_dicts_materialize_derived_schema():
+    df = UserDF({"id": [1, 2], "age": [20, None]})
+    df2 = df.with_columns(age2=df.age + 1)
+
+    rows = df2.rows()
+    assert [r.id for r in rows] == [1, 2]
+    assert [r.age2 for r in rows] == [21, None]
+
+    got_dicts = df2.to_dicts()
+    assert got_dicts == [
+        {"id": 1, "age": 20, "age2": 21},
+        {"id": 2, "age": None, "age2": None},
+    ]
+

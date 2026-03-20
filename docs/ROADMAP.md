@@ -62,6 +62,11 @@ Spec: `docs/DATAFRAMEMODEL.md`.
   - deterministic join collision handling implemented via suffix for right-side non-key columns
   - derived schema descriptors preserved through advanced ops and surfaced in `DataFrameModel`
   - Python integration tests added for join/group_by/aggregations parity + correctness
+- Phase 7: completed
+  - `DataFrameModel.rows()` / `DataFrameModel.to_dicts()` added for row-wise serialization
+  - Derived model types now inherit from the originating subclass for better DX/autocomplete
+  - Rust-side validation errors enriched with additional context (without breaking error substrings)
+  - MkDocs docs site scaffold added (`mkdocs.yml`, `docs/index.md`, and contributor build instructions)
 
 ## Phase 0: Repo Setup
 
@@ -163,10 +168,10 @@ Goals:
 - FastAPI integration quality
 
 Deliverables:
-- Improved error messages (schema + expression validation)
-- Better type hints across `DataFrameModel` and derived model types
-- Autocomplete support
-- Documentation site, examples, and tutorials
-- Row-wise materialization helpers (e.g. `rows()` returning `RowModel`s) for
+- [x] Improved error messages (schema + expression validation)
+- [x] Better type hints across `DataFrameModel` and derived model types
+- [x] Autocomplete support
+- [x] Documentation site, examples, and tutorials
+- [x] Row-wise materialization helpers (e.g. `rows()` returning `RowModel`s) for
   response serialization workflows
 
