@@ -149,10 +149,23 @@ Progress note:
 Goal: declare practical parity target and freeze contracts.
 
 Deliverables:
-- [ ] Parity scorecard table (Implemented / Partial / Missing)
-- [ ] End-to-end examples ported from common Polars workflows
-- [ ] Performance guardrails for major transforms
-- [ ] Final documentation pass with migration notes
+- [x] Parity scorecard table (Implemented / Partial / Missing)
+- [x] End-to-end examples ported from common Polars workflows
+- [x] Performance guardrails for major transforms
+- [x] Final documentation pass with migration notes
+
+Validation:
+- [x] Scorecard published and linked in docs navigation
+- [x] At least 3 end-to-end workflow examples added
+- [x] Performance guardrail suite added for major transform families
+- [x] Full docs pass completed with migration guidance
+
+Progress note:
+- Implemented on branch `v0.5.0`:
+  - Added docs parity scorecard (`Implemented`/`Partial`/`Missing`) and linked it in docs nav.
+  - Added end-to-end Polars-style workflow examples for join/groupby, reshape, and time-series operations.
+  - Added lightweight performance guardrail tests for join, groupby, reshape, and window transforms.
+  - Completed final docs pass with migration notes and consolidated contract references.
 
 ## Suggested execution order
 

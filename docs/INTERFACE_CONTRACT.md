@@ -99,3 +99,11 @@ Rolling/dynamic contracts:
 - Dynamic windows support `every` / `period` with `s/m/h/d` suffixes and explicit aggregation contracts.
 - Nulls are ignored for numeric aggregations; all-null windows yield `None` for nullable aggregates and `0` for `count`.
 
+## Migration Notes (Polars -> Pydantable)
+
+- Keep schema-first modeling: declare columns on `DataFrameModel` before transforms.
+- Prefer `out_name=(op, column)` aggregation specs instead of ad-hoc expression maps.
+- Treat row order as non-contractual unless explicitly sorted before assertions.
+- Use typed nullability (`T | None`) consistently; output schema nullability is contract-driven.
+- For reshape workflows, follow deterministic output naming contracts documented in this file.
+

@@ -124,6 +124,8 @@ typing and `collect()`.
 - `docs/WHY_NOT_POLARS.md` for positioning + trade-offs
 - `docs/DEVELOPER.md` for local setup and contribution workflow
 - `docs/ROADMAP.md` for project phases
+- `docs/PARITY_SCORECARD.md` for parity coverage status
+- `docs/POLARS_WORKFLOWS.md` for end-to-end Polars-style workflows
 
 ## License
 
