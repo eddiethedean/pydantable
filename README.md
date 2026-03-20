@@ -99,6 +99,8 @@ For the full contract details:
 
 ## Installation
 
+Pydantable requires Python `3.10+`.
+
 From this repo:
 
 ```bash

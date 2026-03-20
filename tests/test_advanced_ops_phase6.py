@@ -1,5 +1,3 @@
-from typing import Optional
-
 import pytest
 from conftest import assert_table_eq_sorted
 from pydantable import DataFrame, DataFrameModel
@@ -8,7 +6,7 @@ from pydantable.schema import Schema
 
 class UserSchema(Schema):
     id: int
-    age: Optional[int]
+    age: int | None
 
 
 class CountrySchema(Schema):
@@ -18,7 +16,7 @@ class CountrySchema(Schema):
 
 class UserDF(DataFrameModel):
     id: int
-    age: Optional[int]
+    age: int | None
 
 
 class CountryDF(DataFrameModel):
@@ -41,7 +39,7 @@ def test_phase6_join_inner_happy_path_and_schema():
     assert schema["id"] is int
     # Keep nullable semantics from the left input schema, even if the
     # selected inner-join rows happen to contain no nulls.
-    assert schema["age"] == Optional[int]
+    assert schema["age"] == int | None
     assert schema["country"] is str
 
 
@@ -69,7 +67,15 @@ def test_phase6_groupby_agg_count_sum_mean():
         )
         .collect()
     )
-    got = sorted(zip(out["id"], out["age_count"], out["age_sum"], out["age_mean"]))
+    got = sorted(
+        zip(
+            out["id"],
+            out["age_count"],
+            out["age_sum"],
+            out["age_mean"],
+            strict=True,
+        )
+    )
     assert got == [(1, 1, 10, 10.0), (2, 2, 50, 25.0)]
 
 
@@ -87,5 +93,7 @@ def test_phase6_dataframe_model_join_and_groupby_parity():
     assert out == {"id": [1, 3], "age": [20, 30], "country": ["US", "CA"]}
 
     grouped = users.group_by("id").agg(age_count=("count", "age"))
-    gout = sorted(zip(grouped.collect()["id"], grouped.collect()["age_count"]))
+    gout = sorted(
+        zip(grouped.collect()["id"], grouped.collect()["age_count"], strict=True)
+    )
     assert gout == [(1, 1), (2, 0), (3, 1)]

@@ -4,7 +4,7 @@ This guide is for contributors working on `pydantable` internals.
 
 ## Prerequisites
 
-- Python `3.10+` (project metadata targets `>=3.9`; current local dev flow uses `3.10`)
+- Python `3.10+` (project metadata targets `>=3.10`; current local dev flow uses `3.10`)
 - Rust toolchain (`rustup`, `cargo`)
 - `maturin` for building the PyO3 extension
 

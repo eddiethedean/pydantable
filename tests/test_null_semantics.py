@@ -1,11 +1,12 @@
-from typing import Optional, Union, get_args, get_origin
+from types import UnionType
+from typing import Union, get_args, get_origin
 
 import pytest
 from pydantable import DataFrame, Schema
 
 
 def _is_optional_of(dtype, base_type) -> bool:
-    return get_origin(dtype) is Union and set(get_args(dtype)) == {
+    return get_origin(dtype) in {Union, UnionType} and set(get_args(dtype)) == {
         base_type,
         type(None),
     }
@@ -13,7 +14,7 @@ def _is_optional_of(dtype, base_type) -> bool:
 
 class UserNullable(Schema):
     id: int
-    age: Optional[int]
+    age: int | None
 
 
 def test_arithmetic_propagates_nulls_and_optional_dtype():

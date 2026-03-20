@@ -1,17 +1,15 @@
-from typing import Optional
-
 from pydantable import DataFrame, DataFrameModel
 from pydantable.schema import Schema
 
 
 class UserSchema(Schema):
     id: int
-    age: Optional[int]
+    age: int | None
 
 
 class UserDF(DataFrameModel):
     id: int
-    age: Optional[int]
+    age: int | None
 
 
 def test_phase5_collect_preserves_null_filter_semantics():
@@ -48,5 +46,5 @@ def test_phase5_collect_matches_derived_schema_fields():
     )
     out = df2.collect()
     assert set(out.keys()) == {"id", "age2", "cond"}
-    assert df2.schema_fields()["age2"] == Optional[int]
-    assert df2.schema_fields()["cond"] == Optional[bool]
+    assert df2.schema_fields()["age2"] == int | None
+    assert df2.schema_fields()["cond"] == bool | None

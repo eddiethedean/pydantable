@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, TypeAdapter, create_model
 
@@ -120,7 +120,7 @@ def dtype_descriptor_to_annotation(descriptor: Mapping[str, Any]) -> Any:
 
     py_t = base_map[base]
     if nullable:
-        return Optional[py_t]
+        return py_t | None
     return py_t
 
 

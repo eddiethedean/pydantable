@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import pytest
 from pydantable import DataFrameModel
 from pydantic import ValidationError
@@ -14,7 +12,7 @@ class UserDF(DataFrameModel):
 
 def test_dataframe_model_column_input_happy_path():
     df = UserDF({"id": [1, 2], "age": [20, None]})
-    assert df.schema_fields() == {"id": int, "age": Optional[int]}
+    assert df.schema_fields() == {"id": int, "age": int | None}
     assert df.collect() == {"id": [1, 2], "age": [20, None]}
 
 
@@ -37,10 +35,10 @@ def test_dataframe_model_transformations_return_derived_model():
 
     df2 = df.with_columns(age2=df.age + 1)
     assert "age2" in df2.schema_fields()
-    assert df2.schema_fields()["age2"] == Optional[int]
+    assert df2.schema_fields()["age2"] == int | None
 
     df3 = df2.select("id", "age2")
-    assert df3.schema_fields() == {"id": int, "age2": Optional[int]}
+    assert df3.schema_fields() == {"id": int, "age2": int | None}
 
     df4 = df3.filter(df3.age2 > 11)
     assert df4.collect() == {"id": [2], "age2": [21]}
@@ -62,8 +60,8 @@ def test_dataframe_model_chained_schema_migration_dtypes():
     df = UserDF({"id": [1, 2, 3], "age": [20, None, 30]})
     df2 = df.with_columns(age2=df.age + 1, flag=df.age > 21)
     schema = df2.schema_fields()
-    assert schema["age2"] == Optional[int]
-    assert schema["flag"] == Optional[bool]
+    assert schema["age2"] == int | None
+    assert schema["flag"] == bool | None
 
 
 def test_rust_schema_descriptors_flow_into_derived_model_types():
@@ -73,14 +71,14 @@ def test_rust_schema_descriptors_flow_into_derived_model_types():
     desc = df2._df._rust_plan.schema_descriptors()
     assert desc["age2"] == {"base": "int", "nullable": True}
     assert desc["flag"] == {"base": "bool", "nullable": True}
-    assert df2.schema_fields()["age2"] == Optional[int]
-    assert df2.schema_fields()["flag"] == Optional[bool]
+    assert df2.schema_fields()["age2"] == int | None
+    assert df2.schema_fields()["flag"] == bool | None
 
 
 def test_dataframe_model_with_columns_collision_replacement_semantics():
     df = UserDF({"id": [1, 2, 3], "age": [10, None, 20]})
     df2 = df.with_columns(age=df.age + 1)
-    assert df2.schema_fields()["age"] == Optional[int]
+    assert df2.schema_fields()["age"] == int | None
     assert df2.collect() == {"id": [1, 2, 3], "age": [11, None, 21]}
 
 
