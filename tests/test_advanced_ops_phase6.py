@@ -1,6 +1,7 @@
 from typing import Optional
 
 import pytest
+from conftest import assert_table_eq_sorted
 from pydantable import DataFrame, DataFrameModel
 from pydantable.schema import Schema
 
@@ -30,11 +31,17 @@ def test_phase6_join_inner_happy_path_and_schema():
     right = DataFrame[CountrySchema]({"id": [1, 3], "country": ["US", "CA"]})
     joined = left.join(right, on="id", how="inner")
     out = joined.collect()
-    assert out["id"] == [1, 3]
-    assert out["age"] == [20, 30]
-    assert out["country"] == ["US", "CA"]
+    assert_table_eq_sorted(
+        out,
+        {"id": [1, 3], "age": [20, 30], "country": ["US", "CA"]},
+        keys=["id"],
+    )
+
     schema = joined.schema_fields()
     assert schema["id"] is int
+    # Keep nullable semantics from the left input schema, even if the
+    # selected inner-join rows happen to contain no nulls.
+    assert schema["age"] == Optional[int]
     assert schema["country"] is str
 
 

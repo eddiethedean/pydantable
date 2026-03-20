@@ -625,13 +625,35 @@ pub fn execute_join_polars(
     // Build schema descriptors from actual output dtypes.
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
     for col_name in out_df.get_column_names() {
-        let s = out_df
-            .column(col_name)
-            .map_err(polars_err)?
-            .as_materialized_series();
-        let mut d = dtype_from_polars(s.dtype())?;
-        d.nullable = s.null_count() > 0;
-        out_schema.insert(col_name.to_string(), d);
+        let col_name_str = col_name.as_str();
+        // Preserve nullable semantics from the input schemas instead of
+        // inferring them from observed output nulls. This keeps
+        // `Optional[T]` stable across joins even when the matched rows
+        // happen to contain no nulls.
+        let out_desc = if let Some(left_d) = left_plan.schema.get(col_name_str) {
+            *left_d
+        } else if let Some(stripped) = col_name_str.strip_suffix(suffix.as_str()) {
+            // Collision columns from the right are renamed with the suffix.
+            if let Some(right_d) = right_plan.schema.get(stripped) {
+                *right_d
+            } else {
+                let s = out_df
+                    .column(col_name)
+                    .map_err(polars_err)?
+                    .as_materialized_series();
+                dtype_from_polars(s.dtype())?
+            }
+        } else if let Some(right_d) = right_plan.schema.get(col_name_str) {
+            *right_d
+        } else {
+            let s = out_df
+                .column(col_name)
+                .map_err(polars_err)?
+                .as_materialized_series();
+            dtype_from_polars(s.dtype())?
+        };
+
+        out_schema.insert(col_name.to_string(), out_desc);
     }
 
     let out_dict = PyDict::new_bound(py);
@@ -680,6 +702,7 @@ pub fn execute_groupby_agg_polars(
     let by_exprs = by.iter().map(col).collect::<Vec<_>>();
     let mut agg_exprs = Vec::new();
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
+    let mut tmp_count_cols: HashMap<String, String> = HashMap::new();
     for key in by.iter() {
         out_schema.insert(key.clone(), *plan.schema.get(key).unwrap());
     }
@@ -691,7 +714,7 @@ pub fn execute_groupby_agg_polars(
                 in_col
             ))
         })?;
-        let expr = match op.as_str() {
+        match op.as_str() {
             "count" => {
                 out_schema.insert(
                     out_name.clone(),
@@ -700,7 +723,7 @@ pub fn execute_groupby_agg_polars(
                         nullable: false,
                     },
                 );
-                col(&in_col).count().alias(&out_name)
+                agg_exprs.push(col(&in_col).count().alias(&out_name));
             }
             "sum" => {
                 let base = in_dtype.base.ok_or_else(|| {
@@ -723,7 +746,13 @@ pub fn execute_groupby_agg_polars(
                         nullable: true,
                     },
                 );
-                col(&in_col).sum().alias(&out_name)
+                // Polars returns `0` for `sum` over all-null values.
+                // For SQL-like semantics (and our contract), mask that case
+                // to null by tracking non-null counts.
+                let tmp_count_name = format!("__pydantable_tmp_count_sum_{out_name}");
+                tmp_count_cols.insert(out_name.clone(), tmp_count_name.clone());
+                agg_exprs.push(col(&in_col).count().alias(&tmp_count_name));
+                agg_exprs.push(col(&in_col).sum().alias(&out_name));
             }
             "mean" => {
                 let base = in_dtype.base.ok_or_else(|| {
@@ -746,7 +775,11 @@ pub fn execute_groupby_agg_polars(
                         nullable: true,
                     },
                 );
-                col(&in_col).mean().alias(&out_name)
+                // Same masking approach as for `sum`: all-null -> None.
+                let tmp_count_name = format!("__pydantable_tmp_count_mean_{out_name}");
+                tmp_count_cols.insert(out_name.clone(), tmp_count_name.clone());
+                agg_exprs.push(col(&in_col).count().alias(&tmp_count_name));
+                agg_exprs.push(col(&in_col).mean().alias(&out_name));
             }
             other => {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
@@ -754,8 +787,7 @@ pub fn execute_groupby_agg_polars(
                     other
                 )))
             }
-        };
-        agg_exprs.push(expr);
+        }
     }
 
     let out_df = lf
@@ -771,7 +803,66 @@ pub fn execute_groupby_agg_polars(
             .map_err(polars_err)?
             .as_materialized_series()
             .clone();
-        let py_list = series_to_py_list(py, &col, *dtype)?;
+
+        let py_list = if let Some(tmp_count_col) = tmp_count_cols.get(name) {
+            let count_series = out_df
+                .column(tmp_count_col)
+                .map_err(polars_err)?
+                .as_materialized_series()
+                .clone();
+            // Mask all-null groups: when non-null count is 0, emit `None`.
+            match dtype.base {
+                Some(crate::dtype::BaseType::Int) => {
+                    let casted = col.cast(&DataType::Int64).map_err(polars_err)?;
+                    let counts = count_series.cast(&DataType::Int64).map_err(polars_err)?;
+                    let mut values: Vec<PyObject> = Vec::with_capacity(casted.len());
+                    for (v, c) in casted
+                        .i64()
+                        .map_err(polars_err)?
+                        .into_iter()
+                        .zip(counts.i64().map_err(polars_err)?.into_iter())
+                    {
+                        if c.unwrap_or(0) == 0 {
+                            values.push(py.None());
+                        } else {
+                            match v {
+                                Some(v) => values.push(v.into_py(py)),
+                                None => values.push(py.None()),
+                            }
+                        }
+                    }
+                    PyList::new_bound(py, values).into_py(py)
+                }
+                Some(crate::dtype::BaseType::Float) => {
+                    let casted = col.cast(&DataType::Float64).map_err(polars_err)?;
+                    let counts = count_series.cast(&DataType::Int64).map_err(polars_err)?;
+                    let mut values: Vec<PyObject> = Vec::with_capacity(casted.len());
+                    for (v, c) in casted
+                        .f64()
+                        .map_err(polars_err)?
+                        .into_iter()
+                        .zip(counts.i64().map_err(polars_err)?.into_iter())
+                    {
+                        if c.unwrap_or(0) == 0 {
+                            values.push(py.None());
+                        } else {
+                            match v {
+                                Some(v) => values.push(v.into_py(py)),
+                                None => values.push(py.None()),
+                            }
+                        }
+                    }
+                    PyList::new_bound(py, values).into_py(py)
+                }
+                _ => {
+                    // Shouldn't happen for our current `sum`/`mean` contract.
+                    series_to_py_list(py, &col, *dtype)?
+                }
+            }
+        } else {
+            series_to_py_list(py, &col, *dtype)?
+        };
+
         out_dict.set_item(name, py_list)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
@@ -781,8 +872,8 @@ pub fn execute_groupby_agg_polars(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pyo3::prepare_freethreaded_python;
     use crate::dtype::{BaseType, DTypeDesc};
+    use pyo3::prepare_freethreaded_python;
     use std::sync::Once;
 
     static INIT_PYO3: Once = Once::new();

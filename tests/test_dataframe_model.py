@@ -133,3 +133,14 @@ def test_rows_and_to_dicts_materialize_derived_schema():
         {"id": 1, "age": 20, "age2": 21},
         {"id": 2, "age": None, "age2": None},
     ]
+
+
+def test_rows_returns_empty_list_for_empty_dataframe():
+    df = UserDF({"id": [], "age": []})
+    assert df.rows() == []
+
+
+def test_row_model_rejects_extra_fields():
+    row_model = UserDF.row_model()
+    with pytest.raises(ValidationError):
+        row_model.model_validate({"id": 1, "age": None, "extra": "x"})

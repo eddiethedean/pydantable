@@ -41,3 +41,23 @@ def test_select_requires_at_least_one_column():
     df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
     with pytest.raises(ValueError, match="requires at least one column"):
         df.select()
+
+
+def test_select_rejects_multi_column_expression() -> None:
+    df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
+    expr = df.age + df.id
+    with pytest.raises(
+        TypeError,
+        match=r"select\(\) accepts column names or a ColumnRef expression",
+    ):
+        df.select(expr)
+
+
+def test_with_columns_none_requires_destination_type() -> None:
+    class UserNullable(Schema):
+        id: int
+        age: int | None
+
+    df = DataFrame[UserNullable]({"id": [1, 2], "age": [20, 30]})
+    with pytest.raises(TypeError, match=r"cannot infer destination type"):
+        df.with_columns(new=None)
