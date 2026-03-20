@@ -7,8 +7,12 @@ use crate::dtype::{dtype_to_descriptor_py, dtype_to_python_type, DTypeDesc};
 use crate::expr::{ExprNode, LiteralValue};
 
 #[cfg(feature = "polars_engine")]
+use polars::lazy::dsl::{col, lit};
+#[cfg(feature = "polars_engine")]
 use polars::prelude::{
-    col, DataFrame, DataType, IntoLazy, LazyFrame, NamedFrom, NewChunkedArray, PolarsError, Series,
+    BooleanChunked, DataFrame, DataType, Float64Chunked, IntoLazy, Int64Chunked, JoinArgs,
+    JoinType, IntoColumn, IntoSeries, LazyFrame, NewChunkedArray, PolarsError, Series,
+    StringChunked,
 };
 
 #[derive(Clone, Debug)]
@@ -329,7 +333,9 @@ fn root_data_to_polars_df(
                         v.push(Some(item.extract::<i64>()?));
                     }
                 }
-                Series::new(name.as_str().into(), v)
+                let ca: Int64Chunked =
+                    Int64Chunked::from_iter_options(name.as_str().into(), v.into_iter());
+                ca.into_series()
             }
             Some(crate::dtype::BaseType::Float) => {
                 let mut v: Vec<Option<f64>> = Vec::with_capacity(list.len());
@@ -340,7 +346,11 @@ fn root_data_to_polars_df(
                         v.push(Some(item.extract::<f64>()?));
                     }
                 }
-                Series::new(name.as_str().into(), v)
+                let ca: Float64Chunked = Float64Chunked::from_iter_options(
+                    name.as_str().into(),
+                    v.into_iter(),
+                );
+                ca.into_series()
             }
             Some(crate::dtype::BaseType::Bool) => {
                 let mut v: Vec<Option<bool>> = Vec::with_capacity(list.len());
@@ -351,7 +361,9 @@ fn root_data_to_polars_df(
                         v.push(Some(item.extract::<bool>()?));
                     }
                 }
-                Series::new(name.as_str().into(), v)
+                let ca: BooleanChunked =
+                    BooleanChunked::from_iter_options(name.as_str().into(), v.into_iter());
+                ca.into_series()
             }
             Some(crate::dtype::BaseType::Str) => {
                 let mut v: Vec<Option<String>> = Vec::with_capacity(list.len());
@@ -362,7 +374,11 @@ fn root_data_to_polars_df(
                         v.push(Some(item.extract::<String>()?));
                     }
                 }
-                Series::new(name.as_str().into(), v)
+                let ca: StringChunked = StringChunked::from_iter_options(
+                    name.as_str().into(),
+                    v.into_iter(),
+                );
+                ca.into_series()
             }
             None => {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -373,7 +389,11 @@ fn root_data_to_polars_df(
         series_list.push(s);
     }
 
-    DataFrame::new(series_list.into_iter().map(Into::into).collect()).map_err(polars_err)
+    let columns = series_list
+        .into_iter()
+        .map(|s| s.into_column())
+        .collect::<Vec<polars::prelude::Column>>();
+    DataFrame::new_infer_height(columns).map_err(polars_err)
 }
 
 #[cfg(feature = "polars_engine")]
@@ -394,9 +414,7 @@ fn apply_steps_to_lazy(mut lf: LazyFrame, steps: &[PlanStep]) -> PyResult<LazyFr
             }
             PlanStep::Filter { condition } => {
                 // SQL-like null semantics for filter: keep exactly True; drop False/NULL.
-                let cond = condition
-                    .to_polars_expr()?
-                    .fill_null(polars::prelude::lit(false));
+                let cond = condition.to_polars_expr()?.fill_null(lit(false));
                 lf = lf.filter(cond);
             }
         }
@@ -474,6 +492,261 @@ fn execute_plan_polars(py: Python<'_>, plan: &PlanInner, root_data: &Bound<'_, P
         out_dict.set_item(name, py_list)?;
     }
     Ok(out_dict.into_py(py))
+}
+
+#[cfg(feature = "polars_engine")]
+fn dtype_from_polars(dt: &DataType) -> PyResult<DTypeDesc> {
+    match dt {
+        DataType::Int64 => Ok(DTypeDesc {
+            base: Some(crate::dtype::BaseType::Int),
+            nullable: true,
+        }),
+        DataType::Float64 => Ok(DTypeDesc {
+            base: Some(crate::dtype::BaseType::Float),
+            nullable: true,
+        }),
+        DataType::Boolean => Ok(DTypeDesc {
+            base: Some(crate::dtype::BaseType::Bool),
+            nullable: true,
+        }),
+        DataType::String => Ok(DTypeDesc {
+            base: Some(crate::dtype::BaseType::Str),
+            nullable: true,
+        }),
+        other => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+            "Unsupported Polars dtype in result schema: {other:?}"
+        ))),
+    }
+}
+
+#[cfg(feature = "polars_engine")]
+pub fn execute_join_polars(
+    py: Python<'_>,
+    left_plan: &PlanInner,
+    left_root_data: &Bound<'_, PyAny>,
+    right_plan: &PlanInner,
+    right_root_data: &Bound<'_, PyAny>,
+    on: Vec<String>,
+    how: String,
+    suffix: String,
+) -> PyResult<(PyObject, PyObject)> {
+    if on.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "join(on=...) requires at least one join key.",
+        ));
+    }
+    for key in on.iter() {
+        if !left_plan.schema.contains_key(key) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "join() unknown left join key '{}'.",
+                key
+            )));
+        }
+        if !right_plan.schema.contains_key(key) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "join() unknown right join key '{}'.",
+                key
+            )));
+        }
+    }
+
+    let join_type = match how.as_str() {
+        "inner" => JoinType::Inner,
+        "left" => JoinType::Left,
+        "full" | "outer" => JoinType::Full,
+        other => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Unsupported join how '{}'. Use one of: inner, left, full.",
+                other
+            )))
+        }
+    };
+
+    let left_df = root_data_to_polars_df(&left_plan.root_schema, left_root_data)?;
+    let right_df = root_data_to_polars_df(&right_plan.root_schema, right_root_data)?;
+    let mut left_lf = apply_steps_to_lazy(left_df.lazy(), &left_plan.steps)?;
+    let mut right_lf = apply_steps_to_lazy(right_df.lazy(), &right_plan.steps)?;
+
+    // Deterministic collision handling:
+    // - keep left names unchanged
+    // - for right non-key collisions, apply suffix
+    // - right join keys are dropped (joined on same-name keys)
+    let mut right_select = Vec::new();
+    for name in right_plan.schema.keys() {
+        // The join operation needs the right-side join keys to still exist in the
+        // LazyFrame at join time.
+        if on.contains(name) {
+            right_select.push(col(name));
+            continue;
+        }
+
+        // Deterministic collision handling for non-key columns.
+        if left_plan.schema.contains_key(name) {
+            right_select.push(col(name).alias(format!("{}{}", name, suffix)));
+        } else {
+            right_select.push(col(name));
+        }
+    }
+    if !right_select.is_empty() {
+        right_lf = right_lf.select(right_select);
+    } else {
+        right_lf = right_lf.select([col(on[0].as_str())]);
+    }
+
+    let key_exprs = on.iter().map(|k| col(k)).collect::<Vec<_>>();
+    let joined = left_lf.join(
+        right_lf,
+        key_exprs.clone(),
+        key_exprs,
+        JoinArgs::new(join_type),
+    );
+    let out_df = joined.collect().map_err(polars_err)?;
+
+    // Build schema descriptors from actual output dtypes.
+    let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
+    for col_name in out_df.get_column_names() {
+        let s = out_df.column(col_name).map_err(polars_err)?.as_materialized_series();
+        let mut d = dtype_from_polars(s.dtype())?;
+        d.nullable = s.null_count() > 0;
+        out_schema.insert(col_name.to_string(), d);
+    }
+
+    let out_dict = PyDict::new_bound(py);
+    for (name, dtype) in out_schema.iter() {
+        let col = out_df
+            .column(name)
+            .map_err(polars_err)?
+            .as_materialized_series()
+            .clone();
+        let py_list = series_to_py_list(py, &col, *dtype)?;
+        out_dict.set_item(name, py_list)?;
+    }
+    let desc = schema_descriptors_as_py(py, &out_schema)?;
+    Ok((out_dict.into_py(py), desc))
+}
+
+#[cfg(feature = "polars_engine")]
+pub fn execute_groupby_agg_polars(
+    py: Python<'_>,
+    plan: &PlanInner,
+    root_data: &Bound<'_, PyAny>,
+    by: Vec<String>,
+    aggregations: Vec<(String, String, String)>,
+) -> PyResult<(PyObject, PyObject)> {
+    if by.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "group_by(...) requires at least one key.",
+        ));
+    }
+    for key in by.iter() {
+        if !plan.schema.contains_key(key) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "group_by() unknown key '{}'.",
+                key
+            )));
+        }
+    }
+    if aggregations.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "agg(...) requires at least one aggregation.",
+        ));
+    }
+
+    let df = root_data_to_polars_df(&plan.root_schema, root_data)?;
+    let lf = apply_steps_to_lazy(df.lazy(), &plan.steps)?;
+    let by_exprs = by.iter().map(|k| col(k)).collect::<Vec<_>>();
+    let mut agg_exprs = Vec::new();
+    let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
+    for key in by.iter() {
+        out_schema.insert(key.clone(), *plan.schema.get(key).unwrap());
+    }
+
+    for (out_name, op, in_col) in aggregations.into_iter() {
+        let in_dtype = *plan.schema.get(&in_col).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "agg() unknown input column '{}'.",
+                in_col
+            ))
+        })?;
+        let expr = match op.as_str() {
+            "count" => {
+                out_schema.insert(
+                    out_name.clone(),
+                    DTypeDesc {
+                        base: Some(crate::dtype::BaseType::Int),
+                        nullable: false,
+                    },
+                );
+                col(&in_col).count().alias(&out_name)
+            }
+            "sum" => {
+                let base = in_dtype.base.ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "sum() requires known-base numeric dtype.",
+                    )
+                })?;
+                if !matches!(base, crate::dtype::BaseType::Int | crate::dtype::BaseType::Float) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "sum() requires int or float input columns.",
+                    ));
+                }
+                out_schema.insert(
+                    out_name.clone(),
+                    DTypeDesc {
+                        base: Some(base),
+                        nullable: true,
+                    },
+                );
+                col(&in_col).sum().alias(&out_name)
+            }
+            "mean" => {
+                let base = in_dtype.base.ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "mean() requires known-base numeric dtype.",
+                    )
+                })?;
+                if !matches!(base, crate::dtype::BaseType::Int | crate::dtype::BaseType::Float) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "mean() requires int or float input columns.",
+                    ));
+                }
+                out_schema.insert(
+                    out_name.clone(),
+                    DTypeDesc {
+                        base: Some(crate::dtype::BaseType::Float),
+                        nullable: true,
+                    },
+                );
+                col(&in_col).mean().alias(&out_name)
+            }
+            other => {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Unsupported aggregation '{}'. Use one of: count, sum, mean.",
+                    other
+                )))
+            }
+        };
+        agg_exprs.push(expr);
+    }
+
+    let out_df = lf
+        .group_by(by_exprs)
+        .agg(agg_exprs)
+        .collect()
+        .map_err(polars_err)?;
+
+    let out_dict = PyDict::new_bound(py);
+    for (name, dtype) in out_schema.iter() {
+        let col = out_df
+            .column(name)
+            .map_err(polars_err)?
+            .as_materialized_series()
+            .clone();
+        let py_list = series_to_py_list(py, &col, *dtype)?;
+        out_dict.set_item(name, py_list)?;
+    }
+    let desc = schema_descriptors_as_py(py, &out_schema)?;
+    Ok((out_dict.into_py(py), desc))
 }
 
 #[cfg(test)]

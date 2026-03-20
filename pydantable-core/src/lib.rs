@@ -7,6 +7,8 @@ mod plan;
 use crate::dtype::{dtype_to_python_type, py_annotation_to_dtype, DTypeDesc};
 use crate::expr::{op_symbol_to_arith, op_symbol_to_cmp, ArithOp, CmpOp, ExprNode, ExprHandle};
 use crate::plan::{
+    execute_groupby_agg_polars as execute_groupby_agg_inner,
+    execute_join_polars as execute_join_inner,
     execute_plan as execute_plan_inner,
     make_plan as make_plan_inner,
     plan_filter as plan_filter_inner,
@@ -143,6 +145,54 @@ fn execute_plan(py: Python<'_>, plan: &PyPlan, root_data: &Bound<'_, PyAny>) -> 
     execute_plan_inner(py, &plan.inner, root_data)
 }
 
+#[pyfunction]
+fn execute_join(
+    py: Python<'_>,
+    left_plan: &PyPlan,
+    left_root_data: &Bound<'_, PyAny>,
+    right_plan: &PyPlan,
+    right_root_data: &Bound<'_, PyAny>,
+    on: Vec<String>,
+    how: String,
+    suffix: String,
+) -> PyResult<(PyObject, PyObject)> {
+    execute_join_inner(
+        py,
+        &left_plan.inner,
+        left_root_data,
+        &right_plan.inner,
+        right_root_data,
+        on,
+        how,
+        suffix,
+    )
+}
+
+#[pyfunction]
+fn execute_groupby_agg(
+    py: Python<'_>,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    by: Vec<String>,
+    aggregations: &Bound<'_, PyAny>,
+) -> PyResult<(PyObject, PyObject)> {
+    let dict: &Bound<'_, pyo3::types::PyDict> = aggregations.downcast()?;
+    let mut aggs: Vec<(String, String, String)> = Vec::new();
+    for (k, v) in dict.iter() {
+        let out_name: String = k.extract()?;
+        let spec: &Bound<'_, pyo3::types::PyTuple> = v.downcast()?;
+        if spec.len() != 2 {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "Aggregation spec must be a tuple: (op, input_column).",
+            ));
+        }
+        let op: String = spec.get_item(0)?.extract()?;
+        let in_col: String = spec.get_item(1)?.extract()?;
+        aggs.push((out_name, op, in_col));
+    }
+    execute_groupby_agg_inner(py, &plan.inner, root_data, by, aggs)
+}
+
 /// Minimal Rust/PyO3 stub module for the `pydantable._core` extension.
 ///
 /// This exists so the Python side can import the extension module via maturin.
@@ -153,6 +203,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPlan>()?;
 
     m.add_function(wrap_pyfunction!(execute_plan, m)?)?;
+    m.add_function(wrap_pyfunction!(execute_join, m)?)?;
+    m.add_function(wrap_pyfunction!(execute_groupby_agg, m)?)?;
     m.add_function(wrap_pyfunction!(rust_version, m)?)?;
     m.add_function(wrap_pyfunction!(make_column_ref, m)?)?;
     m.add_function(wrap_pyfunction!(make_literal, m)?)?;

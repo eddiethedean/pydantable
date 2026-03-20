@@ -6,7 +6,12 @@ use pyo3::types::{PyAny, PyDict, PyList, PyString};
 use crate::dtype::{py_value_to_dtype, BaseType, DTypeDesc};
 
 #[cfg(feature = "polars_engine")]
-use polars::prelude::{col, lit, Expr as PolarsExpr, Null};
+#[cfg(feature = "polars_engine")]
+use polars::lazy::dsl::{col, lit, Expr as PolarsExpr};
+#[cfg(feature = "polars_engine")]
+use polars::prelude::{DataType, Null};
+#[cfg(feature = "polars_engine")]
+use polars::prelude::Literal;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ArithOp {
@@ -518,18 +523,12 @@ impl ExprNode {
                 Some(LiteralValue::Bool(b)) => Ok(lit(*b)),
                 Some(LiteralValue::Str(s)) => Ok(lit(s.clone())),
                 None => {
-                    let null_expr = lit(Null {});
+                    let null_expr = Null {}.lit();
                     match dtype.base {
-                        Some(BaseType::Int) => Ok(null_expr.cast(polars::prelude::DataType::Int64)),
-                        Some(BaseType::Float) => {
-                            Ok(null_expr.cast(polars::prelude::DataType::Float64))
-                        }
-                        Some(BaseType::Bool) => {
-                            Ok(null_expr.cast(polars::prelude::DataType::Boolean))
-                        }
-                        Some(BaseType::Str) => {
-                            Ok(null_expr.cast(polars::prelude::DataType::String))
-                        }
+                        Some(BaseType::Int) => Ok(null_expr.cast(DataType::Int64)),
+                        Some(BaseType::Float) => Ok(null_expr.cast(DataType::Float64)),
+                        Some(BaseType::Bool) => Ok(null_expr.cast(DataType::Boolean)),
+                        Some(BaseType::Str) => Ok(null_expr.cast(DataType::String)),
                         None => Ok(null_expr),
                     }
                 }

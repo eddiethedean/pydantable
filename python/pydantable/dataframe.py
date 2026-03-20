@@ -221,6 +221,51 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
+    def join(
+        self,
+        other: "DataFrame[Any]",
+        *,
+        on: Union[str, Sequence[str]],
+        how: str = "inner",
+        suffix: str = "_right",
+    ) -> "DataFrame[Any]":
+        rust = _require_rust_core()
+        if not isinstance(other, DataFrame):
+            raise TypeError("join(other=...) expects another DataFrame.")
+        keys = [on] if isinstance(on, str) else list(on)
+        joined_data, schema_descriptors = rust.execute_join(
+            self._rust_plan,
+            self._root_data,
+            other._rust_plan,
+            other._root_data,
+            keys,
+            how,
+            suffix,
+        )
+        derived_fields = schema_from_descriptors(schema_descriptors)
+        derived_schema_type = make_derived_schema_type(self._current_schema_type, derived_fields)
+        rust_plan = rust.make_plan(derived_fields)
+        return self._from_plan(
+            root_data=joined_data,
+            root_schema_type=derived_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def group_by(self, *keys: Union[str, ColumnRef]) -> "GroupedDataFrame":
+        selected: List[str] = []
+        for key in keys:
+            if isinstance(key, str):
+                selected.append(key)
+            elif isinstance(key, Expr):
+                referenced = key.referenced_columns()
+                if len(referenced) != 1:
+                    raise TypeError("group_by() accepts column names or ColumnRef expressions.")
+                selected.append(next(iter(referenced)))
+            else:
+                raise TypeError("group_by() accepts column names or ColumnRef expressions.")
+        return GroupedDataFrame(self, selected)
+
     def collect(self, *, engine: str = "rust") -> Dict[str, list[Any]]:
         """
         Materialize this typed logical DataFrame into Python column data.
@@ -238,4 +283,45 @@ class DataFrame(Generic[SchemaT]):
 
     def to_dict(self) -> Dict[str, list[Any]]:
         return self.collect(engine="rust")
+
+
+class GroupedDataFrame:
+    def __init__(self, df: DataFrame[Any], keys: Sequence[str]):
+        self._df = df
+        self._keys = list(keys)
+
+    def agg(self, **aggregations: Union[tuple[str, str], tuple[str, ColumnRef]]) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        agg_specs: Dict[str, tuple[str, str]] = {}
+        for out_name, spec in aggregations.items():
+            if not isinstance(spec, tuple) or len(spec) != 2:
+                raise TypeError(
+                    "agg() expects specs like output_name=('sum'|'mean'|'count', column)."
+                )
+            op, col_spec = spec
+            if not isinstance(op, str):
+                raise TypeError("Aggregation operator must be a string.")
+            if isinstance(col_spec, str):
+                in_col = col_spec
+            elif isinstance(col_spec, Expr):
+                referenced = col_spec.referenced_columns()
+                if len(referenced) != 1:
+                    raise TypeError("Aggregation column must reference exactly one column.")
+                in_col = next(iter(referenced))
+            else:
+                raise TypeError("Aggregation column must be a column name or ColumnRef.")
+            agg_specs[out_name] = (op, in_col)
+
+        grouped_data, schema_descriptors = rust.execute_groupby_agg(
+            self._df._rust_plan, self._df._root_data, self._keys, agg_specs
+        )
+        derived_fields = schema_from_descriptors(schema_descriptors)
+        derived_schema_type = make_derived_schema_type(self._df._current_schema_type, derived_fields)
+        rust_plan = rust.make_plan(derived_fields)
+        return self._df._from_plan(
+            root_data=grouped_data,
+            root_schema_type=derived_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
 

@@ -129,6 +129,21 @@ class DataFrameModel:
     def filter(self, condition: Any) -> "DataFrameModel":
         return self._from_dataframe(self._df.filter(condition))
 
+    def join(
+        self,
+        other: "DataFrameModel",
+        *,
+        on: str | Sequence[str],
+        how: str = "inner",
+        suffix: str = "_right",
+    ) -> "DataFrameModel":
+        if not isinstance(other, DataFrameModel):
+            raise TypeError("join(other=...) expects another DataFrameModel instance.")
+        return self._from_dataframe(self._df.join(other._df, on=on, how=how, suffix=suffix))
+
+    def group_by(self, *keys: Any) -> "GroupedDataFrameModel":
+        return GroupedDataFrameModel(self._df.group_by(*keys), self.__class__)
+
     def __getattr__(self, item: str) -> Any:
         # Delegate column refs + API methods to wrapped DataFrame.
         return getattr(self._df, item)
@@ -140,4 +155,13 @@ class DataFrameModel:
     @classmethod
     def schema_model(cls) -> Type[Schema]:
         return cls._SchemaModel
+
+
+class GroupedDataFrameModel:
+    def __init__(self, grouped_df: Any, model_type: Type[DataFrameModel]) -> None:
+        self._grouped_df = grouped_df
+        self._model_type = model_type
+
+    def agg(self, **aggregations: Any) -> DataFrameModel:
+        return self._model_type._from_dataframe(self._grouped_df.agg(**aggregations))
 
