@@ -15,7 +15,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-docs = ["mkdocs"]
+docs = [
+    "sphinx",
+    "myst-parser",
+    "sphinx-autodoc-typehints",
+    "sphinx-rtd-theme",
+]
 
 [tool.maturin]
 # Builds `pydantable._core` from the Rust crate in `pydantable-core/`.

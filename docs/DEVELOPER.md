@@ -61,11 +61,11 @@ Phase 4 boundary contract:
 .venv/bin/basedpyright
 ```
 
-### Build docs (MkDocs)
+### Build docs (Sphinx)
 
 ```bash
 .venv/bin/python -m pip install -e ".[docs]"
-.venv/bin/python -m mkdocs build
+.venv/bin/python -m sphinx -b html docs docs/_build
 ```
 
 ### Build package wheel (mixed Python/Rust)
