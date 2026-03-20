@@ -83,3 +83,19 @@ Supported reshape methods:
 - Current schema contracts only support scalar base dtypes (`int`, `float`, `bool`, `str`).
 - Because list/struct typed columns are not yet part of the schema system, both methods raise explicit `NotImplementedError` with guidance.
 
+## Window and time-series semantics
+
+Supported P6 API surface:
+- `Expr.over(partition_by=..., order_by=...)` (window-expression surface)
+- `rolling_agg(...)`
+- `group_by_dynamic(...).agg(...)`
+
+Temporal typing:
+- Schema descriptors support `datetime`, `date`, and `duration` base types (including nullable variants).
+- Temporal descriptors round-trip through Rust schema descriptors into derived Python schema types.
+
+Rolling/dynamic contracts:
+- Rolling windows support grouped trailing windows with deterministic ordering by `on` (and optional `by` keys).
+- Dynamic windows support `every` / `period` with `s/m/h/d` suffixes and explicit aggregation contracts.
+- Nulls are ignored for numeric aggregations; all-null windows yield `None` for nullable aggregates and `0` for `count`.
+

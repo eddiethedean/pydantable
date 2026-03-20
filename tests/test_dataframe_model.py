@@ -219,3 +219,32 @@ def test_p5_dataframe_model_reshape_methods() -> None:
     assert p_out["id"] == [1]
     assert p_out["A_first"] == [10]
     assert p_out["B_first"] == [None]
+
+
+def test_p6_dataframe_model_rolling_and_dynamic() -> None:
+    class TSModel(DataFrameModel):
+        id: int
+        ts: int
+        v: int | None
+
+    df = TSModel(
+        {
+            "id": [1, 1, 1],
+            "ts": [0, 3600, 7200],
+            "v": [10, None, 30],
+        }
+    )
+    rolled = df.rolling_agg(
+        on="ts",
+        column="v",
+        window_size="2h",
+        op="sum",
+        out_name="v_roll_sum",
+        by=["id"],
+    )
+    assert rolled.collect()["v_roll_sum"] == [10, 10, 40]
+
+    grouped = df.group_by_dynamic("ts", every="1h", by=["id"]).agg(
+        v_count=("count", "v")
+    )
+    assert "v_count" in grouped.collect()

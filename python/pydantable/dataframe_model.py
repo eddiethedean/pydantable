@@ -303,6 +303,42 @@ class DataFrameModel:
     def group_by(self, *keys: Any) -> GroupedDataFrameModel:
         return GroupedDataFrameModel(self._df.group_by(*keys), self.__class__)
 
+    def rolling_agg(
+        self,
+        *,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None = None,
+        min_periods: int = 1,
+    ) -> DataFrameModel:
+        return self._from_dataframe(
+            self._df.rolling_agg(
+                on=on,
+                column=column,
+                window_size=window_size,
+                op=op,
+                out_name=out_name,
+                by=by,
+                min_periods=min_periods,
+            )
+        )
+
+    def group_by_dynamic(
+        self,
+        index_column: str,
+        *,
+        every: str,
+        period: str | None = None,
+        by: Sequence[str] | None = None,
+    ) -> DynamicGroupedDataFrameModel:
+        return DynamicGroupedDataFrameModel(
+            self._df.group_by_dynamic(index_column, every=every, period=period, by=by),
+            self.__class__,
+        )
+
     def __getattr__(self, item: str) -> Any:
         # Delegate column refs + API methods to wrapped DataFrame.
         return getattr(self._df, item)
@@ -330,6 +366,15 @@ class DataFrameModel:
 
 
 class GroupedDataFrameModel:
+    def __init__(self, grouped_df: Any, model_type: type[DataFrameModel]) -> None:
+        self._grouped_df = grouped_df
+        self._model_type = model_type
+
+    def agg(self, **aggregations: Any) -> DataFrameModel:
+        return self._model_type._from_dataframe(self._grouped_df.agg(**aggregations))
+
+
+class DynamicGroupedDataFrameModel:
     def __init__(self, grouped_df: Any, model_type: type[DataFrameModel]) -> None:
         self._grouped_df = grouped_df
         self._model_type = model_type

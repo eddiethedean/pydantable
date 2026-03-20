@@ -80,3 +80,27 @@ class Backend(Protocol):
         root_data: Any,
         columns: Sequence[str],
     ) -> tuple[Any, Any]: ...
+
+    def execute_rolling_agg(
+        self,
+        plan: Any,
+        root_data: Any,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None,
+        min_periods: int,
+    ) -> tuple[Any, Any]: ...
+
+    def execute_groupby_dynamic_agg(
+        self,
+        plan: Any,
+        root_data: Any,
+        index_column: str,
+        every: str,
+        period: str | None,
+        by: Sequence[str] | None,
+        aggregations: Any,
+    ) -> tuple[Any, Any]: ...

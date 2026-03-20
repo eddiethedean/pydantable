@@ -79,6 +79,17 @@ class Expr:  # type: ignore[override]
         rust_expr = _require_rust_core().is_not_null_expr(self._rust_expr)
         return Expr(rust_expr=rust_expr)
 
+    def over(
+        self,
+        partition_by: str | list[str] | tuple[str, ...] | None = None,
+        order_by: str | list[str] | tuple[str, ...] | None = None,
+    ) -> Expr:
+        # Placeholder API surface for phase P6. Current execution paths do not
+        # yet model full window-expression AST lowering.
+        _ = partition_by
+        _ = order_by
+        return self
+
     # Arithmetic
     def __add__(self, other: Any) -> Expr:
         return self._binary("+", other)

@@ -1,3 +1,5 @@
+from datetime import date, datetime, timedelta
+
 import pytest
 from pydantable import DataFrame, Schema
 from pydantable.expressions import ColumnRef
@@ -188,3 +190,99 @@ def test_p5_explode_unnest_raise_not_implemented_for_scalar_schema() -> None:
         df.explode("name")
     with pytest.raises(NotImplementedError, match=r"unnest\(\) requires struct-like"):
         df.unnest("name")
+
+
+def test_p6_rolling_agg_and_dynamic_groupby() -> None:
+    class TS(Schema):
+        id: int
+        ts: int
+        v: int | None
+
+    df = DataFrame[TS](
+        {
+            "id": [1, 1, 1, 2],
+            "ts": [0, 3600, 7200, 0],
+            "v": [10, None, 30, 5],
+        }
+    )
+    rolled = df.rolling_agg(
+        on="ts",
+        column="v",
+        window_size="2h",
+        op="sum",
+        out_name="v_roll_sum",
+        by=["id"],
+    )
+    out = rolled.collect()
+    assert out["v_roll_sum"] == [10, 10, 40, 5]
+
+    dgb = df.group_by_dynamic("ts", every="1h", period="2h", by=["id"]).agg(
+        v_sum=("sum", "v"), v_count=("count", "v")
+    )
+    d_out = dgb.collect()
+    assert "v_sum" in d_out and "v_count" in d_out
+
+
+def test_p6_expr_over_api_surface() -> None:
+    df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
+    expr = (df.age + 1).over(partition_by="id", order_by="age")
+    out = df.with_columns(age2=expr).collect()
+    assert out["age2"] == [21, 31]
+
+
+def test_temporal_columns_and_literals_core_paths() -> None:
+    class T(Schema):
+        id: int
+        ts: datetime
+        d: date
+        dur: timedelta
+
+    df = DataFrame[T](
+        {
+            "id": [1, 2],
+            "ts": [datetime(2024, 1, 1, 0, 0, 0), datetime(2024, 1, 2, 0, 0, 0)],
+            "d": [date(2024, 1, 1), date(2024, 1, 2)],
+            "dur": [timedelta(hours=1), timedelta(hours=2)],
+        }
+    )
+    out = df.collect()
+    assert out["ts"][0] == datetime(2024, 1, 1, 0, 0, 0)
+    assert out["d"][1] == date(2024, 1, 2)
+    assert out["dur"][0] == timedelta(hours=1)
+
+    filtered = df.filter(df.ts > datetime(2024, 1, 1, 12, 0, 0)).collect()
+    assert filtered["id"] == [2]
+
+
+def test_temporal_groupby_and_join_paths() -> None:
+    class L(Schema):
+        id: int
+        ts: datetime
+        v: int | None
+
+    class R(Schema):
+        id: int
+        ts: datetime
+        tag: str
+
+    left = DataFrame[L](
+        {
+            "id": [1, 1, 2],
+            "ts": [datetime(2024, 1, 1), datetime(2024, 1, 2), datetime(2024, 1, 1)],
+            "v": [10, 20, None],
+        }
+    )
+    right = DataFrame[R](
+        {
+            "id": [1, 2],
+            "ts": [datetime(2024, 1, 2), datetime(2024, 1, 1)],
+            "tag": ["a", "b"],
+        }
+    )
+    joined = left.join(right, on=["id", "ts"], how="inner").collect()
+    assert joined["id"] == [1, 2]
+
+    grouped = (
+        left.group_by("id").agg(ts_min=("min", "ts"), ts_max=("max", "ts")).collect()
+    )
+    assert sorted(grouped["id"]) == [1, 2]

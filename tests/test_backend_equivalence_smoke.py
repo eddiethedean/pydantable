@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from datetime import date, datetime, timedelta
 
 import pytest
 from conftest import assert_table_eq_sorted
@@ -324,3 +325,78 @@ def test_backend_equivalence_p5_reshape_ops(backend_mod: str) -> None:
         index="id", columns="key", values="age", aggregate_function="sum"
     ).collect()
     assert_table_eq_sorted(d_pivot, b_pivot, keys=["id"])
+
+
+@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_backend_equivalence_p6_rolling_and_dynamic(backend_mod: str) -> None:
+    backend = importlib.import_module(backend_mod)
+    BackendDataFrameModel = backend.DataFrameModel
+
+    class TSDefault(PolarsDataFrameModel):
+        id: int
+        ts: int
+        v: int | None
+
+    class TSBackend(BackendDataFrameModel):
+        id: int
+        ts: int
+        v: int | None
+
+    payload = {
+        "id": [1, 1, 1, 2],
+        "ts": [0, 3600, 7200, 0],
+        "v": [10, None, 30, 5],
+    }
+    d_df = TSDefault(payload)
+    b_df = TSBackend(payload)
+
+    d_roll = d_df.rolling_agg(
+        on="ts", column="v", window_size="2h", op="sum", out_name="v_roll", by=["id"]
+    ).collect()
+    b_roll = b_df.rolling_agg(
+        on="ts", column="v", window_size="2h", op="sum", out_name="v_roll", by=["id"]
+    ).collect()
+    assert_table_eq_sorted(d_roll, b_roll, keys=["id", "ts"])
+
+    d_dyn = (
+        d_df.group_by_dynamic("ts", every="1h", by=["id"])
+        .agg(v_sum=("sum", "v"))
+        .collect()
+    )
+    b_dyn = (
+        b_df.group_by_dynamic("ts", every="1h", by=["id"])
+        .agg(v_sum=("sum", "v"))
+        .collect()
+    )
+    assert_table_eq_sorted(d_dyn, b_dyn, keys=["id", "ts"])
+
+
+@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_backend_equivalence_temporal_columns_and_literals(backend_mod: str) -> None:
+    backend = importlib.import_module(backend_mod)
+    BackendDataFrameModel = backend.DataFrameModel
+
+    class TDefault(PolarsDataFrameModel):
+        id: int
+        ts: datetime
+        d: date
+        dur: timedelta
+
+    class TBackend(BackendDataFrameModel):
+        id: int
+        ts: datetime
+        d: date
+        dur: timedelta
+
+    payload = {
+        "id": [1, 2],
+        "ts": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
+        "d": [date(2024, 1, 1), date(2024, 1, 2)],
+        "dur": [timedelta(hours=1), timedelta(hours=2)],
+    }
+    d_df = TDefault(payload)
+    b_df = TBackend(payload)
+
+    d_out = d_df.filter(d_df.ts > datetime(2024, 1, 1, 12, 0, 0)).collect()
+    b_out = b_df.filter(b_df.ts > datetime(2024, 1, 1, 12, 0, 0)).collect()
+    assert_table_eq_sorted(d_out, b_out, keys=["id"])

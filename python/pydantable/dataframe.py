@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -621,6 +622,134 @@ class DataFrame(Generic[SchemaT]):
                 )
         return GroupedDataFrame(self, selected)
 
+    def rolling_agg(
+        self,
+        *,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None = None,
+        min_periods: int = 1,
+    ) -> DataFrame[Any]:
+        data = self.collect()
+        if on not in data or column not in data:
+            raise KeyError("rolling_agg() requires existing on/column names.")
+        by_cols = [] if by is None else list(by)
+        for c in by_cols:
+            if c not in data:
+                raise KeyError(f"rolling_agg() unknown grouping column '{c}'.")
+        n = len(data[on])
+        idxs = list(range(n))
+        idxs.sort(
+            key=lambda i: tuple(data[c][i] for c in [*by_cols, on])  # type: ignore[misc]
+        )
+        out: list[Any] = [None] * n
+
+        def _duration_seconds(v: int | str) -> float:
+            if isinstance(v, int):
+                return float(v)
+            unit = v[-1]
+            num = float(v[:-1])
+            factors = {"s": 1.0, "m": 60.0, "h": 3600.0, "d": 86400.0}
+            if unit not in factors:
+                raise ValueError(
+                    "rolling_agg(window_size=...) supports s/m/h/d suffix."
+                )
+            return num * factors[unit]
+
+        def _to_seconds(x: Any) -> float:
+            if isinstance(x, datetime):
+                return x.timestamp()
+            if isinstance(x, date):
+                return float(datetime.combine(x, datetime.min.time()).timestamp())
+            if isinstance(x, timedelta):
+                return x.total_seconds()
+            if isinstance(x, (int, float)):
+                return float(x)
+            raise TypeError(
+                "rolling_agg(on=...) requires numeric/date/datetime/timedelta."
+            )
+
+        win_seconds = _duration_seconds(window_size)
+        supported = {"sum", "mean", "min", "max", "count"}
+        if op not in supported:
+            raise ValueError(
+                f"Unsupported rolling op '{op}'. Use one of {sorted(supported)}."
+            )
+        for pos, i in enumerate(idxs):
+            current_group = tuple(data[c][i] for c in by_cols)
+            current_t = _to_seconds(data[on][i])
+            window_idxs: list[int] = []
+            j = pos
+            while j >= 0:
+                k = idxs[j]
+                if tuple(data[c][k] for c in by_cols) != current_group:
+                    break
+                if current_t - _to_seconds(data[on][k]) <= win_seconds:
+                    window_idxs.append(k)
+                    j -= 1
+                else:
+                    break
+            vals = [
+                data[column][k]
+                for k in reversed(window_idxs)
+                if data[column][k] is not None
+            ]
+            if len(vals) < min_periods:
+                out[i] = None
+                continue
+            if op == "count":
+                out[i] = len(vals)
+            elif op == "sum":
+                out[i] = sum(vals)
+            elif op == "mean":
+                out[i] = sum(vals) / len(vals) if vals else None
+            elif op == "min":
+                out[i] = min(vals) if vals else None
+            else:
+                out[i] = max(vals) if vals else None
+
+        out_data = dict(data)
+        out_data[out_name] = out
+        fields = dict(self._current_field_types)
+        in_dtype = self._current_field_types[column]
+        if op == "count":
+            fields[out_name] = int
+        elif op == "mean":
+            fields[out_name] = float | None
+        elif op in {"sum", "min", "max"}:
+            fields[out_name] = in_dtype
+        else:
+            fields[out_name] = in_dtype
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, fields
+        )
+        rust_plan = _require_rust_core().make_plan(fields)
+        return self._from_plan(
+            root_data=out_data,
+            root_schema_type=derived_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def group_by_dynamic(
+        self,
+        index_column: str,
+        *,
+        every: str,
+        period: str | None = None,
+        by: Sequence[str] | None = None,
+    ) -> DynamicGroupedDataFrame:
+        return DynamicGroupedDataFrame(
+            self,
+            index_column=index_column,
+            every=every,
+            period=period,
+            by=[] if by is None else list(by),
+        )
+
     def collect(self, *, engine: str | None = None) -> dict[str, list[Any]]:
         """
         Materialize this typed logical DataFrame into Python column data.
@@ -723,6 +852,123 @@ class GroupedDataFrame:
         rust_plan = _require_rust_core().make_plan(derived_fields)
         return self._df._from_plan(
             root_data=grouped_data,
+            root_schema_type=derived_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+
+class DynamicGroupedDataFrame:
+    def __init__(
+        self,
+        df: DataFrame[Any],
+        *,
+        index_column: str,
+        every: str,
+        period: str | None,
+        by: Sequence[str],
+    ):
+        self._df = df
+        self._index = index_column
+        self._every = every
+        self._period = period or every
+        self._by = list(by)
+
+    def _seconds(self, text: str) -> float:
+        unit = text[-1]
+        num = float(text[:-1])
+        factors = {"s": 1.0, "m": 60.0, "h": 3600.0, "d": 86400.0}
+        if unit not in factors:
+            raise ValueError("Duration supports s/m/h/d suffixes.")
+        return num * factors[unit]
+
+    def _to_seconds(self, x: Any) -> float:
+        if isinstance(x, datetime):
+            return x.timestamp()
+        if isinstance(x, date):
+            return float(datetime.combine(x, datetime.min.time()).timestamp())
+        if isinstance(x, timedelta):
+            return x.total_seconds()
+        if isinstance(x, (int, float)):
+            return float(x)
+        raise TypeError("group_by_dynamic index column must be time-like or numeric.")
+
+    def agg(self, **aggregations: tuple[str, str]) -> DataFrame[Any]:
+        data = self._df.collect()
+        if self._index not in data:
+            raise KeyError(f"group_by_dynamic() unknown index column '{self._index}'.")
+        for c in self._by:
+            if c not in data:
+                raise KeyError(f"group_by_dynamic() unknown by column '{c}'.")
+        times = [self._to_seconds(v) for v in data[self._index]]
+        every = self._seconds(self._every)
+        period = self._seconds(self._period)
+        t_min = min(times) if times else 0.0
+        t_max = max(times) if times else 0.0
+        start = t_min
+
+        out: dict[str, list[Any]] = {self._index: []}
+        for c in self._by:
+            out[c] = []
+        for name in aggregations:
+            out[name] = []
+
+        while start <= t_max:
+            end = start + period
+            win_rows = [i for i, t in enumerate(times) if start <= t < end]
+            if self._by:
+                grouped: dict[tuple[Any, ...], list[int]] = {}
+                for i in win_rows:
+                    key = tuple(data[c][i] for c in self._by)
+                    grouped.setdefault(key, []).append(i)
+            else:
+                grouped = {(): win_rows}
+
+            for gk, rows in grouped.items():
+                if not rows:
+                    continue
+                out[self._index].append(data[self._index][rows[0]])
+                for idx, c in enumerate(self._by):
+                    out[c].append(gk[idx])
+                for out_name, (op, in_col) in aggregations.items():
+                    vals = [
+                        data[in_col][i] for i in rows if data[in_col][i] is not None
+                    ]
+                    res: Any
+                    if op == "count":
+                        res = len(vals)
+                    elif op == "sum":
+                        res = sum(vals) if vals else None
+                    elif op == "mean":
+                        res = (sum(vals) / len(vals)) if vals else None
+                    elif op == "min":
+                        res = min(vals) if vals else None
+                    elif op == "max":
+                        res = max(vals) if vals else None
+                    else:
+                        raise ValueError(f"Unsupported dynamic aggregation '{op}'.")
+                    out[out_name].append(res)
+            start += every
+
+        fields: dict[str, Any] = {self._index: self._df.schema_fields()[self._index]}
+        for c in self._by:
+            fields[c] = self._df.schema_fields()[c]
+        for out_name, (op, _in_col) in aggregations.items():
+            in_dtype = self._df.schema_fields()[aggregations[out_name][1]]
+            if op == "count":
+                fields[out_name] = int
+            elif op == "mean":
+                fields[out_name] = float | None
+            elif op in {"sum", "min", "max"}:
+                fields[out_name] = in_dtype
+            else:
+                fields[out_name] = in_dtype
+        derived_schema_type = make_derived_schema_type(
+            self._df._current_schema_type, fields
+        )
+        rust_plan = _require_rust_core().make_plan(fields)
+        return self._df._from_plan(
+            root_data=out,
             root_schema_type=derived_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,

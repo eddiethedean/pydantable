@@ -128,14 +128,21 @@ Progress note:
 Goal: advanced analytics parity.
 
 Deliverables:
-- [ ] Window expressions (`over`)
-- [ ] Rolling aggregations
-- [ ] Dynamic group-by/time-window groupings
-- [ ] Time-based expression helpers needed by above
+- [x] Window expressions (`over`)
+- [x] Rolling aggregations
+- [x] Dynamic group-by/time-window groupings
+- [x] Time-based expression helpers needed by above
 
 Validation:
-- [ ] Time-window correctness tests
-- [ ] Window null/ordering behavior tests
+- [x] Time-window correctness tests
+- [x] Window null/ordering behavior tests
+
+Progress note:
+- Implemented on branch `v0.5.0`:
+  - Added temporal schema descriptor support (`datetime`, `date`, `duration`) across Rust/Python schema boundaries.
+  - Added window/time-series API surface for `over`, `rolling_agg`, and `group_by_dynamic(...).agg(...)`.
+  - Expanded contracts, model/schema checks, and backend equivalence smoke coverage for P6 workflows.
+  - Completed temporal execution/materialization + literal support across existing core/join/groupby/reshape/window feature paths.
 
 ## Phase P7: Stabilization and parity scorecard
 

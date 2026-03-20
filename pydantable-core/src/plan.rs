@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyList};
+use pyo3::types::{PyAny, PyDate, PyDateTime, PyDelta, PyDict, PyList};
 
 use crate::dtype::{dtype_to_descriptor_py, dtype_to_python_type, DTypeDesc};
 use crate::expr::LiteralValue;
@@ -11,9 +11,10 @@ use crate::expr::{exprnode_to_serializable, ExprNode};
 use polars::lazy::dsl::{col, lit, Expr as PolarsExpr};
 #[cfg(feature = "polars_engine")]
 use polars::prelude::{
-    BooleanChunked, CrossJoin, DataFrame, DataType, FillNullStrategy, Float64Chunked, Int64Chunked,
-    IntoColumn, IntoLazy, IntoSeries, JoinArgs, JoinType, LazyFrame, MaintainOrderJoin,
-    NewChunkedArray, PolarsError, Series, SortMultipleOptions, StringChunked, UniqueKeepStrategy,
+    BooleanChunked, CrossJoin, DataFrame, DataType, FillNullStrategy, Float64Chunked, Int32Chunked,
+    Int64Chunked, IntoColumn, IntoLazy, IntoSeries, JoinArgs, JoinType, LazyFrame,
+    MaintainOrderJoin, NewChunkedArray, PolarsError, Series, SortMultipleOptions, StringChunked,
+    UniqueKeepStrategy,
 };
 
 #[derive(Clone, Debug)]
@@ -124,6 +125,9 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
                     Some(LiteralValue::Float(v)) => v.into_py(py),
                     Some(LiteralValue::Bool(v)) => v.into_py(py),
                     Some(LiteralValue::Str(v)) => v.clone().into_py(py),
+                    Some(LiteralValue::DateTimeMicros(v)) => v.into_py(py),
+                    Some(LiteralValue::DateDays(v)) => v.into_py(py),
+                    Some(LiteralValue::DurationMicros(v)) => v.into_py(py),
                 };
                 step_out.set_item("value", value_obj)?;
                 step_out.set_item("strategy", strategy)?;
@@ -849,6 +853,52 @@ fn polars_err(e: PolarsError) -> PyErr {
 }
 
 #[cfg(feature = "polars_engine")]
+fn py_datetime_to_micros(item: &Bound<'_, PyAny>) -> PyResult<i64> {
+    let dt = item.downcast::<PyDateTime>()?;
+    let secs: f64 = dt.call_method0("timestamp")?.extract()?;
+    Ok((secs * 1_000_000.0).round() as i64)
+}
+
+#[cfg(feature = "polars_engine")]
+fn py_date_to_days(item: &Bound<'_, PyAny>) -> PyResult<i32> {
+    let d = item.downcast::<PyDate>()?;
+    let ordinal: i32 = d.call_method0("toordinal")?.extract()?;
+    Ok(ordinal - 719_163)
+}
+
+#[cfg(feature = "polars_engine")]
+fn py_timedelta_to_micros(item: &Bound<'_, PyAny>) -> PyResult<i64> {
+    let td = item.downcast::<PyDelta>()?;
+    let secs: f64 = td.call_method0("total_seconds")?.extract()?;
+    Ok((secs * 1_000_000.0).round() as i64)
+}
+
+#[cfg(feature = "polars_engine")]
+fn micros_to_py_datetime(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
+    let dt_mod = py.import_bound("datetime")?;
+    let dt = dt_mod.getattr("datetime")?;
+    Ok(dt
+        .call_method1("fromtimestamp", (micros as f64 / 1_000_000.0,))?
+        .into_py(py))
+}
+
+#[cfg(feature = "polars_engine")]
+fn days_to_py_date(py: Python<'_>, days: i32) -> PyResult<PyObject> {
+    let dt_mod = py.import_bound("datetime")?;
+    let date = dt_mod.getattr("date")?;
+    Ok(date
+        .call_method1("fromordinal", (days + 719_163,))?
+        .into_py(py))
+}
+
+#[cfg(feature = "polars_engine")]
+fn micros_to_py_timedelta(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
+    let dt_mod = py.import_bound("datetime")?;
+    let td = dt_mod.getattr("timedelta")?;
+    Ok(td.call1((0, 0, micros))?.into_py(py))
+}
+
+#[cfg(feature = "polars_engine")]
 fn root_data_to_polars_df(
     root_schema: &HashMap<String, DTypeDesc>,
     root_data: &Bound<'_, PyAny>,
@@ -917,6 +967,54 @@ fn root_data_to_polars_df(
                 let ca: StringChunked =
                     StringChunked::from_iter_options(name.as_str().into(), v.into_iter());
                 ca.into_series()
+            }
+            Some(crate::dtype::BaseType::DateTime) => {
+                let mut v: Vec<Option<i64>> = Vec::with_capacity(list.len());
+                for item in list.iter() {
+                    if item.is_none() {
+                        v.push(None);
+                    } else {
+                        v.push(Some(py_datetime_to_micros(&item)?));
+                    }
+                }
+                let base: Int64Chunked =
+                    Int64Chunked::from_iter_options(name.as_str().into(), v.into_iter());
+                base.into_series()
+                    .cast(&DataType::Datetime(
+                        polars::prelude::TimeUnit::Microseconds,
+                        None,
+                    ))
+                    .map_err(polars_err)?
+            }
+            Some(crate::dtype::BaseType::Date) => {
+                let mut v: Vec<Option<i32>> = Vec::with_capacity(list.len());
+                for item in list.iter() {
+                    if item.is_none() {
+                        v.push(None);
+                    } else {
+                        v.push(Some(py_date_to_days(&item)?));
+                    }
+                }
+                let base: Int32Chunked =
+                    Int32Chunked::from_iter_options(name.as_str().into(), v.into_iter());
+                base.into_series()
+                    .cast(&DataType::Date)
+                    .map_err(polars_err)?
+            }
+            Some(crate::dtype::BaseType::Duration) => {
+                let mut v: Vec<Option<i64>> = Vec::with_capacity(list.len());
+                for item in list.iter() {
+                    if item.is_none() {
+                        v.push(None);
+                    } else {
+                        v.push(Some(py_timedelta_to_micros(&item)?));
+                    }
+                }
+                let base: Int64Chunked =
+                    Int64Chunked::from_iter_options(name.as_str().into(), v.into_iter());
+                base.into_series()
+                    .cast(&DataType::Duration(polars::prelude::TimeUnit::Microseconds))
+                    .map_err(polars_err)?
             }
             None => {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -1001,28 +1099,41 @@ fn apply_steps_to_lazy(mut lf: LazyFrame, steps: &[PlanStep]) -> PyResult<LazyFr
                     .into_iter()
                     .map(|name| {
                         let base = col(&name);
-                        let filled =
-                            if let Some(v) = value.as_ref() {
-                                match v {
-                                    LiteralValue::Int(i) => base.fill_null(lit(*i)),
-                                    LiteralValue::Float(f) => base.fill_null(lit(*f)),
-                                    LiteralValue::Bool(b) => base.fill_null(lit(*b)),
-                                    LiteralValue::Str(s) => base.fill_null(lit(s.clone())),
+                        let filled = if let Some(v) = value.as_ref() {
+                            match v {
+                                LiteralValue::Int(i) => base.fill_null(lit(*i)),
+                                LiteralValue::Float(f) => base.fill_null(lit(*f)),
+                                LiteralValue::Bool(b) => base.fill_null(lit(*b)),
+                                LiteralValue::Str(s) => base.fill_null(lit(s.clone())),
+                                LiteralValue::DateTimeMicros(v) => {
+                                    base.fill_null(lit(*v).cast(DataType::Datetime(
+                                        polars::prelude::TimeUnit::Microseconds,
+                                        None,
+                                    )))
                                 }
-                            } else {
-                                match strategy.as_ref().expect("validated strategy").as_str() {
-                                    "forward" => base
-                                        .fill_null_with_strategy(FillNullStrategy::Forward(None)),
-                                    "backward" => base
-                                        .fill_null_with_strategy(FillNullStrategy::Backward(None)),
-                                    "min" => base.fill_null_with_strategy(FillNullStrategy::Min),
-                                    "max" => base.fill_null_with_strategy(FillNullStrategy::Max),
-                                    "mean" => base.fill_null_with_strategy(FillNullStrategy::Mean),
-                                    "zero" => base.fill_null_with_strategy(FillNullStrategy::Zero),
-                                    "one" => base.fill_null_with_strategy(FillNullStrategy::One),
-                                    _ => base,
+                                LiteralValue::DateDays(v) => {
+                                    base.fill_null(lit(*v).cast(DataType::Date))
                                 }
-                            };
+                                LiteralValue::DurationMicros(v) => base.fill_null(lit(*v).cast(
+                                    DataType::Duration(polars::prelude::TimeUnit::Microseconds),
+                                )),
+                            }
+                        } else {
+                            match strategy.as_ref().expect("validated strategy").as_str() {
+                                "forward" => {
+                                    base.fill_null_with_strategy(FillNullStrategy::Forward(None))
+                                }
+                                "backward" => {
+                                    base.fill_null_with_strategy(FillNullStrategy::Backward(None))
+                                }
+                                "min" => base.fill_null_with_strategy(FillNullStrategy::Min),
+                                "max" => base.fill_null_with_strategy(FillNullStrategy::Max),
+                                "mean" => base.fill_null_with_strategy(FillNullStrategy::Mean),
+                                "zero" => base.fill_null_with_strategy(FillNullStrategy::Zero),
+                                "one" => base.fill_null_with_strategy(FillNullStrategy::One),
+                                _ => base,
+                            }
+                        };
                         filled.alias(&name)
                     })
                     .collect::<Vec<_>>();
@@ -1085,6 +1196,33 @@ fn series_to_py_list(py: Python<'_>, series: &Series, dtype: DTypeDesc) -> PyRes
             for item in casted.str().map_err(polars_err)?.into_iter() {
                 match item {
                     Some(v) => values.push(v.into_py(py)),
+                    None => values.push(py.None()),
+                }
+            }
+        }
+        Some(crate::dtype::BaseType::DateTime) => {
+            let casted = series.cast(&DataType::Int64).map_err(polars_err)?;
+            for item in casted.i64().map_err(polars_err)?.into_iter() {
+                match item {
+                    Some(v) => values.push(micros_to_py_datetime(py, v)?),
+                    None => values.push(py.None()),
+                }
+            }
+        }
+        Some(crate::dtype::BaseType::Date) => {
+            let casted = series.cast(&DataType::Int32).map_err(polars_err)?;
+            for item in casted.i32().map_err(polars_err)?.into_iter() {
+                match item {
+                    Some(v) => values.push(days_to_py_date(py, v)?),
+                    None => values.push(py.None()),
+                }
+            }
+        }
+        Some(crate::dtype::BaseType::Duration) => {
+            let casted = series.cast(&DataType::Int64).map_err(polars_err)?;
+            for item in casted.i64().map_err(polars_err)?.into_iter() {
+                match item {
+                    Some(v) => values.push(micros_to_py_timedelta(py, v)?),
                     None => values.push(py.None()),
                 }
             }
@@ -1791,6 +1929,15 @@ fn py_dict_to_literal_ctx(
                 Some(crate::dtype::BaseType::Float) => LiteralValue::Float(item.extract::<f64>()?),
                 Some(crate::dtype::BaseType::Bool) => LiteralValue::Bool(item.extract::<bool>()?),
                 Some(crate::dtype::BaseType::Str) => LiteralValue::Str(item.extract::<String>()?),
+                Some(crate::dtype::BaseType::DateTime) => {
+                    LiteralValue::DateTimeMicros(py_datetime_to_micros(&item)?)
+                }
+                Some(crate::dtype::BaseType::Date) => {
+                    LiteralValue::DateDays(py_date_to_days(&item)?)
+                }
+                Some(crate::dtype::BaseType::Duration) => {
+                    LiteralValue::DurationMicros(py_timedelta_to_micros(&item)?)
+                }
                 None => {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "Unsupported unknown-base dtype in reshape path.",
@@ -1811,6 +1958,13 @@ fn literal_to_py(py: Python<'_>, v: &LiteralValue) -> PyObject {
         LiteralValue::Float(f) => f.into_py(py),
         LiteralValue::Bool(b) => b.into_py(py),
         LiteralValue::Str(s) => s.clone().into_py(py),
+        LiteralValue::DateTimeMicros(v) => {
+            micros_to_py_datetime(py, *v).unwrap_or_else(|_| v.into_py(py))
+        }
+        LiteralValue::DateDays(v) => days_to_py_date(py, *v).unwrap_or_else(|_| v.into_py(py)),
+        LiteralValue::DurationMicros(v) => {
+            micros_to_py_timedelta(py, *v).unwrap_or_else(|_| v.into_py(py))
+        }
     }
 }
 
@@ -2102,6 +2256,9 @@ pub fn execute_pivot_polars(
             Some(LiteralValue::Int(v)) => v.to_string(),
             Some(LiteralValue::Float(v)) => v.to_string(),
             Some(LiteralValue::Bool(v)) => v.to_string(),
+            Some(LiteralValue::DateTimeMicros(v)) => v.to_string(),
+            Some(LiteralValue::DateDays(v)) => v.to_string(),
+            Some(LiteralValue::DurationMicros(v)) => v.to_string(),
             None => "null".to_string(),
         };
         if seen_pivot.insert(key.clone()) {
@@ -2193,6 +2350,9 @@ pub fn execute_pivot_polars(
                         Some(LiteralValue::Int(v)) => v.to_string(),
                         Some(LiteralValue::Float(v)) => v.to_string(),
                         Some(LiteralValue::Bool(v)) => v.to_string(),
+                        Some(LiteralValue::DateTimeMicros(v)) => v.to_string(),
+                        Some(LiteralValue::DateDays(v)) => v.to_string(),
+                        Some(LiteralValue::DurationMicros(v)) => v.to_string(),
                         None => "null".to_string(),
                     };
                     &key == pv

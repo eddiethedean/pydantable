@@ -406,6 +406,42 @@ fn execute_unnest(
     execute_unnest_inner(py, &plan.inner, root_data, columns)
 }
 
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn execute_rolling_agg(
+    _py: Python<'_>,
+    _plan: &PyPlan,
+    _root_data: &Bound<'_, PyAny>,
+    _on: String,
+    _column: String,
+    _window_size: &Bound<'_, PyAny>,
+    _op: String,
+    _out_name: String,
+    _by: Option<Vec<String>>,
+    _min_periods: usize,
+) -> PyResult<(PyObject, PyObject)> {
+    Err(pyo3::exceptions::PyNotImplementedError::new_err(
+        "Rust execute_rolling_agg is not yet enabled; use Python DataFrame.rolling_agg implementation.",
+    ))
+}
+
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn execute_groupby_dynamic_agg(
+    _py: Python<'_>,
+    _plan: &PyPlan,
+    _root_data: &Bound<'_, PyAny>,
+    _index_column: String,
+    _every: String,
+    _period: Option<String>,
+    _by: Option<Vec<String>>,
+    _aggregations: &Bound<'_, PyAny>,
+) -> PyResult<(PyObject, PyObject)> {
+    Err(pyo3::exceptions::PyNotImplementedError::new_err(
+        "Rust execute_groupby_dynamic_agg is not yet enabled; use Python DataFrame.group_by_dynamic implementation.",
+    ))
+}
+
 /// Minimal Rust/PyO3 stub module for the `pydantable._core` extension.
 ///
 /// This exists so the Python side can import the extension module via maturin.
@@ -423,6 +459,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(execute_pivot, m)?)?;
     m.add_function(wrap_pyfunction!(execute_explode, m)?)?;
     m.add_function(wrap_pyfunction!(execute_unnest, m)?)?;
+    m.add_function(wrap_pyfunction!(execute_rolling_agg, m)?)?;
+    m.add_function(wrap_pyfunction!(execute_groupby_dynamic_agg, m)?)?;
     m.add_function(wrap_pyfunction!(rust_version, m)?)?;
     m.add_function(wrap_pyfunction!(make_column_ref, m)?)?;
     m.add_function(wrap_pyfunction!(make_literal, m)?)?;

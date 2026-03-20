@@ -131,3 +131,35 @@ class PolarsBackend(Backend):
     ) -> tuple[Any, Any]:
         rust = _require_rust_core()
         return rust.execute_unnest(plan, root_data, list(columns))
+
+    def execute_rolling_agg(
+        self,
+        plan: Any,
+        root_data: Any,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None,
+        min_periods: int,
+    ) -> tuple[Any, Any]:
+        rust = _require_rust_core()
+        return rust.execute_rolling_agg(
+            plan, root_data, on, column, window_size, op, out_name, by, min_periods
+        )
+
+    def execute_groupby_dynamic_agg(
+        self,
+        plan: Any,
+        root_data: Any,
+        index_column: str,
+        every: str,
+        period: str | None,
+        by: Sequence[str] | None,
+        aggregations: Any,
+    ) -> tuple[Any, Any]:
+        rust = _require_rust_core()
+        return rust.execute_groupby_dynamic_agg(
+            plan, root_data, index_column, every, period, by, aggregations
+        )
