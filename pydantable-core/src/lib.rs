@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use pyo3::prelude::*;
 
 mod dtype;
@@ -149,6 +151,7 @@ fn execute_plan(py: Python<'_>, plan: &PyPlan, root_data: &Bound<'_, PyAny>) -> 
 }
 
 #[pyfunction]
+#[allow(clippy::too_many_arguments)]
 fn execute_join(
     py: Python<'_>,
     left_plan: &PyPlan,

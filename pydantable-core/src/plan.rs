@@ -4,7 +4,10 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
 
 use crate::dtype::{dtype_to_descriptor_py, dtype_to_python_type, DTypeDesc};
-use crate::expr::{ExprNode, LiteralValue};
+use crate::expr::ExprNode;
+
+#[cfg(not(feature = "polars_engine"))]
+use crate::expr::LiteralValue;
 
 #[cfg(feature = "polars_engine")]
 use polars::lazy::dsl::{col, lit};
@@ -28,6 +31,7 @@ pub struct PlanInner {
     pub root_schema: HashMap<String, DTypeDesc>,
 }
 
+#[cfg(not(feature = "polars_engine"))]
 fn ctx_len(ctx: &HashMap<String, Vec<Option<LiteralValue>>>) -> PyResult<usize> {
     ctx.values().next().map(|v| v.len()).ok_or_else(|| {
         PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -69,8 +73,9 @@ pub fn schema_descriptors_as_py(
     Ok(dict.into_py(py))
 }
 
+#[cfg(not(feature = "polars_engine"))]
 pub fn root_data_to_ctx(
-    py: Python<'_>,
+    _py: Python<'_>,
     root_schema: &HashMap<String, DTypeDesc>,
     root_data: &Bound<'_, PyAny>,
 ) -> PyResult<HashMap<String, Vec<Option<LiteralValue>>>> {
@@ -250,7 +255,7 @@ pub fn execute_plan(
 ) -> PyResult<PyObject> {
     #[cfg(feature = "polars_engine")]
     {
-        return execute_plan_polars(py, plan, root_data);
+        execute_plan_polars(py, plan, root_data)
     }
 
     #[cfg(not(feature = "polars_engine"))]
@@ -415,7 +420,7 @@ fn apply_steps_to_lazy(mut lf: LazyFrame, steps: &[PlanStep]) -> PyResult<LazyFr
     for step in steps.iter() {
         match step {
             PlanStep::Select { columns } => {
-                let exprs = columns.iter().map(|name| col(name)).collect::<Vec<_>>();
+                let exprs = columns.iter().map(col).collect::<Vec<_>>();
                 lf = lf.select(exprs);
             }
             PlanStep::WithColumns { columns } => {
@@ -534,6 +539,7 @@ fn dtype_from_polars(dt: &DataType) -> PyResult<DTypeDesc> {
 }
 
 #[cfg(feature = "polars_engine")]
+#[allow(clippy::too_many_arguments)]
 pub fn execute_join_polars(
     py: Python<'_>,
     left_plan: &PlanInner,
@@ -578,7 +584,7 @@ pub fn execute_join_polars(
 
     let left_df = root_data_to_polars_df(&left_plan.root_schema, left_root_data)?;
     let right_df = root_data_to_polars_df(&right_plan.root_schema, right_root_data)?;
-    let mut left_lf = apply_steps_to_lazy(left_df.lazy(), &left_plan.steps)?;
+    let left_lf = apply_steps_to_lazy(left_df.lazy(), &left_plan.steps)?;
     let mut right_lf = apply_steps_to_lazy(right_df.lazy(), &right_plan.steps)?;
 
     // Deterministic collision handling:
@@ -607,7 +613,7 @@ pub fn execute_join_polars(
         right_lf = right_lf.select([col(on[0].as_str())]);
     }
 
-    let key_exprs = on.iter().map(|k| col(k)).collect::<Vec<_>>();
+    let key_exprs = on.iter().map(col).collect::<Vec<_>>();
     let joined = left_lf.join(
         right_lf,
         key_exprs.clone(),
@@ -671,7 +677,7 @@ pub fn execute_groupby_agg_polars(
 
     let df = root_data_to_polars_df(&plan.root_schema, root_data)?;
     let lf = apply_steps_to_lazy(df.lazy(), &plan.steps)?;
-    let by_exprs = by.iter().map(|k| col(k)).collect::<Vec<_>>();
+    let by_exprs = by.iter().map(col).collect::<Vec<_>>();
     let mut agg_exprs = Vec::new();
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
     for key in by.iter() {
@@ -775,10 +781,21 @@ pub fn execute_groupby_agg_polars(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pyo3::prepare_freethreaded_python;
     use crate::dtype::{BaseType, DTypeDesc};
+    use std::sync::Once;
+
+    static INIT_PYO3: Once = Once::new();
+
+    fn ensure_python_initialized() {
+        INIT_PYO3.call_once(|| {
+            prepare_freethreaded_python();
+        });
+    }
 
     #[test]
     fn plan_select_rejects_empty_projection() {
+        ensure_python_initialized();
         let mut schema = HashMap::new();
         schema.insert("id".to_string(), DTypeDesc::non_nullable(BaseType::Int));
         let plan = make_plan(schema);
@@ -788,6 +805,7 @@ mod tests {
 
     #[test]
     fn schema_descriptors_encode_base_and_nullable() {
+        ensure_python_initialized();
         Python::with_gil(|py| {
             let mut schema = HashMap::new();
             schema.insert("id".to_string(), DTypeDesc::non_nullable(BaseType::Int));

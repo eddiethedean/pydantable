@@ -15,6 +15,6 @@ default = ["polars_engine"]
 polars_engine = ["dep:polars"]
 
 [dependencies]
-pyo3 = { version = "0.23.4", features = ["extension-module"] }
+pyo3 = { version = "0.23.4" }
 polars = { version = "0.53.0", optional = true, features = ["lazy"] }
 

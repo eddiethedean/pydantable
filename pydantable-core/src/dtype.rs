@@ -61,21 +61,21 @@ pub fn py_annotation_to_dtype(py: Python<'_>, dtype_obj: &Bound<'_, PyAny>) -> P
     if let Ok(py_type) = dtype_obj.downcast::<PyType>() {
         // Special-case: `bool` must be detected before `int` because `bool` is a
         // subclass of `int` in Python.
-        if is_py_type(&py_type, "bool") {
+        if is_py_type(py_type, "bool") {
             return Ok(DTypeDesc::non_nullable(BaseType::Bool));
         }
-        if is_py_type(&py_type, "int") {
+        if is_py_type(py_type, "int") {
             return Ok(DTypeDesc::non_nullable(BaseType::Int));
         }
-        if is_py_type(&py_type, "float") {
+        if is_py_type(py_type, "float") {
             return Ok(DTypeDesc::non_nullable(BaseType::Float));
         }
-        if is_py_type(&py_type, "str") {
+        if is_py_type(py_type, "str") {
             return Ok(DTypeDesc::non_nullable(BaseType::Str));
         }
 
         // `type(None)` comes through as a Python type object named "NoneType".
-        if is_py_type(&py_type, "NoneType") {
+        if is_py_type(py_type, "NoneType") {
             return Ok(DTypeDesc::unknown_nullable());
         }
     }
@@ -98,15 +98,15 @@ pub fn py_annotation_to_dtype(py: Python<'_>, dtype_obj: &Bound<'_, PyAny>) -> P
         for arg in union_args.iter()? {
             let arg = arg?;
             if let Ok(arg_type) = arg.downcast::<PyType>() {
-                if is_py_type(&arg_type, "bool") {
+                if is_py_type(arg_type, "bool") {
                     seen_base = Some(BaseType::Bool);
-                } else if is_py_type(&arg_type, "int") {
+                } else if is_py_type(arg_type, "int") {
                     seen_base = Some(BaseType::Int);
-                } else if is_py_type(&arg_type, "float") {
+                } else if is_py_type(arg_type, "float") {
                     seen_base = Some(BaseType::Float);
-                } else if is_py_type(&arg_type, "str") {
+                } else if is_py_type(arg_type, "str") {
                     seen_base = Some(BaseType::Str);
-                } else if is_py_type(&arg_type, "NoneType") {
+                } else if is_py_type(arg_type, "NoneType") {
                     seen_none = true;
                 } else {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -151,9 +151,9 @@ pub fn py_value_to_dtype(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<D
         return Ok(DTypeDesc::non_nullable(BaseType::Str));
     }
 
-    Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
-        "Unsupported literal value type for skeleton."
-    )))
+    Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+        "Unsupported literal value type for skeleton.".to_string(),
+    ))
 }
 
 pub fn dtype_to_python_type(py: Python<'_>, dtype: DTypeDesc) -> PyResult<PyObject> {

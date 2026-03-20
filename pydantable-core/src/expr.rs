@@ -1,11 +1,13 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+#[cfg(not(feature = "polars_engine"))]
+use std::collections::HashMap;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyList, PyString};
+use pyo3::types::PyAny;
 
 use crate::dtype::{py_value_to_dtype, BaseType, DTypeDesc};
 
-#[cfg(feature = "polars_engine")]
 #[cfg(feature = "polars_engine")]
 use polars::lazy::dsl::{col, lit, Expr as PolarsExpr};
 #[cfg(feature = "polars_engine")]
@@ -265,6 +267,7 @@ impl ExprNode {
         })
     }
 
+    #[cfg(not(feature = "polars_engine"))]
     pub fn eval(
         &self,
         ctx: &HashMap<String, Vec<Option<LiteralValue>>>,
@@ -510,7 +513,6 @@ impl ExprNode {
                                                 CmpOp::Le => af <= bf,
                                                 CmpOp::Gt => af > bf,
                                                 CmpOp::Ge => af >= bf,
-                                                _ => unreachable!(),
                                             }
                                         }
                                         BaseType::Str => {
@@ -541,7 +543,6 @@ impl ExprNode {
                                                 CmpOp::Le => as_ <= bs_,
                                                 CmpOp::Gt => as_ > bs_,
                                                 CmpOp::Ge => as_ >= bs_,
-                                                _ => unreachable!(),
                                             }
                                         }
                                         _ => {
@@ -551,7 +552,6 @@ impl ExprNode {
                                         }
                                     }
                                 }
-                                _ => unreachable!(),
                             };
 
                             out.push(Some(LiteralValue::Bool(res_bool)));
@@ -620,18 +620,6 @@ pub struct ExprHandle {
 }
 
 impl ExprHandle {
-    pub fn new_column(name: String, dtype: DTypeDesc) -> PyResult<Self> {
-        Ok(Self {
-            node: ExprNode::make_column_ref(name, dtype)?,
-        })
-    }
-
-    pub fn new_literal(value: Option<LiteralValue>, dtype: DTypeDesc) -> PyResult<Self> {
-        Ok(Self {
-            node: ExprNode::make_literal(value, dtype)?,
-        })
-    }
-
     pub fn from_py_literal(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
         let dtype = py_value_to_dtype(py, value)?;
         if value.is_none() {
