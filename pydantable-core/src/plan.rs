@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
 
 use crate::dtype::{dtype_to_descriptor_py, dtype_to_python_type, DTypeDesc};
-use crate::expr::ExprNode;
+use crate::expr::{exprnode_to_serializable, ExprNode};
 
 #[cfg(not(feature = "polars_engine"))]
 use crate::expr::LiteralValue;
@@ -29,6 +29,53 @@ pub struct PlanInner {
     pub steps: Vec<PlanStep>,
     pub schema: HashMap<String, DTypeDesc>,
     pub root_schema: HashMap<String, DTypeDesc>,
+}
+
+pub fn planinner_to_serializable(
+    py: Python<'_>,
+    inner: &PlanInner,
+) -> PyResult<PyObject> {
+    let out = PyDict::new_bound(py);
+    out.set_item("version", 1)?;
+
+    out.set_item(
+        "schema_descriptors",
+        schema_descriptors_as_py(py, &inner.schema)?,
+    )?;
+    out.set_item(
+        "root_schema_descriptors",
+        schema_descriptors_as_py(py, &inner.root_schema)?,
+    )?;
+
+    let steps = PyList::empty_bound(py);
+    for step in inner.steps.iter() {
+        let step_out = PyDict::new_bound(py);
+        match step {
+            PlanStep::Select { columns } => {
+                step_out.set_item("kind", "select")?;
+                step_out.set_item("columns", columns)?;
+            }
+            PlanStep::WithColumns { columns } => {
+                step_out.set_item("kind", "with_columns")?;
+                let cols = PyDict::new_bound(py);
+                for (name, expr) in columns.iter() {
+                    cols.set_item(name, exprnode_to_serializable(py, expr)?)?;
+                }
+                step_out.set_item("columns", cols)?;
+            }
+            PlanStep::Filter { condition } => {
+                step_out.set_item("kind", "filter")?;
+                step_out.set_item(
+                    "condition",
+                    exprnode_to_serializable(py, condition)?,
+                )?;
+            }
+        }
+        steps.append(step_out)?;
+    }
+
+    out.set_item("steps", steps)?;
+    Ok(out.into_py(py))
 }
 
 #[cfg(not(feature = "polars_engine"))]

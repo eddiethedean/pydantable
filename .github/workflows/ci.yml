@@ -6,6 +6,11 @@ on:
 
 jobs:
   test:
+    strategy:
+      matrix:
+        backend: ["polars", "pandas", "pyspark"]
+    env:
+      PYDANTABLE_BACKEND: ${{ matrix.backend }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

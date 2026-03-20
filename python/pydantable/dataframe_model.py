@@ -65,6 +65,7 @@ class DataFrameModel:
     RowModel: type[BaseModel]
     _SchemaModel: type[Schema]
     _df: DataFrame[Any]
+    _dataframe_cls: type[DataFrame[Any]] = DataFrame
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
@@ -105,7 +106,9 @@ class DataFrameModel:
         strict: bool = True,
     ):
         normalized = _normalize_input(data=data, row_model=self.RowModel)
-        self._df = DataFrame[self._SchemaModel](normalized, strict=strict)
+        self._df = self._dataframe_cls[self._SchemaModel](
+            normalized, strict=strict
+        )
 
     @classmethod
     def _derived_model_type(

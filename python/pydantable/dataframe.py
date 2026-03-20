@@ -14,6 +14,7 @@ from typing import (
 
 from pydantic import BaseModel
 
+from .backends import get_backend
 from .expressions import ColumnRef, Expr
 from .schema import (
     make_derived_schema_type,
@@ -108,6 +109,7 @@ class DataFrame(Generic[SchemaT]):
     """
 
     _schema_type: type[BaseModel] | None = None
+    _backend: str = "polars"
 
     def __class_getitem__(cls, schema_type: Any) -> type[DataFrame[Any]]:
         if not isinstance(schema_type, type) or not issubclass(schema_type, BaseModel):
@@ -244,11 +246,16 @@ class DataFrame(Generic[SchemaT]):
         how: str = "inner",
         suffix: str = "_right",
     ) -> DataFrame[Any]:
-        rust = _require_rust_core()
         if not isinstance(other, DataFrame):
             raise TypeError("join(other=...) expects another DataFrame.")
+        if getattr(other, "_backend", "polars") != getattr(self, "_backend", "polars"):
+            raise ValueError(
+                "join between different backends is not supported yet."
+            )
         keys = [on] if isinstance(on, str) else list(on)
-        joined_data, schema_descriptors = rust.execute_join(
+
+        backend = get_backend(self._backend)
+        joined_data, schema_descriptors = backend.execute_join(
             self._rust_plan,
             self._root_data,
             other._rust_plan,
@@ -261,7 +268,7 @@ class DataFrame(Generic[SchemaT]):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
-        rust_plan = rust.make_plan(derived_fields)
+        rust_plan = _require_rust_core().make_plan(derived_fields)
         return self._from_plan(
             root_data=joined_data,
             root_schema_type=derived_schema_type,
@@ -287,23 +294,22 @@ class DataFrame(Generic[SchemaT]):
                 )
         return GroupedDataFrame(self, selected)
 
-    def collect(self, *, engine: str = "rust") -> dict[str, list[Any]]:
+    def collect(self, *, engine: str | None = None) -> dict[str, list[Any]]:
         """
         Materialize this typed logical DataFrame into Python column data.
 
         Execution is owned by Rust.
         """
-        if engine != "rust":
-            raise NotImplementedError(
-                "The Rust-first build executes collect() in Rust only."
-            )
+        backend_name = self._backend
+        if engine is not None:
+            resolved = engine.lower()
+            backend_name = "polars" if resolved == "rust" else resolved
 
-        rust = _require_rust_core()
-        result = rust.execute_plan(self._rust_plan, self._root_data)
-        return result
+        backend = get_backend(backend_name)
+        return backend.execute_plan(self._rust_plan, self._root_data)
 
     def to_dict(self) -> dict[str, list[Any]]:
-        return self.collect(engine="rust")
+        return self.collect()
 
 
 class GroupedDataFrame:
@@ -314,7 +320,6 @@ class GroupedDataFrame:
     def agg(
         self, **aggregations: tuple[str, str] | tuple[str, ColumnRef]
     ) -> DataFrame[Any]:
-        rust = _require_rust_core()
         agg_specs: dict[str, tuple[str, str]] = {}
         for out_name, spec in aggregations.items():
             if not isinstance(spec, tuple) or len(spec) != 2:
@@ -340,14 +345,18 @@ class GroupedDataFrame:
                 )
             agg_specs[out_name] = (op, in_col)
 
-        grouped_data, schema_descriptors = rust.execute_groupby_agg(
-            self._df._rust_plan, self._df._root_data, self._keys, agg_specs
+        backend = get_backend(self._df._backend)
+        grouped_data, schema_descriptors = backend.execute_groupby_agg(
+            self._df._rust_plan,
+            self._df._root_data,
+            self._keys,
+            agg_specs,
         )
         derived_fields = schema_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
             self._df._current_schema_type, derived_fields
         )
-        rust_plan = rust.make_plan(derived_fields)
+        rust_plan = _require_rust_core().make_plan(derived_fields)
         return self._df._from_plan(
             root_data=grouped_data,
             root_schema_type=derived_schema_type,

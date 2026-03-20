@@ -4,9 +4,9 @@ use std::collections::HashSet;
 use std::collections::HashMap;
 
 use pyo3::prelude::*;
-use pyo3::types::PyAny;
+use pyo3::types::{PyAny, PyDict};
 
-use crate::dtype::{py_value_to_dtype, BaseType, DTypeDesc};
+use crate::dtype::{dtype_to_descriptor_py, py_value_to_dtype, BaseType, DTypeDesc};
 
 #[cfg(feature = "polars_engine")]
 use polars::lazy::dsl::{col, lit, Expr as PolarsExpr};
@@ -612,6 +612,64 @@ impl ExprNode {
             }
         }
     }
+}
+
+fn arith_op_to_str(op: &ArithOp) -> &'static str {
+    match op {
+        ArithOp::Add => "add",
+        ArithOp::Sub => "sub",
+        ArithOp::Mul => "mul",
+        ArithOp::Div => "div",
+    }
+}
+
+fn cmp_op_to_str(op: &CmpOp) -> &'static str {
+    match op {
+        CmpOp::Eq => "eq",
+        CmpOp::Ne => "ne",
+        CmpOp::Lt => "lt",
+        CmpOp::Le => "le",
+        CmpOp::Gt => "gt",
+        CmpOp::Ge => "ge",
+    }
+}
+
+pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyObject> {
+    let dict = PyDict::new_bound(py);
+
+    dict.set_item("dtype", dtype_to_descriptor_py(py, node.dtype())?)?;
+
+    match node {
+        ExprNode::ColumnRef { name, .. } => {
+            dict.set_item("kind", "column_ref")?;
+            dict.set_item("name", name)?;
+        }
+        ExprNode::Literal { value, .. } => {
+            dict.set_item("kind", "literal")?;
+            let value_obj = match value {
+                None => py.None(),
+                Some(LiteralValue::Int(v)) => v.into_py(py),
+                Some(LiteralValue::Float(v)) => v.into_py(py),
+                Some(LiteralValue::Bool(v)) => v.into_py(py),
+                Some(LiteralValue::Str(v)) => v.clone().into_py(py),
+            };
+            dict.set_item("value", value_obj)?;
+        }
+        ExprNode::BinaryOp { op, left, right, .. } => {
+            dict.set_item("kind", "binary_op")?;
+            dict.set_item("op", arith_op_to_str(op))?;
+            dict.set_item("left", exprnode_to_serializable(py, left)?)?;
+            dict.set_item("right", exprnode_to_serializable(py, right)?)?;
+        }
+        ExprNode::CompareOp { op, left, right, .. } => {
+            dict.set_item("kind", "compare_op")?;
+            dict.set_item("op", cmp_op_to_str(op))?;
+            dict.set_item("left", exprnode_to_serializable(py, left)?)?;
+            dict.set_item("right", exprnode_to_serializable(py, right)?)?;
+        }
+    }
+
+    Ok(dict.into_py(py))
 }
 
 #[derive(Clone)]
