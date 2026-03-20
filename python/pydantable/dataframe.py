@@ -392,6 +392,131 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
+    def melt(
+        self,
+        *,
+        id_vars: Sequence[str] | None = None,
+        value_vars: Sequence[str] | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+    ) -> DataFrame[Any]:
+        backend = get_backend(self._backend)
+        out_data, schema_descriptors = backend.execute_melt(
+            self._rust_plan,
+            self._root_data,
+            [] if id_vars is None else list(id_vars),
+            None if value_vars is None else list(value_vars),
+            variable_name,
+            value_name,
+        )
+        derived_fields = schema_from_descriptors(schema_descriptors)
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        rust_plan = _require_rust_core().make_plan(derived_fields)
+        return self._from_plan(
+            root_data=out_data,
+            root_schema_type=derived_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def unpivot(
+        self,
+        *,
+        index: Sequence[str] | None = None,
+        on: Sequence[str] | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+    ) -> DataFrame[Any]:
+        return self.melt(
+            id_vars=index,
+            value_vars=on,
+            variable_name=variable_name,
+            value_name=value_name,
+        )
+
+    def pivot(
+        self,
+        *,
+        index: str | Sequence[str],
+        columns: str | ColumnRef,
+        values: str | Sequence[str],
+        aggregate_function: str = "first",
+    ) -> DataFrame[Any]:
+        index_cols = [index] if isinstance(index, str) else list(index)
+        if isinstance(columns, str):
+            columns_col = columns
+        elif isinstance(columns, Expr):
+            referenced = columns.referenced_columns()
+            if len(referenced) != 1:
+                raise TypeError(
+                    "pivot(columns=...) expects a column name or "
+                    "single-column ColumnRef."
+                )
+            columns_col = next(iter(referenced))
+        else:
+            raise TypeError(
+                "pivot(columns=...) expects a column name or single-column ColumnRef."
+            )
+        value_cols = [values] if isinstance(values, str) else list(values)
+        backend = get_backend(self._backend)
+        out_data, schema_descriptors = backend.execute_pivot(
+            self._rust_plan,
+            self._root_data,
+            index_cols,
+            columns_col,
+            value_cols,
+            aggregate_function,
+        )
+        derived_fields = schema_from_descriptors(schema_descriptors)
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        rust_plan = _require_rust_core().make_plan(derived_fields)
+        return self._from_plan(
+            root_data=out_data,
+            root_schema_type=derived_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def explode(self, columns: str | Sequence[str]) -> DataFrame[Any]:
+        cols = [columns] if isinstance(columns, str) else list(columns)
+        backend = get_backend(self._backend)
+        out_data, schema_descriptors = backend.execute_explode(
+            self._rust_plan, self._root_data, cols
+        )
+        derived_fields = schema_from_descriptors(schema_descriptors)
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        rust_plan = _require_rust_core().make_plan(derived_fields)
+        return self._from_plan(
+            root_data=out_data,
+            root_schema_type=derived_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def unnest(self, columns: str | Sequence[str]) -> DataFrame[Any]:
+        cols = [columns] if isinstance(columns, str) else list(columns)
+        backend = get_backend(self._backend)
+        out_data, schema_descriptors = backend.execute_unnest(
+            self._rust_plan, self._root_data, cols
+        )
+        derived_fields = schema_from_descriptors(schema_descriptors)
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        rust_plan = _require_rust_core().make_plan(derived_fields)
+        return self._from_plan(
+            root_data=out_data,
+            root_schema_type=derived_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
     def join(
         self,
         other: DataFrame[Any],

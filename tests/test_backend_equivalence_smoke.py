@@ -288,3 +288,39 @@ def test_backend_equivalence_p4_groupby_aggregations(backend_mod: str) -> None:
         .collect()
     )
     assert_table_eq_sorted(d_out, b_out, keys=["id"])
+
+
+@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_backend_equivalence_p5_reshape_ops(backend_mod: str) -> None:
+    backend = importlib.import_module(backend_mod)
+    BackendDataFrameModel = backend.DataFrameModel
+
+    class UserDefault(PolarsDataFrameModel):
+        id: int
+        key: str
+        age: int | None
+
+    class UserBackend(BackendDataFrameModel):
+        id: int
+        key: str
+        age: int | None
+
+    payload = {
+        "id": [1, 1, 2, 2],
+        "key": ["A", "B", "A", "B"],
+        "age": [10, None, 20, 30],
+    }
+    d_df = UserDefault(payload)
+    b_df = UserBackend(payload)
+
+    d_melt = d_df.melt(id_vars=["id"], value_vars=["age"]).collect()
+    b_melt = b_df.melt(id_vars=["id"], value_vars=["age"]).collect()
+    assert_table_eq_sorted(d_melt, b_melt, keys=["id", "variable"])
+
+    d_pivot = d_df.pivot(
+        index="id", columns="key", values="age", aggregate_function="sum"
+    ).collect()
+    b_pivot = b_df.pivot(
+        index="id", columns="key", values="age", aggregate_function="sum"
+    ).collect()
+    assert_table_eq_sorted(d_pivot, b_pivot, keys=["id"])

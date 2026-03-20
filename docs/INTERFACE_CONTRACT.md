@@ -58,3 +58,28 @@ The output field nullability is preserved/derived accordingly:
 - nullable aggregates above are typed as `Optional[...]`
 - `count` and `n_unique` outputs remain non-optional integers
 
+## Reshaping semantics
+
+Supported reshape methods:
+- `melt` / `unpivot`
+- `pivot`
+- `explode` and `unnest` API entrypoints
+
+`melt` / `unpivot`:
+- `id_vars` are preserved as-is.
+- `variable_name` is always non-nullable `str`.
+- `value_name` requires all source `value_vars` to share a compatible scalar base dtype.
+- `value_vars` cannot overlap with `id_vars`.
+
+`pivot`:
+- Requires `index`, `columns`, and at least one `values` column.
+- Supports aggregate functions: `count`, `sum`, `mean`, `min`, `max`, `median`, `std`, `var`, `first`, `last`, `n_unique`.
+- Numeric aggregates (`sum`, `mean`, `median`, `std`, `var`) require numeric value dtypes.
+- Generated output columns use deterministic names:
+  - single value column: `<pivot_value>_<agg>`
+  - multiple value columns: `<pivot_value>_<value_col>_<agg>`
+
+`explode` / `unnest`:
+- Current schema contracts only support scalar base dtypes (`int`, `float`, `bool`, `str`).
+- Because list/struct typed columns are not yet part of the schema system, both methods raise explicit `NotImplementedError` with guidance.
+

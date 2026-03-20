@@ -12,15 +12,17 @@ use crate::expr::{
     ExprNode,
 };
 use crate::plan::{
-    execute_concat_polars as execute_concat_inner,
+    execute_concat_polars as execute_concat_inner, execute_explode_polars as execute_explode_inner,
     execute_groupby_agg_polars as execute_groupby_agg_inner,
-    execute_join_polars as execute_join_inner, execute_plan as execute_plan_inner,
-    make_plan as make_plan_inner, plan_drop as plan_drop_inner,
-    plan_drop_nulls as plan_drop_nulls_inner, plan_fill_null as plan_fill_null_inner,
-    plan_filter as plan_filter_inner, plan_rename as plan_rename_inner,
-    plan_select as plan_select_inner, plan_slice as plan_slice_inner, plan_sort as plan_sort_inner,
-    plan_unique as plan_unique_inner, plan_with_columns as plan_with_columns_inner,
-    planinner_to_serializable, schema_descriptors_as_py, schema_fields_as_py, PlanInner,
+    execute_join_polars as execute_join_inner, execute_melt_polars as execute_melt_inner,
+    execute_pivot_polars as execute_pivot_inner, execute_plan as execute_plan_inner,
+    execute_unnest_polars as execute_unnest_inner, make_plan as make_plan_inner,
+    plan_drop as plan_drop_inner, plan_drop_nulls as plan_drop_nulls_inner,
+    plan_fill_null as plan_fill_null_inner, plan_filter as plan_filter_inner,
+    plan_rename as plan_rename_inner, plan_select as plan_select_inner,
+    plan_slice as plan_slice_inner, plan_sort as plan_sort_inner, plan_unique as plan_unique_inner,
+    plan_with_columns as plan_with_columns_inner, planinner_to_serializable,
+    schema_descriptors_as_py, schema_fields_as_py, PlanInner,
 };
 
 #[pyclass]
@@ -341,6 +343,69 @@ fn execute_concat(
     )
 }
 
+#[pyfunction]
+fn execute_melt(
+    py: Python<'_>,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    id_vars: Vec<String>,
+    value_vars: Option<Vec<String>>,
+    variable_name: String,
+    value_name: String,
+) -> PyResult<(PyObject, PyObject)> {
+    execute_melt_inner(
+        py,
+        &plan.inner,
+        root_data,
+        id_vars,
+        value_vars,
+        variable_name,
+        value_name,
+    )
+}
+
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn execute_pivot(
+    py: Python<'_>,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    index: Vec<String>,
+    columns: String,
+    values: Vec<String>,
+    aggregate_function: String,
+) -> PyResult<(PyObject, PyObject)> {
+    execute_pivot_inner(
+        py,
+        &plan.inner,
+        root_data,
+        index,
+        columns,
+        values,
+        aggregate_function,
+    )
+}
+
+#[pyfunction]
+fn execute_explode(
+    py: Python<'_>,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    columns: Vec<String>,
+) -> PyResult<(PyObject, PyObject)> {
+    execute_explode_inner(py, &plan.inner, root_data, columns)
+}
+
+#[pyfunction]
+fn execute_unnest(
+    py: Python<'_>,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    columns: Vec<String>,
+) -> PyResult<(PyObject, PyObject)> {
+    execute_unnest_inner(py, &plan.inner, root_data, columns)
+}
+
 /// Minimal Rust/PyO3 stub module for the `pydantable._core` extension.
 ///
 /// This exists so the Python side can import the extension module via maturin.
@@ -354,6 +419,10 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(execute_join, m)?)?;
     m.add_function(wrap_pyfunction!(execute_groupby_agg, m)?)?;
     m.add_function(wrap_pyfunction!(execute_concat, m)?)?;
+    m.add_function(wrap_pyfunction!(execute_melt, m)?)?;
+    m.add_function(wrap_pyfunction!(execute_pivot, m)?)?;
+    m.add_function(wrap_pyfunction!(execute_explode, m)?)?;
+    m.add_function(wrap_pyfunction!(execute_unnest, m)?)?;
     m.add_function(wrap_pyfunction!(rust_version, m)?)?;
     m.add_function(wrap_pyfunction!(make_column_ref, m)?)?;
     m.add_function(wrap_pyfunction!(make_literal, m)?)?;

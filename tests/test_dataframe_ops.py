@@ -126,3 +126,65 @@ def test_p2_fill_drop_nulls_and_cast_predicates() -> None:
     assert casted.schema_fields()["age_f"] == float | None
     out = casted.with_columns(age_is_null=casted.age.is_null()).collect()
     assert out["age_is_null"] == [False, True, False]
+
+
+def test_p5_melt_and_unpivot() -> None:
+    class S(Schema):
+        id: int
+        a: int | None
+        b: int | None
+
+    df = DataFrame[S]({"id": [1, 2], "a": [10, None], "b": [20, 30]})
+    melted = df.melt(id_vars=["id"], value_vars=["a", "b"])
+    out = melted.collect()
+    assert out["id"] == [1, 1, 2, 2]
+    assert out["variable"] == ["a", "b", "a", "b"]
+    assert out["value"] == [10, 20, None, 30]
+    assert melted.schema_fields()["variable"] is str
+    assert melted.schema_fields()["value"] == int | None
+
+    unpivoted = df.unpivot(index=["id"], on=["a", "b"])
+    assert unpivoted.collect() == out
+
+
+def test_p5_pivot_single_and_multi_values() -> None:
+    class S(Schema):
+        id: int
+        key: str
+        x: int | None
+        y: float | None
+
+    df = DataFrame[S](
+        {
+            "id": [1, 1, 2, 2],
+            "key": ["A", "B", "A", "B"],
+            "x": [10, 20, None, 40],
+            "y": [1.0, 2.0, 3.0, None],
+        }
+    )
+    p1 = df.pivot(
+        index="id", columns="key", values="x", aggregate_function="sum"
+    ).collect()
+    assert p1["id"] == [1, 2]
+    assert p1["A_sum"] == [10, None]
+    assert p1["B_sum"] == [20, 40]
+
+    p2 = df.pivot(
+        index=["id"], columns="key", values=["x", "y"], aggregate_function="first"
+    ).collect()
+    assert p2["A_x_first"] == [10, None]
+    assert p2["B_x_first"] == [20, 40]
+    assert p2["A_y_first"] == [1.0, 3.0]
+    assert p2["B_y_first"] == [2.0, None]
+
+
+def test_p5_explode_unnest_raise_not_implemented_for_scalar_schema() -> None:
+    class S(Schema):
+        id: int
+        name: str
+
+    df = DataFrame[S]({"id": [1], "name": ["a"]})
+    with pytest.raises(NotImplementedError, match=r"explode\(\) requires list-like"):
+        df.explode("name")
+    with pytest.raises(NotImplementedError, match=r"unnest\(\) requires struct-like"):
+        df.unnest("name")

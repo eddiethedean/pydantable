@@ -197,3 +197,25 @@ def test_p4_dataframe_model_groupby_aggregations_schema() -> None:
     assert schema["age_first"] == int | None
     assert schema["age_last"] == int | None
     assert schema["age_n_unique"] is int
+
+
+def test_p5_dataframe_model_reshape_methods() -> None:
+    class SalesDF(DataFrameModel):
+        id: int
+        k: str
+        v: int | None
+
+    df = SalesDF({"id": [1, 1], "k": ["A", "B"], "v": [10, None]})
+    melted = df.melt(
+        id_vars=["id"], value_vars=["v"], variable_name="var", value_name="val"
+    )
+    out = melted.collect()
+    assert out == {"id": [1, 1], "var": ["v", "v"], "val": [10, None]}
+    assert melted.schema_fields()["var"] is str
+    assert melted.schema_fields()["val"] == int | None
+
+    pivoted = df.pivot(index="id", columns="k", values="v", aggregate_function="first")
+    p_out = pivoted.collect()
+    assert p_out["id"] == [1]
+    assert p_out["A_first"] == [10]
+    assert p_out["B_first"] == [None]

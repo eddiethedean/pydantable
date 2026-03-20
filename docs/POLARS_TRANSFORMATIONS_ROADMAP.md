@@ -108,14 +108,20 @@ Progress note:
 Goal: cover pivot/unpivot/explode workflows.
 
 Deliverables:
-- [ ] `explode`
-- [ ] `melt`/`unpivot`
-- [ ] `pivot` (initially non-streaming constraints acceptable)
-- [ ] `unnest` (if list/struct roadmap supports it)
+- [x] `explode`
+- [x] `melt`/`unpivot`
+- [x] `pivot` (initially non-streaming constraints acceptable)
+- [x] `unnest` (if list/struct roadmap supports it)
 
 Validation:
-- [ ] Shape-change schema migration tests
-- [ ] Collision/column naming contract tests
+- [x] Shape-change schema migration tests
+- [x] Collision/column naming contract tests
+
+Progress note:
+- Implemented on branch `v0.5.0`:
+  - Added reshape APIs for `melt`/`unpivot` and `pivot` with deterministic schema descriptors and naming contracts.
+  - Added `explode`/`unnest` API entrypoints with explicit typed-contract errors until list/struct schema support is introduced.
+  - Expanded reshape contract tests, DataFrameModel schema checks, and backend parity smoke coverage.
 
 ## Phase P6: Window and time-series transformations
 

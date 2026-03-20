@@ -46,3 +46,37 @@ class Backend(Protocol):
         right_root_data: Any,
         how: str,
     ) -> tuple[Any, Any]: ...
+
+    def execute_melt(
+        self,
+        plan: Any,
+        root_data: Any,
+        id_vars: Sequence[str],
+        value_vars: Sequence[str] | None,
+        variable_name: str,
+        value_name: str,
+    ) -> tuple[Any, Any]: ...
+
+    def execute_pivot(
+        self,
+        plan: Any,
+        root_data: Any,
+        index: Sequence[str],
+        columns: str,
+        values: Sequence[str],
+        aggregate_function: str,
+    ) -> tuple[Any, Any]: ...
+
+    def execute_explode(
+        self,
+        plan: Any,
+        root_data: Any,
+        columns: Sequence[str],
+    ) -> tuple[Any, Any]: ...
+
+    def execute_unnest(
+        self,
+        plan: Any,
+        root_data: Any,
+        columns: Sequence[str],
+    ) -> tuple[Any, Any]: ...

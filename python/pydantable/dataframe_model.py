@@ -220,6 +220,63 @@ class DataFrameModel:
     def drop_nulls(self, subset: Sequence[str] | None = None) -> DataFrameModel:
         return self._from_dataframe(self._df.drop_nulls(subset=subset))
 
+    def melt(
+        self,
+        *,
+        id_vars: Sequence[str] | None = None,
+        value_vars: Sequence[str] | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+    ) -> DataFrameModel:
+        return self._from_dataframe(
+            self._df.melt(
+                id_vars=id_vars,
+                value_vars=value_vars,
+                variable_name=variable_name,
+                value_name=value_name,
+            )
+        )
+
+    def unpivot(
+        self,
+        *,
+        index: Sequence[str] | None = None,
+        on: Sequence[str] | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+    ) -> DataFrameModel:
+        return self._from_dataframe(
+            self._df.unpivot(
+                index=index,
+                on=on,
+                variable_name=variable_name,
+                value_name=value_name,
+            )
+        )
+
+    def pivot(
+        self,
+        *,
+        index: str | Sequence[str],
+        columns: Any,
+        values: str | Sequence[str],
+        aggregate_function: str = "first",
+    ) -> DataFrameModel:
+        return self._from_dataframe(
+            self._df.pivot(
+                index=index,
+                columns=columns,
+                values=values,
+                aggregate_function=aggregate_function,
+            )
+        )
+
+    def explode(self, columns: str | Sequence[str]) -> DataFrameModel:
+        return self._from_dataframe(self._df.explode(columns))
+
+    def unnest(self, columns: str | Sequence[str]) -> DataFrameModel:
+        return self._from_dataframe(self._df.unnest(columns))
+
     def join(
         self,
         other: DataFrameModel,
