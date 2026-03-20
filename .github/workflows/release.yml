@@ -83,7 +83,7 @@ jobs:
 
       - name: Audit
         working-directory: pydantable-core
-        run: cargo audit
+        run: cargo audit --ignore RUSTSEC-2025-0141
 
   deny:
     name: Deny

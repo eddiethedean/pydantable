@@ -3,6 +3,7 @@ name = "pydantable-core"
 version = "0.4.0"
 edition = "2021"
 publish = false
+license = "MIT"
 
 [lib]
 name = "pydantable_core"
@@ -15,6 +16,6 @@ default = ["polars_engine"]
 polars_engine = ["dep:polars"]
 
 [dependencies]
-pyo3 = { version = "0.23.4" }
+pyo3 = { version = "0.24.1" }
 polars = { version = "0.53.0", optional = true, features = ["lazy"] }
 
