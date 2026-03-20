@@ -111,6 +111,77 @@ class Expr:  # type: ignore[override]
     def __ge__(self, other: Any) -> Expr:
         return self._compare(">=", other)
 
+    def is_null(self) -> Expr:
+        rust_expr = _require_rust_core().expr_is_null(self._rust_expr)
+        return Expr(rust_expr=rust_expr)
+
+    def is_not_null(self) -> Expr:
+        rust_expr = _require_rust_core().expr_is_not_null(self._rust_expr)
+        return Expr(rust_expr=rust_expr)
+
+    def cast(self, dtype: Any) -> Expr:
+        rust_expr = _require_rust_core().expr_cast(self._rust_expr, dtype)
+        return Expr(rust_expr=rust_expr)
+
+    def isin(self, *values: Any) -> Expr:
+        if len(values) == 1 and isinstance(values[0], (list, tuple)):
+            vals = list(values[0])
+        else:
+            vals = list(values)
+        rust_expr = _require_rust_core().expr_in_list(self._rust_expr, vals)
+        return Expr(rust_expr=rust_expr)
+
+    def between(self, low: Any, high: Any) -> Expr:
+        lo = self._coerce_other(low)
+        hi = self._coerce_other(high)
+        rust_expr = _require_rust_core().expr_between(
+            self._rust_expr, lo._rust_expr, hi._rust_expr
+        )
+        return Expr(rust_expr=rust_expr)
+
+    def substr(self, start: Any, length: Any | None = None) -> Expr:
+        st = self._coerce_other(start)
+        rust = _require_rust_core()
+        if length is None:
+            rust_expr = rust.expr_substring(self._rust_expr, st._rust_expr, None)
+        else:
+            ln = self._coerce_other(length)
+            rust_expr = rust.expr_substring(
+                self._rust_expr, st._rust_expr, ln._rust_expr
+            )
+        return Expr(rust_expr=rust_expr)
+
+    def char_length(self) -> Expr:
+        rust_expr = _require_rust_core().expr_string_length(self._rust_expr)
+        return Expr(rust_expr=rust_expr)
+
+
+class WhenChain:
+    """Chained ``when`` / ``otherwise`` (Spark-style)."""
+
+    def __init__(self, condition: Expr, value: Expr):
+        if not isinstance(condition, Expr) or not isinstance(value, Expr):
+            raise TypeError("when() expects Expr arguments.")
+        self._branches: list[tuple[Expr, Expr]] = [(condition, value)]
+
+    def when(self, condition: Expr, value: Expr) -> WhenChain:
+        if not isinstance(condition, Expr) or not isinstance(value, Expr):
+            raise TypeError("when().when(...) expects Expr arguments.")
+        self._branches.append((condition, value))
+        return self
+
+    def otherwise(self, value: Expr) -> Expr:
+        if not isinstance(value, Expr):
+            raise TypeError("otherwise() expects an Expr.")
+        rust = _require_rust_core()
+        pairs = [(c._rust_expr, v._rust_expr) for c, v in self._branches]
+        return Expr(rust_expr=rust.expr_case_when(pairs, value._rust_expr))
+
+
+def when(condition: Expr, value: Expr) -> WhenChain:
+    """First branch of a ``CASE WHEN`` (chain ``.when(...).otherwise(...)``)."""
+    return WhenChain(condition, value)
+
 
 class ColumnRef(Expr):  # type: ignore[override]
     def __init__(self, *, name: str, dtype: Any):
@@ -137,3 +208,24 @@ class BinaryOp(Expr):  # type: ignore[override]
 class CompareOp(Expr):  # type: ignore[override]
     def __init__(self, *, rust_expr: Any):
         super().__init__(rust_expr=rust_expr)
+
+
+def coalesce(*exprs: Expr) -> Expr:
+    """SQL ``coalesce``: first non-null among compatible typed expressions."""
+    if not exprs:
+        raise TypeError("coalesce() requires at least one expression.")
+    rust = _require_rust_core()
+    return Expr(
+        rust_expr=rust.expr_coalesce([e._rust_expr for e in exprs]),
+    )
+
+
+def concat(*exprs: Expr) -> Expr:
+    """Concatenate string expressions."""
+    if len(exprs) < 2:
+        raise TypeError("concat() requires at least two expressions.")
+    for e in exprs:
+        if not isinstance(e, Expr):
+            raise TypeError("concat() arguments must be Expr instances.")
+    rust = _require_rust_core()
+    return Expr(rust_expr=rust.expr_string_concat([e._rust_expr for e in exprs]))

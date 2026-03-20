@@ -59,7 +59,10 @@ from pydantable import DataFrameModel
   optional deps with `pip install "pydantable[pandas]"`. The default backend
   remains Polars/Rust.
 - **`pydantable.pyspark`**: same typed boundary; execution still uses the
-  Rust/Polars core until a PySpark executor is added.
+  Rust/Polars core until a PySpark executor is added. Includes a
+  `pydantable.pyspark.sql` façade (`functions as F`, `Column`, lightweight
+  `types`, and Spark-like `withColumn` / `where` on the pyspark `DataFrame`).
+  See `docs/BACKENDS.md`.
 
 See:
 

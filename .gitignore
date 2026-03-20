@@ -26,6 +26,7 @@ pydantable-core/Cargo.lock
 
 # OS
 .DS_Store
+*.dSYM/
 
 # Secrets & misc
 .env

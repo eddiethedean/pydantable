@@ -238,6 +238,86 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
+    def limit(self, n: int) -> DataFrame[Any]:
+        if n < 0:
+            raise ValueError("limit(n) expects n >= 0.")
+        rust = _require_rust_core()
+        rust_plan = rust.plan_limit(self._rust_plan, n)
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def order_by(
+        self,
+        *columns: str,
+        ascending: bool | list[bool] | None = None,
+    ) -> DataFrame[Any]:
+        if not columns:
+            raise ValueError("order_by() requires at least one column name.")
+        rust = _require_rust_core()
+        asc_list: list[bool] | None
+        if ascending is None:
+            asc_list = None
+        elif isinstance(ascending, bool):
+            asc_list = [ascending]
+        else:
+            asc_list = list(ascending)
+        rust_plan = rust.plan_sort(self._rust_plan, list(columns), asc_list)
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def drop(self, *cols: str) -> DataFrame[Any]:
+        if not cols:
+            raise ValueError("drop() requires at least one column name.")
+        rust = _require_rust_core()
+        rust_plan = rust.plan_drop(self._rust_plan, list(cols))
+        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def distinct(self) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        rust_plan = rust.plan_distinct(self._rust_plan)
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def with_column_renamed(self, existing: str, new: str) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        rust_plan = rust.plan_rename_column(self._rust_plan, existing, new)
+        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def union(self, other: DataFrame[Any]) -> DataFrame[Any]:
+        raise NotImplementedError(
+            "union() is not implemented; use a single DataFrame or extend the engine with concat."
+        )
+
     def join(
         self,
         other: DataFrame[Any],

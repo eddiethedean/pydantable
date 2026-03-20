@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import cmp_to_key
 from typing import Any
 
 
@@ -74,7 +75,136 @@ def _eval_expr(expr: dict[str, Any], i: int, ctx: dict[str, list[Any]]) -> Any:
         if op == "ge":
             return left >= right
         raise ValueError(f"Unknown compare op {op!r}")
+    if kind == "is_null":
+        return _eval_expr(expr["inner"], i, ctx) is None
+    if kind == "is_not_null":
+        return _eval_expr(expr["inner"], i, ctx) is not None
+    if kind == "coalesce":
+        for sub in expr["exprs"]:
+            v = _eval_expr(sub, i, ctx)
+            if v is not None:
+                return v
+        return None
+    if kind == "case_when":
+        for br in expr["branches"]:
+            cond = _eval_expr(br["condition"], i, ctx)
+            if cond is True:
+                return _eval_expr(br["then"], i, ctx)
+            if cond not in (False, None):
+                raise ValueError("CASE WHEN condition must be bool or null")
+        return _eval_expr(expr["else"], i, ctx)
+    if kind == "cast":
+        v = _eval_expr(expr["inner"], i, ctx)
+        return _cast_py_value(v, str(expr["to"]))
+    if kind == "in_list":
+        x = _eval_expr(expr["inner"], i, ctx)
+        if x is None:
+            return None
+        vals = expr["values"]
+        if isinstance(x, float):
+            return any(
+                isinstance(v, (int, float)) and float(x) == float(v) for v in vals
+            )
+        return x in vals
+    if kind == "between":
+        x = _eval_expr(expr["inner"], i, ctx)
+        lo = _eval_expr(expr["low"], i, ctx)
+        hi = _eval_expr(expr["high"], i, ctx)
+        if x is None or lo is None or hi is None:
+            return None
+        return lo <= x <= hi
+    if kind == "string_concat":
+        parts = [_eval_expr(p, i, ctx) for p in expr["parts"]]
+        if any(p is None for p in parts):
+            return None
+        return "".join(str(p) for p in parts)
+    if kind == "substring":
+        s = _eval_expr(expr["inner"], i, ctx)
+        start = _eval_expr(expr["start"], i, ctx)
+        ln_raw = expr.get("length")
+        length = _eval_expr(ln_raw, i, ctx) if ln_raw is not None else None
+        if s is None or start is None:
+            return None
+        if not isinstance(start, int):
+            raise ValueError("substring start must be int")
+        if length is not None and not isinstance(length, int):
+            raise ValueError("substring length must be int")
+        if not isinstance(s, str):
+            raise ValueError("substring inner must be str")
+        return _substr_spark(s, start, length)
+    if kind == "string_length":
+        s = _eval_expr(expr["inner"], i, ctx)
+        if s is None:
+            return None
+        return len(s)
     raise ValueError(f"Unknown expr kind {kind!r}")
+
+
+def _cast_py_value(v: Any, to: str) -> Any:
+    if v is None:
+        return None
+    if to == "int":
+        if isinstance(v, bool):
+            return int(v)
+        return int(v)
+    if to == "float":
+        return float(v)
+    if to == "bool":
+        return bool(v)
+    if to == "str":
+        return str(v)
+    raise ValueError(f"Unknown cast target {to!r}")
+
+
+def _substr_spark(s: str, start: int, length: int | None) -> str:
+    if start < 1:
+        return ""
+    idx = start - 1
+    if idx >= len(s):
+        return ""
+    rest = s[idx:]
+    if length is None:
+        return rest
+    if length <= 0:
+        return ""
+    return rest[:length]
+
+
+def _cmp_sort_indices(
+    ctx: dict[str, list[Any]],
+    by: list[tuple[str, bool]],
+    i: int,
+    j: int,
+) -> int:
+    for col, asc in by:
+        ai = ctx[col][i]
+        aj = ctx[col][j]
+        if ai is None and aj is None:
+            continue
+        if ai is None:
+            return 1
+        if aj is None:
+            return -1
+        if ai == aj:
+            continue
+        if ai < aj:
+            return -1 if asc else 1
+        return 1 if asc else -1
+    return 0
+
+
+def _apply_sort(
+    ctx: dict[str, list[Any]], by: list[tuple[str, bool]]
+) -> None:
+    if not ctx or not by:
+        return
+    n = len(next(iter(ctx.values())))
+    order = sorted(
+        range(n),
+        key=cmp_to_key(lambda a, b: _cmp_sort_indices(ctx, by, a, b)),
+    )
+    for c in ctx:
+        ctx[c] = [ctx[c][k] for k in order]
 
 
 def _execute_plan_from_blob(
@@ -103,6 +233,36 @@ def _execute_plan_from_blob(
             keep = [i for i in range(n) if _eval_expr(condition, i, ctx) is True]
             for col in ctx:
                 ctx[col] = [ctx[col][i] for i in keep]
+        elif sk == "limit":
+            lim = int(step["n"])
+            for c in ctx:
+                ctx[c] = ctx[c][:lim]
+        elif sk == "sort":
+            raw_by = step["by"]
+            pairs = [(str(p["column"]), bool(p["ascending"])) for p in raw_by]
+            _apply_sort(ctx, pairs)
+        elif sk == "drop":
+            for c in step["columns"]:
+                ctx.pop(c, None)
+        elif sk == "distinct":
+            if not ctx:
+                continue
+            cols = sorted(ctx.keys())
+            n = len(next(iter(ctx.values())))
+            seen: set[tuple[Any, ...]] = set()
+            keep: list[int] = []
+            for i in range(n):
+                fp = tuple(ctx[c][i] for c in cols)
+                if fp not in seen:
+                    seen.add(fp)
+                    keep.append(i)
+            for c in ctx:
+                ctx[c] = [ctx[c][i] for i in keep]
+        elif sk == "rename":
+            f = step["from"]
+            t = step["to"]
+            if f in ctx:
+                ctx[t] = ctx.pop(f)
         else:
             raise ValueError(f"Unknown plan step {sk!r}")
     return ctx

@@ -1,22 +1,26 @@
 #![allow(deprecated)]
 
 use pyo3::prelude::*;
+use pyo3::types::{PyList, PyTuple};
 
 mod dtype;
 mod expr;
 mod plan;
 
-use crate::dtype::{dtype_to_python_type, py_annotation_to_dtype, DTypeDesc};
+use crate::dtype::{dtype_to_python_type, py_annotation_to_dtype, py_value_to_dtype, BaseType, DTypeDesc};
 use crate::expr::{
     exprnode_to_serializable, op_symbol_to_arith, op_symbol_to_cmp, ArithOp, CmpOp, ExprHandle,
-    ExprNode,
+    ExprNode, LiteralValue,
 };
 use crate::plan::{
     execute_groupby_agg_polars as execute_groupby_agg_inner,
     execute_join_polars as execute_join_inner, execute_plan as execute_plan_inner,
-    make_plan as make_plan_inner, plan_filter as plan_filter_inner,
-    plan_select as plan_select_inner, plan_with_columns as plan_with_columns_inner,
-    planinner_to_serializable, schema_descriptors_as_py, schema_fields_as_py, PlanInner,
+    make_plan as make_plan_inner, plan_distinct as plan_distinct_step,
+    plan_drop as plan_drop_step, plan_filter as plan_filter_inner,
+    plan_limit as plan_limit_step, plan_rename_column as plan_rename_step,
+    plan_select as plan_select_inner, plan_sort as plan_sort_step,
+    plan_with_columns as plan_with_columns_inner, planinner_to_serializable,
+    schema_descriptors_as_py, schema_fields_as_py, PlanInner,
 };
 
 #[pyclass]
@@ -110,6 +114,153 @@ fn compare_op(op_symbol: String, left: &PyExpr, right: &PyExpr) -> PyResult<PyEx
 }
 
 #[pyfunction]
+fn expr_is_null(expr: &PyExpr) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_is_null(expr.node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_is_not_null(expr: &PyExpr) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_is_not_null(expr.node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_coalesce(exprs: Vec<Bound<'_, PyExpr>>) -> PyResult<PyExpr> {
+    let mut nodes = Vec::with_capacity(exprs.len());
+    for e in exprs {
+        nodes.push(e.borrow().node.clone());
+    }
+    Ok(PyExpr {
+        node: ExprNode::make_coalesce(nodes)?,
+    })
+}
+
+fn py_scalar_to_literal(py: Python<'_>, item: &Bound<'_, PyAny>) -> PyResult<LiteralValue> {
+    if item.is_none() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "isin() list values cannot be None.",
+        ));
+    }
+    let dt = py_value_to_dtype(py, item)?;
+    match dt.base {
+        Some(BaseType::Int) => Ok(LiteralValue::Int(item.extract::<i64>()?)),
+        Some(BaseType::Float) => Ok(LiteralValue::Float(item.extract::<f64>()?)),
+        Some(BaseType::Bool) => Ok(LiteralValue::Bool(item.extract::<bool>()?)),
+        Some(BaseType::Str) => Ok(LiteralValue::Str(item.extract::<String>()?)),
+        None => Err(pyo3::exceptions::PyTypeError::new_err(
+            "isin() value must have a known scalar type.",
+        )),
+    }
+}
+
+fn py_annotation_to_base(py: Python<'_>, ann: &Bound<'_, PyAny>) -> PyResult<BaseType> {
+    let d = py_annotation_to_dtype(py, ann)?;
+    d.base.ok_or_else(|| {
+        pyo3::exceptions::PyTypeError::new_err("cast target must be a concrete scalar type.")
+    })
+}
+
+#[pyfunction]
+fn expr_case_when(
+    py: Python<'_>,
+    branches: Bound<'_, PyList>,
+    else_expr: &PyExpr,
+) -> PyResult<PyExpr> {
+    let mut v: Vec<(ExprNode, ExprNode)> = Vec::new();
+    for item in branches.iter() {
+        let t: &Bound<'_, PyTuple> = item.downcast()?;
+        if t.len() != 2 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "Each branch must be (condition_expr, value_expr).",
+            ));
+        }
+        let c_any = t.get_item(0)?;
+        let a_any = t.get_item(1)?;
+        let c = c_any.downcast::<PyExpr>()?;
+        let a = a_any.downcast::<PyExpr>()?;
+        v.push((c.borrow().node.clone(), a.borrow().node.clone()));
+    }
+    let _ = py;
+    Ok(PyExpr {
+        node: ExprNode::make_case_when(v, else_expr.node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_cast(
+    py: Python<'_>,
+    inner: &PyExpr,
+    dtype_annotation: &Bound<'_, PyAny>,
+) -> PyResult<PyExpr> {
+    let to = py_annotation_to_base(py, dtype_annotation)?;
+    let _ = py;
+    Ok(PyExpr {
+        node: ExprNode::make_cast(inner.node.clone(), to)?,
+    })
+}
+
+#[pyfunction]
+fn expr_in_list(
+    py: Python<'_>,
+    inner: &PyExpr,
+    values: Bound<'_, PyList>,
+) -> PyResult<PyExpr> {
+    let mut lits = Vec::new();
+    for it in values.iter() {
+        lits.push(py_scalar_to_literal(py, &it)?);
+    }
+    let _ = py;
+    Ok(PyExpr {
+        node: ExprNode::make_in_list(inner.node.clone(), lits)?,
+    })
+}
+
+#[pyfunction]
+fn expr_between(inner: &PyExpr, low: &PyExpr, high: &PyExpr) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_between(
+            inner.node.clone(),
+            low.node.clone(),
+            high.node.clone(),
+        )?,
+    })
+}
+
+#[pyfunction]
+fn expr_string_concat(exprs: Vec<Bound<'_, PyExpr>>) -> PyResult<PyExpr> {
+    let mut nodes = Vec::with_capacity(exprs.len());
+    for e in exprs {
+        nodes.push(e.borrow().node.clone());
+    }
+    Ok(PyExpr {
+        node: ExprNode::make_string_concat(nodes)?,
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (inner, start, length=None))]
+fn expr_substring(
+    inner: &PyExpr,
+    start: &PyExpr,
+    length: Option<&PyExpr>,
+) -> PyResult<PyExpr> {
+    let len = length.map(|e| e.node.clone());
+    Ok(PyExpr {
+        node: ExprNode::make_substring(inner.node.clone(), start.node.clone(), len)?,
+    })
+}
+
+#[pyfunction]
+fn expr_string_length(inner: &PyExpr) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_string_length(inner.node.clone())?,
+    })
+}
+
+#[pyfunction]
 fn make_plan(py: Python<'_>, schema_fields: &Bound<'_, PyAny>) -> PyResult<PyPlan> {
     let dict: &Bound<'_, pyo3::types::PyDict> = schema_fields.downcast()?;
     let mut schema: std::collections::HashMap<String, DTypeDesc> = std::collections::HashMap::new();
@@ -153,6 +304,70 @@ fn plan_with_columns(
 fn plan_filter(plan: &PyPlan, condition: &PyExpr) -> PyResult<PyPlan> {
     Ok(PyPlan {
         inner: plan_filter_inner(&plan.inner, condition.node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn plan_limit(plan: &PyPlan, n: usize) -> PyResult<PyPlan> {
+    Ok(PyPlan {
+        inner: plan_limit_step(&plan.inner, n)?,
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (plan, columns, ascending=None))]
+fn plan_sort(
+    plan: &PyPlan,
+    columns: Vec<String>,
+    ascending: Option<Vec<bool>>,
+) -> PyResult<PyPlan> {
+    let n = columns.len();
+    if n == 0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "sort/order_by requires at least one column name.",
+        ));
+    }
+    let asc = match ascending {
+        None => vec![true; n],
+        Some(v) if v.is_empty() => {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "ascending= must be non-empty when provided.",
+            ));
+        }
+        Some(v) if v.len() == 1 => vec![v[0]; n],
+        Some(v) if v.len() == n => v,
+        Some(v) => {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "ascending has length {} but {} columns were given.",
+                v.len(),
+                n
+            )));
+        }
+    };
+    let by: Vec<(String, bool)> = columns.into_iter().zip(asc.into_iter()).collect();
+    Ok(PyPlan {
+        inner: plan_sort_step(&plan.inner, by)?,
+    })
+}
+
+#[pyfunction]
+fn plan_drop(plan: &PyPlan, columns: Vec<String>) -> PyResult<PyPlan> {
+    Ok(PyPlan {
+        inner: plan_drop_step(&plan.inner, columns)?,
+    })
+}
+
+#[pyfunction]
+fn plan_distinct(plan: &PyPlan) -> PyResult<PyPlan> {
+    Ok(PyPlan {
+        inner: plan_distinct_step(&plan.inner)?,
+    })
+}
+
+#[pyfunction]
+fn plan_rename_column(plan: &PyPlan, from: String, to: String) -> PyResult<PyPlan> {
+    Ok(PyPlan {
+        inner: plan_rename_step(&plan.inner, from, to)?,
     })
 }
 
@@ -236,6 +451,21 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(plan_select, m)?)?;
     m.add_function(wrap_pyfunction!(plan_with_columns, m)?)?;
     m.add_function(wrap_pyfunction!(plan_filter, m)?)?;
+    m.add_function(wrap_pyfunction!(plan_limit, m)?)?;
+    m.add_function(wrap_pyfunction!(plan_sort, m)?)?;
+    m.add_function(wrap_pyfunction!(plan_drop, m)?)?;
+    m.add_function(wrap_pyfunction!(plan_distinct, m)?)?;
+    m.add_function(wrap_pyfunction!(plan_rename_column, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_is_null, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_is_not_null, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_coalesce, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_case_when, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_cast, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_in_list, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_between, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_string_concat, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_substring, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_string_length, m)?)?;
     m.add_function(wrap_pyfunction!(plan_to_serializable, m)?)?;
     Ok(())
 }
