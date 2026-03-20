@@ -107,7 +107,8 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Audit
-        run: cargo audit --manifest-path pydantable-core/Cargo.toml --ignore RUSTSEC-2025-0141
+        working-directory: pydantable-core
+        run: cargo audit --ignore RUSTSEC-2025-0141
 
   deny:
     name: Deny
