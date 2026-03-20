@@ -243,7 +243,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           command: publish
-          args: --skip-existing
+          args: --skip-existing -i 3.11 -i 3.12 -i 3.13
 
   publish-pypi-musllinux-x86_64:
     name: PyPI musllinux x86_64
