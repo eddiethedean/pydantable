@@ -69,7 +69,9 @@ class DataFrameModel:
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
-        if cls.__name__ == "DataFrameModel":
+        # Bridge classes in interface modules reuse the name `DataFrameModel` or
+        # expose a typed subclass without their own row schema (user subclasses do).
+        if cls.__name__ in ("DataFrameModel", "PandasDataFrameModel"):
             return
 
         module = sys.modules.get(cls.__module__)

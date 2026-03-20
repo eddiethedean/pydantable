@@ -53,7 +53,13 @@ from pydantable import DataFrameModel
 
 ### Current status
 
-`pydantable.pandas` / `pydantable.pyspark` currently keep the typed API boundary in place, but execution still falls back to the existing Rust/Polars engine. This lets you validate contract equivalence while incrementally replacing the executors later.
+- **`pydantable.pandas`**: pandas-style methods (`assign`, `merge`, `head`, …)
+  on the typed API. `pydantable.pandas.DataFrameModel` uses the pandas execution
+  backend; you can also set `PYDANTABLE_BACKEND=pandas` before import. Install
+  optional deps with `pip install "pydantable[pandas]"`. The default backend
+  remains Polars/Rust.
+- **`pydantable.pyspark`**: same typed boundary; execution still uses the
+  Rust/Polars core until a PySpark executor is added.
 
 See:
 

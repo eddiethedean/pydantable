@@ -22,6 +22,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+pandas = ["pandas>=2.0"]
 docs = [
     "sphinx",
     "myst-parser",

@@ -186,6 +186,11 @@ fn execute_join(
 }
 
 #[pyfunction]
+fn plan_to_serializable(py: Python<'_>, plan: &PyPlan) -> PyResult<PyObject> {
+    planinner_to_serializable(py, &plan.inner)
+}
+
+#[pyfunction]
 fn execute_groupby_agg(
     py: Python<'_>,
     plan: &PyPlan,
@@ -231,5 +236,6 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(plan_select, m)?)?;
     m.add_function(wrap_pyfunction!(plan_with_columns, m)?)?;
     m.add_function(wrap_pyfunction!(plan_filter, m)?)?;
+    m.add_function(wrap_pyfunction!(plan_to_serializable, m)?)?;
     Ok(())
 }

@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from .dataframe import DataFrame as _BaseDataFrame
-from .dataframe_model import DataFrameModel as _BaseDataFrameModel
 from .expressions import Expr
+from .pandas_ui import PandasDataFrame, PandasDataFrameModel
 from .schema import Schema
 
 
-class DataFrame(_BaseDataFrame):
+class DataFrame(PandasDataFrame):
     _backend = "pandas"
 
 
-class DataFrameModel(_BaseDataFrameModel):
+class DataFrameModel(PandasDataFrameModel):
     _dataframe_cls = DataFrame
 
 

@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import pytest
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    # `from pydantable import DataFrame` resolves the backend at import time.
+    os.environ.setdefault("PYDANTABLE_BACKEND", "polars")
 
 
 def _sort_key_for_value(value: Any) -> tuple[int, Any]:
