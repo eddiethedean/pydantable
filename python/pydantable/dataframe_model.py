@@ -206,6 +206,20 @@ class DataFrameModel:
     def tail(self, n: int = 5) -> DataFrameModel:
         return self._from_dataframe(self._df.tail(n))
 
+    def fill_null(
+        self,
+        value: Any = None,
+        *,
+        strategy: str | None = None,
+        subset: Sequence[str] | None = None,
+    ) -> DataFrameModel:
+        return self._from_dataframe(
+            self._df.fill_null(value, strategy=strategy, subset=subset)
+        )
+
+    def drop_nulls(self, subset: Sequence[str] | None = None) -> DataFrameModel:
+        return self._from_dataframe(self._df.drop_nulls(subset=subset))
+
     def join(
         self,
         other: DataFrameModel,

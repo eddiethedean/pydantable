@@ -15,11 +15,12 @@ use crate::plan::{
     execute_concat_polars as execute_concat_inner,
     execute_groupby_agg_polars as execute_groupby_agg_inner,
     execute_join_polars as execute_join_inner, execute_plan as execute_plan_inner,
-    make_plan as make_plan_inner, plan_drop as plan_drop_inner, plan_filter as plan_filter_inner,
-    plan_rename as plan_rename_inner, plan_select as plan_select_inner,
-    plan_slice as plan_slice_inner, plan_sort as plan_sort_inner, plan_unique as plan_unique_inner,
-    plan_with_columns as plan_with_columns_inner, planinner_to_serializable,
-    schema_descriptors_as_py, schema_fields_as_py, PlanInner,
+    make_plan as make_plan_inner, plan_drop as plan_drop_inner,
+    plan_drop_nulls as plan_drop_nulls_inner, plan_fill_null as plan_fill_null_inner,
+    plan_filter as plan_filter_inner, plan_rename as plan_rename_inner,
+    plan_select as plan_select_inner, plan_slice as plan_slice_inner, plan_sort as plan_sort_inner,
+    plan_unique as plan_unique_inner, plan_with_columns as plan_with_columns_inner,
+    planinner_to_serializable, schema_descriptors_as_py, schema_fields_as_py, PlanInner,
 };
 
 #[pyclass]
@@ -113,6 +114,31 @@ fn compare_op(op_symbol: String, left: &PyExpr, right: &PyExpr) -> PyResult<PyEx
 }
 
 #[pyfunction]
+fn cast_expr(
+    py: Python<'_>,
+    expr: &PyExpr,
+    dtype_annotation: &Bound<'_, PyAny>,
+) -> PyResult<PyExpr> {
+    let target = py_annotation_to_dtype(py, dtype_annotation)?;
+    let node = ExprNode::make_cast(expr.node.clone(), target)?;
+    Ok(PyExpr { node })
+}
+
+#[pyfunction]
+fn is_null_expr(expr: &PyExpr) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_is_null(expr.node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn is_not_null_expr(expr: &PyExpr) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_is_not_null(expr.node.clone())?,
+    })
+}
+
+#[pyfunction]
 fn make_plan(py: Python<'_>, schema_fields: &Bound<'_, PyAny>) -> PyResult<PyPlan> {
     let dict: &Bound<'_, pyo3::types::PyDict> = schema_fields.downcast()?;
     let mut schema: std::collections::HashMap<String, DTypeDesc> = std::collections::HashMap::new();
@@ -198,6 +224,45 @@ fn plan_rename(_py: Python<'_>, plan: &PyPlan, columns: &Bound<'_, PyAny>) -> Py
 fn plan_slice(plan: &PyPlan, offset: i64, length: usize) -> PyResult<PyPlan> {
     Ok(PyPlan {
         inner: plan_slice_inner(&plan.inner, offset, length)?,
+    })
+}
+
+#[pyfunction]
+fn plan_fill_null(
+    _py: Python<'_>,
+    plan: &PyPlan,
+    subset: Option<Vec<String>>,
+    value: Option<&Bound<'_, PyAny>>,
+    strategy: Option<String>,
+) -> PyResult<PyPlan> {
+    let scalar = if let Some(v) = value {
+        if v.is_none() {
+            None
+        } else if v.extract::<bool>().is_ok() {
+            Some(crate::expr::LiteralValue::Bool(v.extract::<bool>()?))
+        } else if v.extract::<i64>().is_ok() {
+            Some(crate::expr::LiteralValue::Int(v.extract::<i64>()?))
+        } else if v.extract::<f64>().is_ok() {
+            Some(crate::expr::LiteralValue::Float(v.extract::<f64>()?))
+        } else if v.extract::<String>().is_ok() {
+            Some(crate::expr::LiteralValue::Str(v.extract::<String>()?))
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "fill_null(value=...) supports int/float/bool/str.",
+            ));
+        }
+    } else {
+        None
+    };
+    Ok(PyPlan {
+        inner: plan_fill_null_inner(&plan.inner, subset, scalar, strategy)?,
+    })
+}
+
+#[pyfunction]
+fn plan_drop_nulls(plan: &PyPlan, subset: Option<Vec<String>>) -> PyResult<PyPlan> {
+    Ok(PyPlan {
+        inner: plan_drop_nulls_inner(&plan.inner, subset)?,
     })
 }
 
@@ -292,6 +357,9 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(make_literal, m)?)?;
     m.add_function(wrap_pyfunction!(binary_op, m)?)?;
     m.add_function(wrap_pyfunction!(compare_op, m)?)?;
+    m.add_function(wrap_pyfunction!(cast_expr, m)?)?;
+    m.add_function(wrap_pyfunction!(is_null_expr, m)?)?;
+    m.add_function(wrap_pyfunction!(is_not_null_expr, m)?)?;
     m.add_function(wrap_pyfunction!(make_plan, m)?)?;
     m.add_function(wrap_pyfunction!(plan_select, m)?)?;
     m.add_function(wrap_pyfunction!(plan_with_columns, m)?)?;
@@ -301,5 +369,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(plan_drop, m)?)?;
     m.add_function(wrap_pyfunction!(plan_rename, m)?)?;
     m.add_function(wrap_pyfunction!(plan_slice, m)?)?;
+    m.add_function(wrap_pyfunction!(plan_fill_null, m)?)?;
+    m.add_function(wrap_pyfunction!(plan_drop_nulls, m)?)?;
     Ok(())
 }

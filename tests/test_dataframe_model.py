@@ -164,3 +164,13 @@ def test_p1_dataframe_model_methods_and_concat():
     second = renamed.select("id")
     cat = DataFrameModel.concat([first, second], how="vertical")
     assert cat.collect() == {"id": [1, 2, 3, 1, 2, 3]}
+
+
+def test_p2_dataframe_model_fill_and_drop_nulls() -> None:
+    df = UserDF({"id": [1, 2, 3], "age": [10, None, 30]})
+    filled = df.fill_null(0, subset=["age"])
+    assert filled.collect() == {"id": [1, 2, 3], "age": [10, 0, 30]}
+    assert filled.schema_fields()["age"] is int
+
+    dropped = df.drop_nulls(subset=["age"])
+    assert dropped.collect() == {"id": [1, 3], "age": [10, 30]}

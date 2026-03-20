@@ -49,14 +49,21 @@ Progress note:
 Goal: make null and dtype workflows Polars-like.
 
 Deliverables:
-- [ ] `fill_null` (scalar + strategy variants)
-- [ ] `drop_nulls` (all columns + subset)
-- [ ] `cast` (column expression casting)
-- [ ] `is_null` / `is_not_null` expression helpers
+- [x] `fill_null` (scalar + strategy variants)
+- [x] `drop_nulls` (all columns + subset)
+- [x] `cast` (column expression casting)
+- [x] `is_null` / `is_not_null` expression helpers
 
 Validation:
-- [ ] Null-semantics tests aligned with existing SQL-like contract
-- [ ] Type error contracts for unsupported casts
+- [x] Null-semantics tests aligned with existing SQL-like contract
+- [x] Type error contracts for unsupported casts
+
+Progress note:
+- Implemented on branch `v0.5.0`:
+  - Rust expression AST adds `cast`, `is_null`, `is_not_null`
+  - Rust planner/executor adds `fill_null` and `drop_nulls` (row-wise + Polars paths)
+  - Python `Expr`, `DataFrame`, and `DataFrameModel` expose P2 methods
+  - contract and backend-equivalence tests added for fill/drop/cast/null-predicate behavior
 
 ## Phase P3: Join parity expansion
 

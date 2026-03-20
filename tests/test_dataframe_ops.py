@@ -104,3 +104,25 @@ def test_p1_sort_unique_drop_rename_slice_concat() -> None:
     right_h = renamed.select("years")
     hcat = DataFrame.concat([left_h, right_h], how="horizontal")
     assert hcat.collect() == {"id": [1, 2, 3], "years": [None, 20, 30]}
+
+
+def test_p2_fill_drop_nulls_and_cast_predicates() -> None:
+    class S(Schema):
+        id: int
+        age: int | None
+        score: float | None
+
+    df = DataFrame[S](
+        {"id": [1, 2, 3], "age": [10, None, 30], "score": [None, 1.5, None]}
+    )
+    filled = df.fill_null(0, subset=["age"])
+    assert filled.collect()["age"] == [10, 0, 30]
+    assert filled.schema_fields()["age"] is int
+
+    dropped = df.drop_nulls(subset=["age"])
+    assert dropped.collect() == {"id": [1, 3], "age": [10, 30], "score": [None, None]}
+
+    casted = df.with_columns(age_f=df.age.cast(float))
+    assert casted.schema_fields()["age_f"] == float | None
+    out = casted.with_columns(age_is_null=casted.age.is_null()).collect()
+    assert out["age_is_null"] == [False, True, False]

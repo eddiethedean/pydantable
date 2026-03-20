@@ -142,3 +142,41 @@ def test_backend_equivalence_p1_unary_and_concat(backend_mod: str) -> None:
         [backend_df.select("id"), backend_df.select("id")], how="vertical"
     ).collect()
     assert_table_eq_sorted(default_cat, backend_cat, keys=["id"])
+
+
+@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_backend_equivalence_p2_fill_drop_cast_null_predicates(
+    backend_mod: str,
+) -> None:
+    backend = importlib.import_module(backend_mod)
+    BackendDataFrameModel = backend.DataFrameModel
+
+    class UserDefault(PolarsDataFrameModel):
+        id: int
+        age: int | None
+
+    class UserBackend(BackendDataFrameModel):
+        id: int
+        age: int | None
+
+    payload = {"id": [1, 2, 3], "age": [10, None, 30]}
+    default_df = UserDefault(payload)
+    backend_df = UserBackend(payload)
+
+    default_out = (
+        default_df.fill_null(0, subset=["age"])
+        .with_columns(
+            age_f=default_df.age.cast(float), age_is_null=default_df.age.is_null()
+        )
+        .drop_nulls(subset=["age"])
+        .collect()
+    )
+    backend_out = (
+        backend_df.fill_null(0, subset=["age"])
+        .with_columns(
+            age_f=backend_df.age.cast(float), age_is_null=backend_df.age.is_null()
+        )
+        .drop_nulls(subset=["age"])
+        .collect()
+    )
+    assert_table_eq_sorted(default_out, backend_out, keys=["id"])

@@ -4,18 +4,16 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
 
 use crate::dtype::{dtype_to_descriptor_py, dtype_to_python_type, DTypeDesc};
-use crate::expr::{exprnode_to_serializable, ExprNode};
-
-#[cfg(not(feature = "polars_engine"))]
 use crate::expr::LiteralValue;
+use crate::expr::{exprnode_to_serializable, ExprNode};
 
 #[cfg(feature = "polars_engine")]
 use polars::lazy::dsl::{col, lit, Expr as PolarsExpr};
 #[cfg(feature = "polars_engine")]
 use polars::prelude::{
-    BooleanChunked, DataFrame, DataType, Float64Chunked, Int64Chunked, IntoColumn, IntoLazy,
-    IntoSeries, JoinArgs, JoinType, LazyFrame, NewChunkedArray, PolarsError, Series,
-    SortMultipleOptions, StringChunked, UniqueKeepStrategy,
+    BooleanChunked, DataFrame, DataType, FillNullStrategy, Float64Chunked, Int64Chunked,
+    IntoColumn, IntoLazy, IntoSeries, JoinArgs, JoinType, LazyFrame, NewChunkedArray, PolarsError,
+    Series, SortMultipleOptions, StringChunked, UniqueKeepStrategy,
 };
 
 #[derive(Clone, Debug)]
@@ -43,6 +41,14 @@ pub enum PlanStep {
     Slice {
         offset: i64,
         length: usize,
+    },
+    FillNull {
+        subset: Option<Vec<String>>,
+        value: Option<LiteralValue>,
+        strategy: Option<String>,
+    },
+    DropNulls {
+        subset: Option<Vec<String>>,
     },
 }
 
@@ -104,6 +110,27 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
                 step_out.set_item("kind", "slice")?;
                 step_out.set_item("offset", offset)?;
                 step_out.set_item("length", length)?;
+            }
+            PlanStep::FillNull {
+                subset,
+                value,
+                strategy,
+            } => {
+                step_out.set_item("kind", "fill_null")?;
+                step_out.set_item("subset", subset)?;
+                let value_obj = match value {
+                    None => py.None(),
+                    Some(LiteralValue::Int(v)) => v.into_py(py),
+                    Some(LiteralValue::Float(v)) => v.into_py(py),
+                    Some(LiteralValue::Bool(v)) => v.into_py(py),
+                    Some(LiteralValue::Str(v)) => v.clone().into_py(py),
+                };
+                step_out.set_item("value", value_obj)?;
+                step_out.set_item("strategy", strategy)?;
+            }
+            PlanStep::DropNulls { subset } => {
+                step_out.set_item("kind", "drop_nulls")?;
+                step_out.set_item("subset", subset)?;
             }
         }
         steps.append(step_out)?;
@@ -470,6 +497,100 @@ pub fn plan_slice(plan: &PlanInner, offset: i64, length: usize) -> PyResult<Plan
     })
 }
 
+pub fn plan_fill_null(
+    plan: &PlanInner,
+    subset: Option<Vec<String>>,
+    value: Option<LiteralValue>,
+    strategy: Option<String>,
+) -> PyResult<PlanInner> {
+    if value.is_none() && strategy.is_none() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "fill_null() requires either a scalar value or a strategy.",
+        ));
+    }
+    if value.is_some() && strategy.is_some() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "fill_null() accepts either value or strategy, not both.",
+        ));
+    }
+    if let Some(cols) = subset.as_ref() {
+        if cols.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "fill_null(subset=...) cannot be empty.",
+            ));
+        }
+        for c in cols.iter() {
+            if !plan.schema.contains_key(c) {
+                return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                    "fill_null() unknown subset column '{}'.",
+                    c
+                )));
+            }
+        }
+    }
+    if let Some(s) = strategy.as_ref() {
+        match s.as_str() {
+            "forward" | "backward" | "min" | "max" | "mean" | "zero" | "one" => {}
+            other => {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "fill_null(strategy=...) unsupported value '{}'.",
+                    other
+                )))
+            }
+        }
+    }
+
+    let mut new_schema = plan.schema.clone();
+    if value.is_some() {
+        let targets = subset
+            .clone()
+            .unwrap_or_else(|| new_schema.keys().cloned().collect());
+        for c in targets.iter() {
+            if let Some(mut d) = new_schema.get(c).copied() {
+                d.nullable = false;
+                new_schema.insert(c.clone(), d);
+            }
+        }
+    }
+
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::FillNull {
+        subset,
+        value,
+        strategy,
+    });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: new_schema,
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_drop_nulls(plan: &PlanInner, subset: Option<Vec<String>>) -> PyResult<PlanInner> {
+    if let Some(cols) = subset.as_ref() {
+        if cols.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "drop_nulls(subset=...) cannot be empty.",
+            ));
+        }
+        for c in cols.iter() {
+            if !plan.schema.contains_key(c) {
+                return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                    "drop_nulls() unknown subset column '{}'.",
+                    c
+                )));
+            }
+        }
+    }
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::DropNulls { subset });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: plan.schema.clone(),
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
 pub fn execute_plan(
     py: Python<'_>,
     plan: &PlanInner,
@@ -598,6 +719,104 @@ fn execute_plan_rowwise(
                 let end = std::cmp::min(start.saturating_add(*length), n);
                 for (_, col) in ctx.iter_mut() {
                     *col = col[start..end].to_vec();
+                }
+                n = ctx_len(&ctx)?;
+            }
+            PlanStep::FillNull {
+                subset,
+                value,
+                strategy,
+            } => {
+                let targets = subset
+                    .clone()
+                    .unwrap_or_else(|| ctx.keys().cloned().collect());
+                for name in targets.iter() {
+                    if let Some(col) = ctx.get_mut(name) {
+                        if let Some(v) = value.as_ref() {
+                            for item in col.iter_mut() {
+                                if item.is_none() {
+                                    *item = Some(v.clone());
+                                }
+                            }
+                            continue;
+                        }
+                        if let Some(s) = strategy.as_ref() {
+                            match s.as_str() {
+                                "forward" => {
+                                    let mut last: Option<LiteralValue> = None;
+                                    for item in col.iter_mut() {
+                                        if item.is_none() {
+                                            *item = last.clone();
+                                        } else {
+                                            last = item.clone();
+                                        }
+                                    }
+                                }
+                                "backward" => {
+                                    let mut next: Option<LiteralValue> = None;
+                                    for item in col.iter_mut().rev() {
+                                        if item.is_none() {
+                                            *item = next.clone();
+                                        } else {
+                                            next = item.clone();
+                                        }
+                                    }
+                                }
+                                "zero" => {
+                                    for item in col.iter_mut() {
+                                        if item.is_none() {
+                                            *item = Some(LiteralValue::Int(0));
+                                        }
+                                    }
+                                }
+                                "one" => {
+                                    for item in col.iter_mut() {
+                                        if item.is_none() {
+                                            *item = Some(LiteralValue::Int(1));
+                                        }
+                                    }
+                                }
+                                "min" | "max" | "mean" => {
+                                    let nums: Vec<f64> = col
+                                        .iter()
+                                        .filter_map(|v| match v {
+                                            Some(LiteralValue::Int(i)) => Some(*i as f64),
+                                            Some(LiteralValue::Float(f)) => Some(*f),
+                                            _ => None,
+                                        })
+                                        .collect();
+                                    if nums.is_empty() {
+                                        continue;
+                                    }
+                                    let fill = match s.as_str() {
+                                        "min" => nums.iter().fold(f64::INFINITY, |a, b| a.min(*b)),
+                                        "max" => {
+                                            nums.iter().fold(f64::NEG_INFINITY, |a, b| a.max(*b))
+                                        }
+                                        _ => nums.iter().sum::<f64>() / nums.len() as f64,
+                                    };
+                                    for item in col.iter_mut() {
+                                        if item.is_none() {
+                                            *item = Some(LiteralValue::Float(fill));
+                                        }
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                n = ctx_len(&ctx)?;
+            }
+            PlanStep::DropNulls { subset } => {
+                let targets = subset
+                    .clone()
+                    .unwrap_or_else(|| ctx.keys().cloned().collect());
+                let keep = (0..n)
+                    .filter(|i| targets.iter().all(|c| ctx[c][*i].is_some()))
+                    .collect::<Vec<_>>();
+                for (_, col) in ctx.iter_mut() {
+                    *col = keep.iter().map(|i| col[*i].clone()).collect();
                 }
                 n = ctx_len(&ctx)?;
             }
@@ -765,6 +984,65 @@ fn apply_steps_to_lazy(mut lf: LazyFrame, steps: &[PlanStep]) -> PyResult<LazyFr
             }
             PlanStep::Slice { offset, length } => {
                 lf = lf.slice(*offset, *length as u32);
+            }
+            PlanStep::FillNull {
+                subset,
+                value,
+                strategy,
+            } => {
+                let all_cols = lf
+                    .collect_schema()
+                    .map_err(polars_err)?
+                    .iter_names_cloned()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>();
+                let targets = subset.clone().unwrap_or(all_cols);
+                let exprs = targets
+                    .into_iter()
+                    .map(|name| {
+                        let base = col(&name);
+                        let filled =
+                            if let Some(v) = value.as_ref() {
+                                match v {
+                                    LiteralValue::Int(i) => base.fill_null(lit(*i)),
+                                    LiteralValue::Float(f) => base.fill_null(lit(*f)),
+                                    LiteralValue::Bool(b) => base.fill_null(lit(*b)),
+                                    LiteralValue::Str(s) => base.fill_null(lit(s.clone())),
+                                }
+                            } else {
+                                match strategy.as_ref().expect("validated strategy").as_str() {
+                                    "forward" => base
+                                        .fill_null_with_strategy(FillNullStrategy::Forward(None)),
+                                    "backward" => base
+                                        .fill_null_with_strategy(FillNullStrategy::Backward(None)),
+                                    "min" => base.fill_null_with_strategy(FillNullStrategy::Min),
+                                    "max" => base.fill_null_with_strategy(FillNullStrategy::Max),
+                                    "mean" => base.fill_null_with_strategy(FillNullStrategy::Mean),
+                                    "zero" => base.fill_null_with_strategy(FillNullStrategy::Zero),
+                                    "one" => base.fill_null_with_strategy(FillNullStrategy::One),
+                                    _ => base,
+                                }
+                            };
+                        filled.alias(&name)
+                    })
+                    .collect::<Vec<_>>();
+                lf = lf.with_columns(exprs);
+            }
+            PlanStep::DropNulls { subset } => {
+                let all_cols = lf
+                    .collect_schema()
+                    .map_err(polars_err)?
+                    .iter_names_cloned()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>();
+                let targets = subset.clone().unwrap_or(all_cols);
+                if let Some(first) = targets.first() {
+                    let mut cond = col(first).is_not_null();
+                    for c in targets.iter().skip(1) {
+                        cond = cond.and(col(c).is_not_null());
+                    }
+                    lf = lf.filter(cond);
+                }
             }
         }
     }

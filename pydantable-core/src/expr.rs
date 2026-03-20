@@ -63,6 +63,18 @@ pub enum ExprNode {
         right: Box<ExprNode>,
         dtype: DTypeDesc,
     },
+    Cast {
+        input: Box<ExprNode>,
+        dtype: DTypeDesc,
+    },
+    IsNull {
+        input: Box<ExprNode>,
+        dtype: DTypeDesc,
+    },
+    IsNotNull {
+        input: Box<ExprNode>,
+        dtype: DTypeDesc,
+    },
 }
 
 impl ExprNode {
@@ -72,6 +84,9 @@ impl ExprNode {
             ExprNode::Literal { dtype, .. } => *dtype,
             ExprNode::BinaryOp { dtype, .. } => *dtype,
             ExprNode::CompareOp { dtype, .. } => *dtype,
+            ExprNode::Cast { dtype, .. } => *dtype,
+            ExprNode::IsNull { dtype, .. } => *dtype,
+            ExprNode::IsNotNull { dtype, .. } => *dtype,
         }
     }
 
@@ -89,6 +104,9 @@ impl ExprNode {
                 out.extend(right.referenced_columns());
                 out
             }
+            ExprNode::Cast { input, .. }
+            | ExprNode::IsNull { input, .. }
+            | ExprNode::IsNotNull { input, .. } => input.referenced_columns(),
         }
     }
 
@@ -264,6 +282,62 @@ impl ExprNode {
             left: Box::new(left),
             right: Box::new(right),
             dtype,
+        })
+    }
+
+    pub fn make_cast(input: ExprNode, target: DTypeDesc) -> PyResult<Self> {
+        let base = target.base.ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() target dtype must have known base.",
+            )
+        })?;
+        let in_base = input.dtype().base.ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() input dtype must have known base.",
+            )
+        })?;
+        let allowed = matches!(
+            (in_base, base),
+            (
+                BaseType::Int,
+                BaseType::Int | BaseType::Float | BaseType::Bool | BaseType::Str
+            ) | (
+                BaseType::Float,
+                BaseType::Int | BaseType::Float | BaseType::Bool | BaseType::Str
+            ) | (
+                BaseType::Bool,
+                BaseType::Int | BaseType::Float | BaseType::Bool | BaseType::Str
+            ) | (
+                BaseType::Str,
+                BaseType::Int | BaseType::Float | BaseType::Bool | BaseType::Str
+            )
+        );
+        if !allowed {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() unsupported primitive conversion.",
+            ));
+        }
+        let input_nullable = input.dtype().nullable;
+        Ok(ExprNode::Cast {
+            input: Box::new(input),
+            dtype: DTypeDesc {
+                base: Some(base),
+                nullable: input_nullable || target.nullable,
+            },
+        })
+    }
+
+    pub fn make_is_null(input: ExprNode) -> PyResult<Self> {
+        Ok(ExprNode::IsNull {
+            input: Box::new(input),
+            dtype: DTypeDesc::non_nullable(BaseType::Bool),
+        })
+    }
+
+    pub fn make_is_not_null(input: ExprNode) -> PyResult<Self> {
+        Ok(ExprNode::IsNotNull {
+            input: Box::new(input),
+            dtype: DTypeDesc::non_nullable(BaseType::Bool),
         })
     }
 
@@ -561,6 +635,36 @@ impl ExprNode {
 
                 Ok(out)
             }
+            ExprNode::Cast { input, dtype } => {
+                let vals = input.eval(ctx, n)?;
+                let mut out = Vec::with_capacity(n);
+                let target = dtype.base.ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "cast() target dtype must have known base.",
+                    )
+                })?;
+                for v in vals.into_iter() {
+                    match v {
+                        None => out.push(None),
+                        Some(v) => out.push(Some(cast_literal_value(v, target)?)),
+                    }
+                }
+                Ok(out)
+            }
+            ExprNode::IsNull { input, .. } => {
+                let vals = input.eval(ctx, n)?;
+                Ok(vals
+                    .into_iter()
+                    .map(|v| Some(LiteralValue::Bool(v.is_none())))
+                    .collect())
+            }
+            ExprNode::IsNotNull { input, .. } => {
+                let vals = input.eval(ctx, n)?;
+                Ok(vals
+                    .into_iter()
+                    .map(|v| Some(LiteralValue::Bool(v.is_some())))
+                    .collect())
+            }
         }
     }
 
@@ -610,6 +714,22 @@ impl ExprNode {
                     CmpOp::Ge => Ok(l.gt_eq(r)),
                 }
             }
+            ExprNode::Cast { input, dtype } => {
+                let dt = match dtype.base {
+                    Some(BaseType::Int) => DataType::Int64,
+                    Some(BaseType::Float) => DataType::Float64,
+                    Some(BaseType::Bool) => DataType::Boolean,
+                    Some(BaseType::Str) => DataType::String,
+                    None => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                            "cast() target dtype must have known base.",
+                        ))
+                    }
+                };
+                Ok(input.to_polars_expr()?.cast(dt))
+            }
+            ExprNode::IsNull { input, .. } => Ok(input.to_polars_expr()?.is_null()),
+            ExprNode::IsNotNull { input, .. } => Ok(input.to_polars_expr()?.is_not_null()),
         }
     }
 }
@@ -671,9 +791,61 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             dict.set_item("left", exprnode_to_serializable(py, left)?)?;
             dict.set_item("right", exprnode_to_serializable(py, right)?)?;
         }
+        ExprNode::Cast { input, .. } => {
+            dict.set_item("kind", "cast")?;
+            dict.set_item("input", exprnode_to_serializable(py, input)?)?;
+        }
+        ExprNode::IsNull { input, .. } => {
+            dict.set_item("kind", "is_null")?;
+            dict.set_item("input", exprnode_to_serializable(py, input)?)?;
+        }
+        ExprNode::IsNotNull { input, .. } => {
+            dict.set_item("kind", "is_not_null")?;
+            dict.set_item("input", exprnode_to_serializable(py, input)?)?;
+        }
     }
 
     Ok(dict.into_py(py))
+}
+
+#[cfg(not(feature = "polars_engine"))]
+fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValue> {
+    match target {
+        BaseType::Int => match v {
+            LiteralValue::Int(i) => Ok(LiteralValue::Int(i)),
+            LiteralValue::Float(f) => Ok(LiteralValue::Int(f as i64)),
+            LiteralValue::Bool(b) => Ok(LiteralValue::Int(if b { 1 } else { 0 })),
+            LiteralValue::Str(s) => s.parse::<i64>().map(LiteralValue::Int).map_err(|_| {
+                PyErr::new::<pyo3::exceptions::PyTypeError, _>("Cannot cast str to int.")
+            }),
+        },
+        BaseType::Float => match v {
+            LiteralValue::Int(i) => Ok(LiteralValue::Float(i as f64)),
+            LiteralValue::Float(f) => Ok(LiteralValue::Float(f)),
+            LiteralValue::Bool(b) => Ok(LiteralValue::Float(if b { 1.0 } else { 0.0 })),
+            LiteralValue::Str(s) => s.parse::<f64>().map(LiteralValue::Float).map_err(|_| {
+                PyErr::new::<pyo3::exceptions::PyTypeError, _>("Cannot cast str to float.")
+            }),
+        },
+        BaseType::Bool => match v {
+            LiteralValue::Int(i) => Ok(LiteralValue::Bool(i != 0)),
+            LiteralValue::Float(f) => Ok(LiteralValue::Bool(f != 0.0)),
+            LiteralValue::Bool(b) => Ok(LiteralValue::Bool(b)),
+            LiteralValue::Str(s) => match s.to_lowercase().as_str() {
+                "true" | "1" => Ok(LiteralValue::Bool(true)),
+                "false" | "0" => Ok(LiteralValue::Bool(false)),
+                _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Cannot cast str to bool.",
+                )),
+            },
+        },
+        BaseType::Str => match v {
+            LiteralValue::Int(i) => Ok(LiteralValue::Str(i.to_string())),
+            LiteralValue::Float(f) => Ok(LiteralValue::Str(f.to_string())),
+            LiteralValue::Bool(b) => Ok(LiteralValue::Str(b.to_string())),
+            LiteralValue::Str(s) => Ok(LiteralValue::Str(s)),
+        },
+    }
 }
 
 #[derive(Clone)]

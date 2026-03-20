@@ -351,6 +351,47 @@ class DataFrame(Generic[SchemaT]):
     def tail(self, n: int = 5) -> DataFrame[Any]:
         return self.slice(-n, n)
 
+    def fill_null(
+        self,
+        value: Any = None,
+        *,
+        strategy: str | None = None,
+        subset: Sequence[str] | None = None,
+    ) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        if value is None and strategy is None:
+            raise ValueError("fill_null() requires either value or strategy.")
+        if value is not None and strategy is not None:
+            raise ValueError("fill_null() accepts value or strategy, not both.")
+        rust_plan = rust.plan_fill_null(
+            self._rust_plan,
+            None if subset is None else list(subset),
+            value,
+            strategy,
+        )
+        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def drop_nulls(self, subset: Sequence[str] | None = None) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        rust_plan = rust.plan_drop_nulls(
+            self._rust_plan, None if subset is None else list(subset)
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=rust_plan,
+        )
+
     def join(
         self,
         other: DataFrame[Any],

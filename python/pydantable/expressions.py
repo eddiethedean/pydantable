@@ -67,6 +67,18 @@ class Expr:  # type: ignore[override]
         )
         return CompareOp(rust_expr=rust_expr)
 
+    def cast(self, dtype: Any) -> Expr:
+        rust_expr = _require_rust_core().cast_expr(self._rust_expr, dtype)
+        return Expr(rust_expr=rust_expr)
+
+    def is_null(self) -> Expr:
+        rust_expr = _require_rust_core().is_null_expr(self._rust_expr)
+        return Expr(rust_expr=rust_expr)
+
+    def is_not_null(self) -> Expr:
+        rust_expr = _require_rust_core().is_not_null_expr(self._rust_expr)
+        return Expr(rust_expr=rust_expr)
+
     # Arithmetic
     def __add__(self, other: Any) -> Expr:
         return self._binary("+", other)
