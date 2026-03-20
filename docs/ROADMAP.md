@@ -57,7 +57,11 @@ Spec: `docs/DATAFRAMEMODEL.md`.
   - Python API boundary preserved for `DataFrameModel` and `DataFrame[Schema]`
   - integration coverage added for input-format parity and derived-schema correctness
   - baseline benchmark harness added for execution pipeline timing
-- Phase 6+: pending
+- Phase 6: completed
+  - Rust Polars-backed `join()` and `group_by(...).agg(...)` added
+  - deterministic join collision handling implemented via suffix for right-side non-key columns
+  - derived schema descriptors preserved through advanced ops and surfaced in `DataFrameModel`
+  - Python integration tests added for join/group_by/aggregations parity + correctness
 
 ## Phase 0: Repo Setup
 
@@ -146,11 +150,11 @@ Goals:
 - Feature completeness
 
 Deliverables:
-- `join()`
-- `groupby()`
-- Aggregations (count, mean, sum)
-- Column collision handling rules extended consistently to all advanced ops
-- Unit + integration tests
+- [x] `join()`
+- [x] `group_by()`
+- [x] Aggregations (count, mean, sum)
+- [x] Column collision handling rules extended consistently to advanced ops (join right-side non-keys via `suffix`)
+- [x] Unit + integration tests
 
 ## Phase 7: Polishing & DX (v1.0.0 target)
 
