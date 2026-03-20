@@ -17,6 +17,8 @@ dist/
 
 # Rust
 /target/
+pydantable-core/target/
+pydantable-core/Cargo.lock
 
 # IDE
 .vscode/
@@ -38,4 +40,7 @@ htmlcov/
 *.egg
 .cache/
 /.cache/
+
+# Docs build output
+site/
 
