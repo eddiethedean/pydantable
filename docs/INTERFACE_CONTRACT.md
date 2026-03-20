@@ -46,12 +46,15 @@ values remain aligned.
 
 ## Group-by aggregation semantics (all-null groups)
 
+Supported aggregation operators:
+- `count`, `sum`, `mean`, `min`, `max`, `median`, `std`, `var`, `first`, `last`, `n_unique`
+
 For groups where all input values for an aggregated column are `NULL`:
-- `sum` yields `None` (rather than `0`)
-- `mean` yields `None` (rather than `NaN`)
+- `sum`, `mean`, `min`, `max`, `median`, `std`, `var`, `first`, and `last` yield `None`
 - `count` yields `0`
+- `n_unique` yields `0` (SQL-like distinct-count behavior over non-null values)
 
 The output field nullability is preserved/derived accordingly:
-- `sum/mean` outputs are typed as `Optional[...]`
-- `count` outputs remain non-optional integers
+- nullable aggregates above are typed as `Optional[...]`
+- `count` and `n_unique` outputs remain non-optional integers
 

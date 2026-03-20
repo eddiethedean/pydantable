@@ -89,13 +89,19 @@ Progress note:
 Goal: extend aggregations beyond count/sum/mean.
 
 Deliverables:
-- [ ] Aggregations: `min`, `max`, `median`, `std`, `var`, `first`, `last`, `n_unique`
-- [ ] Multi-aggregation expression API parity improvements
-- [ ] Group-by behavior docs for empty/all-null groups
+- [x] Aggregations: `min`, `max`, `median`, `std`, `var`, `first`, `last`, `n_unique`
+- [x] Multi-aggregation expression API parity improvements
+- [x] Group-by behavior docs for empty/all-null groups
 
 Validation:
-- [ ] Aggregation contract tests for each op
-- [ ] Numeric/non-numeric dtype rejection tests where required
+- [x] Aggregation contract tests for each op
+- [x] Numeric/non-numeric dtype rejection tests where required
+
+Progress note:
+- Implemented on branch `v0.5.0`:
+  - Rust group-by execution now supports `min`, `max`, `median`, `std`, `var`, `first`, `last`, `n_unique`
+  - SQL-like all-null group semantics are preserved across nullable aggregate outputs
+  - Python aggregation API/docs updated and backend parity tests expanded for new operators
 
 ## Phase P5: Reshaping transformations
 

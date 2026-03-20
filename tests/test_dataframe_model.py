@@ -174,3 +174,26 @@ def test_p2_dataframe_model_fill_and_drop_nulls() -> None:
 
     dropped = df.drop_nulls(subset=["age"])
     assert dropped.collect() == {"id": [1, 3], "age": [10, 30]}
+
+
+def test_p4_dataframe_model_groupby_aggregations_schema() -> None:
+    df = UserDF({"id": [1, 1, 2], "age": [10, 20, 30]})
+    grouped = df.group_by("id").agg(
+        age_min=("min", "age"),
+        age_max=("max", "age"),
+        age_median=("median", "age"),
+        age_std=("std", "age"),
+        age_var=("var", "age"),
+        age_first=("first", "age"),
+        age_last=("last", "age"),
+        age_n_unique=("n_unique", "age"),
+    )
+    schema = grouped.schema_fields()
+    assert schema["age_min"] == int | None
+    assert schema["age_max"] == int | None
+    assert schema["age_median"] == float | None
+    assert schema["age_std"] == float | None
+    assert schema["age_var"] == float | None
+    assert schema["age_first"] == int | None
+    assert schema["age_last"] == int | None
+    assert schema["age_n_unique"] is int

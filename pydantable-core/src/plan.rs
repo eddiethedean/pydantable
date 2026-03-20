@@ -1458,9 +1458,149 @@ pub fn execute_groupby_agg_polars(
                 agg_exprs.push(col(&in_col).count().alias(&tmp_count_name));
                 agg_exprs.push(col(&in_col).mean().alias(&out_name));
             }
+            "min" => {
+                let base = in_dtype.base.ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "min() requires known-base dtype.",
+                    )
+                })?;
+                out_schema.insert(
+                    out_name.clone(),
+                    DTypeDesc {
+                        base: Some(base),
+                        nullable: true,
+                    },
+                );
+                agg_exprs.push(col(&in_col).min().alias(&out_name));
+            }
+            "max" => {
+                let base = in_dtype.base.ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "max() requires known-base dtype.",
+                    )
+                })?;
+                out_schema.insert(
+                    out_name.clone(),
+                    DTypeDesc {
+                        base: Some(base),
+                        nullable: true,
+                    },
+                );
+                agg_exprs.push(col(&in_col).max().alias(&out_name));
+            }
+            "median" => {
+                let base = in_dtype.base.ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "median() requires known-base numeric dtype.",
+                    )
+                })?;
+                if !matches!(
+                    base,
+                    crate::dtype::BaseType::Int | crate::dtype::BaseType::Float
+                ) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "median() requires int or float input columns.",
+                    ));
+                }
+                out_schema.insert(
+                    out_name.clone(),
+                    DTypeDesc {
+                        base: Some(crate::dtype::BaseType::Float),
+                        nullable: true,
+                    },
+                );
+                agg_exprs.push(col(&in_col).median().alias(&out_name));
+            }
+            "std" => {
+                let base = in_dtype.base.ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "std() requires known-base numeric dtype.",
+                    )
+                })?;
+                if !matches!(
+                    base,
+                    crate::dtype::BaseType::Int | crate::dtype::BaseType::Float
+                ) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "std() requires int or float input columns.",
+                    ));
+                }
+                out_schema.insert(
+                    out_name.clone(),
+                    DTypeDesc {
+                        base: Some(crate::dtype::BaseType::Float),
+                        nullable: true,
+                    },
+                );
+                agg_exprs.push(col(&in_col).std(1).alias(&out_name));
+            }
+            "var" => {
+                let base = in_dtype.base.ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "var() requires known-base numeric dtype.",
+                    )
+                })?;
+                if !matches!(
+                    base,
+                    crate::dtype::BaseType::Int | crate::dtype::BaseType::Float
+                ) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "var() requires int or float input columns.",
+                    ));
+                }
+                out_schema.insert(
+                    out_name.clone(),
+                    DTypeDesc {
+                        base: Some(crate::dtype::BaseType::Float),
+                        nullable: true,
+                    },
+                );
+                agg_exprs.push(col(&in_col).var(1).alias(&out_name));
+            }
+            "first" => {
+                let base = in_dtype.base.ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "first() requires known-base dtype.",
+                    )
+                })?;
+                out_schema.insert(
+                    out_name.clone(),
+                    DTypeDesc {
+                        base: Some(base),
+                        nullable: true,
+                    },
+                );
+                agg_exprs.push(col(&in_col).first().alias(&out_name));
+            }
+            "last" => {
+                let base = in_dtype.base.ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "last() requires known-base dtype.",
+                    )
+                })?;
+                out_schema.insert(
+                    out_name.clone(),
+                    DTypeDesc {
+                        base: Some(base),
+                        nullable: true,
+                    },
+                );
+                agg_exprs.push(col(&in_col).last().alias(&out_name));
+            }
+            "n_unique" => {
+                out_schema.insert(
+                    out_name.clone(),
+                    DTypeDesc {
+                        base: Some(crate::dtype::BaseType::Int),
+                        nullable: false,
+                    },
+                );
+                // SQL-like behavior: distinct count ignores NULL values.
+                agg_exprs.push(col(&in_col).drop_nulls().n_unique().alias(&out_name));
+            }
             other => {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Unsupported aggregation '{}'. Use one of: count, sum, mean.",
+                    "Unsupported aggregation '{}'. Use one of: count, sum, mean, min, max, median, std, var, first, last, n_unique.",
                     other
                 )))
             }

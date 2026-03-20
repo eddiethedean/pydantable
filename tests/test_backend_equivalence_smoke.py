@@ -240,3 +240,51 @@ def test_backend_equivalence_p3_join_variants_and_expr_keys(backend_mod: str) ->
         b_right, left_on=b_left.id, right_on=b_right.id, how="inner"
     ).collect()
     assert_table_eq_sorted(d_expr, b_expr, keys=["id"])
+
+
+@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_backend_equivalence_p4_groupby_aggregations(backend_mod: str) -> None:
+    backend = importlib.import_module(backend_mod)
+    BackendDataFrameModel = backend.DataFrameModel
+
+    class UserDefault(PolarsDataFrameModel):
+        id: int
+        age: int | None
+
+    class UserBackend(BackendDataFrameModel):
+        id: int
+        age: int | None
+
+    payload = {"id": [1, 1, 2, 2], "age": [10, None, 20, 30]}
+    d_df = UserDefault(payload)
+    b_df = UserBackend(payload)
+
+    d_out = (
+        d_df.group_by("id")
+        .agg(
+            age_min=("min", "age"),
+            age_max=("max", "age"),
+            age_median=("median", "age"),
+            age_std=("std", "age"),
+            age_var=("var", "age"),
+            age_first=("first", "age"),
+            age_last=("last", "age"),
+            age_n_unique=("n_unique", "age"),
+        )
+        .collect()
+    )
+    b_out = (
+        b_df.group_by("id")
+        .agg(
+            age_min=("min", "age"),
+            age_max=("max", "age"),
+            age_median=("median", "age"),
+            age_std=("std", "age"),
+            age_var=("var", "age"),
+            age_first=("first", "age"),
+            age_last=("last", "age"),
+            age_n_unique=("n_unique", "age"),
+        )
+        .collect()
+    )
+    assert_table_eq_sorted(d_out, b_out, keys=["id"])

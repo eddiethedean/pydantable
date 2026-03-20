@@ -563,7 +563,8 @@ class GroupedDataFrame:
             if not isinstance(spec, tuple) or len(spec) != 2:
                 raise TypeError(
                     "agg() expects specs like "
-                    "output_name=('sum'|'mean'|'count', column)."
+                    "output_name=('count'|'sum'|'mean'|'min'|'max'|'median'|"
+                    "'std'|'var'|'first'|'last'|'n_unique', column)."
                 )
             op, col_spec = spec
             if not isinstance(op, str):
