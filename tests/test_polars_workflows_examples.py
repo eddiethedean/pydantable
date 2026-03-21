@@ -39,7 +39,7 @@ def test_workflow_join_groupby() -> None:
         orders.join(users, on="user_id", how="left")
         .group_by("country")
         .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
-        .collect()
+        .collect(as_lists=True)
     )
     assert set(out["country"]) == {"US", "CA"}
     assert sorted(out["n_orders"]) == [1, 2]
@@ -58,7 +58,7 @@ def test_workflow_reshape() -> None:
         columns="metric",
         values="value",
         aggregate_function="first",
-    ).collect()
+    ).collect(as_lists=True)
     assert out["id"] == [1, 2]
     assert "A_first" in out and "B_first" in out
 
@@ -67,12 +67,12 @@ def test_workflow_time_series() -> None:
     df = TS({"id": [1, 1, 1], "ts": [0, 3600, 7200], "v": [10, None, 30]})
     rolled = df.rolling_agg(
         on="ts", column="v", window_size="2h", op="sum", out_name="v_roll", by=["id"]
-    ).collect()
+    ).collect(as_lists=True)
     assert "v_roll" in rolled
 
     dynamic = df.group_by_dynamic("ts", every="1h", by=["id"]).agg(
         v_sum=("sum", "v"),
         v_count=("count", "v"),
     )
-    out = dynamic.collect()
+    out = dynamic.collect(as_lists=True)
     assert "v_sum" in out and "v_count" in out

@@ -17,7 +17,9 @@ def test_pandas_ui_assign_matches_with_columns() -> None:
     a = a0.filter(a0.age2 > 10)
     b0 = df.with_columns(age2=df.age * 2).select("id", "age2")
     b = b0.filter(b0.age2 > 10)
-    assert_table_eq_sorted(a.collect(), b.collect(), keys=["id"])
+    assert_table_eq_sorted(
+        a.collect(as_lists=True), b.collect(as_lists=True), keys=["id"]
+    )
 
 
 def test_pandas_ui_merge_matches_join() -> None:
@@ -34,7 +36,9 @@ def test_pandas_ui_merge_matches_join() -> None:
     right = Right({"id": [1, 2], "country": ["US", "CA"], "score": [100, 200]})
     j = left.join(right, on="id", how="inner", suffix="_r")
     m = left.merge(right, on="id", how="inner", suffixes=("_x", "_r"))
-    assert_table_eq_sorted(j.collect(), m.collect(), keys=["id"])
+    assert_table_eq_sorted(
+        j.collect(as_lists=True), m.collect(as_lists=True), keys=["id"]
+    )
 
 
 def test_pandas_ui_assign_rejects_callable() -> None:
@@ -82,7 +86,9 @@ def test_pandas_ui_matches_default_for_pipeline() -> None:
     p2 = p1.filter(p1.age2 > 10)
     pd1 = pd_df.with_columns(age2=pd_df.age * 2).select("id", "age2")
     pd2 = pd1.filter(pd1.age2 > 10)
-    assert_table_eq_sorted(p2.collect(), pd2.collect(), keys=["id"])
+    assert_table_eq_sorted(
+        p2.collect(as_lists=True), pd2.collect(as_lists=True), keys=["id"]
+    )
 
 
 def test_pandas_ui_introspection_and_getitem() -> None:
@@ -96,7 +102,7 @@ def test_pandas_ui_introspection_and_getitem() -> None:
     assert df.empty is False
     assert "id" in df.dtypes
     sub = df[["id"]]
-    assert sub.collect() == {"id": [1, 2]}
+    assert sub.collect(as_lists=True) == {"id": [1, 2]}
     assert sub.columns == ["id"]
 
 
@@ -105,8 +111,8 @@ def test_pandas_ui_head_tail() -> None:
         id: int
 
     df = User({"id": [1, 2, 3]})
-    assert df.head(2).collect() == {"id": [1, 2]}
-    assert df.tail(2).collect() == {"id": [2, 3]}
+    assert df.head(2).collect(as_lists=True) == {"id": [1, 2]}
+    assert df.tail(2).collect(as_lists=True) == {"id": [2, 3]}
 
 
 def test_pandas_ui_groupby_sum_alias() -> None:
@@ -117,4 +123,6 @@ def test_pandas_ui_groupby_sum_alias() -> None:
     df = Row({"k": [1, 1, 2], "v": [10, 20, 30]})
     a = df.group_by("k").sum("v")
     b = df.group_by("k").agg(v_sum=("sum", "v"))
-    assert_table_eq_sorted(a.collect(), b.collect(), keys=["k"])
+    assert_table_eq_sorted(
+        a.collect(as_lists=True), b.collect(as_lists=True), keys=["k"]
+    )

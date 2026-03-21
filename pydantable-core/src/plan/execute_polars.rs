@@ -1,6 +1,7 @@
 //! Polars-backed physical execution for logical plans.
 
 use std::collections::{BTreeMap, HashMap};
+use std::io::Cursor;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDate, PyDateTime, PyDelta, PyDict, PyList};
@@ -11,17 +12,142 @@ use crate::expr::LiteralValue;
 use super::ir::{PlanInner, PlanStep};
 use super::schema_py::schema_descriptors_as_py;
 
-use polars::lazy::dsl::{col, lit, Expr as PolarsExpr};
+use polars::lazy::dsl::{col, cols, lit, when, Expr as PolarsExpr};
 use polars::prelude::{
     BooleanChunked, CrossJoin, DataFrame, DataType, FillNullStrategy, Float64Chunked, Int32Chunked,
     Int64Chunked, IntoColumn, IntoLazy, IntoSeries, JoinArgs, JoinType, LazyFrame,
-    MaintainOrderJoin, NewChunkedArray, PolarsError, Series, SortMultipleOptions, StringChunked,
-    UniqueKeepStrategy,
+    MaintainOrderJoin, NamedFrom, NewChunkedArray, PlSmallStr, PolarsError, Series,
+    SortMultipleOptions, StringChunked, UniqueKeepStrategy, UnpivotArgsDSL, NULL,
 };
+use polars_io::ipc::{IpcReader, IpcWriter};
+use polars_io::prelude::{SerReader, SerWriter};
+
+#[cfg(feature = "polars_engine")]
+use numpy::PyReadonlyArray1;
+
+#[cfg(feature = "polars_engine")]
+fn try_series_from_numpy(
+    name: &str,
+    obj: &Bound<'_, PyAny>,
+    dtype: &DTypeDesc,
+) -> PyResult<Option<Series>> {
+    let type_name = obj
+        .get_type()
+        .qualname()
+        .ok()
+        .and_then(|q| q.extract::<String>().ok());
+    if type_name.as_deref() != Some("ndarray") {
+        return Ok(None);
+    }
+    let module: String = obj.get_type().getattr("__module__")?.extract()?;
+    if module != "numpy" {
+        return Ok(None);
+    }
+    let kind: String = obj.getattr("dtype")?.getattr("kind")?.extract()?;
+    let Some(base) = dtype.base else {
+        return Ok(None);
+    };
+    let name_pl: PlSmallStr = name.into();
+
+    let series = match (base, kind.as_str()) {
+        (crate::dtype::BaseType::Float, "f") => {
+            let arr: PyReadonlyArray1<f64> = obj.extract()?;
+            Series::new(name_pl, arr.as_slice()?)
+        }
+        (crate::dtype::BaseType::Int, "i") => {
+            let arr: PyReadonlyArray1<i64> = obj.extract()?;
+            Series::new(name_pl, arr.as_slice()?)
+        }
+        (crate::dtype::BaseType::Int, "u") => {
+            let arr: PyReadonlyArray1<u64> = obj.extract()?;
+            let v: Vec<i64> = arr
+                .as_slice()?
+                .iter()
+                .map(|&x| x as i64)
+                .collect();
+            Series::new(name_pl, v.as_slice())
+        }
+        (crate::dtype::BaseType::Bool, "b") => {
+            let arr: PyReadonlyArray1<bool> = obj.extract()?;
+            Series::new(name_pl, arr.as_slice()?)
+        }
+        _ => return Ok(None),
+    };
+
+    Ok(Some(series))
+}
+
+#[cfg(feature = "polars_engine")]
+fn try_series_from_column_buffer(
+    name: &str,
+    obj: &Bound<'_, PyAny>,
+    dtype: &DTypeDesc,
+) -> PyResult<Option<Series>> {
+    let module = obj
+        .get_type()
+        .getattr("__module__")
+        .ok()
+        .and_then(|m| m.extract::<String>().ok());
+    let pa_type = obj
+        .get_type()
+        .qualname()
+        .ok()
+        .and_then(|q| q.extract::<String>().ok());
+
+    if let (Some(m), Some(tn)) = (module.as_deref(), pa_type.as_deref()) {
+        if m.starts_with("pyarrow") && (tn == "Array" || tn == "ChunkedArray") {
+            let np = obj.call_method0("to_numpy")?;
+            return try_series_from_numpy(name, &np, dtype);
+        }
+    }
+    try_series_from_numpy(name, obj, dtype)
+}
 
 #[cfg(feature = "polars_engine")]
 fn polars_err(e: PolarsError) -> PyErr {
     PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Polars execution error: {e}"))
+}
+
+/// Hand off an in-memory Polars `DataFrame` to Python Polars via Arrow IPC (avoids
+/// per-cell `series_to_py_list` materialization).
+#[cfg(feature = "polars_engine")]
+fn polars_dataframe_to_python_via_ipc(py: Python<'_>, df: &mut DataFrame) -> PyResult<PyObject> {
+    let mut buf = Cursor::new(Vec::<u8>::new());
+    IpcWriter::new(&mut buf).finish(df).map_err(polars_err)?;
+    let bytes = buf.into_inner();
+    let io_mod = py.import_bound("io")?;
+    let bytes_io = io_mod.call_method1("BytesIO", (bytes,))?;
+    let pl_mod = py.import_bound("polars")?;
+    let read_ipc = pl_mod.getattr("read_ipc")?;
+    Ok(read_ipc.call1((bytes_io,))?.into_py(py))
+}
+
+#[cfg(feature = "polars_engine")]
+fn try_python_polars_dataframe_to_native(
+    py: Python<'_>,
+    root_schema: &HashMap<String, DTypeDesc>,
+    root_data: &Bound<'_, PyAny>,
+) -> PyResult<Option<DataFrame>> {
+    let type_name = root_data
+        .get_type()
+        .qualname()
+        .ok()
+        .and_then(|q| q.extract::<String>().ok());
+    if type_name.as_deref() != Some("DataFrame") {
+        return Ok(None);
+    }
+    let module: String = root_data.get_type().getattr("__module__")?.extract()?;
+    if !module.starts_with("polars") {
+        return Ok(None);
+    }
+    let bytes_io = py.import_bound("io")?.call_method0("BytesIO")?;
+    root_data.call_method1("write_ipc", (bytes_io.as_ref(),))?;
+    let bytes: Vec<u8> = bytes_io.call_method0("getvalue")?.extract()?;
+    let cursor = Cursor::new(bytes);
+    let mut df = IpcReader::new(cursor).finish().map_err(polars_err)?;
+    let names: Vec<&str> = root_schema.keys().map(|s| s.as_str()).collect();
+    df = df.select(&names).map_err(polars_err)?;
+    Ok(Some(df))
 }
 
 #[cfg(feature = "polars_engine")]
@@ -72,9 +198,13 @@ fn micros_to_py_timedelta(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
 
 #[cfg(feature = "polars_engine")]
 fn root_data_to_polars_df(
+    py: Python<'_>,
     root_schema: &HashMap<String, DTypeDesc>,
     root_data: &Bound<'_, PyAny>,
 ) -> PyResult<DataFrame> {
+    if let Some(df) = try_python_polars_dataframe_to_native(py, root_schema, root_data)? {
+        return Ok(df);
+    }
     let dict: &Bound<'_, PyDict> = root_data.downcast()?;
 
     let mut series_list: Vec<Series> = Vec::new();
@@ -85,7 +215,24 @@ fn root_data_to_polars_df(
                 name
             ))
         })?;
-        let list: &Bound<'_, PyList> = values_any.downcast()?;
+        if let Some(s) = try_series_from_column_buffer(name.as_str(), &values_any, dtype)? {
+            series_list.push(s);
+            continue;
+        }
+
+        let list: Bound<'_, PyList> = if let Ok(l) = values_any.downcast::<PyList>() {
+            l.clone()
+        } else {
+            values_any
+                .call_method0("tolist")?
+                .downcast::<PyList>()
+                .map_err(|_| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+                        "Column '{name}' must be a list or a numpy/pyarrow column convertible with tolist().",
+                    ))
+                })?
+                .clone()
+        };
 
         let s = match dtype.base {
             Some(crate::dtype::BaseType::Int) => {
@@ -424,10 +571,15 @@ pub(crate) fn execute_plan_polars(
     py: Python<'_>,
     plan: &PlanInner,
     root_data: &Bound<'_, PyAny>,
+    as_python_lists: bool,
 ) -> PyResult<PyObject> {
-    let df = root_data_to_polars_df(&plan.root_schema, root_data)?;
+    let df = root_data_to_polars_df(py, &plan.root_schema, root_data)?;
     let lf = PolarsPlanRunner::apply_steps(df.lazy(), &plan.steps)?;
-    let out_df = lf.collect().map_err(polars_err)?;
+    let mut out_df = lf.collect().map_err(polars_err)?;
+
+    if !as_python_lists {
+        return polars_dataframe_to_python_via_ipc(py, &mut out_df);
+    }
 
     let out_dict = PyDict::new_bound(py);
     for (name, dtype) in plan.schema.iter() {
@@ -479,6 +631,7 @@ pub fn execute_join_polars(
     right_on: Vec<String>,
     how: String,
     suffix: String,
+    as_python_lists: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     let is_cross = how == "cross";
     let is_semi = how == "semi";
@@ -530,8 +683,8 @@ pub fn execute_join_polars(
         }
     };
 
-    let left_df = root_data_to_polars_df(&left_plan.root_schema, left_root_data)?;
-    let right_df = root_data_to_polars_df(&right_plan.root_schema, right_root_data)?;
+    let left_df = root_data_to_polars_df(py, &left_plan.root_schema, left_root_data)?;
+    let right_df = root_data_to_polars_df(py, &right_plan.root_schema, right_root_data)?;
     let left_lf = PolarsPlanRunner::apply_steps(left_df.lazy(), &left_plan.steps)?;
     let mut right_lf = PolarsPlanRunner::apply_steps(right_df.lazy(), &right_plan.steps)?;
 
@@ -654,6 +807,15 @@ pub fn execute_join_polars(
         out_schema.insert(col_name.to_string(), out_desc);
     }
 
+    if !as_python_lists {
+        let mut out_only = out_df;
+        let names: Vec<&str> = out_schema.keys().map(|s| s.as_str()).collect();
+        out_only = out_only.select(&names).map_err(polars_err)?;
+        let py_df = polars_dataframe_to_python_via_ipc(py, &mut out_only)?;
+        let desc = schema_descriptors_as_py(py, &out_schema)?;
+        return Ok((py_df, desc));
+    }
+
     let out_dict = PyDict::new_bound(py);
     for (name, dtype) in out_schema.iter() {
         let col = out_df
@@ -669,12 +831,52 @@ pub fn execute_join_polars(
 }
 
 #[cfg(feature = "polars_engine")]
+fn mask_groupby_sum_mean_columns(
+    mut df: DataFrame,
+    tmp_count_cols: &HashMap<String, String>,
+    out_schema: &HashMap<String, DTypeDesc>,
+) -> PyResult<DataFrame> {
+    if tmp_count_cols.is_empty() {
+        let names: Vec<&str> = out_schema.keys().map(|s| s.as_str()).collect();
+        return df.select(&names).map_err(polars_err);
+    }
+    let mut lf = df.lazy();
+    for (out_name, tmp_name) in tmp_count_cols.iter() {
+        let dtype = out_schema.get(out_name).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "Internal error: missing schema for masked column '{out_name}'."
+            ))
+        })?;
+        let expr = match dtype.base {
+            Some(crate::dtype::BaseType::Int) => when(col(tmp_name).eq(lit(0i64)))
+                .then(lit(NULL))
+                .otherwise(col(out_name))
+                .alias(out_name),
+            Some(crate::dtype::BaseType::Float) => when(col(tmp_name).eq(lit(0i64)))
+                .then(lit(NULL))
+                .otherwise(col(out_name))
+                .alias(out_name),
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "sum/mean masking expects int or float output dtypes.",
+                ))
+            }
+        };
+        lf = lf.with_columns([expr]);
+    }
+    df = lf.collect().map_err(polars_err)?;
+    let names: Vec<&str> = out_schema.keys().map(|s| s.as_str()).collect();
+    df.select(&names).map_err(polars_err)
+}
+
+#[cfg(feature = "polars_engine")]
 pub fn execute_groupby_agg_polars(
     py: Python<'_>,
     plan: &PlanInner,
     root_data: &Bound<'_, PyAny>,
     by: Vec<String>,
     aggregations: Vec<(String, String, String)>,
+    as_python_lists: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     if by.is_empty() {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -695,7 +897,7 @@ pub fn execute_groupby_agg_polars(
         ));
     }
 
-    let df = root_data_to_polars_df(&plan.root_schema, root_data)?;
+    let df = root_data_to_polars_df(py, &plan.root_schema, root_data)?;
     let lf = PolarsPlanRunner::apply_steps(df.lazy(), &plan.steps)?;
     let by_exprs = by.iter().map(col).collect::<Vec<_>>();
     let mut agg_exprs = Vec::new();
@@ -928,11 +1130,20 @@ pub fn execute_groupby_agg_polars(
         }
     }
 
-    let out_df = lf
+    let mut out_df = lf
         .group_by(by_exprs)
         .agg(agg_exprs)
         .collect()
         .map_err(polars_err)?;
+
+    out_df = mask_groupby_sum_mean_columns(out_df, &tmp_count_cols, &out_schema)?;
+
+    if !as_python_lists {
+        let mut out_only = out_df;
+        let py_df = polars_dataframe_to_python_via_ipc(py, &mut out_only)?;
+        let desc = schema_descriptors_as_py(py, &out_schema)?;
+        return Ok((py_df, desc));
+    }
 
     let out_dict = PyDict::new_bound(py);
     for (name, dtype) in out_schema.iter() {
@@ -941,66 +1152,7 @@ pub fn execute_groupby_agg_polars(
             .map_err(polars_err)?
             .as_materialized_series()
             .clone();
-
-        let py_list = if let Some(tmp_count_col) = tmp_count_cols.get(name) {
-            let count_series = out_df
-                .column(tmp_count_col)
-                .map_err(polars_err)?
-                .as_materialized_series()
-                .clone();
-            // Mask all-null groups: when non-null count is 0, emit `None`.
-            match dtype.base {
-                Some(crate::dtype::BaseType::Int) => {
-                    let casted = col.cast(&DataType::Int64).map_err(polars_err)?;
-                    let counts = count_series.cast(&DataType::Int64).map_err(polars_err)?;
-                    let mut values: Vec<PyObject> = Vec::with_capacity(casted.len());
-                    for (v, c) in casted
-                        .i64()
-                        .map_err(polars_err)?
-                        .into_iter()
-                        .zip(counts.i64().map_err(polars_err)?.into_iter())
-                    {
-                        if c.unwrap_or(0) == 0 {
-                            values.push(py.None());
-                        } else {
-                            match v {
-                                Some(v) => values.push(v.into_py(py)),
-                                None => values.push(py.None()),
-                            }
-                        }
-                    }
-                    PyList::new_bound(py, values).into_py(py)
-                }
-                Some(crate::dtype::BaseType::Float) => {
-                    let casted = col.cast(&DataType::Float64).map_err(polars_err)?;
-                    let counts = count_series.cast(&DataType::Int64).map_err(polars_err)?;
-                    let mut values: Vec<PyObject> = Vec::with_capacity(casted.len());
-                    for (v, c) in casted
-                        .f64()
-                        .map_err(polars_err)?
-                        .into_iter()
-                        .zip(counts.i64().map_err(polars_err)?.into_iter())
-                    {
-                        if c.unwrap_or(0) == 0 {
-                            values.push(py.None());
-                        } else {
-                            match v {
-                                Some(v) => values.push(v.into_py(py)),
-                                None => values.push(py.None()),
-                            }
-                        }
-                    }
-                    PyList::new_bound(py, values).into_py(py)
-                }
-                _ => {
-                    // Shouldn't happen for our current `sum`/`mean` contract.
-                    series_to_py_list(py, &col, *dtype)?
-                }
-            }
-        } else {
-            series_to_py_list(py, &col, *dtype)?
-        };
-
+        let py_list = series_to_py_list(py, &col, *dtype)?;
         out_dict.set_item(name, py_list)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
@@ -1015,9 +1167,10 @@ pub fn execute_concat_polars(
     right_plan: &PlanInner,
     right_root_data: &Bound<'_, PyAny>,
     how: String,
+    as_python_lists: bool,
 ) -> PyResult<(PyObject, PyObject)> {
-    let left_df = root_data_to_polars_df(&left_plan.root_schema, left_root_data)?;
-    let right_df = root_data_to_polars_df(&right_plan.root_schema, right_root_data)?;
+    let left_df = root_data_to_polars_df(py, &left_plan.root_schema, left_root_data)?;
+    let right_df = root_data_to_polars_df(py, &right_plan.root_schema, right_root_data)?;
     let left_out = PolarsPlanRunner::apply_steps(left_df.lazy(), &left_plan.steps)?
         .collect()
         .map_err(polars_err)?;
@@ -1070,6 +1223,15 @@ pub fn execute_concat_polars(
                 .as_materialized_series();
             out_schema.insert(name.to_string(), dtype_from_polars(s.dtype())?);
         }
+    }
+
+    if !as_python_lists {
+        let mut out_only = out_df;
+        let names: Vec<&str> = out_schema.keys().map(|s| s.as_str()).collect();
+        out_only = out_only.select(&names).map_err(polars_err)?;
+        let py_df = polars_dataframe_to_python_via_ipc(py, &mut out_only)?;
+        let desc = schema_descriptors_as_py(py, &out_schema)?;
+        return Ok((py_df, desc));
     }
 
     let out_dict = PyDict::new_bound(py);
@@ -1245,7 +1407,6 @@ fn agg_literal(
 }
 
 #[cfg(feature = "polars_engine")]
-#[allow(clippy::needless_range_loop)]
 pub fn execute_melt_polars(
     py: Python<'_>,
     plan: &PlanInner,
@@ -1254,6 +1415,7 @@ pub fn execute_melt_polars(
     value_vars: Option<Vec<String>>,
     variable_name: String,
     value_name: String,
+    as_python_lists: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     if variable_name == value_name {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -1313,9 +1475,15 @@ pub fn execute_melt_polars(
         )
     })?;
 
-    let data_obj = super::execute_plan(py, plan, root_data)?;
-    let data_bound = data_obj.bind(py);
-    let ctx = py_dict_to_literal_ctx(&plan.schema, data_bound)?;
+    let df = root_data_to_polars_df(py, &plan.root_schema, root_data)?;
+    let lf = PolarsPlanRunner::apply_steps(df.lazy(), &plan.steps)?;
+    let args = UnpivotArgsDSL {
+        on: Some(cols(values.iter().map(|s| s.as_str()))),
+        index: cols(id_vars.iter().map(|s| s.as_str())),
+        variable_name: Some(variable_name.clone().into()),
+        value_name: Some(value_name.clone().into()),
+    };
+    let mut out_df = lf.unpivot(args).collect().map_err(polars_err)?;
 
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
     for k in id_vars.iter() {
@@ -1336,33 +1504,21 @@ pub fn execute_melt_polars(
         },
     );
 
-    let mut out_cols: HashMap<String, Vec<PyObject>> = HashMap::new();
-    for name in out_schema.keys() {
-        out_cols.insert(name.clone(), Vec::new());
-    }
-    let row_count = ctx.values().next().map_or(0, std::vec::Vec::len);
-    for i in 0..row_count {
-        for vcol in values.iter() {
-            for id in id_vars.iter() {
-                let val = ctx[id][i]
-                    .as_ref()
-                    .map_or(py.None(), |x| literal_to_py(py, x));
-                out_cols.get_mut(id).unwrap().push(val);
-            }
-            out_cols
-                .get_mut(&variable_name)
-                .unwrap()
-                .push(vcol.clone().into_py(py));
-            let vv = ctx[vcol][i]
-                .as_ref()
-                .map_or(py.None(), |x| literal_to_py(py, x));
-            out_cols.get_mut(&value_name).unwrap().push(vv);
-        }
+    if !as_python_lists {
+        let py_df = polars_dataframe_to_python_via_ipc(py, &mut out_df)?;
+        let desc = schema_descriptors_as_py(py, &out_schema)?;
+        return Ok((py_df, desc));
     }
 
     let out_dict = PyDict::new_bound(py);
-    for (k, v) in out_cols {
-        out_dict.set_item(k, PyList::new_bound(py, v))?;
+    for (name, dtype) in out_schema.iter() {
+        let col = out_df
+            .column(name)
+            .map_err(polars_err)?
+            .as_materialized_series()
+            .clone();
+        let py_list = series_to_py_list(py, &col, *dtype)?;
+        out_dict.set_item(name, py_list)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
     Ok((out_dict.into_py(py), desc))
@@ -1378,6 +1534,7 @@ pub fn execute_pivot_polars(
     columns: String,
     values: Vec<String>,
     aggregate_function: String,
+    as_python_lists: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     if index.is_empty() {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -1421,7 +1578,7 @@ pub fn execute_pivot_polars(
         )));
     }
 
-    let data_obj = super::execute_plan(py, plan, root_data)?;
+    let data_obj = super::execute_plan(py, plan, root_data, true)?;
     let data_bound = data_obj.bind(py);
     let ctx = py_dict_to_literal_ctx(&plan.schema, data_bound)?;
 
@@ -1572,6 +1729,297 @@ pub fn execute_pivot_polars(
         out_dict.set_item(k, PyList::new_bound(py, v))?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
+    if !as_python_lists {
+        let pl = py.import_bound("polars")?;
+        let df_obj = pl.getattr("DataFrame")?.call1((out_dict.as_ref(),))?;
+        return Ok((df_obj.into_py(py), desc));
+    }
+    Ok((out_dict.into_py(py), desc))
+}
+
+#[cfg(feature = "polars_engine")]
+fn py_index_value_to_seconds(item: &Bound<'_, PyAny>) -> PyResult<f64> {
+    if item.is_none() {
+        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "group_by_dynamic index column must be time-like or numeric.",
+        ));
+    }
+    if let Ok(dt) = item.downcast::<PyDateTime>() {
+        let secs: f64 = dt.call_method0("timestamp")?.extract()?;
+        return Ok(secs);
+    }
+    if let Ok(d) = item.downcast::<PyDate>() {
+        let py = item.py();
+        let dt_mod = py.import_bound("datetime")?;
+        let datetime = dt_mod.getattr("datetime")?;
+        let combine = datetime.getattr("combine")?;
+        let min_time = datetime.getattr("min")?.getattr("time")?;
+        let dt_obj = combine.call1((d, min_time))?;
+        let secs: f64 = dt_obj.call_method0("timestamp")?.extract()?;
+        return Ok(secs);
+    }
+    if let Ok(td) = item.downcast::<PyDelta>() {
+        let secs: f64 = td.call_method0("total_seconds")?.extract()?;
+        return Ok(secs);
+    }
+    if let Ok(i) = item.extract::<i64>() {
+        return Ok(i as f64);
+    }
+    if let Ok(f) = item.extract::<f64>() {
+        return Ok(f);
+    }
+    Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+        "group_by_dynamic index column must be time-like or numeric.",
+    ))
+}
+
+#[cfg(feature = "polars_engine")]
+fn parse_duration_seconds_strict(text: &str) -> PyResult<f64> {
+    let text = text.trim();
+    if text.len() < 2 {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "invalid duration string",
+        ));
+    }
+    let unit = text.chars().last().unwrap();
+    let num: f64 = text[..text.len() - 1].parse().map_err(|_| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("invalid duration {text:?}"))
+    })?;
+    let factor = match unit {
+        's' => 1.0,
+        'm' => 60.0,
+        'h' => 3600.0,
+        'd' => 86400.0,
+        _ => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Duration supports s/m/h/d suffixes.",
+            ))
+        }
+    };
+    Ok(num * factor)
+}
+
+#[cfg(feature = "polars_engine")]
+fn dynamic_group_key_fragment(value: &Option<LiteralValue>) -> String {
+    match value {
+        None => "N".to_string(),
+        Some(LiteralValue::Int(i)) => format!("I:{i}"),
+        Some(LiteralValue::Float(f)) => format!("F:{f:?}"),
+        Some(LiteralValue::Bool(b)) => format!("B:{b}"),
+        Some(LiteralValue::Str(s)) => format!("S:{s}"),
+        Some(LiteralValue::DateTimeMicros(v)) => format!("DT:{v}"),
+        Some(LiteralValue::DateDays(v)) => format!("D:{v}"),
+        Some(LiteralValue::DurationMicros(v)) => format!("TD:{v}"),
+    }
+}
+
+#[cfg(feature = "polars_engine")]
+fn dynamic_row_group_key(
+    ctx: &HashMap<String, Vec<Option<LiteralValue>>>,
+    by: &[String],
+    row: usize,
+) -> String {
+    let mut s = String::new();
+    for c in by {
+        s.push('|');
+        s.push_str(&dynamic_group_key_fragment(&ctx[c][row]));
+    }
+    s
+}
+
+#[cfg(feature = "polars_engine")]
+#[allow(clippy::too_many_arguments)]
+pub fn execute_groupby_dynamic_agg_polars(
+    py: Python<'_>,
+    plan: &PlanInner,
+    root_data: &Bound<'_, PyAny>,
+    index_column: String,
+    every: String,
+    period: Option<String>,
+    by: Option<Vec<String>>,
+    aggregations: Vec<(String, String, String)>,
+    as_python_lists: bool,
+) -> PyResult<(PyObject, PyObject)> {
+    let by = by.unwrap_or_default();
+    if !plan.schema.contains_key(&index_column) {
+        return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+            "group_by_dynamic() unknown index column '{index_column}'.",
+        )));
+    }
+    for c in by.iter() {
+        if !plan.schema.contains_key(c) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "group_by_dynamic() unknown by column '{c}'.",
+            )));
+        }
+    }
+    if aggregations.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "agg(...) requires at least one aggregation.",
+        ));
+    }
+    for (_, op, _) in aggregations.iter() {
+        if !matches!(op.as_str(), "count" | "sum" | "mean" | "min" | "max") {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Unsupported dynamic aggregation '{op}'.",
+            )));
+        }
+    }
+
+    let data_obj = super::execute_plan(py, plan, root_data, true)?;
+    let data_bound = data_obj.bind(py);
+    let ctx = py_dict_to_literal_ctx(&plan.schema, &data_bound)?;
+
+    let dict: &Bound<'_, PyDict> = data_bound.downcast()?;
+    let index_list_any = dict.get_item(&index_column)?.ok_or_else(|| {
+        PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+            "group_by_dynamic() unknown index column '{index_column}'.",
+        ))
+    })?;
+    let index_list: &Bound<'_, PyList> = index_list_any.downcast()?;
+    let n = index_list.len();
+    let mut times: Vec<f64> = Vec::with_capacity(n);
+    for item in index_list.iter() {
+        times.push(py_index_value_to_seconds(&item)?);
+    }
+
+    let every_s = parse_duration_seconds_strict(&every)?;
+    let period_str = period.unwrap_or_else(|| every.clone());
+    let period_s = parse_duration_seconds_strict(&period_str)?;
+    if every_s <= 0.0 || period_s <= 0.0 {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "group_by_dynamic() requires positive every= and period= durations \
+             (got every={every:?} -> {every_s}, period={period_str:?} -> {period_s}).",
+        )));
+    }
+
+    let (t_min, t_max) = if times.is_empty() {
+        (0.0, 0.0)
+    } else {
+        (
+            times.iter().copied().fold(f64::INFINITY, f64::min),
+            times.iter().copied().fold(f64::NEG_INFINITY, f64::max),
+        )
+    };
+
+    let mut start = t_min;
+    let mut out_cols: HashMap<String, Vec<PyObject>> = HashMap::new();
+    out_cols.insert(index_column.clone(), Vec::new());
+    for c in by.iter() {
+        out_cols.insert(c.clone(), Vec::new());
+    }
+    for (name, _, _) in aggregations.iter() {
+        out_cols.insert(name.clone(), Vec::new());
+    }
+
+    while start <= t_max {
+        let end = start + period_s;
+        let win_rows: Vec<usize> = times
+            .iter()
+            .enumerate()
+            .filter_map(|(i, t)| {
+                if *t >= start && *t < end {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let mut group_order: Vec<String> = Vec::new();
+        let mut group_rows: HashMap<String, Vec<usize>> = HashMap::new();
+
+        if by.is_empty() {
+            group_order.push(String::new());
+            group_rows.insert(String::new(), win_rows);
+        } else {
+            for &i in &win_rows {
+                let key = dynamic_row_group_key(&ctx, &by, i);
+                if !group_rows.contains_key(&key) {
+                    group_order.push(key.clone());
+                }
+                group_rows.entry(key).or_default().push(i);
+            }
+        }
+
+        for key in group_order {
+            let rows = group_rows.get(&key).unwrap();
+            if rows.is_empty() {
+                continue;
+            }
+            let first = rows[0];
+            let idx_val = index_list.get_item(first)?;
+            out_cols
+                .get_mut(&index_column)
+                .unwrap()
+                .push(idx_val.into_py(py));
+
+            for c in by.iter() {
+                let v = ctx[c][first]
+                    .as_ref()
+                    .map_or(py.None(), |x| literal_to_py(py, x));
+                out_cols.get_mut(c).unwrap().push(v);
+            }
+
+            for (out_name, op, in_col) in aggregations.iter() {
+                let in_dtype = *plan.schema.get(in_col).ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                        "agg() unknown input column '{in_col}'.",
+                    ))
+                })?;
+                let base = in_dtype.base.ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "aggregation requires known-base dtype.",
+                    )
+                })?;
+                let vals: Vec<Option<LiteralValue>> =
+                    rows.iter().map(|&i| ctx[in_col][i].clone()).collect();
+                let lit = agg_literal(op, &vals, base)?;
+                out_cols
+                    .get_mut(out_name)
+                    .unwrap()
+                    .push(lit.as_ref().map_or(py.None(), |x| literal_to_py(py, x)));
+            }
+        }
+
+        start += every_s;
+    }
+
+    let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
+    out_schema.insert(
+        index_column.clone(),
+        *plan.schema.get(&index_column).unwrap(),
+    );
+    for c in by.iter() {
+        out_schema.insert(c.clone(), *plan.schema.get(c).unwrap());
+    }
+    for (out_name, op, in_col) in aggregations.iter() {
+        let in_dtype = *plan.schema.get(in_col).unwrap();
+        let out_d = match op.as_str() {
+            "count" => DTypeDesc {
+                base: Some(crate::dtype::BaseType::Int),
+                nullable: false,
+            },
+            "mean" => DTypeDesc {
+                base: Some(crate::dtype::BaseType::Float),
+                nullable: true,
+            },
+            "sum" | "min" | "max" => in_dtype,
+            _ => unreachable!(),
+        };
+        out_schema.insert(out_name.clone(), out_d);
+    }
+
+    let out_dict = PyDict::new_bound(py);
+    for (k, v) in out_cols {
+        out_dict.set_item(k, PyList::new_bound(py, v))?;
+    }
+    let desc = schema_descriptors_as_py(py, &out_schema)?;
+    if !as_python_lists {
+        let pl = py.import_bound("polars")?;
+        let df_obj = pl.getattr("DataFrame")?.call1((out_dict.as_ref(),))?;
+        return Ok((df_obj.into_py(py), desc));
+    }
     Ok((out_dict.into_py(py), desc))
 }
 

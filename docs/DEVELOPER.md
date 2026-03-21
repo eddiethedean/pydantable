@@ -76,11 +76,57 @@ Phase 4 boundary contract:
 .venv/bin/maturin build --release
 ```
 
+### Benchmarks (use a **release** Rust build)
+
+Editable installs (`pip install -e .`) often compile `pydantable._core` in **debug** mode. That is fine for development but **not** comparable to production performance. Before running any benchmark that exercises the extension, build the optimized library:
+
+```bash
+.venv/bin/python -m maturin develop --release
+```
+
+Then run the benchmark scripts (after `pip install -e ".[benchmark]"` for Polars/pandas).
+
+**One-shot (release build + vs Polars + vs pandas):**
+
+```bash
+chmod +x benchmarks/run_release.sh   # once
+./benchmarks/run_release.sh
+./benchmarks/run_release.sh --rows 10000 50000 --rounds 7
+```
+
 ### Run the Phase 5 execution baseline benchmark
+
+Use a release extension (see above), then:
 
 ```bash
 .venv/bin/python benchmarks/phase5_collect_baseline.py
 ```
+
+### Compare pydantable vs native Polars (Python)
+
+Install the optional benchmark extra (pulls in Polars for the comparison side):
+
+```bash
+.venv/bin/python -m pip install -e ".[benchmark]"
+.venv/bin/python -m maturin develop --release
+.venv/bin/python benchmarks/pydantable_vs_polars.py
+```
+
+The script reports mean wall time per scenario (filter/project, join, group-by) and the pydantable/polars ratio. Higher ratios mean more overhead from pydantable’s typed API and wrappers; both sides exercise similar Polars-backed work.
+
+Default `--rows` includes **1,000,000** (along with 1k / 10k / 50k); a full default run can take **minutes**. For a quick check, pass smaller sets, e.g. `--rows 10000 50000`.
+
+### Compare pydantable vs pandas
+
+Uses the same optional `benchmark` extra (installs pandas alongside Polars):
+
+```bash
+.venv/bin/python -m pip install -e ".[benchmark]"
+.venv/bin/python -m maturin develop --release
+.venv/bin/python benchmarks/pydantable_vs_pandas.py
+```
+
+Reports pydantable vs pandas wall time and ratio for the same three scenarios (eager pandas `DataFrame` / `merge` / `groupby`). Default `--rows` matches the Polars script (including **1,000,000**); use `--rows` to limit sizes for faster runs.
 
 ### Build/install extension in editable flow
 

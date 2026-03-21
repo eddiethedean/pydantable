@@ -28,7 +28,12 @@ class TemporalRow(DataFrameModel):
 def test_pyspark_interface_is_spark_flavored_dataframe() -> None:
     df = Left({"id": [1], "bucket": ["A"], "ts": [0], "amount": [10]})
     assert hasattr(df, "withColumn")
-    assert df.collect() == {"id": [1], "bucket": ["A"], "ts": [0], "amount": [10]}
+    assert df.collect(as_lists=True) == {
+        "id": [1],
+        "bucket": ["A"],
+        "ts": [0],
+        "amount": [10],
+    }
 
 
 def test_pyspark_interface_consolidated_pipeline() -> None:
@@ -74,11 +79,11 @@ def test_pyspark_interface_consolidated_pipeline() -> None:
         amount_count=("count", "amount"),
     )
 
-    assert "amount_sum_first" in pivoted.collect()
-    assert "amount_roll" in rolled.collect()
-    assert "amount_sum" in dynamic.collect()
+    assert "amount_sum_first" in pivoted.collect(as_lists=True)
+    assert "amount_roll" in rolled.collect(as_lists=True)
+    assert "amount_sum" in dynamic.collect(as_lists=True)
     assert_table_eq_sorted(
-        grouped.collect(),
+        grouped.collect(as_lists=True),
         {"bucket": ["A", "B"], "amount_sum": [10, 70], "id_count": [2, 2]},
         keys=["bucket"],
     )
@@ -95,5 +100,7 @@ def test_pyspark_interface_temporal_columns_and_literals() -> None:
             "delta": [timedelta(minutes=5), timedelta(minutes=10), None],
         }
     )
-    out = rows.filter(rows.ts >= t0).filter(rows.d >= date(2024, 1, 1)).collect()
+    out = rows.filter(rows.ts >= t0).filter(
+        rows.d >= date(2024, 1, 1)
+    ).collect(as_lists=True)
     assert out["id"] == [1, 2]

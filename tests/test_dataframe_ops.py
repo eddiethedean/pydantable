@@ -15,7 +15,7 @@ def test_with_columns_and_collect_python():
     df2 = df.with_columns(age2=df.age * 2)
     assert df2.schema_fields()["age2"] is int
 
-    result = df2.collect()
+    result = df2.collect(as_lists=True)
     assert result == {"id": [1, 2], "age": [20, 30], "age2": [40, 60]}
 
 
@@ -80,10 +80,10 @@ def test_p1_sort_unique_drop_rename_slice_concat() -> None:
     )
 
     sorted_df = df.sort("id")
-    assert sorted_df.collect()["id"] == [1, 2, 2, 3]
+    assert sorted_df.collect(as_lists=True)["id"] == [1, 2, 2, 3]
 
     unique_df = sorted_df.unique(subset=["id", "age", "country"])
-    assert unique_df.collect()["id"] == [1, 2, 3]
+    assert unique_df.collect(as_lists=True)["id"] == [1, 2, 3]
 
     dropped = unique_df.drop("country")
     assert set(dropped.schema_fields().keys()) == {"id", "age"}
@@ -93,19 +93,19 @@ def test_p1_sort_unique_drop_rename_slice_concat() -> None:
     assert renamed.schema_fields()["years"] == int | None
 
     sliced = renamed.slice(1, 2)
-    assert sliced.collect() == {"id": [2, 3], "years": [20, 30]}
-    assert renamed.head(2).collect() == {"id": [1, 2], "years": [None, 20]}
-    assert renamed.tail(2).collect() == {"id": [2, 3], "years": [20, 30]}
+    assert sliced.collect(as_lists=True) == {"id": [2, 3], "years": [20, 30]}
+    assert renamed.head(2).collect(as_lists=True) == {"id": [1, 2], "years": [None, 20]}
+    assert renamed.tail(2).collect(as_lists=True) == {"id": [2, 3], "years": [20, 30]}
 
     left = renamed.select("id")
     right = renamed.select("id")
     vcat = DataFrame.concat([left, right], how="vertical")
-    assert vcat.collect() == {"id": [1, 2, 3, 1, 2, 3]}
+    assert vcat.collect(as_lists=True) == {"id": [1, 2, 3, 1, 2, 3]}
 
     left_h = renamed.select("id")
     right_h = renamed.select("years")
     hcat = DataFrame.concat([left_h, right_h], how="horizontal")
-    assert hcat.collect() == {"id": [1, 2, 3], "years": [None, 20, 30]}
+    assert hcat.collect(as_lists=True) == {"id": [1, 2, 3], "years": [None, 20, 30]}
 
 
 def test_p2_fill_drop_nulls_and_cast_predicates() -> None:
@@ -118,15 +118,19 @@ def test_p2_fill_drop_nulls_and_cast_predicates() -> None:
         {"id": [1, 2, 3], "age": [10, None, 30], "score": [None, 1.5, None]}
     )
     filled = df.fill_null(0, subset=["age"])
-    assert filled.collect()["age"] == [10, 0, 30]
+    assert filled.collect(as_lists=True)["age"] == [10, 0, 30]
     assert filled.schema_fields()["age"] is int
 
     dropped = df.drop_nulls(subset=["age"])
-    assert dropped.collect() == {"id": [1, 3], "age": [10, 30], "score": [None, None]}
+    assert dropped.collect(as_lists=True) == {
+        "id": [1, 3],
+        "age": [10, 30],
+        "score": [None, None],
+    }
 
     casted = df.with_columns(age_f=df.age.cast(float))
     assert casted.schema_fields()["age_f"] == float | None
-    out = casted.with_columns(age_is_null=casted.age.is_null()).collect()
+    out = casted.with_columns(age_is_null=casted.age.is_null()).collect(as_lists=True)
     assert out["age_is_null"] == [False, True, False]
 
 
@@ -138,15 +142,16 @@ def test_p5_melt_and_unpivot() -> None:
 
     df = DataFrame[S]({"id": [1, 2], "a": [10, None], "b": [20, 30]})
     melted = df.melt(id_vars=["id"], value_vars=["a", "b"])
-    out = melted.collect()
-    assert out["id"] == [1, 1, 2, 2]
-    assert out["variable"] == ["a", "b", "a", "b"]
-    assert out["value"] == [10, 20, None, 30]
+    out = melted.collect(as_lists=True)
+    # Polars `unpivot` expands column-by-column (all `a` rows, then all `b` rows).
+    assert out["id"] == [1, 2, 1, 2]
+    assert out["variable"] == ["a", "a", "b", "b"]
+    assert out["value"] == [10, None, 20, 30]
     assert melted.schema_fields()["variable"] is str
     assert melted.schema_fields()["value"] == int | None
 
     unpivoted = df.unpivot(index=["id"], on=["a", "b"])
-    assert unpivoted.collect() == out
+    assert unpivoted.collect(as_lists=True) == out
 
 
 def test_p5_pivot_single_and_multi_values() -> None:
@@ -166,14 +171,14 @@ def test_p5_pivot_single_and_multi_values() -> None:
     )
     p1 = df.pivot(
         index="id", columns="key", values="x", aggregate_function="sum"
-    ).collect()
+    ).collect(as_lists=True)
     assert p1["id"] == [1, 2]
     assert p1["A_sum"] == [10, None]
     assert p1["B_sum"] == [20, 40]
 
     p2 = df.pivot(
         index=["id"], columns="key", values=["x", "y"], aggregate_function="first"
-    ).collect()
+    ).collect(as_lists=True)
     assert p2["A_x_first"] == [10, None]
     assert p2["B_x_first"] == [20, 40]
     assert p2["A_y_first"] == [1.0, 3.0]
@@ -213,13 +218,13 @@ def test_p6_rolling_agg_and_dynamic_groupby() -> None:
         out_name="v_roll_sum",
         by=["id"],
     )
-    out = rolled.collect()
+    out = rolled.collect(as_lists=True)
     assert out["v_roll_sum"] == [10, 10, 40, 5]
 
     dgb = df.group_by_dynamic("ts", every="1h", period="2h", by=["id"]).agg(
         v_sum=("sum", "v"), v_count=("count", "v")
     )
-    d_out = dgb.collect()
+    d_out = dgb.collect(as_lists=True)
     assert "v_sum" in d_out and "v_count" in d_out
 
 
@@ -247,7 +252,7 @@ def test_p6_expr_over_without_args_no_warning() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
         expr = (df.age + 1).over()
-    out = df.with_columns(age2=expr).collect()
+    out = df.with_columns(age2=expr).collect(as_lists=True)
     assert out["age2"] == [21, 31]
 
 
@@ -255,7 +260,7 @@ def test_p6_expr_over_warns_when_partition_or_order_given() -> None:
     df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
     with pytest.warns(UserWarning, match="not yet implemented"):
         expr = (df.age + 1).over(partition_by="id", order_by="age")
-    out = df.with_columns(age2=expr).collect()
+    out = df.with_columns(age2=expr).collect(as_lists=True)
     assert out["age2"] == [21, 31]
 
 
@@ -274,12 +279,12 @@ def test_temporal_columns_and_literals_core_paths() -> None:
             "dur": [timedelta(hours=1), timedelta(hours=2)],
         }
     )
-    out = df.collect()
+    out = df.collect(as_lists=True)
     assert out["ts"][0] == datetime(2024, 1, 1, 0, 0, 0)
     assert out["d"][1] == date(2024, 1, 2)
     assert out["dur"][0] == timedelta(hours=1)
 
-    filtered = df.filter(df.ts > datetime(2024, 1, 1, 12, 0, 0)).collect()
+    filtered = df.filter(df.ts > datetime(2024, 1, 1, 12, 0, 0)).collect(as_lists=True)
     assert filtered["id"] == [2]
 
 
@@ -308,10 +313,33 @@ def test_temporal_groupby_and_join_paths() -> None:
             "tag": ["a", "b"],
         }
     )
-    joined = left.join(right, on=["id", "ts"], how="inner").collect()
+    joined = left.join(right, on=["id", "ts"], how="inner").collect(as_lists=True)
     assert joined["id"] == [1, 2]
 
-    grouped = (
-        left.group_by("id").agg(ts_min=("min", "ts"), ts_max=("max", "ts")).collect()
-    )
+    grouped = left.group_by("id").agg(
+        ts_min=("min", "ts"),
+        ts_max=("max", "ts"),
+    ).collect(as_lists=True)
     assert sorted(grouped["id"]) == [1, 2]
+
+
+def test_validate_data_false_numpy_ingest_collect() -> None:
+    np = pytest.importorskip("numpy")
+
+    class N(Schema):
+        x: int
+
+    df = DataFrame[N](
+        {"x": np.array([1, 2, 3], dtype=np.int64)},
+        validate_data=False,
+    )
+    assert df.collect(as_lists=True)["x"] == [1, 2, 3]
+
+
+def test_collect_as_numpy() -> None:
+    np = pytest.importorskip("numpy")
+    df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
+    out = df.collect(as_numpy=True)
+    assert set(out.keys()) == {"id", "age"}
+    assert np.asarray(out["id"]).tolist() == [1, 2]
+    assert np.asarray(out["age"]).tolist() == [20, 30]

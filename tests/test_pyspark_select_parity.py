@@ -22,7 +22,7 @@ def test_pyspark_select_wrapper_methods() -> None:
         .withColumnRenamed("name", "name_new")
         .withColumnsRenamed({"age2": "age_twice"})
         .select("id", "name_new", "age_filled", "age_twice")
-        .collect()
+        .collect(as_lists=True)
     )
     assert out["id"] == [1, 2]
     assert out["name_new"] == ["a", "b"]
@@ -36,7 +36,7 @@ def test_pyspark_to_df_and_transform() -> None:
     transformed = renamed.transform(
         lambda x: x.withColumn("uage2", x.uage * 2).select("uid", "uage2")
     )
-    assert transformed.collect() == {"uid": [1, 2], "uage2": [20, 40]}
+    assert transformed.collect(as_lists=True) == {"uid": [1, 2], "uage2": [20, 40]}
 
 
 def test_pyspark_to_df_arity_error() -> None:
@@ -47,7 +47,7 @@ def test_pyspark_to_df_arity_error() -> None:
 
 def test_pyspark_select_typed_computed_projection() -> None:
     df = User({"id": [1, 2], "name": ["a", "b"], "age": [10, 20]})
-    out = df.select_typed("id", age_doubled=df.age * 2).collect()
+    out = df.select_typed("id", age_doubled=df.age * 2).collect(as_lists=True)
     assert out == {"id": [1, 2], "age_doubled": [20, 40]}
 
 
@@ -71,7 +71,7 @@ def test_pyspark_select_temporal_wrappers_preserve_behavior() -> None:
     out = (
         df.withColumn("is_ts_null", df.ts.is_null())
         .select_typed("id", "d", "dur", "is_ts_null")
-        .collect()
+        .collect(as_lists=True)
     )
     assert_table_eq_sorted(
         out,

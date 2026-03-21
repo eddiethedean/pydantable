@@ -13,12 +13,12 @@ class UserDF(DataFrameModel):
 def test_dataframe_model_column_input_happy_path():
     df = UserDF({"id": [1, 2], "age": [20, None]})
     assert df.schema_fields() == {"id": int, "age": int | None}
-    assert df.collect() == {"id": [1, 2], "age": [20, None]}
+    assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
 
 
 def test_dataframe_model_row_input_happy_path():
     df = UserDF([{"id": 1, "age": 20}, {"id": 2, "age": None}])
-    assert df.collect() == {"id": [1, 2], "age": [20, None]}
+    assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
 
 
 def test_dataframe_model_row_model_generation_and_validation():
@@ -41,7 +41,7 @@ def test_dataframe_model_transformations_return_derived_model():
     assert df3.schema_fields() == {"id": int, "age2": int | None}
 
     df4 = df3.filter(df3.age2 > 11)
-    assert df4.collect() == {"id": [2], "age2": [21]}
+    assert df4.collect(as_lists=True) == {"id": [2], "age2": [21]}
 
 
 def test_dataframe_model_row_input_rejects_bad_item_type():
@@ -79,7 +79,7 @@ def test_dataframe_model_with_columns_collision_replacement_semantics():
     df = UserDF({"id": [1, 2, 3], "age": [10, None, 20]})
     df2 = df.with_columns(age=df.age + 1)
     assert df2.schema_fields()["age"] == int | None
-    assert df2.collect() == {"id": [1, 2, 3], "age": [11, None, 21]}
+    assert df2.collect(as_lists=True) == {"id": [1, 2, 3], "age": [11, None, 21]}
 
 
 def test_dataframe_model_filter_preserves_schema_changes_rows_only():
@@ -88,7 +88,7 @@ def test_dataframe_model_filter_preserves_schema_changes_rows_only():
     df2 = df.filter(df.age > 20)
     after = df2.schema_fields()
     assert before == after
-    assert df2.collect() == {"id": [3], "age": [30]}
+    assert df2.collect(as_lists=True) == {"id": [3], "age": [30]}
 
 
 def test_dataframe_model_row_vs_column_input_transformation_parity():
@@ -98,9 +98,13 @@ def test_dataframe_model_row_vs_column_input_transformation_parity():
     col_df = UserDF({"id": [1, 2, 3], "age": [10, None, 30]})
 
     row_df2 = row_df.with_columns(age2=row_df.age + 1)
-    row_out = row_df2.filter(row_df2.age2 > 20).select("id", "age2").collect()
+    row_out = row_df2.filter(row_df2.age2 > 20).select("id", "age2").collect(
+        as_lists=True
+    )
     col_df2 = col_df.with_columns(age2=col_df.age + 1)
-    col_out = col_df2.filter(col_df2.age2 > 20).select("id", "age2").collect()
+    col_out = col_df2.filter(col_df2.age2 > 20).select("id", "age2").collect(
+        as_lists=True
+    )
     assert row_out == col_out == {"id": [3], "age2": [31]}
 
 
@@ -148,32 +152,35 @@ def test_p1_dataframe_model_methods_and_concat():
     df = UserDF({"id": [3, 1, 2, 2], "age": [30, None, 20, 20]})
 
     sorted_df = df.sort("id")
-    assert sorted_df.collect()["id"] == [1, 2, 2, 3]
+    assert sorted_df.collect(as_lists=True)["id"] == [1, 2, 2, 3]
 
     unique_df = sorted_df.unique(subset=["id", "age"])
-    assert unique_df.collect() == {"id": [1, 2, 3], "age": [None, 20, 30]}
+    assert unique_df.collect(as_lists=True) == {"id": [1, 2, 3], "age": [None, 20, 30]}
 
     renamed = unique_df.rename({"age": "years"})
     assert set(renamed.schema_fields().keys()) == {"id", "years"}
     assert renamed.schema_fields()["years"] == int | None
-    assert renamed.slice(1, 2).collect() == {"id": [2, 3], "years": [20, 30]}
-    assert renamed.head(1).collect() == {"id": [1], "years": [None]}
-    assert renamed.tail(1).collect() == {"id": [3], "years": [30]}
+    assert renamed.slice(1, 2).collect(as_lists=True) == {
+        "id": [2, 3],
+        "years": [20, 30],
+    }
+    assert renamed.head(1).collect(as_lists=True) == {"id": [1], "years": [None]}
+    assert renamed.tail(1).collect(as_lists=True) == {"id": [3], "years": [30]}
 
     first = renamed.select("id")
     second = renamed.select("id")
     cat = DataFrameModel.concat([first, second], how="vertical")
-    assert cat.collect() == {"id": [1, 2, 3, 1, 2, 3]}
+    assert cat.collect(as_lists=True) == {"id": [1, 2, 3, 1, 2, 3]}
 
 
 def test_p2_dataframe_model_fill_and_drop_nulls() -> None:
     df = UserDF({"id": [1, 2, 3], "age": [10, None, 30]})
     filled = df.fill_null(0, subset=["age"])
-    assert filled.collect() == {"id": [1, 2, 3], "age": [10, 0, 30]}
+    assert filled.collect(as_lists=True) == {"id": [1, 2, 3], "age": [10, 0, 30]}
     assert filled.schema_fields()["age"] is int
 
     dropped = df.drop_nulls(subset=["age"])
-    assert dropped.collect() == {"id": [1, 3], "age": [10, 30]}
+    assert dropped.collect(as_lists=True) == {"id": [1, 3], "age": [10, 30]}
 
 
 def test_p4_dataframe_model_groupby_aggregations_schema() -> None:
@@ -209,13 +216,13 @@ def test_p5_dataframe_model_reshape_methods() -> None:
     melted = df.melt(
         id_vars=["id"], value_vars=["v"], variable_name="var", value_name="val"
     )
-    out = melted.collect()
+    out = melted.collect(as_lists=True)
     assert out == {"id": [1, 1], "var": ["v", "v"], "val": [10, None]}
     assert melted.schema_fields()["var"] is str
     assert melted.schema_fields()["val"] == int | None
 
     pivoted = df.pivot(index="id", columns="k", values="v", aggregate_function="first")
-    p_out = pivoted.collect()
+    p_out = pivoted.collect(as_lists=True)
     assert p_out["id"] == [1]
     assert p_out["A_first"] == [10]
     assert p_out["B_first"] == [None]
@@ -242,9 +249,9 @@ def test_p6_dataframe_model_rolling_and_dynamic() -> None:
         out_name="v_roll_sum",
         by=["id"],
     )
-    assert rolled.collect()["v_roll_sum"] == [10, 10, 40]
+    assert rolled.collect(as_lists=True)["v_roll_sum"] == [10, 10, 40]
 
     grouped = df.group_by_dynamic("ts", every="1h", by=["id"]).agg(
         v_count=("count", "v")
     )
-    assert "v_count" in grouped.collect()
+    assert "v_count" in grouped.collect(as_lists=True)

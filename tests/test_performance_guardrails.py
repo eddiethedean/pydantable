@@ -37,11 +37,14 @@ def test_performance_guardrails_major_transforms() -> None:
     )
 
     t0 = perf_counter()
-    _ = left.join(right, on=["id", "ts"], how="inner").collect()
+    _ = left.join(right, on=["id", "ts"], how="inner").collect(as_lists=True)
     join_s = perf_counter() - t0
 
     t1 = perf_counter()
-    _ = left.group_by("key").agg(v_sum=("sum", "v"), v_count=("count", "v")).collect()
+    _ = left.group_by("key").agg(
+        v_sum=("sum", "v"),
+        v_count=("count", "v"),
+    ).collect(as_lists=True)
     group_s = perf_counter() - t1
 
     t2 = perf_counter()
@@ -50,14 +53,14 @@ def test_performance_guardrails_major_transforms() -> None:
         .pivot(
             index="id", columns="variable", values="value", aggregate_function="first"
         )
-        .collect()
+        .collect(as_lists=True)
     )
     reshape_s = perf_counter() - t2
 
     t3 = perf_counter()
     _ = left.rolling_agg(
         on="ts", column="v", window_size="10m", op="sum", out_name="v_roll", by=["key"]
-    ).collect()
+    ).collect(as_lists=True)
     window_s = perf_counter() - t3
 
     # Guardrails are intentionally generous to avoid flakiness while still

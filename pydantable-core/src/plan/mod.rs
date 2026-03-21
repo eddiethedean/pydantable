@@ -16,8 +16,9 @@ pub use build::*;
 #[cfg(feature = "polars_engine")]
 #[allow(unused_imports)]
 pub use execute_polars::{
-    execute_concat_polars, execute_explode_polars, execute_groupby_agg_polars, execute_join_polars,
-    execute_melt_polars, execute_pivot_polars, execute_unnest_polars, PolarsPlanRunner,
+    execute_concat_polars, execute_explode_polars, execute_groupby_agg_polars,
+    execute_groupby_dynamic_agg_polars, execute_join_polars, execute_melt_polars,
+    execute_pivot_polars, execute_unnest_polars, PolarsPlanRunner,
 };
 pub use executor::PhysicalPlanExecutor;
 #[allow(unused_imports)]
@@ -39,14 +40,15 @@ pub fn execute_plan(
     py: Python<'_>,
     plan: &PlanInner,
     root_data: &Bound<'_, PyAny>,
+    as_python_lists: bool,
 ) -> PyResult<PyObject> {
     #[cfg(feature = "polars_engine")]
     {
-        PolarsExecutor.execute_plan(py, plan, root_data)
+        PolarsExecutor.execute_plan(py, plan, root_data, as_python_lists)
     }
     #[cfg(not(feature = "polars_engine"))]
     {
-        RowwiseExecutor.execute_plan(py, plan, root_data)
+        RowwiseExecutor.execute_plan(py, plan, root_data, as_python_lists)
     }
 }
 

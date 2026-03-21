@@ -5,6 +5,16 @@ from typing import Any
 import pytest
 
 
+def _materialized_table_to_dict(table: Any) -> dict[str, list[Any]]:
+    if isinstance(table, dict):
+        return table
+    typ = type(table)
+    mod = getattr(typ, "__module__", "") or ""
+    if mod.startswith("polars") and typ.__name__ == "DataFrame":
+        return table.to_dict(as_series=False)
+    raise TypeError(f"Unsupported table type for comparison: {typ!r}")
+
+
 def _sort_key_for_value(value: Any) -> tuple[int, Any]:
     # Ensure Python3 can compare keys even when values contain `None`.
     # We sort `None` last to keep "normal" values ordered first.
@@ -31,10 +41,12 @@ def sort_rows_by_keys(
 
 
 def assert_table_eq_sorted(
-    got: dict[str, list[Any]],
-    expected: dict[str, list[Any]],
+    got: dict[str, list[Any]] | Any,
+    expected: dict[str, list[Any]] | Any,
     keys: list[str],
 ) -> None:
+    got = _materialized_table_to_dict(got)
+    expected = _materialized_table_to_dict(expected)
     got_sorted = sort_rows_by_keys(got, keys)
     expected_sorted = sort_rows_by_keys(expected, keys)
     assert got_sorted == expected_sorted

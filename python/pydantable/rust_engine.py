@@ -34,11 +34,11 @@ def _require_rust_core() -> Any:
     return _RUST_CORE
 
 
-def execute_plan(plan: Any, data: Any) -> Any:
+def execute_plan(plan: Any, data: Any, *, as_python_lists: bool = False) -> Any:
     rust = _require_rust_core()
     if not hasattr(rust, "execute_plan"):
         raise NotImplementedError("Rust extension does not implement `execute_plan`.")
-    return rust.execute_plan(plan, data)
+    return rust.execute_plan(plan, data, as_python_lists)
 
 
 def execute_join(
@@ -50,6 +50,8 @@ def execute_join(
     right_on: Sequence[str],
     how: str,
     suffix: str,
+    *,
+    as_python_lists: bool = False,
 ) -> tuple[Any, Any]:
     rust = _require_rust_core()
     if not hasattr(rust, "execute_join"):
@@ -63,6 +65,7 @@ def execute_join(
         list(right_on),
         how,
         suffix,
+        as_python_lists,
     )
 
 
@@ -71,13 +74,17 @@ def execute_groupby_agg(
     root_data: Any,
     by: Sequence[str],
     aggregations: Any,
+    *,
+    as_python_lists: bool = False,
 ) -> tuple[Any, Any]:
     rust = _require_rust_core()
     if not hasattr(rust, "execute_groupby_agg"):
         raise NotImplementedError(
             "Rust extension does not implement `execute_groupby_agg`."
         )
-    return rust.execute_groupby_agg(plan, root_data, list(by), aggregations)
+    return rust.execute_groupby_agg(
+        plan, root_data, list(by), aggregations, as_python_lists
+    )
 
 
 def execute_concat(
@@ -86,6 +93,8 @@ def execute_concat(
     right_plan: Any,
     right_root_data: Any,
     how: str,
+    *,
+    as_python_lists: bool = False,
 ) -> tuple[Any, Any]:
     rust = _require_rust_core()
     return rust.execute_concat(
@@ -94,6 +103,7 @@ def execute_concat(
         right_plan,
         right_root_data,
         how,
+        as_python_lists,
     )
 
 
@@ -104,6 +114,8 @@ def execute_melt(
     value_vars: Sequence[str] | None,
     variable_name: str,
     value_name: str,
+    *,
+    as_python_lists: bool = False,
 ) -> tuple[Any, Any]:
     rust = _require_rust_core()
     return rust.execute_melt(
@@ -113,6 +125,7 @@ def execute_melt(
         None if value_vars is None else list(value_vars),
         variable_name,
         value_name,
+        as_python_lists,
     )
 
 
@@ -123,6 +136,8 @@ def execute_pivot(
     columns: str,
     values: Sequence[str],
     aggregate_function: str,
+    *,
+    as_python_lists: bool = False,
 ) -> tuple[Any, Any]:
     rust = _require_rust_core()
     return rust.execute_pivot(
@@ -132,6 +147,7 @@ def execute_pivot(
         columns,
         list(values),
         aggregate_function,
+        as_python_lists,
     )
 
 
@@ -178,8 +194,10 @@ def execute_groupby_dynamic_agg(
     period: str | None,
     by: Sequence[str] | None,
     aggregations: Any,
+    *,
+    as_python_lists: bool = False,
 ) -> tuple[Any, Any]:
     rust = _require_rust_core()
     return rust.execute_groupby_dynamic_agg(
-        plan, root_data, index_column, every, period, by, aggregations
+        plan, root_data, index_column, every, period, by, aggregations, as_python_lists
     )

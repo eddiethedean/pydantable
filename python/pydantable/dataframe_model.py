@@ -104,10 +104,14 @@ class DataFrameModel:
     def __init__(
         self,
         data: Mapping[str, Any] | Sequence[Mapping[str, Any]],
+        *,
+        validate_data: bool = True,
     ) -> None:
         normalized = _normalize_input(data=data, row_model=self.RowModel)
         dataframe_cls = cast("Any", self._dataframe_cls)
-        self._df = dataframe_cls[self._SchemaModel](normalized)
+        self._df = dataframe_cls[self._SchemaModel](
+            normalized, validate_data=validate_data
+        )
 
     @classmethod
     def _derived_model_type(
@@ -134,8 +138,16 @@ class DataFrameModel:
     def schema_fields(self) -> dict[str, Any]:
         return self._df.schema_fields()
 
-    def collect(self) -> dict[str, list[Any]]:
-        return self._df.collect()
+    def collect(
+        self,
+        *,
+        as_lists: bool = False,
+        as_numpy: bool = False,
+        as_polars: bool | None = None,
+    ) -> Any:
+        return self._df.collect(
+            as_lists=as_lists, as_numpy=as_numpy, as_polars=as_polars
+        )
 
     def to_dict(self) -> dict[str, list[Any]]:
         return self._df.to_dict()
@@ -147,7 +159,7 @@ class DataFrameModel:
         This is intended as the row-wise bridge for FastAPI response
         serialization workflows.
         """
-        data = self.collect()
+        data = self.collect(as_lists=True)
         if not data:
             return []
 

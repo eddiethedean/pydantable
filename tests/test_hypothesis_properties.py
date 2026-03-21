@@ -134,7 +134,7 @@ def test_validate_columns_strict_misaligned_fails(data: dict[str, list]) -> None
 @settings(max_examples=75)
 def test_dataframe_collect_preserves_columns_and_length(data: dict[str, list]) -> None:
     df = DataFrame[TwoInt](data)
-    got = df.collect()
+    got = df.collect(as_lists=True)
     assert set(got.keys()) == {"id", "age"}
     assert len(got["id"]) == len(data["id"])
     assert_table_eq_sorted(got, data, ["id"])
@@ -144,7 +144,7 @@ def test_dataframe_collect_preserves_columns_and_length(data: dict[str, list]) -
 @settings(max_examples=75)
 def test_with_columns_sum_matches_rowwise_arithmetic(data: dict[str, list]) -> None:
     df = DataFrame[TwoInt](data)
-    out = df.with_columns(s=df.id + df.age).collect()
+    out = df.with_columns(s=df.id + df.age).collect(as_lists=True)
     expected_s = [a + b for a, b in zip(data["id"], data["age"], strict=True)]
     assert_table_eq_sorted(
         out,
@@ -157,7 +157,7 @@ def test_with_columns_sum_matches_rowwise_arithmetic(data: dict[str, list]) -> N
 @settings(max_examples=50)
 def test_select_identity_subset(data: dict[str, list]) -> None:
     df = DataFrame[TwoInt](data)
-    out = df.select("id").collect()
+    out = df.select("id").collect(as_lists=True)
     assert set(out.keys()) == {"id"}
     assert_table_eq_sorted(out, {"id": list(data["id"])}, ["id"])
 
@@ -166,7 +166,7 @@ def test_select_identity_subset(data: dict[str, list]) -> None:
 @settings(max_examples=50)
 def test_filter_self_eq_keeps_all_rows(data: dict[str, list]) -> None:
     df = DataFrame[TwoInt](data)
-    out = df.filter(df.age == df.age).collect()
+    out = df.filter(df.age == df.age).collect(as_lists=True)
     assert_table_eq_sorted(out, data, ["id"])
 
 
@@ -174,7 +174,7 @@ def test_filter_self_eq_keeps_all_rows(data: dict[str, list]) -> None:
 @settings(max_examples=50)
 def test_nullable_int_column_roundtrip(data: dict[str, list]) -> None:
     df = DataFrame[IntOpt](data)
-    got = df.collect()
+    got = df.collect(as_lists=True)
     assert_table_eq_sorted(got, data, ["id"])
 
 

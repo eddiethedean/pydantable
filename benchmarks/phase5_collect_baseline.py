@@ -1,6 +1,10 @@
 """
 Baseline Phase 5 execution benchmark.
 
+Build a **release** extension first for meaningful timings:
+
+    .venv/bin/python -m maturin develop --release
+
 Run:
     .venv/bin/python benchmarks/phase5_collect_baseline.py
 """

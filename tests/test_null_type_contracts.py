@@ -29,5 +29,5 @@ def test_drop_nulls_rejects_unknown_subset_column() -> None:
 
 def test_cast_unparseable_string_to_int_becomes_null() -> None:
     df = DataFrame[UserSchema]({"id": [1], "age": [None], "name": ["x"]})
-    out = df.with_columns(name_i=df.name.cast(int)).collect()
+    out = df.with_columns(name_i=df.name.cast(int)).collect(as_lists=True)
     assert out["name_i"] == [None]

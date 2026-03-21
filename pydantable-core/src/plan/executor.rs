@@ -12,6 +12,7 @@ pub trait PhysicalPlanExecutor {
         py: Python<'_>,
         plan: &PlanInner,
         root_data: &Bound<'_, PyAny>,
+        as_python_lists: bool,
     ) -> PyResult<PyObject>;
 }
 
@@ -25,8 +26,9 @@ impl PhysicalPlanExecutor for PolarsExecutor {
         py: Python<'_>,
         plan: &PlanInner,
         root_data: &Bound<'_, PyAny>,
+        as_python_lists: bool,
     ) -> PyResult<PyObject> {
-        super::execute_polars::execute_plan_polars(py, plan, root_data)
+        super::execute_polars::execute_plan_polars(py, plan, root_data, as_python_lists)
     }
 }
 
@@ -40,6 +42,7 @@ impl PhysicalPlanExecutor for RowwiseExecutor {
         py: Python<'_>,
         plan: &PlanInner,
         root_data: &Bound<'_, PyAny>,
+        _as_python_lists: bool,
     ) -> PyResult<PyObject> {
         super::execute_rowwise::execute_plan_rowwise(py, plan, root_data)
     }

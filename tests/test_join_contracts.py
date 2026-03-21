@@ -75,7 +75,9 @@ def test_join_supports_right_semi_anti_cross() -> None:
         {"id": [2, 3], "age": [None, 30], "country": ["US", "CA"], "score": [200, 300]}
     )
 
-    out_right = left.join(right, on="id", how="right", suffix="_r").collect()
+    out_right = left.join(right, on="id", how="right", suffix="_r").collect(
+        as_lists=True
+    )
     assert set(out_right.keys()) == {
         "id",
         "age",
@@ -85,13 +87,13 @@ def test_join_supports_right_semi_anti_cross() -> None:
         "score_r",
     }
 
-    out_semi = left.join(right, on="id", how="semi").collect()
+    out_semi = left.join(right, on="id", how="semi").collect(as_lists=True)
     assert out_semi == {"id": [2], "age": [None], "score": [20]}
 
-    out_anti = left.join(right, on="id", how="anti").collect()
+    out_anti = left.join(right, on="id", how="anti").collect(as_lists=True)
     assert out_anti == {"id": [1], "age": [10], "score": [10]}
 
-    out_cross = left.join(right, how="cross", suffix="_r").collect()
+    out_cross = left.join(right, how="cross", suffix="_r").collect(as_lists=True)
     assert len(out_cross["id"]) == 4
 
 
@@ -109,7 +111,9 @@ def test_join_supports_expression_keys() -> None:
     right = DataFrame[RightSchema](
         {"id": [2, 1], "age": [20, 10], "country": ["US", "CA"], "score": [200, 100]}
     )
-    out = left.join(right, left_on=left.id, right_on=right.id, how="inner").collect()
+    out = left.join(
+        right, left_on=left.id, right_on=right.id, how="inner"
+    ).collect(as_lists=True)
     assert_table_eq_sorted(
         out,
         {
@@ -139,7 +143,7 @@ def test_join_collision_suffixes_all_non_key_overlaps() -> None:
     right = DataFrame[Right]({"id": [2, 1], "score": [200, 100], "age": [2000, 1000]})
 
     joined = left.join(right, on="id", how="inner", suffix="_r")
-    out = joined.collect()
+    out = joined.collect(as_lists=True)
     assert_table_eq_sorted(
         out,
         {

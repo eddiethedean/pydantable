@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import (
@@ -21,6 +22,7 @@ from .rust_engine import (
     execute_concat,
     execute_explode,
     execute_groupby_agg,
+    execute_groupby_dynamic_agg,
     execute_join,
     execute_melt,
     execute_pivot,
@@ -112,14 +114,21 @@ class DataFrame(Generic[SchemaT]):
         # because it triggers `__class_getitem__` again.
         return type(name, (cls,), {"_schema_type": schema_type})
 
-    def __init__(self, data: Mapping[str, Sequence[Any]]) -> None:
+    def __init__(
+        self,
+        data: Mapping[str, Sequence[Any]] | Any,
+        *,
+        validate_data: bool = True,
+    ) -> None:
         if self._schema_type is None:
             raise TypeError(
                 "Use DataFrame[SchemaType](data) to construct a typed DataFrame."
             )
 
-        root_data = validate_columns_strict(data, self._schema_type)
-        self._root_data: dict[str, list[Any]] = root_data
+        root_data = validate_columns_strict(
+            data, self._schema_type, validate_elements=validate_data
+        )
+        self._root_data: Any = root_data
         self._root_schema_type: type[BaseModel] = self._schema_type
         self._current_schema_type: type[BaseModel] = self._schema_type
         self._current_field_types = schema_field_types(self._current_schema_type)
@@ -130,7 +139,7 @@ class DataFrame(Generic[SchemaT]):
     def _from_plan(
         cls,
         *,
-        root_data: dict[str, list[Any]],
+        root_data: Any,
         root_schema_type: type[BaseModel],
         current_schema_type: type[BaseModel],
         rust_plan: Any,
@@ -396,6 +405,7 @@ class DataFrame(Generic[SchemaT]):
             None if value_vars is None else list(value_vars),
             variable_name,
             value_name,
+            as_python_lists=False,
         )
         derived_fields = schema_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
@@ -455,6 +465,7 @@ class DataFrame(Generic[SchemaT]):
             columns_col,
             value_cols,
             aggregate_function,
+            as_python_lists=False,
         )
         derived_fields = schema_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
@@ -572,6 +583,7 @@ class DataFrame(Generic[SchemaT]):
             right_keys,
             how,
             suffix,
+            as_python_lists=False,
         )
         derived_fields = schema_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
@@ -614,7 +626,7 @@ class DataFrame(Generic[SchemaT]):
         by: Sequence[str] | None = None,
         min_periods: int = 1,
     ) -> DataFrame[Any]:
-        data = self.collect()
+        data = self.collect(as_lists=True)
         if on not in data or column not in data:
             raise KeyError("rolling_agg() requires existing on/column names.")
         by_cols = [] if by is None else list(by)
@@ -731,16 +743,53 @@ class DataFrame(Generic[SchemaT]):
             by=[] if by is None else list(by),
         )
 
-    def collect(self) -> dict[str, list[Any]]:
+    def collect(
+        self,
+        *,
+        as_lists: bool = False,
+        as_numpy: bool = False,
+        as_polars: bool | None = None,
+    ) -> Any:
         """
-        Materialize this typed logical DataFrame into Python column data.
+        Materialize this typed logical DataFrame.
 
-        Execution uses the Rust engine.
+        By default returns a native Polars ``DataFrame`` from the Rust engine
+        (Arrow IPC handoff; requires ``polars``). Use ``as_lists=True`` for the
+        legacy ``dict[str, list]`` representation. With ``as_numpy=True``,
+        returns ``dict[str, numpy.ndarray]`` (requires ``numpy``).
+
+        The ``as_polars`` argument is deprecated; it only toggled the old
+        dict-wrapped Polars path and is mapped to ``as_lists=not as_polars``.
         """
-        return execute_plan(self._rust_plan, self._root_data)
+        if as_polars is not None:
+            warnings.warn(
+                "as_polars is deprecated; collect() returns a Polars DataFrame by "
+                "default. Use collect(as_lists=True) for dicts of lists.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            as_lists = not as_polars
+        if as_numpy and as_lists:
+            raise ValueError(
+                "collect() cannot specify both as_numpy=True and as_lists=True."
+            )
+        out = execute_plan(
+            self._rust_plan, self._root_data, as_python_lists=as_lists
+        )
+        import polars as pl
+
+        if not as_lists and not isinstance(out, pl.DataFrame):
+            out = pl.DataFrame(out)
+        if as_numpy:
+            import numpy as np
+
+            if isinstance(out, pl.DataFrame):
+                return {c: out[c].to_numpy() for c in out.columns}
+            return {k: np.asarray(v) for k, v in out.items()}
+        return out
 
     def to_dict(self) -> dict[str, list[Any]]:
-        return self.collect()
+        return self.collect(as_lists=True)
 
     @classmethod
     def concat(
@@ -762,6 +811,7 @@ class DataFrame(Generic[SchemaT]):
                 df._rust_plan,
                 df._root_data,
                 how,
+                as_python_lists=False,
             )
             derived_fields = schema_from_descriptors(schema_descriptors)
             out_schema_type = make_derived_schema_type(out_schema_type, derived_fields)
@@ -812,6 +862,7 @@ class GroupedDataFrame:
             self._df._root_data,
             self._keys,
             agg_specs,
+            as_python_lists=False,
         )
         derived_fields = schema_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
@@ -842,107 +893,36 @@ class DynamicGroupedDataFrame:
         self._period = period or every
         self._by = list(by)
 
-    def _seconds(self, text: str) -> float:
-        unit = text[-1]
-        num = float(text[:-1])
-        factors = {"s": 1.0, "m": 60.0, "h": 3600.0, "d": 86400.0}
-        if unit not in factors:
-            raise ValueError("Duration supports s/m/h/d suffixes.")
-        return num * factors[unit]
-
-    def _to_seconds(self, x: Any) -> float:
-        if isinstance(x, datetime):
-            return x.timestamp()
-        if isinstance(x, date):
-            return float(datetime.combine(x, datetime.min.time()).timestamp())
-        if isinstance(x, timedelta):
-            return x.total_seconds()
-        if isinstance(x, (int, float)):
-            return float(x)
-        raise TypeError("group_by_dynamic index column must be time-like or numeric.")
-
     def agg(self, **aggregations: tuple[str, str]) -> DataFrame[Any]:
-        data = self._df.collect()
-        if self._index not in data:
-            raise KeyError(f"group_by_dynamic() unknown index column '{self._index}'.")
-        for c in self._by:
-            if c not in data:
-                raise KeyError(f"group_by_dynamic() unknown by column '{c}'.")
-        times = [self._to_seconds(v) for v in data[self._index]]
-        every = self._seconds(self._every)
-        period = self._seconds(self._period)
-        if every <= 0 or period <= 0:
-            raise ValueError(
-                "group_by_dynamic() requires positive every= and period= durations "
-                f"(got every={self._every!r} -> {every}, "
-                f"period={self._period!r} -> {period})."
-            )
-        t_min = min(times) if times else 0.0
-        t_max = max(times) if times else 0.0
-        start = t_min
+        agg_specs: dict[str, tuple[str, str]] = {}
+        for out_name, spec in aggregations.items():
+            if not isinstance(spec, tuple) or len(spec) != 2:
+                raise TypeError(
+                    "agg() expects specs like output_name=('count'|'sum'|'mean'|"
+                    "'min'|'max', column)."
+                )
+            op, in_col = spec
+            if not isinstance(op, str) or not isinstance(in_col, str):
+                raise TypeError("agg() op and column must be strings.")
+            agg_specs[out_name] = (op, in_col)
 
-        out: dict[str, list[Any]] = {self._index: []}
-        for c in self._by:
-            out[c] = []
-        for name in aggregations:
-            out[name] = []
-
-        while start <= t_max:
-            end = start + period
-            win_rows = [i for i, t in enumerate(times) if start <= t < end]
-            if self._by:
-                grouped: dict[tuple[Any, ...], list[int]] = {}
-                for i in win_rows:
-                    key = tuple(data[c][i] for c in self._by)
-                    grouped.setdefault(key, []).append(i)
-            else:
-                grouped = {(): win_rows}
-
-            for gk, rows in grouped.items():
-                if not rows:
-                    continue
-                out[self._index].append(data[self._index][rows[0]])
-                for idx, c in enumerate(self._by):
-                    out[c].append(gk[idx])
-                for out_name, (op, in_col) in aggregations.items():
-                    vals = [
-                        data[in_col][i] for i in rows if data[in_col][i] is not None
-                    ]
-                    res: Any
-                    if op == "count":
-                        res = len(vals)
-                    elif op == "sum":
-                        res = sum(vals) if vals else None
-                    elif op == "mean":
-                        res = (sum(vals) / len(vals)) if vals else None
-                    elif op == "min":
-                        res = min(vals) if vals else None
-                    elif op == "max":
-                        res = max(vals) if vals else None
-                    else:
-                        raise ValueError(f"Unsupported dynamic aggregation '{op}'.")
-                    out[out_name].append(res)
-            start += every
-
-        fields: dict[str, Any] = {self._index: self._df.schema_fields()[self._index]}
-        for c in self._by:
-            fields[c] = self._df.schema_fields()[c]
-        for out_name, (op, _in_col) in aggregations.items():
-            in_dtype = self._df.schema_fields()[aggregations[out_name][1]]
-            if op == "count":
-                fields[out_name] = int
-            elif op == "mean":
-                fields[out_name] = float | None
-            elif op in {"sum", "min", "max"}:
-                fields[out_name] = in_dtype
-            else:
-                fields[out_name] = in_dtype
-        derived_schema_type = make_derived_schema_type(
-            self._df._current_schema_type, fields
+        out_data, schema_descriptors = execute_groupby_dynamic_agg(
+            self._df._rust_plan,
+            self._df._root_data,
+            self._index,
+            self._every,
+            self._period,
+            self._by if self._by else None,
+            agg_specs,
+            as_python_lists=False,
         )
-        rust_plan = _require_rust_core().make_plan(fields)
+        derived_fields = schema_from_descriptors(schema_descriptors)
+        derived_schema_type = make_derived_schema_type(
+            self._df._current_schema_type, derived_fields
+        )
+        rust_plan = _require_rust_core().make_plan(derived_fields)
         return self._df._from_plan(
-            root_data=out,
+            root_data=out_data,
             root_schema_type=derived_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,

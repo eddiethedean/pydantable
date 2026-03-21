@@ -23,6 +23,7 @@ use crate::plan::{
 use crate::plan::{
     execute_concat_polars as execute_concat_inner, execute_explode_polars as execute_explode_inner,
     execute_groupby_agg_polars as execute_groupby_agg_inner,
+    execute_groupby_dynamic_agg_polars as execute_groupby_dynamic_agg_inner,
     execute_join_polars as execute_join_inner, execute_melt_polars as execute_melt_inner,
     execute_pivot_polars as execute_pivot_inner, execute_unnest_polars as execute_unnest_inner,
 };
@@ -70,8 +71,14 @@ impl PyPlan {
         planinner_to_serializable(py, &self.inner)
     }
 
-    fn execute(&self, py: Python<'_>, root_data: &Bound<'_, PyAny>) -> PyResult<PyObject> {
-        execute_plan_inner(py, &self.inner, root_data)
+    #[pyo3(signature = (root_data, as_python_lists=false))]
+    fn execute(
+        &self,
+        py: Python<'_>,
+        root_data: &Bound<'_, PyAny>,
+        as_python_lists: bool,
+    ) -> PyResult<PyObject> {
+        execute_plan_inner(py, &self.inner, root_data, as_python_lists)
     }
 }
 
@@ -375,12 +382,19 @@ fn plan_drop_nulls(plan: &PyPlan, subset: Option<Vec<String>>) -> PyResult<PyPla
 }
 
 #[pyfunction]
-fn execute_plan(py: Python<'_>, plan: &PyPlan, root_data: &Bound<'_, PyAny>) -> PyResult<PyObject> {
-    execute_plan_inner(py, &plan.inner, root_data)
+#[pyo3(signature = (plan, root_data, as_python_lists=false))]
+fn execute_plan(
+    py: Python<'_>,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    as_python_lists: bool,
+) -> PyResult<PyObject> {
+    execute_plan_inner(py, &plan.inner, root_data, as_python_lists)
 }
 
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (left_plan, left_root_data, right_plan, right_root_data, left_on, right_on, how, suffix, as_python_lists=false))]
 fn execute_join(
     py: Python<'_>,
     left_plan: &PyPlan,
@@ -391,6 +405,7 @@ fn execute_join(
     right_on: Vec<String>,
     how: String,
     suffix: String,
+    as_python_lists: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     #[cfg(feature = "polars_engine")]
     {
@@ -404,6 +419,7 @@ fn execute_join(
             right_on,
             how,
             suffix,
+            as_python_lists,
         )
     }
     #[cfg(not(feature = "polars_engine"))]
@@ -415,12 +431,14 @@ fn execute_join(
 }
 
 #[pyfunction]
+#[pyo3(signature = (plan, root_data, by, aggregations, as_python_lists=false))]
 fn execute_groupby_agg(
     py: Python<'_>,
     plan: &PyPlan,
     root_data: &Bound<'_, PyAny>,
     by: Vec<String>,
     aggregations: &Bound<'_, PyAny>,
+    as_python_lists: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     let dict: &Bound<'_, pyo3::types::PyDict> = aggregations.downcast()?;
     let mut aggs: Vec<(String, String, String)> = Vec::new();
@@ -438,7 +456,7 @@ fn execute_groupby_agg(
     }
     #[cfg(feature = "polars_engine")]
     {
-        execute_groupby_agg_inner(py, &plan.inner, root_data, by, aggs)
+        execute_groupby_agg_inner(py, &plan.inner, root_data, by, aggs, as_python_lists)
     }
     #[cfg(not(feature = "polars_engine"))]
     {
@@ -449,6 +467,7 @@ fn execute_groupby_agg(
 }
 
 #[pyfunction]
+#[pyo3(signature = (left_plan, left_root_data, right_plan, right_root_data, how, as_python_lists=false))]
 fn execute_concat(
     py: Python<'_>,
     left_plan: &PyPlan,
@@ -456,6 +475,7 @@ fn execute_concat(
     right_plan: &PyPlan,
     right_root_data: &Bound<'_, PyAny>,
     how: String,
+    as_python_lists: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     #[cfg(feature = "polars_engine")]
     {
@@ -466,6 +486,7 @@ fn execute_concat(
             &right_plan.inner,
             right_root_data,
             how,
+            as_python_lists,
         )
     }
     #[cfg(not(feature = "polars_engine"))]
@@ -477,6 +498,7 @@ fn execute_concat(
 }
 
 #[pyfunction]
+#[pyo3(signature = (plan, root_data, id_vars, value_vars, variable_name, value_name, as_python_lists=false))]
 fn execute_melt(
     py: Python<'_>,
     plan: &PyPlan,
@@ -485,6 +507,7 @@ fn execute_melt(
     value_vars: Option<Vec<String>>,
     variable_name: String,
     value_name: String,
+    as_python_lists: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     #[cfg(feature = "polars_engine")]
     {
@@ -496,6 +519,7 @@ fn execute_melt(
             value_vars,
             variable_name,
             value_name,
+            as_python_lists,
         )
     }
     #[cfg(not(feature = "polars_engine"))]
@@ -508,6 +532,7 @@ fn execute_melt(
 
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (plan, root_data, index, columns, values, aggregate_function, as_python_lists=false))]
 fn execute_pivot(
     py: Python<'_>,
     plan: &PyPlan,
@@ -516,6 +541,7 @@ fn execute_pivot(
     columns: String,
     values: Vec<String>,
     aggregate_function: String,
+    as_python_lists: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     #[cfg(feature = "polars_engine")]
     {
@@ -527,6 +553,7 @@ fn execute_pivot(
             columns,
             values,
             aggregate_function,
+            as_python_lists,
         )
     }
     #[cfg(not(feature = "polars_engine"))]
@@ -596,19 +623,52 @@ fn execute_rolling_agg(
 
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (plan, root_data, index_column, every, period, by, aggregations, as_python_lists=false))]
 fn execute_groupby_dynamic_agg(
-    _py: Python<'_>,
-    _plan: &PyPlan,
-    _root_data: &Bound<'_, PyAny>,
-    _index_column: String,
-    _every: String,
-    _period: Option<String>,
-    _by: Option<Vec<String>>,
-    _aggregations: &Bound<'_, PyAny>,
+    py: Python<'_>,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    index_column: String,
+    every: String,
+    period: Option<String>,
+    by: Option<Vec<String>>,
+    aggregations: &Bound<'_, PyAny>,
+    as_python_lists: bool,
 ) -> PyResult<(PyObject, PyObject)> {
-    Err(pyo3::exceptions::PyNotImplementedError::new_err(
-        "Rust execute_groupby_dynamic_agg is not yet enabled; use Python DataFrame.group_by_dynamic implementation.",
-    ))
+    let dict: &Bound<'_, pyo3::types::PyDict> = aggregations.downcast()?;
+    let mut aggs: Vec<(String, String, String)> = Vec::new();
+    for (k, v) in dict.iter() {
+        let out_name: String = k.extract()?;
+        let spec: &Bound<'_, pyo3::types::PyTuple> = v.downcast()?;
+        if spec.len() != 2 {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "Aggregation spec must be a tuple: (op, input_column).",
+            ));
+        }
+        let op: String = spec.get_item(0)?.extract()?;
+        let in_col: String = spec.get_item(1)?.extract()?;
+        aggs.push((out_name, op, in_col));
+    }
+    #[cfg(feature = "polars_engine")]
+    {
+        execute_groupby_dynamic_agg_inner(
+            py,
+            &plan.inner,
+            root_data,
+            index_column,
+            every,
+            period,
+            by,
+            aggs,
+            as_python_lists,
+        )
+    }
+    #[cfg(not(feature = "polars_engine"))]
+    {
+        Err(pyo3::exceptions::PyRuntimeError::new_err(
+            "group_by_dynamic requires pydantable-core built with the `polars_engine` feature.",
+        ))
+    }
 }
 
 /// Register all classes and functions on the `pydantable._core` extension module.

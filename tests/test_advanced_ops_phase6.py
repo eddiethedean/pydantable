@@ -28,7 +28,7 @@ def test_phase6_join_inner_happy_path_and_schema():
     left = DataFrame[UserSchema]({"id": [1, 2, 3], "age": [20, None, 30]})
     right = DataFrame[CountrySchema]({"id": [1, 3], "country": ["US", "CA"]})
     joined = left.join(right, on="id", how="inner")
-    out = joined.collect()
+    out = joined.collect(as_lists=True)
     assert_table_eq_sorted(
         out,
         {"id": [1, 3], "age": [20, 30], "country": ["US", "CA"]},
@@ -54,7 +54,7 @@ def test_phase6_join_collision_uses_suffix():
 
     left = DataFrame[Left]({"id": [1, 2], "score": [10, 20]})
     right = DataFrame[Right]({"id": [1, 2], "score": [100, 200]})
-    out = left.join(right, on="id", suffix="_r").collect()
+    out = left.join(right, on="id", suffix="_r").collect(as_lists=True)
     assert out == {"id": [1, 2], "score": [10, 20], "score_r": [100, 200]}
 
 
@@ -65,7 +65,7 @@ def test_phase6_groupby_agg_count_sum_mean():
         .agg(
             age_count=("count", "age"), age_sum=("sum", "age"), age_mean=("mean", "age")
         )
-        .collect()
+        .collect(as_lists=True)
     )
     got = sorted(
         zip(
@@ -89,11 +89,10 @@ def test_phase6_dataframe_model_join_and_groupby_parity():
     users = UserDF({"id": [1, 2, 3], "age": [20, None, 30]})
     countries = CountryDF({"id": [1, 3], "country": ["US", "CA"]})
     joined = users.join(countries, on="id")
-    out = joined.collect()
+    out = joined.collect(as_lists=True)
     assert out == {"id": [1, 3], "age": [20, 30], "country": ["US", "CA"]}
 
     grouped = users.group_by("id").agg(age_count=("count", "age"))
-    gout = sorted(
-        zip(grouped.collect()["id"], grouped.collect()["age_count"], strict=True)
-    )
+    g = grouped.collect(as_lists=True)
+    gout = sorted(zip(g["id"], g["age_count"], strict=True))
     assert gout == [(1, 1), (2, 0), (3, 1)]

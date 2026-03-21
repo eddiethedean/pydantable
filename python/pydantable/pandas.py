@@ -10,7 +10,7 @@ from .dataframe_model import DataFrameModel as CoreDataFrameModel
 from .dataframe_model import GroupedDataFrameModel as CoreGroupedDataFrameModel
 from .expressions import Expr
 from .rust_engine import _require_rust_core
-from .schema import Schema
+from .schema import Schema, _is_polars_dataframe
 
 
 def _is_pandas_series(value: object) -> bool:
@@ -84,7 +84,10 @@ class PandasDataFrame(CoreDataFrame):
     def shape(self) -> tuple[int, int]:
         if not self._root_data:
             return (0, len(self._current_field_types))
-        first = next(iter(self._root_data.values()))
+        rd = self._root_data
+        if _is_polars_dataframe(rd):
+            return (len(rd), len(self._current_field_types))
+        first = next(iter(rd.values()))
         return (len(first), len(self._current_field_types))
 
     @property
@@ -101,7 +104,7 @@ class PandasDataFrame(CoreDataFrame):
 
         This is an eager, convenience API (not a zero-copy lazy slice).
         """
-        data = self.collect()
+        data = self.collect(as_lists=True)
         sliced: dict[str, list[Any]]
         if not data:
             sliced = {name: [] for name in self._current_field_types}
@@ -123,7 +126,7 @@ class PandasDataFrame(CoreDataFrame):
 
         Eager; see :meth:`head`.
         """
-        data = self.collect()
+        data = self.collect(as_lists=True)
         sliced: dict[str, list[Any]]
         if not data:
             sliced = {name: [] for name in self._current_field_types}

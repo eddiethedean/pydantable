@@ -23,7 +23,7 @@ def test_arithmetic_propagates_nulls_and_optional_dtype():
 
     assert _is_optional_of(expr.dtype, int)
     df2 = df.with_columns(age2=expr)
-    assert df2.collect()["age2"] == [21, None, 31]
+    assert df2.collect(as_lists=True)["age2"] == [21, None, 31]
 
 
 def test_comparison_propagates_nulls_optional_bool_dtype():
@@ -32,7 +32,7 @@ def test_comparison_propagates_nulls_optional_bool_dtype():
 
     assert _is_optional_of(cond.dtype, bool)
     df2 = df.with_columns(cond=cond)
-    assert df2.collect()["cond"] == [False, None, True]
+    assert df2.collect(as_lists=True)["cond"] == [False, None, True]
 
 
 def test_filter_drops_null_rows_and_keeps_true_only():
@@ -61,7 +61,7 @@ def test_with_columns_collision_replaces_schema_and_values():
     df2 = df.with_columns(age=df.age + 1)
 
     assert _is_optional_of(df2.schema_fields()["age"], int)
-    assert df2.collect() == {"id": [1, 2, 3], "age": [21, None, 31]}
+    assert df2.collect(as_lists=True) == {"id": [1, 2, 3], "age": [21, None, 31]}
 
 
 def test_chained_transformations_preserve_nullable_schema_types():

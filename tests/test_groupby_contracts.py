@@ -51,7 +51,7 @@ def test_all_null_group_preserves_nullable_aggregate_schema() -> None:
         age_mean=("mean", "age"),
         age_count=("count", "age"),
     )
-    out = grouped.collect()
+    out = grouped.collect(as_lists=True)
 
     assert out["id"] == [1]
     assert out["age_sum"] == [None]
@@ -76,7 +76,7 @@ def test_groupby_supports_phase4_aggregations() -> None:
         age_last=("last", "age"),
         age_n_unique=("n_unique", "age"),
     )
-    out = grouped.collect()
+    out = grouped.collect(as_lists=True)
     assert set(out.keys()) == {
         "id",
         "age_min",
@@ -116,7 +116,7 @@ def test_groupby_phase4_all_null_semantics() -> None:
         age_last=("last", "age"),
         age_n_unique=("n_unique", "age"),
     )
-    out = grouped.collect()
+    out = grouped.collect(as_lists=True)
     assert out["age_min"] == [None]
     assert out["age_max"] == [None]
     assert out["age_median"] == [None]

@@ -34,6 +34,7 @@ pub(crate) fn execute_plan_rowwise(
     py: Python<'_>,
     plan: &PlanInner,
     root_data: &Bound<'_, PyAny>,
+    _as_python_lists: bool,
 ) -> PyResult<PyObject> {
     let mut ctx = root_data_to_ctx(py, &plan.root_schema, root_data)?;
     let mut n = ctx_len(&ctx)?;

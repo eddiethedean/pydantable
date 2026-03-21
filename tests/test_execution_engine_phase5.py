@@ -14,7 +14,7 @@ class UserDF(DataFrameModel):
 
 def test_phase5_collect_preserves_null_filter_semantics():
     df = DataFrame[UserSchema]({"id": [1, 2, 3], "age": [20, None, 30]})
-    got = df.filter(df.age > 25).select("id", "age").collect()
+    got = df.filter(df.age > 25).select("id", "age").collect(as_lists=True)
     assert got == {"id": [3], "age": [30]}
 
 
@@ -28,13 +28,13 @@ def test_phase5_row_and_column_inputs_match_under_collect():
         row_df.with_columns(age2=row_df.age + 1)
         .filter(row_df.age > 10)
         .select("id", "age2")
-        .collect()
+        .collect(as_lists=True)
     )
     col_result = (
         col_df.with_columns(age2=col_df.age + 1)
         .filter(col_df.age > 10)
         .select("id", "age2")
-        .collect()
+        .collect(as_lists=True)
     )
     assert row_result == col_result
 
@@ -44,7 +44,7 @@ def test_phase5_collect_matches_derived_schema_fields():
     df2 = df.with_columns(age2=df.age + 1, cond=df.age > 10).select(
         "id", "age2", "cond"
     )
-    out = df2.collect()
+    out = df2.collect(as_lists=True)
     assert set(out.keys()) == {"id", "age2", "cond"}
     assert df2.schema_fields()["age2"] == int | None
     assert df2.schema_fields()["cond"] == bool | None

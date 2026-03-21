@@ -108,6 +108,7 @@ typing and `collect()`.
 - Format + lint: `ruff format .` and `ruff check .`
 - Tests: `pytest -q`
 - CI runs the full test suite against the Rust extension.
+- Benchmarks vs Polars/pandas: use a **release** native build (`maturin develop --release` or `./benchmarks/run_release.sh`); see `docs/DEVELOPER.md`.
 
 ## Docs
 

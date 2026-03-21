@@ -38,15 +38,79 @@ def schema_field_types(schema_type: type[BaseModel]) -> dict[str, Any]:
     return field_types
 
 
+def _sequence_column_to_list(name: str, col: Any) -> list[Any]:
+    """Normalize list/tuple/numpy.ndarray to a Python list."""
+    if isinstance(col, (list, tuple)):
+        return list(col)
+    typ = type(col)
+    if typ.__module__ == "numpy" and typ.__name__ == "ndarray":
+        return col.tolist()
+    raise TypeError(
+        f"Column {name!r} must be a list, tuple, or numpy.ndarray (got {typ!r})."
+    )
+
+
+def _is_polars_dataframe(obj: Any) -> bool:
+    t = type(obj)
+    mod = getattr(t, "__module__", "") or ""
+    return mod.startswith("polars") and t.__name__ == "DataFrame"
+
+
+def _column_buffer_for_trusted(name: str, col: Any) -> Any:
+    """
+    Normalize column inputs when skipping per-element validation.
+
+    Keeps numpy ndarray or pyarrow Array/ChunkedArray buffers for a Rust fast path;
+    list/tuple are copied to ``list``.
+    """
+    if isinstance(col, (list, tuple)):
+        return list(col)
+    typ = type(col)
+    if typ.__module__ == "numpy" and typ.__name__ == "ndarray":
+        return col
+    mod = getattr(typ, "__module__", "") or ""
+    if mod.startswith("pyarrow") and typ.__name__ in ("Array", "ChunkedArray"):
+        return col
+    raise TypeError(
+        f"Column {name!r} must be a list, tuple, numpy.ndarray, or pyarrow "
+        f"Array/ChunkedArray (got {typ!r})."
+    )
+
+
 def validate_columns_strict(
-    data: Mapping[str, Any], schema_type: type[BaseModel]
-) -> dict[str, list[Any]]:
+    data: Mapping[str, Any] | Any,
+    schema_type: type[BaseModel],
+    *,
+    validate_elements: bool = True,
+) -> dict[str, Any] | Any:
     """
     Validate that `data` matches `schema_type` and return normalized columns.
 
-    This validates the column *values* at runtime (sufficient for early skeleton
-    tests). For now, it validates each element using Pydantic `TypeAdapter`.
+    When ``validate_elements`` is True (default), each element is validated with
+    Pydantic ``TypeAdapter``. Set to False for trusted bulk inputs (keys and row
+    lengths are still checked; numpy columns are converted via ``tolist()``).
+
+    With ``validate_elements=False``, a Polars ``DataFrame`` may be passed
+    directly so the Rust engine can ingest it via Arrow IPC without per-cell
+    Python materialization.
     """
+
+    if _is_polars_dataframe(data):
+        if validate_elements:
+            raise TypeError(
+                "Passing a Polars DataFrame requires validate_data=False "
+                "(per-element validation is skipped for columnar buffers)."
+            )
+        field_types = schema_field_types(schema_type)
+        cols = {str(c) for c in data.columns}
+        field_keys = set(field_types.keys())
+        missing = sorted(field_keys - cols)
+        extra = sorted(cols - field_keys)
+        if missing:
+            raise ValueError(f"Missing required columns: {missing}")
+        if extra:
+            raise ValueError(f"Unknown columns for schema: {extra}")
+        return data
 
     field_types = schema_field_types(schema_type)
     data_keys = set(data.keys())
@@ -59,18 +123,19 @@ def validate_columns_strict(
     if extra:
         raise ValueError(f"Unknown columns for schema: {extra}")
 
-    normalized: dict[str, list[Any]] = {}
+    normalized: dict[str, Any] = {}
     lengths = set()
     for name, expected_type in field_types.items():
         col = data[name]
-        if not isinstance(col, (list, tuple)):
-            raise TypeError(f"Column {name!r} must be a list/tuple")
-        values = list(col)
-        lengths.add(len(values))
-
-        adapter = TypeAdapter(expected_type)
-        for v in values:
-            adapter.validate_python(v)
+        if validate_elements:
+            values = _sequence_column_to_list(name, col)
+            lengths.add(len(values))
+            adapter = TypeAdapter(expected_type)
+            for v in values:
+                adapter.validate_python(v)
+        else:
+            values = _column_buffer_for_trusted(name, col)
+            lengths.add(len(values))
 
         normalized[name] = values
 

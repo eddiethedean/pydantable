@@ -2,6 +2,9 @@
 
 All materialization — `collect()`, joins, group-by, reshape, etc. — runs through the
 **compiled Rust extension** (`pydantable._core`), which uses Polars for physical execution.
+By default, `collect()` returns a Polars `DataFrame` via an Arrow IPC handoff from Rust
+(avoiding per-cell Python `list` construction). Pass `collect(as_lists=True)` for a
+`dict[str, list]` result (legacy / compatibility).
 The Python module `python/pydantable/rust_engine.py` is the thin wrapper that invokes
 `execute_plan`, `execute_join`, and related functions on `_core` (no alternate engines).
 
