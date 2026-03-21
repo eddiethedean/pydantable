@@ -1,8 +1,9 @@
 # Pydantable Interface Contract (Polars-style)
 
 This document records the behavior contract that the typed DataFrame API guarantees.
-It is intended to be backend-agnostic at the *type/semantics* level, while allowing
-backend-specific physical ordering.
+It is intended to be independent of Python import style (default vs `pandas` / `pyspark` UI)
+at the *type/semantics* level, while allowing implementation-specific physical ordering
+(e.g. row order from `collect()`).
 
 ## Ordering
 

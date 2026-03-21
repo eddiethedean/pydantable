@@ -1,11 +1,11 @@
 # Pandas UI (`pydantable.pandas`)
 
-The **pandas UI** is an optional import surface that layers **pandas-like method and property names** on top of pydantable’s typed logical DataFrame. It does **not** wrap a `pandas.DataFrame` for the schema-driven `DataFrame` / `DataFrameModel` types; execution still goes through pydantable’s planner and backend (see [Execution Backends](BACKENDS.md)).
+The **pandas UI** is an optional import surface that layers **pandas-like method and property names** on top of pydantable’s typed logical DataFrame. It does **not** wrap a `pandas.DataFrame` for the schema-driven `DataFrame` / `DataFrameModel` types; execution uses the same **Rust engine** as the default export (see [Execution](EXECUTION.md)).
 
 ## When to use it
 
 - You prefer **`assign`**, **`merge`**, **`head`/`tail`**, and **`group_by().sum(...)`**-style ergonomics while keeping **Pydantic `DataFrameModel`** typing.
-- You want **`PYDANTABLE_BACKEND=pandas`** (or the pandas backend selected via `pydantable.pandas`) so `collect()`, joins, and aggregations run in the pandas executor.
+- You import **`pydantable.pandas`** explicitly for those names (or use the default `pydantable` export for Polars-style names).
 
 ```python
 from pydantable.pandas import DataFrameModel, Expr, Schema
@@ -22,11 +22,11 @@ df2 = df.assign(doubled=df.amount * 2)
 
 | Symbol | Role |
 |--------|------|
-| `DataFrame` | Subclass of core `DataFrame` with pandas-style helpers; backend name **`pandas`**. |
+| `DataFrame` | Subclass of core `DataFrame` with pandas-style helpers. |
 | `DataFrameModel` | Pydantic model whose `.df` / operations use `PandasDataFrame`. |
 | `Expr`, `Schema` | Same as top-level pydantable (re-exported for convenience). |
 
-Implementation lives in `python/pydantable/pandas_ui.py`; the public module is `python/pydantable/pandas.py`.
+Implementation lives in `python/pydantable/pandas.py` (pandas-flavored helpers and public `DataFrame` / `DataFrameModel`).
 
 ## `DataFrame` (pandas UI)
 
@@ -100,12 +100,11 @@ Properties **`columns`**, **`shape`**, **`empty`**, **`dtypes`** read from the i
 
 **`PandasGroupedDataFrameModel`** mirrors **`sum` / `mean` / `count`** on grouped models.
 
-## Relationship to the pandas backend
+## Relationship to the default export
 
-- **`from pydantable.pandas import DataFrameModel`** sets the **interface** to pandas naming and sets **`_backend = "pandas"`** on the frame class so execution uses the pandas executor when you `collect()` / join / aggregate.
-- You can also set **`PYDANTABLE_BACKEND=pandas`** and use the default **`from pydantable import DataFrameModel`** for Polars-style *names* with pandas *execution*—that is a different combination (see [BACKENDS.md](BACKENDS.md)).
+- **`from pydantable.pandas import DataFrameModel`** uses pandas-style method names on the same Rust execution path as **`from pydantable import DataFrameModel`**.
 
 ## Further reading
 
 - [Interface contract](INTERFACE_CONTRACT.md) — null semantics and join rules.
-- [Execution Backends](BACKENDS.md) — env var and module matrix.
+- [Execution](EXECUTION.md) — Rust engine overview.

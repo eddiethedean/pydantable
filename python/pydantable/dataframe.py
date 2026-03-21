@@ -15,8 +15,18 @@ from typing import (
 
 from pydantic import BaseModel
 
-from .backends import get_backend
 from .expressions import ColumnRef, Expr
+from .rust_engine import (
+    _require_rust_core,
+    execute_concat,
+    execute_explode,
+    execute_groupby_agg,
+    execute_join,
+    execute_melt,
+    execute_pivot,
+    execute_plan,
+    execute_unnest,
+)
 from .schema import (
     make_derived_schema_type,
     schema_field_types,
@@ -26,24 +36,6 @@ from .schema import (
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
-
-
-def _load_rust_core() -> Any:
-    try:
-        from . import _core as rust_core  # type: ignore
-
-        return rust_core
-    except ImportError:
-        return None
-
-
-_RUST_CORE = _load_rust_core()
-
-
-def _require_rust_core() -> Any:
-    if _RUST_CORE is None:
-        raise NotImplementedError("Rust extension is required for DataFrame execution.")
-    return _RUST_CORE
 
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
@@ -106,11 +98,10 @@ class DataFrame(Generic[SchemaT]):
     - Schema enforcement at DataFrame construction time.
     - Typed expression AST building.
     - Schema propagation through `select`, `filter`, `with_columns`.
-    - Pure-Python `collect()` execution for now.
+    - `collect()` materializes via the Rust engine.
     """
 
     _schema_type: type[BaseModel] | None = None
-    _backend: str = "polars"
 
     def __class_getitem__(cls, schema_type: Any) -> type[DataFrame[Any]]:
         if not isinstance(schema_type, type) or not issubclass(schema_type, BaseModel):
@@ -401,8 +392,7 @@ class DataFrame(Generic[SchemaT]):
         variable_name: str = "variable",
         value_name: str = "value",
     ) -> DataFrame[Any]:
-        backend = get_backend(self._backend)
-        out_data, schema_descriptors = backend.execute_melt(
+        out_data, schema_descriptors = execute_melt(
             self._rust_plan,
             self._root_data,
             [] if id_vars is None else list(id_vars),
@@ -461,8 +451,7 @@ class DataFrame(Generic[SchemaT]):
                 "pivot(columns=...) expects a column name or single-column ColumnRef."
             )
         value_cols = [values] if isinstance(values, str) else list(values)
-        backend = get_backend(self._backend)
-        out_data, schema_descriptors = backend.execute_pivot(
+        out_data, schema_descriptors = execute_pivot(
             self._rust_plan,
             self._root_data,
             index_cols,
@@ -484,8 +473,7 @@ class DataFrame(Generic[SchemaT]):
 
     def explode(self, columns: str | Sequence[str]) -> DataFrame[Any]:
         cols = [columns] if isinstance(columns, str) else list(columns)
-        backend = get_backend(self._backend)
-        out_data, schema_descriptors = backend.execute_explode(
+        out_data, schema_descriptors = execute_explode(
             self._rust_plan, self._root_data, cols
         )
         derived_fields = schema_from_descriptors(schema_descriptors)
@@ -502,8 +490,7 @@ class DataFrame(Generic[SchemaT]):
 
     def unnest(self, columns: str | Sequence[str]) -> DataFrame[Any]:
         cols = [columns] if isinstance(columns, str) else list(columns)
-        backend = get_backend(self._backend)
-        out_data, schema_descriptors = backend.execute_unnest(
+        out_data, schema_descriptors = execute_unnest(
             self._rust_plan, self._root_data, cols
         )
         derived_fields = schema_from_descriptors(schema_descriptors)
@@ -530,8 +517,6 @@ class DataFrame(Generic[SchemaT]):
     ) -> DataFrame[Any]:
         if not isinstance(other, DataFrame):
             raise TypeError("join(other=...) expects another DataFrame.")
-        if getattr(other, "_backend", "polars") != getattr(self, "_backend", "polars"):
-            raise ValueError("join between different backends is not supported yet.")
         if on is not None and (left_on is not None or right_on is not None):
             raise ValueError(
                 "join() use either on=... or left_on=/right_on=..., not both."
@@ -581,8 +566,7 @@ class DataFrame(Generic[SchemaT]):
                     "join() left_on and right_on must have the same length."
                 )
 
-        backend = get_backend(self._backend)
-        joined_data, schema_descriptors = backend.execute_join(
+        joined_data, schema_descriptors = execute_join(
             self._rust_plan,
             self._root_data,
             other._rust_plan,
@@ -750,19 +734,13 @@ class DataFrame(Generic[SchemaT]):
             by=[] if by is None else list(by),
         )
 
-    def collect(self, *, engine: str | None = None) -> dict[str, list[Any]]:
+    def collect(self) -> dict[str, list[Any]]:
         """
         Materialize this typed logical DataFrame into Python column data.
 
-        Execution is owned by Rust.
+        Execution uses the Rust engine.
         """
-        backend_name = self._backend
-        if engine is not None:
-            resolved = engine.lower()
-            backend_name = "polars" if resolved == "rust" else resolved
-
-        backend = get_backend(backend_name)
-        return backend.execute_plan(self._rust_plan, self._root_data)
+        return execute_plan(self._rust_plan, self._root_data)
 
     def to_dict(self) -> dict[str, list[Any]]:
         return self.collect()
@@ -777,16 +755,11 @@ class DataFrame(Generic[SchemaT]):
         if len(dfs) < 2:
             raise ValueError("concat() requires at least two DataFrame inputs.")
         base = dfs[0]
-        backend = get_backend(base._backend)
         out_data = base._root_data
         out_schema_type = base._current_schema_type
         out_plan = base._rust_plan
         for df in dfs[1:]:
-            if df._backend != base._backend:
-                raise ValueError(
-                    "concat between different backends is not supported yet."
-                )
-            out_data, schema_descriptors = backend.execute_concat(
+            out_data, schema_descriptors = execute_concat(
                 out_plan,
                 out_data,
                 df._rust_plan,
@@ -838,8 +811,7 @@ class GroupedDataFrame:
                 )
             agg_specs[out_name] = (op, in_col)
 
-        backend = get_backend(self._df._backend)
-        grouped_data, schema_descriptors = backend.execute_groupby_agg(
+        grouped_data, schema_descriptors = execute_groupby_agg(
             self._df._rust_plan,
             self._df._root_data,
             self._keys,

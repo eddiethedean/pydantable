@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 from conftest import assert_table_eq_sorted
-from pydantable.backends import get_backend
 from pydantable.pyspark import DataFrameModel
 
 
@@ -26,10 +25,10 @@ class TemporalRow(DataFrameModel):
     delta: timedelta | None
 
 
-def test_pyspark_interface_selects_backend() -> None:
+def test_pyspark_interface_is_spark_flavored_dataframe() -> None:
     df = Left({"id": [1], "bucket": ["A"], "ts": [0], "amount": [10]})
-    assert df._backend == "pyspark"
-    assert get_backend("pyspark").name == "pyspark"
+    assert hasattr(df, "withColumn")
+    assert df.collect() == {"id": [1], "bucket": ["A"], "ts": [0], "amount": [10]}
 
 
 def test_pyspark_interface_consolidated_pipeline() -> None:

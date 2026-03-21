@@ -3,9 +3,6 @@ from __future__ import annotations
 import os
 import sys
 
-# Ensure stable imports for docs builds.
-os.environ.setdefault("PYDANTABLE_BACKEND", "polars")
-
 # Make `python/` importable for autodoc.
 DOCS_ROOT = os.path.abspath(os.path.dirname(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(DOCS_ROOT, ".."))

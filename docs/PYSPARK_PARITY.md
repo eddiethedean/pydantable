@@ -29,12 +29,11 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `types` (Array, Map, nested Struct, Decimal, Timestamp) | **Partial** | Flat scalars only in engine; Phase F. |
 | `Row`, encoders, streaming | **Out of scope** | |
 
-For execution, the **pyspark** backend name still uses the Rust/Polars path unless
-a real PySpark backend is added.
+For execution, the PySpark UI uses the same Rust/Polars path as the default export.
 
 ### Phase B status (expression surface)
 
-Delivered in-tree: **`IsNull`**, **`IsNotNull`**, **`Coalesce`**, **`CaseWhen`** (`when` / `otherwise`), **`Cast`**, **`InList`**, **`Between`**, **`StringConcat`**, **`Substring`**, **`StringLength`** — Rust `ExprNode`, Polars lowering, pandas executor, and `pydantable.pyspark.sql.functions` / `Expr` methods.
+Delivered in-tree: **`IsNull`**, **`IsNotNull`**, **`Coalesce`**, **`CaseWhen`** (`when` / `otherwise`), **`Cast`**, **`InList`**, **`Between`**, **`StringConcat`**, **`Substring`**, **`StringLength`** — Rust `ExprNode`, Polars lowering, and `pydantable.pyspark.sql.functions` / `Expr` methods.
 
 **Deferred (still Phase B-adjacent):** rich **date/timestamp** expression helpers and other Spark string functions beyond concat / substring / length.
 

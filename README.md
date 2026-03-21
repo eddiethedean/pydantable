@@ -8,7 +8,7 @@ Pydantable keeps your Pydantic schemas as the source of truth for:
 - expression validity (type errors fail early during AST building)
 - derived schema migration through chained transforms
 
-Execution is dispatched through a backend boundary (default: Polars-style contract), with optional interface modules for `pandas` and `pyspark`.
+Execution always uses the Rust core; optional `pandas` / `pyspark` **UI modules** only change naming/imports (see `docs/EXECUTION.md`).
 
 ## What You Get
 
@@ -22,7 +22,7 @@ Typed, schema-safe transforms:
 - `DataFrameModel.collect()` for materialization into Python column data
 - `DataFrameModel.rows()` and `DataFrameModel.to_dicts()` for row-wise materialization
 
-## Backend Boundary (Polars-style by default)
+## Default API (Polars-style contract)
 
 Pydantable’s *default* exported interface emulates a Polars-style dataframe contract:
 
@@ -38,32 +38,18 @@ from pydantable.pyspark import DataFrameModel as PySparkDataFrameModel
 from pydantable import DataFrameModel as DefaultDataFrameModel
 ```
 
-### Select the backend at import time (env-var based)
-
-```python
-import os
-os.environ["PYDANTABLE_BACKEND"] = "polars"  # or "pandas" / "pyspark"
-```
-
-Then:
-
-```python
-from pydantable import DataFrameModel
-```
-
 ### `pandas` / `pyspark` interface modules
 
 `pydantable.pandas` and `pydantable.pyspark` are **alternate import surfaces**
-(pandas- or PySpark-style naming where applicable). The `pyspark` path uses the
-Rust core for execution. When `PYDANTABLE_BACKEND=pandas`, `execute_plan` uses
-the optional pandas runtime; other operations still use Rust. See `docs/BACKENDS.md`.
+(pandas- or PySpark-style naming where applicable). Execution is always the Rust
+core. See `docs/EXECUTION.md`.
 
 For PySpark-style projection helpers (`withColumn`, `withColumnRenamed`, `toDF`,
 `transform`, `select_typed`), see `docs/PYSPARK_INTERFACE.md`.
 
 See:
 
-- `docs/BACKENDS.md`
+- `docs/EXECUTION.md`
 - `docs/INTERFACE_CONTRACT.md`
 
 ## Quick Start
@@ -119,12 +105,13 @@ typing and `collect()`.
 
 ## Development & CI
 
-- Lint: `ruff check .`
+- Format + lint: `ruff format .` and `ruff check .`
 - Tests: `pytest -q`
-- CI runs the same test suite across backend selections via `PYDANTABLE_BACKEND`.
+- CI runs the full test suite against the Rust extension.
 
 ## Docs
 
+- `docs/EXECUTION.md` for the Rust execution model and UI modules
 - `docs/DATAFRAMEMODEL.md` for the `DataFrameModel` contract/design spec
 - `docs/FASTAPI.md` for end-to-end FastAPI integration examples
 - `docs/WHY_NOT_POLARS.md` for positioning + trade-offs

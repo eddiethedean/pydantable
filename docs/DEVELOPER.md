@@ -28,6 +28,7 @@ source .venv/bin/activate
 ## Repository Layout
 
 - `python/pydantable/`: thin Python API layer + Pydantic integration
+- `python/pydantable/rust_engine.py`: calls into `pydantable._core` for execution (single engine)
 - `pydantable-core/src/`: Rust core (`dtype`, `expr`, `plan`, PyO3 exports)
 - `tests/`: Python integration/unit tests for behavior contracts
 - `docs/`: product docs + roadmap/spec docs
@@ -54,9 +55,10 @@ Phase 4 boundary contract:
 .venv/bin/python -m pytest -q
 ```
 
-### Lint/type-check
+### Lint/format/type-check
 
 ```bash
+.venv/bin/ruff format .
 .venv/bin/ruff check .
 .venv/bin/basedpyright
 ```

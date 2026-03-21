@@ -19,6 +19,7 @@ The current primary FastAPI-facing API is `DataFrameModel`, a class that:
 
 See:
 - `docs/DATAFRAMEMODEL.md` for the DataFrameModel contract
+- `docs/EXECUTION.md` for the Rust execution model and optional UI modules
 - `docs/FASTAPI.md` for end-to-end FastAPI examples
 - `docs/WHY_NOT_POLARS.md` for positioning vs Polars
 
@@ -82,8 +83,8 @@ values stay aligned.
 ## Roadmap
 
 -   MVP schema + expressions
--   Rust backend and logical planning
--   Rust Polars execution engine
+-   Rust expression typing and logical planning (`pydantable-core`)
+-   Polars-backed execution via PyO3 (`pydantable._core`, called from `rust_engine.py`)
 -   Advanced query operations
 
 ## License

@@ -5,18 +5,8 @@ DataFrame contract.
 
 ## Select the interface
 
-Use import-based selection:
-
 ```python
 from pydantable.pyspark import DataFrameModel
-```
-
-Or environment-based selection:
-
-```python
-import os
-os.environ["PYDANTABLE_BACKEND"] = "pyspark"
-from pydantable import DataFrameModel
 ```
 
 ## Execution model
@@ -27,7 +17,7 @@ PySpark-style method names and ergonomics, not a separate Spark runtime.
 
 See:
 
-- `docs/BACKENDS.md`
+- `docs/EXECUTION.md`
 - `docs/INTERFACE_CONTRACT.md`
 
 ## PySpark select feature mapping

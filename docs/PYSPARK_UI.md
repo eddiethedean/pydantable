@@ -2,7 +2,7 @@
 
 The **PySpark UI** is an optional import surface that adds **Apache Spark–style names** (`withColumn`, `where`, `orderBy`, …) and a small **`pyspark.sql`-like** submodule on top of pydantable’s typed logical DataFrame. It is **not** the Apache Spark `DataFrame`; there is no JVM, no `SparkSession`, and no runtime dependency on the `pyspark` package.
 
-Execution uses pydantable’s Rust/Polars core for the **`pyspark`** backend name unless a future PySpark executor is added (see [Execution Backends](BACKENDS.md)).
+Execution uses pydantable’s Rust/Polars core (see [Execution](EXECUTION.md)).
 
 ## When to use it
 
@@ -25,12 +25,12 @@ out = df.withColumn("greeting", F.concat(F.col("name", dtype=str), F.lit("!")))
 
 | Symbol | Role |
 |--------|------|
-| `DataFrame` | Core logical `DataFrame` + Spark-like methods; **`_backend = "pyspark"`**. |
+| `DataFrame` | Core logical `DataFrame` + Spark-like methods (same Rust engine as default). |
 | `DataFrameModel` | Pydantic model; inner frame is the PySpark UI `DataFrame`. |
 | `Expr`, `Schema` | Re-exported from pydantable core. |
 | `sql` | Package with `functions`, `types`, `Column`, etc. |
 
-Implementation for the DataFrame wrappers is in `python/pydantable/pyspark/spark_ui.py`.
+Implementation for the DataFrame wrappers is in `python/pydantable/pyspark/dataframe.py`.
 
 ## `DataFrame` (PySpark UI)
 
@@ -82,10 +82,10 @@ Full coverage vs Spark is summarized in **[PySpark parity matrix](PYSPARK_PARITY
 - **`SparkSession`**, **`spark.sql("...")`**, streaming, catalogs.
 - **`Window`** and window functions (roadmapped separately).
 - Untyped **`F.col("x")`** without **`dtype=`** (pydantable requires static types at build time).
-- Interop with a real **`pyspark.sql.DataFrame`** unless a dedicated backend is added later.
+- Interop with a real **`pyspark.sql.DataFrame`** unless a dedicated integration is added later.
 
 ## Further reading
 
 - [PySpark parity matrix](PYSPARK_PARITY.md)
-- [Execution Backends](BACKENDS.md)
+- [Execution](EXECUTION.md)
 - [Interface contract](INTERFACE_CONTRACT.md)

@@ -19,10 +19,8 @@ class DataFrame(CoreDataFrame):
     PySpark-flavored method names on the typed logical DataFrame.
 
     This is not an Apache Spark DataFrame; execution uses the pydantable Rust
-    core (Polars engine) for the ``pyspark`` backend name.
+    core (Polars engine).
     """
-
-    _backend = "pyspark"
 
     @staticmethod
     def _as_pyspark_df(df: CoreDataFrame) -> DataFrame:

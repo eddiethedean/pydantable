@@ -41,8 +41,8 @@ Progress note:
 - Implemented on branch `v0.5.0`:
   - Rust plan/execution support for P1 unary methods and concat
   - Python `DataFrame` / `DataFrameModel` API parity for P1 methods
-  - backend protocol extended for concat execution
-  - tests expanded for API contracts and backend equivalence smoke coverage
+  - Rust `execute_concat` wired through `python/pydantable/rust_engine.py`
+  - tests expanded for API contracts and UI equivalence smoke coverage (`tests/test_ui_equivalence_smoke.py`)
 
 ## Phase P2: Null/type conversion operations
 
@@ -63,7 +63,7 @@ Progress note:
   - Rust expression AST adds `cast`, `is_null`, `is_not_null`
   - Rust planner/executor adds `fill_null` and `drop_nulls` (row-wise + Polars paths)
   - Python `Expr`, `DataFrame`, and `DataFrameModel` expose P2 methods
-  - contract and backend-equivalence tests added for fill/drop/cast/null-predicate behavior
+  - contract and UI-equivalence tests added for fill/drop/cast/null-predicate behavior
 
 ## Phase P3: Join parity expansion
 
@@ -101,7 +101,7 @@ Progress note:
 - Implemented on branch `v0.5.0`:
   - Rust group-by execution now supports `min`, `max`, `median`, `std`, `var`, `first`, `last`, `n_unique`
   - SQL-like all-null group semantics are preserved across nullable aggregate outputs
-  - Python aggregation API/docs updated and backend parity tests expanded for new operators
+  - Python aggregation API/docs updated and parity tests expanded for new operators
 
 ## Phase P5: Reshaping transformations
 
@@ -121,7 +121,7 @@ Progress note:
 - Implemented on branch `v0.5.0`:
   - Added reshape APIs for `melt`/`unpivot` and `pivot` with deterministic schema descriptors and naming contracts.
   - Added `explode`/`unnest` API entrypoints with explicit typed-contract errors until list/struct schema support is introduced.
-  - Expanded reshape contract tests, DataFrameModel schema checks, and backend parity smoke coverage.
+  - Expanded reshape contract tests, DataFrameModel schema checks, and UI equivalence smoke coverage.
 
 ## Phase P6: Window and time-series transformations
 
@@ -141,7 +141,7 @@ Progress note:
 - Implemented on branch `v0.5.0`:
   - Added temporal schema descriptor support (`datetime`, `date`, `duration`) across Rust/Python schema boundaries.
   - Added window/time-series API surface for `over`, `rolling_agg`, and `group_by_dynamic(...).agg(...)`.
-  - Expanded contracts, model/schema checks, and backend equivalence smoke coverage for P6 workflows.
+  - Expanded contracts, model/schema checks, and UI equivalence smoke coverage for P6 workflows.
   - Completed temporal execution/materialization + literal support across existing core/join/groupby/reshape/window feature paths.
 
 ## Phase P7: Stabilization and parity scorecard

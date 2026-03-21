@@ -66,7 +66,7 @@ def test_pandas_ui_merge_rejects_left_on() -> None:
         L({"a": [1]}).merge(R({"b": [1]}), on="a", left_on="a", right_on="b")
 
 
-def test_pandas_backend_matches_polars_for_pipeline() -> None:
+def test_pandas_ui_matches_default_for_pipeline() -> None:
     class UserP(PolarsDataFrameModel):
         id: int
         age: int | None

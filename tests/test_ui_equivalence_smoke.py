@@ -8,41 +8,41 @@ from conftest import assert_table_eq_sorted
 from pydantable import DataFrameModel as PolarsDataFrameModel
 
 
-@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
-def test_backend_equivalence_select_with_columns_filter_collect(
-    backend_mod: str,
+@pytest.mark.parametrize("ui_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_ui_equivalence_select_with_columns_filter_collect(
+    ui_mod: str,
 ) -> None:
-    backend = importlib.import_module(backend_mod)
-    BackendDataFrameModel = backend.DataFrameModel
+    pkg = importlib.import_module(ui_mod)
+    UiDataFrameModel = pkg.DataFrameModel
 
     class UserDefault(PolarsDataFrameModel):
         id: int
         age: int | None
 
-    class UserBackend(BackendDataFrameModel):
+    class UserUi(UiDataFrameModel):
         id: int
         age: int | None
 
     payload = {"id": [1, 2], "age": [20, None]}
 
     default_df = UserDefault(payload)
-    backend_df = UserBackend(payload)
+    ui_df = UserUi(payload)
 
     default_df2 = default_df.with_columns(age2=default_df.age * 2).select("id", "age2")
     default_out = default_df2.filter(default_df2.age2 > 10).collect()
 
-    backend_df2 = backend_df.with_columns(age2=backend_df.age * 2).select("id", "age2")
-    backend_out = backend_df2.filter(backend_df2.age2 > 10).collect()
+    ui_df2 = ui_df.with_columns(age2=ui_df.age * 2).select("id", "age2")
+    ui_out = ui_df2.filter(ui_df2.age2 > 10).collect()
 
-    assert_table_eq_sorted(default_out, backend_out, keys=["id"])
+    assert_table_eq_sorted(default_out, ui_out, keys=["id"])
 
 
-@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
-def test_backend_equivalence_join_and_groupby_all_null_semantics(
-    backend_mod: str,
+@pytest.mark.parametrize("ui_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_ui_equivalence_join_and_groupby_all_null_semantics(
+    ui_mod: str,
 ) -> None:
-    backend = importlib.import_module(backend_mod)
-    BackendDataFrameModel = backend.DataFrameModel
+    pkg = importlib.import_module(ui_mod)
+    UiDataFrameModel = pkg.DataFrameModel
 
     class LeftDefault(PolarsDataFrameModel):
         id: int
@@ -55,12 +55,12 @@ def test_backend_equivalence_join_and_groupby_all_null_semantics(
         country: str
         score: int
 
-    class LeftBackend(BackendDataFrameModel):
+    class LeftUi(UiDataFrameModel):
         id: int
         age: int | None
         score: int
 
-    class RightBackend(BackendDataFrameModel):
+    class RightUi(UiDataFrameModel):
         id: int
         age: int | None
         country: str
@@ -76,15 +76,15 @@ def test_backend_equivalence_join_and_groupby_all_null_semantics(
 
     default_left = LeftDefault(left_payload)
     default_right = RightDefault(right_payload)
-    backend_left = LeftBackend(left_payload)
-    backend_right = RightBackend(right_payload)
+    ui_left = LeftUi(left_payload)
+    ui_right = RightUi(right_payload)
 
     default_joined = default_left.join(default_right, on="id", how="inner", suffix="_r")
-    backend_joined = backend_left.join(backend_right, on="id", how="inner", suffix="_r")
+    ui_joined = ui_left.join(ui_right, on="id", how="inner", suffix="_r")
 
     default_join_out = default_joined.collect()
-    backend_join_out = backend_joined.collect()
-    assert_table_eq_sorted(default_join_out, backend_join_out, keys=["id"])
+    ui_join_out = ui_joined.collect()
+    assert_table_eq_sorted(default_join_out, ui_join_out, keys=["id"])
 
     # all-null group semantics: sum/mean -> None, count -> 0
     default_grouped = default_joined.group_by("id").agg(
@@ -92,33 +92,33 @@ def test_backend_equivalence_join_and_groupby_all_null_semantics(
         age_mean=("mean", "age"),
         age_count=("count", "age"),
     )
-    backend_grouped = backend_joined.group_by("id").agg(
+    ui_grouped = ui_joined.group_by("id").agg(
         age_sum=("sum", "age"),
         age_mean=("mean", "age"),
         age_count=("count", "age"),
     )
 
     default_group_out = default_grouped.collect()
-    backend_group_out = backend_grouped.collect()
-    assert_table_eq_sorted(default_group_out, backend_group_out, keys=["id"])
+    ui_group_out = ui_grouped.collect()
+    assert_table_eq_sorted(default_group_out, ui_group_out, keys=["id"])
 
 
-@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
-def test_backend_equivalence_p1_unary_and_concat(backend_mod: str) -> None:
-    backend = importlib.import_module(backend_mod)
-    BackendDataFrameModel = backend.DataFrameModel
+@pytest.mark.parametrize("ui_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_ui_equivalence_p1_unary_and_concat(ui_mod: str) -> None:
+    pkg = importlib.import_module(ui_mod)
+    UiDataFrameModel = pkg.DataFrameModel
 
     class UserDefault(PolarsDataFrameModel):
         id: int
         age: int | None
 
-    class UserBackend(BackendDataFrameModel):
+    class UserUi(UiDataFrameModel):
         id: int
         age: int | None
 
     payload = {"id": [3, 1, 2, 2], "age": [30, None, 20, 20]}
     default_df = UserDefault(payload)
-    backend_df = UserBackend(payload)
+    ui_df = UserUi(payload)
 
     default_out = (
         default_df.sort("id")
@@ -127,42 +127,42 @@ def test_backend_equivalence_p1_unary_and_concat(backend_mod: str) -> None:
         .slice(1, 2)
         .collect()
     )
-    backend_out = (
-        backend_df.sort("id")
+    ui_out = (
+        ui_df.sort("id")
         .unique(subset=["id", "age"])
         .rename({"age": "years"})
         .slice(1, 2)
         .collect()
     )
-    assert_table_eq_sorted(default_out, backend_out, keys=["id"])
+    assert_table_eq_sorted(default_out, ui_out, keys=["id"])
 
     default_cat = PolarsDataFrameModel.concat(
         [default_df.select("id"), default_df.select("id")], how="vertical"
     ).collect()
-    backend_cat = BackendDataFrameModel.concat(
-        [backend_df.select("id"), backend_df.select("id")], how="vertical"
+    ui_cat = UiDataFrameModel.concat(
+        [ui_df.select("id"), ui_df.select("id")], how="vertical"
     ).collect()
-    assert_table_eq_sorted(default_cat, backend_cat, keys=["id"])
+    assert_table_eq_sorted(default_cat, ui_cat, keys=["id"])
 
 
-@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
-def test_backend_equivalence_p2_fill_drop_cast_null_predicates(
-    backend_mod: str,
+@pytest.mark.parametrize("ui_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_ui_equivalence_p2_fill_drop_cast_null_predicates(
+    ui_mod: str,
 ) -> None:
-    backend = importlib.import_module(backend_mod)
-    BackendDataFrameModel = backend.DataFrameModel
+    pkg = importlib.import_module(ui_mod)
+    UiDataFrameModel = pkg.DataFrameModel
 
     class UserDefault(PolarsDataFrameModel):
         id: int
         age: int | None
 
-    class UserBackend(BackendDataFrameModel):
+    class UserUi(UiDataFrameModel):
         id: int
         age: int | None
 
     payload = {"id": [1, 2, 3], "age": [10, None, 30]}
     default_df = UserDefault(payload)
-    backend_df = UserBackend(payload)
+    ui_df = UserUi(payload)
 
     default_out = (
         default_df.fill_null(0, subset=["age"])
@@ -172,21 +172,21 @@ def test_backend_equivalence_p2_fill_drop_cast_null_predicates(
         .drop_nulls(subset=["age"])
         .collect()
     )
-    backend_out = (
-        backend_df.fill_null(0, subset=["age"])
+    ui_out = (
+        ui_df.fill_null(0, subset=["age"])
         .with_columns(
-            age_f=backend_df.age.cast(float), age_is_null=backend_df.age.is_null()
+            age_f=ui_df.age.cast(float), age_is_null=ui_df.age.is_null()
         )
         .drop_nulls(subset=["age"])
         .collect()
     )
-    assert_table_eq_sorted(default_out, backend_out, keys=["id"])
+    assert_table_eq_sorted(default_out, ui_out, keys=["id"])
 
 
-@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
-def test_backend_equivalence_p3_join_variants_and_expr_keys(backend_mod: str) -> None:
-    backend = importlib.import_module(backend_mod)
-    BackendDataFrameModel = backend.DataFrameModel
+@pytest.mark.parametrize("ui_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_ui_equivalence_p3_join_variants_and_expr_keys(ui_mod: str) -> None:
+    pkg = importlib.import_module(ui_mod)
+    UiDataFrameModel = pkg.DataFrameModel
 
     class LeftDefault(PolarsDataFrameModel):
         id: int
@@ -199,12 +199,12 @@ def test_backend_equivalence_p3_join_variants_and_expr_keys(backend_mod: str) ->
         country: str
         score: int
 
-    class LeftBackend(BackendDataFrameModel):
+    class LeftUi(UiDataFrameModel):
         id: int
         age: int | None
         score: int
 
-    class RightBackend(BackendDataFrameModel):
+    class RightUi(UiDataFrameModel):
         id: int
         age: int | None
         country: str
@@ -220,8 +220,8 @@ def test_backend_equivalence_p3_join_variants_and_expr_keys(backend_mod: str) ->
 
     d_left = LeftDefault(left_payload)
     d_right = RightDefault(right_payload)
-    b_left = LeftBackend(left_payload)
-    b_right = RightBackend(right_payload)
+    b_left = LeftUi(left_payload)
+    b_right = RightUi(right_payload)
 
     for how in ["right", "semi", "anti", "cross"]:
         if how == "cross":
@@ -243,22 +243,22 @@ def test_backend_equivalence_p3_join_variants_and_expr_keys(backend_mod: str) ->
     assert_table_eq_sorted(d_expr, b_expr, keys=["id"])
 
 
-@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
-def test_backend_equivalence_p4_groupby_aggregations(backend_mod: str) -> None:
-    backend = importlib.import_module(backend_mod)
-    BackendDataFrameModel = backend.DataFrameModel
+@pytest.mark.parametrize("ui_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_ui_equivalence_p4_groupby_aggregations(ui_mod: str) -> None:
+    pkg = importlib.import_module(ui_mod)
+    UiDataFrameModel = pkg.DataFrameModel
 
     class UserDefault(PolarsDataFrameModel):
         id: int
         age: int | None
 
-    class UserBackend(BackendDataFrameModel):
+    class UserUi(UiDataFrameModel):
         id: int
         age: int | None
 
     payload = {"id": [1, 1, 2, 2], "age": [10, None, 20, 30]}
     d_df = UserDefault(payload)
-    b_df = UserBackend(payload)
+    b_df = UserUi(payload)
 
     d_out = (
         d_df.group_by("id")
@@ -291,17 +291,17 @@ def test_backend_equivalence_p4_groupby_aggregations(backend_mod: str) -> None:
     assert_table_eq_sorted(d_out, b_out, keys=["id"])
 
 
-@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
-def test_backend_equivalence_p5_reshape_ops(backend_mod: str) -> None:
-    backend = importlib.import_module(backend_mod)
-    BackendDataFrameModel = backend.DataFrameModel
+@pytest.mark.parametrize("ui_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_ui_equivalence_p5_reshape_ops(ui_mod: str) -> None:
+    pkg = importlib.import_module(ui_mod)
+    UiDataFrameModel = pkg.DataFrameModel
 
     class UserDefault(PolarsDataFrameModel):
         id: int
         key: str
         age: int | None
 
-    class UserBackend(BackendDataFrameModel):
+    class UserUi(UiDataFrameModel):
         id: int
         key: str
         age: int | None
@@ -312,7 +312,7 @@ def test_backend_equivalence_p5_reshape_ops(backend_mod: str) -> None:
         "age": [10, None, 20, 30],
     }
     d_df = UserDefault(payload)
-    b_df = UserBackend(payload)
+    b_df = UserUi(payload)
 
     d_melt = d_df.melt(id_vars=["id"], value_vars=["age"]).collect()
     b_melt = b_df.melt(id_vars=["id"], value_vars=["age"]).collect()
@@ -327,17 +327,17 @@ def test_backend_equivalence_p5_reshape_ops(backend_mod: str) -> None:
     assert_table_eq_sorted(d_pivot, b_pivot, keys=["id"])
 
 
-@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
-def test_backend_equivalence_p6_rolling_and_dynamic(backend_mod: str) -> None:
-    backend = importlib.import_module(backend_mod)
-    BackendDataFrameModel = backend.DataFrameModel
+@pytest.mark.parametrize("ui_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_ui_equivalence_p6_rolling_and_dynamic(ui_mod: str) -> None:
+    pkg = importlib.import_module(ui_mod)
+    UiDataFrameModel = pkg.DataFrameModel
 
     class TSDefault(PolarsDataFrameModel):
         id: int
         ts: int
         v: int | None
 
-    class TSBackend(BackendDataFrameModel):
+    class TSUi(UiDataFrameModel):
         id: int
         ts: int
         v: int | None
@@ -348,7 +348,7 @@ def test_backend_equivalence_p6_rolling_and_dynamic(backend_mod: str) -> None:
         "v": [10, None, 30, 5],
     }
     d_df = TSDefault(payload)
-    b_df = TSBackend(payload)
+    b_df = TSUi(payload)
 
     d_roll = d_df.rolling_agg(
         on="ts", column="v", window_size="2h", op="sum", out_name="v_roll", by=["id"]
@@ -371,10 +371,10 @@ def test_backend_equivalence_p6_rolling_and_dynamic(backend_mod: str) -> None:
     assert_table_eq_sorted(d_dyn, b_dyn, keys=["id", "ts"])
 
 
-@pytest.mark.parametrize("backend_mod", ["pydantable.pandas", "pydantable.pyspark"])
-def test_backend_equivalence_temporal_columns_and_literals(backend_mod: str) -> None:
-    backend = importlib.import_module(backend_mod)
-    BackendDataFrameModel = backend.DataFrameModel
+@pytest.mark.parametrize("ui_mod", ["pydantable.pandas", "pydantable.pyspark"])
+def test_ui_equivalence_temporal_columns_and_literals(ui_mod: str) -> None:
+    pkg = importlib.import_module(ui_mod)
+    UiDataFrameModel = pkg.DataFrameModel
 
     class TDefault(PolarsDataFrameModel):
         id: int
@@ -382,7 +382,7 @@ def test_backend_equivalence_temporal_columns_and_literals(backend_mod: str) -> 
         d: date
         dur: timedelta
 
-    class TBackend(BackendDataFrameModel):
+    class TUi(UiDataFrameModel):
         id: int
         ts: datetime
         d: date
@@ -395,7 +395,7 @@ def test_backend_equivalence_temporal_columns_and_literals(backend_mod: str) -> 
         "dur": [timedelta(hours=1), timedelta(hours=2)],
     }
     d_df = TDefault(payload)
-    b_df = TBackend(payload)
+    b_df = TUi(payload)
 
     d_out = d_df.filter(d_df.ts > datetime(2024, 1, 1, 12, 0, 0)).collect()
     b_out = b_df.filter(b_df.ts > datetime(2024, 1, 1, 12, 0, 0)).collect()
