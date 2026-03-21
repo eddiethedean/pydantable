@@ -104,12 +104,10 @@ class DataFrameModel:
     def __init__(
         self,
         data: Mapping[str, Any] | Sequence[Mapping[str, Any]],
-        *,
-        strict: bool = True,
-    ):
+    ) -> None:
         normalized = _normalize_input(data=data, row_model=self.RowModel)
         dataframe_cls = cast("Any", self._dataframe_cls)
-        self._df = dataframe_cls[self._SchemaModel](normalized, strict=strict)
+        self._df = dataframe_cls[self._SchemaModel](normalized)
 
     @classmethod
     def _derived_model_type(

@@ -112,14 +112,11 @@ class DataFrame(Generic[SchemaT]):
         # because it triggers `__class_getitem__` again.
         return type(name, (cls,), {"_schema_type": schema_type})
 
-    def __init__(self, data: Mapping[str, Sequence[Any]], *, strict: bool = True):
+    def __init__(self, data: Mapping[str, Sequence[Any]]) -> None:
         if self._schema_type is None:
             raise TypeError(
                 "Use DataFrame[SchemaType](data) to construct a typed DataFrame."
             )
-
-        if not strict:
-            raise NotImplementedError("Non-strict mode is not implemented in 0.5.0.")
 
         root_data = validate_columns_strict(data, self._schema_type)
         self._root_data: dict[str, list[Any]] = root_data
@@ -782,9 +779,7 @@ class GroupedDataFrame:
         self._df = df
         self._keys = list(keys)
 
-    def agg(
-        self, **aggregations: tuple[str, str] | tuple[str, ColumnRef]
-    ) -> DataFrame[Any]:
+    def agg(self, **aggregations: tuple[str, str] | tuple[str, Expr]) -> DataFrame[Any]:
         agg_specs: dict[str, tuple[str, str]] = {}
         for out_name, spec in aggregations.items():
             if not isinstance(spec, tuple) or len(spec) != 2:
@@ -807,7 +802,8 @@ class GroupedDataFrame:
                 in_col = next(iter(referenced))
             else:
                 raise TypeError(
-                    "Aggregation column must be a column name or ColumnRef."
+                    "Aggregation column must be a column name or Expr "
+                    "referencing one column."
                 )
             agg_specs[out_name] = (op, in_col)
 
@@ -875,6 +871,12 @@ class DynamicGroupedDataFrame:
         times = [self._to_seconds(v) for v in data[self._index]]
         every = self._seconds(self._every)
         period = self._seconds(self._period)
+        if every <= 0 or period <= 0:
+            raise ValueError(
+                "group_by_dynamic() requires positive every= and period= durations "
+                f"(got every={self._every!r} -> {every}, "
+                f"period={self._period!r} -> {period})."
+            )
         t_min = min(times) if times else 0.0
         t_max = max(times) if times else 0.0
         start = t_min

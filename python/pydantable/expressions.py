@@ -1,26 +1,9 @@
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
-
-def _load_rust_core() -> Any:
-    try:
-        from . import _core as rust_core  # type: ignore
-
-        return rust_core
-    except ImportError:
-        return None
-
-
-_RUST_CORE = _load_rust_core()
-
-
-def _require_rust_core() -> Any:
-    if _RUST_CORE is None:
-        raise NotImplementedError(
-            "Rust extension is required for typed expression building."
-        )
-    return _RUST_CORE
+from .rust_engine import _require_rust_core
 
 
 class Expr:  # type: ignore[override]
@@ -84,10 +67,14 @@ class Expr:  # type: ignore[override]
         partition_by: str | list[str] | tuple[str, ...] | None = None,
         order_by: str | list[str] | tuple[str, ...] | None = None,
     ) -> Expr:
-        # Placeholder API surface for phase P6. Current execution paths do not
-        # yet model full window-expression AST lowering.
-        _ = partition_by
-        _ = order_by
+        if partition_by is not None or order_by is not None:
+            warnings.warn(
+                "Expr.over(partition_by=..., order_by=...) is not yet implemented; "
+                "arguments are ignored and the expression is evaluated without "
+                "window framing.",
+                UserWarning,
+                stacklevel=2,
+            )
         return self
 
     # Arithmetic

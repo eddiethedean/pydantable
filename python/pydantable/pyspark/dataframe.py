@@ -276,7 +276,7 @@ class DataFrameModel(CoreDataFrameModel):
         od = other._df if isinstance(other, DataFrameModel) else other
         return cast("DataFrameModel", self._from_dataframe(self._df.union(od)))
 
-    def unionAll(self, other: DataFrame) -> DataFrameModel:
+    def unionAll(self, other: DataFrameModel | DataFrame) -> DataFrameModel:
         return self.union(other)
 
     @property

@@ -223,9 +223,38 @@ def test_p6_rolling_agg_and_dynamic_groupby() -> None:
     assert "v_sum" in d_out and "v_count" in d_out
 
 
-def test_p6_expr_over_api_surface() -> None:
+def test_group_by_dynamic_rejects_non_positive_every() -> None:
+    class TS(Schema):
+        id: int
+        ts: int
+        v: int | None
+
+    df = DataFrame[TS](
+        {
+            "id": [1],
+            "ts": [0],
+            "v": [1],
+        }
+    )
+    with pytest.raises(ValueError, match="positive every"):
+        df.group_by_dynamic("ts", every="0s", by=["id"]).agg(v_sum=("sum", "v"))
+
+
+def test_p6_expr_over_without_args_no_warning() -> None:
+    import warnings
+
     df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
-    expr = (df.age + 1).over(partition_by="id", order_by="age")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        expr = (df.age + 1).over()
+    out = df.with_columns(age2=expr).collect()
+    assert out["age2"] == [21, 31]
+
+
+def test_p6_expr_over_warns_when_partition_or_order_given() -> None:
+    df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
+    with pytest.warns(UserWarning, match="not yet implemented"):
+        expr = (df.age + 1).over(partition_by="id", order_by="age")
     out = df.with_columns(age2=expr).collect()
     assert out["age2"] == [21, 31]
 

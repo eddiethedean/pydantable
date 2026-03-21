@@ -87,9 +87,9 @@ Supported reshape methods:
 ## Window and time-series semantics
 
 Supported P6 API surface:
-- `Expr.over(partition_by=..., order_by=...)` (window-expression surface)
+- `Expr.over(partition_by=..., order_by=...)` exists for API compatibility, but **window framing is not implemented yet**. Calling `.over()` with no arguments is silent; if you pass `partition_by` or `order_by`, pydantable emits a **runtime warning** and still evaluates the underlying expression as a non-window expression (no partition/order semantics).
 - `rolling_agg(...)`
-- `group_by_dynamic(...).agg(...)`
+- `group_by_dynamic(...).agg(...)` requires **positive** `every` and `period` duration strings (e.g. `every="0s"` raises `ValueError` to avoid infinite loops in the reference dynamic implementation).
 
 Temporal typing:
 - Schema descriptors support `datetime`, `date`, and `duration` base types (including nullable variants).
