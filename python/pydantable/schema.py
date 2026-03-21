@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel, ConfigDict, TypeAdapter, create_model
 
@@ -92,10 +92,16 @@ def make_derived_schema_type(
     # Make derived schemas strict by inheriting from our `Schema` base.
     # If the user passed a custom BaseModel subclass, we still want strict
     # `extra="forbid"` behavior.
-    derived = create_model(  # type: ignore[call-overload]
+    # `create_model` stubs expose many keyword-only params (`__config__`, …). Unpacking
+    # `**{ name: (type, ...) }` makes Pyright match each tuple against those params.
+    # Widen the mapping for `**` so values are treated as dynamic field definitions.
+    field_definitions: dict[str, Any] = {
+        name: (t, ...) for name, t in field_types.items()
+    }
+    derived = create_model(
         f"{base_schema_type.__name__}Derived",
         __base__=Schema,
-        **{name: (t, ...) for name, t in field_types.items()},
+        **cast("Any", field_definitions),
     )
     return derived
 

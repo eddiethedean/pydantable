@@ -174,9 +174,7 @@ def test_ui_equivalence_p2_fill_drop_cast_null_predicates(
     )
     ui_out = (
         ui_df.fill_null(0, subset=["age"])
-        .with_columns(
-            age_f=ui_df.age.cast(float), age_is_null=ui_df.age.is_null()
-        )
+        .with_columns(age_f=ui_df.age.cast(float), age_is_null=ui_df.age.is_null())
         .drop_nulls(subset=["age"])
         .collect()
     )
