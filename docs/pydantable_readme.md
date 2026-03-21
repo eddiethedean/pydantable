@@ -43,7 +43,7 @@ print(result)  # {"id": [2], "age2": [60]}
 
 ## Current Repository Status
 
-In the `0.4.0` skeleton, `DataFrameModel` is available as the primary
+In the `0.5.0` release, `DataFrameModel` is available as the primary
 FastAPI-facing API, backed by the same typed expression and Rust execution core
 as the lower-level `DataFrame[Schema]` API.
 

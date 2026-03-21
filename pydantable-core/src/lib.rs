@@ -76,7 +76,7 @@ impl PyPlan {
 
 #[pyfunction]
 fn rust_version() -> &'static str {
-    "0.4.0-skeleton-rust"
+    "0.5.0"
 }
 
 #[pyfunction]

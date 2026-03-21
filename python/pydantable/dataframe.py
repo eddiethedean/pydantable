@@ -119,7 +119,7 @@ class DataFrame(Generic[SchemaT]):
             )
 
         if not strict:
-            raise NotImplementedError("Non-strict mode is not implemented in 0.4.0.")
+            raise NotImplementedError("Non-strict mode is not implemented in 0.5.0.")
 
         root_data = validate_columns_strict(data, self._schema_type)
         self._root_data: dict[str, list[Any]] = root_data
