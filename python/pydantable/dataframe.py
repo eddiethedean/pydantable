@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -238,91 +239,292 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
-    def limit(self, n: int) -> DataFrame[Any]:
-        if n < 0:
-            raise ValueError("limit(n) expects n >= 0.")
-        rust = _require_rust_core()
-        rust_plan = rust.plan_limit(self._rust_plan, n)
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=self._current_schema_type,
-            rust_plan=rust_plan,
-        )
-
-    def order_by(
-        self,
-        *columns: str,
-        ascending: bool | list[bool] | None = None,
+    def sort(
+        self, *by: str | ColumnRef, descending: bool | Sequence[bool] = False
     ) -> DataFrame[Any]:
-        if not columns:
-            raise ValueError("order_by() requires at least one column name.")
         rust = _require_rust_core()
-        asc_list: list[bool] | None
-        if ascending is None:
-            asc_list = None
-        elif isinstance(ascending, bool):
-            asc_list = [ascending]
+        keys: list[str] = []
+        for key in by:
+            if isinstance(key, str):
+                keys.append(key)
+            elif isinstance(key, Expr):
+                referenced = key.referenced_columns()
+                if len(referenced) != 1:
+                    raise TypeError(
+                        "sort() accepts column names or a ColumnRef expression."
+                    )
+                keys.append(next(iter(referenced)))
+            else:
+                raise TypeError("sort() accepts column names or ColumnRef objects.")
+
+        desc = (
+            [descending] * len(keys)
+            if isinstance(descending, bool)
+            else list(descending)
+        )
+        rust_plan = rust.plan_sort(self._rust_plan, keys, desc)
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def unique(
+        self,
+        subset: Sequence[str] | None = None,
+        *,
+        keep: str = "first",
+    ) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        rust_plan = rust.plan_unique(
+            self._rust_plan, None if subset is None else list(subset), keep
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def distinct(
+        self,
+        subset: Sequence[str] | None = None,
+        *,
+        keep: str = "first",
+    ) -> DataFrame[Any]:
+        return self.unique(subset=subset, keep=keep)
+
+    def drop(self, *columns: str | ColumnRef) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        selected: list[str] = []
+        for col in columns:
+            if isinstance(col, str):
+                selected.append(col)
+            elif isinstance(col, Expr):
+                referenced = col.referenced_columns()
+                if len(referenced) != 1:
+                    raise TypeError(
+                        "drop() accepts column names or a ColumnRef expression."
+                    )
+                selected.append(next(iter(referenced)))
+            else:
+                raise TypeError("drop() accepts column names or ColumnRef objects.")
+        rust_plan = rust.plan_drop(self._rust_plan, selected)
+        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def rename(self, columns: Mapping[str, str]) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        rust_plan = rust.plan_rename(self._rust_plan, dict(columns))
+        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def slice(self, offset: int, length: int) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        rust_plan = rust.plan_slice(self._rust_plan, int(offset), int(length))
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def head(self, n: int = 5) -> DataFrame[Any]:
+        return self.slice(0, n)
+
+    def tail(self, n: int = 5) -> DataFrame[Any]:
+        return self.slice(-n, n)
+
+    def fill_null(
+        self,
+        value: Any = None,
+        *,
+        strategy: str | None = None,
+        subset: Sequence[str] | None = None,
+    ) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        if value is None and strategy is None:
+            raise ValueError("fill_null() requires either value or strategy.")
+        if value is not None and strategy is not None:
+            raise ValueError("fill_null() accepts value or strategy, not both.")
+        rust_plan = rust.plan_fill_null(
+            self._rust_plan,
+            None if subset is None else list(subset),
+            value,
+            strategy,
+        )
+        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def drop_nulls(self, subset: Sequence[str] | None = None) -> DataFrame[Any]:
+        rust = _require_rust_core()
+        rust_plan = rust.plan_drop_nulls(
+            self._rust_plan, None if subset is None else list(subset)
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def melt(
+        self,
+        *,
+        id_vars: Sequence[str] | None = None,
+        value_vars: Sequence[str] | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+    ) -> DataFrame[Any]:
+        backend = get_backend(self._backend)
+        out_data, schema_descriptors = backend.execute_melt(
+            self._rust_plan,
+            self._root_data,
+            [] if id_vars is None else list(id_vars),
+            None if value_vars is None else list(value_vars),
+            variable_name,
+            value_name,
+        )
+        derived_fields = schema_from_descriptors(schema_descriptors)
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        rust_plan = _require_rust_core().make_plan(derived_fields)
+        return self._from_plan(
+            root_data=out_data,
+            root_schema_type=derived_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def unpivot(
+        self,
+        *,
+        index: Sequence[str] | None = None,
+        on: Sequence[str] | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+    ) -> DataFrame[Any]:
+        return self.melt(
+            id_vars=index,
+            value_vars=on,
+            variable_name=variable_name,
+            value_name=value_name,
+        )
+
+    def pivot(
+        self,
+        *,
+        index: str | Sequence[str],
+        columns: str | ColumnRef,
+        values: str | Sequence[str],
+        aggregate_function: str = "first",
+    ) -> DataFrame[Any]:
+        index_cols = [index] if isinstance(index, str) else list(index)
+        if isinstance(columns, str):
+            columns_col = columns
+        elif isinstance(columns, Expr):
+            referenced = columns.referenced_columns()
+            if len(referenced) != 1:
+                raise TypeError(
+                    "pivot(columns=...) expects a column name or "
+                    "single-column ColumnRef."
+                )
+            columns_col = next(iter(referenced))
         else:
-            asc_list = list(ascending)
-        rust_plan = rust.plan_sort(self._rust_plan, list(columns), asc_list)
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=self._current_schema_type,
-            rust_plan=rust_plan,
+            raise TypeError(
+                "pivot(columns=...) expects a column name or single-column ColumnRef."
+            )
+        value_cols = [values] if isinstance(values, str) else list(values)
+        backend = get_backend(self._backend)
+        out_data, schema_descriptors = backend.execute_pivot(
+            self._rust_plan,
+            self._root_data,
+            index_cols,
+            columns_col,
+            value_cols,
+            aggregate_function,
         )
-
-    def drop(self, *cols: str) -> DataFrame[Any]:
-        if not cols:
-            raise ValueError("drop() requires at least one column name.")
-        rust = _require_rust_core()
-        rust_plan = rust.plan_drop(self._rust_plan, list(cols))
-        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
+        derived_fields = schema_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
+        rust_plan = _require_rust_core().make_plan(derived_fields)
         return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
+            root_data=out_data,
+            root_schema_type=derived_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
         )
 
-    def distinct(self) -> DataFrame[Any]:
-        rust = _require_rust_core()
-        rust_plan = rust.plan_distinct(self._rust_plan)
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=self._current_schema_type,
-            rust_plan=rust_plan,
+    def explode(self, columns: str | Sequence[str]) -> DataFrame[Any]:
+        cols = [columns] if isinstance(columns, str) else list(columns)
+        backend = get_backend(self._backend)
+        out_data, schema_descriptors = backend.execute_explode(
+            self._rust_plan, self._root_data, cols
         )
-
-    def with_column_renamed(self, existing: str, new: str) -> DataFrame[Any]:
-        rust = _require_rust_core()
-        rust_plan = rust.plan_rename_column(self._rust_plan, existing, new)
-        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
+        derived_fields = schema_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
+        rust_plan = _require_rust_core().make_plan(derived_fields)
         return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
+            root_data=out_data,
+            root_schema_type=derived_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
         )
 
-    def union(self, other: DataFrame[Any]) -> DataFrame[Any]:
-        raise NotImplementedError(
-            "union() is not implemented; use a single DataFrame or extend the engine with concat."
+    def unnest(self, columns: str | Sequence[str]) -> DataFrame[Any]:
+        cols = [columns] if isinstance(columns, str) else list(columns)
+        backend = get_backend(self._backend)
+        out_data, schema_descriptors = backend.execute_unnest(
+            self._rust_plan, self._root_data, cols
+        )
+        derived_fields = schema_from_descriptors(schema_descriptors)
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        rust_plan = _require_rust_core().make_plan(derived_fields)
+        return self._from_plan(
+            root_data=out_data,
+            root_schema_type=derived_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
         )
 
     def join(
         self,
         other: DataFrame[Any],
         *,
-        on: str | Sequence[str],
+        on: str | Sequence[str] | None = None,
+        left_on: str | Expr | Sequence[str | Expr] | None = None,
+        right_on: str | Expr | Sequence[str | Expr] | None = None,
         how: str = "inner",
         suffix: str = "_right",
     ) -> DataFrame[Any]:
@@ -330,7 +532,54 @@ class DataFrame(Generic[SchemaT]):
             raise TypeError("join(other=...) expects another DataFrame.")
         if getattr(other, "_backend", "polars") != getattr(self, "_backend", "polars"):
             raise ValueError("join between different backends is not supported yet.")
-        keys = [on] if isinstance(on, str) else list(on)
+        if on is not None and (left_on is not None or right_on is not None):
+            raise ValueError(
+                "join() use either on=... or left_on=/right_on=..., not both."
+            )
+
+        def _resolve_keys(keys: str | Expr | Sequence[str | Expr] | None) -> list[str]:
+            if keys is None:
+                return []
+            raw: list[str | Expr] = (
+                [keys] if isinstance(keys, (str, Expr)) else list(keys)
+            )
+            out: list[str] = []
+            for key in raw:
+                if isinstance(key, str):
+                    out.append(key)
+                elif isinstance(key, Expr):
+                    referenced = key.referenced_columns()
+                    if len(referenced) != 1:
+                        raise TypeError(
+                            "join expression keys must reference exactly one column."
+                        )
+                    out.append(next(iter(referenced)))
+                else:
+                    raise TypeError(
+                        "join keys must be str, Expr, or sequences thereof."
+                    )
+            return out
+
+        if on is not None:
+            left_keys = [on] if isinstance(on, str) else list(on)
+            right_keys = list(left_keys)
+        else:
+            left_keys = _resolve_keys(left_on)
+            right_keys = _resolve_keys(right_on)
+
+        if how == "cross":
+            if left_keys or right_keys:
+                raise ValueError("cross join does not accept on/left_on/right_on keys.")
+        else:
+            if not left_keys or not right_keys:
+                raise ValueError(
+                    "join() requires on=... or both left_on=... "
+                    "and right_on=... for non-cross joins."
+                )
+            if len(left_keys) != len(right_keys):
+                raise ValueError(
+                    "join() left_on and right_on must have the same length."
+                )
 
         backend = get_backend(self._backend)
         joined_data, schema_descriptors = backend.execute_join(
@@ -338,7 +587,8 @@ class DataFrame(Generic[SchemaT]):
             self._root_data,
             other._rust_plan,
             other._root_data,
-            keys,
+            left_keys,
+            right_keys,
             how,
             suffix,
         )
@@ -372,6 +622,134 @@ class DataFrame(Generic[SchemaT]):
                 )
         return GroupedDataFrame(self, selected)
 
+    def rolling_agg(
+        self,
+        *,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None = None,
+        min_periods: int = 1,
+    ) -> DataFrame[Any]:
+        data = self.collect()
+        if on not in data or column not in data:
+            raise KeyError("rolling_agg() requires existing on/column names.")
+        by_cols = [] if by is None else list(by)
+        for c in by_cols:
+            if c not in data:
+                raise KeyError(f"rolling_agg() unknown grouping column '{c}'.")
+        n = len(data[on])
+        idxs = list(range(n))
+        idxs.sort(
+            key=lambda i: tuple(data[c][i] for c in [*by_cols, on])  # type: ignore[misc]
+        )
+        out: list[Any] = [None] * n
+
+        def _duration_seconds(v: int | str) -> float:
+            if isinstance(v, int):
+                return float(v)
+            unit = v[-1]
+            num = float(v[:-1])
+            factors = {"s": 1.0, "m": 60.0, "h": 3600.0, "d": 86400.0}
+            if unit not in factors:
+                raise ValueError(
+                    "rolling_agg(window_size=...) supports s/m/h/d suffix."
+                )
+            return num * factors[unit]
+
+        def _to_seconds(x: Any) -> float:
+            if isinstance(x, datetime):
+                return x.timestamp()
+            if isinstance(x, date):
+                return float(datetime.combine(x, datetime.min.time()).timestamp())
+            if isinstance(x, timedelta):
+                return x.total_seconds()
+            if isinstance(x, (int, float)):
+                return float(x)
+            raise TypeError(
+                "rolling_agg(on=...) requires numeric/date/datetime/timedelta."
+            )
+
+        win_seconds = _duration_seconds(window_size)
+        supported = {"sum", "mean", "min", "max", "count"}
+        if op not in supported:
+            raise ValueError(
+                f"Unsupported rolling op '{op}'. Use one of {sorted(supported)}."
+            )
+        for pos, i in enumerate(idxs):
+            current_group = tuple(data[c][i] for c in by_cols)
+            current_t = _to_seconds(data[on][i])
+            window_idxs: list[int] = []
+            j = pos
+            while j >= 0:
+                k = idxs[j]
+                if tuple(data[c][k] for c in by_cols) != current_group:
+                    break
+                if current_t - _to_seconds(data[on][k]) <= win_seconds:
+                    window_idxs.append(k)
+                    j -= 1
+                else:
+                    break
+            vals = [
+                data[column][k]
+                for k in reversed(window_idxs)
+                if data[column][k] is not None
+            ]
+            if len(vals) < min_periods:
+                out[i] = None
+                continue
+            if op == "count":
+                out[i] = len(vals)
+            elif op == "sum":
+                out[i] = sum(vals)
+            elif op == "mean":
+                out[i] = sum(vals) / len(vals) if vals else None
+            elif op == "min":
+                out[i] = min(vals) if vals else None
+            else:
+                out[i] = max(vals) if vals else None
+
+        out_data = dict(data)
+        out_data[out_name] = out
+        fields = dict(self._current_field_types)
+        in_dtype = self._current_field_types[column]
+        if op == "count":
+            fields[out_name] = int
+        elif op == "mean":
+            fields[out_name] = float | None
+        elif op in {"sum", "min", "max"}:
+            fields[out_name] = in_dtype
+        else:
+            fields[out_name] = in_dtype
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, fields
+        )
+        rust_plan = _require_rust_core().make_plan(fields)
+        return self._from_plan(
+            root_data=out_data,
+            root_schema_type=derived_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def group_by_dynamic(
+        self,
+        index_column: str,
+        *,
+        every: str,
+        period: str | None = None,
+        by: Sequence[str] | None = None,
+    ) -> DynamicGroupedDataFrame:
+        return DynamicGroupedDataFrame(
+            self,
+            index_column=index_column,
+            every=every,
+            period=period,
+            by=[] if by is None else list(by),
+        )
+
     def collect(self, *, engine: str | None = None) -> dict[str, list[Any]]:
         """
         Materialize this typed logical DataFrame into Python column data.
@@ -389,6 +767,42 @@ class DataFrame(Generic[SchemaT]):
     def to_dict(self) -> dict[str, list[Any]]:
         return self.collect()
 
+    @classmethod
+    def concat(
+        cls,
+        dfs: Sequence[DataFrame[Any]],
+        *,
+        how: str = "vertical",
+    ) -> DataFrame[Any]:
+        if len(dfs) < 2:
+            raise ValueError("concat() requires at least two DataFrame inputs.")
+        base = dfs[0]
+        backend = get_backend(base._backend)
+        out_data = base._root_data
+        out_schema_type = base._current_schema_type
+        out_plan = base._rust_plan
+        for df in dfs[1:]:
+            if df._backend != base._backend:
+                raise ValueError(
+                    "concat between different backends is not supported yet."
+                )
+            out_data, schema_descriptors = backend.execute_concat(
+                out_plan,
+                out_data,
+                df._rust_plan,
+                df._root_data,
+                how,
+            )
+            derived_fields = schema_from_descriptors(schema_descriptors)
+            out_schema_type = make_derived_schema_type(out_schema_type, derived_fields)
+            out_plan = _require_rust_core().make_plan(derived_fields)
+        return cls._from_plan(
+            root_data=out_data,
+            root_schema_type=out_schema_type,
+            current_schema_type=out_schema_type,
+            rust_plan=out_plan,
+        )
+
 
 class GroupedDataFrame:
     def __init__(self, df: DataFrame[Any], keys: Sequence[str]):
@@ -403,7 +817,8 @@ class GroupedDataFrame:
             if not isinstance(spec, tuple) or len(spec) != 2:
                 raise TypeError(
                     "agg() expects specs like "
-                    "output_name=('sum'|'mean'|'count', column)."
+                    "output_name=('count'|'sum'|'mean'|'min'|'max'|'median'|"
+                    "'std'|'var'|'first'|'last'|'n_unique', column)."
                 )
             op, col_spec = spec
             if not isinstance(op, str):
@@ -437,6 +852,123 @@ class GroupedDataFrame:
         rust_plan = _require_rust_core().make_plan(derived_fields)
         return self._df._from_plan(
             root_data=grouped_data,
+            root_schema_type=derived_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+
+class DynamicGroupedDataFrame:
+    def __init__(
+        self,
+        df: DataFrame[Any],
+        *,
+        index_column: str,
+        every: str,
+        period: str | None,
+        by: Sequence[str],
+    ):
+        self._df = df
+        self._index = index_column
+        self._every = every
+        self._period = period or every
+        self._by = list(by)
+
+    def _seconds(self, text: str) -> float:
+        unit = text[-1]
+        num = float(text[:-1])
+        factors = {"s": 1.0, "m": 60.0, "h": 3600.0, "d": 86400.0}
+        if unit not in factors:
+            raise ValueError("Duration supports s/m/h/d suffixes.")
+        return num * factors[unit]
+
+    def _to_seconds(self, x: Any) -> float:
+        if isinstance(x, datetime):
+            return x.timestamp()
+        if isinstance(x, date):
+            return float(datetime.combine(x, datetime.min.time()).timestamp())
+        if isinstance(x, timedelta):
+            return x.total_seconds()
+        if isinstance(x, (int, float)):
+            return float(x)
+        raise TypeError("group_by_dynamic index column must be time-like or numeric.")
+
+    def agg(self, **aggregations: tuple[str, str]) -> DataFrame[Any]:
+        data = self._df.collect()
+        if self._index not in data:
+            raise KeyError(f"group_by_dynamic() unknown index column '{self._index}'.")
+        for c in self._by:
+            if c not in data:
+                raise KeyError(f"group_by_dynamic() unknown by column '{c}'.")
+        times = [self._to_seconds(v) for v in data[self._index]]
+        every = self._seconds(self._every)
+        period = self._seconds(self._period)
+        t_min = min(times) if times else 0.0
+        t_max = max(times) if times else 0.0
+        start = t_min
+
+        out: dict[str, list[Any]] = {self._index: []}
+        for c in self._by:
+            out[c] = []
+        for name in aggregations:
+            out[name] = []
+
+        while start <= t_max:
+            end = start + period
+            win_rows = [i for i, t in enumerate(times) if start <= t < end]
+            if self._by:
+                grouped: dict[tuple[Any, ...], list[int]] = {}
+                for i in win_rows:
+                    key = tuple(data[c][i] for c in self._by)
+                    grouped.setdefault(key, []).append(i)
+            else:
+                grouped = {(): win_rows}
+
+            for gk, rows in grouped.items():
+                if not rows:
+                    continue
+                out[self._index].append(data[self._index][rows[0]])
+                for idx, c in enumerate(self._by):
+                    out[c].append(gk[idx])
+                for out_name, (op, in_col) in aggregations.items():
+                    vals = [
+                        data[in_col][i] for i in rows if data[in_col][i] is not None
+                    ]
+                    res: Any
+                    if op == "count":
+                        res = len(vals)
+                    elif op == "sum":
+                        res = sum(vals) if vals else None
+                    elif op == "mean":
+                        res = (sum(vals) / len(vals)) if vals else None
+                    elif op == "min":
+                        res = min(vals) if vals else None
+                    elif op == "max":
+                        res = max(vals) if vals else None
+                    else:
+                        raise ValueError(f"Unsupported dynamic aggregation '{op}'.")
+                    out[out_name].append(res)
+            start += every
+
+        fields: dict[str, Any] = {self._index: self._df.schema_fields()[self._index]}
+        for c in self._by:
+            fields[c] = self._df.schema_fields()[c]
+        for out_name, (op, _in_col) in aggregations.items():
+            in_dtype = self._df.schema_fields()[aggregations[out_name][1]]
+            if op == "count":
+                fields[out_name] = int
+            elif op == "mean":
+                fields[out_name] = float | None
+            elif op in {"sum", "min", "max"}:
+                fields[out_name] = in_dtype
+            else:
+                fields[out_name] = in_dtype
+        derived_schema_type = make_derived_schema_type(
+            self._df._current_schema_type, fields
+        )
+        rust_plan = _require_rust_core().make_plan(fields)
+        return self._df._from_plan(
+            root_data=out,
             root_schema_type=derived_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,

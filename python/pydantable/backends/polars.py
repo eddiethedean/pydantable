@@ -27,7 +27,8 @@ class PolarsBackend(Backend):
         left_root_data: Any,
         right_plan: Any,
         right_root_data: Any,
-        on: Sequence[str],
+        left_on: Sequence[str],
+        right_on: Sequence[str],
         how: str,
         suffix: str,
     ) -> tuple[Any, Any]:
@@ -37,7 +38,8 @@ class PolarsBackend(Backend):
             left_root_data,
             right_plan,
             right_root_data,
-            list(on),
+            list(left_on),
+            list(right_on),
             how,
             suffix,
         )
@@ -55,4 +57,109 @@ class PolarsBackend(Backend):
             root_data,
             list(by),
             aggregations,
+        )
+
+    def execute_concat(
+        self,
+        left_plan: Any,
+        left_root_data: Any,
+        right_plan: Any,
+        right_root_data: Any,
+        how: str,
+    ) -> tuple[Any, Any]:
+        rust = _require_rust_core()
+        return rust.execute_concat(
+            left_plan,
+            left_root_data,
+            right_plan,
+            right_root_data,
+            how,
+        )
+
+    def execute_melt(
+        self,
+        plan: Any,
+        root_data: Any,
+        id_vars: Sequence[str],
+        value_vars: Sequence[str] | None,
+        variable_name: str,
+        value_name: str,
+    ) -> tuple[Any, Any]:
+        rust = _require_rust_core()
+        return rust.execute_melt(
+            plan,
+            root_data,
+            list(id_vars),
+            None if value_vars is None else list(value_vars),
+            variable_name,
+            value_name,
+        )
+
+    def execute_pivot(
+        self,
+        plan: Any,
+        root_data: Any,
+        index: Sequence[str],
+        columns: str,
+        values: Sequence[str],
+        aggregate_function: str,
+    ) -> tuple[Any, Any]:
+        rust = _require_rust_core()
+        return rust.execute_pivot(
+            plan,
+            root_data,
+            list(index),
+            columns,
+            list(values),
+            aggregate_function,
+        )
+
+    def execute_explode(
+        self,
+        plan: Any,
+        root_data: Any,
+        columns: Sequence[str],
+    ) -> tuple[Any, Any]:
+        rust = _require_rust_core()
+        return rust.execute_explode(plan, root_data, list(columns))
+
+    def execute_unnest(
+        self,
+        plan: Any,
+        root_data: Any,
+        columns: Sequence[str],
+    ) -> tuple[Any, Any]:
+        rust = _require_rust_core()
+        return rust.execute_unnest(plan, root_data, list(columns))
+
+    def execute_rolling_agg(
+        self,
+        plan: Any,
+        root_data: Any,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None,
+        min_periods: int,
+    ) -> tuple[Any, Any]:
+        rust = _require_rust_core()
+        return rust.execute_rolling_agg(
+            plan, root_data, on, column, window_size, op, out_name, by, min_periods
+        )
+
+    def execute_groupby_dynamic_agg(
+        self,
+        plan: Any,
+        root_data: Any,
+        index_column: str,
+        every: str,
+        period: str | None,
+        by: Sequence[str] | None,
+        aggregations: Any,
+    ) -> tuple[Any, Any]:
+        rust = _require_rust_core()
+        return rust.execute_groupby_dynamic_agg(
+            plan, root_data, index_column, every, period, by, aggregations
         )

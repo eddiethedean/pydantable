@@ -5,10 +5,10 @@ from .polars import PolarsBackend
 
 class PySparkBackend(PolarsBackend):
     """
-    Optional `pyspark` interface backend.
+    Backend tag for the PySpark-named interface module.
 
-    For now this is a fallback executor that uses the existing Rust/Polars
-    engine, while exposing the backend boundary for later full implementations.
+    Execution uses the same Rust core (Polars engine) as the default backend;
+    the `pyspark` name only selects dispatch/identity in the Python layer.
     """
 
     name = "pyspark"

@@ -11,7 +11,7 @@ Use the default exports:
 from pydantable import DataFrameModel
 ```
 
-This default interface is backed by the Rust/Polars execution core.
+This default interface is backed by the existing Rust/Polars execution core.
 
 ## Optional interface modules
 
@@ -25,62 +25,46 @@ from pydantable.pyspark import DataFrameModel  # pyspark interface
 These interfaces keep the same typed API and contracts, while selecting a
 different backend name in the Python dispatch layer.
 
-## Pandas backend (`PYDANTABLE_BACKEND=pandas` or `pydantable.pandas`)
+### PySpark interface selection
 
-When the pandas backend is selected, `collect()`, joins, and group-by
-aggregations are executed by a pandas-based executor that replays the logical
-plan (serialized from Rust) with SQL-like null semantics aligned to
-`docs/INTERFACE_CONTRACT.md`.
-
-Install the optional dependency:
-
-```bash
-pip install "pydantable[pandas]"
-```
-
-CI installs `pandas` for the Python test job so backend equivalence tests run.
-
-## Pandas-flavored API (`from pydantable.pandas import ...`)
-
-See **[Pandas UI](PANDAS_UI.md)** for full detail. In short, `pydantable.pandas`
-adds pandas-like names (`assign`, `merge`, `head`/`tail`, grouped `sum`/`mean`/`count`,
-introspection properties, `__getitem__`) on the same typed engine. String `query()`,
-`loc`/`iloc`, assign callables, and `pandas.Series` column values are not supported.
-
-## PySpark interface module
-
-`pydantable.pyspark` keeps the typed API boundary; execution still uses the
-Rust/Polars core until a PySpark executor is wired.
-
-See **[PySpark UI](PYSPARK_UI.md)** for DataFrame / `DataFrameModel` aliases and
-**[PySpark parity matrix](PYSPARK_PARITY.md)** for API coverage vs Apache Spark.
-
-### PySpark SQL-style façade (`pydantable.pyspark.sql`)
-
-Mirrors common **import paths**, not binary compatibility with Apache Spark:
+You can select the PySpark interface in two equivalent ways:
 
 ```python
-from pydantable.pyspark.sql import functions as F
-from pydantable.pyspark.sql import Column, IntegerType, StructType
+from pydantable.pyspark import DataFrameModel
 ```
 
-- **`functions.lit`**, **`functions.col(..., dtype=...)`** — `col` requires an
-  explicit `dtype` (or use `df.col("name")` on a typed `DataFrame`). Untyped
-  `F.col("x")` like PySpark is not supported.
-- **`Column`** — type alias for pydantable’s typed `Expr`.
-- **`types`** — `IntegerType`, `LongType`, `DoubleType`, `StringType`,
-  `BooleanType` with `to_annotation()`; `StructField` / `StructType` for a simple
-  schema view. These are **not** JVM Spark types.
-- **DataFrame ergonomics** on `pydantable.pyspark.DataFrame` /
-  `DataFrameModel`: `withColumn`, `where`, `filter`, `select`, `orderBy`/`sort`,
-  `limit`, `drop`, `distinct`, `withColumnRenamed`, `dropDuplicates` (all-column
-  only; `subset=` raises), `columns`, `schema`, and `__getitem__` with `str` /
-  `list[str]`. `union` / `unionAll` follow the core planner (may raise until
-  vertical concat is fully implemented).
+```python
+import os
+os.environ["PYDANTABLE_BACKEND"] = "pyspark"
+from pydantable import DataFrameModel
+```
 
-- **`functions`**: `lit`, typed `col`, `isnull` / `isnotnull`, `coalesce`, `when` /
-  `otherwise`, `cast`, `between`, `isin`, `concat`, `substring`, `length`;
-  aggregate names (`sum`, `avg`, …) raise with a hint to use `group_by().agg`.
+The PySpark interface supports the same currently implemented operation
+families as default exports:
 
-There is no `SparkSession`, SQL string execution, `Window`, or interop with the
-`pyspark` package unless added later.
+- core transforms (`select`, `with_columns`, `filter`, `sort`, `unique`, slicing)
+- null/type transforms (`fill_null`, `drop_nulls`, `cast`, null predicates)
+- joins and group-by aggregations
+- reshape (`melt`/`unpivot`, `pivot`)
+- rolling and dynamic window operations
+- temporal columns/literals (`datetime`, `date`, `duration`, including nullable)
+- PySpark-style select wrappers (`withColumn`, `withColumns`, `withColumnRenamed`,
+  `withColumnsRenamed`, `toDF`, `transform`, `select_typed`)
+
+`selectExpr` SQL-string projection is intentionally out of scope for the typed
+interface. Use typed expressions with `select_typed(...)` instead.
+
+## Execution model for `pandas` / `pyspark` modules
+
+The `pydantable.pandas` and `pydantable.pyspark` modules are **naming/import
+variants** of the same typed API. They set a backend tag for Python dispatch
+and tests. The ``pyspark`` backend uses the Rust core for execution. The
+``pandas`` backend runs ``execute_plan`` via the optional pandas runtime; joins,
+reshape, rolling windows, and other operations still use the Rust core. Pydantable
+does not run Apache Spark for the ``pyspark`` import path.
+
+See also `docs/PANDAS_UI.md` and `docs/PYSPARK_UI.md`.
+
+Semantics are defined by `docs/INTERFACE_CONTRACT.md`, independent of selected
+interface module.
+

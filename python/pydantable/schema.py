@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, TypeAdapter, create_model
@@ -114,6 +115,9 @@ def dtype_descriptor_to_annotation(descriptor: Mapping[str, Any]) -> Any:
         "float": float,
         "bool": bool,
         "str": str,
+        "datetime": datetime,
+        "date": date,
+        "duration": timedelta,
     }
     if base not in base_map:
         raise TypeError(f"Unsupported Rust dtype descriptor base: {base!r}")

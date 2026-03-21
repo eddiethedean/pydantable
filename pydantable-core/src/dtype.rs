@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyBool, PyFloat, PyInt, PyString, PyType};
+use pyo3::types::{PyAny, PyBool, PyDate, PyDateTime, PyDelta, PyFloat, PyInt, PyString, PyType};
 
 /// Supported base scalar types for the skeleton expression system.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -8,6 +8,9 @@ pub enum BaseType {
     Float,
     Bool,
     Str,
+    DateTime,
+    Date,
+    Duration,
 }
 
 /// DType descriptor for expression typing and nullability.
@@ -73,6 +76,15 @@ pub fn py_annotation_to_dtype(py: Python<'_>, dtype_obj: &Bound<'_, PyAny>) -> P
         if is_py_type(py_type, "str") {
             return Ok(DTypeDesc::non_nullable(BaseType::Str));
         }
+        if is_py_type(py_type, "datetime") {
+            return Ok(DTypeDesc::non_nullable(BaseType::DateTime));
+        }
+        if is_py_type(py_type, "date") {
+            return Ok(DTypeDesc::non_nullable(BaseType::Date));
+        }
+        if is_py_type(py_type, "timedelta") {
+            return Ok(DTypeDesc::non_nullable(BaseType::Duration));
+        }
 
         // `type(None)` comes through as a Python type object named "NoneType".
         if is_py_type(py_type, "NoneType") {
@@ -106,6 +118,12 @@ pub fn py_annotation_to_dtype(py: Python<'_>, dtype_obj: &Bound<'_, PyAny>) -> P
                     seen_base = Some(BaseType::Float);
                 } else if is_py_type(arg_type, "str") {
                     seen_base = Some(BaseType::Str);
+                } else if is_py_type(arg_type, "datetime") {
+                    seen_base = Some(BaseType::DateTime);
+                } else if is_py_type(arg_type, "date") {
+                    seen_base = Some(BaseType::Date);
+                } else if is_py_type(arg_type, "timedelta") {
+                    seen_base = Some(BaseType::Duration);
                 } else if is_py_type(arg_type, "NoneType") {
                     seen_none = true;
                 } else {
@@ -150,6 +168,15 @@ pub fn py_value_to_dtype(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<D
     if value.downcast::<PyString>().is_ok() {
         return Ok(DTypeDesc::non_nullable(BaseType::Str));
     }
+    if value.downcast::<PyDateTime>().is_ok() {
+        return Ok(DTypeDesc::non_nullable(BaseType::DateTime));
+    }
+    if value.downcast::<PyDate>().is_ok() {
+        return Ok(DTypeDesc::non_nullable(BaseType::Date));
+    }
+    if value.downcast::<PyDelta>().is_ok() {
+        return Ok(DTypeDesc::non_nullable(BaseType::Duration));
+    }
 
     Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
         "Unsupported literal value type for skeleton.".to_string(),
@@ -165,6 +192,9 @@ pub fn dtype_to_python_type(py: Python<'_>, dtype: DTypeDesc) -> PyResult<PyObje
         Some(BaseType::Float) => builtins.getattr("float")?,
         Some(BaseType::Bool) => builtins.getattr("bool")?,
         Some(BaseType::Str) => builtins.getattr("str")?,
+        Some(BaseType::DateTime) => py.import_bound("datetime")?.getattr("datetime")?,
+        Some(BaseType::Date) => py.import_bound("datetime")?.getattr("date")?,
+        Some(BaseType::Duration) => py.import_bound("datetime")?.getattr("timedelta")?,
         None => {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Cannot convert unknown-base nullable dtype to a Python schema type.",
@@ -189,6 +219,9 @@ pub fn dtype_to_descriptor_py(py: Python<'_>, dtype: DTypeDesc) -> PyResult<PyOb
         Some(BaseType::Float) => "float",
         Some(BaseType::Bool) => "bool",
         Some(BaseType::Str) => "str",
+        Some(BaseType::DateTime) => "datetime",
+        Some(BaseType::Date) => "date",
+        Some(BaseType::Duration) => "duration",
         None => "unknown",
     };
     dict.set_item("base", base)?;

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
 from functools import cmp_to_key
-from typing import Any
+from typing import Any, cast
 
 
 def _plan_to_dict(plan: Any) -> dict[str, Any]:
@@ -16,7 +17,7 @@ def _plan_to_dict(plan: Any) -> dict[str, Any]:
 
 
 def _pd():
-    import pandas as pd
+    import pandas as pd  # type: ignore[import-untyped]
 
     return pd
 
@@ -33,6 +34,23 @@ def _scalar_to_py(v: Any) -> Any:
         except (ValueError, AttributeError):
             return v
     return v
+
+
+def _coerce_compare_pair(left: Any, right: Any) -> tuple[Any, Any]:
+    """Align Python datetime column values with Rust literal microseconds (ints)."""
+    if (
+        isinstance(left, datetime)
+        and isinstance(right, (int, float))
+        and not isinstance(right, bool)
+    ):
+        return left, datetime.fromtimestamp(float(right) / 1e6)
+    if (
+        isinstance(right, datetime)
+        and isinstance(left, (int, float))
+        and not isinstance(left, bool)
+    ):
+        return datetime.fromtimestamp(float(left) / 1e6), right
+    return left, right
 
 
 def _eval_expr(expr: dict[str, Any], i: int, ctx: dict[str, list[Any]]) -> Any:
@@ -62,6 +80,7 @@ def _eval_expr(expr: dict[str, Any], i: int, ctx: dict[str, list[Any]]) -> Any:
         right = _eval_expr(expr["right"], i, ctx)
         if left is None or right is None:
             return None
+        left, right = _coerce_compare_pair(left, right)
         if op == "eq":
             return left == right
         if op == "ne":
@@ -76,9 +95,15 @@ def _eval_expr(expr: dict[str, Any], i: int, ctx: dict[str, list[Any]]) -> Any:
             return left >= right
         raise ValueError(f"Unknown compare op {op!r}")
     if kind == "is_null":
-        return _eval_expr(expr["inner"], i, ctx) is None
+        inner = expr.get("inner") or expr.get("input")
+        if not isinstance(inner, dict):
+            raise ValueError("is_null expression missing inner/input")
+        return _eval_expr(cast("dict[str, Any]", inner), i, ctx) is None
     if kind == "is_not_null":
-        return _eval_expr(expr["inner"], i, ctx) is not None
+        inner = expr.get("inner") or expr.get("input")
+        if not isinstance(inner, dict):
+            raise ValueError("is_not_null expression missing inner/input")
+        return _eval_expr(cast("dict[str, Any]", inner), i, ctx) is not None
     if kind == "coalesce":
         for sub in expr["exprs"]:
             v = _eval_expr(sub, i, ctx)
@@ -94,8 +119,15 @@ def _eval_expr(expr: dict[str, Any], i: int, ctx: dict[str, list[Any]]) -> Any:
                 raise ValueError("CASE WHEN condition must be bool or null")
         return _eval_expr(expr["else"], i, ctx)
     if kind == "cast":
-        v = _eval_expr(expr["inner"], i, ctx)
-        return _cast_py_value(v, str(expr["to"]))
+        inner = expr.get("inner") or expr.get("input")
+        if not isinstance(inner, dict):
+            raise ValueError("cast expression missing inner/input")
+        v = _eval_expr(cast("dict[str, Any]", inner), i, ctx)
+        to = expr.get("to")
+        if to is None:
+            desc = expr.get("dtype") or {}
+            to = desc.get("base", "str")
+        return _cast_py_value(v, str(to))
     if kind == "in_list":
         x = _eval_expr(expr["inner"], i, ctx)
         if x is None:
@@ -193,16 +225,15 @@ def _cmp_sort_indices(
     return 0
 
 
-def _apply_sort(
-    ctx: dict[str, list[Any]], by: list[tuple[str, bool]]
-) -> None:
+def _apply_sort(ctx: dict[str, list[Any]], by: list[tuple[str, bool]]) -> None:
     if not ctx or not by:
         return
     n = len(next(iter(ctx.values())))
-    order = sorted(
-        range(n),
-        key=cmp_to_key(lambda a, b: _cmp_sort_indices(ctx, by, a, b)),
-    )
+
+    def _pair_cmp(ai: int, bi: int) -> int:
+        return _cmp_sort_indices(ctx, by, ai, bi)
+
+    order = sorted(range(n), key=cmp_to_key(_pair_cmp))
     for c in ctx:
         ctx[c] = [ctx[c][k] for k in order]
 
@@ -239,7 +270,16 @@ def _execute_plan_from_blob(
                 ctx[c] = ctx[c][:lim]
         elif sk == "sort":
             raw_by = step["by"]
-            pairs = [(str(p["column"]), bool(p["ascending"])) for p in raw_by]
+            desc_list = list(step.get("descending", []))
+            if not raw_by:
+                continue
+            if isinstance(raw_by[0], dict):
+                pairs = [(str(p["column"]), bool(p["ascending"])) for p in raw_by]
+            else:
+                pairs = []
+                for i, col in enumerate(raw_by):
+                    d = bool(desc_list[i]) if i < len(desc_list) else False
+                    pairs.append((str(col), not d))
             _apply_sort(ctx, pairs)
         elif sk == "drop":
             for c in step["columns"]:
@@ -250,19 +290,76 @@ def _execute_plan_from_blob(
             cols = sorted(ctx.keys())
             n = len(next(iter(ctx.values())))
             seen: set[tuple[Any, ...]] = set()
-            keep: list[int] = []
+            kept_rows: list[int] = []
             for i in range(n):
                 fp = tuple(ctx[c][i] for c in cols)
                 if fp not in seen:
                     seen.add(fp)
-                    keep.append(i)
+                    kept_rows.append(i)
             for c in ctx:
-                ctx[c] = [ctx[c][i] for i in keep]
+                ctx[c] = [ctx[c][i] for i in kept_rows]
+        elif sk == "unique":
+            subset = step.get("subset")
+            keep_mode = str(step.get("keep", "first"))
+            key_cols = list(subset) if subset else sorted(ctx.keys())
+            if not ctx or not key_cols:
+                continue
+            n = len(next(iter(ctx.values())))
+            seen: set[tuple[Any, ...]] = set()
+            kept_rows: list[int] = []
+            if keep_mode == "last":
+                for i in range(n - 1, -1, -1):
+                    fp = tuple(ctx[c][i] for c in key_cols)
+                    if fp not in seen:
+                        seen.add(fp)
+                        kept_rows.append(i)
+                kept_rows.reverse()
+            else:
+                for i in range(n):
+                    fp = tuple(ctx[c][i] for c in key_cols)
+                    if fp not in seen:
+                        seen.add(fp)
+                        kept_rows.append(i)
+            for c in ctx:
+                ctx[c] = [ctx[c][i] for i in kept_rows]
+        elif sk == "slice":
+            off = int(step["offset"])
+            length = int(step["length"])
+            if not ctx:
+                continue
+            n = len(next(iter(ctx.values())))
+            start = off if off >= 0 else max(0, n + off)
+            end = min(n, start + length)
+            for c in ctx:
+                ctx[c] = ctx[c][start:end]
+        elif sk == "fill_null":
+            subset = step.get("subset")
+            fill_val = step.get("value")
+            cols = list(subset) if subset else list(ctx.keys())
+            for c in cols:
+                if c not in ctx:
+                    continue
+                ctx[c] = [fill_val if v is None else v for v in ctx[c]]
+        elif sk == "drop_nulls":
+            subset = step.get("subset")
+            cols = list(subset) if subset else list(ctx.keys())
+            if not ctx:
+                continue
+            n = len(next(iter(ctx.values())))
+            keep_idx = [
+                i
+                for i in range(n)
+                if not any(ctx[c][i] is None for c in cols if c in ctx)
+            ]
+            for c in ctx:
+                ctx[c] = [ctx[c][i] for i in keep_idx]
         elif sk == "rename":
-            f = step["from"]
-            t = step["to"]
-            if f in ctx:
-                ctx[t] = ctx.pop(f)
+            mapping = step.get("columns") or {}
+            if isinstance(mapping, dict):
+                for f, t in mapping.items():
+                    fs, ts = str(f), str(t)
+                    if fs in ctx:
+                        ctx[ts] = ctx.pop(fs)
         else:
             raise ValueError(f"Unknown plan step {sk!r}")
     return ctx

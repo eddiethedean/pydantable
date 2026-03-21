@@ -7,8 +7,14 @@ from pydantable.expressions import (
     Expr,
     Literal,
     WhenChain,
+)
+from pydantable.expressions import (
     coalesce as coalesce_expr,
+)
+from pydantable.expressions import (
     concat as concat_expr,
+)
+from pydantable.expressions import (
     when as when_chain,
 )
 
@@ -99,7 +105,7 @@ _AGG_HINT = (
 )
 
 
-def sum(*_args: Any, **_kwargs: Any) -> Any:  # noqa: A001
+def sum(*_args: Any, **_kwargs: Any) -> Any:
     raise NotImplementedError(_AGG_HINT.format(name="sum"))
 
 
@@ -111,11 +117,11 @@ def mean(*_args: Any, **_kwargs: Any) -> Any:
     raise NotImplementedError(_AGG_HINT.format(name="mean"))
 
 
-def max(*_args: Any, **_kwargs: Any) -> Any:  # noqa: A001
+def max(*_args: Any, **_kwargs: Any) -> Any:
     raise NotImplementedError(_AGG_HINT.format(name="max"))
 
 
-def min(*_args: Any, **_kwargs: Any) -> Any:  # noqa: A001
+def min(*_args: Any, **_kwargs: Any) -> Any:
     raise NotImplementedError(_AGG_HINT.format(name="min"))
 
 
@@ -133,8 +139,8 @@ __all__ = [
     "concat",
     "count",
     "isin",
-    "isnull",
     "isnotnull",
+    "isnull",
     "length",
     "lit",
     "max",

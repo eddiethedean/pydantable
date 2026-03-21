@@ -51,24 +51,19 @@ Then:
 from pydantable import DataFrameModel
 ```
 
-### Current status
+### `pandas` / `pyspark` interface modules
 
-- **`pydantable.pandas`**: pandas-style methods (`assign`, `merge`, `head`, …)
-  on the typed API. `pydantable.pandas.DataFrameModel` uses the pandas execution
-  backend; you can also set `PYDANTABLE_BACKEND=pandas` before import. Install
-  optional deps with `pip install "pydantable[pandas]"`. The default backend
-  remains Polars/Rust.
-- **`pydantable.pyspark`**: same typed boundary; execution still uses the
-  Rust/Polars core until a PySpark executor is added. Includes a
-  `pydantable.pyspark.sql` façade (`functions as F`, `Column`, lightweight
-  `types`, and Spark-like `withColumn` / `where` on the pyspark `DataFrame`).
-  See `docs/BACKENDS.md`.
+`pydantable.pandas` and `pydantable.pyspark` are **alternate import surfaces**
+(pandas- or PySpark-style naming where applicable). The `pyspark` path uses the
+Rust core for execution. When `PYDANTABLE_BACKEND=pandas`, `execute_plan` uses
+the optional pandas runtime; other operations still use Rust. See `docs/BACKENDS.md`.
+
+For PySpark-style projection helpers (`withColumn`, `withColumnRenamed`, `toDF`,
+`transform`, `select_typed`), see `docs/PYSPARK_INTERFACE.md`.
 
 See:
 
 - `docs/BACKENDS.md`
-- `docs/PANDAS_UI.md` — pandas-style `assign` / `merge` / `head` / grouped shortcuts
-- `docs/PYSPARK_UI.md` — Spark-like `DataFrame` names and `pyspark.sql` façade
 - `docs/INTERFACE_CONTRACT.md`
 
 ## Quick Start
@@ -135,6 +130,9 @@ typing and `collect()`.
 - `docs/WHY_NOT_POLARS.md` for positioning + trade-offs
 - `docs/DEVELOPER.md` for local setup and contribution workflow
 - `docs/ROADMAP.md` for project phases
+- `docs/PARITY_SCORECARD.md` for parity coverage status
+- `docs/POLARS_WORKFLOWS.md` for end-to-end Polars-style workflows
+- `docs/PYSPARK_INTERFACE.md` for PySpark interface usage and status
 
 ## License
 

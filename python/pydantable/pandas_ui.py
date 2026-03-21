@@ -99,6 +99,7 @@ class PandasDataFrame(CoreDataFrame):
         This is an eager, convenience API (not a zero-copy lazy slice).
         """
         data = self.collect()
+        sliced: dict[str, list[Any]]
         if not data:
             sliced = {name: [] for name in self._current_field_types}
         else:
@@ -120,6 +121,7 @@ class PandasDataFrame(CoreDataFrame):
         Eager; see :meth:`head`.
         """
         data = self.collect()
+        sliced: dict[str, list[Any]]
         if not data:
             sliced = {name: [] for name in self._current_field_types}
         else:
@@ -206,7 +208,7 @@ class PandasDataFrameModel(CoreDataFrameModel):
         return type(self)._from_dataframe(self._df.tail(n))
 
     def __getitem__(self, key: str | list[str]) -> Any:
-        return self._df[key]
+        return self._df[key]  # type: ignore[index]
 
     def group_by(self, *keys: Any) -> PandasGroupedDataFrameModel:
         g = self._df.group_by(*keys)

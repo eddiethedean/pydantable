@@ -178,22 +178,168 @@ class DataFrameModel:
     def filter(self, condition: Any) -> DataFrameModel:
         return self._from_dataframe(self._df.filter(condition))
 
+    def sort(
+        self, *by: Any, descending: bool | Sequence[bool] = False
+    ) -> DataFrameModel:
+        return self._from_dataframe(self._df.sort(*by, descending=descending))
+
+    def unique(
+        self, subset: Sequence[str] | None = None, *, keep: str = "first"
+    ) -> DataFrameModel:
+        return self._from_dataframe(self._df.unique(subset=subset, keep=keep))
+
+    def distinct(
+        self, subset: Sequence[str] | None = None, *, keep: str = "first"
+    ) -> DataFrameModel:
+        return self._from_dataframe(self._df.distinct(subset=subset, keep=keep))
+
+    def drop(self, *columns: Any) -> DataFrameModel:
+        return self._from_dataframe(self._df.drop(*columns))
+
+    def rename(self, columns: Mapping[str, str]) -> DataFrameModel:
+        return self._from_dataframe(self._df.rename(columns))
+
+    def slice(self, offset: int, length: int) -> DataFrameModel:
+        return self._from_dataframe(self._df.slice(offset, length))
+
+    def head(self, n: int = 5) -> DataFrameModel:
+        return self._from_dataframe(self._df.head(n))
+
+    def tail(self, n: int = 5) -> DataFrameModel:
+        return self._from_dataframe(self._df.tail(n))
+
+    def fill_null(
+        self,
+        value: Any = None,
+        *,
+        strategy: str | None = None,
+        subset: Sequence[str] | None = None,
+    ) -> DataFrameModel:
+        return self._from_dataframe(
+            self._df.fill_null(value, strategy=strategy, subset=subset)
+        )
+
+    def drop_nulls(self, subset: Sequence[str] | None = None) -> DataFrameModel:
+        return self._from_dataframe(self._df.drop_nulls(subset=subset))
+
+    def melt(
+        self,
+        *,
+        id_vars: Sequence[str] | None = None,
+        value_vars: Sequence[str] | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+    ) -> DataFrameModel:
+        return self._from_dataframe(
+            self._df.melt(
+                id_vars=id_vars,
+                value_vars=value_vars,
+                variable_name=variable_name,
+                value_name=value_name,
+            )
+        )
+
+    def unpivot(
+        self,
+        *,
+        index: Sequence[str] | None = None,
+        on: Sequence[str] | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+    ) -> DataFrameModel:
+        return self._from_dataframe(
+            self._df.unpivot(
+                index=index,
+                on=on,
+                variable_name=variable_name,
+                value_name=value_name,
+            )
+        )
+
+    def pivot(
+        self,
+        *,
+        index: str | Sequence[str],
+        columns: Any,
+        values: str | Sequence[str],
+        aggregate_function: str = "first",
+    ) -> DataFrameModel:
+        return self._from_dataframe(
+            self._df.pivot(
+                index=index,
+                columns=columns,
+                values=values,
+                aggregate_function=aggregate_function,
+            )
+        )
+
+    def explode(self, columns: str | Sequence[str]) -> DataFrameModel:
+        return self._from_dataframe(self._df.explode(columns))
+
+    def unnest(self, columns: str | Sequence[str]) -> DataFrameModel:
+        return self._from_dataframe(self._df.unnest(columns))
+
     def join(
         self,
         other: DataFrameModel,
         *,
-        on: str | Sequence[str],
+        on: str | Sequence[str] | None = None,
+        left_on: Any = None,
+        right_on: Any = None,
         how: str = "inner",
         suffix: str = "_right",
     ) -> DataFrameModel:
         if not isinstance(other, DataFrameModel):
             raise TypeError("join(other=...) expects another DataFrameModel instance.")
         return self._from_dataframe(
-            self._df.join(other._df, on=on, how=how, suffix=suffix)
+            self._df.join(
+                other._df,
+                on=on,
+                left_on=left_on,
+                right_on=right_on,
+                how=how,
+                suffix=suffix,
+            )
         )
 
     def group_by(self, *keys: Any) -> GroupedDataFrameModel:
         return GroupedDataFrameModel(self._df.group_by(*keys), self.__class__)
+
+    def rolling_agg(
+        self,
+        *,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None = None,
+        min_periods: int = 1,
+    ) -> DataFrameModel:
+        return self._from_dataframe(
+            self._df.rolling_agg(
+                on=on,
+                column=column,
+                window_size=window_size,
+                op=op,
+                out_name=out_name,
+                by=by,
+                min_periods=min_periods,
+            )
+        )
+
+    def group_by_dynamic(
+        self,
+        index_column: str,
+        *,
+        every: str,
+        period: str | None = None,
+        by: Sequence[str] | None = None,
+    ) -> DynamicGroupedDataFrameModel:
+        return DynamicGroupedDataFrameModel(
+            self._df.group_by_dynamic(index_column, every=every, period=period, by=by),
+            self.__class__,
+        )
 
     def __getattr__(self, item: str) -> Any:
         # Delegate column refs + API methods to wrapped DataFrame.
@@ -207,8 +353,30 @@ class DataFrameModel:
     def schema_model(cls) -> type[Schema]:
         return cls._SchemaModel
 
+    @classmethod
+    def concat(
+        cls,
+        dfs: Sequence[DataFrameModel],
+        *,
+        how: str = "vertical",
+    ) -> DataFrameModel:
+        if len(dfs) < 2:
+            raise ValueError("concat() requires at least two DataFrameModel inputs.")
+        if not all(isinstance(df, DataFrameModel) for df in dfs):
+            raise TypeError("concat() expects a sequence of DataFrameModel objects.")
+        return cls._from_dataframe(DataFrame.concat([df._df for df in dfs], how=how))
+
 
 class GroupedDataFrameModel:
+    def __init__(self, grouped_df: Any, model_type: type[DataFrameModel]) -> None:
+        self._grouped_df = grouped_df
+        self._model_type = model_type
+
+    def agg(self, **aggregations: Any) -> DataFrameModel:
+        return self._model_type._from_dataframe(self._grouped_df.agg(**aggregations))
+
+
+class DynamicGroupedDataFrameModel:
     def __init__(self, grouped_df: Any, model_type: type[DataFrameModel]) -> None:
         self._grouped_df = grouped_df
         self._model_type = model_type

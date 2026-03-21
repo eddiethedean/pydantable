@@ -6,6 +6,8 @@ from .schema import Schema
 
 
 class DataFrame(PandasDataFrame):
+    """pandas-flavored interface; core execution uses the Rust engine."""
+
     _backend = "pandas"
 
 

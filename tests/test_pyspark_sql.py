@@ -102,14 +102,18 @@ def test_functions_when_cast_isin_between_concat_substring_length() -> None:
         .otherwise(F.lit("many"))
     )
     out_w = df.withColumn("w", w).select("x", "w").collect()
-    assert_table_eq_sorted(out_w, {"x": [1, 2, 3], "w": ["one", "two", "many"]}, keys=["x"])
+    assert_table_eq_sorted(
+        out_w, {"x": [1, 2, 3], "w": ["one", "two", "many"]}, keys=["x"]
+    )
 
     out_cast = (
         df.withColumn("xf", F.cast(F.col("x", dtype=int), float))
         .select("x", "xf")
         .collect()
     )
-    assert_table_eq_sorted(out_cast, {"x": [1, 2, 3], "xf": [1.0, 2.0, 3.0]}, keys=["x"])
+    assert_table_eq_sorted(
+        out_cast, {"x": [1, 2, 3], "xf": [1.0, 2.0, 3.0]}, keys=["x"]
+    )
 
     out_isin = (
         df.withColumn("inq", F.isin(F.col("x", dtype=int), 1, 3))
@@ -125,7 +129,9 @@ def test_functions_when_cast_isin_between_concat_substring_length() -> None:
         .select("x", "b")
         .collect()
     )
-    assert_table_eq_sorted(out_bet, {"x": [1, 2, 3], "b": [False, True, True]}, keys=["x"])
+    assert_table_eq_sorted(
+        out_bet, {"x": [1, 2, 3], "b": [False, True, True]}, keys=["x"]
+    )
 
     out_cat = (
         df.withColumn(
@@ -148,7 +154,9 @@ def test_functions_when_cast_isin_between_concat_substring_length() -> None:
         .select("x", "s")
         .collect()
     )
-    assert_table_eq_sorted(out_sub, {"x": [1, 2, 3], "s": ["hi", "th", "bo"]}, keys=["x"])
+    assert_table_eq_sorted(
+        out_sub, {"x": [1, 2, 3], "s": ["hi", "th", "bo"]}, keys=["x"]
+    )
 
     out_len = (
         df.withColumn("ln", F.length(F.col("name", dtype=str)))

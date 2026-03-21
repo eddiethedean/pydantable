@@ -67,6 +67,29 @@ class Expr:  # type: ignore[override]
         )
         return CompareOp(rust_expr=rust_expr)
 
+    def cast(self, dtype: Any) -> Expr:
+        rust_expr = _require_rust_core().cast_expr(self._rust_expr, dtype)
+        return Expr(rust_expr=rust_expr)
+
+    def is_null(self) -> Expr:
+        rust_expr = _require_rust_core().is_null_expr(self._rust_expr)
+        return Expr(rust_expr=rust_expr)
+
+    def is_not_null(self) -> Expr:
+        rust_expr = _require_rust_core().is_not_null_expr(self._rust_expr)
+        return Expr(rust_expr=rust_expr)
+
+    def over(
+        self,
+        partition_by: str | list[str] | tuple[str, ...] | None = None,
+        order_by: str | list[str] | tuple[str, ...] | None = None,
+    ) -> Expr:
+        # Placeholder API surface for phase P6. Current execution paths do not
+        # yet model full window-expression AST lowering.
+        _ = partition_by
+        _ = order_by
+        return self
+
     # Arithmetic
     def __add__(self, other: Any) -> Expr:
         return self._binary("+", other)
@@ -110,18 +133,6 @@ class Expr:  # type: ignore[override]
 
     def __ge__(self, other: Any) -> Expr:
         return self._compare(">=", other)
-
-    def is_null(self) -> Expr:
-        rust_expr = _require_rust_core().expr_is_null(self._rust_expr)
-        return Expr(rust_expr=rust_expr)
-
-    def is_not_null(self) -> Expr:
-        rust_expr = _require_rust_core().expr_is_not_null(self._rust_expr)
-        return Expr(rust_expr=rust_expr)
-
-    def cast(self, dtype: Any) -> Expr:
-        rust_expr = _require_rust_core().expr_cast(self._rust_expr, dtype)
-        return Expr(rust_expr=rust_expr)
 
     def isin(self, *values: Any) -> Expr:
         if len(values) == 1 and isinstance(values[0], (list, tuple)):
@@ -174,8 +185,9 @@ class WhenChain:
         if not isinstance(value, Expr):
             raise TypeError("otherwise() expects an Expr.")
         rust = _require_rust_core()
-        pairs = [(c._rust_expr, v._rust_expr) for c, v in self._branches]
-        return Expr(rust_expr=rust.expr_case_when(pairs, value._rust_expr))
+        conds = [c._rust_expr for c, _ in self._branches]
+        thens = [v._rust_expr for _, v in self._branches]
+        return Expr(rust_expr=rust.expr_case_when(conds, thens, value._rust_expr))
 
 
 def when(condition: Expr, value: Expr) -> WhenChain:
@@ -216,7 +228,7 @@ def coalesce(*exprs: Expr) -> Expr:
         raise TypeError("coalesce() requires at least one expression.")
     rust = _require_rust_core()
     return Expr(
-        rust_expr=rust.expr_coalesce([e._rust_expr for e in exprs]),
+        rust_expr=rust.coalesce_exprs([e._rust_expr for e in exprs]),
     )
 
 

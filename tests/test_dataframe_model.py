@@ -142,3 +142,109 @@ def test_row_model_rejects_extra_fields():
     row_model = UserDF.row_model()
     with pytest.raises(ValidationError):
         row_model.model_validate({"id": 1, "age": None, "extra": "x"})
+
+
+def test_p1_dataframe_model_methods_and_concat():
+    df = UserDF({"id": [3, 1, 2, 2], "age": [30, None, 20, 20]})
+
+    sorted_df = df.sort("id")
+    assert sorted_df.collect()["id"] == [1, 2, 2, 3]
+
+    unique_df = sorted_df.unique(subset=["id", "age"])
+    assert unique_df.collect() == {"id": [1, 2, 3], "age": [None, 20, 30]}
+
+    renamed = unique_df.rename({"age": "years"})
+    assert set(renamed.schema_fields().keys()) == {"id", "years"}
+    assert renamed.schema_fields()["years"] == int | None
+    assert renamed.slice(1, 2).collect() == {"id": [2, 3], "years": [20, 30]}
+    assert renamed.head(1).collect() == {"id": [1], "years": [None]}
+    assert renamed.tail(1).collect() == {"id": [3], "years": [30]}
+
+    first = renamed.select("id")
+    second = renamed.select("id")
+    cat = DataFrameModel.concat([first, second], how="vertical")
+    assert cat.collect() == {"id": [1, 2, 3, 1, 2, 3]}
+
+
+def test_p2_dataframe_model_fill_and_drop_nulls() -> None:
+    df = UserDF({"id": [1, 2, 3], "age": [10, None, 30]})
+    filled = df.fill_null(0, subset=["age"])
+    assert filled.collect() == {"id": [1, 2, 3], "age": [10, 0, 30]}
+    assert filled.schema_fields()["age"] is int
+
+    dropped = df.drop_nulls(subset=["age"])
+    assert dropped.collect() == {"id": [1, 3], "age": [10, 30]}
+
+
+def test_p4_dataframe_model_groupby_aggregations_schema() -> None:
+    df = UserDF({"id": [1, 1, 2], "age": [10, 20, 30]})
+    grouped = df.group_by("id").agg(
+        age_min=("min", "age"),
+        age_max=("max", "age"),
+        age_median=("median", "age"),
+        age_std=("std", "age"),
+        age_var=("var", "age"),
+        age_first=("first", "age"),
+        age_last=("last", "age"),
+        age_n_unique=("n_unique", "age"),
+    )
+    schema = grouped.schema_fields()
+    assert schema["age_min"] == int | None
+    assert schema["age_max"] == int | None
+    assert schema["age_median"] == float | None
+    assert schema["age_std"] == float | None
+    assert schema["age_var"] == float | None
+    assert schema["age_first"] == int | None
+    assert schema["age_last"] == int | None
+    assert schema["age_n_unique"] is int
+
+
+def test_p5_dataframe_model_reshape_methods() -> None:
+    class SalesDF(DataFrameModel):
+        id: int
+        k: str
+        v: int | None
+
+    df = SalesDF({"id": [1, 1], "k": ["A", "B"], "v": [10, None]})
+    melted = df.melt(
+        id_vars=["id"], value_vars=["v"], variable_name="var", value_name="val"
+    )
+    out = melted.collect()
+    assert out == {"id": [1, 1], "var": ["v", "v"], "val": [10, None]}
+    assert melted.schema_fields()["var"] is str
+    assert melted.schema_fields()["val"] == int | None
+
+    pivoted = df.pivot(index="id", columns="k", values="v", aggregate_function="first")
+    p_out = pivoted.collect()
+    assert p_out["id"] == [1]
+    assert p_out["A_first"] == [10]
+    assert p_out["B_first"] == [None]
+
+
+def test_p6_dataframe_model_rolling_and_dynamic() -> None:
+    class TSModel(DataFrameModel):
+        id: int
+        ts: int
+        v: int | None
+
+    df = TSModel(
+        {
+            "id": [1, 1, 1],
+            "ts": [0, 3600, 7200],
+            "v": [10, None, 30],
+        }
+    )
+    rolled = df.rolling_agg(
+        on="ts",
+        column="v",
+        window_size="2h",
+        op="sum",
+        out_name="v_roll_sum",
+        by=["id"],
+    )
+    assert rolled.collect()["v_roll_sum"] == [10, 10, 40]
+
+    grouped = df.group_by_dynamic("ts", every="1h", by=["id"]).agg(
+        v_count=("count", "v")
+    )
+    assert "v_count" in grouped.collect()

@@ -1,23 +1,77 @@
 use std::collections::HashSet;
 
 #[cfg(not(feature = "polars_engine"))]
-use std::cmp::Ordering;
-#[cfg(not(feature = "polars_engine"))]
 use std::collections::HashMap;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict};
+use pyo3::types::{PyAny, PyDate, PyDateTime, PyDelta, PyDict, PyList};
 
 use crate::dtype::{dtype_to_descriptor_py, py_value_to_dtype, BaseType, DTypeDesc};
 
 #[cfg(feature = "polars_engine")]
-use polars::lazy::dsl::{coalesce as pl_coalesce, col, lit, Expr as PolarsExpr};
+use polars::lazy::dsl::{coalesce, col, concat_str, lit, ternary_expr, Expr as PolarsExpr};
 #[cfg(feature = "polars_engine")]
 use polars::prelude::Literal;
 #[cfg(feature = "polars_engine")]
-use polars::prelude::{
-    concat_str, when as pl_when, DataType, NamedFrom, Null, PlSmallStr, Series,
-};
+use polars::prelude::{ClosedInterval, DataType, NamedFrom, Null, Series, TimeUnit};
+
+#[cfg(feature = "polars_engine")]
+fn literals_to_series(values: &[LiteralValue], base: BaseType) -> PyResult<Series> {
+    match base {
+        BaseType::Int => {
+            let v: Vec<i64> = values
+                .iter()
+                .map(|x| match x {
+                    LiteralValue::Int(i) => Ok(*i),
+                    _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "isin() int list expected.",
+                    )),
+                })
+                .collect::<PyResult<_>>()?;
+            Ok(Series::new("".into(), v))
+        }
+        BaseType::Float => {
+            let v: Vec<f64> = values
+                .iter()
+                .map(|x| match x {
+                    LiteralValue::Float(f) => Ok(*f),
+                    LiteralValue::Int(i) => Ok(*i as f64),
+                    _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "isin() float list expected.",
+                    )),
+                })
+                .collect::<PyResult<_>>()?;
+            Ok(Series::new("".into(), v))
+        }
+        BaseType::Bool => {
+            let v: Vec<bool> = values
+                .iter()
+                .map(|x| match x {
+                    LiteralValue::Bool(b) => Ok(*b),
+                    _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "isin() bool list expected.",
+                    )),
+                })
+                .collect::<PyResult<_>>()?;
+            Ok(Series::new("".into(), v))
+        }
+        BaseType::Str => {
+            let v: Vec<String> = values
+                .iter()
+                .map(|x| match x {
+                    LiteralValue::Str(s) => Ok(s.clone()),
+                    _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "isin() str list expected.",
+                    )),
+                })
+                .collect::<PyResult<_>>()?;
+            Ok(Series::new("".into(), v))
+        }
+        _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "isin() unsupported dtype for list literal.",
+        )),
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ArithOp {
@@ -37,12 +91,48 @@ pub enum CmpOp {
     Ge,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LiteralValue {
     Int(i64),
     Float(f64),
     Bool(bool),
     Str(String),
+    DateTimeMicros(i64),
+    DateDays(i32),
+    DurationMicros(i64),
+}
+
+fn base_type_json(b: BaseType) -> &'static str {
+    match b {
+        BaseType::Int => "int",
+        BaseType::Float => "float",
+        BaseType::Bool => "bool",
+        BaseType::Str => "str",
+        BaseType::DateTime => "datetime",
+        BaseType::Date => "date",
+        BaseType::Duration => "duration",
+    }
+}
+
+#[cfg(not(feature = "polars_engine"))]
+fn literal_between_inclusive(x: &LiteralValue, lo: &LiteralValue, hi: &LiteralValue) -> bool {
+    match (x, lo, hi) {
+        (LiteralValue::Int(a), LiteralValue::Int(b), LiteralValue::Int(c)) => *a >= *b && *a <= *c,
+        (LiteralValue::Float(a), LiteralValue::Float(b), LiteralValue::Float(c)) => {
+            *a >= *b && *a <= *c
+        }
+        (LiteralValue::Int(a), LiteralValue::Int(b), LiteralValue::Float(c)) => {
+            *a as f64 >= *b as f64 && *a as f64 <= *c
+        }
+        (LiteralValue::Int(a), LiteralValue::Float(b), LiteralValue::Float(c)) => {
+            *a as f64 >= *b && *a as f64 <= *c
+        }
+        (LiteralValue::Float(a), LiteralValue::Int(b), LiteralValue::Int(c)) => {
+            *a >= *b as f64 && *a <= *c as f64
+        }
+        (LiteralValue::Str(a), LiteralValue::Str(b), LiteralValue::Str(c)) => a >= b && a <= c,
+        _ => false,
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -67,32 +157,30 @@ pub enum ExprNode {
         right: Box<ExprNode>,
         dtype: DTypeDesc,
     },
+    Cast {
+        input: Box<ExprNode>,
+        dtype: DTypeDesc,
+    },
     IsNull {
-        inner: Box<ExprNode>,
+        input: Box<ExprNode>,
         dtype: DTypeDesc,
     },
     IsNotNull {
-        inner: Box<ExprNode>,
+        input: Box<ExprNode>,
         dtype: DTypeDesc,
     },
     Coalesce {
         exprs: Vec<ExprNode>,
         dtype: DTypeDesc,
     },
-    /// `CASE WHEN c1 THEN v1 ... ELSE e END` — first true condition wins; null/false skips.
     CaseWhen {
         branches: Vec<(ExprNode, ExprNode)>,
         else_: Box<ExprNode>,
         dtype: DTypeDesc,
     },
-    Cast {
-        inner: Box<ExprNode>,
-        to: BaseType,
-        dtype: DTypeDesc,
-    },
     InList {
         inner: Box<ExprNode>,
-        candidates: Vec<LiteralValue>,
+        values: Vec<LiteralValue>,
         dtype: DTypeDesc,
     },
     Between {
@@ -107,9 +195,7 @@ pub enum ExprNode {
     },
     Substring {
         inner: Box<ExprNode>,
-        /// 1-based start index (PySpark `substr` convention).
         start: Box<ExprNode>,
-        /// Length in characters; if None, slice to end of string.
         length: Option<Box<ExprNode>>,
         dtype: DTypeDesc,
     },
@@ -126,16 +212,16 @@ impl ExprNode {
             ExprNode::Literal { dtype, .. } => *dtype,
             ExprNode::BinaryOp { dtype, .. } => *dtype,
             ExprNode::CompareOp { dtype, .. } => *dtype,
+            ExprNode::Cast { dtype, .. } => *dtype,
             ExprNode::IsNull { dtype, .. } => *dtype,
             ExprNode::IsNotNull { dtype, .. } => *dtype,
-            ExprNode::Coalesce { dtype, .. } => *dtype,
-            ExprNode::CaseWhen { dtype, .. } => *dtype,
-            ExprNode::Cast { dtype, .. } => *dtype,
-            ExprNode::InList { dtype, .. } => *dtype,
-            ExprNode::Between { dtype, .. } => *dtype,
-            ExprNode::StringConcat { dtype, .. } => *dtype,
-            ExprNode::Substring { dtype, .. } => *dtype,
-            ExprNode::StringLength { dtype, .. } => *dtype,
+            ExprNode::Coalesce { dtype, .. }
+            | ExprNode::CaseWhen { dtype, .. }
+            | ExprNode::InList { dtype, .. }
+            | ExprNode::Between { dtype, .. }
+            | ExprNode::StringConcat { dtype, .. }
+            | ExprNode::Substring { dtype, .. }
+            | ExprNode::StringLength { dtype, .. } => *dtype,
         }
     }
 
@@ -153,9 +239,9 @@ impl ExprNode {
                 out.extend(right.referenced_columns());
                 out
             }
-            ExprNode::IsNull { inner, .. } | ExprNode::IsNotNull { inner, .. } => {
-                inner.referenced_columns()
-            }
+            ExprNode::Cast { input, .. }
+            | ExprNode::IsNull { input, .. }
+            | ExprNode::IsNotNull { input, .. } => input.referenced_columns(),
             ExprNode::Coalesce { exprs, .. } => {
                 let mut out = HashSet::new();
                 for e in exprs {
@@ -164,9 +250,7 @@ impl ExprNode {
                 out
             }
             ExprNode::CaseWhen {
-                branches,
-                else_,
-                ..
+                branches, else_, ..
             } => {
                 let mut out = else_.referenced_columns();
                 for (c, t) in branches {
@@ -175,9 +259,10 @@ impl ExprNode {
                 }
                 out
             }
-            ExprNode::Cast { inner, .. } => inner.referenced_columns(),
             ExprNode::InList { inner, .. } => inner.referenced_columns(),
-            ExprNode::Between { inner, low, high, .. } => {
+            ExprNode::Between {
+                inner, low, high, ..
+            } => {
                 let mut out = inner.referenced_columns();
                 out.extend(low.referenced_columns());
                 out.extend(high.referenced_columns());
@@ -198,8 +283,8 @@ impl ExprNode {
             } => {
                 let mut out = inner.referenced_columns();
                 out.extend(start.referenced_columns());
-                if let Some(len) = length {
-                    out.extend(len.referenced_columns());
+                if let Some(l) = length {
+                    out.extend(l.referenced_columns());
                 }
                 out
             }
@@ -288,7 +373,10 @@ impl ExprNode {
                     (BaseType::Int, BaseType::Int | BaseType::Float)
                         | (BaseType::Float, BaseType::Int | BaseType::Float)
                 ) || (lb == BaseType::Bool && rb == BaseType::Bool)
-                    || (lb == BaseType::Str && rb == BaseType::Str));
+                    || (lb == BaseType::Str && rb == BaseType::Str)
+                    || (lb == BaseType::DateTime && rb == BaseType::DateTime)
+                    || (lb == BaseType::Date && rb == BaseType::Date)
+                    || (lb == BaseType::Duration && rb == BaseType::Duration));
 
                 if !allowed {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -323,10 +411,13 @@ impl ExprNode {
                         | (BaseType::Float, BaseType::Int | BaseType::Float)
                 );
                 let allowed_str = lb == BaseType::Str && rb == BaseType::Str;
+                let allowed_temporal = (lb == BaseType::DateTime && rb == BaseType::DateTime)
+                    || (lb == BaseType::Date && rb == BaseType::Date)
+                    || (lb == BaseType::Duration && rb == BaseType::Duration);
 
-                if !(allowed_numeric || allowed_str) {
+                if !(allowed_numeric || allowed_str || allowed_temporal) {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "Ordering comparisons require numeric-numeric or str-str operands.",
+                        "Ordering comparisons require numeric-numeric, str-str, or same temporal operands.",
                     ));
                 }
 
@@ -382,192 +473,174 @@ impl ExprNode {
         })
     }
 
-    fn infer_coalesce_dtype(parts: &[ExprNode]) -> PyResult<DTypeDesc> {
-        if parts.is_empty() {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "coalesce() requires at least one expression.",
+    pub fn make_cast(input: ExprNode, target: DTypeDesc) -> PyResult<Self> {
+        let base = target.base.ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() target dtype must have known base.",
+            )
+        })?;
+        let in_base = input.dtype().base.ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() input dtype must have known base.",
+            )
+        })?;
+        let allowed = matches!(
+            (in_base, base),
+            (
+                BaseType::Int,
+                BaseType::Int | BaseType::Float | BaseType::Bool | BaseType::Str
+            ) | (
+                BaseType::Float,
+                BaseType::Int | BaseType::Float | BaseType::Bool | BaseType::Str
+            ) | (
+                BaseType::Bool,
+                BaseType::Int | BaseType::Float | BaseType::Bool | BaseType::Str
+            ) | (
+                BaseType::Str,
+                BaseType::Int | BaseType::Float | BaseType::Bool | BaseType::Str
+            )
+        );
+        if !allowed {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() unsupported primitive conversion.",
             ));
         }
-        let mut cur: Option<BaseType> = None;
-        for p in parts {
-            let b = p.dtype().base.ok_or_else(|| {
-                PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "coalesce() operands must have known scalar types.",
-                )
-            })?;
-            cur = Some(match (cur, b) {
-                (None, b) => b,
-                (Some(BaseType::Int), BaseType::Int) => BaseType::Int,
-                (Some(BaseType::Int), BaseType::Float) | (Some(BaseType::Float), BaseType::Int) => {
-                    BaseType::Float
-                }
-                (Some(BaseType::Float), BaseType::Float) => BaseType::Float,
-                (Some(a), b) if a == b => a,
-                (Some(a), b) => {
-                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
-                        "coalesce() requires compatible types; cannot mix {a:?} with {b:?}."
-                    )));
-                }
-            });
-        }
-        Ok(DTypeDesc {
-            base: cur,
-            nullable: true,
+        let input_nullable = input.dtype().nullable;
+        Ok(ExprNode::Cast {
+            input: Box::new(input),
+            dtype: DTypeDesc {
+                base: Some(base),
+                nullable: input_nullable || target.nullable,
+            },
         })
     }
 
-    pub fn make_is_null(inner: ExprNode) -> PyResult<Self> {
+    pub fn make_is_null(input: ExprNode) -> PyResult<Self> {
         Ok(ExprNode::IsNull {
-            inner: Box::new(inner),
-            dtype: DTypeDesc {
-                base: Some(BaseType::Bool),
-                nullable: false,
-            },
+            input: Box::new(input),
+            dtype: DTypeDesc::non_nullable(BaseType::Bool),
         })
     }
 
-    pub fn make_is_not_null(inner: ExprNode) -> PyResult<Self> {
+    pub fn make_is_not_null(input: ExprNode) -> PyResult<Self> {
         Ok(ExprNode::IsNotNull {
-            inner: Box::new(inner),
-            dtype: DTypeDesc {
-                base: Some(BaseType::Bool),
-                nullable: false,
-            },
+            input: Box::new(input),
+            dtype: DTypeDesc::non_nullable(BaseType::Bool),
         })
     }
 
     pub fn make_coalesce(exprs: Vec<ExprNode>) -> PyResult<Self> {
-        let dtype = Self::infer_coalesce_dtype(&exprs)?;
-        Ok(ExprNode::Coalesce { exprs, dtype })
-    }
-
-    fn infer_case_when_dtype(branches: &[(ExprNode, ExprNode)], else_: &ExprNode) -> PyResult<DTypeDesc> {
-        let mut parts: Vec<ExprNode> = Vec::new();
-        for (_, t) in branches {
-            parts.push(t.clone());
-        }
-        parts.push(else_.clone());
-        Self::infer_coalesce_dtype(&parts)
-    }
-
-    pub fn make_case_when(
-        branches: Vec<(ExprNode, ExprNode)>,
-        else_: ExprNode,
-    ) -> PyResult<Self> {
-        if branches.is_empty() {
+        if exprs.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "case_when requires at least one (condition, value) branch.",
+                "coalesce() requires at least one expression.",
             ));
         }
-        for (cond, _) in branches.iter() {
-            let d = cond.dtype();
-            if d.base != Some(BaseType::Bool) {
+        let mut nullable = false;
+        let first_base = exprs[0].dtype().base.ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "coalesce() requires expressions with known dtypes.",
+            )
+        })?;
+        for e in &exprs {
+            if e.dtype().base != Some(first_base) {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "CASE WHEN condition must be bool or Optional[bool].",
+                    "coalesce() requires compatible scalar dtypes.",
                 ));
             }
+            nullable |= e.dtype().nullable;
         }
-        let dtype = Self::infer_case_when_dtype(&branches, &else_)?;
+        Ok(ExprNode::Coalesce {
+            exprs,
+            dtype: DTypeDesc {
+                base: Some(first_base),
+                nullable,
+            },
+        })
+    }
+
+    pub fn make_case_when(branches: Vec<(ExprNode, ExprNode)>, else_: ExprNode) -> PyResult<Self> {
+        if branches.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "case_when() requires at least one branch.",
+            ));
+        }
+        let mut nullable = else_.dtype().nullable;
+        let first_base = branches[0].1.dtype().base.ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "case_when() requires then-branches with known dtypes.",
+            )
+        })?;
+        for (_, t) in &branches {
+            if t.dtype().base != Some(first_base) {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "case_when() requires compatible then dtypes.",
+                ));
+            }
+            nullable |= t.dtype().nullable;
+        }
+        if else_.dtype().base != Some(first_base) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "case_when() else branch dtype must match then branches.",
+            ));
+        }
         Ok(ExprNode::CaseWhen {
             branches,
             else_: Box::new(else_),
-            dtype,
-        })
-    }
-
-    pub fn make_cast(inner: ExprNode, to: BaseType) -> PyResult<Self> {
-        let nullable = inner.dtype().nullable;
-        Ok(ExprNode::Cast {
-            inner: Box::new(inner),
-            to,
             dtype: DTypeDesc {
-                base: Some(to),
+                base: Some(first_base),
                 nullable,
             },
         })
     }
 
-    pub fn make_in_list(inner: ExprNode, candidates: Vec<LiteralValue>) -> PyResult<Self> {
-        if candidates.is_empty() {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "isin() requires at least one literal value.",
-            ));
-        }
+    pub fn make_in_list(inner: ExprNode, values: Vec<LiteralValue>) -> PyResult<Self> {
         let ib = inner.dtype().base.ok_or_else(|| {
             PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "isin() inner expression must have a known scalar type.",
+                "isin() requires a column expression with known dtype.",
             )
         })?;
-        let nullable = inner.dtype().nullable;
-        for c in candidates.iter() {
-            Self::check_literal_matches_base(ib, c)?;
+        if values.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "isin() requires at least one value.",
+            ));
+        }
+        for v in &values {
+            let vb = match v {
+                LiteralValue::Int(_) => Some(BaseType::Int),
+                LiteralValue::Float(_) => Some(BaseType::Float),
+                LiteralValue::Bool(_) => Some(BaseType::Bool),
+                LiteralValue::Str(_) => Some(BaseType::Str),
+                LiteralValue::DateTimeMicros(_)
+                | LiteralValue::DateDays(_)
+                | LiteralValue::DurationMicros(_) => None,
+            };
+            if vb != Some(ib) {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "isin() value types must match column dtype.",
+                ));
+            }
         }
         Ok(ExprNode::InList {
             inner: Box::new(inner),
-            candidates,
-            dtype: DTypeDesc {
-                base: Some(BaseType::Bool),
-                nullable,
-            },
+            values,
+            dtype: DTypeDesc::non_nullable(BaseType::Bool),
         })
-    }
-
-    fn check_literal_matches_base(base: BaseType, lit: &LiteralValue) -> PyResult<()> {
-        let ok = match (base, lit) {
-            (BaseType::Int, LiteralValue::Int(_)) => true,
-            (BaseType::Float, LiteralValue::Int(_)) | (BaseType::Float, LiteralValue::Float(_)) => {
-                true
-            }
-            (BaseType::Int, LiteralValue::Float(_)) => false,
-            (BaseType::Bool, LiteralValue::Bool(_)) => true,
-            (BaseType::Str, LiteralValue::Str(_)) => true,
-            _ => false,
-        };
-        if ok {
-            Ok(())
-        } else {
-            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "isin() literal type does not match column type.",
-            ))
-        }
     }
 
     pub fn make_between(inner: ExprNode, low: ExprNode, high: ExprNode) -> PyResult<Self> {
         let ib = inner.dtype().base.ok_or_else(|| {
-            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "between() requires a typed inner expression.",
-            )
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>("between() requires known inner dtype.")
         })?;
-        let lb = low.dtype().base.ok_or_else(|| {
-            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "between() low bound must have a known type.",
-            )
-        })?;
-        let hb = high.dtype().base.ok_or_else(|| {
-            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "between() high bound must have a known type.",
-            )
-        })?;
-        let allowed = matches!(
-            (ib, lb, hb),
-            (BaseType::Int | BaseType::Float, BaseType::Int | BaseType::Float, BaseType::Int | BaseType::Float)
-                | (BaseType::Str, BaseType::Str, BaseType::Str)
-        );
-        if !allowed {
+        if low.dtype().base != Some(ib) || high.dtype().base != Some(ib) {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "between() supports numeric or string bounds compatible with the inner column.",
+                "between() bounds must match inner dtype.",
             ));
         }
-        let nullable =
-            inner.dtype().nullable || low.dtype().nullable || high.dtype().nullable;
         Ok(ExprNode::Between {
             inner: Box::new(inner),
             low: Box::new(low),
             high: Box::new(high),
-            dtype: DTypeDesc {
-                base: Some(BaseType::Bool),
-                nullable,
-            },
+            dtype: DTypeDesc::non_nullable(BaseType::Bool),
         })
     }
 
@@ -577,15 +650,14 @@ impl ExprNode {
                 "concat() requires at least two expressions.",
             ));
         }
-        let mut nullable = false;
-        for p in parts.iter() {
+        for p in &parts {
             if p.dtype().base != Some(BaseType::Str) {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "concat() arguments must be string-typed expressions.",
+                    "concat() requires string-typed expressions.",
                 ));
             }
-            nullable |= p.dtype().nullable;
         }
+        let nullable = parts.iter().any(|p| p.dtype().nullable);
         Ok(ExprNode::StringConcat {
             parts,
             dtype: DTypeDesc {
@@ -602,27 +674,24 @@ impl ExprNode {
     ) -> PyResult<Self> {
         if inner.dtype().base != Some(BaseType::Str) {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "substring() inner expression must be string-typed.",
+                "substring() requires a string column.",
             ));
         }
         if start.dtype().base != Some(BaseType::Int) {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "substring() start must be int-typed (1-based position).",
+                "substring() start must be int.",
             ));
         }
-        if let Some(ref len) = length {
-            if len.dtype().base != Some(BaseType::Int) {
+        if let Some(l) = &length {
+            if l.dtype().base != Some(BaseType::Int) {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "substring() length must be int-typed when provided.",
+                    "substring() length must be int.",
                 ));
             }
         }
         let nullable = inner.dtype().nullable
             || start.dtype().nullable
-            || length
-                .as_ref()
-                .map(|l| l.dtype().nullable)
-                .unwrap_or(false);
+            || length.as_ref().map(|l| l.dtype().nullable).unwrap_or(false);
         Ok(ExprNode::Substring {
             inner: Box::new(inner),
             start: Box::new(start),
@@ -637,7 +706,7 @@ impl ExprNode {
     pub fn make_string_length(inner: ExprNode) -> PyResult<Self> {
         if inner.dtype().base != Some(BaseType::Str) {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "length() expects a string-typed expression.",
+                "length() requires a string column.",
             ));
         }
         let nullable = inner.dtype().nullable;
@@ -779,85 +848,124 @@ impl ExprNode {
                         (Some(va), Some(vb)) => {
                             let res_bool = match op {
                                 CmpOp::Eq | CmpOp::Ne => {
-                                    let eq = match effective_base {
-                                        BaseType::Int | BaseType::Float => {
-                                            let af = match va {
-                                                LiteralValue::Int(i) => i as f64,
-                                                LiteralValue::Float(f) => f,
-                                                _ => {
-                                                    return Err(PyErr::new::<
+                                    let eq =
+                                        match effective_base {
+                                            BaseType::Int | BaseType::Float => {
+                                                let af = match va {
+                                                    LiteralValue::Int(i) => i as f64,
+                                                    LiteralValue::Float(f) => f,
+                                                    _ => {
+                                                        return Err(PyErr::new::<
                                                         pyo3::exceptions::PyTypeError,
                                                         _,
                                                     >(
                                                         "Typed equality expected numeric operands.",
                                                     ));
-                                                }
-                                            };
-                                            let bf = match vb {
-                                                LiteralValue::Int(i) => i as f64,
-                                                LiteralValue::Float(f) => f,
-                                                _ => {
-                                                    return Err(PyErr::new::<
+                                                    }
+                                                };
+                                                let bf = match vb {
+                                                    LiteralValue::Int(i) => i as f64,
+                                                    LiteralValue::Float(f) => f,
+                                                    _ => {
+                                                        return Err(PyErr::new::<
                                                         pyo3::exceptions::PyTypeError,
                                                         _,
                                                     >(
                                                         "Typed equality expected numeric operands.",
                                                     ));
-                                                }
-                                            };
-                                            af == bf
-                                        }
-                                        BaseType::Bool => {
-                                            let ab = match va {
-                                                LiteralValue::Bool(b) => b,
-                                                _ => {
-                                                    return Err(PyErr::new::<
+                                                    }
+                                                };
+                                                af == bf
+                                            }
+                                            BaseType::Bool => {
+                                                let ab = match va {
+                                                    LiteralValue::Bool(b) => b,
+                                                    _ => {
+                                                        return Err(PyErr::new::<
                                                         pyo3::exceptions::PyTypeError,
                                                         _,
                                                     >(
                                                         "Typed equality expected bool operands.",
                                                     ));
-                                                }
-                                            };
-                                            let bb = match vb {
-                                                LiteralValue::Bool(b) => b,
-                                                _ => {
-                                                    return Err(PyErr::new::<
+                                                    }
+                                                };
+                                                let bb = match vb {
+                                                    LiteralValue::Bool(b) => b,
+                                                    _ => {
+                                                        return Err(PyErr::new::<
                                                         pyo3::exceptions::PyTypeError,
                                                         _,
                                                     >(
                                                         "Typed equality expected bool operands.",
                                                     ));
-                                                }
-                                            };
-                                            ab == bb
-                                        }
-                                        BaseType::Str => {
-                                            let as_ = match va {
-                                                LiteralValue::Str(s) => s,
+                                                    }
+                                                };
+                                                ab == bb
+                                            }
+                                            BaseType::Str => {
+                                                let as_ = match va {
+                                                    LiteralValue::Str(s) => s,
+                                                    _ => {
+                                                        return Err(PyErr::new::<
+                                                            pyo3::exceptions::PyTypeError,
+                                                            _,
+                                                        >(
+                                                            "Typed equality expected str operands.",
+                                                        ));
+                                                    }
+                                                };
+                                                let bs_ = match vb {
+                                                    LiteralValue::Str(s) => s,
+                                                    _ => {
+                                                        return Err(PyErr::new::<
+                                                            pyo3::exceptions::PyTypeError,
+                                                            _,
+                                                        >(
+                                                            "Typed equality expected str operands.",
+                                                        ));
+                                                    }
+                                                };
+                                                as_ == bs_
+                                            }
+                                            BaseType::DateTime => match (va, vb) {
+                                                (
+                                                    LiteralValue::DateTimeMicros(a),
+                                                    LiteralValue::DateTimeMicros(b),
+                                                ) => a == b,
                                                 _ => {
                                                     return Err(PyErr::new::<
-                                                        pyo3::exceptions::PyTypeError,
-                                                        _,
-                                                    >(
-                                                        "Typed equality expected str operands.",
-                                                    ));
+                                                    pyo3::exceptions::PyTypeError,
+                                                    _,
+                                                >("Typed equality expected datetime operands."));
                                                 }
-                                            };
-                                            let bs_ = match vb {
-                                                LiteralValue::Str(s) => s,
+                                            },
+                                            BaseType::Date => {
+                                                match (va, vb) {
+                                                    (
+                                                        LiteralValue::DateDays(a),
+                                                        LiteralValue::DateDays(b),
+                                                    ) => a == b,
+                                                    _ => {
+                                                        return Err(PyErr::new::<
+                                                    pyo3::exceptions::PyTypeError,
+                                                    _,
+                                                >("Typed equality expected date operands."));
+                                                    }
+                                                }
+                                            }
+                                            BaseType::Duration => match (va, vb) {
+                                                (
+                                                    LiteralValue::DurationMicros(a),
+                                                    LiteralValue::DurationMicros(b),
+                                                ) => a == b,
                                                 _ => {
                                                     return Err(PyErr::new::<
-                                                        pyo3::exceptions::PyTypeError,
-                                                        _,
-                                                    >(
-                                                        "Typed equality expected str operands.",
-                                                    ));
+                                                    pyo3::exceptions::PyTypeError,
+                                                    _,
+                                                >("Typed equality expected duration operands."));
                                                 }
-                                            };
-                                            as_ == bs_
-                                        }
-                                    };
+                                            },
+                                        };
                                     if *op == CmpOp::Eq {
                                         eq
                                     } else {
@@ -928,6 +1036,74 @@ impl ExprNode {
                                                 CmpOp::Ge => as_ >= bs_,
                                             }
                                         }
+                                        BaseType::DateTime => {
+                                            let (a, b) = match (va, vb) {
+                                                (
+                                                    LiteralValue::DateTimeMicros(a),
+                                                    LiteralValue::DateTimeMicros(b),
+                                                ) => (a, b),
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed ordering expected datetime operands.",
+                                                    ));
+                                                }
+                                            };
+                                            match op {
+                                                CmpOp::Lt => a < b,
+                                                CmpOp::Le => a <= b,
+                                                CmpOp::Gt => a > b,
+                                                CmpOp::Ge => a >= b,
+                                                _ => false,
+                                            }
+                                        }
+                                        BaseType::Date => {
+                                            let (a, b) =
+                                                match (va, vb) {
+                                                    (
+                                                        LiteralValue::DateDays(a),
+                                                        LiteralValue::DateDays(b),
+                                                    ) => (a, b),
+                                                    _ => {
+                                                        return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >("Typed ordering expected date operands."));
+                                                    }
+                                                };
+                                            match op {
+                                                CmpOp::Lt => a < b,
+                                                CmpOp::Le => a <= b,
+                                                CmpOp::Gt => a > b,
+                                                CmpOp::Ge => a >= b,
+                                                _ => false,
+                                            }
+                                        }
+                                        BaseType::Duration => {
+                                            let (a, b) = match (va, vb) {
+                                                (
+                                                    LiteralValue::DurationMicros(a),
+                                                    LiteralValue::DurationMicros(b),
+                                                ) => (a, b),
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed ordering expected duration operands.",
+                                                    ));
+                                                }
+                                            };
+                                            match op {
+                                                CmpOp::Lt => a < b,
+                                                CmpOp::Le => a <= b,
+                                                CmpOp::Gt => a > b,
+                                                CmpOp::Ge => a >= b,
+                                                _ => false,
+                                            }
+                                        }
                                         _ => {
                                             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                                             "Ordering operand types not supported by typed skeleton.",
@@ -944,153 +1120,150 @@ impl ExprNode {
 
                 Ok(out)
             }
-            ExprNode::IsNull { inner, .. } => {
-                let vals = inner.eval(ctx, n)?;
+            ExprNode::Cast { input, dtype } => {
+                let vals = input.eval(ctx, n)?;
+                let mut out = Vec::with_capacity(n);
+                let target = dtype.base.ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "cast() target dtype must have known base.",
+                    )
+                })?;
+                for v in vals.into_iter() {
+                    match v {
+                        None => out.push(None),
+                        Some(v) => out.push(Some(cast_literal_value(v, target)?)),
+                    }
+                }
+                Ok(out)
+            }
+            ExprNode::IsNull { input, .. } => {
+                let vals = input.eval(ctx, n)?;
                 Ok(vals
                     .into_iter()
                     .map(|v| Some(LiteralValue::Bool(v.is_none())))
                     .collect())
             }
-            ExprNode::IsNotNull { inner, .. } => {
-                let vals = inner.eval(ctx, n)?;
+            ExprNode::IsNotNull { input, .. } => {
+                let vals = input.eval(ctx, n)?;
                 Ok(vals
                     .into_iter()
                     .map(|v| Some(LiteralValue::Bool(v.is_some())))
                     .collect())
             }
-            ExprNode::Coalesce { exprs, dtype } => {
-                let rows: Vec<Vec<Option<LiteralValue>>> = exprs
-                    .iter()
-                    .map(|e| e.eval(ctx, n))
-                    .collect::<PyResult<_>>()?;
-                let base = dtype.base.ok_or_else(|| {
-                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "Coalesce result dtype base cannot be unknown.",
-                    )
-                })?;
-                let m = rows.first().map(|r| r.len()).unwrap_or(0);
-                let mut out = Vec::with_capacity(m);
-                for i in 0..m {
-                    let mut picked: Option<LiteralValue> = None;
-                    for row in &rows {
-                        if let Some(ref v) = row[i] {
-                            picked = Some(v.clone());
-                            break;
+            ExprNode::Coalesce { exprs, .. } => {
+                let mut cols: Vec<Vec<Option<LiteralValue>>> = Vec::new();
+                for e in exprs {
+                    cols.push(e.eval(ctx, n)?);
+                }
+                let mut out: Vec<Option<LiteralValue>> = vec![None; n];
+                for i in 0..n {
+                    for c in &cols {
+                        if let Some(cell) = c.get(i) {
+                            if let Some(lv) = cell {
+                                out[i] = Some(lv.clone());
+                                break;
+                            }
                         }
                     }
-                    out.push(coalesce_cell_to_dtype(picked, base)?);
                 }
                 Ok(out)
             }
             ExprNode::CaseWhen {
-                branches,
-                else_,
-                dtype,
+                branches, else_, ..
             } => {
-                let base = dtype.base.ok_or_else(|| {
-                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "CaseWhen result dtype base cannot be unknown.",
-                    )
-                })?;
-                let cond_cols: Vec<Vec<Option<LiteralValue>>> = branches
-                    .iter()
-                    .map(|(c, _)| c.eval(ctx, n))
-                    .collect::<PyResult<_>>()?;
-                let then_cols: Vec<Vec<Option<LiteralValue>>> = branches
-                    .iter()
-                    .map(|(_, t)| t.eval(ctx, n))
-                    .collect::<PyResult<_>>()?;
-                let else_vals = else_.eval(ctx, n)?;
-                let mut out = Vec::with_capacity(n);
+                let mut cond_cols: Vec<Vec<Option<LiteralValue>>> = Vec::new();
+                let mut then_cols: Vec<Vec<Option<LiteralValue>>> = Vec::new();
+                for (c, t) in branches {
+                    cond_cols.push(c.eval(ctx, n)?);
+                    then_cols.push(t.eval(ctx, n)?);
+                }
+                let else_v = else_.eval(ctx, n)?;
+                let mut out: Vec<Option<LiteralValue>> = Vec::with_capacity(n);
                 for i in 0..n {
-                    let mut chosen: Option<Option<LiteralValue>> = None;
-                    for (ci, ti) in cond_cols.iter().zip(then_cols.iter()) {
-                        match &ci[i] {
+                    let mut picked: Option<LiteralValue> = None;
+                    for (cc, tc) in cond_cols.iter().zip(then_cols.iter()) {
+                        let cond = cc.get(i).and_then(|x| x.as_ref());
+                        match cond {
                             Some(LiteralValue::Bool(true)) => {
-                                chosen = Some(ti[i].clone());
+                                picked = tc.get(i).and_then(|x| x.clone());
                                 break;
                             }
                             Some(LiteralValue::Bool(false)) | None => {}
                             _ => {
-                                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                                    "CASE WHEN condition must evaluate to bool or null.",
+                                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                    "CASE WHEN expects boolean conditions.",
                                 ));
                             }
                         }
                     }
-                    let cell = match chosen {
-                        None => else_vals[i].clone(),
-                        Some(v) => v,
-                    };
-                    out.push(coalesce_cell_to_dtype(cell, base)?);
+                    if picked.is_none() {
+                        picked = else_v.get(i).and_then(|x| x.clone());
+                    }
+                    out.push(picked);
                 }
                 Ok(out)
             }
-            ExprNode::Cast { inner, to, .. } => {
+            ExprNode::InList { inner, values, .. } => {
                 let vals = inner.eval(ctx, n)?;
-                Ok(vals
-                    .into_iter()
-                    .map(|v| cast_literal_to_base(v.as_ref(), *to))
-                    .collect())
-            }
-            ExprNode::InList {
-                inner,
-                candidates,
-                ..
-            } => {
-                let vals = inner.eval(ctx, n)?;
-                let ib = inner.dtype().base.unwrap();
                 Ok(vals
                     .into_iter()
                     .map(|v| match v {
                         None => None,
-                        Some(ref x) => Some(LiteralValue::Bool(
-                            candidates.iter().any(|c| literals_equal(ib, x, c)),
-                        )),
+                        Some(x) => Some(LiteralValue::Bool(values.iter().any(|u| u == &x))),
                     })
                     .collect())
             }
             ExprNode::Between {
-                inner,
-                low,
-                high,
-                ..
+                inner, low, high, ..
             } => {
                 let iv = inner.eval(ctx, n)?;
                 let lv = low.eval(ctx, n)?;
                 let hv = high.eval(ctx, n)?;
                 let mut out = Vec::with_capacity(n);
                 for i in 0..n {
-                    out.push(between_at(&iv[i], &lv[i], &hv[i])?);
+                    let tri = match (
+                        iv.get(i).and_then(|x| x.as_ref()),
+                        lv.get(i).and_then(|x| x.as_ref()),
+                        hv.get(i).and_then(|x| x.as_ref()),
+                    ) {
+                        (Some(a), Some(b), Some(c)) => Some(literal_between_inclusive(a, b, c)),
+                        _ => None,
+                    };
+                    out.push(tri.map(LiteralValue::Bool));
                 }
                 Ok(out)
             }
             ExprNode::StringConcat { parts, .. } => {
-                let mut mat: Vec<Vec<Option<LiteralValue>>> =
-                    parts.iter().map(|p| p.eval(ctx, n)).collect::<PyResult<_>>()?;
-                let mut out = Vec::with_capacity(n);
+                let part_vals: Vec<Vec<Option<LiteralValue>>> = parts
+                    .iter()
+                    .map(|p| p.eval(ctx, n))
+                    .collect::<PyResult<_>>()?;
+                let mut out: Vec<Option<LiteralValue>> = Vec::with_capacity(n);
                 for i in 0..n {
-                    let mut acc = String::new();
+                    let mut buf = String::new();
                     let mut miss = false;
-                    for col in mat.iter_mut() {
-                        match &col[i] {
+                    for col in &part_vals {
+                        match col.get(i).and_then(|x| x.as_ref()) {
                             None => {
                                 miss = true;
                                 break;
                             }
-                            Some(LiteralValue::Str(s)) => acc.push_str(s),
+                            Some(LiteralValue::Str(s)) => buf.push_str(s),
+                            Some(LiteralValue::Int(v)) => buf.push_str(&v.to_string()),
+                            Some(LiteralValue::Float(v)) => buf.push_str(&v.to_string()),
+                            Some(LiteralValue::Bool(v)) => buf.push_str(&v.to_string()),
                             _ => {
                                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                                    "concat() internal type error.",
+                                    "concat() expected string or coercible scalar parts.",
                                 ));
                             }
                         }
                     }
-                    out.push(if miss {
-                        None
+                    if miss {
+                        out.push(None);
                     } else {
-                        Some(LiteralValue::Str(acc))
-                    });
+                        out.push(Some(LiteralValue::Str(buf)));
+                    }
                 }
                 Ok(out)
             }
@@ -1100,55 +1273,70 @@ impl ExprNode {
                 length,
                 ..
             } => {
-                let sv = inner.eval(ctx, n)?;
-                let st = start.eval(ctx, n)?;
-                let ln = match length {
-                    None => None,
-                    Some(l) => Some(l.eval(ctx, n)?),
+                let svals = inner.eval(ctx, n)?;
+                let stvals = start.eval(ctx, n)?;
+                let lnvals = if let Some(l) = length {
+                    Some(l.eval(ctx, n)?)
+                } else {
+                    None
                 };
-                let mut out = Vec::with_capacity(n);
+                let mut out: Vec<Option<LiteralValue>> = Vec::with_capacity(n);
                 for i in 0..n {
-                    let cell = match (&sv[i], &st[i]) {
-                        (None, _) | (_, None) => None,
-                        (Some(LiteralValue::Str(s)), Some(LiteralValue::Int(pos))) => {
-                            let len_opt = match &ln {
+                    let res = match (
+                        svals.get(i).and_then(|x| x.as_ref()),
+                        stvals.get(i).and_then(|x| x.as_ref()),
+                    ) {
+                        (Some(LiteralValue::Str(s)), Some(LiteralValue::Int(st))) => {
+                            let ln = lnvals
+                                .as_ref()
+                                .and_then(|c| c.get(i).and_then(|x| x.as_ref()));
+                            let ln_i = match ln {
+                                Some(LiteralValue::Int(v)) => Some(*v),
                                 None => None,
-                                Some(lv) => match &lv[i] {
-                                    None => None,
-                                    Some(LiteralValue::Int(l)) => Some(*l),
-                                    _ => {
-                                        return Err(PyErr::new::<
-                                            pyo3::exceptions::PyTypeError,
-                                            _,
-                                        >(
-                                            "substring length must be int.",
-                                        ));
-                                    }
-                                },
+                                _ => {
+                                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                        "substring length must be int.",
+                                    ));
+                                }
                             };
-                            Some(LiteralValue::Str(substr_spark(s, *pos, len_opt)))
+                            let slice_spark = |text: &str, start1: i64, len: Option<i64>| {
+                                if start1 < 1 {
+                                    return String::new();
+                                }
+                                let idx = (start1 - 1) as usize;
+                                if idx >= text.len() {
+                                    return String::new();
+                                }
+                                let rest = &text[idx..];
+                                match len {
+                                    None => rest.to_string(),
+                                    Some(l) if l <= 0 => String::new(),
+                                    Some(l) => rest.chars().take(l as usize).collect(),
+                                }
+                            };
+                            Some(LiteralValue::Str(slice_spark(s, *st, ln_i)))
                         }
+                        (None, _) | (_, None) => None,
                         _ => {
                             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                                 "substring expects string and int start.",
                             ));
                         }
                     };
-                    out.push(cell);
+                    out.push(res);
                 }
                 Ok(out)
             }
             ExprNode::StringLength { inner, .. } => {
-                let sv = inner.eval(ctx, n)?;
-                Ok(sv
+                let vals = inner.eval(ctx, n)?;
+                Ok(vals
                     .into_iter()
-                    .map(|v| {
-                        v.map(|lit| match lit {
-                            LiteralValue::Str(s) => {
-                                LiteralValue::Int(s.chars().count() as i64)
-                            }
-                            _ => unreachable!(),
-                        })
+                    .map(|v| match v {
+                        None => None,
+                        Some(LiteralValue::Str(s)) => {
+                            Some(LiteralValue::Int(s.chars().count() as i64))
+                        }
+                        _ => None,
                     })
                     .collect())
             }
@@ -1164,6 +1352,13 @@ impl ExprNode {
                 Some(LiteralValue::Float(f)) => Ok(lit(*f)),
                 Some(LiteralValue::Bool(b)) => Ok(lit(*b)),
                 Some(LiteralValue::Str(s)) => Ok(lit(s.clone())),
+                Some(LiteralValue::DateTimeMicros(v)) => {
+                    Ok(lit(*v).cast(DataType::Datetime(TimeUnit::Microseconds, None)))
+                }
+                Some(LiteralValue::DateDays(v)) => Ok(lit(*v).cast(DataType::Date)),
+                Some(LiteralValue::DurationMicros(v)) => {
+                    Ok(lit(*v).cast(DataType::Duration(TimeUnit::Microseconds)))
+                }
                 None => {
                     let null_expr = Null {}.lit();
                     match dtype.base {
@@ -1171,6 +1366,13 @@ impl ExprNode {
                         Some(BaseType::Float) => Ok(null_expr.cast(DataType::Float64)),
                         Some(BaseType::Bool) => Ok(null_expr.cast(DataType::Boolean)),
                         Some(BaseType::Str) => Ok(null_expr.cast(DataType::String)),
+                        Some(BaseType::DateTime) => {
+                            Ok(null_expr.cast(DataType::Datetime(TimeUnit::Microseconds, None)))
+                        }
+                        Some(BaseType::Date) => Ok(null_expr.cast(DataType::Date)),
+                        Some(BaseType::Duration) => {
+                            Ok(null_expr.cast(DataType::Duration(TimeUnit::Microseconds)))
+                        }
                         None => Ok(null_expr),
                     }
                 }
@@ -1201,55 +1403,61 @@ impl ExprNode {
                     CmpOp::Ge => Ok(l.gt_eq(r)),
                 }
             }
-            ExprNode::IsNull { inner, .. } => Ok(inner.to_polars_expr()?.is_null()),
-            ExprNode::IsNotNull { inner, .. } => Ok(inner.to_polars_expr()?.is_not_null()),
-            ExprNode::Coalesce { exprs, dtype } => {
-                let mut polars_exprs: Vec<PolarsExpr> = Vec::with_capacity(exprs.len());
-                for e in exprs {
-                    let mut pe = e.to_polars_expr()?;
-                    if dtype.base == Some(BaseType::Float) {
-                        pe = pe.cast(DataType::Float64);
+            ExprNode::Cast { input, dtype } => {
+                let dt = match dtype.base {
+                    Some(BaseType::Int) => DataType::Int64,
+                    Some(BaseType::Float) => DataType::Float64,
+                    Some(BaseType::Bool) => DataType::Boolean,
+                    Some(BaseType::Str) => DataType::String,
+                    Some(BaseType::DateTime) => DataType::Datetime(TimeUnit::Microseconds, None),
+                    Some(BaseType::Date) => DataType::Date,
+                    Some(BaseType::Duration) => DataType::Duration(TimeUnit::Microseconds),
+                    None => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                            "cast() target dtype must have known base.",
+                        ))
                     }
-                    polars_exprs.push(pe);
-                }
-                Ok(pl_coalesce(polars_exprs.as_slice()))
+                };
+                Ok(input.to_polars_expr()?.cast(dt))
+            }
+            ExprNode::IsNull { input, .. } => Ok(input.to_polars_expr()?.is_null()),
+            ExprNode::IsNotNull { input, .. } => Ok(input.to_polars_expr()?.is_not_null()),
+            ExprNode::Coalesce { exprs, .. } => {
+                let parts: Vec<PolarsExpr> = exprs
+                    .iter()
+                    .map(|e| e.to_polars_expr())
+                    .collect::<PyResult<_>>()?;
+                Ok(coalesce(parts.as_slice()))
             }
             ExprNode::CaseWhen {
-                branches,
-                else_,
-                dtype,
-            } => polars_case_when(branches, else_.as_ref(), *dtype),
-            ExprNode::Cast { inner, to, .. } => {
-                let ie = inner.to_polars_expr()?;
-                let dt = polars_data_type(*to);
-                Ok(ie.cast(dt))
-            }
-            ExprNode::InList {
-                inner,
-                candidates,
-                ..
+                branches, else_, ..
             } => {
-                let ib = inner.dtype().base.unwrap();
-                let s = literal_series_for_isin(candidates, ib)?;
-                Ok(inner.to_polars_expr()?.is_in(lit(s), false))
+                let mut acc = else_.to_polars_expr()?;
+                for (c, t) in branches.iter().rev() {
+                    acc = ternary_expr(c.to_polars_expr()?, t.to_polars_expr()?, acc);
+                }
+                Ok(acc)
+            }
+            ExprNode::InList { inner, values, .. } => {
+                let base = inner.dtype().base.ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>("isin() inner dtype unknown.")
+                })?;
+                let series = literals_to_series(values, base)?;
+                Ok(inner.to_polars_expr()?.is_in(lit(series), true))
             }
             ExprNode::Between {
-                inner,
-                low,
-                high,
-                ..
-            } => {
-                let x = inner.to_polars_expr()?;
-                let lo = low.to_polars_expr()?;
-                let hi = high.to_polars_expr()?;
-                Ok(x.clone().gt_eq(lo).and(x.lt_eq(hi)))
-            }
+                inner, low, high, ..
+            } => Ok(inner.to_polars_expr()?.is_between(
+                low.to_polars_expr()?,
+                high.to_polars_expr()?,
+                ClosedInterval::Both,
+            )),
             ExprNode::StringConcat { parts, .. } => {
-                let mut pes: Vec<PolarsExpr> = Vec::with_capacity(parts.len());
-                for p in parts {
-                    pes.push(p.to_polars_expr()?);
-                }
-                Ok(concat_str(pes.as_slice(), "", false))
+                let exprs: Vec<PolarsExpr> = parts
+                    .iter()
+                    .map(|p| p.to_polars_expr())
+                    .collect::<PyResult<_>>()?;
+                Ok(concat_str(exprs.as_slice(), "", true))
             }
             ExprNode::Substring {
                 inner,
@@ -1257,238 +1465,16 @@ impl ExprNode {
                 length,
                 ..
             } => {
-                let s = inner.to_polars_expr()?;
+                let inner_e = inner.to_polars_expr()?;
                 let off = start.to_polars_expr()? - lit(1i64);
-                let len_e = match length {
-                    None => lit(1_000_000i64),
+                let len = match length {
                     Some(l) => l.to_polars_expr()?,
+                    None => lit(1_000_000i64),
                 };
-                Ok(s.str().slice(off, len_e))
+                Ok(inner_e.str().slice(off, len))
             }
             ExprNode::StringLength { inner, .. } => Ok(inner.to_polars_expr()?.str().len_chars()),
         }
-    }
-}
-
-#[cfg(feature = "polars_engine")]
-fn polars_data_type(b: BaseType) -> DataType {
-    match b {
-        BaseType::Int => DataType::Int64,
-        BaseType::Float => DataType::Float64,
-        BaseType::Bool => DataType::Boolean,
-        BaseType::Str => DataType::String,
-    }
-}
-
-#[cfg(feature = "polars_engine")]
-fn polars_promote_expr(e: &ExprNode, target: DTypeDesc) -> PyResult<PolarsExpr> {
-    let mut pe = e.to_polars_expr()?;
-    if target.base == Some(BaseType::Float) {
-        pe = pe.cast(DataType::Float64);
-    }
-    Ok(pe)
-}
-
-#[cfg(feature = "polars_engine")]
-fn polars_case_when(
-    branches: &[(ExprNode, ExprNode)],
-    else_: &ExprNode,
-    dtype: DTypeDesc,
-) -> PyResult<PolarsExpr> {
-    if branches.len() == 1 {
-        let (c0, t0) = &branches[0];
-        return Ok(pl_when(c0.to_polars_expr()?)
-            .then(polars_promote_expr(t0, dtype)?)
-            .otherwise(polars_promote_expr(else_, dtype)?));
-    }
-    let mut ct = pl_when(branches[0].0.to_polars_expr()?)
-        .then(polars_promote_expr(&branches[0].1, dtype)?)
-        .when(branches[1].0.to_polars_expr()?)
-        .then(polars_promote_expr(&branches[1].1, dtype)?);
-    for (c, t) in branches.iter().skip(2) {
-        ct = ct
-            .when(c.to_polars_expr()?)
-            .then(polars_promote_expr(t, dtype)?);
-    }
-    Ok(ct.otherwise(polars_promote_expr(else_, dtype)?))
-}
-
-#[cfg(feature = "polars_engine")]
-fn literal_series_for_isin(candidates: &[LiteralValue], base: BaseType) -> PyResult<Series> {
-    match base {
-        BaseType::Int => {
-            let v: Vec<i64> = candidates
-                .iter()
-                .map(|l| match l {
-                    LiteralValue::Int(i) => Ok(*i),
-                    _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "isin int list",
-                    )),
-                })
-                .collect::<PyResult<_>>()?;
-            Ok(Series::new(PlSmallStr::EMPTY, v))
-        }
-        BaseType::Float => {
-            let v: Vec<f64> = candidates
-                .iter()
-                .map(|l| match l {
-                    LiteralValue::Int(i) => Ok(*i as f64),
-                    LiteralValue::Float(f) => Ok(*f),
-                    _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "isin float list",
-                    )),
-                })
-                .collect::<PyResult<_>>()?;
-            Ok(Series::new(PlSmallStr::EMPTY, v))
-        }
-        BaseType::Bool => {
-            let v: Vec<bool> = candidates
-                .iter()
-                .map(|l| match l {
-                    LiteralValue::Bool(b) => Ok(*b),
-                    _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "isin bool list",
-                    )),
-                })
-                .collect::<PyResult<_>>()?;
-            Ok(Series::new(PlSmallStr::EMPTY, v))
-        }
-        BaseType::Str => {
-            let v: Vec<String> = candidates
-                .iter()
-                .map(|l| match l {
-                    LiteralValue::Str(s) => Ok(s.clone()),
-                    _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "isin str list",
-                    )),
-                })
-                .collect::<PyResult<_>>()?;
-            Ok(Series::new(PlSmallStr::EMPTY, v))
-        }
-    }
-}
-
-#[cfg(not(feature = "polars_engine"))]
-fn substr_spark(s: &str, start: i64, len_opt: Option<i64>) -> String {
-    if start < 1 {
-        return String::new();
-    }
-    let idx = (start - 1) as usize;
-    let chars: Vec<char> = s.chars().collect();
-    if idx >= chars.len() {
-        return String::new();
-    }
-    let rest = &chars[idx..];
-    match len_opt {
-        None => rest.iter().collect(),
-        Some(l) if l <= 0 => String::new(),
-        Some(l) => rest.iter().take(l as usize).collect(),
-    }
-}
-
-#[cfg(not(feature = "polars_engine"))]
-fn literal_to_f64(v: &LiteralValue) -> f64 {
-    match v {
-        LiteralValue::Int(i) => *i as f64,
-        LiteralValue::Float(f) => *f,
-        _ => f64::NAN,
-    }
-}
-
-#[cfg(not(feature = "polars_engine"))]
-fn literals_equal(inner_base: BaseType, cell: &LiteralValue, cand: &LiteralValue) -> bool {
-    match inner_base {
-        BaseType::Int => matches!(
-            (cell, cand),
-            (LiteralValue::Int(a), LiteralValue::Int(b)) if a == b
-        ),
-        BaseType::Float => literal_to_f64(cell) == literal_to_f64(cand),
-        BaseType::Bool => matches!(
-            (cell, cand),
-            (LiteralValue::Bool(a), LiteralValue::Bool(b)) if a == b
-        ),
-        BaseType::Str => matches!(
-            (cell, cand),
-            (LiteralValue::Str(a), LiteralValue::Str(b)) if a == b
-        ),
-    }
-}
-
-#[cfg(not(feature = "polars_engine"))]
-fn cmp_for_between(a: &LiteralValue, b: &LiteralValue) -> PyResult<Ordering> {
-    Ok(match (a, b) {
-        (LiteralValue::Int(x), LiteralValue::Int(y)) => x.cmp(y),
-        (LiteralValue::Int(x), LiteralValue::Float(y)) => (*x as f64).total_cmp(y),
-        (LiteralValue::Float(x), LiteralValue::Int(y)) => x.total_cmp(&(*y as f64)),
-        (LiteralValue::Float(x), LiteralValue::Float(y)) => x.total_cmp(y),
-        (LiteralValue::Str(x), LiteralValue::Str(y)) => x.cmp(y),
-        _ => {
-            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "between() bound types are incompatible.",
-            ));
-        }
-    })
-}
-
-#[cfg(not(feature = "polars_engine"))]
-fn between_at(
-    x: &Option<LiteralValue>,
-    lo: &Option<LiteralValue>,
-    hi: &Option<LiteralValue>,
-) -> PyResult<Option<LiteralValue>> {
-    match (x, lo, hi) {
-        (None, _, _) | (_, None, _) | (_, _, None) => Ok(None),
-        (Some(xv), Some(lv), Some(hv)) => {
-            let ge_lo = cmp_for_between(xv, lv)? != Ordering::Less;
-            let le_hi = cmp_for_between(xv, hi)? != Ordering::Greater;
-            Ok(Some(LiteralValue::Bool(ge_lo && le_hi)))
-        }
-    }
-}
-
-#[cfg(not(feature = "polars_engine"))]
-fn cast_literal_to_base(v: Option<&LiteralValue>, to: BaseType) -> Option<LiteralValue> {
-    let x = v?;
-    match (to, x) {
-        (BaseType::Int, LiteralValue::Int(i)) => Some(LiteralValue::Int(*i)),
-        (BaseType::Int, LiteralValue::Float(f)) => Some(LiteralValue::Int(*f as i64)),
-        (BaseType::Float, LiteralValue::Int(i)) => Some(LiteralValue::Float(*i as f64)),
-        (BaseType::Float, LiteralValue::Float(f)) => Some(LiteralValue::Float(*f)),
-        (BaseType::Bool, LiteralValue::Bool(b)) => Some(LiteralValue::Bool(*b)),
-        (BaseType::Str, LiteralValue::Str(s)) => Some(LiteralValue::Str(s.clone())),
-        (BaseType::Str, LiteralValue::Int(i)) => Some(LiteralValue::Str(i.to_string())),
-        (BaseType::Str, LiteralValue::Float(f)) => Some(LiteralValue::Str(f.to_string())),
-        (BaseType::Str, LiteralValue::Bool(b)) => Some(LiteralValue::Str(b.to_string())),
-        (BaseType::Int, LiteralValue::Str(s)) => s.parse().ok().map(LiteralValue::Int),
-        (BaseType::Float, LiteralValue::Str(s)) => s.parse().ok().map(LiteralValue::Float),
-        (BaseType::Bool, LiteralValue::Str(s)) => match s.as_str() {
-            "true" | "True" | "1" => Some(LiteralValue::Bool(true)),
-            "false" | "False" | "0" => Some(LiteralValue::Bool(false)),
-            _ => None,
-        },
-        (BaseType::Int, LiteralValue::Bool(b)) => Some(LiteralValue::Int(if *b { 1 } else { 0 })),
-        (BaseType::Bool, LiteralValue::Int(i)) => Some(LiteralValue::Bool(*i != 0)),
-        _ => None,
-    }
-}
-
-#[cfg(not(feature = "polars_engine"))]
-fn coalesce_cell_to_dtype(
-    v: Option<LiteralValue>,
-    base: BaseType,
-) -> PyResult<Option<LiteralValue>> {
-    let Some(v) = v else {
-        return Ok(None);
-    };
-    match (base, v) {
-        (BaseType::Int, LiteralValue::Int(i)) => Ok(Some(LiteralValue::Int(i))),
-        (BaseType::Float, LiteralValue::Int(i)) => Ok(Some(LiteralValue::Float(i as f64))),
-        (BaseType::Float, LiteralValue::Float(f)) => Ok(Some(LiteralValue::Float(f))),
-        (BaseType::Bool, LiteralValue::Bool(b)) => Ok(Some(LiteralValue::Bool(b))),
-        (BaseType::Str, LiteralValue::Str(s)) => Ok(Some(LiteralValue::Str(s))),
-        _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-            "coalesce() branch value does not match inferred common type.",
-        )),
     }
 }
 
@@ -1530,6 +1516,9 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
                 Some(LiteralValue::Float(v)) => v.into_py(py),
                 Some(LiteralValue::Bool(v)) => v.into_py(py),
                 Some(LiteralValue::Str(v)) => v.clone().into_py(py),
+                Some(LiteralValue::DateTimeMicros(v)) => v.into_py(py),
+                Some(LiteralValue::DateDays(v)) => v.into_py(py),
+                Some(LiteralValue::DurationMicros(v)) => v.into_py(py),
             };
             dict.set_item("value", value_obj)?;
         }
@@ -1549,61 +1538,66 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             dict.set_item("left", exprnode_to_serializable(py, left)?)?;
             dict.set_item("right", exprnode_to_serializable(py, right)?)?;
         }
-        ExprNode::IsNull { inner, .. } => {
-            dict.set_item("kind", "is_null")?;
-            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+        ExprNode::Cast { input, dtype } => {
+            dict.set_item("kind", "cast")?;
+            dict.set_item("input", exprnode_to_serializable(py, input)?)?;
+            dict.set_item("inner", exprnode_to_serializable(py, input)?)?;
+            if let Some(b) = dtype.base {
+                dict.set_item("to", base_type_json(b))?;
+            }
         }
-        ExprNode::IsNotNull { inner, .. } => {
+        ExprNode::IsNull { input, .. } => {
+            dict.set_item("kind", "is_null")?;
+            dict.set_item("input", exprnode_to_serializable(py, input)?)?;
+            dict.set_item("inner", exprnode_to_serializable(py, input)?)?;
+        }
+        ExprNode::IsNotNull { input, .. } => {
             dict.set_item("kind", "is_not_null")?;
-            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+            dict.set_item("input", exprnode_to_serializable(py, input)?)?;
+            dict.set_item("inner", exprnode_to_serializable(py, input)?)?;
         }
         ExprNode::Coalesce { exprs, .. } => {
             dict.set_item("kind", "coalesce")?;
-            let lst = pyo3::types::PyList::empty_bound(py);
+            let list = PyList::empty_bound(py);
             for e in exprs {
-                lst.append(exprnode_to_serializable(py, e)?)?;
+                list.append(exprnode_to_serializable(py, e)?)?;
             }
-            dict.set_item("exprs", lst)?;
+            dict.set_item("exprs", list)?;
         }
         ExprNode::CaseWhen {
-            branches,
-            else_,
-            ..
+            branches, else_, ..
         } => {
             dict.set_item("kind", "case_when")?;
-            let lst = pyo3::types::PyList::empty_bound(py);
+            let list = PyList::empty_bound(py);
             for (c, t) in branches {
-                let pair = PyDict::new_bound(py);
-                pair.set_item("condition", exprnode_to_serializable(py, c)?)?;
-                pair.set_item("then", exprnode_to_serializable(py, t)?)?;
-                lst.append(pair)?;
+                let br = PyDict::new_bound(py);
+                br.set_item("condition", exprnode_to_serializable(py, c)?)?;
+                br.set_item("then", exprnode_to_serializable(py, t)?)?;
+                list.append(br)?;
             }
-            dict.set_item("branches", lst)?;
+            dict.set_item("branches", list)?;
             dict.set_item("else", exprnode_to_serializable(py, else_)?)?;
         }
-        ExprNode::Cast { inner, to, .. } => {
-            dict.set_item("kind", "cast")?;
-            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
-            dict.set_item("to", base_type_to_str(*to))?;
-        }
-        ExprNode::InList {
-            inner,
-            candidates,
-            ..
-        } => {
+        ExprNode::InList { inner, values, .. } => {
             dict.set_item("kind", "in_list")?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
-            let lst = pyo3::types::PyList::empty_bound(py);
-            for c in candidates {
-                lst.append(literal_value_to_py(py, c)?)?;
+            let list = PyList::empty_bound(py);
+            for v in values {
+                let pyv = match v {
+                    LiteralValue::Int(i) => i.into_py(py),
+                    LiteralValue::Float(f) => f.into_py(py),
+                    LiteralValue::Bool(b) => b.into_py(py),
+                    LiteralValue::Str(s) => s.clone().into_py(py),
+                    LiteralValue::DateTimeMicros(v) => v.into_py(py),
+                    LiteralValue::DateDays(v) => v.into_py(py),
+                    LiteralValue::DurationMicros(v) => v.into_py(py),
+                };
+                list.append(pyv)?;
             }
-            dict.set_item("values", lst)?;
+            dict.set_item("values", list)?;
         }
         ExprNode::Between {
-            inner,
-            low,
-            high,
-            ..
+            inner, low, high, ..
         } => {
             dict.set_item("kind", "between")?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
@@ -1612,11 +1606,11 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
         }
         ExprNode::StringConcat { parts, .. } => {
             dict.set_item("kind", "string_concat")?;
-            let lst = pyo3::types::PyList::empty_bound(py);
+            let list = PyList::empty_bound(py);
             for p in parts {
-                lst.append(exprnode_to_serializable(py, p)?)?;
+                list.append(exprnode_to_serializable(py, p)?)?;
             }
-            dict.set_item("parts", lst)?;
+            dict.set_item("parts", list)?;
         }
         ExprNode::Substring {
             inner,
@@ -1628,8 +1622,12 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
             dict.set_item("start", exprnode_to_serializable(py, start)?)?;
             match length {
-                None => dict.set_item("length", py.None())?,
-                Some(l) => dict.set_item("length", exprnode_to_serializable(py, l)?)?,
+                Some(l) => {
+                    dict.set_item("length", exprnode_to_serializable(py, l)?)?;
+                }
+                None => {
+                    dict.set_item("length", py.None())?;
+                }
             }
         }
         ExprNode::StringLength { inner, .. } => {
@@ -1641,22 +1639,49 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
     Ok(dict.into_py(py))
 }
 
-fn base_type_to_str(b: BaseType) -> &'static str {
-    match b {
-        BaseType::Int => "int",
-        BaseType::Float => "float",
-        BaseType::Bool => "bool",
-        BaseType::Str => "str",
+#[cfg(not(feature = "polars_engine"))]
+fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValue> {
+    match target {
+        BaseType::Int => match v {
+            LiteralValue::Int(i) => Ok(LiteralValue::Int(i)),
+            LiteralValue::Float(f) => Ok(LiteralValue::Int(f as i64)),
+            LiteralValue::Bool(b) => Ok(LiteralValue::Int(if b { 1 } else { 0 })),
+            LiteralValue::Str(s) => s.parse::<i64>().map(LiteralValue::Int).map_err(|_| {
+                PyErr::new::<pyo3::exceptions::PyTypeError, _>("Cannot cast str to int.")
+            }),
+        },
+        BaseType::Float => match v {
+            LiteralValue::Int(i) => Ok(LiteralValue::Float(i as f64)),
+            LiteralValue::Float(f) => Ok(LiteralValue::Float(f)),
+            LiteralValue::Bool(b) => Ok(LiteralValue::Float(if b { 1.0 } else { 0.0 })),
+            LiteralValue::Str(s) => s.parse::<f64>().map(LiteralValue::Float).map_err(|_| {
+                PyErr::new::<pyo3::exceptions::PyTypeError, _>("Cannot cast str to float.")
+            }),
+        },
+        BaseType::Bool => match v {
+            LiteralValue::Int(i) => Ok(LiteralValue::Bool(i != 0)),
+            LiteralValue::Float(f) => Ok(LiteralValue::Bool(f != 0.0)),
+            LiteralValue::Bool(b) => Ok(LiteralValue::Bool(b)),
+            LiteralValue::Str(s) => match s.to_lowercase().as_str() {
+                "true" | "1" => Ok(LiteralValue::Bool(true)),
+                "false" | "0" => Ok(LiteralValue::Bool(false)),
+                _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Cannot cast str to bool.",
+                )),
+            },
+        },
+        BaseType::Str => match v {
+            LiteralValue::Int(i) => Ok(LiteralValue::Str(i.to_string())),
+            LiteralValue::Float(f) => Ok(LiteralValue::Str(f.to_string())),
+            LiteralValue::Bool(b) => Ok(LiteralValue::Str(b.to_string())),
+            LiteralValue::Str(s) => Ok(LiteralValue::Str(s)),
+        },
+        BaseType::DateTime | BaseType::Date | BaseType::Duration => {
+            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Row-wise cast() for temporal types is not supported.",
+            ))
+        }
     }
-}
-
-fn literal_value_to_py(py: Python<'_>, v: &LiteralValue) -> PyResult<PyObject> {
-    Ok(match v {
-        LiteralValue::Int(i) => i.into_py(py),
-        LiteralValue::Float(f) => f.into_py(py),
-        LiteralValue::Bool(b) => b.into_py(py),
-        LiteralValue::Str(s) => s.clone().into_py(py),
-    })
 }
 
 #[derive(Clone)]
@@ -1678,6 +1703,21 @@ impl ExprHandle {
             Some(BaseType::Float) => LiteralValue::Float(value.extract::<f64>()?),
             Some(BaseType::Bool) => LiteralValue::Bool(value.extract::<bool>()?),
             Some(BaseType::Str) => LiteralValue::Str(value.extract::<String>()?),
+            Some(BaseType::DateTime) => {
+                let dt = value.downcast::<PyDateTime>()?;
+                let secs: f64 = dt.call_method0("timestamp")?.extract()?;
+                LiteralValue::DateTimeMicros((secs * 1_000_000.0).round() as i64)
+            }
+            Some(BaseType::Date) => {
+                let d = value.downcast::<PyDate>()?;
+                let ordinal: i32 = d.call_method0("toordinal")?.extract()?;
+                LiteralValue::DateDays(ordinal - 719_163)
+            }
+            Some(BaseType::Duration) => {
+                let td = value.downcast::<PyDelta>()?;
+                let secs: f64 = td.call_method0("total_seconds")?.extract()?;
+                LiteralValue::DurationMicros((secs * 1_000_000.0).round() as i64)
+            }
             None => {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "Non-None literal must have known base dtype.",
