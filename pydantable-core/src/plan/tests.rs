@@ -151,3 +151,231 @@ fn planinner_to_serializable_smoke() {
         );
     });
 }
+
+/// Polars-backed execution: IPC default path, list path, and groupby sum null masking.
+#[cfg(feature = "polars_engine")]
+mod polars_engine_tests {
+    use std::collections::HashMap;
+
+    use pyo3::prelude::*;
+    use pyo3::types::{PyDict, PyList};
+
+    use super::ensure_python_initialized;
+    use crate::dtype::{BaseType, DTypeDesc};
+    use crate::plan::{execute_groupby_agg_polars, execute_plan, make_plan};
+
+    fn sample_kv_schema() -> HashMap<String, DTypeDesc> {
+        let mut schema = HashMap::new();
+        schema.insert("k".to_string(), DTypeDesc::non_nullable(BaseType::Int));
+        schema.insert("v".to_string(), DTypeDesc::nullable(BaseType::Int));
+        schema
+    }
+
+    #[test]
+    fn execute_plan_as_python_lists_returns_dict_of_lists() {
+        ensure_python_initialized();
+        Python::with_gil(|py| {
+            let mut schema = HashMap::new();
+            schema.insert("id".to_string(), DTypeDesc::non_nullable(BaseType::Int));
+            schema.insert("age".to_string(), DTypeDesc::nullable(BaseType::Int));
+            let plan = make_plan(schema);
+
+            let root = PyDict::new_bound(py);
+            root.set_item("id", PyList::new_bound(py, [1_i64, 2_i64]))
+                .unwrap();
+            let ages = PyList::empty_bound(py);
+            ages.append(20_i64).unwrap();
+            ages.append(py.None()).unwrap();
+            root.set_item("age", ages).unwrap();
+
+            let out = execute_plan(py, &plan, root.as_any(), true).unwrap();
+            let dict = out.bind(py).downcast::<PyDict>().expect("dict of lists");
+            let ids: Vec<i64> = dict.get_item("id").unwrap().unwrap().extract().unwrap();
+            let age0 = dict
+                .get_item("age")
+                .unwrap()
+                .unwrap()
+                .get_item(0)
+                .unwrap()
+                .extract::<i64>()
+                .unwrap();
+            assert!(dict.get_item("age").unwrap().unwrap().get_item(1).unwrap().is_none());
+            assert_eq!(ids, vec![1, 2]);
+            assert_eq!(age0, 20);
+        });
+    }
+
+    #[test]
+    fn execute_plan_default_returns_polars_dataframe() {
+        ensure_python_initialized();
+        Python::with_gil(|py| {
+            let mut schema = HashMap::new();
+            schema.insert("id".to_string(), DTypeDesc::non_nullable(BaseType::Int));
+            schema.insert("age".to_string(), DTypeDesc::nullable(BaseType::Int));
+            let plan = make_plan(schema);
+
+            let root = PyDict::new_bound(py);
+            root.set_item("id", PyList::new_bound(py, [1_i64, 2_i64]))
+                .unwrap();
+            let ages = PyList::empty_bound(py);
+            ages.append(20_i64).unwrap();
+            ages.append(py.None()).unwrap();
+            root.set_item("age", ages).unwrap();
+
+            let out = execute_plan(py, &plan, root.as_any(), false).unwrap();
+            let polars = py.import_bound("polars").unwrap();
+            let df_class = polars.getattr("DataFrame").unwrap();
+            let builtins = py.import_bound("builtins").unwrap();
+            let isinstance = builtins.getattr("isinstance").unwrap();
+            let is_df: bool = isinstance
+                .call1((out.bind(py), df_class.as_any()))
+                .unwrap()
+                .extract()
+                .unwrap();
+            assert!(is_df, "expected polars.DataFrame from IPC path");
+
+            let ids: Vec<i64> = out
+                .bind(py)
+                .getattr("get_column")
+                .unwrap()
+                .call1(("id",))
+                .unwrap()
+                .call_method0("to_list")
+                .unwrap()
+                .extract()
+                .unwrap();
+            assert_eq!(ids, vec![1, 2]);
+        });
+    }
+
+    #[test]
+    fn groupby_sum_masks_all_null_group_to_none() {
+        ensure_python_initialized();
+        Python::with_gil(|py| {
+            let plan = make_plan(sample_kv_schema());
+            let root = PyDict::new_bound(py);
+            root.set_item("k", PyList::new_bound(py, [1_i64, 1_i64, 2_i64]))
+                .unwrap();
+            let vs = PyList::empty_bound(py);
+            vs.append(py.None()).unwrap();
+            vs.append(py.None()).unwrap();
+            vs.append(5_i64).unwrap();
+            root.set_item("v", vs).unwrap();
+
+            let (data, _desc) = execute_groupby_agg_polars(
+                py,
+                &plan,
+                root.as_any(),
+                vec!["k".to_string()],
+                vec![("s".to_string(), "sum".to_string(), "v".to_string())],
+                true,
+            )
+            .unwrap();
+
+            let dict = data.bind(py).downcast::<PyDict>().unwrap();
+            let keys: Vec<i64> = dict.get_item("k").unwrap().unwrap().extract().unwrap();
+            let sums: Vec<Option<i64>> = dict.get_item("s").unwrap().unwrap().extract().unwrap();
+
+            let mut pairs: Vec<(i64, Option<i64>)> = keys
+                .into_iter()
+                .zip(sums.into_iter())
+                .collect();
+            pairs.sort_by_key(|(k, _)| *k);
+            assert_eq!(pairs, vec![(1, None), (2, Some(5))]);
+        });
+    }
+
+    #[test]
+    fn groupby_sum_ipc_dataframe_aligns_with_lists_columns() {
+        ensure_python_initialized();
+        Python::with_gil(|py| {
+            let plan = make_plan(sample_kv_schema());
+            let root = PyDict::new_bound(py);
+            root.set_item("k", PyList::new_bound(py, [1_i64, 1_i64, 2_i64]))
+                .unwrap();
+            let vs = PyList::empty_bound(py);
+            vs.append(py.None()).unwrap();
+            vs.append(py.None()).unwrap();
+            vs.append(5_i64).unwrap();
+            root.set_item("v", vs).unwrap();
+
+            let (data_lists, _) = execute_groupby_agg_polars(
+                py,
+                &plan,
+                root.as_any(),
+                vec!["k".to_string()],
+                vec![("s".to_string(), "sum".to_string(), "v".to_string())],
+                true,
+            )
+            .unwrap();
+
+            let root2 = PyDict::new_bound(py);
+            root2.set_item("k", PyList::new_bound(py, [1_i64, 1_i64, 2_i64]))
+                .unwrap();
+            let vs2 = PyList::empty_bound(py);
+            vs2.append(py.None()).unwrap();
+            vs2.append(py.None()).unwrap();
+            vs2.append(5_i64).unwrap();
+            root2.set_item("v", vs2).unwrap();
+
+            let (data_ipc, _) = execute_groupby_agg_polars(
+                py,
+                &plan,
+                root2.as_any(),
+                vec!["k".to_string()],
+                vec![("s".to_string(), "sum".to_string(), "v".to_string())],
+                false,
+            )
+            .unwrap();
+
+            let polars = py.import_bound("polars").unwrap();
+            let df_class = polars.getattr("DataFrame").unwrap();
+            let builtins = py.import_bound("builtins").unwrap();
+            let isinstance = builtins.getattr("isinstance").unwrap();
+            assert!(
+                isinstance
+                    .call1((data_ipc.bind(py), df_class.as_any()))
+                    .unwrap()
+                    .extract::<bool>()
+                    .unwrap()
+            );
+
+            let dict_lists = data_lists.bind(py).downcast::<PyDict>().unwrap();
+            let k_lists: Vec<i64> = dict_lists.get_item("k").unwrap().unwrap().extract().unwrap();
+            let s_lists: Vec<Option<i64>> =
+                dict_lists.get_item("s").unwrap().unwrap().extract().unwrap();
+
+            let k_ipc: Vec<i64> = data_ipc
+                .bind(py)
+                .getattr("get_column")
+                .unwrap()
+                .call1(("k",))
+                .unwrap()
+                .call_method0("to_list")
+                .unwrap()
+                .extract()
+                .unwrap();
+            let s_ipc: Vec<Option<i64>> = data_ipc
+                .bind(py)
+                .getattr("get_column")
+                .unwrap()
+                .call1(("s",))
+                .unwrap()
+                .call_method0("to_list")
+                .unwrap()
+                .extract()
+                .unwrap();
+
+            let mut pairs_lists: Vec<(i64, Option<i64>)> =
+                k_lists.into_iter().zip(s_lists.into_iter()).collect();
+            pairs_lists.sort_by_key(|(k, _)| *k);
+            let mut pairs_ipc: Vec<(i64, Option<i64>)> =
+                k_ipc.into_iter().zip(s_ipc.into_iter()).collect();
+            pairs_ipc.sort_by_key(|(k, _)| *k);
+            assert_eq!(
+                pairs_ipc, pairs_lists,
+                "IPC DataFrame columns should match dict-of-lists groupby output"
+            );
+        });
+    }
+}

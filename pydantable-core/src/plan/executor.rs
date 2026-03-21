@@ -44,6 +44,6 @@ impl PhysicalPlanExecutor for RowwiseExecutor {
         root_data: &Bound<'_, PyAny>,
         _as_python_lists: bool,
     ) -> PyResult<PyObject> {
-        super::execute_rowwise::execute_plan_rowwise(py, plan, root_data)
+        super::execute_rowwise::execute_plan_rowwise(py, plan, root_data, _as_python_lists)
     }
 }
