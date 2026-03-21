@@ -1,118 +1,14 @@
-use std::collections::HashSet;
+//! Typing rules, `ExprNode::make_*`, [`ExprNode::eval`], and [`ExprNode::referenced_columns`].
 
 #[cfg(not(feature = "polars_engine"))]
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDate, PyDateTime, PyDelta, PyDict, PyList};
 
-use crate::dtype::{dtype_to_descriptor_py, py_value_to_dtype, BaseType, DTypeDesc};
+use crate::dtype::{BaseType, DTypeDesc};
 
-#[cfg(feature = "polars_engine")]
-use polars::lazy::dsl::{coalesce, col, concat_str, lit, ternary_expr, Expr as PolarsExpr};
-#[cfg(feature = "polars_engine")]
-use polars::prelude::Literal;
-#[cfg(feature = "polars_engine")]
-use polars::prelude::{ClosedInterval, DataType, NamedFrom, Null, Series, TimeUnit};
-
-#[cfg(feature = "polars_engine")]
-fn literals_to_series(values: &[LiteralValue], base: BaseType) -> PyResult<Series> {
-    match base {
-        BaseType::Int => {
-            let v: Vec<i64> = values
-                .iter()
-                .map(|x| match x {
-                    LiteralValue::Int(i) => Ok(*i),
-                    _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "isin() int list expected.",
-                    )),
-                })
-                .collect::<PyResult<_>>()?;
-            Ok(Series::new("".into(), v))
-        }
-        BaseType::Float => {
-            let v: Vec<f64> = values
-                .iter()
-                .map(|x| match x {
-                    LiteralValue::Float(f) => Ok(*f),
-                    LiteralValue::Int(i) => Ok(*i as f64),
-                    _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "isin() float list expected.",
-                    )),
-                })
-                .collect::<PyResult<_>>()?;
-            Ok(Series::new("".into(), v))
-        }
-        BaseType::Bool => {
-            let v: Vec<bool> = values
-                .iter()
-                .map(|x| match x {
-                    LiteralValue::Bool(b) => Ok(*b),
-                    _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "isin() bool list expected.",
-                    )),
-                })
-                .collect::<PyResult<_>>()?;
-            Ok(Series::new("".into(), v))
-        }
-        BaseType::Str => {
-            let v: Vec<String> = values
-                .iter()
-                .map(|x| match x {
-                    LiteralValue::Str(s) => Ok(s.clone()),
-                    _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "isin() str list expected.",
-                    )),
-                })
-                .collect::<PyResult<_>>()?;
-            Ok(Series::new("".into(), v))
-        }
-        _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-            "isin() unsupported dtype for list literal.",
-        )),
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ArithOp {
-    Add,
-    Sub,
-    Mul,
-    Div,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CmpOp {
-    Eq,
-    Ne,
-    Lt,
-    Le,
-    Gt,
-    Ge,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum LiteralValue {
-    Int(i64),
-    Float(f64),
-    Bool(bool),
-    Str(String),
-    DateTimeMicros(i64),
-    DateDays(i32),
-    DurationMicros(i64),
-}
-
-fn base_type_json(b: BaseType) -> &'static str {
-    match b {
-        BaseType::Int => "int",
-        BaseType::Float => "float",
-        BaseType::Bool => "bool",
-        BaseType::Str => "str",
-        BaseType::DateTime => "datetime",
-        BaseType::Date => "date",
-        BaseType::Duration => "duration",
-    }
-}
+use super::ir::{ArithOp, CmpOp, ExprNode, LiteralValue};
 
 #[cfg(not(feature = "polars_engine"))]
 fn literal_between_inclusive(x: &LiteralValue, lo: &LiteralValue, hi: &LiteralValue) -> bool {
@@ -133,76 +29,6 @@ fn literal_between_inclusive(x: &LiteralValue, lo: &LiteralValue, hi: &LiteralVa
         (LiteralValue::Str(a), LiteralValue::Str(b), LiteralValue::Str(c)) => a >= b && a <= c,
         _ => false,
     }
-}
-
-#[derive(Clone, Debug)]
-pub enum ExprNode {
-    ColumnRef {
-        name: String,
-        dtype: DTypeDesc,
-    },
-    Literal {
-        value: Option<LiteralValue>,
-        dtype: DTypeDesc,
-    },
-    BinaryOp {
-        op: ArithOp,
-        left: Box<ExprNode>,
-        right: Box<ExprNode>,
-        dtype: DTypeDesc,
-    },
-    CompareOp {
-        op: CmpOp,
-        left: Box<ExprNode>,
-        right: Box<ExprNode>,
-        dtype: DTypeDesc,
-    },
-    Cast {
-        input: Box<ExprNode>,
-        dtype: DTypeDesc,
-    },
-    IsNull {
-        input: Box<ExprNode>,
-        dtype: DTypeDesc,
-    },
-    IsNotNull {
-        input: Box<ExprNode>,
-        dtype: DTypeDesc,
-    },
-    Coalesce {
-        exprs: Vec<ExprNode>,
-        dtype: DTypeDesc,
-    },
-    CaseWhen {
-        branches: Vec<(ExprNode, ExprNode)>,
-        else_: Box<ExprNode>,
-        dtype: DTypeDesc,
-    },
-    InList {
-        inner: Box<ExprNode>,
-        values: Vec<LiteralValue>,
-        dtype: DTypeDesc,
-    },
-    Between {
-        inner: Box<ExprNode>,
-        low: Box<ExprNode>,
-        high: Box<ExprNode>,
-        dtype: DTypeDesc,
-    },
-    StringConcat {
-        parts: Vec<ExprNode>,
-        dtype: DTypeDesc,
-    },
-    Substring {
-        inner: Box<ExprNode>,
-        start: Box<ExprNode>,
-        length: Option<Box<ExprNode>>,
-        dtype: DTypeDesc,
-    },
-    StringLength {
-        inner: Box<ExprNode>,
-        dtype: DTypeDesc,
-    },
 }
 
 impl ExprNode {
@@ -1004,6 +830,7 @@ impl ExprNode {
                                                 CmpOp::Le => af <= bf,
                                                 CmpOp::Gt => af > bf,
                                                 CmpOp::Ge => af >= bf,
+                                                CmpOp::Eq | CmpOp::Ne => unreachable!(),
                                             }
                                         }
                                         BaseType::Str => {
@@ -1034,6 +861,7 @@ impl ExprNode {
                                                 CmpOp::Le => as_ <= bs_,
                                                 CmpOp::Gt => as_ > bs_,
                                                 CmpOp::Ge => as_ >= bs_,
+                                                CmpOp::Eq | CmpOp::Ne => unreachable!(),
                                             }
                                         }
                                         BaseType::DateTime => {
@@ -1156,13 +984,11 @@ impl ExprNode {
                     cols.push(e.eval(ctx, n)?);
                 }
                 let mut out: Vec<Option<LiteralValue>> = vec![None; n];
-                for i in 0..n {
+                for (i, out_slot) in out.iter_mut().enumerate() {
                     for c in &cols {
-                        if let Some(cell) = c.get(i) {
-                            if let Some(lv) = cell {
-                                out[i] = Some(lv.clone());
-                                break;
-                            }
+                        if let Some(Some(lv)) = c.get(i) {
+                            *out_slot = Some(lv.clone());
+                            break;
                         }
                     }
                 }
@@ -1207,10 +1033,7 @@ impl ExprNode {
                 let vals = inner.eval(ctx, n)?;
                 Ok(vals
                     .into_iter()
-                    .map(|v| match v {
-                        None => None,
-                        Some(x) => Some(LiteralValue::Bool(values.iter().any(|u| u == &x))),
-                    })
+                    .map(|v| v.map(|x| LiteralValue::Bool(values.iter().any(|u| u == &x))))
                     .collect())
             }
             ExprNode::Between {
@@ -1342,301 +1165,6 @@ impl ExprNode {
             }
         }
     }
-
-    #[cfg(feature = "polars_engine")]
-    pub fn to_polars_expr(&self) -> PyResult<PolarsExpr> {
-        match self {
-            ExprNode::ColumnRef { name, .. } => Ok(col(name)),
-            ExprNode::Literal { value, dtype } => match value {
-                Some(LiteralValue::Int(i)) => Ok(lit(*i)),
-                Some(LiteralValue::Float(f)) => Ok(lit(*f)),
-                Some(LiteralValue::Bool(b)) => Ok(lit(*b)),
-                Some(LiteralValue::Str(s)) => Ok(lit(s.clone())),
-                Some(LiteralValue::DateTimeMicros(v)) => {
-                    Ok(lit(*v).cast(DataType::Datetime(TimeUnit::Microseconds, None)))
-                }
-                Some(LiteralValue::DateDays(v)) => Ok(lit(*v).cast(DataType::Date)),
-                Some(LiteralValue::DurationMicros(v)) => {
-                    Ok(lit(*v).cast(DataType::Duration(TimeUnit::Microseconds)))
-                }
-                None => {
-                    let null_expr = Null {}.lit();
-                    match dtype.base {
-                        Some(BaseType::Int) => Ok(null_expr.cast(DataType::Int64)),
-                        Some(BaseType::Float) => Ok(null_expr.cast(DataType::Float64)),
-                        Some(BaseType::Bool) => Ok(null_expr.cast(DataType::Boolean)),
-                        Some(BaseType::Str) => Ok(null_expr.cast(DataType::String)),
-                        Some(BaseType::DateTime) => {
-                            Ok(null_expr.cast(DataType::Datetime(TimeUnit::Microseconds, None)))
-                        }
-                        Some(BaseType::Date) => Ok(null_expr.cast(DataType::Date)),
-                        Some(BaseType::Duration) => {
-                            Ok(null_expr.cast(DataType::Duration(TimeUnit::Microseconds)))
-                        }
-                        None => Ok(null_expr),
-                    }
-                }
-            },
-            ExprNode::BinaryOp {
-                op, left, right, ..
-            } => {
-                let l = left.to_polars_expr()?;
-                let r = right.to_polars_expr()?;
-                match op {
-                    ArithOp::Add => Ok(l + r),
-                    ArithOp::Sub => Ok(l - r),
-                    ArithOp::Mul => Ok(l * r),
-                    ArithOp::Div => Ok(l / r),
-                }
-            }
-            ExprNode::CompareOp {
-                op, left, right, ..
-            } => {
-                let l = left.to_polars_expr()?;
-                let r = right.to_polars_expr()?;
-                match op {
-                    CmpOp::Eq => Ok(l.eq(r)),
-                    CmpOp::Ne => Ok(l.neq(r)),
-                    CmpOp::Lt => Ok(l.lt(r)),
-                    CmpOp::Le => Ok(l.lt_eq(r)),
-                    CmpOp::Gt => Ok(l.gt(r)),
-                    CmpOp::Ge => Ok(l.gt_eq(r)),
-                }
-            }
-            ExprNode::Cast { input, dtype } => {
-                let dt = match dtype.base {
-                    Some(BaseType::Int) => DataType::Int64,
-                    Some(BaseType::Float) => DataType::Float64,
-                    Some(BaseType::Bool) => DataType::Boolean,
-                    Some(BaseType::Str) => DataType::String,
-                    Some(BaseType::DateTime) => DataType::Datetime(TimeUnit::Microseconds, None),
-                    Some(BaseType::Date) => DataType::Date,
-                    Some(BaseType::Duration) => DataType::Duration(TimeUnit::Microseconds),
-                    None => {
-                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                            "cast() target dtype must have known base.",
-                        ))
-                    }
-                };
-                Ok(input.to_polars_expr()?.cast(dt))
-            }
-            ExprNode::IsNull { input, .. } => Ok(input.to_polars_expr()?.is_null()),
-            ExprNode::IsNotNull { input, .. } => Ok(input.to_polars_expr()?.is_not_null()),
-            ExprNode::Coalesce { exprs, .. } => {
-                let parts: Vec<PolarsExpr> = exprs
-                    .iter()
-                    .map(|e| e.to_polars_expr())
-                    .collect::<PyResult<_>>()?;
-                Ok(coalesce(parts.as_slice()))
-            }
-            ExprNode::CaseWhen {
-                branches, else_, ..
-            } => {
-                let mut acc = else_.to_polars_expr()?;
-                for (c, t) in branches.iter().rev() {
-                    acc = ternary_expr(c.to_polars_expr()?, t.to_polars_expr()?, acc);
-                }
-                Ok(acc)
-            }
-            ExprNode::InList { inner, values, .. } => {
-                let base = inner.dtype().base.ok_or_else(|| {
-                    PyErr::new::<pyo3::exceptions::PyTypeError, _>("isin() inner dtype unknown.")
-                })?;
-                let series = literals_to_series(values, base)?;
-                Ok(inner.to_polars_expr()?.is_in(lit(series), true))
-            }
-            ExprNode::Between {
-                inner, low, high, ..
-            } => Ok(inner.to_polars_expr()?.is_between(
-                low.to_polars_expr()?,
-                high.to_polars_expr()?,
-                ClosedInterval::Both,
-            )),
-            ExprNode::StringConcat { parts, .. } => {
-                let exprs: Vec<PolarsExpr> = parts
-                    .iter()
-                    .map(|p| p.to_polars_expr())
-                    .collect::<PyResult<_>>()?;
-                Ok(concat_str(exprs.as_slice(), "", true))
-            }
-            ExprNode::Substring {
-                inner,
-                start,
-                length,
-                ..
-            } => {
-                let inner_e = inner.to_polars_expr()?;
-                let off = start.to_polars_expr()? - lit(1i64);
-                let len = match length {
-                    Some(l) => l.to_polars_expr()?,
-                    None => lit(1_000_000i64),
-                };
-                Ok(inner_e.str().slice(off, len))
-            }
-            ExprNode::StringLength { inner, .. } => Ok(inner.to_polars_expr()?.str().len_chars()),
-        }
-    }
-}
-
-fn arith_op_to_str(op: &ArithOp) -> &'static str {
-    match op {
-        ArithOp::Add => "add",
-        ArithOp::Sub => "sub",
-        ArithOp::Mul => "mul",
-        ArithOp::Div => "div",
-    }
-}
-
-fn cmp_op_to_str(op: &CmpOp) -> &'static str {
-    match op {
-        CmpOp::Eq => "eq",
-        CmpOp::Ne => "ne",
-        CmpOp::Lt => "lt",
-        CmpOp::Le => "le",
-        CmpOp::Gt => "gt",
-        CmpOp::Ge => "ge",
-    }
-}
-
-pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyObject> {
-    let dict = PyDict::new_bound(py);
-
-    dict.set_item("dtype", dtype_to_descriptor_py(py, node.dtype())?)?;
-
-    match node {
-        ExprNode::ColumnRef { name, .. } => {
-            dict.set_item("kind", "column_ref")?;
-            dict.set_item("name", name)?;
-        }
-        ExprNode::Literal { value, .. } => {
-            dict.set_item("kind", "literal")?;
-            let value_obj = match value {
-                None => py.None(),
-                Some(LiteralValue::Int(v)) => v.into_py(py),
-                Some(LiteralValue::Float(v)) => v.into_py(py),
-                Some(LiteralValue::Bool(v)) => v.into_py(py),
-                Some(LiteralValue::Str(v)) => v.clone().into_py(py),
-                Some(LiteralValue::DateTimeMicros(v)) => v.into_py(py),
-                Some(LiteralValue::DateDays(v)) => v.into_py(py),
-                Some(LiteralValue::DurationMicros(v)) => v.into_py(py),
-            };
-            dict.set_item("value", value_obj)?;
-        }
-        ExprNode::BinaryOp {
-            op, left, right, ..
-        } => {
-            dict.set_item("kind", "binary_op")?;
-            dict.set_item("op", arith_op_to_str(op))?;
-            dict.set_item("left", exprnode_to_serializable(py, left)?)?;
-            dict.set_item("right", exprnode_to_serializable(py, right)?)?;
-        }
-        ExprNode::CompareOp {
-            op, left, right, ..
-        } => {
-            dict.set_item("kind", "compare_op")?;
-            dict.set_item("op", cmp_op_to_str(op))?;
-            dict.set_item("left", exprnode_to_serializable(py, left)?)?;
-            dict.set_item("right", exprnode_to_serializable(py, right)?)?;
-        }
-        ExprNode::Cast { input, dtype } => {
-            dict.set_item("kind", "cast")?;
-            dict.set_item("input", exprnode_to_serializable(py, input)?)?;
-            dict.set_item("inner", exprnode_to_serializable(py, input)?)?;
-            if let Some(b) = dtype.base {
-                dict.set_item("to", base_type_json(b))?;
-            }
-        }
-        ExprNode::IsNull { input, .. } => {
-            dict.set_item("kind", "is_null")?;
-            dict.set_item("input", exprnode_to_serializable(py, input)?)?;
-            dict.set_item("inner", exprnode_to_serializable(py, input)?)?;
-        }
-        ExprNode::IsNotNull { input, .. } => {
-            dict.set_item("kind", "is_not_null")?;
-            dict.set_item("input", exprnode_to_serializable(py, input)?)?;
-            dict.set_item("inner", exprnode_to_serializable(py, input)?)?;
-        }
-        ExprNode::Coalesce { exprs, .. } => {
-            dict.set_item("kind", "coalesce")?;
-            let list = PyList::empty_bound(py);
-            for e in exprs {
-                list.append(exprnode_to_serializable(py, e)?)?;
-            }
-            dict.set_item("exprs", list)?;
-        }
-        ExprNode::CaseWhen {
-            branches, else_, ..
-        } => {
-            dict.set_item("kind", "case_when")?;
-            let list = PyList::empty_bound(py);
-            for (c, t) in branches {
-                let br = PyDict::new_bound(py);
-                br.set_item("condition", exprnode_to_serializable(py, c)?)?;
-                br.set_item("then", exprnode_to_serializable(py, t)?)?;
-                list.append(br)?;
-            }
-            dict.set_item("branches", list)?;
-            dict.set_item("else", exprnode_to_serializable(py, else_)?)?;
-        }
-        ExprNode::InList { inner, values, .. } => {
-            dict.set_item("kind", "in_list")?;
-            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
-            let list = PyList::empty_bound(py);
-            for v in values {
-                let pyv = match v {
-                    LiteralValue::Int(i) => i.into_py(py),
-                    LiteralValue::Float(f) => f.into_py(py),
-                    LiteralValue::Bool(b) => b.into_py(py),
-                    LiteralValue::Str(s) => s.clone().into_py(py),
-                    LiteralValue::DateTimeMicros(v) => v.into_py(py),
-                    LiteralValue::DateDays(v) => v.into_py(py),
-                    LiteralValue::DurationMicros(v) => v.into_py(py),
-                };
-                list.append(pyv)?;
-            }
-            dict.set_item("values", list)?;
-        }
-        ExprNode::Between {
-            inner, low, high, ..
-        } => {
-            dict.set_item("kind", "between")?;
-            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
-            dict.set_item("low", exprnode_to_serializable(py, low)?)?;
-            dict.set_item("high", exprnode_to_serializable(py, high)?)?;
-        }
-        ExprNode::StringConcat { parts, .. } => {
-            dict.set_item("kind", "string_concat")?;
-            let list = PyList::empty_bound(py);
-            for p in parts {
-                list.append(exprnode_to_serializable(py, p)?)?;
-            }
-            dict.set_item("parts", list)?;
-        }
-        ExprNode::Substring {
-            inner,
-            start,
-            length,
-            ..
-        } => {
-            dict.set_item("kind", "substring")?;
-            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
-            dict.set_item("start", exprnode_to_serializable(py, start)?)?;
-            match length {
-                Some(l) => {
-                    dict.set_item("length", exprnode_to_serializable(py, l)?)?;
-                }
-                None => {
-                    dict.set_item("length", py.None())?;
-                }
-            }
-        }
-        ExprNode::StringLength { inner, .. } => {
-            dict.set_item("kind", "string_length")?;
-            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
-        }
-    }
-
-    Ok(dict.into_py(py))
 }
 
 #[cfg(not(feature = "polars_engine"))]
@@ -1649,6 +1177,13 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             LiteralValue::Str(s) => s.parse::<i64>().map(LiteralValue::Int).map_err(|_| {
                 PyErr::new::<pyo3::exceptions::PyTypeError, _>("Cannot cast str to int.")
             }),
+            LiteralValue::DateTimeMicros(_)
+            | LiteralValue::DateDays(_)
+            | LiteralValue::DurationMicros(_) => {
+                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Cannot cast temporal literal to int.",
+                ))
+            }
         },
         BaseType::Float => match v {
             LiteralValue::Int(i) => Ok(LiteralValue::Float(i as f64)),
@@ -1657,6 +1192,13 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             LiteralValue::Str(s) => s.parse::<f64>().map(LiteralValue::Float).map_err(|_| {
                 PyErr::new::<pyo3::exceptions::PyTypeError, _>("Cannot cast str to float.")
             }),
+            LiteralValue::DateTimeMicros(_)
+            | LiteralValue::DateDays(_)
+            | LiteralValue::DurationMicros(_) => {
+                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Cannot cast temporal literal to float.",
+                ))
+            }
         },
         BaseType::Bool => match v {
             LiteralValue::Int(i) => Ok(LiteralValue::Bool(i != 0)),
@@ -1669,92 +1211,31 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
                     "Cannot cast str to bool.",
                 )),
             },
+            LiteralValue::DateTimeMicros(_)
+            | LiteralValue::DateDays(_)
+            | LiteralValue::DurationMicros(_) => {
+                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Cannot cast temporal literal to bool.",
+                ))
+            }
         },
         BaseType::Str => match v {
             LiteralValue::Int(i) => Ok(LiteralValue::Str(i.to_string())),
             LiteralValue::Float(f) => Ok(LiteralValue::Str(f.to_string())),
             LiteralValue::Bool(b) => Ok(LiteralValue::Str(b.to_string())),
             LiteralValue::Str(s) => Ok(LiteralValue::Str(s)),
+            LiteralValue::DateTimeMicros(_)
+            | LiteralValue::DateDays(_)
+            | LiteralValue::DurationMicros(_) => {
+                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Cannot cast temporal literal to str.",
+                ))
+            }
         },
         BaseType::DateTime | BaseType::Date | BaseType::Duration => {
             Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Row-wise cast() for temporal types is not supported.",
             ))
         }
-    }
-}
-
-#[derive(Clone)]
-pub struct ExprHandle {
-    pub node: ExprNode,
-}
-
-impl ExprHandle {
-    pub fn from_py_literal(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let dtype = py_value_to_dtype(py, value)?;
-        if value.is_none() {
-            return Ok(Self {
-                node: ExprNode::make_literal(None, dtype)?,
-            });
-        }
-
-        let lit = match dtype.base {
-            Some(BaseType::Int) => LiteralValue::Int(value.extract::<i64>()?),
-            Some(BaseType::Float) => LiteralValue::Float(value.extract::<f64>()?),
-            Some(BaseType::Bool) => LiteralValue::Bool(value.extract::<bool>()?),
-            Some(BaseType::Str) => LiteralValue::Str(value.extract::<String>()?),
-            Some(BaseType::DateTime) => {
-                let dt = value.downcast::<PyDateTime>()?;
-                let secs: f64 = dt.call_method0("timestamp")?.extract()?;
-                LiteralValue::DateTimeMicros((secs * 1_000_000.0).round() as i64)
-            }
-            Some(BaseType::Date) => {
-                let d = value.downcast::<PyDate>()?;
-                let ordinal: i32 = d.call_method0("toordinal")?.extract()?;
-                LiteralValue::DateDays(ordinal - 719_163)
-            }
-            Some(BaseType::Duration) => {
-                let td = value.downcast::<PyDelta>()?;
-                let secs: f64 = td.call_method0("total_seconds")?.extract()?;
-                LiteralValue::DurationMicros((secs * 1_000_000.0).round() as i64)
-            }
-            None => {
-                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "Non-None literal must have known base dtype.",
-                ))
-            }
-        };
-
-        Ok(Self {
-            node: ExprNode::make_literal(Some(lit), dtype)?,
-        })
-    }
-}
-
-pub fn op_symbol_to_arith(op: &str) -> PyResult<ArithOp> {
-    match op {
-        "+" => Ok(ArithOp::Add),
-        "-" => Ok(ArithOp::Sub),
-        "*" => Ok(ArithOp::Mul),
-        "/" => Ok(ArithOp::Div),
-        other => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-            "Unsupported arithmetic operator {:?}.",
-            other
-        ))),
-    }
-}
-
-pub fn op_symbol_to_cmp(op: &str) -> PyResult<CmpOp> {
-    match op {
-        "==" => Ok(CmpOp::Eq),
-        "!=" => Ok(CmpOp::Ne),
-        "<" => Ok(CmpOp::Lt),
-        "<=" => Ok(CmpOp::Le),
-        ">" => Ok(CmpOp::Gt),
-        ">=" => Ok(CmpOp::Ge),
-        other => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-            "Unsupported comparison operator {:?}.",
-            other
-        ))),
     }
 }

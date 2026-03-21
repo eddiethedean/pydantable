@@ -1,0 +1,366 @@
+//! Pure planner transforms: `PlanInner` → `PlanInner`.
+
+use std::collections::HashMap;
+
+use pyo3::prelude::*;
+
+use crate::dtype::DTypeDesc;
+use crate::expr::{ExprNode, LiteralValue};
+
+use super::ir::{PlanInner, PlanStep};
+
+pub fn plan_select(plan: &PlanInner, columns: Vec<String>) -> PyResult<PlanInner> {
+    if columns.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "select() requires at least one column.",
+        ));
+    }
+
+    for c in columns.iter() {
+        if !plan.schema.contains_key(c) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "select() unknown column '{}'.",
+                c
+            )));
+        }
+    }
+
+    let mut new_schema = HashMap::new();
+    for c in columns.iter() {
+        new_schema.insert(c.clone(), *plan.schema.get(c).unwrap());
+    }
+
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::Select { columns });
+
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: new_schema,
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_with_columns(
+    plan: &PlanInner,
+    columns: HashMap<String, ExprNode>,
+) -> PyResult<PlanInner> {
+    let mut new_schema = plan.schema.clone();
+    let mut new_steps = plan.steps.clone();
+
+    // Type-check and compute derived schema.
+    for (name, expr) in columns.iter() {
+        let referenced = expr.referenced_columns();
+        for c in referenced.iter() {
+            if !plan.schema.contains_key(c) {
+                let mut available: Vec<String> = plan.schema.keys().cloned().collect();
+                available.sort();
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Expression for '{}' references unknown column '{}'. Available columns: [{}].",
+                    name,
+                    c,
+                    available.join(", ")
+                )));
+            }
+        }
+
+        let mut expr_dtype = expr.dtype();
+        if expr_dtype.base.is_none() {
+            // Literal(None) assigned directly needs destination type inference.
+            if let Some(dest) = plan.schema.get(name) {
+                let base = dest.base.ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Destination schema base type is unknown.",
+                    )
+                })?;
+                expr_dtype = DTypeDesc {
+                    base: Some(base),
+                    nullable: true,
+                };
+            } else {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+                    "with_columns({}=None) cannot infer destination type; combine None with a typed expression or replace an existing column.",
+                    name
+                )));
+            }
+        }
+
+        new_schema.insert(name.clone(), expr_dtype);
+    }
+
+    new_steps.push(PlanStep::WithColumns { columns });
+
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: new_schema,
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_filter(plan: &PlanInner, condition: ExprNode) -> PyResult<PlanInner> {
+    let cond_dtype = condition.dtype();
+    if cond_dtype.base != Some(crate::dtype::BaseType::Bool) {
+        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            format!(
+                "filter(condition) expects condition typed as bool or Optional[bool]. Got base={:?} nullable={}.",
+                cond_dtype.base, cond_dtype.nullable
+            ),
+        ));
+    }
+
+    // referenced column validation.
+    let referenced = condition.referenced_columns();
+    for c in referenced.iter() {
+        if !plan.schema.contains_key(c) {
+            let mut available: Vec<String> = plan.schema.keys().cloned().collect();
+            available.sort();
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Filter expression references unknown column '{}'. Available columns: [{}].",
+                c,
+                available.join(", ")
+            )));
+        }
+    }
+
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::Filter { condition });
+
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: plan.schema.clone(),
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_sort(plan: &PlanInner, by: Vec<String>, descending: Vec<bool>) -> PyResult<PlanInner> {
+    if by.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "sort(by=...) requires at least one key.",
+        ));
+    }
+    if !descending.is_empty() && descending.len() != by.len() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "sort(descending=...) must be empty or the same length as by.",
+        ));
+    }
+    for key in by.iter() {
+        if !plan.schema.contains_key(key) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "sort() unknown key '{}'.",
+                key
+            )));
+        }
+    }
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::Sort { by, descending });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: plan.schema.clone(),
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_unique(
+    plan: &PlanInner,
+    subset: Option<Vec<String>>,
+    keep: String,
+) -> PyResult<PlanInner> {
+    if let Some(keys) = subset.as_ref() {
+        if keys.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "unique(subset=...) cannot be empty.",
+            ));
+        }
+        for key in keys.iter() {
+            if !plan.schema.contains_key(key) {
+                return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                    "unique() unknown subset column '{}'.",
+                    key
+                )));
+            }
+        }
+    }
+    match keep.as_str() {
+        "first" | "last" | "any" => {}
+        other => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "unique(keep=...) unsupported value '{}'. Use one of: first, last, any.",
+                other
+            )))
+        }
+    }
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::Unique { subset, keep });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: plan.schema.clone(),
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_drop(plan: &PlanInner, columns: Vec<String>) -> PyResult<PlanInner> {
+    if columns.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "drop(...) requires at least one column.",
+        ));
+    }
+    let mut new_schema = plan.schema.clone();
+    for col in columns.iter() {
+        if !new_schema.contains_key(col) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "drop() unknown column '{}'.",
+                col
+            )));
+        }
+        new_schema.remove(col);
+    }
+    if new_schema.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "drop(...) cannot remove all columns.",
+        ));
+    }
+    let mut new_steps = plan.steps.clone();
+    let kept = new_schema.keys().cloned().collect::<Vec<_>>();
+    new_steps.push(PlanStep::Select { columns: kept });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: new_schema,
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_rename(plan: &PlanInner, columns: HashMap<String, String>) -> PyResult<PlanInner> {
+    if columns.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "rename(...) requires at least one mapping.",
+        ));
+    }
+    let mut new_schema = plan.schema.clone();
+    for (old, new) in columns.iter() {
+        if !plan.schema.contains_key(old) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "rename() unknown column '{}'.",
+                old
+            )));
+        }
+        if old != new && new_schema.contains_key(new) && !columns.contains_key(new) {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "rename() target '{}' already exists.",
+                new
+            )));
+        }
+        let dtype = *plan.schema.get(old).unwrap();
+        new_schema.remove(old);
+        new_schema.insert(new.clone(), dtype);
+    }
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::Rename { columns });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: new_schema,
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_slice(plan: &PlanInner, offset: i64, length: usize) -> PyResult<PlanInner> {
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::Slice { offset, length });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: plan.schema.clone(),
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_fill_null(
+    plan: &PlanInner,
+    subset: Option<Vec<String>>,
+    value: Option<LiteralValue>,
+    strategy: Option<String>,
+) -> PyResult<PlanInner> {
+    if value.is_none() && strategy.is_none() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "fill_null() requires either a scalar value or a strategy.",
+        ));
+    }
+    if value.is_some() && strategy.is_some() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "fill_null() accepts either value or strategy, not both.",
+        ));
+    }
+    if let Some(cols) = subset.as_ref() {
+        if cols.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "fill_null(subset=...) cannot be empty.",
+            ));
+        }
+        for c in cols.iter() {
+            if !plan.schema.contains_key(c) {
+                return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                    "fill_null() unknown subset column '{}'.",
+                    c
+                )));
+            }
+        }
+    }
+    if let Some(s) = strategy.as_ref() {
+        match s.as_str() {
+            "forward" | "backward" | "min" | "max" | "mean" | "zero" | "one" => {}
+            other => {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "fill_null(strategy=...) unsupported value '{}'.",
+                    other
+                )))
+            }
+        }
+    }
+
+    let mut new_schema = plan.schema.clone();
+    if value.is_some() {
+        let targets = subset
+            .clone()
+            .unwrap_or_else(|| new_schema.keys().cloned().collect());
+        for c in targets.iter() {
+            if let Some(mut d) = new_schema.get(c).copied() {
+                d.nullable = false;
+                new_schema.insert(c.clone(), d);
+            }
+        }
+    }
+
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::FillNull {
+        subset,
+        value,
+        strategy,
+    });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: new_schema,
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_drop_nulls(plan: &PlanInner, subset: Option<Vec<String>>) -> PyResult<PlanInner> {
+    if let Some(cols) = subset.as_ref() {
+        if cols.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "drop_nulls(subset=...) cannot be empty.",
+            ));
+        }
+        for c in cols.iter() {
+            if !plan.schema.contains_key(c) {
+                return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                    "drop_nulls() unknown subset column '{}'.",
+                    c
+                )));
+            }
+        }
+    }
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::DropNulls { subset });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: plan.schema.clone(),
+        root_schema: plan.root_schema.clone(),
+    })
+}
