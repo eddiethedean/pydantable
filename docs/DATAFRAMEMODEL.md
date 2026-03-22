@@ -45,7 +45,7 @@ df1 = UserDF({"id": [1, 2], "age": [20, 30]})
 print(df1.to_dict())
 ```
 
-Output:
+Output (one run):
 
 ```text
 {'id': [1, 2], 'age': [20, 30]}
@@ -64,10 +64,10 @@ df2 = UserDF([
 print(df2.to_dict())
 ```
 
-Output:
+Output (one run):
 
 ```text
-{'id': [1, 2], 'age': [20, 30]}
+{'age': [20, 30], 'id': [1, 2]}
 ```
 
 This format is ideal for REST/JSON APIs and works naturally with FastAPI.
@@ -80,10 +80,10 @@ df3 = UserDF([RM(id=1, age=20), RM(id=2, age=30)])
 print(df3.to_dict())
 ```
 
-Output:
+Output (one run):
 
 ```text
-{'id': [1, 2], 'age': [20, 30]}
+{'age': [20, 30], 'id': [1, 2]}
 ```
 
 Use this when you already have validated row objects—for example **`list[UserDF.RowModel]`** from a FastAPI request body (see `docs/FASTAPI.md`).
@@ -125,10 +125,10 @@ print(df2.to_dict())
 
 `age2` is added if missing; if `age2` already exists, it is replaced.
 
-Output:
+Output (one run):
 
 ```text
-{'id': [1, 2], 'age': [20, 40], 'age2': [40, 80]}
+{'id': [1, 2], 'age2': [40, 80], 'age': [20, 40]}
 ```
 
 ## Query-building and typed expressions
@@ -143,7 +143,7 @@ df4 = df3.filter(df3.age2 > 40)
 print(df4.to_dict())
 ```
 
-Output:
+Output (one run):
 
 ```text
 {'id': [2, 3], 'age2': [100, 120]}
@@ -158,8 +158,12 @@ The expression system must:
 
 ## Typed Dtypes + Null Semantics (skeleton contract)
 
-Supported expression dtypes (for the current skeleton): `int`, `float`, `bool`,
-and `str`.
+Supported **scalar** dtypes for schema fields and expressions:
+
+- `int`, `float`, `bool`, `str`
+- `datetime`, `date`, `timedelta` (from the `datetime` module)
+
+Use `Optional[T]` / `T | None` for nullable columns. The full contract (descriptor names, unsupported cases, bulk ingest): **`SUPPORTED_TYPES.md`**.
 
 Null semantics are SQL-like (`propagate_nulls`):
 

@@ -24,6 +24,7 @@ The current primary FastAPI-facing API is `DataFrameModel`, a class that:
 - uses replacement semantics for `with_columns` name collisions
 
 See:
+- `docs/SUPPORTED_TYPES.md` for **scalar column dtypes** (and what is not supported)
 - `docs/DATAFRAMEMODEL.md` for the DataFrameModel contract
 - `docs/EXECUTION.md` for the Rust execution model and optional UI modules
 - `docs/FASTAPI.md` for end-to-end FastAPI examples
@@ -47,10 +48,10 @@ result = df4.to_dict()
 print(result)
 ```
 
-Output from `print(result)`:
+Output from `print(result)` (one run):
 
 ```text
-{'id': [2], 'age2': [60]}
+{'age2': [60], 'id': [2]}
 ```
 
 ## Current Repository Status
@@ -74,9 +75,10 @@ Phase 4 is complete for logical-plan boundary hardening:
 - Python schema migration consumes Rust schema descriptors (`base`, `nullable`)
 - Rust-side plan tests and Python metadata-flow integration tests are in place
 
-### Supported Expression Dtypes + Null Semantics (skeleton)
-Rust enforces expression typing (at AST-build time) and executes expressions
-with supported dtypes: `int`, `float`, `bool`, `str`.
+### Supported expression dtypes + null semantics
+Rust enforces expression typing (at AST-build time) for scalar dtypes:
+`int`, `float`, `bool`, `str`, `datetime`, `date`, `timedelta`. See
+`docs/SUPPORTED_TYPES.md` for the full list, nullability, and unsupported cases.
 
 Null semantics are SQL-like (`propagate_nulls`):
 - arithmetic: `NULL` + anything yields `NULL`

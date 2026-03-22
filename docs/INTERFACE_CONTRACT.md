@@ -85,8 +85,8 @@ Supported reshape methods:
   - multiple value columns: `<pivot_value>_<value_col>_<agg>`
 
 `explode` / `unnest`:
-- Current schema contracts only support scalar base dtypes (`int`, `float`, `bool`, `str`).
-- Because list/struct typed columns are not yet part of the schema system, both methods raise explicit `NotImplementedError` with guidance.
+- Only **scalar** column dtypes are modeled; see `SUPPORTED_TYPES.md` for the full list (`int`, `float`, `bool`, `str`, `datetime`, `date`, `timedelta`, each nullable).
+- Because **list**/**struct** typed columns are not yet part of the schema system, both methods raise explicit `NotImplementedError` with guidance.
 
 ## Window and time-series semantics
 

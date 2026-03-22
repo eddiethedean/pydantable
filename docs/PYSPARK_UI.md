@@ -22,10 +22,10 @@ out = df.withColumn("greeting", F.concat(F.col("name", dtype=str), F.lit("!")))
 print(out.to_dict())
 ```
 
-Output:
+Output (one run):
 
 ```text
-{'id': [1], 'name': ['Ada'], 'greeting': ['Ada!']}
+{'greeting': ['Ada!'], 'name': ['Ada'], 'id': [1]}
 ```
 
 ## Imports

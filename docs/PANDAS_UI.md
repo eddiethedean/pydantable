@@ -19,10 +19,10 @@ df2 = df.assign(doubled=df.amount * 2)
 print(df2.to_dict())
 ```
 
-Output:
+Output (one run):
 
 ```text
-{'doubled': [20, 40], 'region': ['US', 'EU'], 'amount': [10, 20]}
+{'region': ['US', 'EU'], 'amount': [10, 20], 'doubled': [20, 40]}
 ```
 
 ## Imports

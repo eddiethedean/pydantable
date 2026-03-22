@@ -60,12 +60,11 @@ df = Metrics({
 })
 
 wide = df.pivot(index="id", columns="metric", values="value", aggregate_function="first")
-out = wide.to_dict()
-print(out)
+print(wide.to_dict())
 # Column names follow the contract (for example: "A_first", "B_first").
 ```
 
-Output:
+Output (one run):
 
 ```text
 {'id': [1, 2], 'A_first': [10, None], 'B_first': [20, 40]}
@@ -95,9 +94,9 @@ print(rolled.to_dict())
 print(dynamic.to_dict())
 ```
 
-Output:
+Output (one run):
 
 ```text
-{'v': [10, None, 30], 'id': [1, 1, 1], 'v_roll': [10, 10, 40], 'ts': [0, 3600, 7200]}
+{'v': [10, None, 30], 'ts': [0, 3600, 7200], 'id': [1, 1, 1], 'v_roll': [10, 10, 40]}
 {'ts': [0, 3600, 7200], 'id': [1, 1, 1], 'v_sum': [10, None, 30], 'v_count': [1, 0, 1]}
 ```

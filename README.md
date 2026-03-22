@@ -12,6 +12,17 @@ Pydantable keeps your Pydantic schemas as the source of truth for:
 
 Execution always uses the Rust core; optional `pandas` / `pyspark` **UI modules** only change naming/imports (see `docs/EXECUTION.md`).
 
+## Supported data types
+
+**Columns and expressions** use scalar Python types only:
+
+| Type | Nullable form |
+|------|----------------|
+| `int`, `float`, `bool`, `str` | `Optional[T]` / `T \| None` |
+| `datetime`, `date`, `timedelta` (`datetime` stdlib) | same |
+
+Nested models, `list`/`dict` cells, and other non-scalar column values are not supported yet. **`docs/SUPPORTED_TYPES.md`** also lists **planned future types** (including nested models). Full detail and runtime buffer notes live there too.
+
 ## What You Get
 
 Typed, schema-safe transforms:
@@ -76,10 +87,10 @@ result = df4.to_dict()
 print(result)
 ```
 
-Output from `print(result)`:
+Output from `print(result)` (one run):
 
 ```text
-{'id': [1], 'age2': [40]}
+{'age2': [40], 'id': [1]}
 ```
 
 ## Semantics Contract (high level)
@@ -124,6 +135,7 @@ if you need `DataFrame.to_polars()`.
 
 ## Docs
 
+- `docs/SUPPORTED_TYPES.md` for **scalar dtypes**, nullability, and what is not supported
 - `docs/EXECUTION.md` for the Rust execution model, materialization (`collect` / `to_dict` / `to_polars`), and UI modules
 - `docs/DATAFRAMEMODEL.md` for the `DataFrameModel` contract/design spec
 - `docs/FASTAPI.md` for end-to-end FastAPI integration examples

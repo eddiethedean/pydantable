@@ -49,6 +49,34 @@ df3 = df2.select("id", "age2")
 df4 = df3.filter(df3.age2 > 40)
 assert df4.to_dict() == {"id": [2], "age2": [60]}
 
+# docs/DATAFRAMEMODEL.md
+
+
+class DFUser(DataFrameModel):
+    id: int
+    age: int
+
+
+df1 = DFUser({"id": [1, 2], "age": [20, 30]})
+assert df1.to_dict() == {"id": [1, 2], "age": [20, 30]}
+
+df_row = DFUser([{"id": 1, "age": 20}, {"id": 2, "age": 30}])
+assert df_row.to_dict() == {"age": [20, 30], "id": [1, 2]}
+
+_RM = DFUser.row_model()
+df_rm = DFUser([_RM(id=1, age=20), _RM(id=2, age=30)])
+assert df_rm.to_dict() == {"age": [20, 30], "id": [1, 2]}
+
+df_c = DFUser({"id": [1, 2], "age": [20, 40]})
+df_c2 = df_c.with_columns(age2=df_c.age * 2)
+assert df_c2.to_dict() == {"id": [1, 2], "age": [20, 40], "age2": [40, 80]}
+
+df_q = DFUser({"id": [1, 2, 3], "age": [10, 50, 60]})
+df_q2 = df_q.with_columns(age2=df_q.age * 2)
+df_q3 = df_q2.select("id", "age2")
+df_q4 = df_q3.filter(df_q3.age2 > 40)
+assert df_q4.to_dict() == {"id": [2, 3], "age2": [100, 120]}
+
 # docs/PANDAS_UI
 
 

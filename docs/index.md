@@ -5,10 +5,13 @@ with a Rust-powered execution core (Polars-backed inside the native extension).
 
 **Materialization (0.6+):** `collect()` returns a **list of Pydantic row models** for the current schema. Use **`to_dict()`** (or **`collect(as_lists=True)`**) for columnar **`dict[str, list]`** responses. **`to_polars()`** is available when the optional Python **`polars`** package is installed (`pip install 'pydantable[polars]'`). Details: `EXECUTION.md`, `DATAFRAMEMODEL.md`.
 
+**Scalar dtypes:** `int`, `float`, `bool`, `str`, `datetime`, `date`, `timedelta`, each nullable via `Optional` / `| None`. Authoritative list: `SUPPORTED_TYPES.md`.
+
 ```{toctree}
 :maxdepth: 2
 
 DATAFRAMEMODEL
+SUPPORTED_TYPES
 FASTAPI
 ROADMAP
 DEVELOPER
