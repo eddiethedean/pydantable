@@ -237,10 +237,10 @@ app = FastAPI()
 
 
 @app.post("/users", response_model=list[UserRow])
-def create_users(rows: list[UserDF.RowModel]) -> list[UserRow]:
+def create_users(rows: list[UserDF.RowModel]):
     df = UserDF(rows)
     projected = df.select("id", "age")
-    return [UserRow.model_validate(m.model_dump()) for m in projected.collect()]
+    return projected.collect()
 ```
 
 The handler mirrors `UserDF(rows).select(...).collect()` on validated row models;
@@ -250,8 +250,8 @@ registering routes does not run the handler until you serve the app (for example
 
 Because transformations migrate the model type, response types can become
 as precise as the query’s projected schema. For a **JSON array of objects**, return
-**`collect()`** (optionally mapping each row with `YourDto.model_validate(m.model_dump())`
-for a stable OpenAPI type—see `docs/FASTAPI.md`).
+**`collect()`** and declare **`response_model=list[YourRow]`**; FastAPI validates
+and filters the response to that schema (see `docs/FASTAPI.md`).
 
 ## Materializing row models
 

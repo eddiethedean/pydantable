@@ -27,8 +27,9 @@ pip install .
 
 Real services often receive **more than one related table** (partner feed, staged
 upload, or denormalized batch). Validate each as `list[...RowModel]`, build two
-`DataFrameModel` instances, then **join → fill nulls → aggregate**. Materialize
-rows with **`collect()`** and map to a stable OpenAPI DTO.
+`DataFrameModel` instances, then **join → fill nulls → aggregate**. Return
+**`collect()`**; FastAPI applies **`response_model`** to validate and serialize
+the response (no need to wrap rows in `model_validate` yourself).
 
 ```python
 from fastapi import APIRouter, FastAPI
@@ -68,7 +69,7 @@ app.include_router(router)
 
 
 @router.post("/sales-by-country", response_model=list[CountryRevenueRow])
-def sales_by_country(body: SalesByCountryBody) -> list[CountryRevenueRow]:
+def sales_by_country(body: SalesByCountryBody):
     orders = OrderLineDF(body.orders)
     users = UserDimDF(body.users)
     rolled = (
@@ -78,7 +79,7 @@ def sales_by_country(body: SalesByCountryBody) -> list[CountryRevenueRow]:
         .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
         .sort("country")
     )
-    return [CountryRevenueRow.model_validate(m.model_dump()) for m in rolled.collect()]
+    return rolled.collect()
 ```
 
 Example request (abbreviated):
@@ -139,10 +140,10 @@ def adults(
     rows: list[UserDF.RowModel],
     min_age: Annotated[int, Query(ge=0, le=120)] = 18,
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
-) -> list[AdultRow]:
+):
     df = UserDF(rows)
     ranked = df.filter(df.age >= min_age).sort("age", descending=True).head(limit)
-    return [AdultRow.model_validate(m.model_dump()) for m in ranked.collect()]
+    return ranked.collect()
 ```
 
 With body `[{"id": 1, "age": 22}, {"id": 2, "age": null}, {"id": 3, "age": 15}, {"id": 4, "age": 30}]` and default query params, the handler returns adults sorted by `age` descending, at most `limit` rows — here `[{"id": 4, "age": 30}, {"id": 1, "age": 22}]` when `limit=2`.
@@ -182,14 +183,14 @@ def top_lines(
     rows: list[LineItemDF.RowModel],
     min_line_total: Annotated[float, Query(ge=0.0)] = 0.0,
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
-) -> list[LineTotalRow]:
+):
     df = LineItemDF(rows)
     df2 = df.with_columns(line_total=df.qty * df.unit_price)
     df3 = df2.filter(df2.line_total >= min_line_total).sort(
         "line_total", descending=True
     )
     out = df3.head(limit).select("sku", "qty", "line_total")
-    return [LineTotalRow.model_validate(m.model_dump()) for m in out.collect()]
+    return out.collect()
 ```
 
 For `[{"sku": "A", "qty": 2, "unit_price": 10.0}, {"sku": "B", "qty": 1, "unit_price": 5.0}]` with `min_line_total=10` and `limit=1`, **`collect()`** yields one row: **`A`** with **`line_total` 20.0**.
@@ -197,7 +198,7 @@ For `[{"sku": "A", "qty": 2, "unit_price": 10.0}, {"sku": "B", "qty": 1, "unit_p
 ## Columnar vs row-shaped responses
 
 - **`to_dict()`** — `dict[str, list]`; one JSON object with parallel arrays.
-- **`collect()`** — `list` of Pydantic models for the **current** schema; natural fit for **`list[Row]`** JSON and `response_model=list[...]`.
+- **`collect()`** — `list` of Pydantic models for the **current** schema; return it from the handler and let **`response_model`** define OpenAPI and validate the serialized response.
 - **`to_dicts()`** — `list[dict]` from row models when you want plain dicts without a separate DTO class.
 
 ## Error timing and API safety
