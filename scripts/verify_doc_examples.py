@@ -263,26 +263,72 @@ assert [m.model_dump() for m in df2.collect()] == [
     {"id": 2, "age2": None},
 ]
 
-df = UserFastApi([RM(id=1, age=22), RM(id=2, age=None), RM(id=3, age=15)])
-assert [m.model_dump() for m in df.filter(df.age >= 18).collect()] == [
+df = UserFastApi(
+    [
+        RM(id=1, age=22),
+        RM(id=2, age=None),
+        RM(id=3, age=15),
+        RM(id=4, age=30),
+    ]
+)
+ranked = df.filter(df.age >= 18).sort("age", descending=True).head(2)
+assert [m.model_dump() for m in ranked.collect()] == [
+    {"id": 4, "age": 30},
     {"id": 1, "age": 22},
 ]
 
 
-class EventDF(DataFrameModel):
+class OrderLineDF(DataFrameModel):
+    order_id: int
     user_id: int
-    spend: float | None
+    amount: float | None
 
 
-ERM = EventDF.row_model()
-df = EventDF([ERM(user_id=1, spend=150.0), ERM(user_id=2, spend=50.0)])
-df2 = (
-    df.with_columns(spend_usd=df.spend * 1.0)
-    .filter(df.spend > 100.0)
-    .select("user_id", "spend_usd")
+class UserDimDF(DataFrameModel):
+    user_id: int
+    country: str
+
+
+orders = OrderLineDF(
+    {
+        "order_id": [1, 2, 3],
+        "user_id": [10, 10, 20],
+        "amount": [50.0, None, 20.0],
+    }
 )
-assert [m.model_dump() for m in df2.collect()] == [
-    {"user_id": 1, "spend_usd": 150.0},
+users = UserDimDF({"user_id": [10, 20], "country": ["US", "CA"]})
+rolled = (
+    orders.join(users, on="user_id", how="left")
+    .fill_null(0.0, subset=["amount"])
+    .group_by("country")
+    .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
+    .sort("country")
+)
+assert [m.model_dump() for m in rolled.collect()] == [
+    {"country": "CA", "n_orders": 1, "total": 20.0},
+    {"country": "US", "n_orders": 2, "total": 50.0},
+]
+
+
+class LineItemDF(DataFrameModel):
+    sku: str
+    qty: int
+    unit_price: float
+
+
+LM = LineItemDF.row_model()
+df = LineItemDF(
+    [LM(sku="A", qty=2, unit_price=10.0), LM(sku="B", qty=1, unit_price=5.0)]
+)
+df2 = df.with_columns(line_total=df.qty * df.unit_price)
+df3 = (
+    df2.filter(df2.line_total >= 10.0)
+    .sort("line_total", descending=True)
+    .head(1)
+    .select("sku", "qty", "line_total")
+)
+assert [m.model_dump() for m in df3.collect()] == [
+    {"sku": "A", "qty": 2, "line_total": 20.0},
 ]
 
 print("verify_doc_examples: ok")

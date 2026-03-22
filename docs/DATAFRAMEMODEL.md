@@ -216,6 +216,7 @@ For endpoints that receive `[{"id": 1, "age": 20}, ...]`, type the body as
 
 ```python
 from fastapi import FastAPI
+from pydantic import BaseModel
 
 from pydantable import DataFrameModel
 
@@ -225,18 +226,25 @@ class UserDF(DataFrameModel):
     age: int
 
 
+class UserRow(BaseModel):
+    """Response row; matches the selected projection."""
+
+    id: int
+    age: int
+
+
 app = FastAPI()
 
 
-@app.post("/users")
-def create_users(rows: list[UserDF.RowModel]) -> UserDF:
+@app.post("/users", response_model=list[UserRow])
+def create_users(rows: list[UserDF.RowModel]) -> list[UserRow]:
     df = UserDF(rows)
-    return df.select("id", "age")  # returns a new model type
+    projected = df.select("id", "age")
+    return [UserRow.model_validate(m.model_dump()) for m in projected.collect()]
 ```
 
-The handler body is the same idea as running `UserDF([...]).select("id", "age")` on
-validated row models; defining the app registers routes but does not print output
-until you serve it (for example with Uvicorn).
+The handler mirrors `UserDF(rows).select(...).collect()` on validated row models;
+registering routes does not run the handler until you serve the app (for example with Uvicorn).
 
 ### Typical response flow
 

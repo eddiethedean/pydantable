@@ -1,16 +1,17 @@
 # FastAPI Integration Guide
 
-This guide shows full FastAPI-oriented examples using `DataFrameModel` as the
-primary FastAPI-facing API, with typed expressions and Rust-backed execution.
+This guide shows FastAPI-oriented patterns using `DataFrameModel` as the
+primary API: validated request bodies, typed transforms, and **`collect()`** to
+materialize **row lists** for JSON responses.
 
 ## Why this matters
 
 For FastAPI services, `pydantable` gives you:
 
-- Pydantic schema validation at API boundaries
-- typed dataframe transformations in service logic
-- `DataFrameModel` construction from column dicts, row dicts, or **sequences of Pydantic models** (including `YourDF.RowModel` from a typed request body)
-- Rust execution for `to_dict()` (columnar) and **`collect()`** (row list: **`list`** of Pydantic models for the **current** projected schema)
+- Pydantic validation at API boundaries (`RowModel` per `DataFrameModel`)
+- typed dataframe transformations in handlers or services
+- **`collect()`** — `list` of Pydantic models for the **current** projection (ideal for `response_model=list[YourRow]`)
+- **`to_dict()`** — `dict[str, list]` when the response is **column-shaped** JSON
 
 ## Install
 
@@ -22,71 +23,99 @@ pip install .
 
 `pydantable` requires the Rust extension in the current skeleton.
 
-## Example 1: Request payload -> transformed response (DataFrameModel)
+## Example 1: Router + multi-table body — revenue by country
 
-This endpoint accepts a **JSON array of row objects** typed as `list[UserDF.RowModel]`,
-builds the `DataFrameModel` from those Pydantic instances, applies typed dataframe
-operations, and returns a **JSON array of row objects** using **`collect()`** (each
-element is a Pydantic model for the projected schema). The handler maps those models
-onto stable **`UserAge2Row`** DTOs for OpenAPI; you can **`return df2.collect()`**
-directly when you do not need a separate response class.
+Real services often receive **more than one related table** (partner feed, staged
+upload, or denormalized batch). Validate each as `list[...RowModel]`, build two
+`DataFrameModel` instances, then **join → fill nulls → aggregate**. Materialize
+rows with **`collect()`** and map to a stable OpenAPI DTO.
 
 ```python
-from typing import Optional
-
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from pydantic import BaseModel
 
 from pydantable import DataFrameModel
 
-
-class UserDF(DataFrameModel):
-    id: int
-    age: Optional[int]
+router = APIRouter(prefix="/api/v1/reports", tags=["reports"])
 
 
-class UserAge2Row(BaseModel):
-    """API response row; fields match the transformed projection."""
+class OrderLineDF(DataFrameModel):
+    order_id: int
+    user_id: int
+    amount: float | None
 
-    id: int
-    age2: Optional[int]
+
+class UserDimDF(DataFrameModel):
+    user_id: int
+    country: str
+
+
+class SalesByCountryBody(BaseModel):
+    """Two datasets in one JSON payload (common for bulk ingest APIs)."""
+
+    orders: list[OrderLineDF.RowModel]
+    users: list[UserDimDF.RowModel]
+
+
+class CountryRevenueRow(BaseModel):
+    country: str
+    total: float
+    n_orders: int
 
 
 app = FastAPI()
+app.include_router(router)
 
 
-@app.post("/users/age2", response_model=list[UserAge2Row])
-def users_age2(rows: list[UserDF.RowModel]) -> list[UserAge2Row]:
-    # Pydantic validates each row before DataFrameModel construction.
-    df = UserDF(rows)
-
-    # Typed expression + schema migration.
-    df2 = df.with_columns(age2=df.age + 1).select("id", "age2")
-
-    # Rust executes the plan; collect() -> list of Pydantic models (df2.schema_type).
-    return [UserAge2Row.model_validate(m.model_dump()) for m in df2.collect()]
+@router.post("/sales-by-country", response_model=list[CountryRevenueRow])
+def sales_by_country(body: SalesByCountryBody) -> list[CountryRevenueRow]:
+    orders = OrderLineDF(body.orders)
+    users = UserDimDF(body.users)
+    rolled = (
+        orders.join(users, on="user_id", how="left")
+        .fill_null(0.0, subset=["amount"])
+        .group_by("country")
+        .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
+        .sort("country")
+    )
+    return [CountryRevenueRow.model_validate(m.model_dump()) for m in rolled.collect()]
 ```
 
-If the request body is `[{"id": 1, "age": 20}, {"id": 2, "age": null}]`, the response body is:
+Example request (abbreviated):
 
 ```json
-[{"id": 1, "age2": 21}, {"id": 2, "age2": null}]
+{
+  "orders": [
+    {"order_id": 1, "user_id": 10, "amount": 50.0},
+    {"order_id": 2, "user_id": 10, "amount": null},
+    {"order_id": 3, "user_id": 20, "amount": 20.0}
+  ],
+  "users": [
+    {"user_id": 10, "country": "US"},
+    {"user_id": 20, "country": "CA"}
+  ]
+}
 ```
 
-Behavior notes:
+Example response (sorted for readability):
 
-- `age2` is typed as `Optional[int]` because nulls propagate.
-- if `age` is `None`, `age2` is `None`.
+```json
+[
+  {"country": "CA", "total": 20.0, "n_orders": 1},
+  {"country": "US", "total": 50.0, "n_orders": 2}
+]
+```
 
-## Example 2: Filtering with nullable conditions (DataFrameModel)
+## Example 2: Query parameters + `collect()` — ranked adults with a cap
 
-`filter(condition)` keeps rows where condition is exactly `True` and drops
-rows where it is `False` or `NULL`.
+Use **`Query`** for bounds that belong on the URL (versioning, caching, client
+SDKs). Chain **`filter` → `sort` → `head`** then **`collect()`** for the
+response body.
 
 ```python
-from typing import Optional
+from typing import Annotated
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from pydantic import BaseModel
 
 from pydantable import DataFrameModel
@@ -94,120 +123,98 @@ from pydantable import DataFrameModel
 
 class UserDF(DataFrameModel):
     id: int
-    age: Optional[int]
+    age: int | None
 
 
 class AdultRow(BaseModel):
     id: int
-    age: Optional[int]
+    age: int | None
 
 
 app = FastAPI()
 
 
 @app.post("/users/adults", response_model=list[AdultRow])
-def adults(rows: list[UserDF.RowModel]) -> list[AdultRow]:
+def adults(
+    rows: list[UserDF.RowModel],
+    min_age: Annotated[int, Query(ge=0, le=120)] = 18,
+    limit: Annotated[int, Query(ge=1, le=500)] = 50,
+) -> list[AdultRow]:
     df = UserDF(rows)
-
-    # condition dtype: Optional[bool]
-    df2 = df.filter(df.age >= 18)
-    return [AdultRow.model_validate(m.model_dump()) for m in df2.collect()]
+    ranked = df.filter(df.age >= min_age).sort("age", descending=True).head(limit)
+    return [AdultRow.model_validate(m.model_dump()) for m in ranked.collect()]
 ```
 
-With input:
+With body `[{"id": 1, "age": 22}, {"id": 2, "age": null}, {"id": 3, "age": 15}, {"id": 4, "age": 30}]` and default query params, the handler returns adults sorted by `age` descending, at most `limit` rows — here `[{"id": 4, "age": 30}, {"id": 1, "age": 22}]` when `limit=2`.
 
-```json
-[{"id": 1, "age": 22}, {"id": 2, "age": null}, {"id": 3, "age": 15}]
-```
+## Example 3: Derived column + filter — top lines by computed total
 
-Response body:
-
-```json
-[{"id": 1, "age": 22}]
-```
-
-## Example 3: Chained transformation endpoint (DataFrameModel)
-
-This example shows a realistic service flow: enrich, filter, project.
+`with_columns` adds **`line_total`**; subsequent **`filter`**, **`sort`**, and
+**`head`** use the **derived** dataframe (`df2`, `df3`, …) so column references
+match the migrated schema.
 
 ```python
-from typing import Optional
+from typing import Annotated
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from pydantic import BaseModel
 
 from pydantable import DataFrameModel
 
 
-class EventDF(DataFrameModel):
-    user_id: int
-    spend: Optional[float]
+class LineItemDF(DataFrameModel):
+    sku: str
+    qty: int
+    unit_price: float
 
 
-class HighValueRow(BaseModel):
-    user_id: int
-    spend_usd: Optional[float]
+class LineTotalRow(BaseModel):
+    sku: str
+    qty: int
+    line_total: float
 
 
 app = FastAPI()
 
 
-@app.post("/events/high-value", response_model=list[HighValueRow])
-def high_value(rows: list[EventDF.RowModel]) -> list[HighValueRow]:
-    df = EventDF(rows)
-
-    df2 = (
-        df.with_columns(spend_usd=df.spend * 1.0)
-        .filter(df.spend > 100.0)
-        .select("user_id", "spend_usd")
+@app.post("/procurement/top-lines", response_model=list[LineTotalRow])
+def top_lines(
+    rows: list[LineItemDF.RowModel],
+    min_line_total: Annotated[float, Query(ge=0.0)] = 0.0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+) -> list[LineTotalRow]:
+    df = LineItemDF(rows)
+    df2 = df.with_columns(line_total=df.qty * df.unit_price)
+    df3 = df2.filter(df2.line_total >= min_line_total).sort(
+        "line_total", descending=True
     )
-    return [HighValueRow.model_validate(m.model_dump()) for m in df2.collect()]
+    out = df3.head(limit).select("sku", "qty", "line_total")
+    return [LineTotalRow.model_validate(m.model_dump()) for m in out.collect()]
 ```
 
-For a request body `[{"user_id": 1, "spend": 150.0}, {"user_id": 2, "spend": 50.0}]`, the response body is:
-
-```json
-[{"user_id": 1, "spend_usd": 150.0}]
-```
+For `[{"sku": "A", "qty": 2, "unit_price": 10.0}, {"sku": "B", "qty": 1, "unit_price": 5.0}]` with `min_line_total=10` and `limit=1`, **`collect()`** yields one row: **`A`** with **`line_total` 20.0**.
 
 ## Columnar vs row-shaped responses
 
-- **`to_dict()`** — `dict[str, list]`; use when your API returns **columns** (e.g. bulk arrays in one JSON object).
-- **`collect()`** — `list` of Pydantic models for the **current** projected schema (`df.schema_type`); use for **row arrays** in JSON. For OpenAPI, map with `YourRowDto.model_validate(m.model_dump())` when you want a stable named type, or return **`df.collect()`** directly if the generated row type is enough.
+- **`to_dict()`** — `dict[str, list]`; one JSON object with parallel arrays.
+- **`collect()`** — `list` of Pydantic models for the **current** schema; natural fit for **`list[Row]`** JSON and `response_model=list[...]`.
+- **`to_dicts()`** — `list[dict]` from row models when you want plain dicts without a separate DTO class.
 
 ## Error timing and API safety
 
 In the current Rust-first design:
 
-- invalid expression type combinations fail when building the expression AST
-  (during operator overloads)
+- invalid expression type combinations fail while building the expression AST
 - invalid `filter()` condition types fail before execution
 - invalid `select()` projections (for example, empty projections) fail from Rust
   logical-plan validation before execution
 
-This keeps FastAPI handlers predictable: many category errors are raised before
-query execution.
+That keeps handlers predictable: many errors surface before **`collect()`** runs.
 
-Phase 3 (basic transformations) is complete:
+## Practical pattern for larger apps
 
-- `select()`, `with_columns()`, and `filter()` behavior is locked
-- `with_columns()` replacement semantics are deterministic for collisions
-- row-input (dict rows, Pydantic row models) and column-input transformation parity is validated
+- **Routes**: Pydantic request/response models; **`collect()`** for row-list responses.
+- **Services**: `DataFrameModel` transforms (reusable across HTTP, CLI, workers).
+- **Adapters**: load/save column dicts or row lists from databases, queues, or object storage.
 
-Phase 4 (logical-plan boundary hardening) is complete:
-
-- Rust is authoritative for plan validation and migration metadata
-- Python derives output model annotations from Rust schema descriptors
-- behavior compatibility is preserved for existing FastAPI transformation flows
-
-## Practical pattern for services
-
-For larger apps, a clean split is:
-
-- **Route layer**: Pydantic request/response models; materialize rows with **`collect()`** when responses are row lists
-- **Service layer**: `DataFrameModel` transforms
-- **Persistence layer**: source/sink adapters (db, queue, storage)
-
-That keeps your data contract (`DataFrameModel` schema annotations) and transformation contract in one
-typed place.
-
+This keeps schema and transformation contracts in one typed layer.
