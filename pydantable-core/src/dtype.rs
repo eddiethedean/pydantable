@@ -204,7 +204,7 @@ fn is_py_enum_type(py: Python<'_>, py_type: &Bound<'_, PyType>) -> PyResult<bool
     let enum_base = enums.getattr("Enum")?;
     let builtins = py.import_bound("builtins")?;
     let issubclass = builtins.getattr("issubclass")?;
-    Ok(issubclass.call1((py_type, enum_base))?.extract::<bool>()?)
+    issubclass.call1((py_type, enum_base))?.extract::<bool>()
 }
 
 /// String used for Polars Utf8 cells and expression literals (`enum.Enum.value` or `str(...)`).
@@ -588,7 +588,7 @@ fn scalar_base_to_py_type(py: Python<'_>, base: BaseType) -> PyResult<PyObject> 
         BaseType::Enum => {
             let typing = py.import_bound("typing")?;
             typing.getattr("Any")?.into_py(py)
-        },
+        }
         BaseType::DateTime => py
             .import_bound("datetime")?
             .getattr("datetime")?
@@ -693,11 +693,5 @@ pub fn scaled_i128_to_decimal_string(v: i128) -> String {
     let p = 10_u128.pow(DECIMAL_SCALE as u32);
     let whole = av / p;
     let frac = av % p;
-    format!(
-        "{}{}.{:0>width$}",
-        sign,
-        whole,
-        frac,
-        width = DECIMAL_SCALE
-    )
+    format!("{}{}.{:0>width$}", sign, whole, frac, width = DECIMAL_SCALE)
 }

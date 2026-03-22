@@ -56,6 +56,17 @@ line-length = 88
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 
+[tool.mypy]
+python_version = "3.10"
+mypy_path = "python"
+explicit_package_bases = true
+
+# Tests use parametrized UI bases and column attrs that are Expr at runtime but
+# look like optional scalars to static analysis; typecheck the package only.
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
+
 [tool.pytest.ini_options]
 pythonpath = ["python"]
 testpaths = ["tests"]

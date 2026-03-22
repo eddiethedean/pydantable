@@ -1,11 +1,10 @@
-"""Integration tests for type-specific Expr operations (numeric, string, bool, temporal, list)."""
+"""Integration tests for type-specific Expr: numeric, string, bool, temporal, list."""
 
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
-
 from pydantable import DataFrame, Schema
 
 

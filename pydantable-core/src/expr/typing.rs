@@ -27,8 +27,7 @@ fn dtype_is_string_like(dtype: &DTypeDesc) -> bool {
 
 #[cfg(not(feature = "polars_engine"))]
 fn trim_matches_char_set(s: &str, pat: &str) -> String {
-    s.trim_matches(|c| pat.chars().any(|m| m == c))
-        .to_string()
+    s.trim_matches(|c| pat.chars().any(|m| m == c)).to_string()
 }
 
 #[cfg(not(feature = "polars_engine"))]
@@ -418,8 +417,8 @@ impl ExprNode {
                         | (BaseType::Float, BaseType::Int | BaseType::Float)
                 );
                 let allowed_str = lb == BaseType::Str && rb == BaseType::Str;
-                let allowed_enum = lb == BaseType::Enum && rb == BaseType::Enum
-                    || (lb == BaseType::Str && rb == BaseType::Enum)
+                let allowed_enum = ((lb == BaseType::Str || lb == BaseType::Enum)
+                    && rb == BaseType::Enum)
                     || (lb == BaseType::Enum && rb == BaseType::Str);
                 let allowed_uuid = lb == BaseType::Uuid && rb == BaseType::Uuid;
                 let allowed_decimal = lb == BaseType::Decimal && rb == BaseType::Decimal;
@@ -572,7 +571,7 @@ impl ExprNode {
                 | (BaseType::Str, BaseType::Decimal)
                 | (BaseType::Enum, BaseType::Str | BaseType::Enum)
                 | (BaseType::Str, BaseType::Enum)
-            | (BaseType::DateTime, BaseType::Date)
+                | (BaseType::DateTime, BaseType::Date)
                 | (BaseType::DateTime, BaseType::Str)
                 | (BaseType::Date, BaseType::Str)
         );
@@ -812,7 +811,9 @@ impl ExprNode {
         start: ExprNode,
         length: Option<ExprNode>,
     ) -> PyResult<Self> {
-        if inner.dtype().is_struct() || inner.dtype().is_list() || !dtype_is_string_like(&inner.dtype())
+        if inner.dtype().is_struct()
+            || inner.dtype().is_list()
+            || !dtype_is_string_like(&inner.dtype())
         {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "substring() requires a string column.",
@@ -854,7 +855,9 @@ impl ExprNode {
     }
 
     pub fn make_string_length(inner: ExprNode) -> PyResult<Self> {
-        if inner.dtype().is_struct() || inner.dtype().is_list() || !dtype_is_string_like(&inner.dtype())
+        if inner.dtype().is_struct()
+            || inner.dtype().is_list()
+            || !dtype_is_string_like(&inner.dtype())
         {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "length() requires a string column.",
@@ -875,7 +878,9 @@ impl ExprNode {
         pattern: String,
         replacement: String,
     ) -> PyResult<Self> {
-        if inner.dtype().is_struct() || inner.dtype().is_list() || !dtype_is_string_like(&inner.dtype())
+        if inner.dtype().is_struct()
+            || inner.dtype().is_list()
+            || !dtype_is_string_like(&inner.dtype())
         {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "str_replace() requires a string-like column.",
@@ -976,7 +981,9 @@ impl ExprNode {
     }
 
     pub fn make_string_unary(inner: ExprNode, op: StringUnaryOp) -> PyResult<Self> {
-        if inner.dtype().is_struct() || inner.dtype().is_list() || !dtype_is_string_like(&inner.dtype())
+        if inner.dtype().is_struct()
+            || inner.dtype().is_list()
+            || !dtype_is_string_like(&inner.dtype())
         {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "String operation requires a string column.",
@@ -1161,9 +1168,7 @@ impl ExprNode {
     fn make_list_numeric_agg(inner: ExprNode, kind: ListAggKind) -> PyResult<Self> {
         let (base, list_nullable) = match inner.dtype() {
             DTypeDesc::List {
-                inner: e,
-                nullable,
-                ..
+                inner: e, nullable, ..
             } => match e.as_ref() {
                 DTypeDesc::Scalar {
                     base: Some(BaseType::Int),
@@ -1383,9 +1388,11 @@ impl ExprNode {
                                         )));
                                     }
                                     _ => {
-                                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                                            "date arithmetic expects date ± duration.",
-                                        ));
+                                        return Err(
+                                            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                                "date arithmetic expects date ± duration.",
+                                            ),
+                                        );
                                     }
                                 }
                             }
@@ -1422,140 +1429,140 @@ impl ExprNode {
                         (Some(va), Some(vb)) => {
                             let res_bool = match op {
                                 CmpOp::Eq | CmpOp::Ne => {
-                                    let eq =
-                                        match effective_base {
-                                            BaseType::Int | BaseType::Float => {
-                                                let af = match va {
-                                                    LiteralValue::Int(i) => i as f64,
-                                                    LiteralValue::Float(f) => f,
-                                                    _ => {
-                                                        return Err(PyErr::new::<
+                                    let eq = match effective_base {
+                                        BaseType::Int | BaseType::Float => {
+                                            let af = match va {
+                                                LiteralValue::Int(i) => i as f64,
+                                                LiteralValue::Float(f) => f,
+                                                _ => {
+                                                    return Err(PyErr::new::<
                                                         pyo3::exceptions::PyTypeError,
                                                         _,
                                                     >(
                                                         "Typed equality expected numeric operands.",
                                                     ));
-                                                    }
-                                                };
-                                                let bf = match vb {
-                                                    LiteralValue::Int(i) => i as f64,
-                                                    LiteralValue::Float(f) => f,
-                                                    _ => {
-                                                        return Err(PyErr::new::<
+                                                }
+                                            };
+                                            let bf = match vb {
+                                                LiteralValue::Int(i) => i as f64,
+                                                LiteralValue::Float(f) => f,
+                                                _ => {
+                                                    return Err(PyErr::new::<
                                                         pyo3::exceptions::PyTypeError,
                                                         _,
                                                     >(
                                                         "Typed equality expected numeric operands.",
                                                     ));
-                                                    }
-                                                };
-                                                af == bf
-                                            }
-                                            BaseType::Bool => {
-                                                let ab = match va {
-                                                    LiteralValue::Bool(b) => b,
-                                                    _ => {
-                                                        return Err(PyErr::new::<
+                                                }
+                                            };
+                                            af == bf
+                                        }
+                                        BaseType::Bool => {
+                                            let ab = match va {
+                                                LiteralValue::Bool(b) => b,
+                                                _ => {
+                                                    return Err(PyErr::new::<
                                                         pyo3::exceptions::PyTypeError,
                                                         _,
                                                     >(
                                                         "Typed equality expected bool operands.",
                                                     ));
-                                                    }
-                                                };
-                                                let bb = match vb {
-                                                    LiteralValue::Bool(b) => b,
-                                                    _ => {
-                                                        return Err(PyErr::new::<
+                                                }
+                                            };
+                                            let bb = match vb {
+                                                LiteralValue::Bool(b) => b,
+                                                _ => {
+                                                    return Err(PyErr::new::<
                                                         pyo3::exceptions::PyTypeError,
                                                         _,
                                                     >(
                                                         "Typed equality expected bool operands.",
                                                     ));
-                                                    }
-                                                };
-                                                ab == bb
-                                            }
-                                            BaseType::Str | BaseType::Enum => {
-                                                let as_ = match &va {
-                                                    LiteralValue::Str(s) | LiteralValue::EnumStr(s) => {
-                                                        s.as_str()
-                                                    }
-                                                    _ => {
-                                                        return Err(PyErr::new::<
+                                                }
+                                            };
+                                            ab == bb
+                                        }
+                                        BaseType::Str | BaseType::Enum => {
+                                            let as_ = match &va {
+                                                LiteralValue::Str(s) | LiteralValue::EnumStr(s) => {
+                                                    s.as_str()
+                                                }
+                                                _ => {
+                                                    return Err(PyErr::new::<
                                                             pyo3::exceptions::PyTypeError,
                                                             _,
                                                         >(
                                                             "Typed equality expected str-like operands.",
                                                         ));
-                                                    }
-                                                };
-                                                let bs_ = match &vb {
-                                                    LiteralValue::Str(s) | LiteralValue::EnumStr(s) => {
-                                                        s.as_str()
-                                                    }
-                                                    _ => {
-                                                        return Err(PyErr::new::<
+                                                }
+                                            };
+                                            let bs_ = match &vb {
+                                                LiteralValue::Str(s) | LiteralValue::EnumStr(s) => {
+                                                    s.as_str()
+                                                }
+                                                _ => {
+                                                    return Err(PyErr::new::<
                                                             pyo3::exceptions::PyTypeError,
                                                             _,
                                                         >(
                                                             "Typed equality expected str-like operands.",
                                                         ));
-                                                    }
-                                                };
-                                                as_ == bs_
-                                            }
-                                            BaseType::Uuid => {
-                                                let as_ = match va {
-                                                    LiteralValue::Uuid(s) => s,
-                                                    _ => {
-                                                        return Err(PyErr::new::<
-                                                            pyo3::exceptions::PyTypeError,
-                                                            _,
-                                                        >(
-                                                            "Typed equality expected uuid operands.",
-                                                        ));
-                                                    }
-                                                };
-                                                let bs_ = match vb {
-                                                    LiteralValue::Uuid(s) => s,
-                                                    _ => {
-                                                        return Err(PyErr::new::<
-                                                            pyo3::exceptions::PyTypeError,
-                                                            _,
-                                                        >(
-                                                            "Typed equality expected uuid operands.",
-                                                        ));
-                                                    }
-                                                };
-                                                as_ == bs_
-                                            }
-                                            BaseType::Decimal => {
-                                                let ai = match va {
-                                                    LiteralValue::Decimal(i) => *i,
-                                                    _ => {
-                                                        return Err(PyErr::new::<
-                                                            pyo3::exceptions::PyTypeError,
-                                                            _,
-                                                        >(
-                                                            "Typed equality expected decimal operands.",
-                                                        ));
-                                                    }
-                                                };
-                                                let bi = match vb {
-                                                    LiteralValue::Decimal(i) => *i,
-                                                    _ => {
-                                                        return Err(PyErr::new::<
-                                                            pyo3::exceptions::PyTypeError,
-                                                            _,
-                                                        >(
-                                                            "Typed equality expected decimal operands.",
-                                                        ));
-                                                    }
-                                                };
-                                                ai == bi
-                                            }
-                                            BaseType::DateTime => match (va, vb) {
+                                                }
+                                            };
+                                            as_ == bs_
+                                        }
+                                        BaseType::Uuid => {
+                                            let as_ = match va {
+                                                LiteralValue::Uuid(s) => s,
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed equality expected uuid operands.",
+                                                    ));
+                                                }
+                                            };
+                                            let bs_ = match vb {
+                                                LiteralValue::Uuid(s) => s,
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed equality expected uuid operands.",
+                                                    ));
+                                                }
+                                            };
+                                            as_ == bs_
+                                        }
+                                        BaseType::Decimal => {
+                                            let ai = match va {
+                                                LiteralValue::Decimal(i) => *i,
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed equality expected decimal operands.",
+                                                    ));
+                                                }
+                                            };
+                                            let bi = match vb {
+                                                LiteralValue::Decimal(i) => *i,
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed equality expected decimal operands.",
+                                                    ));
+                                                }
+                                            };
+                                            ai == bi
+                                        }
+                                        BaseType::DateTime => {
+                                            match (va, vb) {
                                                 (
                                                     LiteralValue::DateTimeMicros(a),
                                                     LiteralValue::DateTimeMicros(b),
@@ -1566,22 +1573,24 @@ impl ExprNode {
                                                     _,
                                                 >("Typed equality expected datetime operands."));
                                                 }
-                                            },
-                                            BaseType::Date => {
-                                                match (va, vb) {
-                                                    (
-                                                        LiteralValue::DateDays(a),
-                                                        LiteralValue::DateDays(b),
-                                                    ) => a == b,
-                                                    _ => {
-                                                        return Err(PyErr::new::<
+                                            }
+                                        }
+                                        BaseType::Date => match (va, vb) {
+                                            (
+                                                LiteralValue::DateDays(a),
+                                                LiteralValue::DateDays(b),
+                                            ) => a == b,
+                                            _ => {
+                                                return Err(PyErr::new::<
                                                     pyo3::exceptions::PyTypeError,
                                                     _,
-                                                >("Typed equality expected date operands."));
-                                                    }
-                                                }
+                                                >(
+                                                    "Typed equality expected date operands.",
+                                                ));
                                             }
-                                            BaseType::Duration => match (va, vb) {
+                                        },
+                                        BaseType::Duration => {
+                                            match (va, vb) {
                                                 (
                                                     LiteralValue::DurationMicros(a),
                                                     LiteralValue::DurationMicros(b),
@@ -1592,8 +1601,9 @@ impl ExprNode {
                                                     _,
                                                 >("Typed equality expected duration operands."));
                                                 }
-                                            },
-                                        };
+                                            }
+                                        }
+                                    };
                                     if *op == CmpOp::Eq {
                                         eq
                                     } else {
@@ -1986,7 +1996,10 @@ impl ExprNode {
                         svals.get(i).and_then(|x| x.as_ref()),
                         stvals.get(i).and_then(|x| x.as_ref()),
                     ) {
-                        (Some(LiteralValue::Str(s)) | Some(LiteralValue::EnumStr(s)), Some(LiteralValue::Int(st))) => {
+                        (
+                            Some(LiteralValue::Str(s)) | Some(LiteralValue::EnumStr(s)),
+                            Some(LiteralValue::Int(st)),
+                        ) => {
                             let ln = lnvals
                                 .as_ref()
                                 .and_then(|c| c.get(i).and_then(|x| x.as_ref()));
@@ -2040,7 +2053,9 @@ impl ExprNode {
                             Some(LiteralValue::Int(s.chars().count() as i64))
                         }
                         Some(LiteralValue::Decimal(d)) => Some(LiteralValue::Int(
-                            crate::dtype::scaled_i128_to_decimal_string(*d).chars().count() as i64,
+                            crate::dtype::scaled_i128_to_decimal_string(*d)
+                                .chars()
+                                .count() as i64,
                         )),
                         _ => None,
                     })
@@ -2113,14 +2128,10 @@ impl ExprNode {
                             StringUnaryOp::Upper => Some(LiteralValue::Str(s.to_uppercase())),
                             StringUnaryOp::Lower => Some(LiteralValue::Str(s.to_lowercase())),
                             StringUnaryOp::StripPrefix(ref p) => Some(LiteralValue::Str(
-                                s.strip_prefix(p.as_str())
-                                    .unwrap_or(s)
-                                    .to_string(),
+                                s.strip_prefix(p.as_str()).unwrap_or(s).to_string(),
                             )),
                             StringUnaryOp::StripSuffix(ref suf) => Some(LiteralValue::Str(
-                                s.strip_suffix(suf.as_str())
-                                    .unwrap_or(s)
-                                    .to_string(),
+                                s.strip_suffix(suf.as_str()).unwrap_or(s).to_string(),
                             )),
                             StringUnaryOp::StripChars(ref c) => {
                                 Some(LiteralValue::Str(trim_matches_char_set(s, c)))
@@ -2176,9 +2187,9 @@ impl ExprNode {
                     .into_iter()
                     .map(|v| match v {
                         None => None,
-                        Some(LiteralValue::DateTimeMicros(us)) => Some(LiteralValue::DateDays(
-                            (us / 86_400_000_000) as i32,
-                        )),
+                        Some(LiteralValue::DateTimeMicros(us)) => {
+                            Some(LiteralValue::DateDays((us / 86_400_000_000) as i32))
+                        }
                         _ => None,
                     })
                     .collect())
@@ -2204,7 +2215,9 @@ impl ExprNode {
                             Some(LiteralValue::Int(i))
                         }
                         Some(LiteralValue::DateDays(days)) if is_date => match part {
-                            TemporalPart::Hour | TemporalPart::Minute | TemporalPart::Second => None,
+                            TemporalPart::Hour | TemporalPart::Minute | TemporalPart::Second => {
+                                None
+                            }
                             TemporalPart::Year | TemporalPart::Month | TemporalPart::Day => {
                                 let (y, mo, d) = utc_calendar_from_epoch_days(days);
                                 let i = match part {
@@ -2254,11 +2267,9 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             | LiteralValue::DurationMicros(_)
             | LiteralValue::Uuid(_)
             | LiteralValue::Decimal(_)
-            | LiteralValue::EnumStr(_) => {
-                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "Cannot cast temporal literal to int.",
-                ))
-            }
+            | LiteralValue::EnumStr(_) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Cannot cast temporal literal to int.",
+            )),
         },
         BaseType::Float => match v {
             LiteralValue::Int(i) => Ok(LiteralValue::Float(i as f64)),
@@ -2272,11 +2283,9 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             | LiteralValue::DurationMicros(_)
             | LiteralValue::Uuid(_)
             | LiteralValue::Decimal(_)
-            | LiteralValue::EnumStr(_) => {
-                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "Cannot cast temporal literal to float.",
-                ))
-            }
+            | LiteralValue::EnumStr(_) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Cannot cast temporal literal to float.",
+            )),
         },
         BaseType::Bool => match v {
             LiteralValue::Int(i) => Ok(LiteralValue::Bool(i != 0)),
@@ -2294,11 +2303,9 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             | LiteralValue::DurationMicros(_)
             | LiteralValue::Uuid(_)
             | LiteralValue::Decimal(_)
-            | LiteralValue::EnumStr(_) => {
-                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "Cannot cast temporal literal to bool.",
-                ))
-            }
+            | LiteralValue::EnumStr(_) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Cannot cast temporal literal to bool.",
+            )),
         },
         BaseType::Str => match v {
             LiteralValue::Int(i) => Ok(LiteralValue::Str(i.to_string())),
@@ -2352,7 +2359,10 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
                 let whole: i128 = whole_s.parse().map_err(|_| {
                     PyErr::new::<pyo3::exceptions::PyTypeError, _>("Cannot cast str to decimal.")
                 })?;
-                let mut frac = frac_s.chars().take(crate::dtype::DECIMAL_SCALE).collect::<String>();
+                let mut frac = frac_s
+                    .chars()
+                    .take(crate::dtype::DECIMAL_SCALE)
+                    .collect::<String>();
                 while frac.len() < crate::dtype::DECIMAL_SCALE {
                     frac.push('0');
                 }

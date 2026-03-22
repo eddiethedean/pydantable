@@ -260,11 +260,7 @@ fn expr_string_replace(
     replacement: String,
 ) -> PyResult<PyExpr> {
     Ok(PyExpr {
-        node: ExprNode::make_string_replace(
-            inner.borrow().node.clone(),
-            pattern,
-            replacement,
-        )?,
+        node: ExprNode::make_string_replace(inner.borrow().node.clone(), pattern, replacement)?,
     })
 }
 
@@ -391,10 +387,7 @@ fn expr_list_len(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
 #[pyfunction]
 fn expr_list_get(inner: Bound<'_, PyExpr>, index: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
     Ok(PyExpr {
-        node: ExprNode::make_list_get(
-            inner.borrow().node.clone(),
-            index.borrow().node.clone(),
-        )?,
+        node: ExprNode::make_list_get(inner.borrow().node.clone(), index.borrow().node.clone())?,
     })
 }
 
@@ -525,6 +518,39 @@ fn plan_slice(plan: &PyPlan, offset: i64, length: usize) -> PyResult<PyPlan> {
     })
 }
 
+fn py_value_is_uuid(v: &Bound<'_, PyAny>) -> PyResult<bool> {
+    let py = v.py();
+    let builtins = py.import_bound("builtins")?;
+    let isinstance = builtins.getattr("isinstance")?;
+    let uuid_cls = py.import_bound("uuid")?.getattr("UUID")?;
+    Ok(isinstance
+        .call1((v, &uuid_cls))?
+        .extract::<bool>()
+        .unwrap_or(false))
+}
+
+fn py_value_is_decimal(v: &Bound<'_, PyAny>) -> PyResult<bool> {
+    let py = v.py();
+    let builtins = py.import_bound("builtins")?;
+    let isinstance = builtins.getattr("isinstance")?;
+    let dec_cls = py.import_bound("decimal")?.getattr("Decimal")?;
+    Ok(isinstance
+        .call1((v, &dec_cls))?
+        .extract::<bool>()
+        .unwrap_or(false))
+}
+
+fn py_value_is_enum(v: &Bound<'_, PyAny>) -> PyResult<bool> {
+    let py = v.py();
+    let builtins = py.import_bound("builtins")?;
+    let isinstance = builtins.getattr("isinstance")?;
+    let enum_cls = py.import_bound("enum")?.getattr("Enum")?;
+    Ok(isinstance
+        .call1((v, &enum_cls))?
+        .extract::<bool>()
+        .unwrap_or(false))
+}
+
 #[pyfunction]
 fn plan_fill_null(
     _py: Python<'_>,
@@ -544,41 +570,14 @@ fn plan_fill_null(
             Some(crate::expr::LiteralValue::Float(v.extract::<f64>()?))
         } else if v.extract::<String>().is_ok() {
             Some(crate::expr::LiteralValue::Str(v.extract::<String>()?))
-        } else if {
-            let py = v.py();
-            let builtins = py.import_bound("builtins")?;
-            let isinstance = builtins.getattr("isinstance")?;
-            let uuid_cls = py.import_bound("uuid")?.getattr("UUID")?;
-            isinstance
-                .call1((v, &uuid_cls))?
-                .extract::<bool>()
-                .unwrap_or(false)
-        } {
+        } else if py_value_is_uuid(v)? {
             let s: String = v.str()?.extract()?;
             Some(crate::expr::LiteralValue::Uuid(s))
-        } else if {
-            let py = v.py();
-            let builtins = py.import_bound("builtins")?;
-            let isinstance = builtins.getattr("isinstance")?;
-            let dec_cls = py.import_bound("decimal")?.getattr("Decimal")?;
-            isinstance
-                .call1((v, &dec_cls))?
-                .extract::<bool>()
-                .unwrap_or(false)
-        } {
+        } else if py_value_is_decimal(v)? {
             Some(crate::expr::LiteralValue::Decimal(
                 crate::dtype::py_decimal_to_scaled_i128(v)?,
             ))
-        } else if {
-            let py = v.py();
-            let builtins = py.import_bound("builtins")?;
-            let isinstance = builtins.getattr("isinstance")?;
-            let enum_cls = py.import_bound("enum")?.getattr("Enum")?;
-            isinstance
-                .call1((v, &enum_cls))?
-                .extract::<bool>()
-                .unwrap_or(false)
-        } {
+        } else if py_value_is_enum(v)? {
             Some(crate::expr::LiteralValue::EnumStr(
                 crate::dtype::py_enum_to_wire_string(v)?,
             ))

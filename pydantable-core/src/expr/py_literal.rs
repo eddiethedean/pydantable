@@ -3,7 +3,9 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDate, PyDateTime, PyDelta};
 
-use crate::dtype::{py_decimal_to_scaled_i128, py_enum_to_wire_string, py_value_to_dtype, BaseType};
+use crate::dtype::{
+    py_decimal_to_scaled_i128, py_enum_to_wire_string, py_value_to_dtype, BaseType,
+};
 
 use super::ir::{ArithOp, CmpOp, ExprNode, LiteralValue};
 

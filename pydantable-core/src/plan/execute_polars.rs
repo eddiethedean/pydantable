@@ -7,8 +7,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDate, PyDateTime, PyDelta, PyDict, PyList};
 
 use crate::dtype::{
-    py_decimal_to_scaled_i128, py_enum_to_wire_string, scaled_i128_to_py_decimal, BaseType, DTypeDesc,
-    DECIMAL_PRECISION, DECIMAL_SCALE,
+    py_decimal_to_scaled_i128, py_enum_to_wire_string, scaled_i128_to_py_decimal, BaseType,
+    DTypeDesc, DECIMAL_PRECISION, DECIMAL_SCALE,
 };
 use crate::expr::LiteralValue;
 
@@ -19,11 +19,10 @@ use polars::chunked_array::builder::get_list_builder;
 use polars::lazy::dsl::{col, cols, lit, when, Expr as PolarsExpr};
 use polars::prelude::{
     AnyValue, BooleanChunked, CrossJoin, DataFrame, DataType, ExplodeOptions, Field,
-    FillNullStrategy, Float64Chunked, Int32Chunked, Int64Chunked, Int128Chunked, IntoColumn,
+    FillNullStrategy, Float64Chunked, Int128Chunked, Int32Chunked, Int64Chunked, IntoColumn,
     IntoLazy, IntoSeries, JoinArgs, JoinType, LazyFrame, Literal, MaintainOrderJoin, NamedFrom,
     NewChunkedArray, PlSmallStr, PolarsError, Scalar, Series, SortMultipleOptions, StringChunked,
-    StructChunked, TimeUnit,
-    UniqueKeepStrategy, UnpivotArgsDSL, NULL,
+    StructChunked, TimeUnit, UniqueKeepStrategy, UnpivotArgsDSL, NULL,
 };
 use polars_io::ipc::{IpcReader, IpcWriter};
 use polars_io::prelude::{SerReader, SerWriter};
@@ -1769,13 +1768,13 @@ fn py_dict_to_literal_ctx(
                 Some(crate::dtype::BaseType::Str) => LiteralValue::Str(item.extract::<String>()?),
                 Some(crate::dtype::BaseType::Enum) => {
                     LiteralValue::EnumStr(py_enum_to_wire_string(&item)?)
-                },
+                }
                 Some(crate::dtype::BaseType::Uuid) => {
                     LiteralValue::Uuid(py_extract_uuid_canonical(&item)?)
-                },
+                }
                 Some(crate::dtype::BaseType::Decimal) => {
                     LiteralValue::Decimal(py_decimal_to_scaled_i128(&item)?)
-                },
+                }
                 Some(crate::dtype::BaseType::DateTime) => {
                     LiteralValue::DateTimeMicros(py_datetime_to_micros(&item)?)
                 }
@@ -1812,7 +1811,9 @@ fn literal_to_py(py: Python<'_>, v: &LiteralValue) -> PyObject {
             .and_then(|c| c.call1((s.as_str(),)))
             .map(|o| o.into_py(py))
             .unwrap_or_else(|_| s.clone().into_py(py)),
-        LiteralValue::Decimal(v) => scaled_i128_to_py_decimal(py, *v).unwrap_or_else(|_| v.into_py(py)),
+        LiteralValue::Decimal(v) => {
+            scaled_i128_to_py_decimal(py, *v).unwrap_or_else(|_| v.into_py(py))
+        }
         LiteralValue::DateTimeMicros(v) => {
             micros_to_py_datetime(py, *v).unwrap_or_else(|_| v.into_py(py))
         }
@@ -1856,9 +1857,7 @@ fn agg_literal(
                 let scale = 10_f64.powi(crate::dtype::DECIMAL_SCALE as i32);
                 let as_float = |x: i128| x as f64 / scale;
                 return match op {
-                    "sum" => Ok(Some(LiteralValue::Decimal(
-                        decs.iter().copied().sum(),
-                    ))),
+                    "sum" => Ok(Some(LiteralValue::Decimal(decs.iter().copied().sum()))),
                     "min" => Ok(Some(LiteralValue::Decimal(*decs.iter().min().unwrap()))),
                     "max" => Ok(Some(LiteralValue::Decimal(*decs.iter().max().unwrap()))),
                     "mean" => Ok(Some(LiteralValue::Float(
@@ -2740,26 +2739,22 @@ pub fn execute_unnest_polars(
     let df = root_data_to_polars_df(py, &plan.root_schema, root_data)?;
     let mut lf = PolarsPlanRunner::apply_steps(df.lazy(), &plan.steps)?;
     let sep: PlSmallStr = "_".into();
-    lf = lf.unnest(
-        cols(columns.iter().map(|s| s.as_str())),
-        Some(sep),
-    );
+    lf = lf.unnest(cols(columns.iter().map(|s| s.as_str())), Some(sep));
     let out_df = lf.collect().map_err(polars_err)?;
 
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
     for col_name in out_df.get_column_names() {
         let col_name_str = col_name.as_str();
-        let out_desc = if let Some(d) =
-            dtype_for_unnest_output_column(col_name_str, &plan.schema, &columns)
-        {
-            d
-        } else {
-            let s = out_df
-                .column(col_name)
-                .map_err(polars_err)?
-                .as_materialized_series();
-            dtype_from_polars(s.dtype())?
-        };
+        let out_desc =
+            if let Some(d) = dtype_for_unnest_output_column(col_name_str, &plan.schema, &columns) {
+                d
+            } else {
+                let s = out_df
+                    .column(col_name)
+                    .map_err(polars_err)?
+                    .as_materialized_series();
+                dtype_from_polars(s.dtype())?
+            };
         out_schema.insert(col_name_str.to_string(), out_desc);
     }
 

@@ -37,11 +37,7 @@ def _unwrap_annotated(annotation: Any) -> Any:
 def _is_supported_non_null_scalar_type(tp: Any) -> bool:
     if tp in _SUPPORTED_NON_NULL_SCALAR_TYPES:
         return True
-    return (
-        isinstance(tp, type)
-        and issubclass(tp, enum.Enum)
-        and tp is not enum.Enum
-    )
+    return isinstance(tp, type) and issubclass(tp, enum.Enum) and tp is not enum.Enum
 
 
 def is_supported_scalar_column_annotation(annotation: Any) -> bool:
@@ -97,11 +93,11 @@ def _is_supported_column_annotation_inner(
             _unwrap_annotated(args[0]), _model_stack=_model_stack
         )
     if origin is list:
-        args = get_args(ann)
-        if len(args) != 1:
+        list_args = get_args(ann)
+        if len(list_args) != 1:
             return False
         return _is_supported_column_annotation_inner(
-            _unwrap_annotated(args[0]), _model_stack=_model_stack
+            _unwrap_annotated(list_args[0]), _model_stack=_model_stack
         )
     if origin is not None:
         return False
@@ -326,7 +322,7 @@ def dtype_descriptor_to_annotation(descriptor: Mapping[str, Any]) -> Any:
                 f"{descriptor!r}"
             )
         inner_ann = dtype_descriptor_to_annotation(inner)
-        out = list[inner_ann]  # type: ignore[misc]
+        out = list[inner_ann]  # type: ignore[valid-type]
         if nullable:
             return out | None
         return out

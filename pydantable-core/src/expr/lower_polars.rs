@@ -10,8 +10,8 @@ use super::ir::{
 
 use polars::lazy::dsl::{coalesce, col, concat_str, lit, ternary_expr, Expr as PolarsExpr};
 use polars::prelude::{
-    ClosedInterval, DataType, Int128Chunked, IntoSeries, Literal, NamedFrom, NewChunkedArray,
-    Null, RoundMode, Scalar, Series, TimeUnit,
+    ClosedInterval, DataType, Int128Chunked, IntoSeries, Literal, NamedFrom, NewChunkedArray, Null,
+    RoundMode, Scalar, Series, TimeUnit,
 };
 
 /// Polars lowering hook (dependency inversion / extension point for new variants).
@@ -115,9 +115,7 @@ fn literals_to_series(values: &[LiteralValue], base: BaseType) -> PyResult<Serie
                 .collect::<PyResult<_>>()?;
             Ok(Int128Chunked::from_iter_values("".into(), v.into_iter())
                 .into_decimal(DECIMAL_PRECISION, DECIMAL_SCALE)
-                .map_err(|e| {
-                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("{e}"))
-                })?
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("{e}")))?
                 .into_series())
         }
         _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -137,9 +135,9 @@ impl ExprNode {
                 Some(LiteralValue::Str(s)) => Ok(lit(s.clone())),
                 Some(LiteralValue::Uuid(s)) => Ok(lit(s.clone())),
                 Some(LiteralValue::EnumStr(s)) => Ok(lit(s.clone())),
-                Some(LiteralValue::Decimal(v)) => Ok(
-                    Scalar::new_decimal(*v, DECIMAL_PRECISION, DECIMAL_SCALE).lit(),
-                ),
+                Some(LiteralValue::Decimal(v)) => {
+                    Ok(Scalar::new_decimal(*v, DECIMAL_PRECISION, DECIMAL_SCALE).lit())
+                }
                 Some(LiteralValue::DateTimeMicros(v)) => {
                     Ok(lit(*v).cast(DataType::Datetime(TimeUnit::Microseconds, None)))
                 }
@@ -173,10 +171,9 @@ impl ExprNode {
                         crate::dtype::DTypeDesc::Scalar {
                             base: Some(BaseType::Decimal),
                             ..
-                        } => Ok(null_expr.cast(DataType::Decimal(
-                            DECIMAL_PRECISION,
-                            DECIMAL_SCALE,
-                        ))),
+                        } => {
+                            Ok(null_expr.cast(DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE)))
+                        }
                         crate::dtype::DTypeDesc::Scalar {
                             base: Some(BaseType::DateTime),
                             ..
@@ -343,11 +340,8 @@ impl ExprNode {
                 ..
             } => {
                 let e = inner.to_polars_expr()?;
-                Ok(e.str().replace_all(
-                    lit(pattern.as_str()),
-                    lit(replacement.as_str()),
-                    true,
-                ))
+                Ok(e.str()
+                    .replace_all(lit(pattern.as_str()), lit(replacement.as_str()), true))
             }
             ExprNode::StructField { base, field, .. } => Ok(base
                 .to_polars_expr()?

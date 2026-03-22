@@ -75,6 +75,7 @@ def test_dataframe_model_row_input_rejects_bad_item_type():
 
 def test_dataframe_model_rejects_unsupported_dict_type_at_class_definition():
     with pytest.raises(TypeError, match="unsupported type") as exc:
+
         class BadDict(DataFrameModel):
             m: dict[str, int]
 
@@ -85,6 +86,7 @@ def test_dataframe_model_rejects_unsupported_dict_type_at_class_definition():
 
 def test_dataframe_model_rejects_unsupported_union_of_two_scalars_at_class_definition():
     with pytest.raises(TypeError, match="unsupported type"):
+
         class BadUnion(DataFrameModel):
             x: int | str
 

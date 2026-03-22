@@ -198,13 +198,17 @@ class Expr:  # type: ignore[override]
     def strip_prefix(self, prefix: str) -> Expr:
         rust = _require_rust_core()
         return Expr(
-            rust_expr=rust.expr_string_unary(self._rust_expr, "strip_prefix", str(prefix))
+            rust_expr=rust.expr_string_unary(
+                self._rust_expr, "strip_prefix", str(prefix)
+            )
         )
 
     def strip_suffix(self, suffix: str) -> Expr:
         rust = _require_rust_core()
         return Expr(
-            rust_expr=rust.expr_string_unary(self._rust_expr, "strip_suffix", str(suffix))
+            rust_expr=rust.expr_string_unary(
+                self._rust_expr, "strip_suffix", str(suffix)
+            )
         )
 
     def strip_chars(self, chars: str) -> Expr:

@@ -1,14 +1,13 @@
 from decimal import Decimal
 
 import pytest
-from pydantic import ValidationError
-
 from pydantable import DataFrame, Schema
 from pydantable.schema import (
     descriptor_matches_column_annotation,
     dtype_descriptor_to_annotation,
     is_supported_scalar_column_annotation,
 )
+from pydantic import ValidationError
 
 
 class Row(Schema):

@@ -4,7 +4,6 @@ import enum
 import warnings
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from collections.abc import Mapping
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -42,12 +41,13 @@ from .schema import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
 _NoneType = type(None)
+
 
 def _coerce_enum_columns(
     data: dict[str, list[Any]],

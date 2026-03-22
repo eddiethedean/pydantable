@@ -3,8 +3,8 @@ from __future__ import annotations
 import enum
 import uuid
 from contextlib import suppress
-from decimal import Decimal
 from dataclasses import dataclass
+from decimal import Decimal
 from types import NoneType
 from typing import Any, get_args, get_origin, get_type_hints
 
