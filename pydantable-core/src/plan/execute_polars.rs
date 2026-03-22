@@ -1,23 +1,25 @@
 //! Polars-backed physical execution for logical plans.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Cursor;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDate, PyDateTime, PyDelta, PyDict, PyList};
 
-use crate::dtype::DTypeDesc;
+use crate::dtype::{BaseType, DTypeDesc};
 use crate::expr::LiteralValue;
 
 use super::ir::{PlanInner, PlanStep};
 use super::schema_py::schema_descriptors_as_py;
 
+use polars::chunked_array::builder::get_list_builder;
 use polars::lazy::dsl::{col, cols, lit, when, Expr as PolarsExpr};
 use polars::prelude::{
-    BooleanChunked, CrossJoin, DataFrame, DataType, FillNullStrategy, Float64Chunked, Int32Chunked,
-    Int64Chunked, IntoColumn, IntoLazy, IntoSeries, JoinArgs, JoinType, LazyFrame,
-    MaintainOrderJoin, NamedFrom, NewChunkedArray, PlSmallStr, PolarsError, Series,
-    SortMultipleOptions, StringChunked, UniqueKeepStrategy, UnpivotArgsDSL, NULL,
+    AnyValue, BooleanChunked, CrossJoin, DataFrame, DataType, ExplodeOptions, Field, FillNullStrategy,
+    Float64Chunked, Int32Chunked, Int64Chunked, IntoColumn, IntoLazy, IntoSeries, JoinArgs, JoinType,
+    LazyFrame, MaintainOrderJoin, NamedFrom, NewChunkedArray, PlSmallStr, PolarsError, Series,
+    SortMultipleOptions, StringChunked, StructChunked, TimeUnit, UniqueKeepStrategy, UnpivotArgsDSL,
+    NULL,
 };
 use polars_io::ipc::{IpcReader, IpcWriter};
 use polars_io::prelude::{SerReader, SerWriter};
@@ -44,26 +46,29 @@ fn try_series_from_numpy(
         return Ok(None);
     }
     let kind: String = obj.getattr("dtype")?.getattr("kind")?.extract()?;
-    let Some(base) = dtype.base else {
-        return Ok(None);
+    let base = match dtype {
+        DTypeDesc::Scalar {
+            base: Some(b), ..
+        } => b,
+        _ => return Ok(None),
     };
     let name_pl: PlSmallStr = name.into();
 
     let series = match (base, kind.as_str()) {
-        (crate::dtype::BaseType::Float, "f") => {
+        (BaseType::Float, "f") => {
             let arr: PyReadonlyArray1<f64> = obj.extract()?;
             Series::new(name_pl, arr.as_slice()?)
         }
-        (crate::dtype::BaseType::Int, "i") => {
+        (BaseType::Int, "i") => {
             let arr: PyReadonlyArray1<i64> = obj.extract()?;
             Series::new(name_pl, arr.as_slice()?)
         }
-        (crate::dtype::BaseType::Int, "u") => {
+        (BaseType::Int, "u") => {
             let arr: PyReadonlyArray1<u64> = obj.extract()?;
             let v: Vec<i64> = arr.as_slice()?.iter().map(|&x| x as i64).collect();
             Series::new(name_pl, v.as_slice())
         }
-        (crate::dtype::BaseType::Bool, "b") => {
+        (BaseType::Bool, "b") => {
             let arr: PyReadonlyArray1<bool> = obj.extract()?;
             Series::new(name_pl, arr.as_slice()?)
         }
@@ -193,6 +198,252 @@ fn micros_to_py_timedelta(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
 }
 
 #[cfg(feature = "polars_engine")]
+fn py_row_get_field<'py>(
+    item: &Bound<'py, PyAny>,
+    fname: &str,
+) -> PyResult<Bound<'py, PyAny>> {
+    if let Ok(d) = item.downcast::<PyDict>() {
+        return d.call_method1("get", (fname, item.py().None()));
+    }
+    item.getattr(fname)
+}
+
+/// Map a pydantable dtype to a Polars [`DataType`] for list builders and validation.
+#[cfg(feature = "polars_engine")]
+fn dtype_desc_to_polars_data_type(d: &DTypeDesc) -> PyResult<DataType> {
+    match d {
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Int),
+            ..
+        } => Ok(DataType::Int64),
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Float),
+            ..
+        } => Ok(DataType::Float64),
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Bool),
+            ..
+        } => Ok(DataType::Boolean),
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Str),
+            ..
+        } => Ok(DataType::String),
+        DTypeDesc::Scalar {
+            base: Some(BaseType::DateTime),
+            ..
+        } => Ok(DataType::Datetime(TimeUnit::Microseconds, None)),
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Date),
+            ..
+        } => Ok(DataType::Date),
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Duration),
+            ..
+        } => Ok(DataType::Duration(TimeUnit::Microseconds)),
+        DTypeDesc::Scalar {
+            base: None,
+            ..
+        } => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "Root schema cannot have unknown-base dtype.",
+        )),
+        DTypeDesc::Struct { fields, .. } => {
+            let sub: Vec<Field> = fields
+                .iter()
+                .map(|(n, fd)| {
+                    Ok(Field::new(
+                        PlSmallStr::from_str(n),
+                        dtype_desc_to_polars_data_type(fd)?,
+                    ))
+                })
+                .collect::<PyResult<_>>()?;
+            Ok(DataType::Struct(sub))
+        }
+        DTypeDesc::List { inner, .. } => Ok(DataType::List(Box::new(
+            dtype_desc_to_polars_data_type(inner)?,
+        ))),
+    }
+}
+
+/// Build a Polars `Series` from a Python list column and a pydantable [`DTypeDesc`].
+#[cfg(feature = "polars_engine")]
+fn py_list_to_series(
+    py: Python<'_>,
+    name: &str,
+    list: &Bound<'_, PyList>,
+    dtype: &DTypeDesc,
+) -> PyResult<Series> {
+    match dtype {
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Int),
+            ..
+        } => {
+            let mut v: Vec<Option<i64>> = Vec::with_capacity(list.len());
+            for item in list.iter() {
+                if item.is_none() {
+                    v.push(None);
+                } else {
+                    v.push(Some(item.extract::<i64>()?));
+                }
+            }
+            let ca: Int64Chunked =
+                Int64Chunked::from_iter_options(name.into(), v.into_iter());
+            Ok(ca.into_series())
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Float),
+            ..
+        } => {
+            let mut v: Vec<Option<f64>> = Vec::with_capacity(list.len());
+            for item in list.iter() {
+                if item.is_none() {
+                    v.push(None);
+                } else {
+                    v.push(Some(item.extract::<f64>()?));
+                }
+            }
+            let ca: Float64Chunked =
+                Float64Chunked::from_iter_options(name.into(), v.into_iter());
+            Ok(ca.into_series())
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Bool),
+            ..
+        } => {
+            let mut v: Vec<Option<bool>> = Vec::with_capacity(list.len());
+            for item in list.iter() {
+                if item.is_none() {
+                    v.push(None);
+                } else {
+                    v.push(Some(item.extract::<bool>()?));
+                }
+            }
+            let ca: BooleanChunked =
+                BooleanChunked::from_iter_options(name.into(), v.into_iter());
+            Ok(ca.into_series())
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Str),
+            ..
+        } => {
+            let mut v: Vec<Option<String>> = Vec::with_capacity(list.len());
+            for item in list.iter() {
+                if item.is_none() {
+                    v.push(None);
+                } else {
+                    v.push(Some(item.extract::<String>()?));
+                }
+            }
+            let ca: StringChunked =
+                StringChunked::from_iter_options(name.into(), v.into_iter());
+            Ok(ca.into_series())
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::DateTime),
+            ..
+        } => {
+            let mut v: Vec<Option<i64>> = Vec::with_capacity(list.len());
+            for item in list.iter() {
+                if item.is_none() {
+                    v.push(None);
+                } else {
+                    v.push(Some(py_datetime_to_micros(&item)?));
+                }
+            }
+            let base: Int64Chunked =
+                Int64Chunked::from_iter_options(name.into(), v.into_iter());
+            base.into_series()
+                .cast(&DataType::Datetime(
+                    polars::prelude::TimeUnit::Microseconds,
+                    None,
+                ))
+                .map_err(polars_err)
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Date),
+            ..
+        } => {
+            let mut v: Vec<Option<i32>> = Vec::with_capacity(list.len());
+            for item in list.iter() {
+                if item.is_none() {
+                    v.push(None);
+                } else {
+                    v.push(Some(py_date_to_days(&item)?));
+                }
+            }
+            let base: Int32Chunked =
+                Int32Chunked::from_iter_options(name.into(), v.into_iter());
+            base.into_series()
+                .cast(&DataType::Date)
+                .map_err(polars_err)
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Duration),
+            ..
+        } => {
+            let mut v: Vec<Option<i64>> = Vec::with_capacity(list.len());
+            for item in list.iter() {
+                if item.is_none() {
+                    v.push(None);
+                } else {
+                    v.push(Some(py_timedelta_to_micros(&item)?));
+                }
+            }
+            let base: Int64Chunked =
+                Int64Chunked::from_iter_options(name.into(), v.into_iter());
+            base.into_series()
+                .cast(&DataType::Duration(polars::prelude::TimeUnit::Microseconds))
+                .map_err(polars_err)
+        }
+        DTypeDesc::Scalar {
+            base: None,
+            ..
+        } => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "Root schema cannot have unknown-base dtype.",
+        )),
+        DTypeDesc::List { inner, .. } => {
+            let inner_polars = dtype_desc_to_polars_data_type(inner)?;
+            let est_vals = list.len().saturating_mul(8).max(8);
+            let mut builder = get_list_builder(
+                &inner_polars,
+                est_vals,
+                list.len(),
+                PlSmallStr::from(name),
+            );
+            for item in list.iter() {
+                if item.is_none() {
+                    builder.append_null();
+                } else {
+                    let sub = item.downcast::<PyList>()?;
+                    let inner_series = py_list_to_series(py, "item", sub, inner)?;
+                    builder.append_series(&inner_series).map_err(polars_err)?;
+                }
+            }
+            Ok(builder.finish().into_series())
+        }
+        DTypeDesc::Struct { fields, .. } => {
+            let mut field_series: Vec<Series> = Vec::with_capacity(fields.len());
+            for (fname, fd) in fields {
+                let field_list = PyList::empty_bound(py);
+                for item in list.iter() {
+                    if item.is_none() {
+                        field_list.append(py.None())?;
+                    } else {
+                        let sub = py_row_get_field(&item, fname.as_str())?;
+                        field_list.append(sub)?;
+                    }
+                }
+                let fs = py_list_to_series(py, fname.as_str(), &field_list, fd)?;
+                field_series.push(fs);
+            }
+            let len = list.len();
+            let ca = StructChunked::from_series(name.into(), len, field_series.iter())
+                .map_err(polars_err)?;
+            Ok(ca.into_series())
+        }
+    }
+}
+
+#[cfg(feature = "polars_engine")]
 fn root_data_to_polars_df(
     py: Python<'_>,
     root_schema: &HashMap<String, DTypeDesc>,
@@ -230,113 +481,7 @@ fn root_data_to_polars_df(
                 .clone()
         };
 
-        let s = match dtype.base {
-            Some(crate::dtype::BaseType::Int) => {
-                let mut v: Vec<Option<i64>> = Vec::with_capacity(list.len());
-                for item in list.iter() {
-                    if item.is_none() {
-                        v.push(None);
-                    } else {
-                        v.push(Some(item.extract::<i64>()?));
-                    }
-                }
-                let ca: Int64Chunked =
-                    Int64Chunked::from_iter_options(name.as_str().into(), v.into_iter());
-                ca.into_series()
-            }
-            Some(crate::dtype::BaseType::Float) => {
-                let mut v: Vec<Option<f64>> = Vec::with_capacity(list.len());
-                for item in list.iter() {
-                    if item.is_none() {
-                        v.push(None);
-                    } else {
-                        v.push(Some(item.extract::<f64>()?));
-                    }
-                }
-                let ca: Float64Chunked =
-                    Float64Chunked::from_iter_options(name.as_str().into(), v.into_iter());
-                ca.into_series()
-            }
-            Some(crate::dtype::BaseType::Bool) => {
-                let mut v: Vec<Option<bool>> = Vec::with_capacity(list.len());
-                for item in list.iter() {
-                    if item.is_none() {
-                        v.push(None);
-                    } else {
-                        v.push(Some(item.extract::<bool>()?));
-                    }
-                }
-                let ca: BooleanChunked =
-                    BooleanChunked::from_iter_options(name.as_str().into(), v.into_iter());
-                ca.into_series()
-            }
-            Some(crate::dtype::BaseType::Str) => {
-                let mut v: Vec<Option<String>> = Vec::with_capacity(list.len());
-                for item in list.iter() {
-                    if item.is_none() {
-                        v.push(None);
-                    } else {
-                        v.push(Some(item.extract::<String>()?));
-                    }
-                }
-                let ca: StringChunked =
-                    StringChunked::from_iter_options(name.as_str().into(), v.into_iter());
-                ca.into_series()
-            }
-            Some(crate::dtype::BaseType::DateTime) => {
-                let mut v: Vec<Option<i64>> = Vec::with_capacity(list.len());
-                for item in list.iter() {
-                    if item.is_none() {
-                        v.push(None);
-                    } else {
-                        v.push(Some(py_datetime_to_micros(&item)?));
-                    }
-                }
-                let base: Int64Chunked =
-                    Int64Chunked::from_iter_options(name.as_str().into(), v.into_iter());
-                base.into_series()
-                    .cast(&DataType::Datetime(
-                        polars::prelude::TimeUnit::Microseconds,
-                        None,
-                    ))
-                    .map_err(polars_err)?
-            }
-            Some(crate::dtype::BaseType::Date) => {
-                let mut v: Vec<Option<i32>> = Vec::with_capacity(list.len());
-                for item in list.iter() {
-                    if item.is_none() {
-                        v.push(None);
-                    } else {
-                        v.push(Some(py_date_to_days(&item)?));
-                    }
-                }
-                let base: Int32Chunked =
-                    Int32Chunked::from_iter_options(name.as_str().into(), v.into_iter());
-                base.into_series()
-                    .cast(&DataType::Date)
-                    .map_err(polars_err)?
-            }
-            Some(crate::dtype::BaseType::Duration) => {
-                let mut v: Vec<Option<i64>> = Vec::with_capacity(list.len());
-                for item in list.iter() {
-                    if item.is_none() {
-                        v.push(None);
-                    } else {
-                        v.push(Some(py_timedelta_to_micros(&item)?));
-                    }
-                }
-                let base: Int64Chunked =
-                    Int64Chunked::from_iter_options(name.as_str().into(), v.into_iter());
-                base.into_series()
-                    .cast(&DataType::Duration(polars::prelude::TimeUnit::Microseconds))
-                    .map_err(polars_err)?
-            }
-            None => {
-                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "Root schema cannot have unknown-base dtype.",
-                ))
-            }
-        };
+        let s = py_list_to_series(py, name.as_str(), &list, dtype)?;
         series_list.push(s);
     }
 
@@ -487,10 +632,177 @@ impl PolarsPlanRunner {
 }
 
 #[cfg(feature = "polars_engine")]
-fn series_to_py_list(py: Python<'_>, series: &Series, dtype: DTypeDesc) -> PyResult<PyObject> {
+fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> PyResult<PyObject> {
+    if matches!(av, AnyValue::Null) {
+        return Ok(py.None());
+    }
+    match fd {
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Int),
+            ..
+        } => {
+            let i = match av {
+                AnyValue::Int64(v) => v,
+                AnyValue::Int32(v) => v as i64,
+                _ => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Expected int AnyValue.",
+                    ));
+                }
+            };
+            Ok(i.into_py(py))
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Float),
+            ..
+        } => {
+            let f = match av {
+                AnyValue::Float64(v) => v,
+                AnyValue::Float32(v) => v as f64,
+                AnyValue::Int64(v) => v as f64,
+                _ => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Expected float AnyValue.",
+                    ));
+                }
+            };
+            Ok(f.into_py(py))
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Bool),
+            ..
+        } => match av {
+            AnyValue::Boolean(b) => Ok(b.into_py(py)),
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Expected bool AnyValue.",
+            )),
+        },
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Str),
+            ..
+        } => match av {
+            AnyValue::String(s) => Ok(s.into_py(py)),
+            AnyValue::StringOwned(s) => Ok(s.to_string().into_py(py)),
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Expected str AnyValue.",
+            )),
+        },
+        DTypeDesc::Scalar {
+            base: Some(BaseType::DateTime),
+            ..
+        } => {
+                let micros = match av {
+                AnyValue::Datetime(ts, tu, _) => match tu {
+                    TimeUnit::Microseconds => ts,
+                    TimeUnit::Milliseconds => ts * 1000,
+                    TimeUnit::Nanoseconds => ts / 1000,
+                },
+                _ => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Expected datetime AnyValue.",
+                    ));
+                }
+            };
+            micros_to_py_datetime(py, micros)
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Date),
+            ..
+        } => match av {
+            AnyValue::Date(d) => days_to_py_date(py, d),
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Expected date AnyValue.",
+            )),
+        },
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Duration),
+            ..
+        } => {
+                let micros = match av {
+                AnyValue::Duration(ts, tu) => match tu {
+                    TimeUnit::Microseconds => ts,
+                    TimeUnit::Milliseconds => ts * 1000,
+                    TimeUnit::Nanoseconds => ts / 1000,
+                },
+                _ => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Expected duration AnyValue.",
+                    ));
+                }
+            };
+            micros_to_py_timedelta(py, micros)
+        }
+        DTypeDesc::List { inner, .. } => {
+            let av_static = av.into_static();
+            let AnyValue::List(series) = av_static else {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Expected list AnyValue.",
+                ));
+            };
+            let py_inner = PyList::empty_bound(py);
+            for sub_av in series.iter() {
+                py_inner.append(polars_anyvalue_to_py(py, sub_av, inner)?)?;
+            }
+            Ok(py_inner.into_py(py))
+        }
+        DTypeDesc::Struct { fields, .. } => {
+            let av_static = av.into_static();
+            let AnyValue::StructOwned(payload) = av_static else {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Expected struct AnyValue.",
+                ));
+            };
+            let (vals, _) = payload.as_ref();
+            let d = PyDict::new_bound(py);
+            for ((name, fdt), inner) in fields.iter().zip(vals.iter()) {
+                let py_v = polars_anyvalue_to_py(py, inner.clone(), fdt)?;
+                d.set_item(name.as_str(), py_v)?;
+            }
+            Ok(d.into_py(py))
+        }
+        _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "Unsupported dtype in polars_anyvalue_to_py.",
+        )),
+    }
+}
+
+#[cfg(feature = "polars_engine")]
+fn series_to_py_list(py: Python<'_>, series: &Series, dtype: &DTypeDesc) -> PyResult<PyObject> {
     let mut values: Vec<PyObject> = Vec::with_capacity(series.len());
-    match dtype.base {
-        Some(crate::dtype::BaseType::Int) => {
+    match dtype {
+        DTypeDesc::Struct { .. } => {
+            for av in series.iter() {
+                let py_v = match av {
+                    AnyValue::Null => py.None(),
+                    _ => polars_anyvalue_to_py(py, av, dtype)?,
+                };
+                values.push(py_v);
+            }
+        }
+        DTypeDesc::List { inner, .. } => {
+            for av in series.iter() {
+                let py_v = match av {
+                    AnyValue::Null => py.None(),
+                    AnyValue::List(s) => {
+                        let py_inner = PyList::empty_bound(py);
+                        for sub_av in s.iter() {
+                            py_inner.append(polars_anyvalue_to_py(py, sub_av, inner)?)?;
+                        }
+                        py_inner.into_py(py)
+                    }
+                    _ => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                            "Expected list cell in list column.",
+                        ));
+                    }
+                };
+                values.push(py_v);
+            }
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Int),
+            ..
+        } => {
             let casted = series.cast(&DataType::Int64).map_err(polars_err)?;
             for item in casted.i64().map_err(polars_err)?.into_iter() {
                 match item {
@@ -499,7 +811,10 @@ fn series_to_py_list(py: Python<'_>, series: &Series, dtype: DTypeDesc) -> PyRes
                 }
             }
         }
-        Some(crate::dtype::BaseType::Float) => {
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Float),
+            ..
+        } => {
             let casted = series.cast(&DataType::Float64).map_err(polars_err)?;
             for item in casted.f64().map_err(polars_err)?.into_iter() {
                 match item {
@@ -508,7 +823,10 @@ fn series_to_py_list(py: Python<'_>, series: &Series, dtype: DTypeDesc) -> PyRes
                 }
             }
         }
-        Some(crate::dtype::BaseType::Bool) => {
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Bool),
+            ..
+        } => {
             let casted = series.cast(&DataType::Boolean).map_err(polars_err)?;
             for item in casted.bool().map_err(polars_err)?.into_iter() {
                 match item {
@@ -517,7 +835,10 @@ fn series_to_py_list(py: Python<'_>, series: &Series, dtype: DTypeDesc) -> PyRes
                 }
             }
         }
-        Some(crate::dtype::BaseType::Str) => {
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Str),
+            ..
+        } => {
             let casted = series.cast(&DataType::String).map_err(polars_err)?;
             for item in casted.str().map_err(polars_err)?.into_iter() {
                 match item {
@@ -526,7 +847,10 @@ fn series_to_py_list(py: Python<'_>, series: &Series, dtype: DTypeDesc) -> PyRes
                 }
             }
         }
-        Some(crate::dtype::BaseType::DateTime) => {
+        DTypeDesc::Scalar {
+            base: Some(BaseType::DateTime),
+            ..
+        } => {
             let casted = series.cast(&DataType::Int64).map_err(polars_err)?;
             for item in casted.i64().map_err(polars_err)?.into_iter() {
                 match item {
@@ -535,7 +859,10 @@ fn series_to_py_list(py: Python<'_>, series: &Series, dtype: DTypeDesc) -> PyRes
                 }
             }
         }
-        Some(crate::dtype::BaseType::Date) => {
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Date),
+            ..
+        } => {
             let casted = series.cast(&DataType::Int32).map_err(polars_err)?;
             for item in casted.i32().map_err(polars_err)?.into_iter() {
                 match item {
@@ -544,7 +871,10 @@ fn series_to_py_list(py: Python<'_>, series: &Series, dtype: DTypeDesc) -> PyRes
                 }
             }
         }
-        Some(crate::dtype::BaseType::Duration) => {
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Duration),
+            ..
+        } => {
             let casted = series.cast(&DataType::Int64).map_err(polars_err)?;
             for item in casted.i64().map_err(polars_err)?.into_iter() {
                 match item {
@@ -553,10 +883,13 @@ fn series_to_py_list(py: Python<'_>, series: &Series, dtype: DTypeDesc) -> PyRes
                 }
             }
         }
-        None => {
+        DTypeDesc::Scalar {
+            base: None,
+            ..
+        } => {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Output schema cannot have unknown-base dtype.",
-            ))
+            ));
         }
     }
     Ok(PyList::new_bound(py, values).into_py(py))
@@ -584,7 +917,7 @@ pub(crate) fn execute_plan_polars(
             .map_err(polars_err)?
             .as_materialized_series()
             .clone();
-        let py_list = series_to_py_list(py, &col, *dtype)?;
+        let py_list = series_to_py_list(py, &col, dtype)?;
         out_dict.set_item(name, py_list)?;
     }
     Ok(out_dict.into_py(py))
@@ -593,20 +926,46 @@ pub(crate) fn execute_plan_polars(
 #[cfg(feature = "polars_engine")]
 fn dtype_from_polars(dt: &DataType) -> PyResult<DTypeDesc> {
     match dt {
-        DataType::Int64 => Ok(DTypeDesc {
-            base: Some(crate::dtype::BaseType::Int),
+        DataType::Int64 => Ok(DTypeDesc::Scalar {
+            base: Some(BaseType::Int),
             nullable: true,
         }),
-        DataType::Float64 => Ok(DTypeDesc {
-            base: Some(crate::dtype::BaseType::Float),
+        DataType::Float64 => Ok(DTypeDesc::Scalar {
+            base: Some(BaseType::Float),
             nullable: true,
         }),
-        DataType::Boolean => Ok(DTypeDesc {
-            base: Some(crate::dtype::BaseType::Bool),
+        DataType::Boolean => Ok(DTypeDesc::Scalar {
+            base: Some(BaseType::Bool),
             nullable: true,
         }),
-        DataType::String => Ok(DTypeDesc {
-            base: Some(crate::dtype::BaseType::Str),
+        DataType::String => Ok(DTypeDesc::Scalar {
+            base: Some(BaseType::Str),
+            nullable: true,
+        }),
+        DataType::Datetime(_, _) => Ok(DTypeDesc::Scalar {
+            base: Some(BaseType::DateTime),
+            nullable: true,
+        }),
+        DataType::Date => Ok(DTypeDesc::Scalar {
+            base: Some(BaseType::Date),
+            nullable: true,
+        }),
+        DataType::Duration(_) => Ok(DTypeDesc::Scalar {
+            base: Some(BaseType::Duration),
+            nullable: true,
+        }),
+        DataType::Struct(flds) => {
+            let mut fields: Vec<(String, DTypeDesc)> = Vec::with_capacity(flds.len());
+            for f in flds {
+                fields.push((f.name().to_string(), dtype_from_polars(f.dtype())?));
+            }
+            Ok(DTypeDesc::Struct {
+                fields,
+                nullable: true,
+            })
+        }
+        DataType::List(inner) => Ok(DTypeDesc::List {
+            inner: Box::new(dtype_from_polars(inner)?),
             nullable: true,
         }),
         other => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
@@ -766,17 +1125,17 @@ pub fn execute_join_polars(
         // `Optional[T]` stable across joins even when the matched rows
         // happen to contain no nulls.
         let out_desc = if let Some(left_d) = left_plan.schema.get(col_name_str) {
-            let mut d = *left_d;
+            let mut d = left_d.clone();
             if matches!(join_type, JoinType::Right | JoinType::Full) {
-                d.nullable = true;
+                d = d.with_assigned_none_nullability();
             }
             d
         } else if let Some(stripped) = col_name_str.strip_suffix(suffix.as_str()) {
             // Collision columns from the right are renamed with the suffix.
             if let Some(right_d) = right_plan.schema.get(stripped) {
-                let mut d = *right_d;
+                let mut d = right_d.clone();
                 if matches!(join_type, JoinType::Left | JoinType::Full) {
-                    d.nullable = true;
+                    d = d.with_assigned_none_nullability();
                 }
                 d
             } else {
@@ -787,9 +1146,9 @@ pub fn execute_join_polars(
                 dtype_from_polars(s.dtype())?
             }
         } else if let Some(right_d) = right_plan.schema.get(col_name_str) {
-            let mut d = *right_d;
+            let mut d = right_d.clone();
             if matches!(join_type, JoinType::Left | JoinType::Full) {
-                d.nullable = true;
+                d = d.with_assigned_none_nullability();
             }
             d
         } else {
@@ -819,7 +1178,7 @@ pub fn execute_join_polars(
             .map_err(polars_err)?
             .as_materialized_series()
             .clone();
-        let py_list = series_to_py_list(py, &col, *dtype)?;
+        let py_list = series_to_py_list(py, &col, dtype)?;
         out_dict.set_item(name, py_list)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
@@ -843,7 +1202,7 @@ fn mask_groupby_sum_mean_columns(
                 "Internal error: missing schema for masked column '{out_name}'."
             ))
         })?;
-        let expr = match dtype.base {
+        let expr = match dtype.as_scalar_base_field().flatten() {
             Some(crate::dtype::BaseType::Int) => when(col(tmp_name).eq(lit(0i64)))
                 .then(lit(NULL))
                 .otherwise(col(out_name))
@@ -900,11 +1259,11 @@ pub fn execute_groupby_agg_polars(
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
     let mut tmp_count_cols: HashMap<String, String> = HashMap::new();
     for key in by.iter() {
-        out_schema.insert(key.clone(), *plan.schema.get(key).unwrap());
+        out_schema.insert(key.clone(), plan.schema.get(key).unwrap().clone());
     }
 
     for (out_name, op, in_col) in aggregations.into_iter() {
-        let in_dtype = *plan.schema.get(&in_col).ok_or_else(|| {
+        let in_dtype = plan.schema.get(&in_col).cloned().ok_or_else(|| {
             PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
                 "agg() unknown input column '{}'.",
                 in_col
@@ -914,7 +1273,7 @@ pub fn execute_groupby_agg_polars(
             "count" => {
                 out_schema.insert(
                     out_name.clone(),
-                    DTypeDesc {
+                    DTypeDesc::Scalar {
                         base: Some(crate::dtype::BaseType::Int),
                         nullable: false,
                     },
@@ -922,7 +1281,7 @@ pub fn execute_groupby_agg_polars(
                 agg_exprs.push(col(&in_col).count().alias(&out_name));
             }
             "sum" => {
-                let base = in_dtype.base.ok_or_else(|| {
+                let base = in_dtype.as_scalar_base_field().flatten().ok_or_else(|| {
                     PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "sum() requires known-base numeric dtype.",
                     )
@@ -937,7 +1296,7 @@ pub fn execute_groupby_agg_polars(
                 }
                 out_schema.insert(
                     out_name.clone(),
-                    DTypeDesc {
+                    DTypeDesc::Scalar {
                         base: Some(base),
                         nullable: true,
                     },
@@ -951,7 +1310,7 @@ pub fn execute_groupby_agg_polars(
                 agg_exprs.push(col(&in_col).sum().alias(&out_name));
             }
             "mean" => {
-                let base = in_dtype.base.ok_or_else(|| {
+                let base = in_dtype.as_scalar_base_field().flatten().ok_or_else(|| {
                     PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "mean() requires known-base numeric dtype.",
                     )
@@ -966,7 +1325,7 @@ pub fn execute_groupby_agg_polars(
                 }
                 out_schema.insert(
                     out_name.clone(),
-                    DTypeDesc {
+                    DTypeDesc::Scalar {
                         base: Some(crate::dtype::BaseType::Float),
                         nullable: true,
                     },
@@ -978,14 +1337,14 @@ pub fn execute_groupby_agg_polars(
                 agg_exprs.push(col(&in_col).mean().alias(&out_name));
             }
             "min" => {
-                let base = in_dtype.base.ok_or_else(|| {
+                let base = in_dtype.as_scalar_base_field().flatten().ok_or_else(|| {
                     PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "min() requires known-base dtype.",
                     )
                 })?;
                 out_schema.insert(
                     out_name.clone(),
-                    DTypeDesc {
+                    DTypeDesc::Scalar {
                         base: Some(base),
                         nullable: true,
                     },
@@ -993,14 +1352,14 @@ pub fn execute_groupby_agg_polars(
                 agg_exprs.push(col(&in_col).min().alias(&out_name));
             }
             "max" => {
-                let base = in_dtype.base.ok_or_else(|| {
+                let base = in_dtype.as_scalar_base_field().flatten().ok_or_else(|| {
                     PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "max() requires known-base dtype.",
                     )
                 })?;
                 out_schema.insert(
                     out_name.clone(),
-                    DTypeDesc {
+                    DTypeDesc::Scalar {
                         base: Some(base),
                         nullable: true,
                     },
@@ -1008,7 +1367,7 @@ pub fn execute_groupby_agg_polars(
                 agg_exprs.push(col(&in_col).max().alias(&out_name));
             }
             "median" => {
-                let base = in_dtype.base.ok_or_else(|| {
+                let base = in_dtype.as_scalar_base_field().flatten().ok_or_else(|| {
                     PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "median() requires known-base numeric dtype.",
                     )
@@ -1023,7 +1382,7 @@ pub fn execute_groupby_agg_polars(
                 }
                 out_schema.insert(
                     out_name.clone(),
-                    DTypeDesc {
+                    DTypeDesc::Scalar {
                         base: Some(crate::dtype::BaseType::Float),
                         nullable: true,
                     },
@@ -1031,7 +1390,7 @@ pub fn execute_groupby_agg_polars(
                 agg_exprs.push(col(&in_col).median().alias(&out_name));
             }
             "std" => {
-                let base = in_dtype.base.ok_or_else(|| {
+                let base = in_dtype.as_scalar_base_field().flatten().ok_or_else(|| {
                     PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "std() requires known-base numeric dtype.",
                     )
@@ -1046,7 +1405,7 @@ pub fn execute_groupby_agg_polars(
                 }
                 out_schema.insert(
                     out_name.clone(),
-                    DTypeDesc {
+                    DTypeDesc::Scalar {
                         base: Some(crate::dtype::BaseType::Float),
                         nullable: true,
                     },
@@ -1054,7 +1413,7 @@ pub fn execute_groupby_agg_polars(
                 agg_exprs.push(col(&in_col).std(1).alias(&out_name));
             }
             "var" => {
-                let base = in_dtype.base.ok_or_else(|| {
+                let base = in_dtype.as_scalar_base_field().flatten().ok_or_else(|| {
                     PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "var() requires known-base numeric dtype.",
                     )
@@ -1069,7 +1428,7 @@ pub fn execute_groupby_agg_polars(
                 }
                 out_schema.insert(
                     out_name.clone(),
-                    DTypeDesc {
+                    DTypeDesc::Scalar {
                         base: Some(crate::dtype::BaseType::Float),
                         nullable: true,
                     },
@@ -1077,14 +1436,14 @@ pub fn execute_groupby_agg_polars(
                 agg_exprs.push(col(&in_col).var(1).alias(&out_name));
             }
             "first" => {
-                let base = in_dtype.base.ok_or_else(|| {
+                let base = in_dtype.as_scalar_base_field().flatten().ok_or_else(|| {
                     PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "first() requires known-base dtype.",
                     )
                 })?;
                 out_schema.insert(
                     out_name.clone(),
-                    DTypeDesc {
+                    DTypeDesc::Scalar {
                         base: Some(base),
                         nullable: true,
                     },
@@ -1092,14 +1451,14 @@ pub fn execute_groupby_agg_polars(
                 agg_exprs.push(col(&in_col).first().alias(&out_name));
             }
             "last" => {
-                let base = in_dtype.base.ok_or_else(|| {
+                let base = in_dtype.as_scalar_base_field().flatten().ok_or_else(|| {
                     PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "last() requires known-base dtype.",
                     )
                 })?;
                 out_schema.insert(
                     out_name.clone(),
-                    DTypeDesc {
+                    DTypeDesc::Scalar {
                         base: Some(base),
                         nullable: true,
                     },
@@ -1109,7 +1468,7 @@ pub fn execute_groupby_agg_polars(
             "n_unique" => {
                 out_schema.insert(
                     out_name.clone(),
-                    DTypeDesc {
+                    DTypeDesc::Scalar {
                         base: Some(crate::dtype::BaseType::Int),
                         nullable: false,
                     },
@@ -1148,7 +1507,7 @@ pub fn execute_groupby_agg_polars(
             .map_err(polars_err)?
             .as_materialized_series()
             .clone();
-        let py_list = series_to_py_list(py, &col, *dtype)?;
+        let py_list = series_to_py_list(py, &col, dtype)?;
         out_dict.set_item(name, py_list)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
@@ -1176,13 +1535,23 @@ pub fn execute_concat_polars(
 
     let out_df = match how.as_str() {
         "vertical" => {
-            if left_out.get_column_names() != right_out.get_column_names() {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "concat(vertical) requires both inputs to have identical columns.",
-                ));
-            }
+            let left_names = left_out.get_column_names();
+            let right_names = right_out.get_column_names();
+            let right_aligned = if left_names == right_names {
+                right_out
+            } else {
+                let ls: HashSet<_> = left_names.iter().collect();
+                let rs: HashSet<_> = right_names.iter().collect();
+                if ls != rs {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "concat(vertical) requires both inputs to have identical columns.",
+                    ));
+                }
+                let names: Vec<&str> = left_names.iter().map(|n| n.as_str()).collect();
+                right_out.select(&names).map_err(polars_err)?
+            };
             let mut df = left_out.clone();
-            df.vstack_mut(&right_out).map_err(polars_err)?;
+            df.vstack_mut(&right_aligned).map_err(polars_err)?;
             df
         }
         "horizontal" => {
@@ -1209,9 +1578,9 @@ pub fn execute_concat_polars(
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
     for name in out_df.get_column_names().iter() {
         if let Some(d) = left_plan.schema.get(name.as_str()) {
-            out_schema.insert(name.to_string(), *d);
+            out_schema.insert(name.to_string(), d.clone());
         } else if let Some(d) = right_plan.schema.get(name.as_str()) {
-            out_schema.insert(name.to_string(), *d);
+            out_schema.insert(name.to_string(), d.clone());
         } else {
             let s = out_df
                 .column(name)
@@ -1237,7 +1606,7 @@ pub fn execute_concat_polars(
             .map_err(polars_err)?
             .as_materialized_series()
             .clone();
-        let py_list = series_to_py_list(py, &col, *dtype)?;
+        let py_list = series_to_py_list(py, &col, dtype)?;
         out_dict.set_item(name, py_list)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
@@ -1265,7 +1634,7 @@ fn py_dict_to_literal_ctx(
                 values.push(None);
                 continue;
             }
-            let lit = match dtype.base {
+            let lit = match dtype.as_scalar_base_field().flatten() {
                 Some(crate::dtype::BaseType::Int) => LiteralValue::Int(item.extract::<i64>()?),
                 Some(crate::dtype::BaseType::Float) => LiteralValue::Float(item.extract::<f64>()?),
                 Some(crate::dtype::BaseType::Bool) => LiteralValue::Bool(item.extract::<bool>()?),
@@ -1458,9 +1827,17 @@ pub fn execute_melt_polars(
         }
     }
     values.sort();
-    let first_base = plan.schema.get(&values[0]).and_then(|d| d.base);
+    let first_base = plan
+        .schema
+        .get(&values[0])
+        .and_then(|d| d.as_scalar_base_field().flatten());
     for c in values.iter().skip(1) {
-        if plan.schema.get(c).and_then(|d| d.base) != first_base {
+        if plan
+            .schema
+            .get(c)
+            .and_then(|d| d.as_scalar_base_field().flatten())
+            != first_base
+        {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "melt() requires all value columns to share the same base dtype.",
             ));
@@ -1484,7 +1861,7 @@ pub fn execute_melt_polars(
 
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
     for k in id_vars.iter() {
-        out_schema.insert(k.clone(), *plan.schema.get(k).unwrap());
+        out_schema.insert(k.clone(), plan.schema.get(k).unwrap().clone());
     }
     out_schema.insert(
         variable_name.clone(),
@@ -1492,10 +1869,10 @@ pub fn execute_melt_polars(
     );
     let nullable = values
         .iter()
-        .any(|c| plan.schema.get(c).map(|d| d.nullable).unwrap_or(true));
+        .any(|c| plan.schema.get(c).map(|d| d.nullable_flag()).unwrap_or(true));
     out_schema.insert(
         value_name.clone(),
-        DTypeDesc {
+        DTypeDesc::Scalar {
             base: Some(base),
             nullable,
         },
@@ -1514,7 +1891,7 @@ pub fn execute_melt_polars(
             .map_err(polars_err)?
             .as_materialized_series()
             .clone();
-        let py_list = series_to_py_list(py, &col, *dtype)?;
+        let py_list = series_to_py_list(py, &col, dtype)?;
         out_dict.set_item(name, py_list)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
@@ -1616,7 +1993,7 @@ pub fn execute_pivot_polars(
 
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
     for c in index.iter() {
-        out_schema.insert(c.clone(), *plan.schema.get(c).unwrap());
+        out_schema.insert(c.clone(), plan.schema.get(c).unwrap().clone());
     }
     let mut out_cols: HashMap<String, Vec<PyObject>> = HashMap::new();
     for c in index.iter() {
@@ -1637,8 +2014,8 @@ pub fn execute_pivot_polars(
                     name
                 )));
             }
-            let in_d = *plan.schema.get(v).unwrap();
-            let base = in_d.base.ok_or_else(|| {
+            let in_d = plan.schema.get(v).unwrap().clone();
+            let base = in_d.as_scalar_base_field().flatten().ok_or_else(|| {
                 PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "pivot() value columns must have known-base dtypes.",
                 )
@@ -1657,14 +2034,14 @@ pub fn execute_pivot_polars(
             let out_d = match aggregate_function.as_str() {
                 "count" | "n_unique" => DTypeDesc::non_nullable(crate::dtype::BaseType::Int),
                 "mean" | "median" | "std" | "var" => {
-                    DTypeDesc::nullable(crate::dtype::BaseType::Float)
+                    DTypeDesc::scalar_nullable(crate::dtype::BaseType::Float)
                 }
-                _ => DTypeDesc {
+                _ => DTypeDesc::Scalar {
                     base: Some(base),
                     nullable: true,
                 },
             };
-            generated_cols.push((name.clone(), v.clone(), out_d));
+            generated_cols.push((name.clone(), v.clone(), out_d.clone()));
             out_schema.insert(name.clone(), out_d);
             out_cols.insert(name, Vec::new());
         }
@@ -1712,7 +2089,10 @@ pub fn execute_pivot_polars(
                 let lit = agg_literal(
                     &aggregate_function,
                     &vals,
-                    out_d.base.unwrap_or(crate::dtype::BaseType::Float),
+                    out_d
+                        .as_scalar_base_field()
+                        .flatten()
+                        .unwrap_or(crate::dtype::BaseType::Float),
                 )?;
                 out_cols
                     .get_mut(name)
@@ -1960,12 +2340,12 @@ pub fn execute_groupby_dynamic_agg_polars(
             }
 
             for (out_name, op, in_col) in aggregations.iter() {
-                let in_dtype = *plan.schema.get(in_col).ok_or_else(|| {
+                let in_dtype = plan.schema.get(in_col).cloned().ok_or_else(|| {
                     PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
                         "agg() unknown input column '{in_col}'.",
                     ))
                 })?;
-                let base = in_dtype.base.ok_or_else(|| {
+                let base = in_dtype.as_scalar_base_field().flatten().ok_or_else(|| {
                     PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "aggregation requires known-base dtype.",
                     )
@@ -1986,23 +2366,23 @@ pub fn execute_groupby_dynamic_agg_polars(
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
     out_schema.insert(
         index_column.clone(),
-        *plan.schema.get(&index_column).unwrap(),
+        plan.schema.get(&index_column).unwrap().clone(),
     );
     for c in by.iter() {
-        out_schema.insert(c.clone(), *plan.schema.get(c).unwrap());
+        out_schema.insert(c.clone(), plan.schema.get(c).unwrap().clone());
     }
     for (out_name, op, in_col) in aggregations.iter() {
-        let in_dtype = *plan.schema.get(in_col).unwrap();
+        let in_dtype = plan.schema.get(in_col).unwrap().clone();
         let out_d = match op.as_str() {
-            "count" => DTypeDesc {
+            "count" => DTypeDesc::Scalar {
                 base: Some(crate::dtype::BaseType::Int),
                 nullable: false,
             },
-            "mean" => DTypeDesc {
+            "mean" => DTypeDesc::Scalar {
                 base: Some(crate::dtype::BaseType::Float),
                 nullable: true,
             },
-            "sum" | "min" | "max" => in_dtype,
+            "sum" | "min" | "max" => in_dtype.clone(),
             _ => unreachable!(),
         };
         out_schema.insert(out_name.clone(), out_d);
@@ -2022,23 +2402,79 @@ pub fn execute_groupby_dynamic_agg_polars(
 }
 
 #[cfg(feature = "polars_engine")]
+fn dtype_after_explode(inner: &DTypeDesc) -> DTypeDesc {
+    match inner {
+        DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
+            base: *base,
+            nullable: true,
+        },
+        DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
+            fields: fields.clone(),
+            nullable: true,
+        },
+        DTypeDesc::List {
+            inner: i,
+            nullable: _,
+        } => DTypeDesc::List {
+            inner: i.clone(),
+            nullable: true,
+        },
+    }
+}
+
+#[cfg(feature = "polars_engine")]
 pub fn execute_explode_polars(
-    _py: Python<'_>,
+    py: Python<'_>,
     plan: &PlanInner,
-    _root_data: &Bound<'_, PyAny>,
+    root_data: &Bound<'_, PyAny>,
     columns: Vec<String>,
 ) -> PyResult<(PyObject, PyObject)> {
     for c in columns.iter() {
-        if !plan.schema.contains_key(c) {
-            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+        let dt = plan.schema.get(c).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
                 "explode() unknown column '{}'.",
+                c
+            ))
+        })?;
+        if !matches!(dt, DTypeDesc::List { .. }) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+                "explode() column '{}' must have list dtype.",
                 c
             )));
         }
     }
-    Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-        "explode() requires list-like typed columns, which are not yet supported by the current schema type system.",
-    ))
+
+    let df = root_data_to_polars_df(py, &plan.root_schema, root_data)?;
+    let mut lf = PolarsPlanRunner::apply_steps(df.lazy(), &plan.steps)?;
+    lf = lf.explode(
+        cols(columns.iter().map(|c| c.as_str())),
+        ExplodeOptions {
+            empty_as_null: false,
+            keep_nulls: true,
+        },
+    );
+    let out_df = lf.collect().map_err(polars_err)?;
+
+    let mut out_schema: HashMap<String, DTypeDesc> = plan.schema.clone();
+    for c in &columns {
+        if let Some(DTypeDesc::List { inner, .. }) = out_schema.get(c) {
+            let new_d = dtype_after_explode(inner);
+            out_schema.insert(c.clone(), new_d);
+        }
+    }
+
+    let out_dict = PyDict::new_bound(py);
+    for (name, dtype) in out_schema.iter() {
+        let s = out_df
+            .column(name)
+            .map_err(polars_err)?
+            .as_materialized_series()
+            .clone();
+        let py_list = series_to_py_list(py, &s, dtype)?;
+        out_dict.set_item(name, py_list)?;
+    }
+    let desc = schema_descriptors_as_py(py, &out_schema)?;
+    Ok((out_dict.into_py(py), desc))
 }
 
 #[cfg(feature = "polars_engine")]

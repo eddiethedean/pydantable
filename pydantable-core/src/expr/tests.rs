@@ -94,7 +94,7 @@ fn exprnode_to_serializable_column_ref_roundtrip_shape() {
     ensure_python_initialized();
     Python::with_gil(|py| {
         let node =
-            ExprNode::make_column_ref("amount".to_string(), DTypeDesc::nullable(BaseType::Float))
+            ExprNode::make_column_ref("amount".to_string(), DTypeDesc::scalar_nullable(BaseType::Float))
                 .expect("amount");
         let obj = exprnode_to_serializable(py, &node).expect("serialize");
         let d: &Bound<'_, PyDict> = obj.downcast_bound(py).expect("dict");

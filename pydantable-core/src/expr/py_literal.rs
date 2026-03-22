@@ -21,30 +21,64 @@ impl ExprHandle {
             });
         }
 
-        let lit = match dtype.base {
-            Some(BaseType::Int) => LiteralValue::Int(value.extract::<i64>()?),
-            Some(BaseType::Float) => LiteralValue::Float(value.extract::<f64>()?),
-            Some(BaseType::Bool) => LiteralValue::Bool(value.extract::<bool>()?),
-            Some(BaseType::Str) => LiteralValue::Str(value.extract::<String>()?),
-            Some(BaseType::DateTime) => {
+        let lit = match &dtype {
+            crate::dtype::DTypeDesc::Scalar {
+                base: Some(BaseType::Int),
+                ..
+            } => LiteralValue::Int(value.extract::<i64>()?),
+            crate::dtype::DTypeDesc::Scalar {
+                base: Some(BaseType::Float),
+                ..
+            } => LiteralValue::Float(value.extract::<f64>()?),
+            crate::dtype::DTypeDesc::Scalar {
+                base: Some(BaseType::Bool),
+                ..
+            } => LiteralValue::Bool(value.extract::<bool>()?),
+            crate::dtype::DTypeDesc::Scalar {
+                base: Some(BaseType::Str),
+                ..
+            } => LiteralValue::Str(value.extract::<String>()?),
+            crate::dtype::DTypeDesc::Scalar {
+                base: Some(BaseType::DateTime),
+                ..
+            } => {
                 let dt = value.downcast::<PyDateTime>()?;
                 let secs: f64 = dt.call_method0("timestamp")?.extract()?;
                 LiteralValue::DateTimeMicros((secs * 1_000_000.0).round() as i64)
             }
-            Some(BaseType::Date) => {
+            crate::dtype::DTypeDesc::Scalar {
+                base: Some(BaseType::Date),
+                ..
+            } => {
                 let d = value.downcast::<PyDate>()?;
                 let ordinal: i32 = d.call_method0("toordinal")?.extract()?;
                 LiteralValue::DateDays(ordinal - 719_163)
             }
-            Some(BaseType::Duration) => {
+            crate::dtype::DTypeDesc::Scalar {
+                base: Some(BaseType::Duration),
+                ..
+            } => {
                 let td = value.downcast::<PyDelta>()?;
                 let secs: f64 = td.call_method0("total_seconds")?.extract()?;
                 LiteralValue::DurationMicros((secs * 1_000_000.0).round() as i64)
             }
-            None => {
+            crate::dtype::DTypeDesc::Scalar {
+                base: None,
+                ..
+            } => {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "Non-None literal must have known base dtype.",
-                ))
+                ));
+            }
+            crate::dtype::DTypeDesc::Struct { .. } => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Struct literals are not supported.",
+                ));
+            }
+            crate::dtype::DTypeDesc::List { .. } => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "List literals are not supported.",
+                ));
             }
         };
 

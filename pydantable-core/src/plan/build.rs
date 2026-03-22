@@ -27,7 +27,7 @@ pub fn plan_select(plan: &PlanInner, columns: Vec<String>) -> PyResult<PlanInner
 
     let mut new_schema = HashMap::new();
     for c in columns.iter() {
-        new_schema.insert(c.clone(), *plan.schema.get(c).unwrap());
+        new_schema.insert(c.clone(), plan.schema.get(c).unwrap().clone());
     }
 
     let mut new_steps = plan.steps.clone();
@@ -64,18 +64,10 @@ pub fn plan_with_columns(
         }
 
         let mut expr_dtype = expr.dtype();
-        if expr_dtype.base.is_none() {
+        if expr_dtype.is_scalar_unknown_nullable() {
             // Literal(None) assigned directly needs destination type inference.
             if let Some(dest) = plan.schema.get(name) {
-                let base = dest.base.ok_or_else(|| {
-                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "Destination schema base type is unknown.",
-                    )
-                })?;
-                expr_dtype = DTypeDesc {
-                    base: Some(base),
-                    nullable: true,
-                };
+                expr_dtype = dest.clone().with_assigned_none_nullability();
             } else {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
                     "with_columns({}=None) cannot infer destination type; combine None with a typed expression or replace an existing column.",
@@ -98,11 +90,10 @@ pub fn plan_with_columns(
 
 pub fn plan_filter(plan: &PlanInner, condition: ExprNode) -> PyResult<PlanInner> {
     let cond_dtype = condition.dtype();
-    if cond_dtype.base != Some(crate::dtype::BaseType::Bool) {
+    if cond_dtype.as_scalar_base_field().flatten() != Some(crate::dtype::BaseType::Bool) {
         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
             format!(
-                "filter(condition) expects condition typed as bool or Optional[bool]. Got base={:?} nullable={}.",
-                cond_dtype.base, cond_dtype.nullable
+                "filter(condition) expects condition typed as bool or Optional[bool]. Got dtype={cond_dtype:?}.",
             ),
         ));
     }
@@ -248,7 +239,7 @@ pub fn plan_rename(plan: &PlanInner, columns: HashMap<String, String>) -> PyResu
                 new
             )));
         }
-        let dtype = *plan.schema.get(old).unwrap();
+        let dtype = plan.schema.get(old).unwrap().clone();
         new_schema.remove(old);
         new_schema.insert(new.clone(), dtype);
     }
@@ -320,9 +311,22 @@ pub fn plan_fill_null(
             .clone()
             .unwrap_or_else(|| new_schema.keys().cloned().collect());
         for c in targets.iter() {
-            if let Some(mut d) = new_schema.get(c).copied() {
-                d.nullable = false;
-                new_schema.insert(c.clone(), d);
+            if let Some(d) = new_schema.get(c).cloned() {
+                let updated = match d {
+                    DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
+                        base,
+                        nullable: false,
+                    },
+                    DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
+                        fields,
+                        nullable: false,
+                    },
+                    DTypeDesc::List { inner, .. } => DTypeDesc::List {
+                        inner,
+                        nullable: false,
+                    },
+                };
+                new_schema.insert(c.clone(), updated);
             }
         }
     }

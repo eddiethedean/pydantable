@@ -12,7 +12,7 @@ pub fn schema_fields_as_py(
 ) -> PyResult<PyObject> {
     let dict = pyo3::types::PyDict::new_bound(py);
     for (name, dtype) in schema.iter() {
-        let t = dtype_to_python_type(py, *dtype)?;
+        let t = dtype_to_python_type(py, dtype.clone())?;
         dict.set_item(name, t)?;
     }
     Ok(dict.into_py(py))
@@ -24,7 +24,7 @@ pub fn schema_descriptors_as_py(
 ) -> PyResult<PyObject> {
     let dict = pyo3::types::PyDict::new_bound(py);
     for (name, dtype) in schema.iter() {
-        let d = dtype_to_descriptor_py(py, *dtype)?;
+        let d = dtype_to_descriptor_py(py, dtype)?;
         dict.set_item(name, d)?;
     }
     Ok(dict.into_py(py))

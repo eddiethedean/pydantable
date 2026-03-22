@@ -42,7 +42,7 @@ fn cmp_op_to_str(op: &CmpOp) -> &'static str {
 pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyObject> {
     let dict = PyDict::new_bound(py);
 
-    dict.set_item("dtype", dtype_to_descriptor_py(py, node.dtype())?)?;
+    dict.set_item("dtype", dtype_to_descriptor_py(py, &node.dtype())?)?;
 
     match node {
         ExprNode::ColumnRef { name, .. } => {
@@ -83,8 +83,11 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             dict.set_item("kind", "cast")?;
             dict.set_item("input", exprnode_to_serializable(py, input)?)?;
             dict.set_item("inner", exprnode_to_serializable(py, input)?)?;
-            if let Some(b) = dtype.base {
-                dict.set_item("to", base_type_json(b))?;
+            if let crate::dtype::DTypeDesc::Scalar {
+                base: Some(b), ..
+            } = dtype
+            {
+                dict.set_item("to", base_type_json(*b))?;
             }
         }
         ExprNode::IsNull { input, .. } => {
@@ -174,6 +177,11 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
         ExprNode::StringLength { inner, .. } => {
             dict.set_item("kind", "string_length")?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+        }
+        ExprNode::StructField { base, field, .. } => {
+            dict.set_item("kind", "struct_field")?;
+            dict.set_item("base", exprnode_to_serializable(py, base)?)?;
+            dict.set_item("field", field)?;
         }
     }
 

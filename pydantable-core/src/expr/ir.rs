@@ -99,4 +99,10 @@ pub enum ExprNode {
         inner: Box<ExprNode>,
         dtype: DTypeDesc,
     },
+    /// Extract one field from a struct-typed expression (Polars `struct.field`).
+    StructField {
+        base: Box<ExprNode>,
+        field: String,
+        dtype: DTypeDesc,
+    },
 }

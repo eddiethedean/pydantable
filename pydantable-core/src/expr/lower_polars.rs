@@ -99,19 +99,51 @@ impl ExprNode {
                 }
                 None => {
                     let null_expr = Null {}.lit();
-                    match dtype.base {
-                        Some(BaseType::Int) => Ok(null_expr.cast(DataType::Int64)),
-                        Some(BaseType::Float) => Ok(null_expr.cast(DataType::Float64)),
-                        Some(BaseType::Bool) => Ok(null_expr.cast(DataType::Boolean)),
-                        Some(BaseType::Str) => Ok(null_expr.cast(DataType::String)),
-                        Some(BaseType::DateTime) => {
-                            Ok(null_expr.cast(DataType::Datetime(TimeUnit::Microseconds, None)))
-                        }
-                        Some(BaseType::Date) => Ok(null_expr.cast(DataType::Date)),
-                        Some(BaseType::Duration) => {
-                            Ok(null_expr.cast(DataType::Duration(TimeUnit::Microseconds)))
-                        }
-                        None => Ok(null_expr),
+                    match dtype {
+                        crate::dtype::DTypeDesc::Scalar {
+                            base: Some(BaseType::Int),
+                            ..
+                        } => Ok(null_expr.cast(DataType::Int64)),
+                        crate::dtype::DTypeDesc::Scalar {
+                            base: Some(BaseType::Float),
+                            ..
+                        } => Ok(null_expr.cast(DataType::Float64)),
+                        crate::dtype::DTypeDesc::Scalar {
+                            base: Some(BaseType::Bool),
+                            ..
+                        } => Ok(null_expr.cast(DataType::Boolean)),
+                        crate::dtype::DTypeDesc::Scalar {
+                            base: Some(BaseType::Str),
+                            ..
+                        } => Ok(null_expr.cast(DataType::String)),
+                        crate::dtype::DTypeDesc::Scalar {
+                            base: Some(BaseType::DateTime),
+                            ..
+                        } => Ok(null_expr.cast(DataType::Datetime(TimeUnit::Microseconds, None))),
+                        crate::dtype::DTypeDesc::Scalar {
+                            base: Some(BaseType::Date),
+                            ..
+                        } => Ok(null_expr.cast(DataType::Date)),
+                        crate::dtype::DTypeDesc::Scalar {
+                            base: Some(BaseType::Duration),
+                            ..
+                        } => Ok(null_expr.cast(DataType::Duration(TimeUnit::Microseconds))),
+                        crate::dtype::DTypeDesc::Scalar {
+                            base: None,
+                            ..
+                        } => Ok(null_expr),
+                        crate::dtype::DTypeDesc::Struct { .. } => Err(PyErr::new::<
+                            pyo3::exceptions::PyTypeError,
+                            _,
+                        >(
+                            "Null struct literals must be lowered via schema-typed plan context.",
+                        )),
+                        crate::dtype::DTypeDesc::List { .. } => Err(PyErr::new::<
+                            pyo3::exceptions::PyTypeError,
+                            _,
+                        >(
+                            "Null list literals must be lowered via schema-typed plan context.",
+                        )),
                     }
                 }
             },
@@ -142,18 +174,39 @@ impl ExprNode {
                 }
             }
             ExprNode::Cast { input, dtype } => {
-                let dt = match dtype.base {
-                    Some(BaseType::Int) => DataType::Int64,
-                    Some(BaseType::Float) => DataType::Float64,
-                    Some(BaseType::Bool) => DataType::Boolean,
-                    Some(BaseType::Str) => DataType::String,
-                    Some(BaseType::DateTime) => DataType::Datetime(TimeUnit::Microseconds, None),
-                    Some(BaseType::Date) => DataType::Date,
-                    Some(BaseType::Duration) => DataType::Duration(TimeUnit::Microseconds),
-                    None => {
+                let dt = match dtype {
+                    crate::dtype::DTypeDesc::Scalar {
+                        base: Some(BaseType::Int),
+                        ..
+                    } => DataType::Int64,
+                    crate::dtype::DTypeDesc::Scalar {
+                        base: Some(BaseType::Float),
+                        ..
+                    } => DataType::Float64,
+                    crate::dtype::DTypeDesc::Scalar {
+                        base: Some(BaseType::Bool),
+                        ..
+                    } => DataType::Boolean,
+                    crate::dtype::DTypeDesc::Scalar {
+                        base: Some(BaseType::Str),
+                        ..
+                    } => DataType::String,
+                    crate::dtype::DTypeDesc::Scalar {
+                        base: Some(BaseType::DateTime),
+                        ..
+                    } => DataType::Datetime(TimeUnit::Microseconds, None),
+                    crate::dtype::DTypeDesc::Scalar {
+                        base: Some(BaseType::Date),
+                        ..
+                    } => DataType::Date,
+                    crate::dtype::DTypeDesc::Scalar {
+                        base: Some(BaseType::Duration),
+                        ..
+                    } => DataType::Duration(TimeUnit::Microseconds),
+                    _ => {
                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                            "cast() target dtype must have known base.",
-                        ))
+                            "cast() target dtype must have known scalar base.",
+                        ));
                     }
                 };
                 Ok(input.to_polars_expr()?.cast(dt))
@@ -177,7 +230,7 @@ impl ExprNode {
                 Ok(acc)
             }
             ExprNode::InList { inner, values, .. } => {
-                let base = inner.dtype().base.ok_or_else(|| {
+                let base = inner.dtype().as_scalar_base_field().flatten().ok_or_else(|| {
                     PyErr::new::<pyo3::exceptions::PyTypeError, _>("isin() inner dtype unknown.")
                 })?;
                 let series = literals_to_series(values, base)?;
@@ -212,6 +265,10 @@ impl ExprNode {
                 Ok(inner_e.str().slice(off, len))
             }
             ExprNode::StringLength { inner, .. } => Ok(inner.to_polars_expr()?.str().len_chars()),
+            ExprNode::StructField { base, field, .. } => Ok(base
+                .to_polars_expr()?
+                .struct_()
+                .field_by_name(field.as_str())),
         }
     }
 }

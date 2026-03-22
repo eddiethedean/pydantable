@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import dataclass
 from types import NoneType
-from typing import Any, get_args
+from typing import Any, get_args, get_origin, get_type_hints
+
+from pydantic import BaseModel
 
 
 class DataType:
@@ -77,19 +80,43 @@ class StructField:
     dataType: DataType
 
 
-class StructType:
-    """Simple struct schema view (not PySpark StructType)."""
+class ArrayType(DataType):
+    """Spark-like array/list token (element dtype + nullability)."""
 
-    def __init__(self, fields: list[StructField]) -> None:
+    typeName = "array"
+
+    def __init__(self, element_type: DataType, *, nullable: bool = False) -> None:
+        self.element_type = element_type
+        self.nullable = nullable
+
+    def __repr__(self) -> str:
+        n = "nullable " if self.nullable else ""
+        return f"{n}ArrayType({self.element_type!r})"
+
+    def to_annotation(self) -> Any:
+        raise NotImplementedError("ArrayType.to_annotation is not supported.")
+
+
+class StructType(DataType):
+    """Nested record or simple struct schema view (not JVM PySpark StructType)."""
+
+    typeName = "struct"
+
+    def __init__(self, fields: list[StructField], *, nullable: bool = False) -> None:
         self.fields = list(fields)
+        self.nullable = nullable
 
     @property
     def names(self) -> list[str]:
         return [f.name for f in self.fields]
 
     def __repr__(self) -> str:
+        n = "nullable " if self.nullable else ""
         inner = ", ".join(f"{sf.name}: {sf.dataType!r}" for sf in self.fields)
-        return f"StructType([{inner}])"
+        return f"{n}StructType([{inner}])"
+
+    def to_annotation(self) -> Any:
+        raise NotImplementedError("StructType.to_annotation is not supported.")
 
 
 def annotation_to_data_type(annotation: Any) -> DataType:
@@ -118,4 +145,29 @@ def annotation_to_data_type(annotation: Any) -> DataType:
                 return StringType(nullable=True)
             if isinstance(inner, BooleanType):
                 return BooleanType(nullable=True)
+            if isinstance(inner, StructType):
+                return StructType(inner.fields, nullable=True)
+            if isinstance(inner, ArrayType):
+                return ArrayType(inner.element_type, nullable=True)
+
+    origin = get_origin(annotation)
+    if origin is list:
+        la = get_args(annotation)
+        if len(la) == 1:
+            return ArrayType(annotation_to_data_type(la[0]))
+
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        hints: dict[str, Any] = {}
+        with suppress(Exception):
+            hints = get_type_hints(annotation, include_extras=True)
+        fields: list[StructField] = []
+        for n, finfo in annotation.model_fields.items():
+            ann = hints.get(n)
+            if ann is None:
+                ann = finfo.annotation
+            if ann is None:
+                continue
+            fields.append(StructField(n, annotation_to_data_type(ann)))
+        return StructType(fields)
+
     return StringType(nullable=False)

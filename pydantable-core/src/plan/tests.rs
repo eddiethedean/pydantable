@@ -33,7 +33,7 @@ fn schema_descriptors_encode_base_and_nullable() {
     Python::with_gil(|py| {
         let mut schema = HashMap::new();
         schema.insert("id".to_string(), DTypeDesc::non_nullable(BaseType::Int));
-        schema.insert("age".to_string(), DTypeDesc::nullable(BaseType::Int));
+        schema.insert("age".to_string(), DTypeDesc::scalar_nullable(BaseType::Int));
         let obj = schema_descriptors_as_py(py, &schema).unwrap();
         let dict = obj.bind(py).downcast::<PyDict>().unwrap();
 
@@ -60,7 +60,7 @@ fn planinner_to_serializable_smoke() {
         // Base schema
         let mut schema = HashMap::new();
         schema.insert("id".to_string(), DTypeDesc::non_nullable(BaseType::Int));
-        schema.insert("age".to_string(), DTypeDesc::nullable(BaseType::Int));
+        schema.insert("age".to_string(), DTypeDesc::scalar_nullable(BaseType::Int));
 
         let plan0 = make_plan(schema);
 
@@ -70,7 +70,7 @@ fn planinner_to_serializable_smoke() {
 
         // with_columns(age2 = age + 2)
         let age_ref =
-            ExprNode::make_column_ref("age".to_string(), DTypeDesc::nullable(BaseType::Int))
+            ExprNode::make_column_ref("age".to_string(), DTypeDesc::scalar_nullable(BaseType::Int))
                 .expect("age column ref");
         let lit_two = ExprNode::make_literal(
             Some(LiteralValue::Int(2)),
@@ -87,7 +87,7 @@ fn planinner_to_serializable_smoke() {
         // filter(age2 > 10)
         let age2_dtype = plan2.schema.get("age2").expect("age2 in derived schema");
         let age2_ref =
-            ExprNode::make_column_ref("age2".to_string(), *age2_dtype).expect("age2 column ref");
+            ExprNode::make_column_ref("age2".to_string(), age2_dtype.clone()).expect("age2 column ref");
         let lit_10 = ExprNode::make_literal(
             Some(LiteralValue::Int(10)),
             DTypeDesc::non_nullable(BaseType::Int),
@@ -167,7 +167,7 @@ mod polars_engine_tests {
     fn sample_kv_schema() -> HashMap<String, DTypeDesc> {
         let mut schema = HashMap::new();
         schema.insert("k".to_string(), DTypeDesc::non_nullable(BaseType::Int));
-        schema.insert("v".to_string(), DTypeDesc::nullable(BaseType::Int));
+        schema.insert("v".to_string(), DTypeDesc::scalar_nullable(BaseType::Int));
         schema
     }
 
@@ -177,7 +177,7 @@ mod polars_engine_tests {
         Python::with_gil(|py| {
             let mut schema = HashMap::new();
             schema.insert("id".to_string(), DTypeDesc::non_nullable(BaseType::Int));
-            schema.insert("age".to_string(), DTypeDesc::nullable(BaseType::Int));
+            schema.insert("age".to_string(), DTypeDesc::scalar_nullable(BaseType::Int));
             let plan = make_plan(schema);
 
             let root = PyDict::new_bound(py);
@@ -219,7 +219,7 @@ mod polars_engine_tests {
         Python::with_gil(|py| {
             let mut schema = HashMap::new();
             schema.insert("id".to_string(), DTypeDesc::non_nullable(BaseType::Int));
-            schema.insert("age".to_string(), DTypeDesc::nullable(BaseType::Int));
+            schema.insert("age".to_string(), DTypeDesc::scalar_nullable(BaseType::Int));
             let plan = make_plan(schema);
 
             let root = PyDict::new_bound(py);

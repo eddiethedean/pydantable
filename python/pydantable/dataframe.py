@@ -31,6 +31,8 @@ from .rust_engine import (
 )
 from .schema import (
     make_derived_schema_type,
+    merge_field_types_preserving_identity,
+    previous_field_types_for_join,
     schema_field_types,
     schema_from_descriptors,
     validate_columns_strict,
@@ -43,9 +45,6 @@ if TYPE_CHECKING:
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
 _NoneType = type(None)
-
-_SUPPORTED_BASE_TYPES = (int, float, bool, str)
-
 
 def _rows_from_column_dict(
     data: dict[str, list[Any]], row_type: type[BaseModel]
@@ -72,22 +71,6 @@ def _is_bool_or_nullable_bool(dtype: Any) -> bool:
         if len(args) == 2 and _NoneType in args and bool in args:
             return True
     return False
-
-
-def _base_type_from_nullable(dtype: Any) -> Any:
-    """
-    Extract the base scalar type from either `T` or `Optional[T]` / `Union[T, None]`.
-    """
-    if dtype in _SUPPORTED_BASE_TYPES:
-        return dtype
-    origin = get_origin(dtype)
-    if origin is Union:
-        args = tuple(get_args(dtype))
-        if len(args) == 2 and _NoneType in args:
-            base = args[0] if args[1] is _NoneType else args[1]
-            if base in _SUPPORTED_BASE_TYPES:
-                return base
-    raise TypeError(f"Unsupported (non-nullable or nullable) dtype: {dtype!r}")
 
 
 @dataclass(frozen=True)
@@ -173,6 +156,16 @@ class DataFrame(Generic[SchemaT]):
     def schema_fields(self) -> dict[str, Any]:
         return dict(self._current_field_types)
 
+    def _field_types_from_descriptors(
+        self,
+        descriptors: Mapping[str, Mapping[str, Any]],
+        *,
+        previous: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        derived = schema_from_descriptors(descriptors)
+        prev = self._current_field_types if previous is None else previous
+        return merge_field_types_preserving_identity(prev, descriptors, derived)
+
     def col(self, name: str) -> ColumnRef:
         if name not in self._current_field_types:
             raise KeyError(f"Unknown column {name!r} for current schema.")
@@ -195,7 +188,8 @@ class DataFrame(Generic[SchemaT]):
                 rust_columns[name] = rust.make_literal(value=value)
 
         rust_plan = rust.plan_with_columns(self._rust_plan, rust_columns)
-        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
+        desc = rust_plan.schema_descriptors()
+        derived_fields = self._field_types_from_descriptors(desc)
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
@@ -224,7 +218,8 @@ class DataFrame(Generic[SchemaT]):
                 raise TypeError("select() accepts column names or ColumnRef objects.")
 
         rust_plan = rust.plan_select(self._rust_plan, selected)
-        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
+        desc = rust_plan.schema_descriptors()
+        derived_fields = self._field_types_from_descriptors(desc)
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
@@ -321,7 +316,8 @@ class DataFrame(Generic[SchemaT]):
             else:
                 raise TypeError("drop() accepts column names or ColumnRef objects.")
         rust_plan = rust.plan_drop(self._rust_plan, selected)
-        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
+        desc = rust_plan.schema_descriptors()
+        derived_fields = self._field_types_from_descriptors(desc)
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
@@ -334,8 +330,14 @@ class DataFrame(Generic[SchemaT]):
 
     def rename(self, columns: Mapping[str, str]) -> DataFrame[Any]:
         rust = _require_rust_core()
-        rust_plan = rust.plan_rename(self._rust_plan, dict(columns))
-        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
+        rename_map = dict(columns)
+        rust_plan = rust.plan_rename(self._rust_plan, rename_map)
+        desc = rust_plan.schema_descriptors()
+        rename_prev: dict[str, Any] = dict(self._current_field_types)
+        for old_name, new_name in rename_map.items():
+            if old_name in self._current_field_types:
+                rename_prev[new_name] = self._current_field_types[old_name]
+        derived_fields = self._field_types_from_descriptors(desc, previous=rename_prev)
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
@@ -380,7 +382,8 @@ class DataFrame(Generic[SchemaT]):
             value,
             strategy,
         )
-        derived_fields = schema_from_descriptors(rust_plan.schema_descriptors())
+        desc = rust_plan.schema_descriptors()
+        derived_fields = self._field_types_from_descriptors(desc)
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
@@ -420,7 +423,7 @@ class DataFrame(Generic[SchemaT]):
             value_name,
             as_python_lists=True,
         )
-        derived_fields = schema_from_descriptors(schema_descriptors)
+        derived_fields = self._field_types_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
@@ -480,7 +483,7 @@ class DataFrame(Generic[SchemaT]):
             aggregate_function,
             as_python_lists=True,
         )
-        derived_fields = schema_from_descriptors(schema_descriptors)
+        derived_fields = self._field_types_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
@@ -497,7 +500,7 @@ class DataFrame(Generic[SchemaT]):
         out_data, schema_descriptors = execute_explode(
             self._rust_plan, self._root_data, cols
         )
-        derived_fields = schema_from_descriptors(schema_descriptors)
+        derived_fields = self._field_types_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
@@ -514,7 +517,7 @@ class DataFrame(Generic[SchemaT]):
         out_data, schema_descriptors = execute_unnest(
             self._rust_plan, self._root_data, cols
         )
-        derived_fields = schema_from_descriptors(schema_descriptors)
+        derived_fields = self._field_types_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
@@ -598,7 +601,15 @@ class DataFrame(Generic[SchemaT]):
             suffix,
             as_python_lists=True,
         )
-        derived_fields = schema_from_descriptors(schema_descriptors)
+        join_prev = previous_field_types_for_join(
+            self._current_field_types,
+            other._current_field_types,
+            suffix=suffix,
+            output_columns=list(schema_descriptors.keys()),
+        )
+        derived_fields = self._field_types_from_descriptors(
+            schema_descriptors, previous=join_prev
+        )
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
@@ -832,6 +843,7 @@ class DataFrame(Generic[SchemaT]):
         base = dfs[0]
         out_data = base._root_data
         out_schema_type = base._current_schema_type
+        merged_ft = dict(base._current_field_types)
         out_plan = base._rust_plan
         for df in dfs[1:]:
             out_data, schema_descriptors = execute_concat(
@@ -843,8 +855,11 @@ class DataFrame(Generic[SchemaT]):
                 as_python_lists=True,
             )
             derived_fields = schema_from_descriptors(schema_descriptors)
-            out_schema_type = make_derived_schema_type(out_schema_type, derived_fields)
-            out_plan = _require_rust_core().make_plan(derived_fields)
+            merged_ft = merge_field_types_preserving_identity(
+                merged_ft, schema_descriptors, derived_fields
+            )
+            out_schema_type = make_derived_schema_type(out_schema_type, merged_ft)
+            out_plan = _require_rust_core().make_plan(merged_ft)
         return cls._from_plan(
             root_data=out_data,
             root_schema_type=out_schema_type,
@@ -893,7 +908,7 @@ class GroupedDataFrame:
             agg_specs,
             as_python_lists=True,
         )
-        derived_fields = schema_from_descriptors(schema_descriptors)
+        derived_fields = self._df._field_types_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
             self._df._current_schema_type, derived_fields
         )
@@ -945,7 +960,7 @@ class DynamicGroupedDataFrame:
             agg_specs,
             as_python_lists=True,
         )
-        derived_fields = schema_from_descriptors(schema_descriptors)
+        derived_fields = self._df._field_types_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
             self._df._current_schema_type, derived_fields
         )

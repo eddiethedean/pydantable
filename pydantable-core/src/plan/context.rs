@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDate, PyDateTime, PyDelta, PyDict, PyList};
 
-use crate::dtype::DTypeDesc;
+use crate::dtype::{BaseType, DTypeDesc};
 use crate::expr::LiteralValue;
 
 #[cfg(not(feature = "polars_engine"))]
@@ -38,43 +38,68 @@ pub fn root_data_to_ctx(
             ))
         })?;
 
+        if matches!(expected, DTypeDesc::Struct { .. } | DTypeDesc::List { .. }) {
+            return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                "Struct/list columns require the Polars execution engine (polars_engine feature).",
+            ));
+        }
+
         let mut out: Vec<Option<LiteralValue>> = Vec::with_capacity(list.len());
         for item in list.iter() {
             let item = item;
             if item.is_none() {
                 out.push(None);
             } else {
-                let lit = match expected.base {
-                    Some(crate::dtype::BaseType::Int) => LiteralValue::Int(item.extract::<i64>()?),
-                    Some(crate::dtype::BaseType::Float) => {
-                        LiteralValue::Float(item.extract::<f64>()?)
-                    }
-                    Some(crate::dtype::BaseType::Bool) => {
-                        LiteralValue::Bool(item.extract::<bool>()?)
-                    }
-                    Some(crate::dtype::BaseType::Str) => {
-                        LiteralValue::Str(item.extract::<String>()?)
-                    }
-                    Some(crate::dtype::BaseType::DateTime) => {
+                let lit = match expected {
+                    DTypeDesc::Scalar {
+                        base: Some(BaseType::Int),
+                        ..
+                    } => LiteralValue::Int(item.extract::<i64>()?),
+                    DTypeDesc::Scalar {
+                        base: Some(BaseType::Float),
+                        ..
+                    } => LiteralValue::Float(item.extract::<f64>()?),
+                    DTypeDesc::Scalar {
+                        base: Some(BaseType::Bool),
+                        ..
+                    } => LiteralValue::Bool(item.extract::<bool>()?),
+                    DTypeDesc::Scalar {
+                        base: Some(BaseType::Str),
+                        ..
+                    } => LiteralValue::Str(item.extract::<String>()?),
+                    DTypeDesc::Scalar {
+                        base: Some(BaseType::DateTime),
+                        ..
+                    } => {
                         let dt = item.downcast::<PyDateTime>()?;
                         let secs: f64 = dt.call_method0("timestamp")?.extract()?;
                         LiteralValue::DateTimeMicros((secs * 1_000_000.0).round() as i64)
                     }
-                    Some(crate::dtype::BaseType::Date) => {
+                    DTypeDesc::Scalar {
+                        base: Some(BaseType::Date),
+                        ..
+                    } => {
                         let d = item.downcast::<PyDate>()?;
                         let ordinal: i32 = d.call_method0("toordinal")?.extract()?;
                         LiteralValue::DateDays(ordinal - 719_163)
                     }
-                    Some(crate::dtype::BaseType::Duration) => {
+                    DTypeDesc::Scalar {
+                        base: Some(BaseType::Duration),
+                        ..
+                    } => {
                         let td = item.downcast::<PyDelta>()?;
                         let secs: f64 = td.call_method0("total_seconds")?.extract()?;
                         LiteralValue::DurationMicros((secs * 1_000_000.0).round() as i64)
                     }
-                    None => {
+                    DTypeDesc::Scalar {
+                        base: None,
+                        ..
+                    } => {
                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                             "Root schema cannot have unknown-base dtype.",
-                        ))
+                        ));
                     }
+                    DTypeDesc::Struct { .. } | DTypeDesc::List { .. } => unreachable!(),
                 };
                 out.push(Some(lit));
             }

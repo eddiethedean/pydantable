@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from pydantable import DataFrameModel
+from pydantable import DataFrameModel, Schema
 from pydantable.schema import is_supported_scalar_column_annotation
 from pydantic import ValidationError
 
@@ -9,6 +9,16 @@ from pydantic import ValidationError
 class UserDF(DataFrameModel):
     id: int
     age: int | None
+
+
+class _AddrNested(Schema):
+    street: str
+    zip_code: int | None
+
+
+class _PersonWithAddrDF(DataFrameModel):
+    id: int
+    addr: _AddrNested
 
 
 def test_dataframe_model_column_input_happy_path():
@@ -63,13 +73,13 @@ def test_dataframe_model_row_input_rejects_bad_item_type():
         UserDF([1, 2, 3])  # type: ignore[arg-type]
 
 
-def test_dataframe_model_rejects_unsupported_list_type_at_class_definition():
+def test_dataframe_model_rejects_unsupported_dict_type_at_class_definition():
     with pytest.raises(TypeError, match="unsupported type") as exc:
-        class BadList(DataFrameModel):
-            items: list[int]
+        class BadDict(DataFrameModel):
+            m: dict[str, int]
 
-    assert "BadList" in str(exc.value)
-    assert "items" in str(exc.value)
+    assert "BadDict" in str(exc.value)
+    assert "m" in str(exc.value)
     assert "SUPPORTED_TYPES" in str(exc.value)
 
 
@@ -263,6 +273,28 @@ def test_p5_dataframe_model_reshape_methods() -> None:
     assert p_out["id"] == [1]
     assert p_out["A_first"] == [10]
     assert p_out["B_first"] == [None]
+
+
+def test_nested_model_column_round_trip() -> None:
+    df = _PersonWithAddrDF(
+        {
+            "id": [1, 2],
+            "addr": [
+                {"street": "Main", "zip_code": 12345},
+                {"street": "Oak", "zip_code": None},
+            ],
+        }
+    )
+    assert df.collect(as_lists=True) == {
+        "id": [1, 2],
+        "addr": [
+            {"street": "Main", "zip_code": 12345},
+            {"street": "Oak", "zip_code": None},
+        ],
+    }
+    desc = df._df._rust_plan.schema_descriptors()["addr"]
+    assert desc["kind"] == "struct"
+    assert desc["nullable"] is False
 
 
 def test_p6_dataframe_model_rolling_and_dynamic() -> None:

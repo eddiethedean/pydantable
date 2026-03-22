@@ -4,6 +4,7 @@ import pytest
 from conftest import assert_table_eq_sorted
 from pydantable.pyspark import DataFrame, DataFrameModel
 from pydantable.pyspark.sql import (
+    ArrayType,
     BooleanType,
     Column,
     DoubleType,
@@ -76,6 +77,41 @@ def test_types_to_annotation() -> None:
     assert StringType().to_annotation() is str
     assert DoubleType().to_annotation() is float
     assert BooleanType().to_annotation() is bool
+
+
+def test_annotation_to_data_type_nested_model() -> None:
+    class Inner(Schema):
+        x: int
+
+    class Outer(Schema):
+        id: int
+        inner: Inner
+
+    dt = annotation_to_data_type(Outer)
+    assert isinstance(dt, StructType)
+    assert len(dt.fields) == 2
+    assert dt.fields[0].name == "id"
+    assert isinstance(dt.fields[0].dataType, IntegerType)
+    assert dt.fields[1].name == "inner"
+    assert isinstance(dt.fields[1].dataType, StructType)
+
+
+def test_annotation_to_data_type_list_int() -> None:
+    dt = annotation_to_data_type(list[int])
+    assert isinstance(dt, ArrayType)
+    assert isinstance(dt.element_type, IntegerType)
+
+
+def test_annotation_to_data_type_list_nested_and_optional() -> None:
+    nested = annotation_to_data_type(list[list[int]])
+    assert isinstance(nested, ArrayType)
+    assert isinstance(nested.element_type, ArrayType)
+    assert isinstance(nested.element_type.element_type, IntegerType)
+
+    opt = annotation_to_data_type(list[str] | None)
+    assert isinstance(opt, ArrayType)
+    assert isinstance(opt.element_type, StringType)
+    assert opt.nullable is True
 
 
 def test_annotation_to_data_type_roundtrip() -> None:

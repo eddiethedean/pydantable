@@ -18,6 +18,7 @@ from .functions import (
     when,
 )
 from .types import (
+    ArrayType,
     BooleanType,
     DataType,
     DoubleType,
@@ -30,6 +31,7 @@ from .types import (
 )
 
 __all__ = [
+    "ArrayType",
     "BooleanType",
     "Column",
     "DataType",

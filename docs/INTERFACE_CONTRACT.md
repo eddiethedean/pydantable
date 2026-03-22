@@ -85,8 +85,8 @@ Supported reshape methods:
   - multiple value columns: `<pivot_value>_<value_col>_<agg>`
 
 `explode` / `unnest`:
-- Only **scalar** column dtypes are modeled; see `SUPPORTED_TYPES.md` for the full list (`int`, `float`, `bool`, `str`, `datetime`, `date`, `timedelta`, each nullable).
-- Because **list**/**struct** typed columns are not yet part of the schema system, both methods raise explicit `NotImplementedError` with guidance.
+- **Homogeneous list** columns (`list[T]` / `List[T]` with supported `T`) are modeled end-to-end; `explode(columns)` unwraps one list level and updates the schema to the inner dtype (nullable). See [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md).
+- **`unnest`** for struct columns is still not implemented (see runtime error).
 
 ## Window and time-series semantics
 
@@ -98,6 +98,13 @@ Supported P6 API surface:
 Temporal typing:
 - Schema descriptors support `datetime`, `date`, and `duration` base types (including nullable variants).
 - Temporal descriptors round-trip through Rust schema descriptors into derived Python schema types.
+
+## Struct columns (nested Pydantic models)
+
+- Nested **`Schema` / `BaseModel`** fields are supported as **struct** dtypes in Rust and Polars; see [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md) for the descriptor format and expression limits.
+- **Pass-through** operations (`select`, `filter`, `sort`, `slice`, `join` on scalar keys, `concat` when schemas align) keep struct columns when the logical schema still matches.
+- **Python type identity** after transforms: when a new Rust descriptor matches the previous column’s annotation, pydantable keeps your original nested class; new or renamed columns, or changed dtypes, may use anonymous `create_model` types while preserving validation shape.
+- **Struct field access**: `Expr.struct_field(name)` (e.g. `df.addr.struct_field("street")`) projects a scalar field; invalid names fail at expression build time.
 
 Rolling/dynamic contracts:
 - Rolling windows support grouped trailing windows with deterministic ordering by `on` (and optional `by` keys).

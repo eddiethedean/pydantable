@@ -184,3 +184,11 @@ Deliverables:
 - [x] Row-wise materialization helpers (e.g. `rows()` returning `RowModel`s) for
   response serialization workflows
 
+## Post-7 follow-ups (in flight / planned)
+
+- [x] **Nested Pydantic model columns** (struct dtypes, Polars struct I/O, conservative expression typing, derived-schema identity merge where descriptors match prior annotations). See [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md).
+- [x] **Struct field projection** via `Expr.struct_field(...)` (Rust + Polars).
+- [x] **PySpark UI**: `annotation_to_data_type` builds nested `StructType` for nested `BaseModel` columns.
+- [x] **Homogeneous list columns** (`list[T]`) with list dtypes, descriptors, Polars list I/O, and `explode()` for list-typed columns (`unnest` for structs still pending).
+- [ ] **Additional scalars** (`uuid.UUID` as a first-class dtype, `enum.Enum`, `Decimal`, …) with `BaseType` / Polars / descriptor extensions (typically one type per PR).
+

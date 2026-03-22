@@ -1,8 +1,11 @@
 # Supported data types
 
-This page is the **authoritative list** of scalar types pydantable accepts on
+This page is the **authoritative list** of column types pydantable accepts on
 `DataFrameModel` / `DataFrame[Schema]` fields, uses in **expression typing**
-(Rust AST), and maps to **Rust schema descriptors** (`{"base": ..., "nullable": ...}`).
+(Rust AST), and maps to **Rust schema descriptors** (scalar:
+`{"base": ..., "nullable": ...}`, nested struct:
+`{"kind": "struct", "nullable": ..., "fields": [...]}`, or homogeneous list:
+`{"kind": "list", "nullable": ..., "inner": <descriptor>}`).
 
 For behavior contracts (nulls, joins, ordering), see `INTERFACE_CONTRACT.md`.
 
@@ -33,24 +36,95 @@ Nullable columns use the same base types with **`None`** as a cell value:
 Expression results and filter conditions follow SQL-like null rules; see
 `INTERFACE_CONTRACT.md`.
 
+## Nested Pydantic models (struct columns)
+
+A column may use a **`Schema` / `BaseModel` subclass** whose fields are themselves
+supported column types (scalars or further nested models). Each cell is one nested
+model instance: in columnar Python input, use a **list of dicts** (or objects that
+validate as the nested model).
+
+Rust maps these to **struct** dtypes and Polars **struct** columns. **Expression
+support for struct columns is intentionally limited** (for example, no arithmetic
+on whole structs; equality is allowed only when struct shapes match). Prefer
+scalar fields or `Expr.struct_field(...)` for field projection.
+
+## Homogeneous list columns (`list[T]` / `List[T]`)
+
+Use **`list[T]`** (or `typing.List[T]`) where **`T`** is any supported column type
+(scalar, nested struct, or another `list[...]`). Each cell is a Python `list` of
+values matching `T`. Rust uses `DTypeDesc::List` and Polars **list** columns.
+
+- **`explode(...)`** is supported for list-typed columns: it lowers to Polars
+  `explode` and sets the column’s dtype to the inner `T` (nullable).
+- **Expressions**: list columns do not support arithmetic; use **`explode`** or
+  project scalars after explode.
+
+### Descriptor shape (list)
+
+```json
+{
+  "kind": "list",
+  "nullable": false,
+  "inner": {"base": "int", "nullable": false}
+}
+```
+
+### Descriptor shape (Rust ↔ Python)
+
+Scalars keep the existing flat form for compatibility:
+
+```json
+{"base": "int", "nullable": false}
+```
+
+Nested models use `kind: "struct"` with ordered fields (each field has a `name`
+and recursive `dtype`):
+
+```json
+{
+  "kind": "struct",
+  "nullable": false,
+  "fields": [
+    {"name": "street", "dtype": {"base": "str", "nullable": false}},
+    {"name": "zip", "dtype": {"base": "int", "nullable": true}}
+  ]
+}
+```
+
+When the logical plan changes shape, pydantable rebuilds field types from Rust
+descriptors. If a column **name** was already in the current schema and the new
+descriptor **matches** that annotation (via
+`descriptor_matches_column_annotation` in `python/pydantable/schema.py`), the
+**original** Python type is kept—including your nested `Schema` classes. New or
+renamed columns, or columns whose dtype changed (for example after `with_columns`
+or `fill_null`), still use anonymous `create_model` types where no prior
+annotation applies.
+
 ## Expression typing (Rust)
 
 The native core builds a typed expression tree for `Expr` (column references,
 literals, arithmetic, comparisons, etc.). **Invalid combinations fail when the
-expression is built**, not only at execution time. Base types match the table
-above (including temporal types).
+expression is built**, not only at execution time. Scalar base types match the table
+above (including temporal types); struct columns follow the conservative rules
+described above.
 
 ## Not supported as schema column types
 
 These are **out of scope** for the current schema system:
 
-- Nested Pydantic models, `list[...]`, `dict[...]`, or arbitrary objects as **per-cell** values
-- `explode` / `unnest` on non-scalar columns (see `INTERFACE_CONTRACT.md`; list/struct columns are not modeled yet)
+- `list[...]`, `dict[...]`, or arbitrary objects as **per-cell** values (except
+  nested **`BaseModel`** columns as documented above)
+- `explode` / `unnest` on list columns (see `INTERFACE_CONTRACT.md`)
 
 ## When unsupported field types fail
 
-- **`DataFrameModel` subclasses**: each field annotation is validated **when the class is defined** (in `__init_subclass__`). Unsupported types (for example `list[int]`, `dict[str, int]`, `int | str`, or `typing.Any`) raise **`TypeError`** immediately, before `RowModel` is generated. The message lists supported scalar dtypes and points to this page.
-- **`DataFrame[Schema]`** with a hand-written **`Schema`** subclass: the same scalar rules apply in the Rust engine, but there is **no** class-time check on the `Schema` model itself. If an annotation is unsupported, you typically see an error when you **first construct** `DataFrame[YourSchema](...)` (native plan build), or from Pydantic if the annotation is invalid for another reason.
+- **`DataFrameModel` subclasses**: each field annotation is validated **when the class is defined** (in `__init_subclass__`). Unsupported types (for example `list[int]`, `dict[str, int]`, `int | str`, or `typing.Any`) raise **`TypeError`** immediately, before `RowModel` is generated. The message lists supported dtypes and points to this page.
+- **`DataFrame[Schema]`** with a hand-written **`Schema`** subclass: there is **no**
+  class-time check on the `Schema` model (unlike `DataFrameModel`). Unsupported
+  annotations surface when you **first construct** `DataFrame[YourSchema](...)`
+  (native plan build from `schema_fields()`), or from Pydantic during validation.
+  Nested `BaseModel` fields are supported when annotations match what the Rust
+  dtype layer accepts (nested scalars or further nested models).
 
 ## Future / planned types (roadmap direction)
 
@@ -60,7 +134,6 @@ richer schemas and APIs. Ordering and timing follow project priorities (see
 
 | Planned category | Examples | Notes |
 |------------------|----------|--------|
-| **Nested Pydantic models** | `Address`, `Money(amount: Decimal, currency: str)` as a field type on `DataFrameModel` | Struct/object columns: one **nested model instance** per row per column; JSON round-trip, validation, and Rust descriptors for nested shapes. |
 | **Homogeneous list columns** | `list[int]`, `list[str]`, `list[float]` | Enables **`explode`**, list-aware **`unnest`**, and element-wise ops where defined. |
 | **Maps / dict-like cells** | `dict[str, T]` with a fixed value type `T`, or a dedicated **map** dtype | Semi-structured columns; stricter than arbitrary JSON `dict`. |
 | **Enums** | `enum.Enum` or `Literal[...]`-backed fields | Discrete categoricals with stable string/value mapping. |
@@ -70,12 +143,14 @@ richer schemas and APIs. Ordering and timing follow project priorities (see
 | **Time-of-day** | `time` | Distinct from `datetime` and `timedelta`; useful for schedules. |
 | **Geospatial / extension dtypes** | e.g. WKB, GeoJSON-backed types | Only if there is a clear Polars/Arrow story and API surface. |
 
-**Nested models** are the anchor feature: once struct columns exist, list columns of structs and controlled `explode`/`unnest` paths become realistic. Broader **expression typing** for these types will follow the same pattern as scalars: invalid operations fail at AST build time where possible.
+**List columns** build on scalar and struct columns: once list dtypes exist,
+`explode`/`unnest` and element-wise operations can be added in a controlled way.
 
 ## Runtime column payloads (Python)
 
 For **default** construction, columns are typically `dict[str, list]` with one
-Python value per row per column. Lists may be plain `list`, `tuple`, or
+Python value per row per column; **struct** columns use a list of **dicts** (or
+compatible row objects). Lists may be plain `list`, `tuple`, or
 `numpy.ndarray` (see `schema.validate_columns_strict`).
 
 With **`validate_data=False`**, trusted bulk paths may pass **NumPy**, **PyArrow**,

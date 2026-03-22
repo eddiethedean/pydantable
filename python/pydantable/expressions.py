@@ -153,6 +153,10 @@ class Expr:  # type: ignore[override]
         rust_expr = _require_rust_core().expr_string_length(self._rust_expr)
         return Expr(rust_expr=rust_expr)
 
+    def struct_field(self, name: str) -> Expr:
+        rust_expr = _require_rust_core().expr_struct_field(self._rust_expr, name)
+        return Expr(rust_expr=rust_expr)
+
 
 class WhenChain:
     """Chained ``when`` / ``otherwise`` (Spark-style)."""

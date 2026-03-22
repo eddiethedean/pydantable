@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyBool, PyDate, PyDateTime, PyDelta, PyFloat, PyInt, PyString, PyType};
+use pyo3::types::{PyAny, PyBool, PyDate, PyDateTime, PyDelta, PyFloat, PyInt, PyString, PyTuple, PyType};
 
 /// Supported base scalar types for the skeleton expression system.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -15,55 +15,264 @@ pub enum BaseType {
 
 /// DType descriptor for expression typing and nullability.
 ///
-/// - `base == None` is used for an "unknown base" nullable literal (`Literal(None)`).
+/// - Scalar with `base == None` is used for an "unknown base" nullable literal (`Literal(None)`).
 ///   The base must be inferred from the other operand during operator typing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct DTypeDesc {
-    pub base: Option<BaseType>,
-    pub nullable: bool,
+/// - `Struct` represents nested Pydantic models (recursive).
+/// - `List` is a homogeneous list column (`list[T]` / `List[T]`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DTypeDesc {
+    Scalar {
+        base: Option<BaseType>,
+        nullable: bool,
+    },
+    Struct {
+        fields: Vec<(String, DTypeDesc)>,
+        nullable: bool,
+    },
+    List {
+        inner: Box<DTypeDesc>,
+        nullable: bool,
+    },
 }
 
 impl DTypeDesc {
     pub fn unknown_nullable() -> Self {
-        Self {
+        Self::Scalar {
             base: None,
             nullable: true,
         }
     }
 
     pub fn non_nullable(base: BaseType) -> Self {
-        Self {
+        Self::Scalar {
             base: Some(base),
             nullable: false,
         }
     }
 
-    pub fn nullable(base: BaseType) -> Self {
-        Self {
+    pub fn scalar_nullable(base: BaseType) -> Self {
+        Self::Scalar {
             base: Some(base),
             nullable: true,
         }
     }
+
+    /// True for scalar unknown-base nullable literal dtype.
+    pub fn is_scalar_unknown_nullable(&self) -> bool {
+        matches!(
+            self,
+            DTypeDesc::Scalar {
+                base: None,
+                nullable: true,
+            }
+        )
+    }
+
+    pub fn nullable_flag(&self) -> bool {
+        match self {
+            DTypeDesc::Scalar { nullable, .. }
+            | DTypeDesc::Struct { nullable, .. }
+            | DTypeDesc::List { nullable, .. } => *nullable,
+        }
+    }
+
+    /// After assigning `Literal(None)` to a typed column, the column is nullable.
+    pub fn with_assigned_none_nullability(self) -> Self {
+        match self {
+            DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
+                base,
+                nullable: true,
+            },
+            DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
+                fields,
+                nullable: true,
+            },
+            DTypeDesc::List { inner, .. } => DTypeDesc::List {
+                inner,
+                nullable: true,
+            },
+        }
+    }
+
+    #[inline]
+    pub fn is_struct(&self) -> bool {
+        matches!(self, DTypeDesc::Struct { .. })
+    }
+
+    #[inline]
+    pub fn is_list(&self) -> bool {
+        matches!(self, DTypeDesc::List { .. })
+    }
+
+    /// `Some(base_field)` for [`DTypeDesc::Scalar`]; [`None`] for composite dtypes.
+    #[inline]
+    pub fn as_scalar_base_field(&self) -> Option<Option<BaseType>> {
+        match self {
+            DTypeDesc::Scalar { base, .. } => Some(*base),
+            DTypeDesc::Struct { .. } | DTypeDesc::List { .. } => None,
+        }
+    }
+}
+
+pub fn dtype_structural_eq(a: &DTypeDesc, b: &DTypeDesc) -> bool {
+    match (a, b) {
+        (
+            DTypeDesc::Scalar {
+                base: ba,
+                nullable: na,
+            },
+            DTypeDesc::Scalar {
+                base: bb,
+                nullable: nb,
+            },
+        ) => ba == bb && na == nb,
+        (
+            DTypeDesc::Struct {
+                fields: fa,
+                nullable: na,
+            },
+            DTypeDesc::Struct {
+                fields: fb,
+                nullable: nb,
+            },
+        ) => {
+            na == nb
+                && fa.len() == fb.len()
+                && fa
+                    .iter()
+                    .zip(fb.iter())
+                    .all(|((na, da), (nb, db))| na == nb && dtype_structural_eq(da, db))
+        }
+        (
+            DTypeDesc::List {
+                inner: ia,
+                nullable: na,
+            },
+            DTypeDesc::List {
+                inner: ib,
+                nullable: nb,
+            },
+        ) => na == nb && dtype_structural_eq(ia, ib),
+        _ => false,
+    }
 }
 
 fn is_py_type(obj: &Bound<'_, PyAny>, expected: &str) -> bool {
-    // Compare the Python type's `__name__` to avoid identity issues.
-    // This works fine for skeleton-level supported types.
     obj.getattr("__name__")
         .and_then(|v| v.extract::<String>())
         .map(|name| name == expected)
         .unwrap_or(false)
 }
 
+fn unwrap_annotated<'py>(
+    py: Python<'py>,
+    dtype_obj: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let typing = py.import_bound("typing")?;
+    let annotated = typing.getattr("Annotated")?;
+    let mut current = dtype_obj.clone();
+    loop {
+        let origin = typing.call_method1("get_origin", (&current,))?;
+        if origin.is_none() {
+            break;
+        }
+        if origin.eq(&annotated)? {
+            let args = typing.call_method1("get_args", (&current,))?;
+            let tuple = args.downcast::<PyTuple>()?;
+            current = tuple.get_item(0)?;
+        } else {
+            break;
+        }
+    }
+    Ok(current)
+}
+
+fn is_pydantic_model_class(py: Python<'_>, py_type: &Bound<'_, PyType>) -> PyResult<bool> {
+    let pydantic = py.import_bound("pydantic")?;
+    let base_model = pydantic.getattr("BaseModel")?;
+    let builtins = py.import_bound("builtins")?;
+    let issubclass = builtins.getattr("issubclass")?;
+    issubclass
+        .call1((py_type, base_model))?
+        .extract::<bool>()
+}
+
+fn pydantic_model_to_struct_dtype(py: Python<'_>, model_cls: &Bound<'_, PyType>) -> PyResult<DTypeDesc> {
+    let model_fields = model_cls.getattr("model_fields")?;
+    let items = model_fields.call_method0("items")?;
+    let mut fields: Vec<(String, DTypeDesc)> = Vec::new();
+    for item in items.try_iter()? {
+        let item = item?;
+        let tuple = item.downcast::<PyTuple>()?;
+        let name: String = tuple.get_item(0)?.extract()?;
+        let field_info = tuple.get_item(1)?;
+        let annotation = field_info.getattr("annotation")?;
+        let inner = py_annotation_to_dtype(py, &annotation)?;
+        fields.push((name, inner));
+    }
+    Ok(DTypeDesc::Struct {
+        fields,
+        nullable: false,
+    })
+}
+
+/// If `dtype_obj` is `T | None` / `Optional[T]`, return inner `T` and `true`.
+fn unwrap_optional_union<'py>(
+    py: Python<'py>,
+    dtype_obj: &Bound<'py, PyAny>,
+) -> PyResult<(Bound<'py, PyAny>, bool)> {
+    let typing = py.import_bound("typing")?;
+    let get_origin = typing.getattr("get_origin")?;
+    let get_args = typing.getattr("get_args")?;
+    let origin = get_origin.call1((dtype_obj,))?;
+    if origin.is_none() {
+        return Ok((dtype_obj.clone(), false));
+    }
+    let args = get_args.call1((dtype_obj,))?;
+    let tuple = args.downcast::<PyTuple>()?;
+    let mut non_none: Vec<Bound<'_, PyAny>> = Vec::new();
+    let mut saw_none = false;
+    for i in 0..tuple.len() {
+        let arg = tuple.get_item(i)?;
+        if let Ok(t) = arg.downcast::<PyType>() {
+            if is_py_type(t, "NoneType") {
+                saw_none = true;
+                continue;
+            }
+        }
+        non_none.push(arg);
+    }
+    if saw_none && non_none.len() == 1 {
+        return Ok((non_none[0].clone(), true));
+    }
+    Ok((dtype_obj.clone(), false))
+}
+
 pub fn py_annotation_to_dtype(py: Python<'_>, dtype_obj: &Bound<'_, PyAny>) -> PyResult<DTypeDesc> {
-    // Handle direct supported scalar annotations.
-    //
-    // Pydantic schema annotations typically come through as actual Python classes
-    // like `int`, `float`, `bool`, `str`, or as `typing.Optional[T]` which is a
-    // Union[T, NoneType].
+    let unannot = unwrap_annotated(py, dtype_obj)?;
+    let (inner, opt_union) = unwrap_optional_union(py, &unannot)?;
+    let mut dt = py_annotation_to_dtype_impl(py, &inner)?;
+    if opt_union {
+        dt = match dt {
+            DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
+                base,
+                nullable: true,
+            },
+            DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
+                fields,
+                nullable: true,
+            },
+            DTypeDesc::List { inner, .. } => DTypeDesc::List {
+                inner,
+                nullable: true,
+            },
+        };
+    }
+    Ok(dt)
+}
+
+fn py_annotation_to_dtype_impl(py: Python<'_>, dtype_obj: &Bound<'_, PyAny>) -> PyResult<DTypeDesc> {
     if let Ok(py_type) = dtype_obj.downcast::<PyType>() {
-        // Special-case: `bool` must be detected before `int` because `bool` is a
-        // subclass of `int` in Python.
         if is_py_type(py_type, "bool") {
             return Ok(DTypeDesc::non_nullable(BaseType::Bool));
         }
@@ -85,74 +294,101 @@ pub fn py_annotation_to_dtype(py: Python<'_>, dtype_obj: &Bound<'_, PyAny>) -> P
         if is_py_type(py_type, "timedelta") {
             return Ok(DTypeDesc::non_nullable(BaseType::Duration));
         }
-
-        // `type(None)` comes through as a Python type object named "NoneType".
         if is_py_type(py_type, "NoneType") {
             return Ok(DTypeDesc::unknown_nullable());
         }
+
+        if is_pydantic_model_class(py, py_type)? {
+            return pydantic_model_to_struct_dtype(py, py_type);
+        }
     }
 
-    // Optional / Union[T, None] handling via Python's typing module.
-    let typing = py.import("typing")?;
+    let typing = py.import_bound("typing")?;
+    let builtins = py.import_bound("builtins")?;
     let origin = typing.call_method1("get_origin", (dtype_obj,))?;
+    let tuple_binding = typing.call_method1("get_args", (dtype_obj,))?;
+    let tuple = tuple_binding.downcast::<PyTuple>()?;
+
+    if !origin.is_none() {
+        let list_origin = builtins.getattr("list")?;
+        let list_legacy = typing.getattr("List")?;
+        if (origin.eq(&list_origin)? || origin.eq(&list_legacy)?) && tuple.len() == 1 {
+            let inner = py_annotation_to_dtype_impl(py, &tuple.get_item(0)?)?;
+            return Ok(DTypeDesc::List {
+                inner: Box::new(inner),
+                nullable: false,
+            });
+        }
+    }
+
     if origin.is_none() {
         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-            "Unsupported dtype annotation for skeleton.".to_string(),
+            "Unsupported dtype annotation for pydantable.",
         ));
     }
+    let mut seen_none = false;
+    let mut seen_inner: Option<DTypeDesc> = None;
 
-    {
-        // Only support the Optional[T] / Union[T, None] form in the skeleton.
-        let union_args = typing.call_method1("get_args", (dtype_obj,))?;
-        let mut seen_none = false;
-        let mut seen_base: Option<BaseType> = None;
-
-        for arg in union_args.iter()? {
-            let arg = arg?;
-            if let Ok(arg_type) = arg.downcast::<PyType>() {
-                if is_py_type(arg_type, "bool") {
-                    seen_base = Some(BaseType::Bool);
-                } else if is_py_type(arg_type, "int") {
-                    seen_base = Some(BaseType::Int);
-                } else if is_py_type(arg_type, "float") {
-                    seen_base = Some(BaseType::Float);
-                } else if is_py_type(arg_type, "str") {
-                    seen_base = Some(BaseType::Str);
-                } else if is_py_type(arg_type, "datetime") {
-                    seen_base = Some(BaseType::DateTime);
-                } else if is_py_type(arg_type, "date") {
-                    seen_base = Some(BaseType::Date);
-                } else if is_py_type(arg_type, "timedelta") {
-                    seen_base = Some(BaseType::Duration);
-                } else if is_py_type(arg_type, "NoneType") {
-                    seen_none = true;
-                } else {
-                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "Unsupported Optional/Union arg base type.".to_string(),
-                    ));
-                }
+    for i in 0..tuple.len() {
+        let arg = tuple.get_item(i)?;
+        if let Ok(arg_type) = arg.downcast::<PyType>() {
+            if is_py_type(arg_type, "bool") {
+                seen_inner = Some(DTypeDesc::non_nullable(BaseType::Bool));
+            } else if is_py_type(arg_type, "int") {
+                seen_inner = Some(DTypeDesc::non_nullable(BaseType::Int));
+            } else if is_py_type(arg_type, "float") {
+                seen_inner = Some(DTypeDesc::non_nullable(BaseType::Float));
+            } else if is_py_type(arg_type, "str") {
+                seen_inner = Some(DTypeDesc::non_nullable(BaseType::Str));
+            } else if is_py_type(arg_type, "datetime") {
+                seen_inner = Some(DTypeDesc::non_nullable(BaseType::DateTime));
+            } else if is_py_type(arg_type, "date") {
+                seen_inner = Some(DTypeDesc::non_nullable(BaseType::Date));
+            } else if is_py_type(arg_type, "timedelta") {
+                seen_inner = Some(DTypeDesc::non_nullable(BaseType::Duration));
+            } else if is_py_type(arg_type, "NoneType") {
+                seen_none = true;
+            } else if is_pydantic_model_class(py, arg_type)? {
+                seen_inner = Some(pydantic_model_to_struct_dtype(py, arg_type)?);
             } else {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "Unsupported Optional/Union arg (expected a type object).".to_string(),
+                    "Unsupported Optional/Union arg base type.",
                 ));
             }
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Unsupported Optional/Union arg (expected a type object or known annotation).",
+            ));
         }
+    }
 
-        if seen_none {
-            if let Some(base) = seen_base {
-                return Ok(DTypeDesc::nullable(base));
-            }
-            return Ok(DTypeDesc::unknown_nullable());
+    if seen_none {
+        if let Some(inner) = seen_inner {
+            return Ok(match inner {
+                DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
+                    base,
+                    nullable: true,
+                },
+                DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
+                    fields,
+                    nullable: true,
+                },
+                DTypeDesc::List { inner, .. } => DTypeDesc::List {
+                    inner,
+                    nullable: true,
+                },
+            });
         }
+        return Ok(DTypeDesc::unknown_nullable());
     }
 
     Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-        "Unsupported dtype annotation for skeleton.".to_string(),
+        "Unsupported dtype annotation for pydantable.",
     ))
 }
 
 pub fn py_value_to_dtype(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<DTypeDesc> {
-    let _ = py; // reserved for future coercions
+    let _ = py;
     if value.is_none() {
         return Ok(DTypeDesc::unknown_nullable());
     }
@@ -179,52 +415,130 @@ pub fn py_value_to_dtype(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<D
     }
 
     Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-        "Unsupported literal value type for skeleton.".to_string(),
+        "Unsupported literal value type (struct literals are not supported; use column references).",
     ))
 }
 
-pub fn dtype_to_python_type(py: Python<'_>, dtype: DTypeDesc) -> PyResult<PyObject> {
-    let typing = py.import_bound("typing")?;
-    let builtins = py.import_bound("builtins")?;
-
-    let base_type_obj = match dtype.base {
-        Some(BaseType::Int) => builtins.getattr("int")?,
-        Some(BaseType::Float) => builtins.getattr("float")?,
-        Some(BaseType::Bool) => builtins.getattr("bool")?,
-        Some(BaseType::Str) => builtins.getattr("str")?,
-        Some(BaseType::DateTime) => py.import_bound("datetime")?.getattr("datetime")?,
-        Some(BaseType::Date) => py.import_bound("datetime")?.getattr("date")?,
-        Some(BaseType::Duration) => py.import_bound("datetime")?.getattr("timedelta")?,
-        None => {
-            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "Cannot convert unknown-base nullable dtype to a Python schema type.",
-            ))
+fn create_model_for_struct_dtype(
+    py: Python<'_>,
+    dtype: &DTypeDesc,
+    counter: &mut usize,
+) -> PyResult<PyObject> {
+    match dtype {
+        DTypeDesc::Scalar {
+            base: Some(b),
+            nullable,
+        } => {
+            let t = scalar_base_to_py_type(py, *b)?;
+            if *nullable {
+                let typing = py.import_bound("typing")?;
+                let opt = typing.getattr("Optional")?;
+                Ok(opt.get_item(t)?.into_py(py))
+            } else {
+                Ok(t.into_py(py))
+            }
         }
-    };
+        DTypeDesc::Scalar {
+            base: None,
+            ..
+        } => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "Cannot convert unknown-base dtype to a Python schema type.",
+        )),
+        DTypeDesc::List { inner, nullable } => {
+            let builtins = py.import_bound("builtins")?;
+            let list_cls = builtins.getattr("list")?;
+            let inner_ann = create_model_for_struct_dtype(py, inner, counter)?;
+            let list_ann = list_cls.call_method1("__getitem__", (inner_ann,))?;
+            if *nullable {
+                let typing = py.import_bound("typing")?;
+                let opt = typing.getattr("Optional")?;
+                Ok(opt.get_item(list_ann)?.into_py(py))
+            } else {
+                Ok(list_ann.into_py(py))
+            }
+        },
+        DTypeDesc::Struct { fields, nullable } => {
+            let pydantic = py.import_bound("pydantic")?;
+            let create_model = pydantic.getattr("create_model")?;
+            let config_dict = pydantic.getattr("ConfigDict")?;
+            let extra = pyo3::types::PyDict::new_bound(py);
+            extra.set_item("extra", "forbid")?;
+            let mc = config_dict.call1((extra,))?;
 
-    if dtype.nullable {
-        let optional = typing.getattr("Optional")?;
-        // `typing.Optional[T]` uses `__getitem__`.
-        let t = optional.get_item(base_type_obj)?;
-        Ok(t.into_py(py))
-    } else {
-        Ok(base_type_obj.into_py(py))
+            let kwargs = pyo3::types::PyDict::new_bound(py);
+            kwargs.set_item("model_config", &mc)?;
+            for (fname, fd) in fields {
+                let ann = create_model_for_struct_dtype(py, fd, counter)?;
+                let ellipsis = pyo3::types::PyEllipsis::get(py);
+                let tup = pyo3::types::PyTuple::new_bound(py, [ann, ellipsis.into_py(py)]);
+                kwargs.set_item(fname, tup)?;
+            }
+            *counter += 1;
+            let model_name = format!("PydantableStruct{}", counter);
+            let model = create_model.call((model_name,), Some(&kwargs))?;
+            if *nullable {
+                let typing = py.import_bound("typing")?;
+                let opt = typing.getattr("Optional")?;
+                Ok(opt.get_item(model)?.into_py(py))
+            } else {
+                Ok(model.into_py(py))
+            }
+        }
     }
 }
 
-pub fn dtype_to_descriptor_py(py: Python<'_>, dtype: DTypeDesc) -> PyResult<PyObject> {
+fn scalar_base_to_py_type(py: Python<'_>, base: BaseType) -> PyResult<PyObject> {
+    let builtins = py.import_bound("builtins")?;
+    Ok(match base {
+        BaseType::Int => builtins.getattr("int")?.into_py(py),
+        BaseType::Float => builtins.getattr("float")?.into_py(py),
+        BaseType::Bool => builtins.getattr("bool")?.into_py(py),
+        BaseType::Str => builtins.getattr("str")?.into_py(py),
+        BaseType::DateTime => py.import_bound("datetime")?.getattr("datetime")?.into_py(py),
+        BaseType::Date => py.import_bound("datetime")?.getattr("date")?.into_py(py),
+        BaseType::Duration => py.import_bound("datetime")?.getattr("timedelta")?.into_py(py),
+    })
+}
+
+pub fn dtype_to_python_type(py: Python<'_>, dtype: DTypeDesc) -> PyResult<PyObject> {
+    let mut c = 0usize;
+    create_model_for_struct_dtype(py, &dtype, &mut c)
+}
+
+pub fn dtype_to_descriptor_py(py: Python<'_>, dtype: &DTypeDesc) -> PyResult<PyObject> {
     let dict = pyo3::types::PyDict::new_bound(py);
-    let base = match dtype.base {
-        Some(BaseType::Int) => "int",
-        Some(BaseType::Float) => "float",
-        Some(BaseType::Bool) => "bool",
-        Some(BaseType::Str) => "str",
-        Some(BaseType::DateTime) => "datetime",
-        Some(BaseType::Date) => "date",
-        Some(BaseType::Duration) => "duration",
-        None => "unknown",
-    };
-    dict.set_item("base", base)?;
-    dict.set_item("nullable", dtype.nullable)?;
+    match dtype {
+        DTypeDesc::Scalar { base, nullable } => {
+            let base_s = match base {
+                Some(BaseType::Int) => "int",
+                Some(BaseType::Float) => "float",
+                Some(BaseType::Bool) => "bool",
+                Some(BaseType::Str) => "str",
+                Some(BaseType::DateTime) => "datetime",
+                Some(BaseType::Date) => "date",
+                Some(BaseType::Duration) => "duration",
+                None => "unknown",
+            };
+            dict.set_item("base", base_s)?;
+            dict.set_item("nullable", *nullable)?;
+        }
+        DTypeDesc::Struct { fields, nullable } => {
+            dict.set_item("kind", "struct")?;
+            dict.set_item("nullable", *nullable)?;
+            let field_list = pyo3::types::PyList::empty_bound(py);
+            for (name, fd) in fields {
+                let fe = pyo3::types::PyDict::new_bound(py);
+                fe.set_item("name", name)?;
+                fe.set_item("dtype", dtype_to_descriptor_py(py, fd)?)?;
+                field_list.append(fe)?;
+            }
+            dict.set_item("fields", field_list)?;
+        }
+        DTypeDesc::List { inner, nullable } => {
+            dict.set_item("kind", "list")?;
+            dict.set_item("nullable", *nullable)?;
+            dict.set_item("inner", dtype_to_descriptor_py(py, inner)?)?;
+        }
+    }
     Ok(dict.into_py(py))
 }

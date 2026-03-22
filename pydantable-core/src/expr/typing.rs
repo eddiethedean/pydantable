@@ -6,7 +6,7 @@ use std::collections::HashSet;
 
 use pyo3::prelude::*;
 
-use crate::dtype::{BaseType, DTypeDesc};
+use crate::dtype::{dtype_structural_eq, BaseType, DTypeDesc};
 
 use super::ir::{ArithOp, CmpOp, ExprNode, LiteralValue};
 
@@ -34,20 +34,21 @@ fn literal_between_inclusive(x: &LiteralValue, lo: &LiteralValue, hi: &LiteralVa
 impl ExprNode {
     pub fn dtype(&self) -> DTypeDesc {
         match self {
-            ExprNode::ColumnRef { dtype, .. } => *dtype,
-            ExprNode::Literal { dtype, .. } => *dtype,
-            ExprNode::BinaryOp { dtype, .. } => *dtype,
-            ExprNode::CompareOp { dtype, .. } => *dtype,
-            ExprNode::Cast { dtype, .. } => *dtype,
-            ExprNode::IsNull { dtype, .. } => *dtype,
-            ExprNode::IsNotNull { dtype, .. } => *dtype,
+            ExprNode::ColumnRef { dtype, .. } => dtype.clone(),
+            ExprNode::Literal { dtype, .. } => dtype.clone(),
+            ExprNode::BinaryOp { dtype, .. } => dtype.clone(),
+            ExprNode::CompareOp { dtype, .. } => dtype.clone(),
+            ExprNode::Cast { dtype, .. } => dtype.clone(),
+            ExprNode::IsNull { dtype, .. } => dtype.clone(),
+            ExprNode::IsNotNull { dtype, .. } => dtype.clone(),
             ExprNode::Coalesce { dtype, .. }
             | ExprNode::CaseWhen { dtype, .. }
             | ExprNode::InList { dtype, .. }
             | ExprNode::Between { dtype, .. }
             | ExprNode::StringConcat { dtype, .. }
             | ExprNode::Substring { dtype, .. }
-            | ExprNode::StringLength { dtype, .. } => *dtype,
+            | ExprNode::StringLength { dtype, .. }
+            | ExprNode::StructField { dtype, .. } => dtype.clone(),
         }
     }
 
@@ -115,15 +116,22 @@ impl ExprNode {
                 out
             }
             ExprNode::StringLength { inner, .. } => inner.referenced_columns(),
+            ExprNode::StructField { base, .. } => base.referenced_columns(),
         }
     }
 
     fn infer_arith_dtype(op: ArithOp, left: DTypeDesc, right: DTypeDesc) -> PyResult<DTypeDesc> {
-        let nullable = left.nullable || right.nullable;
+        if left.is_struct() || right.is_struct() || left.is_list() || right.is_list() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Arithmetic operators do not support struct- or list-typed columns.",
+            ));
+        }
+        let nullable = left.nullable_flag() || right.nullable_flag();
+        let left_b = left.as_scalar_base_field().unwrap();
+        let right_b = right.as_scalar_base_field().unwrap();
 
-        let inferred_base = match (left.base, right.base) {
+        let inferred_base = match (left_b, right_b) {
             (Some(a), Some(b)) => {
-                // Only numeric base types are valid here.
                 let valid = matches!(
                     (a, b),
                     (BaseType::Int, BaseType::Int | BaseType::Float)
@@ -159,31 +167,50 @@ impl ExprNode {
             )
         })?;
 
-        // Division always returns float in this skeleton.
         if op == ArithOp::Div {
-            return Ok(DTypeDesc {
+            return Ok(DTypeDesc::Scalar {
                 base: Some(BaseType::Float),
                 nullable,
             });
         }
 
-        Ok(DTypeDesc {
+        Ok(DTypeDesc::Scalar {
             base: Some(inferred_base),
             nullable,
         })
     }
 
     fn infer_compare_dtype(op: CmpOp, left: DTypeDesc, right: DTypeDesc) -> PyResult<DTypeDesc> {
-        let nullable = left.nullable || right.nullable;
+        let nullable = left.nullable_flag() || right.nullable_flag();
 
         match op {
             CmpOp::Eq | CmpOp::Ne => {
-                // Allowed equality combinations:
-                // - numeric vs numeric (int/float)
-                // - bool vs bool
-                // - str vs str
-                let inferred_left_base = left.base.or(right.base);
-                let inferred_right_base = right.base.or(left.base);
+                if left.is_struct() && right.is_struct() {
+                    if !dtype_structural_eq(&left, &right) {
+                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                            "Equality requires structurally equal struct dtypes.",
+                        ));
+                    }
+                    return Ok(DTypeDesc::Scalar {
+                        base: Some(BaseType::Bool),
+                        nullable,
+                    });
+                }
+                if left.is_struct() || right.is_struct() {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Cannot compare struct columns to scalar columns.",
+                    ));
+                }
+                if left.is_list() || right.is_list() {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Equality comparisons for list columns are not supported yet.",
+                    ));
+                }
+
+                let lb = left.as_scalar_base_field().unwrap();
+                let rb = right.as_scalar_base_field().unwrap();
+                let inferred_left_base = lb.or(rb);
+                let inferred_right_base = rb.or(lb);
                 let (lb, rb) = match (inferred_left_base, inferred_right_base) {
                     (Some(a), Some(b)) => (a, b),
                     (None, None) => {
@@ -206,21 +233,26 @@ impl ExprNode {
 
                 if !allowed {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "Equality requires numeric-numeric, bool-bool, or str-str operands.",
+                        "Equality requires compatible scalar operands or matching struct dtypes.",
                     ));
                 }
 
-                Ok(DTypeDesc {
+                Ok(DTypeDesc::Scalar {
                     base: Some(BaseType::Bool),
                     nullable,
                 })
             }
             CmpOp::Lt | CmpOp::Le | CmpOp::Gt | CmpOp::Ge => {
-                // Allowed ordering:
-                // - numeric vs numeric
-                // - str vs str
-                let inferred_left_base = left.base.or(right.base);
-                let inferred_right_base = right.base.or(left.base);
+                if left.is_struct() || right.is_struct() || left.is_list() || right.is_list() {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Ordering comparisons do not support struct- or list-typed columns.",
+                    ));
+                }
+
+                let lb = left.as_scalar_base_field().unwrap();
+                let rb = right.as_scalar_base_field().unwrap();
+                let inferred_left_base = lb.or(rb);
+                let inferred_right_base = rb.or(lb);
                 let (lb, rb) = match (inferred_left_base, inferred_right_base) {
                     (Some(a), Some(b)) => (a, b),
                     (None, None) => {
@@ -247,7 +279,7 @@ impl ExprNode {
                     ));
                 }
 
-                Ok(DTypeDesc {
+                Ok(DTypeDesc::Scalar {
                     base: Some(BaseType::Bool),
                     nullable,
                 })
@@ -256,25 +288,50 @@ impl ExprNode {
     }
 
     pub fn make_column_ref(name: String, dtype: DTypeDesc) -> PyResult<Self> {
-        if dtype.base.is_none() {
+        if dtype.is_scalar_unknown_nullable() {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "ColumnRef dtype cannot have unknown base.",
+                "ColumnRef dtype cannot have unknown scalar base.",
             ));
         }
         Ok(ExprNode::ColumnRef { name, dtype })
     }
 
     pub fn make_literal(value: Option<LiteralValue>, dtype: DTypeDesc) -> PyResult<Self> {
-        if value.is_none() && dtype.base.is_some() {
-            // Literal(None) should correspond to unknown base nullable.
-            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "Literal(None) must have unknown-base nullable dtype.",
-            ));
-        }
-        if value.is_some() && dtype.base.is_none() {
-            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "Non-None Literal must have a known base dtype.",
-            ));
+        match (&value, &dtype) {
+            (None, DTypeDesc::Scalar { base: None, .. }) => {}
+            (None, DTypeDesc::Scalar { base: Some(_), .. }) => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Literal(None) must use unknown-base nullable dtype or a nullable struct column type.",
+                ));
+            }
+            (None, DTypeDesc::Struct { nullable: true, .. }) => {}
+            (None, DTypeDesc::Struct { nullable: false, .. }) => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Literal(None) cannot target a non-nullable struct column.",
+                ));
+            }
+            (None, DTypeDesc::List { nullable: true, .. }) => {}
+            (None, DTypeDesc::List { nullable: false, .. }) => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Literal(None) cannot target a non-nullable list column.",
+                ));
+            }
+            (Some(_), DTypeDesc::Scalar { base: None, .. }) => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Non-None Literal must have a known scalar base dtype.",
+                ));
+            }
+            (Some(_), DTypeDesc::Struct { .. }) => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Struct literals are not supported; use column references.",
+                ));
+            }
+            (Some(_), DTypeDesc::List { .. }) => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "List literals are not supported; use column references.",
+                ));
+            }
+            (Some(_), _) => {}
         }
         Ok(ExprNode::Literal { value, dtype })
     }
@@ -300,16 +357,35 @@ impl ExprNode {
     }
 
     pub fn make_cast(input: ExprNode, target: DTypeDesc) -> PyResult<Self> {
-        let base = target.base.ok_or_else(|| {
-            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "cast() target dtype must have known base.",
-            )
-        })?;
-        let in_base = input.dtype().base.ok_or_else(|| {
-            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "cast() input dtype must have known base.",
-            )
-        })?;
+        if target.is_struct()
+            || input.dtype().is_struct()
+            || target.is_list()
+            || input.dtype().is_list()
+        {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() does not support struct or list dtypes.",
+            ));
+        }
+        let base = match &target {
+            DTypeDesc::Scalar {
+                base: Some(b), ..
+            } => *b,
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "cast() target dtype must have known base.",
+                ));
+            }
+        };
+        let in_base = match input.dtype() {
+            DTypeDesc::Scalar {
+                base: Some(b), ..
+            } => b,
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "cast() input dtype must have known base.",
+                ));
+            }
+        };
         let allowed = matches!(
             (in_base, base),
             (
@@ -331,12 +407,12 @@ impl ExprNode {
                 "cast() unsupported primitive conversion.",
             ));
         }
-        let input_nullable = input.dtype().nullable;
+        let input_nullable = input.dtype().nullable_flag();
         Ok(ExprNode::Cast {
             input: Box::new(input),
-            dtype: DTypeDesc {
+            dtype: DTypeDesc::Scalar {
                 base: Some(base),
-                nullable: input_nullable || target.nullable,
+                nullable: input_nullable || target.nullable_flag(),
             },
         })
     }
@@ -362,22 +438,27 @@ impl ExprNode {
             ));
         }
         let mut nullable = false;
-        let first_base = exprs[0].dtype().base.ok_or_else(|| {
+        if exprs.iter().any(|e| e.dtype().is_struct() || e.dtype().is_list()) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "coalesce() does not support struct or list dtypes.",
+            ));
+        }
+        let first_base = exprs[0].dtype().as_scalar_base_field().flatten().ok_or_else(|| {
             PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "coalesce() requires expressions with known dtypes.",
             )
         })?;
         for e in &exprs {
-            if e.dtype().base != Some(first_base) {
+            if e.dtype().as_scalar_base_field().flatten() != Some(first_base) {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "coalesce() requires compatible scalar dtypes.",
                 ));
             }
-            nullable |= e.dtype().nullable;
+            nullable |= e.dtype().nullable_flag();
         }
         Ok(ExprNode::Coalesce {
             exprs,
-            dtype: DTypeDesc {
+            dtype: DTypeDesc::Scalar {
                 base: Some(first_base),
                 nullable,
             },
@@ -390,21 +471,31 @@ impl ExprNode {
                 "case_when() requires at least one branch.",
             ));
         }
-        let mut nullable = else_.dtype().nullable;
-        let first_base = branches[0].1.dtype().base.ok_or_else(|| {
+        if else_.dtype().is_struct()
+            || else_.dtype().is_list()
+            || branches
+                .iter()
+                .any(|(_, t)| t.dtype().is_struct() || t.dtype().is_list())
+        {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "case_when() does not support struct or list dtypes.",
+            ));
+        }
+        let mut nullable = else_.dtype().nullable_flag();
+        let first_base = branches[0].1.dtype().as_scalar_base_field().flatten().ok_or_else(|| {
             PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "case_when() requires then-branches with known dtypes.",
             )
         })?;
         for (_, t) in &branches {
-            if t.dtype().base != Some(first_base) {
+            if t.dtype().as_scalar_base_field().flatten() != Some(first_base) {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "case_when() requires compatible then dtypes.",
                 ));
             }
-            nullable |= t.dtype().nullable;
+            nullable |= t.dtype().nullable_flag();
         }
-        if else_.dtype().base != Some(first_base) {
+        if else_.dtype().as_scalar_base_field().flatten() != Some(first_base) {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "case_when() else branch dtype must match then branches.",
             ));
@@ -412,7 +503,7 @@ impl ExprNode {
         Ok(ExprNode::CaseWhen {
             branches,
             else_: Box::new(else_),
-            dtype: DTypeDesc {
+            dtype: DTypeDesc::Scalar {
                 base: Some(first_base),
                 nullable,
             },
@@ -420,7 +511,12 @@ impl ExprNode {
     }
 
     pub fn make_in_list(inner: ExprNode, values: Vec<LiteralValue>) -> PyResult<Self> {
-        let ib = inner.dtype().base.ok_or_else(|| {
+        if inner.dtype().is_struct() || inner.dtype().is_list() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "isin() does not support struct or list dtypes.",
+            ));
+        }
+        let ib = inner.dtype().as_scalar_base_field().flatten().ok_or_else(|| {
             PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "isin() requires a column expression with known dtype.",
             )
@@ -454,10 +550,23 @@ impl ExprNode {
     }
 
     pub fn make_between(inner: ExprNode, low: ExprNode, high: ExprNode) -> PyResult<Self> {
-        let ib = inner.dtype().base.ok_or_else(|| {
+        if inner.dtype().is_struct()
+            || inner.dtype().is_list()
+            || low.dtype().is_struct()
+            || low.dtype().is_list()
+            || high.dtype().is_struct()
+            || high.dtype().is_list()
+        {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "between() does not support struct or list dtypes.",
+            ));
+        }
+        let ib = inner.dtype().as_scalar_base_field().flatten().ok_or_else(|| {
             PyErr::new::<pyo3::exceptions::PyTypeError, _>("between() requires known inner dtype.")
         })?;
-        if low.dtype().base != Some(ib) || high.dtype().base != Some(ib) {
+        if low.dtype().as_scalar_base_field().flatten() != Some(ib)
+            || high.dtype().as_scalar_base_field().flatten() != Some(ib)
+        {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "between() bounds must match inner dtype.",
             ));
@@ -477,16 +586,19 @@ impl ExprNode {
             ));
         }
         for p in &parts {
-            if p.dtype().base != Some(BaseType::Str) {
+            if p.dtype().is_struct()
+                || p.dtype().is_list()
+                || p.dtype().as_scalar_base_field().flatten() != Some(BaseType::Str)
+            {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "concat() requires string-typed expressions.",
                 ));
             }
         }
-        let nullable = parts.iter().any(|p| p.dtype().nullable);
+        let nullable = parts.iter().any(|p| p.dtype().nullable_flag());
         Ok(ExprNode::StringConcat {
             parts,
-            dtype: DTypeDesc {
+            dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Str),
                 nullable,
             },
@@ -498,31 +610,43 @@ impl ExprNode {
         start: ExprNode,
         length: Option<ExprNode>,
     ) -> PyResult<Self> {
-        if inner.dtype().base != Some(BaseType::Str) {
+        if inner.dtype().is_struct()
+            || inner.dtype().is_list()
+            || inner.dtype().as_scalar_base_field().flatten() != Some(BaseType::Str)
+        {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "substring() requires a string column.",
             ));
         }
-        if start.dtype().base != Some(BaseType::Int) {
+        if start.dtype().is_struct()
+            || start.dtype().is_list()
+            || start.dtype().as_scalar_base_field().flatten() != Some(BaseType::Int)
+        {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "substring() start must be int.",
             ));
         }
         if let Some(l) = &length {
-            if l.dtype().base != Some(BaseType::Int) {
+            if l.dtype().is_struct()
+                || l.dtype().is_list()
+                || l.dtype().as_scalar_base_field().flatten() != Some(BaseType::Int)
+            {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "substring() length must be int.",
                 ));
             }
         }
-        let nullable = inner.dtype().nullable
-            || start.dtype().nullable
-            || length.as_ref().map(|l| l.dtype().nullable).unwrap_or(false);
+        let nullable = inner.dtype().nullable_flag()
+            || start.dtype().nullable_flag()
+            || length
+                .as_ref()
+                .map(|l| l.dtype().nullable_flag())
+                .unwrap_or(false);
         Ok(ExprNode::Substring {
             inner: Box::new(inner),
             start: Box::new(start),
             length: length.map(Box::new),
-            dtype: DTypeDesc {
+            dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Str),
                 nullable,
             },
@@ -530,18 +654,65 @@ impl ExprNode {
     }
 
     pub fn make_string_length(inner: ExprNode) -> PyResult<Self> {
-        if inner.dtype().base != Some(BaseType::Str) {
+        if inner.dtype().is_struct()
+            || inner.dtype().is_list()
+            || inner.dtype().as_scalar_base_field().flatten() != Some(BaseType::Str)
+        {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "length() requires a string column.",
             ));
         }
-        let nullable = inner.dtype().nullable;
+        let nullable = inner.dtype().nullable_flag();
         Ok(ExprNode::StringLength {
             inner: Box::new(inner),
-            dtype: DTypeDesc {
+            dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable,
             },
+        })
+    }
+
+    pub fn make_struct_field(inner: ExprNode, field: String) -> PyResult<Self> {
+        let dtype = match inner.dtype() {
+            DTypeDesc::Struct {
+                fields,
+                nullable: struct_nullable,
+            } => {
+                let (_, fd) = fields.iter().find(|(n, _)| n == &field).ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+                        "Unknown struct field {:?}.",
+                        field
+                    ))
+                })?;
+                let mut out = fd.clone();
+                if struct_nullable {
+                    out = match out {
+                        DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
+                            base,
+                            nullable: true,
+                        },
+                        DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
+                            fields,
+                            nullable: true,
+                        },
+                        DTypeDesc::List { inner, .. } => DTypeDesc::List {
+                            inner,
+                            nullable: true,
+                        },
+                    };
+                }
+                out
+            }
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "struct_field() requires a struct-typed expression.",
+                ));
+            }
+        };
+        Ok(ExprNode::StructField {
+            base: Box::new(inner),
+            field,
+            dtype,
         })
     }
 
@@ -580,11 +751,16 @@ impl ExprNode {
                 let rvals = right.eval(ctx, n)?;
                 let mut out: Vec<Option<LiteralValue>> = Vec::with_capacity(n);
 
-                let result_base = dtype.base.ok_or_else(|| {
-                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "BinaryOp result dtype base cannot be unknown.",
-                    )
-                })?;
+                let result_base = match dtype {
+                    DTypeDesc::Scalar {
+                        base: Some(b), ..
+                    } => *b,
+                    _ => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                            "BinaryOp result dtype base cannot be unknown.",
+                        ));
+                    }
+                };
 
                 for (a, b) in lvals.into_iter().zip(rvals.into_iter()) {
                     match (a, b) {
@@ -660,8 +836,8 @@ impl ExprNode {
                 let mut out: Vec<Option<LiteralValue>> = Vec::with_capacity(n);
 
                 // Decide comparison mode based on operand base types from child dtypes.
-                let left_base = left.dtype().base;
-                let right_base = right.dtype().base;
+                let left_base = left.dtype().as_scalar_base_field().flatten();
+                let right_base = right.dtype().as_scalar_base_field().flatten();
                 let effective_base = left_base.or(right_base).ok_or_else(|| {
                     PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "Comparison operand base cannot be unknown.",
@@ -951,11 +1127,16 @@ impl ExprNode {
             ExprNode::Cast { input, dtype } => {
                 let vals = input.eval(ctx, n)?;
                 let mut out = Vec::with_capacity(n);
-                let target = dtype.base.ok_or_else(|| {
-                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "cast() target dtype must have known base.",
-                    )
-                })?;
+                let target = match dtype {
+                    DTypeDesc::Scalar {
+                        base: Some(b), ..
+                    } => *b,
+                    _ => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                            "cast() target dtype must have known base.",
+                        ));
+                    }
+                };
                 for v in vals.into_iter() {
                     match v {
                         None => out.push(None),
@@ -1163,6 +1344,12 @@ impl ExprNode {
                     })
                     .collect())
             }
+            ExprNode::StructField { .. } => Err(PyErr::new::<
+                pyo3::exceptions::PyNotImplementedError,
+                _,
+            >(
+                "Struct field access is only supported with the Polars execution engine.",
+            )),
         }
     }
 }

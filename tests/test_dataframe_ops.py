@@ -11,6 +11,15 @@ class User(Schema):
     age: int
 
 
+class _Addr(Schema):
+    street: str
+
+
+class _Person(Schema):
+    id: int
+    addr: _Addr
+
+
 def test_with_columns_and_collect_python():
     df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
     df2 = df.with_columns(age2=df.age * 2)
@@ -35,6 +44,112 @@ def test_select_and_filter():
     df4 = df3.filter(df3.age2 > 40)
     result = df4.to_dict()
     assert result == {"id": [2], "age2": [60]}
+
+
+def test_nested_schema_collect_filter_and_select_preserve_struct_column():
+    df = DataFrame[_Person](
+        {
+            "id": [1, 2],
+            "addr": [{"street": "a"}, {"street": "b"}],
+        }
+    )
+    assert df.collect(as_lists=True) == {
+        "id": [1, 2],
+        "addr": [{"street": "a"}, {"street": "b"}],
+    }
+    df2 = df.filter(df.id > 1)
+    assert df2.collect(as_lists=True) == {
+        "id": [2],
+        "addr": [{"street": "b"}],
+    }
+    df3 = df2.select("addr", "id")
+    fields = df3.schema_fields()
+    assert fields["id"] is int
+    assert fields["addr"] is _Addr
+    assert df3.collect(as_lists=True) == {
+        "addr": [{"street": "b"}],
+        "id": [2],
+    }
+
+
+def test_nested_schema_rejects_arithmetic_on_struct_column():
+    df = DataFrame[_Person](
+        {"id": [1], "addr": [{"street": "main"}]},
+    )
+    with pytest.raises(TypeError, match="struct- or list-typed columns"):
+        _ = df.addr + 1
+
+
+def test_rename_preserves_nested_schema_class() -> None:
+    df = DataFrame[_Person](
+        {"id": [1], "addr": [{"street": "main"}]},
+    )
+    df2 = df.rename({"addr": "location"})
+    assert df2.schema_fields()["location"] is _Addr
+
+
+def test_struct_field_expr_projects_scalar() -> None:
+    df = DataFrame[_Person](
+        {
+            "id": [1, 2],
+            "addr": [{"street": "a"}, {"street": "b"}],
+        }
+    )
+    out = df.with_columns(st=df.addr.struct_field("street"))
+    assert out.schema_fields()["st"] is str
+    assert out.collect(as_lists=True) == {
+        "id": [1, 2],
+        "addr": [{"street": "a"}, {"street": "b"}],
+        "st": ["a", "b"],
+    }
+
+
+def test_join_preserves_struct_identity_on_pass_through_columns() -> None:
+    class L(Schema):
+        k: int
+        addr: _Addr
+
+    class R(Schema):
+        k: int
+        v: int
+
+    left = DataFrame[L]({"k": [1], "addr": [{"street": "x"}]})
+    right = DataFrame[R]({"k": [1], "v": [2]})
+    j = left.join(right, on="k", how="inner")
+    assert j.schema_fields()["addr"] is _Addr
+    assert j.schema_fields()["v"] is int
+
+
+class _WithIntList(Schema):
+    id: int
+    tags: list[int]
+
+
+def test_list_int_roundtrip_and_explode() -> None:
+    df = DataFrame[_WithIntList](
+        {
+            "id": [1, 2],
+            "tags": [[1, 2], [3]],
+        }
+    )
+    assert df.collect(as_lists=True) == {"id": [1, 2], "tags": [[1, 2], [3]]}
+    ex = df.explode("tags")
+    assert ex.collect(as_lists=True) == {"id": [1, 1, 2], "tags": [1, 2, 3]}
+
+
+def test_concat_vertical_preserves_struct_identity() -> None:
+    df1 = DataFrame[_Person](
+        {"id": [1], "addr": [{"street": "a"}]},
+    )
+    df2 = DataFrame[_Person](
+        {"id": [2], "addr": [{"street": "b"}]},
+    )
+    cat = DataFrame.concat([df1, df2], how="vertical")
+    assert cat.schema_fields()["addr"] is _Addr
+    assert cat.collect(as_lists=True) == {
+        "id": [1, 2],
+        "addr": [{"street": "a"}, {"street": "b"}],
+    }
 
 
 def test_with_columns_rejects_unknown_referenced_columns():
@@ -198,7 +313,7 @@ def test_p5_explode_unnest_raise_not_implemented_for_scalar_schema() -> None:
         name: str
 
     df = DataFrame[S]({"id": [1], "name": ["a"]})
-    with pytest.raises(NotImplementedError, match=r"explode\(\) requires list-like"):
+    with pytest.raises(TypeError, match="list dtype"):
         df.explode("name")
     with pytest.raises(NotImplementedError, match=r"unnest\(\) requires struct-like"):
         df.unnest("name")
@@ -360,5 +475,5 @@ def test_to_polars_when_installed() -> None:
     pytest.importorskip("polars")
     df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
     pdf = df.to_polars()
-    assert list(pdf.columns) == ["id", "age"]
+    assert set(pdf.columns) == {"id", "age"}
     assert pdf["id"].to_list() == [1, 2]

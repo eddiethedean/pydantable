@@ -94,9 +94,9 @@ fn make_column_ref(
     dtype_annotation: &Bound<'_, PyAny>,
 ) -> PyResult<PyExpr> {
     let dtype: DTypeDesc = py_annotation_to_dtype(py, dtype_annotation)?;
-    if dtype.base.is_none() {
+    if dtype.is_scalar_unknown_nullable() {
         return Err(pyo3::exceptions::PyTypeError::new_err(
-            "ColumnRef dtype cannot have unknown base.",
+            "ColumnRef dtype cannot have unknown scalar base.",
         ));
     }
     Ok(PyExpr {
@@ -250,6 +250,13 @@ fn expr_substring(
 fn expr_string_length(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
     Ok(PyExpr {
         node: ExprNode::make_string_length(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_struct_field(inner: Bound<'_, PyExpr>, field: String) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_struct_field(inner.borrow().node.clone(), field)?,
     })
 }
 
@@ -702,6 +709,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr_string_concat, m)?)?;
     m.add_function(wrap_pyfunction!(expr_substring, m)?)?;
     m.add_function(wrap_pyfunction!(expr_string_length, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_struct_field, m)?)?;
     m.add_function(wrap_pyfunction!(make_plan, m)?)?;
     m.add_function(wrap_pyfunction!(plan_select, m)?)?;
     m.add_function(wrap_pyfunction!(plan_with_columns, m)?)?;
