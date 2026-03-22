@@ -6,7 +6,10 @@ use std::io::Cursor;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDate, PyDateTime, PyDelta, PyDict, PyList};
 
-use crate::dtype::{BaseType, DTypeDesc};
+use crate::dtype::{
+    py_decimal_to_scaled_i128, py_enum_to_wire_string, scaled_i128_to_py_decimal, BaseType, DTypeDesc,
+    DECIMAL_PRECISION, DECIMAL_SCALE,
+};
 use crate::expr::LiteralValue;
 
 use super::ir::{PlanInner, PlanStep};
@@ -15,11 +18,12 @@ use super::schema_py::schema_descriptors_as_py;
 use polars::chunked_array::builder::get_list_builder;
 use polars::lazy::dsl::{col, cols, lit, when, Expr as PolarsExpr};
 use polars::prelude::{
-    AnyValue, BooleanChunked, CrossJoin, DataFrame, DataType, ExplodeOptions, Field, FillNullStrategy,
-    Float64Chunked, Int32Chunked, Int64Chunked, IntoColumn, IntoLazy, IntoSeries, JoinArgs, JoinType,
-    LazyFrame, MaintainOrderJoin, NamedFrom, NewChunkedArray, PlSmallStr, PolarsError, Series,
-    SortMultipleOptions, StringChunked, StructChunked, TimeUnit, UniqueKeepStrategy, UnpivotArgsDSL,
-    NULL,
+    AnyValue, BooleanChunked, CrossJoin, DataFrame, DataType, ExplodeOptions, Field,
+    FillNullStrategy, Float64Chunked, Int32Chunked, Int64Chunked, Int128Chunked, IntoColumn,
+    IntoLazy, IntoSeries, JoinArgs, JoinType, LazyFrame, Literal, MaintainOrderJoin, NamedFrom,
+    NewChunkedArray, PlSmallStr, PolarsError, Scalar, Series, SortMultipleOptions, StringChunked,
+    StructChunked, TimeUnit,
+    UniqueKeepStrategy, UnpivotArgsDSL, NULL,
 };
 use polars_io::ipc::{IpcReader, IpcWriter};
 use polars_io::prelude::{SerReader, SerWriter};
@@ -47,9 +51,7 @@ fn try_series_from_numpy(
     }
     let kind: String = obj.getattr("dtype")?.getattr("kind")?.extract()?;
     let base = match dtype {
-        DTypeDesc::Scalar {
-            base: Some(b), ..
-        } => b,
+        DTypeDesc::Scalar { base: Some(b), .. } => b,
         _ => return Ok(None),
     };
     let name_pl: PlSmallStr = name.into();
@@ -198,14 +200,33 @@ fn micros_to_py_timedelta(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
 }
 
 #[cfg(feature = "polars_engine")]
-fn py_row_get_field<'py>(
-    item: &Bound<'py, PyAny>,
-    fname: &str,
-) -> PyResult<Bound<'py, PyAny>> {
+fn py_row_get_field<'py>(item: &Bound<'py, PyAny>, fname: &str) -> PyResult<Bound<'py, PyAny>> {
     if let Ok(d) = item.downcast::<PyDict>() {
         return d.call_method1("get", (fname, item.py().None()));
     }
     item.getattr(fname)
+}
+
+/// Canonical UUID string for `uuid.UUID` or `str` cells (logical `BaseType::Uuid`).
+#[cfg(feature = "polars_engine")]
+fn py_extract_uuid_canonical(item: &Bound<'_, PyAny>) -> PyResult<String> {
+    if let Ok(s) = item.extract::<String>() {
+        return Ok(s);
+    }
+    let py = item.py();
+    let builtins = py.import_bound("builtins")?;
+    let isinstance = builtins.getattr("isinstance")?;
+    let uuid_cls = py.import_bound("uuid")?.getattr("UUID")?;
+    if isinstance
+        .call1((item, &uuid_cls))?
+        .extract::<bool>()
+        .unwrap_or(false)
+    {
+        return item.str()?.extract();
+    }
+    Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+        "UUID column cells must be uuid.UUID or str.",
+    ))
 }
 
 /// Map a pydantable dtype to a Polars [`DataType`] for list builders and validation.
@@ -225,9 +246,17 @@ fn dtype_desc_to_polars_data_type(d: &DTypeDesc) -> PyResult<DataType> {
             ..
         } => Ok(DataType::Boolean),
         DTypeDesc::Scalar {
-            base: Some(BaseType::Str),
+            base: Some(BaseType::Str | BaseType::Enum),
             ..
         } => Ok(DataType::String),
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Uuid),
+            ..
+        } => Ok(DataType::String),
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Decimal),
+            ..
+        } => Ok(DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE)),
         DTypeDesc::Scalar {
             base: Some(BaseType::DateTime),
             ..
@@ -240,12 +269,11 @@ fn dtype_desc_to_polars_data_type(d: &DTypeDesc) -> PyResult<DataType> {
             base: Some(BaseType::Duration),
             ..
         } => Ok(DataType::Duration(TimeUnit::Microseconds)),
-        DTypeDesc::Scalar {
-            base: None,
-            ..
-        } => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-            "Root schema cannot have unknown-base dtype.",
-        )),
+        DTypeDesc::Scalar { base: None, .. } => {
+            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Root schema cannot have unknown-base dtype.",
+            ))
+        }
         DTypeDesc::Struct { fields, .. } => {
             let sub: Vec<Field> = fields
                 .iter()
@@ -285,8 +313,7 @@ fn py_list_to_series(
                     v.push(Some(item.extract::<i64>()?));
                 }
             }
-            let ca: Int64Chunked =
-                Int64Chunked::from_iter_options(name.into(), v.into_iter());
+            let ca: Int64Chunked = Int64Chunked::from_iter_options(name.into(), v.into_iter());
             Ok(ca.into_series())
         }
         DTypeDesc::Scalar {
@@ -301,8 +328,7 @@ fn py_list_to_series(
                     v.push(Some(item.extract::<f64>()?));
                 }
             }
-            let ca: Float64Chunked =
-                Float64Chunked::from_iter_options(name.into(), v.into_iter());
+            let ca: Float64Chunked = Float64Chunked::from_iter_options(name.into(), v.into_iter());
             Ok(ca.into_series())
         }
         DTypeDesc::Scalar {
@@ -317,8 +343,7 @@ fn py_list_to_series(
                     v.push(Some(item.extract::<bool>()?));
                 }
             }
-            let ca: BooleanChunked =
-                BooleanChunked::from_iter_options(name.into(), v.into_iter());
+            let ca: BooleanChunked = BooleanChunked::from_iter_options(name.into(), v.into_iter());
             Ok(ca.into_series())
         }
         DTypeDesc::Scalar {
@@ -333,9 +358,57 @@ fn py_list_to_series(
                     v.push(Some(item.extract::<String>()?));
                 }
             }
-            let ca: StringChunked =
-                StringChunked::from_iter_options(name.into(), v.into_iter());
+            let ca: StringChunked = StringChunked::from_iter_options(name.into(), v.into_iter());
             Ok(ca.into_series())
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Enum),
+            ..
+        } => {
+            let mut v: Vec<Option<String>> = Vec::with_capacity(list.len());
+            for item in list.iter() {
+                if item.is_none() {
+                    v.push(None);
+                } else {
+                    v.push(Some(py_enum_to_wire_string(&item)?));
+                }
+            }
+            let ca: StringChunked = StringChunked::from_iter_options(name.into(), v.into_iter());
+            Ok(ca.into_series())
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Uuid),
+            ..
+        } => {
+            let mut v: Vec<Option<String>> = Vec::with_capacity(list.len());
+            for item in list.iter() {
+                if item.is_none() {
+                    v.push(None);
+                } else {
+                    v.push(Some(py_extract_uuid_canonical(&item)?));
+                }
+            }
+            let ca: StringChunked = StringChunked::from_iter_options(name.into(), v.into_iter());
+            Ok(ca.into_series())
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Decimal),
+            ..
+        } => {
+            let mut v: Vec<Option<i128>> = Vec::with_capacity(list.len());
+            for item in list.iter() {
+                if item.is_none() {
+                    v.push(None);
+                } else {
+                    v.push(Some(py_decimal_to_scaled_i128(&item)?));
+                }
+            }
+            Ok(
+                Int128Chunked::from_iter_options(PlSmallStr::from(name), v.into_iter())
+                    .into_decimal(DECIMAL_PRECISION, DECIMAL_SCALE)
+                    .map_err(polars_err)?
+                    .into_series(),
+            )
         }
         DTypeDesc::Scalar {
             base: Some(BaseType::DateTime),
@@ -349,8 +422,7 @@ fn py_list_to_series(
                     v.push(Some(py_datetime_to_micros(&item)?));
                 }
             }
-            let base: Int64Chunked =
-                Int64Chunked::from_iter_options(name.into(), v.into_iter());
+            let base: Int64Chunked = Int64Chunked::from_iter_options(name.into(), v.into_iter());
             base.into_series()
                 .cast(&DataType::Datetime(
                     polars::prelude::TimeUnit::Microseconds,
@@ -370,11 +442,8 @@ fn py_list_to_series(
                     v.push(Some(py_date_to_days(&item)?));
                 }
             }
-            let base: Int32Chunked =
-                Int32Chunked::from_iter_options(name.into(), v.into_iter());
-            base.into_series()
-                .cast(&DataType::Date)
-                .map_err(polars_err)
+            let base: Int32Chunked = Int32Chunked::from_iter_options(name.into(), v.into_iter());
+            base.into_series().cast(&DataType::Date).map_err(polars_err)
         }
         DTypeDesc::Scalar {
             base: Some(BaseType::Duration),
@@ -388,27 +457,21 @@ fn py_list_to_series(
                     v.push(Some(py_timedelta_to_micros(&item)?));
                 }
             }
-            let base: Int64Chunked =
-                Int64Chunked::from_iter_options(name.into(), v.into_iter());
+            let base: Int64Chunked = Int64Chunked::from_iter_options(name.into(), v.into_iter());
             base.into_series()
                 .cast(&DataType::Duration(polars::prelude::TimeUnit::Microseconds))
                 .map_err(polars_err)
         }
-        DTypeDesc::Scalar {
-            base: None,
-            ..
-        } => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-            "Root schema cannot have unknown-base dtype.",
-        )),
+        DTypeDesc::Scalar { base: None, .. } => {
+            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Root schema cannot have unknown-base dtype.",
+            ))
+        }
         DTypeDesc::List { inner, .. } => {
             let inner_polars = dtype_desc_to_polars_data_type(inner)?;
             let est_vals = list.len().saturating_mul(8).max(8);
-            let mut builder = get_list_builder(
-                &inner_polars,
-                est_vals,
-                list.len(),
-                PlSmallStr::from(name),
-            );
+            let mut builder =
+                get_list_builder(&inner_polars, est_vals, list.len(), PlSmallStr::from(name));
             for item in list.iter() {
                 if item.is_none() {
                     builder.append_null();
@@ -576,6 +639,11 @@ impl PolarsPlanRunner {
                                 LiteralValue::Float(f) => base.fill_null(lit(*f)),
                                 LiteralValue::Bool(b) => base.fill_null(lit(*b)),
                                 LiteralValue::Str(s) => base.fill_null(lit(s.clone())),
+                                LiteralValue::EnumStr(s) => base.fill_null(lit(s.clone())),
+                                LiteralValue::Uuid(s) => base.fill_null(lit(s.clone())),
+                                LiteralValue::Decimal(v) => base.fill_null(
+                                    Scalar::new_decimal(*v, DECIMAL_PRECISION, DECIMAL_SCALE).lit(),
+                                ),
                                 LiteralValue::DateTimeMicros(v) => {
                                     base.fill_null(lit(*v).cast(DataType::Datetime(
                                         polars::prelude::TimeUnit::Microseconds,
@@ -678,7 +746,7 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             )),
         },
         DTypeDesc::Scalar {
-            base: Some(BaseType::Str),
+            base: Some(BaseType::Str | BaseType::Enum),
             ..
         } => match av {
             AnyValue::String(s) => Ok(s.into_py(py)),
@@ -688,10 +756,37 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             )),
         },
         DTypeDesc::Scalar {
+            base: Some(BaseType::Uuid),
+            ..
+        } => match av {
+            AnyValue::String(s) => {
+                let uuid_mod = py.import_bound("uuid")?;
+                let ctor = uuid_mod.getattr("UUID")?;
+                Ok(ctor.call1((s.to_string(),))?.into_py(py))
+            }
+            AnyValue::StringOwned(s) => {
+                let uuid_mod = py.import_bound("uuid")?;
+                let ctor = uuid_mod.getattr("UUID")?;
+                Ok(ctor.call1((s.to_string(),))?.into_py(py))
+            }
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Expected str AnyValue for UUID column.",
+            )),
+        },
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Decimal),
+            ..
+        } => match av {
+            AnyValue::Decimal(v, _, _) => scaled_i128_to_py_decimal(py, v),
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Expected decimal AnyValue.",
+            )),
+        },
+        DTypeDesc::Scalar {
             base: Some(BaseType::DateTime),
             ..
         } => {
-                let micros = match av {
+            let micros = match av {
                 AnyValue::Datetime(ts, tu, _) => match tu {
                     TimeUnit::Microseconds => ts,
                     TimeUnit::Milliseconds => ts * 1000,
@@ -718,7 +813,7 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             base: Some(BaseType::Duration),
             ..
         } => {
-                let micros = match av {
+            let micros = match av {
                 AnyValue::Duration(ts, tu) => match tu {
                     TimeUnit::Microseconds => ts,
                     TimeUnit::Milliseconds => ts * 1000,
@@ -836,7 +931,7 @@ fn series_to_py_list(py: Python<'_>, series: &Series, dtype: &DTypeDesc) -> PyRe
             }
         }
         DTypeDesc::Scalar {
-            base: Some(BaseType::Str),
+            base: Some(BaseType::Str | BaseType::Enum),
             ..
         } => {
             let casted = series.cast(&DataType::String).map_err(polars_err)?;
@@ -845,6 +940,38 @@ fn series_to_py_list(py: Python<'_>, series: &Series, dtype: &DTypeDesc) -> PyRe
                     Some(v) => values.push(v.into_py(py)),
                     None => values.push(py.None()),
                 }
+            }
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Uuid),
+            ..
+        } => {
+            let casted = series.cast(&DataType::String).map_err(polars_err)?;
+            let uuid_mod = py.import_bound("uuid")?;
+            let uuid_ctor = uuid_mod.getattr("UUID")?;
+            for item in casted.str().map_err(polars_err)?.into_iter() {
+                match item {
+                    Some(v) => {
+                        let u = uuid_ctor.call1((v,))?;
+                        values.push(u.into_py(py));
+                    }
+                    None => values.push(py.None()),
+                }
+            }
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Decimal),
+            ..
+        } => {
+            let casted = series
+                .cast(&DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE))
+                .map_err(polars_err)?;
+            for av in casted.iter() {
+                let py_v = match av {
+                    AnyValue::Null => py.None(),
+                    _ => polars_anyvalue_to_py(py, av, dtype)?,
+                };
+                values.push(py_v);
             }
         }
         DTypeDesc::Scalar {
@@ -883,10 +1010,7 @@ fn series_to_py_list(py: Python<'_>, series: &Series, dtype: &DTypeDesc) -> PyRe
                 }
             }
         }
-        DTypeDesc::Scalar {
-            base: None,
-            ..
-        } => {
+        DTypeDesc::Scalar { base: None, .. } => {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Output schema cannot have unknown-base dtype.",
             ));
@@ -940,6 +1064,10 @@ fn dtype_from_polars(dt: &DataType) -> PyResult<DTypeDesc> {
         }),
         DataType::String => Ok(DTypeDesc::Scalar {
             base: Some(BaseType::Str),
+            nullable: true,
+        }),
+        DataType::Decimal(_, _) => Ok(DTypeDesc::Scalar {
+            base: Some(BaseType::Decimal),
             nullable: true,
         }),
         DataType::Datetime(_, _) => Ok(DTypeDesc::Scalar {
@@ -1639,6 +1767,15 @@ fn py_dict_to_literal_ctx(
                 Some(crate::dtype::BaseType::Float) => LiteralValue::Float(item.extract::<f64>()?),
                 Some(crate::dtype::BaseType::Bool) => LiteralValue::Bool(item.extract::<bool>()?),
                 Some(crate::dtype::BaseType::Str) => LiteralValue::Str(item.extract::<String>()?),
+                Some(crate::dtype::BaseType::Enum) => {
+                    LiteralValue::EnumStr(py_enum_to_wire_string(&item)?)
+                },
+                Some(crate::dtype::BaseType::Uuid) => {
+                    LiteralValue::Uuid(py_extract_uuid_canonical(&item)?)
+                },
+                Some(crate::dtype::BaseType::Decimal) => {
+                    LiteralValue::Decimal(py_decimal_to_scaled_i128(&item)?)
+                },
                 Some(crate::dtype::BaseType::DateTime) => {
                     LiteralValue::DateTimeMicros(py_datetime_to_micros(&item)?)
                 }
@@ -1668,6 +1805,14 @@ fn literal_to_py(py: Python<'_>, v: &LiteralValue) -> PyObject {
         LiteralValue::Float(f) => f.into_py(py),
         LiteralValue::Bool(b) => b.into_py(py),
         LiteralValue::Str(s) => s.clone().into_py(py),
+        LiteralValue::EnumStr(s) => s.clone().into_py(py),
+        LiteralValue::Uuid(s) => py
+            .import_bound("uuid")
+            .and_then(|m| m.getattr("UUID"))
+            .and_then(|c| c.call1((s.as_str(),)))
+            .map(|o| o.into_py(py))
+            .unwrap_or_else(|_| s.clone().into_py(py)),
+        LiteralValue::Decimal(v) => scaled_i128_to_py_decimal(py, *v).unwrap_or_else(|_| v.into_py(py)),
         LiteralValue::DateTimeMicros(v) => {
             micros_to_py_datetime(py, *v).unwrap_or_else(|_| v.into_py(py))
         }
@@ -1697,6 +1842,58 @@ fn agg_literal(
         "first" => Ok(non_null.first().map(|v| (*v).clone())),
         "last" => Ok(non_null.last().map(|v| (*v).clone())),
         "min" | "max" | "sum" | "mean" | "median" | "std" | "var" => {
+            if matches!(base, crate::dtype::BaseType::Decimal) {
+                let decs: Vec<i128> = non_null
+                    .iter()
+                    .filter_map(|v| match v {
+                        LiteralValue::Decimal(i) => Some(*i),
+                        _ => None,
+                    })
+                    .collect();
+                if decs.is_empty() {
+                    return Ok(None);
+                }
+                let scale = 10_f64.powi(crate::dtype::DECIMAL_SCALE as i32);
+                let as_float = |x: i128| x as f64 / scale;
+                return match op {
+                    "sum" => Ok(Some(LiteralValue::Decimal(
+                        decs.iter().copied().sum(),
+                    ))),
+                    "min" => Ok(Some(LiteralValue::Decimal(*decs.iter().min().unwrap()))),
+                    "max" => Ok(Some(LiteralValue::Decimal(*decs.iter().max().unwrap()))),
+                    "mean" => Ok(Some(LiteralValue::Float(
+                        decs.iter().map(|&x| as_float(x)).sum::<f64>() / decs.len() as f64,
+                    ))),
+                    "median" => {
+                        let mut v: Vec<f64> = decs.iter().map(|&x| as_float(x)).collect();
+                        v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                        let n = v.len();
+                        let m = if n % 2 == 1 {
+                            v[n / 2]
+                        } else {
+                            (v[n / 2 - 1] + v[n / 2]) / 2.0
+                        };
+                        Ok(Some(LiteralValue::Float(m)))
+                    }
+                    "std" | "var" => {
+                        if decs.len() < 2 {
+                            return Ok(None);
+                        }
+                        let vf: Vec<f64> = decs.iter().map(|&x| as_float(x)).collect();
+                        let mean = vf.iter().sum::<f64>() / vf.len() as f64;
+                        let sq = vf.iter().map(|x| (x - mean) * (x - mean)).sum::<f64>();
+                        let var = sq / (vf.len() as f64 - 1.0);
+                        if op == "var" {
+                            Ok(Some(LiteralValue::Float(var)))
+                        } else {
+                            Ok(Some(LiteralValue::Float(var.sqrt())))
+                        }
+                    }
+                    _ => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "Unsupported decimal aggregation op.",
+                    )),
+                };
+            }
             let nums = non_null
                 .iter()
                 .filter_map(|v| match v {
@@ -1867,9 +2064,12 @@ pub fn execute_melt_polars(
         variable_name.clone(),
         DTypeDesc::non_nullable(crate::dtype::BaseType::Str),
     );
-    let nullable = values
-        .iter()
-        .any(|c| plan.schema.get(c).map(|d| d.nullable_flag()).unwrap_or(true));
+    let nullable = values.iter().any(|c| {
+        plan.schema
+            .get(c)
+            .map(|d| d.nullable_flag())
+            .unwrap_or(true)
+    });
     out_schema.insert(
         value_name.clone(),
         DTypeDesc::Scalar {
@@ -1968,6 +2168,9 @@ pub fn execute_pivot_polars(
     for item in pivot_col.iter() {
         let key = match item {
             Some(LiteralValue::Str(s)) => s.clone(),
+            Some(LiteralValue::EnumStr(s)) => s.clone(),
+            Some(LiteralValue::Uuid(s)) => s.clone(),
+            Some(LiteralValue::Decimal(v)) => v.to_string(),
             Some(LiteralValue::Int(v)) => v.to_string(),
             Some(LiteralValue::Float(v)) => v.to_string(),
             Some(LiteralValue::Bool(v)) => v.to_string(),
@@ -2025,10 +2228,12 @@ pub fn execute_pivot_polars(
                 "sum" | "mean" | "median" | "std" | "var"
             ) && !matches!(
                 base,
-                crate::dtype::BaseType::Int | crate::dtype::BaseType::Float
+                crate::dtype::BaseType::Int
+                    | crate::dtype::BaseType::Float
+                    | crate::dtype::BaseType::Decimal
             ) {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "pivot() numeric aggregations require int or float value columns.",
+                    "pivot() numeric aggregations require int, float, or decimal value columns.",
                 ));
             }
             let out_d = match aggregate_function.as_str() {
@@ -2062,6 +2267,9 @@ pub fn execute_pivot_polars(
                 .filter(|i| {
                     let key = match &ctx[&columns][*i] {
                         Some(LiteralValue::Str(s)) => s.clone(),
+                        Some(LiteralValue::EnumStr(s)) => s.clone(),
+                        Some(LiteralValue::Uuid(s)) => s.clone(),
+                        Some(LiteralValue::Decimal(v)) => v.to_string(),
                         Some(LiteralValue::Int(v)) => v.to_string(),
                         Some(LiteralValue::Float(v)) => v.to_string(),
                         Some(LiteralValue::Bool(v)) => v.to_string(),
@@ -2185,6 +2393,9 @@ fn dynamic_group_key_fragment(value: &Option<LiteralValue>) -> String {
         Some(LiteralValue::Float(f)) => format!("F:{f:?}"),
         Some(LiteralValue::Bool(b)) => format!("B:{b}"),
         Some(LiteralValue::Str(s)) => format!("S:{s}"),
+        Some(LiteralValue::EnumStr(s)) => format!("E:{s}"),
+        Some(LiteralValue::Uuid(s)) => format!("U:{s}"),
+        Some(LiteralValue::Decimal(v)) => format!("DEC:{v}"),
         Some(LiteralValue::DateTimeMicros(v)) => format!("DT:{v}"),
         Some(LiteralValue::DateDays(v)) => format!("D:{v}"),
         Some(LiteralValue::DurationMicros(v)) => format!("TD:{v}"),
@@ -2478,21 +2689,90 @@ pub fn execute_explode_polars(
 }
 
 #[cfg(feature = "polars_engine")]
+fn dtype_for_unnest_output_column(
+    name: &str,
+    plan_schema: &HashMap<String, DTypeDesc>,
+    unnest_parents: &[String],
+) -> Option<DTypeDesc> {
+    for parent in unnest_parents {
+        if let Some(DTypeDesc::Struct {
+            fields,
+            nullable: struct_nullable,
+        }) = plan_schema.get(parent)
+        {
+            for (fname, fdt) in fields {
+                let composed = format!("{parent}_{fname}");
+                if composed == name {
+                    let mut out = fdt.clone();
+                    if *struct_nullable {
+                        out = out.with_assigned_none_nullability();
+                    }
+                    return Some(out);
+                }
+            }
+        }
+    }
+    plan_schema.get(name).cloned()
+}
+
+#[cfg(feature = "polars_engine")]
 pub fn execute_unnest_polars(
-    _py: Python<'_>,
+    py: Python<'_>,
     plan: &PlanInner,
-    _root_data: &Bound<'_, PyAny>,
+    root_data: &Bound<'_, PyAny>,
     columns: Vec<String>,
 ) -> PyResult<(PyObject, PyObject)> {
     for c in columns.iter() {
-        if !plan.schema.contains_key(c) {
-            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+        let dt = plan.schema.get(c).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
                 "unnest() unknown column '{}'.",
+                c
+            ))
+        })?;
+        if !matches!(dt, DTypeDesc::Struct { .. }) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+                "unnest() column '{}' must have struct dtype (nested model column).",
                 c
             )));
         }
     }
-    Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-        "unnest() requires struct-like typed columns, which are not yet supported by the current schema type system.",
-    ))
+
+    let df = root_data_to_polars_df(py, &plan.root_schema, root_data)?;
+    let mut lf = PolarsPlanRunner::apply_steps(df.lazy(), &plan.steps)?;
+    let sep: PlSmallStr = "_".into();
+    lf = lf.unnest(
+        cols(columns.iter().map(|s| s.as_str())),
+        Some(sep),
+    );
+    let out_df = lf.collect().map_err(polars_err)?;
+
+    let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
+    for col_name in out_df.get_column_names() {
+        let col_name_str = col_name.as_str();
+        let out_desc = if let Some(d) =
+            dtype_for_unnest_output_column(col_name_str, &plan.schema, &columns)
+        {
+            d
+        } else {
+            let s = out_df
+                .column(col_name)
+                .map_err(polars_err)?
+                .as_materialized_series();
+            dtype_from_polars(s.dtype())?
+        };
+        out_schema.insert(col_name_str.to_string(), out_desc);
+    }
+
+    let out_dict = PyDict::new_bound(py);
+    for (name, dtype) in out_schema.iter() {
+        let s = out_df
+            .column(name)
+            .map_err(polars_err)?
+            .as_materialized_series()
+            .clone();
+        let py_list = series_to_py_list(py, &s, dtype)?;
+        out_dict.set_item(name, py_list)?;
+    }
+    let desc = schema_descriptors_as_py(py, &out_schema)?;
+    Ok((out_dict.into_py(py), desc))
 }

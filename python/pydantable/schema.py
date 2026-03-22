@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import enum
 import types
+import uuid
 from collections.abc import Mapping
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from typing import (
     Annotated,
     Any,
@@ -17,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, TypeAdapter, create_model
 
 _NoneType = type(None)
 _SUPPORTED_NON_NULL_SCALAR_TYPES = frozenset(
-    {int, float, bool, str, datetime, date, timedelta}
+    {int, float, bool, str, uuid.UUID, Decimal, datetime, date, timedelta}
 )
 
 
@@ -32,7 +35,13 @@ def _unwrap_annotated(annotation: Any) -> Any:
 
 
 def _is_supported_non_null_scalar_type(tp: Any) -> bool:
-    return tp in _SUPPORTED_NON_NULL_SCALAR_TYPES
+    if tp in _SUPPORTED_NON_NULL_SCALAR_TYPES:
+        return True
+    return (
+        isinstance(tp, type)
+        and issubclass(tp, enum.Enum)
+        and tp is not enum.Enum
+    )
 
 
 def is_supported_scalar_column_annotation(annotation: Any) -> bool:
@@ -358,6 +367,9 @@ def dtype_descriptor_to_annotation(descriptor: Mapping[str, Any]) -> Any:
         "float": float,
         "bool": bool,
         "str": str,
+        "enum": Any,
+        "uuid": uuid.UUID,
+        "decimal": Decimal,
         "datetime": datetime,
         "date": date,
         "duration": timedelta,
@@ -398,6 +410,8 @@ _RUST_BASE_FOR_PY_SCALAR: dict[type, str] = {
     float: "float",
     bool: "bool",
     str: "str",
+    uuid.UUID: "uuid",
+    Decimal: "decimal",
     datetime: "datetime",
     date: "date",
     timedelta: "duration",
@@ -464,6 +478,12 @@ def descriptor_matches_column_annotation(
         return False
     if exp_base == "unknown":
         return inner is Any
+    if exp_base == "enum":
+        return (
+            isinstance(inner, type)
+            and issubclass(inner, enum.Enum)
+            and inner is not enum.Enum
+        )
     expected_py = None
     for py_t, rust_s in _RUST_BASE_FOR_PY_SCALAR.items():
         if rust_s == exp_base:

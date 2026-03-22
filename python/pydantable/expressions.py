@@ -157,6 +157,147 @@ class Expr:  # type: ignore[override]
         rust_expr = _require_rust_core().expr_struct_field(self._rust_expr, name)
         return Expr(rust_expr=rust_expr)
 
+    # Numeric
+    def abs(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_abs(self._rust_expr))
+
+    def round(self, decimals: int = 0) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_round(self._rust_expr, int(decimals)))
+
+    def floor(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_floor(self._rust_expr))
+
+    def ceil(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_ceil(self._rust_expr))
+
+    # Strings
+    def strip(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_string_unary(self._rust_expr, "strip"))
+
+    def upper(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_string_unary(self._rust_expr, "upper"))
+
+    def lower(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_string_unary(self._rust_expr, "lower"))
+
+    def str_replace(self, pattern: str, replacement: str) -> Expr:
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_string_replace(
+                self._rust_expr, str(pattern), str(replacement)
+            )
+        )
+
+    def strip_prefix(self, prefix: str) -> Expr:
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_string_unary(self._rust_expr, "strip_prefix", str(prefix))
+        )
+
+    def strip_suffix(self, suffix: str) -> Expr:
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_string_unary(self._rust_expr, "strip_suffix", str(suffix))
+        )
+
+    def strip_chars(self, chars: str) -> Expr:
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_string_unary(self._rust_expr, "strip_chars", str(chars))
+        )
+
+    # Boolean logic (typed; operands must be boolean expressions)
+    def __and__(self, other: Any) -> Expr:
+        right = other if isinstance(other, Expr) else self._coerce_other(other)
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_logical_and(self._rust_expr, right._rust_expr))
+
+    def __rand__(self, other: Any) -> Expr:
+        left = self._coerce_other(other)
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_logical_and(left._rust_expr, self._rust_expr))
+
+    def __or__(self, other: Any) -> Expr:
+        right = other if isinstance(other, Expr) else self._coerce_other(other)
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_logical_or(self._rust_expr, right._rust_expr))
+
+    def __ror__(self, other: Any) -> Expr:
+        left = self._coerce_other(other)
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_logical_or(left._rust_expr, self._rust_expr))
+
+    def __invert__(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_logical_not(self._rust_expr))
+
+    # Datetime / date parts (Rust validates column type)
+    def dt_year(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "year"))
+
+    def dt_month(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "month"))
+
+    def dt_day(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "day"))
+
+    def dt_hour(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "hour"))
+
+    def dt_minute(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "minute"))
+
+    def dt_second(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "second"))
+
+    def dt_date(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_datetime_to_date(self._rust_expr))
+
+    # List columns
+    def list_len(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_list_len(self._rust_expr))
+
+    def list_get(self, index: Any) -> Expr:
+        rust = _require_rust_core()
+        idx = index if isinstance(index, Expr) else Literal(value=index)
+        return Expr(
+            rust_expr=rust.expr_list_get(self._rust_expr, idx._rust_expr),
+        )
+
+    def list_contains(self, value: Any) -> Expr:
+        rust = _require_rust_core()
+        v = value if isinstance(value, Expr) else Literal(value=value)
+        return Expr(
+            rust_expr=rust.expr_list_contains(self._rust_expr, v._rust_expr),
+        )
+
+    def list_min(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_list_min(self._rust_expr))
+
+    def list_max(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_list_max(self._rust_expr))
+
+    def list_sum(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_list_sum(self._rust_expr))
+
 
 class WhenChain:
     """Chained ``when`` / ``otherwise`` (Spark-style)."""

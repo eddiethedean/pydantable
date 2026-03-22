@@ -3,6 +3,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
 
+use crate::dtype::scaled_i128_to_py_decimal;
 use crate::expr::LiteralValue;
 
 use super::context::{ctx_len, root_data_to_ctx};
@@ -88,6 +89,16 @@ pub(crate) fn execute_plan_rowwise(
                             }
                             (Some(LiteralValue::Bool(x)), Some(LiteralValue::Bool(y))) => x.cmp(y),
                             (Some(LiteralValue::Str(x)), Some(LiteralValue::Str(y))) => x.cmp(y),
+                            (Some(LiteralValue::EnumStr(x)), Some(LiteralValue::EnumStr(y))) => {
+                                x.cmp(y)
+                            }
+                            (Some(LiteralValue::Str(x)), Some(LiteralValue::EnumStr(y))) => {
+                                x.as_str().cmp(y.as_str())
+                            }
+                            (Some(LiteralValue::EnumStr(x)), Some(LiteralValue::Str(y))) => {
+                                x.as_str().cmp(y.as_str())
+                            }
+                            (Some(LiteralValue::Uuid(x)), Some(LiteralValue::Uuid(y))) => x.cmp(y),
                             _ => Ordering::Equal,
                         };
                         if ord != Ordering::Equal {
@@ -259,6 +270,15 @@ pub(crate) fn execute_plan_rowwise(
                 Some(LiteralValue::Float(f)) => values.push(f.into_py(py)),
                 Some(LiteralValue::Bool(b)) => values.push(b.into_py(py)),
                 Some(LiteralValue::Str(s)) => values.push(s.clone().into_py(py)),
+                Some(LiteralValue::EnumStr(s)) => values.push(s.clone().into_py(py)),
+                Some(LiteralValue::Uuid(s)) => {
+                    let uuid_mod = py.import_bound("uuid")?;
+                    let ctor = uuid_mod.getattr("UUID")?;
+                    values.push(ctor.call1((s.as_str(),))?.into_py(py));
+                }
+                Some(LiteralValue::Decimal(d)) => {
+                    values.push(scaled_i128_to_py_decimal(py, *d)?);
+                }
                 Some(LiteralValue::DateTimeMicros(v)) => {
                     values.push(micros_to_py_datetime(py, *v)?)
                 }

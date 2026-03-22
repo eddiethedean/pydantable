@@ -49,6 +49,14 @@ Null handling is SQL-like (`propagate_nulls`):
 These rules are enforced in the Rust core so that derived schemas and runtime
 values remain aligned.
 
+### Boolean expressions (`&`, `|`, `~`)
+
+`Expr` supports typed boolean combinations (`&`, `|`, `~`) on boolean columns or
+comparisons. Null propagation follows **Polars** (Kleene / three-valued) rules for
+`and` / `or` / `not`, not only SQL `WHERE` filtering rules. For example, `filter`
+still keeps rows where the predicate is exactly `True`; combined expressions may
+produce `NULL` boolean cells where operands are null.
+
 ## Group-by aggregation semantics (all-null groups)
 
 Supported aggregation operators:
@@ -86,7 +94,11 @@ Supported reshape methods:
 
 `explode` / `unnest`:
 - **Homogeneous list** columns (`list[T]` / `List[T]` with supported `T`) are modeled end-to-end; `explode(columns)` unwraps one list level and updates the schema to the inner dtype (nullable). See [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md).
-- **`unnest`** for struct columns is still not implemented (see runtime error).
+- **`unnest`** for **struct** columns (nested model columns) is implemented: named struct fields are promoted to top-level columns with Polars `unnest`, and the logical schema is migrated accordingly.
+
+## Row-wise expression evaluation (`polars_engine` disabled)
+
+When the extension is built **without** the Polars execution engine, a small subset of `ExprNode::eval` runs for tests and offline paths. **List** expressions (`list_len`, `list_get`, `list_contains`, `list_min` / `list_max` / `list_sum`) and **struct field** projection are **not** implemented there (no list cell representation in the row-wise literal context). **`TemporalPart`** extractors are implemented for **UTC** wall time from `datetime` microsecond literals and for `date` cells encoded as Polars/Python day offsets; use the normal Polars-backed `collect()` path for production semantics.
 
 ## Window and time-series semantics
 

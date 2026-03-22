@@ -8,7 +8,7 @@ use pyo3::types::PyAny;
 use crate::dtype::{dtype_to_python_type, py_annotation_to_dtype, DTypeDesc};
 use crate::expr::{
     exprnode_to_serializable, op_symbol_to_arith, op_symbol_to_cmp, ArithOp, CmpOp, ExprHandle,
-    ExprNode,
+    ExprNode, LogicalOp, StringUnaryOp, TemporalPart, UnaryNumericOp,
 };
 use crate::plan::{
     execute_plan as execute_plan_inner, make_plan as make_plan_inner, plan_drop as plan_drop_inner,
@@ -254,9 +254,185 @@ fn expr_string_length(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
 }
 
 #[pyfunction]
+fn expr_string_replace(
+    inner: Bound<'_, PyExpr>,
+    pattern: String,
+    replacement: String,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_string_replace(
+            inner.borrow().node.clone(),
+            pattern,
+            replacement,
+        )?,
+    })
+}
+
+#[pyfunction]
 fn expr_struct_field(inner: Bound<'_, PyExpr>, field: String) -> PyResult<PyExpr> {
     Ok(PyExpr {
         node: ExprNode::make_struct_field(inner.borrow().node.clone(), field)?,
+    })
+}
+
+#[pyfunction]
+fn expr_abs(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_unary_numeric(inner.borrow().node.clone(), UnaryNumericOp::Abs)?,
+    })
+}
+
+#[pyfunction]
+fn expr_round(inner: Bound<'_, PyExpr>, decimals: u32) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_unary_numeric(
+            inner.borrow().node.clone(),
+            UnaryNumericOp::Round { decimals },
+        )?,
+    })
+}
+
+#[pyfunction]
+fn expr_floor(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_unary_numeric(inner.borrow().node.clone(), UnaryNumericOp::Floor)?,
+    })
+}
+
+#[pyfunction]
+fn expr_ceil(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_unary_numeric(inner.borrow().node.clone(), UnaryNumericOp::Ceil)?,
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (inner, op, arg=None))]
+fn expr_string_unary(
+    inner: Bound<'_, PyExpr>,
+    op: String,
+    arg: Option<String>,
+) -> PyResult<PyExpr> {
+    let uop = match (op.as_str(), arg.as_deref()) {
+        ("strip", None) => StringUnaryOp::Strip,
+        ("upper", None) => StringUnaryOp::Upper,
+        ("lower", None) => StringUnaryOp::Lower,
+        ("strip_prefix", Some(s)) => StringUnaryOp::StripPrefix(s.to_string()),
+        ("strip_suffix", Some(s)) => StringUnaryOp::StripSuffix(s.to_string()),
+        ("strip_chars", Some(s)) => StringUnaryOp::StripChars(s.to_string()),
+        _ => {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "string_unary: use op 'strip'|'upper'|'lower' (no arg), or \
+                 'strip_prefix'|'strip_suffix'|'strip_chars' with a string arg.",
+            ));
+        }
+    };
+    Ok(PyExpr {
+        node: ExprNode::make_string_unary(inner.borrow().node.clone(), uop)?,
+    })
+}
+
+#[pyfunction]
+fn expr_logical_and(left: Bound<'_, PyExpr>, right: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_logical_binary(
+            LogicalOp::And,
+            left.borrow().node.clone(),
+            right.borrow().node.clone(),
+        )?,
+    })
+}
+
+#[pyfunction]
+fn expr_logical_or(left: Bound<'_, PyExpr>, right: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_logical_binary(
+            LogicalOp::Or,
+            left.borrow().node.clone(),
+            right.borrow().node.clone(),
+        )?,
+    })
+}
+
+#[pyfunction]
+fn expr_logical_not(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_logical_not(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_temporal_part(inner: Bound<'_, PyExpr>, part: String) -> PyResult<PyExpr> {
+    let p = match part.as_str() {
+        "year" => TemporalPart::Year,
+        "month" => TemporalPart::Month,
+        "day" => TemporalPart::Day,
+        "hour" => TemporalPart::Hour,
+        "minute" => TemporalPart::Minute,
+        "second" => TemporalPart::Second,
+        _ => {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "temporal part must be year|month|day|hour|minute|second",
+            ));
+        }
+    };
+    Ok(PyExpr {
+        node: ExprNode::make_temporal_part(inner.borrow().node.clone(), p)?,
+    })
+}
+
+#[pyfunction]
+fn expr_list_len(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_list_len(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_list_get(inner: Bound<'_, PyExpr>, index: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_list_get(
+            inner.borrow().node.clone(),
+            index.borrow().node.clone(),
+        )?,
+    })
+}
+
+#[pyfunction]
+fn expr_list_contains(inner: Bound<'_, PyExpr>, value: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_list_contains(
+            inner.borrow().node.clone(),
+            value.borrow().node.clone(),
+        )?,
+    })
+}
+
+#[pyfunction]
+fn expr_list_min(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_list_min(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_list_max(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_list_max(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_list_sum(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_list_sum(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_datetime_to_date(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_datetime_to_date(inner.borrow().node.clone())?,
     })
 }
 
@@ -368,9 +544,47 @@ fn plan_fill_null(
             Some(crate::expr::LiteralValue::Float(v.extract::<f64>()?))
         } else if v.extract::<String>().is_ok() {
             Some(crate::expr::LiteralValue::Str(v.extract::<String>()?))
+        } else if {
+            let py = v.py();
+            let builtins = py.import_bound("builtins")?;
+            let isinstance = builtins.getattr("isinstance")?;
+            let uuid_cls = py.import_bound("uuid")?.getattr("UUID")?;
+            isinstance
+                .call1((v, &uuid_cls))?
+                .extract::<bool>()
+                .unwrap_or(false)
+        } {
+            let s: String = v.str()?.extract()?;
+            Some(crate::expr::LiteralValue::Uuid(s))
+        } else if {
+            let py = v.py();
+            let builtins = py.import_bound("builtins")?;
+            let isinstance = builtins.getattr("isinstance")?;
+            let dec_cls = py.import_bound("decimal")?.getattr("Decimal")?;
+            isinstance
+                .call1((v, &dec_cls))?
+                .extract::<bool>()
+                .unwrap_or(false)
+        } {
+            Some(crate::expr::LiteralValue::Decimal(
+                crate::dtype::py_decimal_to_scaled_i128(v)?,
+            ))
+        } else if {
+            let py = v.py();
+            let builtins = py.import_bound("builtins")?;
+            let isinstance = builtins.getattr("isinstance")?;
+            let enum_cls = py.import_bound("enum")?.getattr("Enum")?;
+            isinstance
+                .call1((v, &enum_cls))?
+                .extract::<bool>()
+                .unwrap_or(false)
+        } {
+            Some(crate::expr::LiteralValue::EnumStr(
+                crate::dtype::py_enum_to_wire_string(v)?,
+            ))
         } else {
             return Err(pyo3::exceptions::PyTypeError::new_err(
-                "fill_null(value=...) supports int/float/bool/str.",
+                "fill_null(value=...) supports int/float/bool/str/uuid.UUID/decimal.Decimal/enum.Enum.",
             ));
         }
     } else {
@@ -709,7 +923,24 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr_string_concat, m)?)?;
     m.add_function(wrap_pyfunction!(expr_substring, m)?)?;
     m.add_function(wrap_pyfunction!(expr_string_length, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_string_replace, m)?)?;
     m.add_function(wrap_pyfunction!(expr_struct_field, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_abs, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_round, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_floor, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_ceil, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_string_unary, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_logical_and, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_logical_or, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_logical_not, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_temporal_part, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_list_len, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_list_get, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_list_contains, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_list_min, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_list_max, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_list_sum, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_datetime_to_date, m)?)?;
     m.add_function(wrap_pyfunction!(make_plan, m)?)?;
     m.add_function(wrap_pyfunction!(plan_select, m)?)?;
     m.add_function(wrap_pyfunction!(plan_with_columns, m)?)?;

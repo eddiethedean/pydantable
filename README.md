@@ -93,6 +93,28 @@ Output from `print(result)` (one run):
 {'age2': [40], 'id': [1]}
 ```
 
+### Typed expressions (examples)
+
+Boolean filters and datetime parts compose on the Rust-typed `Expr` API:
+
+```python
+from datetime import datetime, timezone
+
+class Row(DataFrameModel):
+    ts: datetime
+    flag: bool
+
+d = Row(
+    {
+        "ts": [datetime(2024, 3, 1, 12, 0, tzinfo=timezone.utc)],
+        "flag": [True],
+    }
+)
+out = d.filter(d.flag & (d.ts.dt_year() == 2024)).collect(as_lists=True)
+```
+
+Homogeneous list columns (`list[int]`, etc.) support `list_len()`, `list_get`, `list_contains`, and numeric `list_min` / `list_max` / `list_sum`; null cells follow the same null-propagation rules as scalars.
+
 ## Semantics Contract (high level)
 
 Null semantics are SQL-like (`propagate_nulls`):

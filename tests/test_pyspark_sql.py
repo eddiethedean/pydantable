@@ -96,6 +96,28 @@ def test_annotation_to_data_type_nested_model() -> None:
     assert isinstance(dt.fields[1].dataType, StructType)
 
 
+def test_annotation_to_data_type_deeply_nested_model() -> None:
+    class Leaf(Schema):
+        z: str
+
+    class Mid(Schema):
+        y: int
+        leaf: Leaf
+
+    class Root(Schema):
+        id: int
+        mid: Mid
+
+    dt = annotation_to_data_type(Root)
+    assert isinstance(dt, StructType)
+    assert dt.fields[1].name == "mid"
+    mid = dt.fields[1].dataType
+    assert isinstance(mid, StructType)
+    assert mid.fields[1].name == "leaf"
+    assert isinstance(mid.fields[1].dataType, StructType)
+    assert mid.fields[1].dataType.fields[0].name == "z"
+
+
 def test_annotation_to_data_type_list_int() -> None:
     dt = annotation_to_data_type(list[int])
     assert isinstance(dt, ArrayType)

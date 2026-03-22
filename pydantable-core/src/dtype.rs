@@ -1,5 +1,12 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyBool, PyDate, PyDateTime, PyDelta, PyFloat, PyInt, PyString, PyTuple, PyType};
+use pyo3::types::{
+    PyAny, PyBool, PyDate, PyDateTime, PyDelta, PyFloat, PyInt, PyString, PyTuple, PyType,
+};
+
+/// Polars precision for [`BaseType::Decimal`] columns and literals.
+pub const DECIMAL_PRECISION: usize = 38;
+/// Polars scale for [`BaseType::Decimal`] columns and literals (`10^{-scale}` units).
+pub const DECIMAL_SCALE: usize = 9;
 
 /// Supported base scalar types for the skeleton expression system.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -8,6 +15,11 @@ pub enum BaseType {
     Float,
     Bool,
     Str,
+    Uuid,
+    /// Fixed-point decimal: Polars `Decimal(38, 9)` (values scaled by `10^9`).
+    Decimal,
+    /// Python `enum.Enum` subclass (Polars Utf8; values use the enum member’s `.value` when string-coercible).
+    Enum,
     DateTime,
     Date,
     Duration,
@@ -187,17 +199,35 @@ fn unwrap_annotated<'py>(
     Ok(current)
 }
 
+fn is_py_enum_type(py: Python<'_>, py_type: &Bound<'_, PyType>) -> PyResult<bool> {
+    let enums = py.import_bound("enum")?;
+    let enum_base = enums.getattr("Enum")?;
+    let builtins = py.import_bound("builtins")?;
+    let issubclass = builtins.getattr("issubclass")?;
+    Ok(issubclass.call1((py_type, enum_base))?.extract::<bool>()?)
+}
+
+/// String used for Polars Utf8 cells and expression literals (`enum.Enum.value` or `str(...)`).
+pub fn py_enum_to_wire_string(item: &Bound<'_, PyAny>) -> PyResult<String> {
+    let val = item.getattr("value")?;
+    if let Ok(s) = val.extract::<String>() {
+        return Ok(s);
+    }
+    val.str()?.extract()
+}
+
 fn is_pydantic_model_class(py: Python<'_>, py_type: &Bound<'_, PyType>) -> PyResult<bool> {
     let pydantic = py.import_bound("pydantic")?;
     let base_model = pydantic.getattr("BaseModel")?;
     let builtins = py.import_bound("builtins")?;
     let issubclass = builtins.getattr("issubclass")?;
-    issubclass
-        .call1((py_type, base_model))?
-        .extract::<bool>()
+    issubclass.call1((py_type, base_model))?.extract::<bool>()
 }
 
-fn pydantic_model_to_struct_dtype(py: Python<'_>, model_cls: &Bound<'_, PyType>) -> PyResult<DTypeDesc> {
+fn pydantic_model_to_struct_dtype(
+    py: Python<'_>,
+    model_cls: &Bound<'_, PyType>,
+) -> PyResult<DTypeDesc> {
     let model_fields = model_cls.getattr("model_fields")?;
     let items = model_fields.call_method0("items")?;
     let mut fields: Vec<(String, DTypeDesc)> = Vec::new();
@@ -271,7 +301,10 @@ pub fn py_annotation_to_dtype(py: Python<'_>, dtype_obj: &Bound<'_, PyAny>) -> P
     Ok(dt)
 }
 
-fn py_annotation_to_dtype_impl(py: Python<'_>, dtype_obj: &Bound<'_, PyAny>) -> PyResult<DTypeDesc> {
+fn py_annotation_to_dtype_impl(
+    py: Python<'_>,
+    dtype_obj: &Bound<'_, PyAny>,
+) -> PyResult<DTypeDesc> {
     if let Ok(py_type) = dtype_obj.downcast::<PyType>() {
         if is_py_type(py_type, "bool") {
             return Ok(DTypeDesc::non_nullable(BaseType::Bool));
@@ -285,6 +318,18 @@ fn py_annotation_to_dtype_impl(py: Python<'_>, dtype_obj: &Bound<'_, PyAny>) -> 
         if is_py_type(py_type, "str") {
             return Ok(DTypeDesc::non_nullable(BaseType::Str));
         }
+        if is_py_type(py_type, "UUID") {
+            let module: String = py_type.getattr("__module__")?.extract()?;
+            if module == "uuid" {
+                return Ok(DTypeDesc::non_nullable(BaseType::Uuid));
+            }
+        }
+        if is_py_type(py_type, "Decimal") {
+            let module: String = py_type.getattr("__module__")?.extract()?;
+            if module == "decimal" {
+                return Ok(DTypeDesc::non_nullable(BaseType::Decimal));
+            }
+        }
         if is_py_type(py_type, "datetime") {
             return Ok(DTypeDesc::non_nullable(BaseType::DateTime));
         }
@@ -296,6 +341,10 @@ fn py_annotation_to_dtype_impl(py: Python<'_>, dtype_obj: &Bound<'_, PyAny>) -> 
         }
         if is_py_type(py_type, "NoneType") {
             return Ok(DTypeDesc::unknown_nullable());
+        }
+
+        if is_py_enum_type(py, py_type)? {
+            return Ok(DTypeDesc::non_nullable(BaseType::Enum));
         }
 
         if is_pydantic_model_class(py, py_type)? {
@@ -340,6 +389,18 @@ fn py_annotation_to_dtype_impl(py: Python<'_>, dtype_obj: &Bound<'_, PyAny>) -> 
                 seen_inner = Some(DTypeDesc::non_nullable(BaseType::Float));
             } else if is_py_type(arg_type, "str") {
                 seen_inner = Some(DTypeDesc::non_nullable(BaseType::Str));
+            } else if is_py_type(arg_type, "UUID") {
+                let module: String = arg_type.getattr("__module__")?.extract()?;
+                if module == "uuid" {
+                    seen_inner = Some(DTypeDesc::non_nullable(BaseType::Uuid));
+                }
+            } else if is_py_type(arg_type, "Decimal") {
+                let module: String = arg_type.getattr("__module__")?.extract()?;
+                if module == "decimal" {
+                    seen_inner = Some(DTypeDesc::non_nullable(BaseType::Decimal));
+                }
+            } else if is_py_enum_type(py, arg_type)? {
+                seen_inner = Some(DTypeDesc::non_nullable(BaseType::Enum));
             } else if is_py_type(arg_type, "datetime") {
                 seen_inner = Some(DTypeDesc::non_nullable(BaseType::DateTime));
             } else if is_py_type(arg_type, "date") {
@@ -404,6 +465,35 @@ pub fn py_value_to_dtype(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<D
     if value.downcast::<PyString>().is_ok() {
         return Ok(DTypeDesc::non_nullable(BaseType::Str));
     }
+    let builtins = py.import_bound("builtins")?;
+    let isinstance = builtins.getattr("isinstance")?;
+    let uuid_mod = py.import_bound("uuid")?;
+    let uuid_cls = uuid_mod.getattr("UUID")?;
+    if isinstance
+        .call1((value, &uuid_cls))?
+        .extract::<bool>()
+        .unwrap_or(false)
+    {
+        return Ok(DTypeDesc::non_nullable(BaseType::Uuid));
+    }
+    let dec_mod = py.import_bound("decimal")?;
+    let dec_cls = dec_mod.getattr("Decimal")?;
+    if isinstance
+        .call1((value, &dec_cls))?
+        .extract::<bool>()
+        .unwrap_or(false)
+    {
+        return Ok(DTypeDesc::non_nullable(BaseType::Decimal));
+    }
+    let enums = py.import_bound("enum")?;
+    let enum_cls = enums.getattr("Enum")?;
+    if isinstance
+        .call1((value, &enum_cls))?
+        .extract::<bool>()
+        .unwrap_or(false)
+    {
+        return Ok(DTypeDesc::non_nullable(BaseType::Enum));
+    }
     if value.downcast::<PyDateTime>().is_ok() {
         return Ok(DTypeDesc::non_nullable(BaseType::DateTime));
     }
@@ -438,12 +528,11 @@ fn create_model_for_struct_dtype(
                 Ok(t.into_py(py))
             }
         }
-        DTypeDesc::Scalar {
-            base: None,
-            ..
-        } => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-            "Cannot convert unknown-base dtype to a Python schema type.",
-        )),
+        DTypeDesc::Scalar { base: None, .. } => {
+            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Cannot convert unknown-base dtype to a Python schema type.",
+            ))
+        }
         DTypeDesc::List { inner, nullable } => {
             let builtins = py.import_bound("builtins")?;
             let list_cls = builtins.getattr("list")?;
@@ -456,7 +545,7 @@ fn create_model_for_struct_dtype(
             } else {
                 Ok(list_ann.into_py(py))
             }
-        },
+        }
         DTypeDesc::Struct { fields, nullable } => {
             let pydantic = py.import_bound("pydantic")?;
             let create_model = pydantic.getattr("create_model")?;
@@ -494,9 +583,21 @@ fn scalar_base_to_py_type(py: Python<'_>, base: BaseType) -> PyResult<PyObject> 
         BaseType::Float => builtins.getattr("float")?.into_py(py),
         BaseType::Bool => builtins.getattr("bool")?.into_py(py),
         BaseType::Str => builtins.getattr("str")?.into_py(py),
-        BaseType::DateTime => py.import_bound("datetime")?.getattr("datetime")?.into_py(py),
+        BaseType::Uuid => py.import_bound("uuid")?.getattr("UUID")?.into_py(py),
+        BaseType::Decimal => py.import_bound("decimal")?.getattr("Decimal")?.into_py(py),
+        BaseType::Enum => {
+            let typing = py.import_bound("typing")?;
+            typing.getattr("Any")?.into_py(py)
+        },
+        BaseType::DateTime => py
+            .import_bound("datetime")?
+            .getattr("datetime")?
+            .into_py(py),
         BaseType::Date => py.import_bound("datetime")?.getattr("date")?.into_py(py),
-        BaseType::Duration => py.import_bound("datetime")?.getattr("timedelta")?.into_py(py),
+        BaseType::Duration => py
+            .import_bound("datetime")?
+            .getattr("timedelta")?
+            .into_py(py),
     })
 }
 
@@ -514,6 +615,9 @@ pub fn dtype_to_descriptor_py(py: Python<'_>, dtype: &DTypeDesc) -> PyResult<PyO
                 Some(BaseType::Float) => "float",
                 Some(BaseType::Bool) => "bool",
                 Some(BaseType::Str) => "str",
+                Some(BaseType::Uuid) => "uuid",
+                Some(BaseType::Decimal) => "decimal",
+                Some(BaseType::Enum) => "enum",
                 Some(BaseType::DateTime) => "datetime",
                 Some(BaseType::Date) => "date",
                 Some(BaseType::Duration) => "duration",
@@ -541,4 +645,59 @@ pub fn dtype_to_descriptor_py(py: Python<'_>, dtype: &DTypeDesc) -> PyResult<PyO
         }
     }
     Ok(dict.into_py(py))
+}
+
+/// Convert a Python `decimal.Decimal` to Polars `Decimal(`[`DECIMAL_PRECISION`], [`DECIMAL_SCALE`]`)` unscaled `i128`.
+pub fn py_decimal_to_scaled_i128(item: &Bound<'_, PyAny>) -> PyResult<i128> {
+    let py = item.py();
+    let dec_mod = py.import_bound("decimal")?;
+    let dec_cls = dec_mod.getattr("Decimal")?;
+    let builtins = py.import_bound("builtins")?;
+    let isinstance = builtins.getattr("isinstance")?;
+    if !isinstance.call1((item, &dec_cls))?.extract::<bool>()? {
+        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "Expected decimal.Decimal.",
+        ));
+    }
+    let pow10 = 10_i128.pow(DECIMAL_SCALE as u32);
+    let int_cls = builtins.getattr("int")?;
+    let factor = int_cls.call1((pow10.to_string(),))?;
+    let prod = item.call_method1("__mul__", (factor,))?;
+    let integral = prod.call_method0("to_integral_value")?;
+    let s: String = integral.call_method0("__str__")?.extract()?;
+    s.parse::<i128>().map_err(|_| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "decimal value out of range for fixed-precision engine storage",
+        )
+    })
+}
+
+/// Inverse of [`py_decimal_to_scaled_i128`].
+pub fn scaled_i128_to_py_decimal(py: Python<'_>, v: i128) -> PyResult<PyObject> {
+    let dec_mod = py.import_bound("decimal")?;
+    let dec_cls = dec_mod.getattr("Decimal")?;
+    let builtins = py.import_bound("builtins")?;
+    let int_cls = builtins.getattr("int")?;
+    let numer = dec_cls.call1((int_cls.call1((v.to_string(),))?,))?;
+    let denom_str = format!("1{}", "0".repeat(DECIMAL_SCALE));
+    let denom = dec_cls.call1((denom_str.as_str(),))?;
+    let out = numer.call_method1("__truediv__", (denom,))?;
+    Ok(out.into_py(py))
+}
+
+/// Fixed-point string for a scaled `i128` (`Decimal(`[`DECIMAL_PRECISION`], [`DECIMAL_SCALE`]`)` cell).
+#[cfg(not(feature = "polars_engine"))]
+pub fn scaled_i128_to_decimal_string(v: i128) -> String {
+    let sign = if v < 0 { "-" } else { "" };
+    let av = v.unsigned_abs();
+    let p = 10_u128.pow(DECIMAL_SCALE as u32);
+    let whole = av / p;
+    let frac = av % p;
+    format!(
+        "{}{}.{:0>width$}",
+        sign,
+        whole,
+        frac,
+        width = DECIMAL_SCALE
+    )
 }

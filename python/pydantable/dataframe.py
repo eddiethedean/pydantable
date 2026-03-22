@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import enum
 import warnings
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from collections.abc import Mapping
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -14,7 +16,7 @@ from typing import (
     get_origin,
 )
 
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 
 from .expressions import ColumnRef, Expr
 from .rust_engine import (
@@ -30,6 +32,7 @@ from .rust_engine import (
     execute_unnest,
 )
 from .schema import (
+    _annotation_nullable_inner,
     make_derived_schema_type,
     merge_field_types_preserving_identity,
     previous_field_types_for_join,
@@ -39,12 +42,38 @@ from .schema import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
 
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
 _NoneType = type(None)
+
+def _coerce_enum_columns(
+    data: dict[str, list[Any]],
+    field_types: Mapping[str, Any],
+) -> dict[str, list[Any]]:
+    """Rehydrate Rust Utf8 enum cells into concrete ``enum.Enum`` field types."""
+    if not data or not field_types:
+        return data
+    out = dict(data)
+    for name, ann in field_types.items():
+        if name not in out:
+            continue
+        inner, _nullable = _annotation_nullable_inner(ann)
+        origin = get_origin(inner)
+        if origin is list:
+            continue
+        if not isinstance(inner, type):
+            continue
+        if issubclass(inner, BaseModel):
+            continue
+        if not (issubclass(inner, enum.Enum) and inner is not enum.Enum):
+            continue
+        adapter = TypeAdapter(ann)
+        out[name] = [adapter.validate_python(v) for v in out[name]]
+    return out
+
 
 def _rows_from_column_dict(
     data: dict[str, list[Any]], row_type: type[BaseModel]
@@ -806,6 +835,7 @@ class DataFrame(Generic[SchemaT]):
         column_dict = execute_plan(
             self._rust_plan, self._root_data, as_python_lists=True
         )
+        column_dict = _coerce_enum_columns(column_dict, self._current_field_types)
         if as_lists:
             return column_dict
         if as_numpy:
@@ -815,7 +845,8 @@ class DataFrame(Generic[SchemaT]):
         return _rows_from_column_dict(column_dict, self._current_schema_type)
 
     def to_dict(self) -> dict[str, list[Any]]:
-        return execute_plan(self._rust_plan, self._root_data, as_python_lists=True)
+        raw = execute_plan(self._rust_plan, self._root_data, as_python_lists=True)
+        return _coerce_enum_columns(raw, self._current_field_types)
 
     def to_polars(self) -> Any:
         """

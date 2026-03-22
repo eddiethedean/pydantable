@@ -315,7 +315,7 @@ def test_p5_explode_unnest_raise_not_implemented_for_scalar_schema() -> None:
     df = DataFrame[S]({"id": [1], "name": ["a"]})
     with pytest.raises(TypeError, match="list dtype"):
         df.explode("name")
-    with pytest.raises(NotImplementedError, match=r"unnest\(\) requires struct-like"):
+    with pytest.raises(TypeError, match="struct dtype"):
         df.unnest("name")
 
 

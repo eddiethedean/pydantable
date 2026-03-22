@@ -19,6 +19,9 @@ Each column in your schema is one **scalar** Python type from this set:
 | `float` | built-in | `float` |
 | `bool` | built-in | `bool` |
 | `str` | built-in | `str` |
+| `UUID` | `from uuid import UUID` | `uuid` (stored as Polars **Utf8**; cells round-trip as `uuid.UUID`) |
+| `Decimal` | `from decimal import Decimal` | `decimal` (Polars **`Decimal(38, 9)`**; scale fixed at 9) |
+| `enum.Enum` subclass | `import enum` | `enum` (Polars **Utf8**; wire value is the member’s `.value` when it is a string, otherwise `str(member)`) |
 | `datetime` | `from datetime import datetime` | `datetime` |
 | `date` | `from datetime import date` | `date` |
 | `timedelta` | `from datetime import timedelta` | `duration` |
@@ -108,13 +111,26 @@ expression is built**, not only at execution time. Scalar base types match the t
 above (including temporal types); struct columns follow the conservative rules
 described above.
 
+### Type-specific `Expr` methods (common operations)
+
+Beyond generic arithmetic and comparisons, the following are supported (see
+`Expr` in the Python API):
+
+- **Numeric:** `abs()`, `round(decimals=...)`, `floor()`, `ceil()` on `int` / `float` columns.
+- **String:** `strip()`, `upper()`, `lower()` (plus existing `substr`, `char_length`, `concat`).
+- **Boolean:** `&`, `|`, `~` for combining boolean-typed expressions.
+- **Datetime / date:** `dt_year()`, `dt_month()`, `dt_day()`, `dt_hour()`, `dt_minute()`, `dt_second()` (time-of-day parts require `datetime`, not plain `date`).
+- **Homogeneous lists:** `list_len()` on `list[T]` columns.
+- **Cast:** `cast(T)` supports the usual primitive conversions plus `datetime` → `date` / `str` and `date` → `str` where listed in the Rust `cast` typing rules.
+
+Temporal part extraction on timezone-aware `datetime` values follows Polars’ interpretation of the stored dtype.
+
 ## Not supported as schema column types
 
 These are **out of scope** for the current schema system:
 
-- `list[...]`, `dict[...]`, or arbitrary objects as **per-cell** values (except
-  nested **`BaseModel`** columns as documented above)
-- `explode` / `unnest` on list columns (see `INTERFACE_CONTRACT.md`)
+- `dict[...]` or arbitrary objects as **per-cell** values (except nested
+  **`BaseModel`** columns and homogeneous **`list[T]`** as documented above)
 
 ## When unsupported field types fail
 
@@ -134,7 +150,6 @@ richer schemas and APIs. Ordering and timing follow project priorities (see
 
 | Planned category | Examples | Notes |
 |------------------|----------|--------|
-| **Homogeneous list columns** | `list[int]`, `list[str]`, `list[float]` | Enables **`explode`**, list-aware **`unnest`**, and element-wise ops where defined. |
 | **Maps / dict-like cells** | `dict[str, T]` with a fixed value type `T`, or a dedicated **map** dtype | Semi-structured columns; stricter than arbitrary JSON `dict`. |
 | **Enums** | `enum.Enum` or `Literal[...]`-backed fields | Discrete categoricals with stable string/value mapping. |
 | **Decimal / money** | `Decimal` | Exact numeric; important for billing and financial APIs. |
@@ -143,8 +158,7 @@ richer schemas and APIs. Ordering and timing follow project priorities (see
 | **Time-of-day** | `time` | Distinct from `datetime` and `timedelta`; useful for schedules. |
 | **Geospatial / extension dtypes** | e.g. WKB, GeoJSON-backed types | Only if there is a clear Polars/Arrow story and API surface. |
 
-**List columns** build on scalar and struct columns: once list dtypes exist,
-`explode`/`unnest` and element-wise operations can be added in a controlled way.
+**Already shipped:** homogeneous **`list[T]`** columns, **`explode()`**, and list-aware expressions such as **`list_len()`** (see above). **`unnest()`** on **struct** columns promotes nested fields to top-level columns when supported by the executor (see `ROADMAP.md`).
 
 ## Runtime column payloads (Python)
 

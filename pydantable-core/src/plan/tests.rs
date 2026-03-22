@@ -86,8 +86,8 @@ fn planinner_to_serializable_smoke() {
 
         // filter(age2 > 10)
         let age2_dtype = plan2.schema.get("age2").expect("age2 in derived schema");
-        let age2_ref =
-            ExprNode::make_column_ref("age2".to_string(), age2_dtype.clone()).expect("age2 column ref");
+        let age2_ref = ExprNode::make_column_ref("age2".to_string(), age2_dtype.clone())
+            .expect("age2 column ref");
         let lit_10 = ExprNode::make_literal(
             Some(LiteralValue::Int(10)),
             DTypeDesc::non_nullable(BaseType::Int),

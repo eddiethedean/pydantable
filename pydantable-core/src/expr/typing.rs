@@ -8,10 +8,75 @@ use pyo3::prelude::*;
 
 use crate::dtype::{dtype_structural_eq, BaseType, DTypeDesc};
 
-use super::ir::{ArithOp, CmpOp, ExprNode, LiteralValue};
+use super::ir::{
+    ArithOp, CmpOp, ExprNode, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart, UnaryNumericOp,
+};
+
+enum ListAggKind {
+    Min,
+    Max,
+    Sum,
+}
+
+fn dtype_is_string_like(dtype: &DTypeDesc) -> bool {
+    matches!(
+        dtype.as_scalar_base_field().flatten(),
+        Some(BaseType::Str | BaseType::Enum)
+    )
+}
+
+#[cfg(not(feature = "polars_engine"))]
+fn trim_matches_char_set(s: &str, pat: &str) -> String {
+    s.trim_matches(|c| pat.chars().any(|m| m == c))
+        .to_string()
+}
+
+#[cfg(not(feature = "polars_engine"))]
+fn wire_str<'a>(v: &'a LiteralValue) -> Option<&'a str> {
+    match v {
+        LiteralValue::Str(s) | LiteralValue::EnumStr(s) => Some(s.as_str()),
+        _ => None,
+    }
+}
+
+/// Proleptic Gregorian calendar from Python / Polars `Date` days since 1970-01-01.
+#[cfg(not(feature = "polars_engine"))]
+fn ordinal_to_ymd(ordinal: i32) -> (i32, u32, u32) {
+    let a = ordinal + 32044;
+    let b = (4 * a + 3) / 146_097;
+    let c = a - (146_097 * b) / 4;
+    let d = (4 * c + 3) / 1461;
+    let e = c - (1461 * d) / 4;
+    let m = (5 * e + 2) / 153;
+    let day = e - (153 * m + 2) / 5 + 1;
+    let month = m + 3 - 12 * (m / 10);
+    let year = b * 100 + d - 4800 + m / 10;
+    (year, month as u32, day as u32)
+}
+
+#[cfg(not(feature = "polars_engine"))]
+fn utc_calendar_from_epoch_days(days: i32) -> (i32, u32, u32) {
+    ordinal_to_ymd(days + 719_163)
+}
+
+/// UTC wall time from Unix epoch microseconds (matches naive `datetime.fromtimestamp` semantics).
+#[cfg(not(feature = "polars_engine"))]
+fn utc_ymdhms_from_unix_micros(us: i64) -> (i32, u32, u32, u32, u32, u32) {
+    let secs = us.div_euclid(1_000_000);
+    let days = secs.div_euclid(86_400);
+    let sod = secs.rem_euclid(86_400);
+    let (y, mo, d) = utc_calendar_from_epoch_days(days as i32);
+    let h = (sod / 3600) as u32;
+    let mi = ((sod % 3600) / 60) as u32;
+    let s = (sod % 60) as u32;
+    (y, mo, d, h, mi, s)
+}
 
 #[cfg(not(feature = "polars_engine"))]
 fn literal_between_inclusive(x: &LiteralValue, lo: &LiteralValue, hi: &LiteralValue) -> bool {
+    if let (Some(xw), Some(lw), Some(hw)) = (wire_str(x), wire_str(lo), wire_str(hi)) {
+        return xw >= lw && xw <= hw;
+    }
     match (x, lo, hi) {
         (LiteralValue::Int(a), LiteralValue::Int(b), LiteralValue::Int(c)) => *a >= *b && *a <= *c,
         (LiteralValue::Float(a), LiteralValue::Float(b), LiteralValue::Float(c)) => {
@@ -27,6 +92,10 @@ fn literal_between_inclusive(x: &LiteralValue, lo: &LiteralValue, hi: &LiteralVa
             *a >= *b as f64 && *a <= *c as f64
         }
         (LiteralValue::Str(a), LiteralValue::Str(b), LiteralValue::Str(c)) => a >= b && a <= c,
+        (LiteralValue::Uuid(a), LiteralValue::Uuid(b), LiteralValue::Uuid(c)) => a >= b && a <= c,
+        (LiteralValue::Decimal(a), LiteralValue::Decimal(b), LiteralValue::Decimal(c)) => {
+            a >= b && a <= c
+        }
         _ => false,
     }
 }
@@ -48,7 +117,20 @@ impl ExprNode {
             | ExprNode::StringConcat { dtype, .. }
             | ExprNode::Substring { dtype, .. }
             | ExprNode::StringLength { dtype, .. }
-            | ExprNode::StructField { dtype, .. } => dtype.clone(),
+            | ExprNode::StringReplace { dtype, .. }
+            | ExprNode::StructField { dtype, .. }
+            | ExprNode::UnaryNumeric { dtype, .. }
+            | ExprNode::StringUnary { dtype, .. }
+            | ExprNode::LogicalBinary { dtype, .. }
+            | ExprNode::LogicalNot { dtype, .. }
+            | ExprNode::TemporalPart { dtype, .. }
+            | ExprNode::ListLen { dtype, .. }
+            | ExprNode::ListGet { dtype, .. }
+            | ExprNode::ListContains { dtype, .. }
+            | ExprNode::ListMin { dtype, .. }
+            | ExprNode::ListMax { dtype, .. }
+            | ExprNode::ListSum { dtype, .. }
+            | ExprNode::DatetimeToDate { dtype, .. } => dtype.clone(),
         }
     }
 
@@ -115,7 +197,32 @@ impl ExprNode {
                 }
                 out
             }
-            ExprNode::StringLength { inner, .. } => inner.referenced_columns(),
+            ExprNode::StringLength { inner, .. }
+            | ExprNode::StringReplace { inner, .. }
+            | ExprNode::UnaryNumeric { inner, .. }
+            | ExprNode::StringUnary { inner, .. }
+            | ExprNode::LogicalNot { inner, .. }
+            | ExprNode::TemporalPart { inner, .. }
+            | ExprNode::ListLen { inner, .. }
+            | ExprNode::ListMin { inner, .. }
+            | ExprNode::ListMax { inner, .. }
+            | ExprNode::ListSum { inner, .. }
+            | ExprNode::DatetimeToDate { inner, .. } => inner.referenced_columns(),
+            ExprNode::ListGet { inner, index, .. } => {
+                let mut out = inner.referenced_columns();
+                out.extend(index.referenced_columns());
+                out
+            }
+            ExprNode::ListContains { inner, value, .. } => {
+                let mut out = inner.referenced_columns();
+                out.extend(value.referenced_columns());
+                out
+            }
+            ExprNode::LogicalBinary { left, right, .. } => {
+                let mut out = left.referenced_columns();
+                out.extend(right.referenced_columns());
+                out
+            }
             ExprNode::StructField { base, .. } => base.referenced_columns(),
         }
     }
@@ -130,12 +237,46 @@ impl ExprNode {
         let left_b = left.as_scalar_base_field().unwrap();
         let right_b = right.as_scalar_base_field().unwrap();
 
+        if let (Some(a), Some(b)) = (left_b, right_b) {
+            use ArithOp::*;
+            match (a, b, op) {
+                (BaseType::DateTime, BaseType::Duration, Add)
+                | (BaseType::Duration, BaseType::DateTime, Add) => {
+                    return Ok(DTypeDesc::Scalar {
+                        base: Some(BaseType::DateTime),
+                        nullable,
+                    });
+                }
+                (BaseType::DateTime, BaseType::Duration, Sub) => {
+                    return Ok(DTypeDesc::Scalar {
+                        base: Some(BaseType::DateTime),
+                        nullable,
+                    });
+                }
+                (BaseType::Date, BaseType::Duration, Add)
+                | (BaseType::Duration, BaseType::Date, Add) => {
+                    return Ok(DTypeDesc::Scalar {
+                        base: Some(BaseType::Date),
+                        nullable,
+                    });
+                }
+                (BaseType::Date, BaseType::Duration, Sub) => {
+                    return Ok(DTypeDesc::Scalar {
+                        base: Some(BaseType::Date),
+                        nullable,
+                    });
+                }
+                _ => {}
+            }
+        }
+
         let inferred_base = match (left_b, right_b) {
             (Some(a), Some(b)) => {
                 let valid = matches!(
                     (a, b),
                     (BaseType::Int, BaseType::Int | BaseType::Float)
                         | (BaseType::Float, BaseType::Int | BaseType::Float)
+                        | (BaseType::Decimal, BaseType::Decimal)
                 );
                 if !valid {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
@@ -145,17 +286,20 @@ impl ExprNode {
                 }
                 match (a, b) {
                     (BaseType::Int, BaseType::Int) => Some(BaseType::Int),
+                    (BaseType::Decimal, BaseType::Decimal) => Some(BaseType::Decimal),
                     _ => Some(BaseType::Float),
                 }
             }
             (None, Some(b)) => match b {
                 BaseType::Int => Some(BaseType::Int),
                 BaseType::Float => Some(BaseType::Float),
+                BaseType::Decimal => Some(BaseType::Decimal),
                 _ => None,
             },
             (Some(a), None) => match a {
                 BaseType::Int => Some(BaseType::Int),
                 BaseType::Float => Some(BaseType::Float),
+                BaseType::Decimal => Some(BaseType::Decimal),
                 _ => None,
             },
             (None, None) => None,
@@ -227,6 +371,11 @@ impl ExprNode {
                         | (BaseType::Float, BaseType::Int | BaseType::Float)
                 ) || (lb == BaseType::Bool && rb == BaseType::Bool)
                     || (lb == BaseType::Str && rb == BaseType::Str)
+                    || (lb == BaseType::Enum && rb == BaseType::Enum)
+                    || (lb == BaseType::Str && rb == BaseType::Enum)
+                    || (lb == BaseType::Enum && rb == BaseType::Str)
+                    || (lb == BaseType::Uuid && rb == BaseType::Uuid)
+                    || (lb == BaseType::Decimal && rb == BaseType::Decimal)
                     || (lb == BaseType::DateTime && rb == BaseType::DateTime)
                     || (lb == BaseType::Date && rb == BaseType::Date)
                     || (lb == BaseType::Duration && rb == BaseType::Duration));
@@ -269,13 +418,24 @@ impl ExprNode {
                         | (BaseType::Float, BaseType::Int | BaseType::Float)
                 );
                 let allowed_str = lb == BaseType::Str && rb == BaseType::Str;
+                let allowed_enum = lb == BaseType::Enum && rb == BaseType::Enum
+                    || (lb == BaseType::Str && rb == BaseType::Enum)
+                    || (lb == BaseType::Enum && rb == BaseType::Str);
+                let allowed_uuid = lb == BaseType::Uuid && rb == BaseType::Uuid;
+                let allowed_decimal = lb == BaseType::Decimal && rb == BaseType::Decimal;
                 let allowed_temporal = (lb == BaseType::DateTime && rb == BaseType::DateTime)
                     || (lb == BaseType::Date && rb == BaseType::Date)
                     || (lb == BaseType::Duration && rb == BaseType::Duration);
 
-                if !(allowed_numeric || allowed_str || allowed_temporal) {
+                if !(allowed_numeric
+                    || allowed_str
+                    || allowed_enum
+                    || allowed_uuid
+                    || allowed_decimal
+                    || allowed_temporal)
+                {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "Ordering comparisons require numeric-numeric, str-str, or same temporal operands.",
+                        "Ordering comparisons require numeric-numeric, str/str-like, uuid-uuid, decimal-decimal, or same temporal operands.",
                     ));
                 }
 
@@ -305,13 +465,23 @@ impl ExprNode {
                 ));
             }
             (None, DTypeDesc::Struct { nullable: true, .. }) => {}
-            (None, DTypeDesc::Struct { nullable: false, .. }) => {
+            (
+                None,
+                DTypeDesc::Struct {
+                    nullable: false, ..
+                },
+            ) => {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "Literal(None) cannot target a non-nullable struct column.",
                 ));
             }
             (None, DTypeDesc::List { nullable: true, .. }) => {}
-            (None, DTypeDesc::List { nullable: false, .. }) => {
+            (
+                None,
+                DTypeDesc::List {
+                    nullable: false, ..
+                },
+            ) => {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "Literal(None) cannot target a non-nullable list column.",
                 ));
@@ -367,9 +537,7 @@ impl ExprNode {
             ));
         }
         let base = match &target {
-            DTypeDesc::Scalar {
-                base: Some(b), ..
-            } => *b,
+            DTypeDesc::Scalar { base: Some(b), .. } => *b,
             _ => {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "cast() target dtype must have known base.",
@@ -377,9 +545,7 @@ impl ExprNode {
             }
         };
         let in_base = match input.dtype() {
-            DTypeDesc::Scalar {
-                base: Some(b), ..
-            } => b,
+            DTypeDesc::Scalar { base: Some(b), .. } => b,
             _ => {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "cast() input dtype must have known base.",
@@ -400,7 +566,15 @@ impl ExprNode {
             ) | (
                 BaseType::Str,
                 BaseType::Int | BaseType::Float | BaseType::Bool | BaseType::Str
-            )
+            ) | (BaseType::Uuid, BaseType::Str | BaseType::Uuid)
+                | (BaseType::Str, BaseType::Uuid)
+                | (BaseType::Decimal, BaseType::Str | BaseType::Decimal)
+                | (BaseType::Str, BaseType::Decimal)
+                | (BaseType::Enum, BaseType::Str | BaseType::Enum)
+                | (BaseType::Str, BaseType::Enum)
+            | (BaseType::DateTime, BaseType::Date)
+                | (BaseType::DateTime, BaseType::Str)
+                | (BaseType::Date, BaseType::Str)
         );
         if !allowed {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -438,16 +612,23 @@ impl ExprNode {
             ));
         }
         let mut nullable = false;
-        if exprs.iter().any(|e| e.dtype().is_struct() || e.dtype().is_list()) {
+        if exprs
+            .iter()
+            .any(|e| e.dtype().is_struct() || e.dtype().is_list())
+        {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "coalesce() does not support struct or list dtypes.",
             ));
         }
-        let first_base = exprs[0].dtype().as_scalar_base_field().flatten().ok_or_else(|| {
-            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "coalesce() requires expressions with known dtypes.",
-            )
-        })?;
+        let first_base = exprs[0]
+            .dtype()
+            .as_scalar_base_field()
+            .flatten()
+            .ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "coalesce() requires expressions with known dtypes.",
+                )
+            })?;
         for e in &exprs {
             if e.dtype().as_scalar_base_field().flatten() != Some(first_base) {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -482,11 +663,16 @@ impl ExprNode {
             ));
         }
         let mut nullable = else_.dtype().nullable_flag();
-        let first_base = branches[0].1.dtype().as_scalar_base_field().flatten().ok_or_else(|| {
-            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "case_when() requires then-branches with known dtypes.",
-            )
-        })?;
+        let first_base = branches[0]
+            .1
+            .dtype()
+            .as_scalar_base_field()
+            .flatten()
+            .ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "case_when() requires then-branches with known dtypes.",
+                )
+            })?;
         for (_, t) in &branches {
             if t.dtype().as_scalar_base_field().flatten() != Some(first_base) {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -516,11 +702,15 @@ impl ExprNode {
                 "isin() does not support struct or list dtypes.",
             ));
         }
-        let ib = inner.dtype().as_scalar_base_field().flatten().ok_or_else(|| {
-            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "isin() requires a column expression with known dtype.",
-            )
-        })?;
+        let ib = inner
+            .dtype()
+            .as_scalar_base_field()
+            .flatten()
+            .ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "isin() requires a column expression with known dtype.",
+                )
+            })?;
         if values.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "isin() requires at least one value.",
@@ -532,11 +722,20 @@ impl ExprNode {
                 LiteralValue::Float(_) => Some(BaseType::Float),
                 LiteralValue::Bool(_) => Some(BaseType::Bool),
                 LiteralValue::Str(_) => Some(BaseType::Str),
+                LiteralValue::Uuid(_) => Some(BaseType::Uuid),
+                LiteralValue::Decimal(_) => Some(BaseType::Decimal),
+                LiteralValue::EnumStr(_) => Some(BaseType::Enum),
                 LiteralValue::DateTimeMicros(_)
                 | LiteralValue::DateDays(_)
                 | LiteralValue::DurationMicros(_) => None,
             };
-            if vb != Some(ib) {
+            let ok = match (ib, vb) {
+                (a, Some(b)) if a == b => true,
+                (BaseType::Enum, Some(BaseType::Str)) => true,
+                (BaseType::Str, Some(BaseType::Enum)) => true,
+                _ => false,
+            };
+            if !ok {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "isin() value types must match column dtype.",
                 ));
@@ -561,9 +760,15 @@ impl ExprNode {
                 "between() does not support struct or list dtypes.",
             ));
         }
-        let ib = inner.dtype().as_scalar_base_field().flatten().ok_or_else(|| {
-            PyErr::new::<pyo3::exceptions::PyTypeError, _>("between() requires known inner dtype.")
-        })?;
+        let ib = inner
+            .dtype()
+            .as_scalar_base_field()
+            .flatten()
+            .ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "between() requires known inner dtype.",
+                )
+            })?;
         if low.dtype().as_scalar_base_field().flatten() != Some(ib)
             || high.dtype().as_scalar_base_field().flatten() != Some(ib)
         {
@@ -586,10 +791,7 @@ impl ExprNode {
             ));
         }
         for p in &parts {
-            if p.dtype().is_struct()
-                || p.dtype().is_list()
-                || p.dtype().as_scalar_base_field().flatten() != Some(BaseType::Str)
-            {
+            if p.dtype().is_struct() || p.dtype().is_list() || !dtype_is_string_like(&p.dtype()) {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "concat() requires string-typed expressions.",
                 ));
@@ -610,9 +812,7 @@ impl ExprNode {
         start: ExprNode,
         length: Option<ExprNode>,
     ) -> PyResult<Self> {
-        if inner.dtype().is_struct()
-            || inner.dtype().is_list()
-            || inner.dtype().as_scalar_base_field().flatten() != Some(BaseType::Str)
+        if inner.dtype().is_struct() || inner.dtype().is_list() || !dtype_is_string_like(&inner.dtype())
         {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "substring() requires a string column.",
@@ -654,9 +854,7 @@ impl ExprNode {
     }
 
     pub fn make_string_length(inner: ExprNode) -> PyResult<Self> {
-        if inner.dtype().is_struct()
-            || inner.dtype().is_list()
-            || inner.dtype().as_scalar_base_field().flatten() != Some(BaseType::Str)
+        if inner.dtype().is_struct() || inner.dtype().is_list() || !dtype_is_string_like(&inner.dtype())
         {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "length() requires a string column.",
@@ -667,6 +865,29 @@ impl ExprNode {
             inner: Box::new(inner),
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
+                nullable,
+            },
+        })
+    }
+
+    pub fn make_string_replace(
+        inner: ExprNode,
+        pattern: String,
+        replacement: String,
+    ) -> PyResult<Self> {
+        if inner.dtype().is_struct() || inner.dtype().is_list() || !dtype_is_string_like(&inner.dtype())
+        {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "str_replace() requires a string-like column.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::StringReplace {
+            inner: Box::new(inner),
+            pattern,
+            replacement,
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Str),
                 nullable,
             },
         })
@@ -716,6 +937,300 @@ impl ExprNode {
         })
     }
 
+    fn numeric_inner_dtype(inner: &DTypeDesc) -> PyResult<(BaseType, bool)> {
+        if inner.is_struct() || inner.is_list() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Numeric unary operations do not support struct- or list-typed columns.",
+            ));
+        }
+        let nullable = inner.nullable_flag();
+        match inner.as_scalar_base_field().flatten() {
+            Some(b @ BaseType::Int) | Some(b @ BaseType::Float) => Ok((b, nullable)),
+            Some(other) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+                "Numeric unary operation requires int or float column; got {:?}.",
+                other
+            ))),
+            None => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Numeric unary operation requires a column with known numeric dtype.",
+            )),
+        }
+    }
+
+    pub fn make_unary_numeric(inner: ExprNode, op: UnaryNumericOp) -> PyResult<Self> {
+        let (in_base, nullable) = Self::numeric_inner_dtype(&inner.dtype())?;
+        let dtype = match op {
+            UnaryNumericOp::Abs | UnaryNumericOp::Round { .. } => DTypeDesc::Scalar {
+                base: Some(in_base),
+                nullable,
+            },
+            UnaryNumericOp::Floor | UnaryNumericOp::Ceil => DTypeDesc::Scalar {
+                base: Some(BaseType::Float),
+                nullable,
+            },
+        };
+        Ok(ExprNode::UnaryNumeric {
+            op,
+            inner: Box::new(inner),
+            dtype,
+        })
+    }
+
+    pub fn make_string_unary(inner: ExprNode, op: StringUnaryOp) -> PyResult<Self> {
+        if inner.dtype().is_struct() || inner.dtype().is_list() || !dtype_is_string_like(&inner.dtype())
+        {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "String operation requires a string column.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::StringUnary {
+            op,
+            inner: Box::new(inner),
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Str),
+                nullable,
+            },
+        })
+    }
+
+    pub fn make_logical_binary(op: LogicalOp, left: ExprNode, right: ExprNode) -> PyResult<Self> {
+        let is_bool = |d: &DTypeDesc| {
+            matches!(
+                d,
+                DTypeDesc::Scalar {
+                    base: Some(BaseType::Bool),
+                    ..
+                }
+            )
+        };
+        if !is_bool(&left.dtype()) || !is_bool(&right.dtype()) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Logical operations require boolean expressions.",
+            ));
+        }
+        let nullable = left.dtype().nullable_flag() || right.dtype().nullable_flag();
+        Ok(ExprNode::LogicalBinary {
+            op,
+            left: Box::new(left),
+            right: Box::new(right),
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Bool),
+                nullable,
+            },
+        })
+    }
+
+    pub fn make_logical_not(inner: ExprNode) -> PyResult<Self> {
+        let is_bool = matches!(
+            inner.dtype(),
+            DTypeDesc::Scalar {
+                base: Some(BaseType::Bool),
+                ..
+            }
+        );
+        if !is_bool {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Logical not requires a boolean expression.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::LogicalNot {
+            inner: Box::new(inner),
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Bool),
+                nullable,
+            },
+        })
+    }
+
+    pub fn make_temporal_part(inner: ExprNode, part: TemporalPart) -> PyResult<Self> {
+        let d = inner.dtype();
+        if d.is_struct() || d.is_list() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Temporal extraction requires a datetime or date column.",
+            ));
+        }
+        let base = d.as_scalar_base_field().flatten();
+        let is_dt = base == Some(BaseType::DateTime);
+        let is_date = base == Some(BaseType::Date);
+        if !is_dt && !is_date {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Temporal extraction requires a datetime or date column.",
+            ));
+        }
+        match part {
+            TemporalPart::Hour | TemporalPart::Minute | TemporalPart::Second if !is_dt => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "hour(), minute(), second() require a datetime column.",
+                ));
+            }
+            _ => {}
+        }
+        let nullable = d.nullable_flag();
+        Ok(ExprNode::TemporalPart {
+            part,
+            inner: Box::new(inner),
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Int),
+                nullable,
+            },
+        })
+    }
+
+    pub fn make_list_len(inner: ExprNode) -> PyResult<Self> {
+        if !inner.dtype().is_list() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "list_len() requires a list-typed column.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::ListLen {
+            inner: Box::new(inner),
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Int),
+                nullable,
+            },
+        })
+    }
+
+    pub fn make_list_get(inner: ExprNode, index: ExprNode) -> PyResult<Self> {
+        let element = match inner.dtype() {
+            DTypeDesc::List { inner: e, .. } => e.as_ref().clone(),
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "list_get() requires a list-typed column.",
+                ));
+            }
+        };
+        if matches!(&element, DTypeDesc::List { .. }) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "list_get() does not support nested list columns.",
+            ));
+        }
+        if index.dtype().is_struct()
+            || index.dtype().is_list()
+            || index.dtype().as_scalar_base_field().flatten() != Some(BaseType::Int)
+        {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "list_get() index must be an int expression.",
+            ));
+        }
+        let dtype = match element {
+            DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
+                base,
+                nullable: true,
+            },
+            DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
+                fields,
+                nullable: true,
+            },
+            DTypeDesc::List { .. } => unreachable!(),
+        };
+        Ok(ExprNode::ListGet {
+            inner: Box::new(inner),
+            index: Box::new(index),
+            dtype,
+        })
+    }
+
+    pub fn make_list_contains(inner: ExprNode, value: ExprNode) -> PyResult<Self> {
+        let elt = match inner.dtype() {
+            DTypeDesc::List { inner: e, .. } => e.as_ref().clone(),
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "list_contains() requires a list-typed column.",
+                ));
+            }
+        };
+        if !dtype_structural_eq(&elt, &value.dtype()) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "list_contains() value dtype must match the list element dtype.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag() || value.dtype().nullable_flag();
+        Ok(ExprNode::ListContains {
+            inner: Box::new(inner),
+            value: Box::new(value),
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Bool),
+                nullable,
+            },
+        })
+    }
+
+    fn make_list_numeric_agg(inner: ExprNode, kind: ListAggKind) -> PyResult<Self> {
+        let (base, list_nullable) = match inner.dtype() {
+            DTypeDesc::List {
+                inner: e,
+                nullable,
+                ..
+            } => match e.as_ref() {
+                DTypeDesc::Scalar {
+                    base: Some(BaseType::Int),
+                    ..
+                } => (BaseType::Int, nullable),
+                DTypeDesc::Scalar {
+                    base: Some(BaseType::Float),
+                    ..
+                } => (BaseType::Float, nullable),
+                _ => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "list_min/list_max/list_sum require list[int] or list[float].",
+                    ));
+                }
+            },
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "list aggregation requires a list-typed column.",
+                ));
+            }
+        };
+        let dtype = DTypeDesc::Scalar {
+            base: Some(base),
+            nullable: list_nullable,
+        };
+        let inner = Box::new(inner);
+        Ok(match kind {
+            ListAggKind::Min => ExprNode::ListMin { inner, dtype },
+            ListAggKind::Max => ExprNode::ListMax { inner, dtype },
+            ListAggKind::Sum => ExprNode::ListSum { inner, dtype },
+        })
+    }
+
+    pub fn make_list_min(inner: ExprNode) -> PyResult<Self> {
+        Self::make_list_numeric_agg(inner, ListAggKind::Min)
+    }
+
+    pub fn make_list_max(inner: ExprNode) -> PyResult<Self> {
+        Self::make_list_numeric_agg(inner, ListAggKind::Max)
+    }
+
+    pub fn make_list_sum(inner: ExprNode) -> PyResult<Self> {
+        Self::make_list_numeric_agg(inner, ListAggKind::Sum)
+    }
+
+    pub fn make_datetime_to_date(inner: ExprNode) -> PyResult<Self> {
+        let d = inner.dtype();
+        if d.is_struct() || d.is_list() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "dt_date() requires a datetime column.",
+            ));
+        }
+        if d.as_scalar_base_field().flatten() != Some(BaseType::DateTime) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "dt_date() requires a datetime column.",
+            ));
+        }
+        let nullable = d.nullable_flag();
+        Ok(ExprNode::DatetimeToDate {
+            inner: Box::new(inner),
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Date),
+                nullable,
+            },
+        })
+    }
+
     #[cfg(not(feature = "polars_engine"))]
     pub fn eval(
         &self,
@@ -752,9 +1267,7 @@ impl ExprNode {
                 let mut out: Vec<Option<LiteralValue>> = Vec::with_capacity(n);
 
                 let result_base = match dtype {
-                    DTypeDesc::Scalar {
-                        base: Some(b), ..
-                    } => *b,
+                    DTypeDesc::Scalar { base: Some(b), .. } => *b,
                     _ => {
                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                             "BinaryOp result dtype base cannot be unknown.",
@@ -816,6 +1329,65 @@ impl ExprNode {
                                     ArithOp::Div => af / bf,
                                 };
                                 out.push(Some(LiteralValue::Float(res_f)));
+                            }
+                            BaseType::DateTime => match (op, va, vb) {
+                                (
+                                    ArithOp::Add,
+                                    LiteralValue::DateTimeMicros(dt),
+                                    LiteralValue::DurationMicros(d),
+                                )
+                                | (
+                                    ArithOp::Add,
+                                    LiteralValue::DurationMicros(d),
+                                    LiteralValue::DateTimeMicros(dt),
+                                ) => {
+                                    out.push(Some(LiteralValue::DateTimeMicros(dt + d)));
+                                }
+                                (
+                                    ArithOp::Sub,
+                                    LiteralValue::DateTimeMicros(dt),
+                                    LiteralValue::DurationMicros(d),
+                                ) => {
+                                    out.push(Some(LiteralValue::DateTimeMicros(dt - d)));
+                                }
+                                _ => {
+                                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                        "datetime arithmetic expects datetime ± duration.",
+                                    ));
+                                }
+                            },
+                            BaseType::Date => {
+                                const US_PER_DAY: i64 = 86_400_000_000;
+                                match (op, va, vb) {
+                                    (
+                                        ArithOp::Add,
+                                        LiteralValue::DateDays(d),
+                                        LiteralValue::DurationMicros(us),
+                                    )
+                                    | (
+                                        ArithOp::Add,
+                                        LiteralValue::DurationMicros(us),
+                                        LiteralValue::DateDays(d),
+                                    ) => {
+                                        out.push(Some(LiteralValue::DateDays(
+                                            d + (us / US_PER_DAY) as i32,
+                                        )));
+                                    }
+                                    (
+                                        ArithOp::Sub,
+                                        LiteralValue::DateDays(d),
+                                        LiteralValue::DurationMicros(us),
+                                    ) => {
+                                        out.push(Some(LiteralValue::DateDays(
+                                            d - (us / US_PER_DAY) as i32,
+                                        )));
+                                    }
+                                    _ => {
+                                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                            "date arithmetic expects date ± duration.",
+                                        ));
+                                    }
+                                }
                             }
                             _ => {
                                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -904,30 +1476,84 @@ impl ExprNode {
                                                 };
                                                 ab == bb
                                             }
-                                            BaseType::Str => {
-                                                let as_ = match va {
-                                                    LiteralValue::Str(s) => s,
+                                            BaseType::Str | BaseType::Enum => {
+                                                let as_ = match &va {
+                                                    LiteralValue::Str(s) | LiteralValue::EnumStr(s) => {
+                                                        s.as_str()
+                                                    }
                                                     _ => {
                                                         return Err(PyErr::new::<
                                                             pyo3::exceptions::PyTypeError,
                                                             _,
                                                         >(
-                                                            "Typed equality expected str operands.",
+                                                            "Typed equality expected str-like operands.",
                                                         ));
                                                     }
                                                 };
-                                                let bs_ = match vb {
-                                                    LiteralValue::Str(s) => s,
+                                                let bs_ = match &vb {
+                                                    LiteralValue::Str(s) | LiteralValue::EnumStr(s) => {
+                                                        s.as_str()
+                                                    }
                                                     _ => {
                                                         return Err(PyErr::new::<
                                                             pyo3::exceptions::PyTypeError,
                                                             _,
                                                         >(
-                                                            "Typed equality expected str operands.",
+                                                            "Typed equality expected str-like operands.",
                                                         ));
                                                     }
                                                 };
                                                 as_ == bs_
+                                            }
+                                            BaseType::Uuid => {
+                                                let as_ = match va {
+                                                    LiteralValue::Uuid(s) => s,
+                                                    _ => {
+                                                        return Err(PyErr::new::<
+                                                            pyo3::exceptions::PyTypeError,
+                                                            _,
+                                                        >(
+                                                            "Typed equality expected uuid operands.",
+                                                        ));
+                                                    }
+                                                };
+                                                let bs_ = match vb {
+                                                    LiteralValue::Uuid(s) => s,
+                                                    _ => {
+                                                        return Err(PyErr::new::<
+                                                            pyo3::exceptions::PyTypeError,
+                                                            _,
+                                                        >(
+                                                            "Typed equality expected uuid operands.",
+                                                        ));
+                                                    }
+                                                };
+                                                as_ == bs_
+                                            }
+                                            BaseType::Decimal => {
+                                                let ai = match va {
+                                                    LiteralValue::Decimal(i) => *i,
+                                                    _ => {
+                                                        return Err(PyErr::new::<
+                                                            pyo3::exceptions::PyTypeError,
+                                                            _,
+                                                        >(
+                                                            "Typed equality expected decimal operands.",
+                                                        ));
+                                                    }
+                                                };
+                                                let bi = match vb {
+                                                    LiteralValue::Decimal(i) => *i,
+                                                    _ => {
+                                                        return Err(PyErr::new::<
+                                                            pyo3::exceptions::PyTypeError,
+                                                            _,
+                                                        >(
+                                                            "Typed equality expected decimal operands.",
+                                                        ));
+                                                    }
+                                                };
+                                                ai == bi
                                             }
                                             BaseType::DateTime => match (va, vb) {
                                                 (
@@ -1009,26 +1635,30 @@ impl ExprNode {
                                                 CmpOp::Eq | CmpOp::Ne => unreachable!(),
                                             }
                                         }
-                                        BaseType::Str => {
-                                            let as_ = match va {
-                                                LiteralValue::Str(s) => s,
+                                        BaseType::Str | BaseType::Enum => {
+                                            let as_ = match &va {
+                                                LiteralValue::Str(s) | LiteralValue::EnumStr(s) => {
+                                                    s.as_str()
+                                                }
                                                 _ => {
                                                     return Err(PyErr::new::<
                                                         pyo3::exceptions::PyTypeError,
                                                         _,
                                                     >(
-                                                        "Typed ordering expected str operands.",
+                                                        "Typed ordering expected str-like operands.",
                                                     ));
                                                 }
                                             };
-                                            let bs_ = match vb {
-                                                LiteralValue::Str(s) => s,
+                                            let bs_ = match &vb {
+                                                LiteralValue::Str(s) | LiteralValue::EnumStr(s) => {
+                                                    s.as_str()
+                                                }
                                                 _ => {
                                                     return Err(PyErr::new::<
                                                         pyo3::exceptions::PyTypeError,
                                                         _,
                                                     >(
-                                                        "Typed ordering expected str operands.",
+                                                        "Typed ordering expected str-like operands.",
                                                     ));
                                                 }
                                             };
@@ -1037,6 +1667,68 @@ impl ExprNode {
                                                 CmpOp::Le => as_ <= bs_,
                                                 CmpOp::Gt => as_ > bs_,
                                                 CmpOp::Ge => as_ >= bs_,
+                                                CmpOp::Eq | CmpOp::Ne => unreachable!(),
+                                            }
+                                        }
+                                        BaseType::Uuid => {
+                                            let as_ = match va {
+                                                LiteralValue::Uuid(s) => s,
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed ordering expected uuid operands.",
+                                                    ));
+                                                }
+                                            };
+                                            let bs_ = match vb {
+                                                LiteralValue::Uuid(s) => s,
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed ordering expected uuid operands.",
+                                                    ));
+                                                }
+                                            };
+                                            match op {
+                                                CmpOp::Lt => as_ < bs_,
+                                                CmpOp::Le => as_ <= bs_,
+                                                CmpOp::Gt => as_ > bs_,
+                                                CmpOp::Ge => as_ >= bs_,
+                                                CmpOp::Eq | CmpOp::Ne => unreachable!(),
+                                            }
+                                        }
+                                        BaseType::Decimal => {
+                                            let ai = match va {
+                                                LiteralValue::Decimal(i) => *i,
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed ordering expected decimal operands.",
+                                                    ));
+                                                }
+                                            };
+                                            let bi = match vb {
+                                                LiteralValue::Decimal(i) => *i,
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed ordering expected decimal operands.",
+                                                    ));
+                                                }
+                                            };
+                                            match op {
+                                                CmpOp::Lt => ai < bi,
+                                                CmpOp::Le => ai <= bi,
+                                                CmpOp::Gt => ai > bi,
+                                                CmpOp::Ge => ai >= bi,
                                                 CmpOp::Eq | CmpOp::Ne => unreachable!(),
                                             }
                                         }
@@ -1128,9 +1820,7 @@ impl ExprNode {
                 let vals = input.eval(ctx, n)?;
                 let mut out = Vec::with_capacity(n);
                 let target = match dtype {
-                    DTypeDesc::Scalar {
-                        base: Some(b), ..
-                    } => *b,
+                    DTypeDesc::Scalar { base: Some(b), .. } => *b,
                     _ => {
                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                             "cast() target dtype must have known base.",
@@ -1252,7 +1942,13 @@ impl ExprNode {
                                 miss = true;
                                 break;
                             }
-                            Some(LiteralValue::Str(s)) => buf.push_str(s),
+                            Some(LiteralValue::Str(s)) | Some(LiteralValue::EnumStr(s)) => {
+                                buf.push_str(s)
+                            }
+                            Some(LiteralValue::Uuid(s)) => buf.push_str(s),
+                            Some(LiteralValue::Decimal(d)) => {
+                                buf.push_str(&crate::dtype::scaled_i128_to_decimal_string(*d))
+                            }
                             Some(LiteralValue::Int(v)) => buf.push_str(&v.to_string()),
                             Some(LiteralValue::Float(v)) => buf.push_str(&v.to_string()),
                             Some(LiteralValue::Bool(v)) => buf.push_str(&v.to_string()),
@@ -1290,7 +1986,7 @@ impl ExprNode {
                         svals.get(i).and_then(|x| x.as_ref()),
                         stvals.get(i).and_then(|x| x.as_ref()),
                     ) {
-                        (Some(LiteralValue::Str(s)), Some(LiteralValue::Int(st))) => {
+                        (Some(LiteralValue::Str(s)) | Some(LiteralValue::EnumStr(s)), Some(LiteralValue::Int(st))) => {
                             let ln = lnvals
                                 .as_ref()
                                 .and_then(|c| c.get(i).and_then(|x| x.as_ref()));
@@ -1337,19 +2033,208 @@ impl ExprNode {
                     .into_iter()
                     .map(|v| match v {
                         None => None,
-                        Some(LiteralValue::Str(s)) => {
+                        Some(LiteralValue::Str(s)) | Some(LiteralValue::EnumStr(s)) => {
                             Some(LiteralValue::Int(s.chars().count() as i64))
+                        }
+                        Some(LiteralValue::Uuid(s)) => {
+                            Some(LiteralValue::Int(s.chars().count() as i64))
+                        }
+                        Some(LiteralValue::Decimal(d)) => Some(LiteralValue::Int(
+                            crate::dtype::scaled_i128_to_decimal_string(*d).chars().count() as i64,
+                        )),
+                        _ => None,
+                    })
+                    .collect())
+            }
+            ExprNode::StringReplace {
+                inner,
+                pattern,
+                replacement,
+                ..
+            } => {
+                let vals = inner.eval(ctx, n)?;
+                let pat = pattern.as_str();
+                let rep = replacement.as_str();
+                Ok(vals
+                    .into_iter()
+                    .map(|v| match v {
+                        None => None,
+                        Some(LiteralValue::Str(s)) | Some(LiteralValue::EnumStr(s)) => {
+                            Some(LiteralValue::Str(s.replace(pat, rep)))
                         }
                         _ => None,
                     })
                     .collect())
             }
-            ExprNode::StructField { .. } => Err(PyErr::new::<
-                pyo3::exceptions::PyNotImplementedError,
-                _,
-            >(
-                "Struct field access is only supported with the Polars execution engine.",
-            )),
+            ExprNode::UnaryNumeric { op, inner, .. } => {
+                let vals = inner.eval(ctx, n)?;
+                let round_f = |f: f64, decimals: u32| {
+                    let m = 10f64.powi(decimals as i32);
+                    (f * m).round() / m
+                };
+                Ok(vals
+                    .into_iter()
+                    .map(|v| match (op, v) {
+                        (UnaryNumericOp::Abs, Some(LiteralValue::Int(i))) => {
+                            Some(LiteralValue::Int(i.abs()))
+                        }
+                        (UnaryNumericOp::Abs, Some(LiteralValue::Float(f))) => {
+                            Some(LiteralValue::Float(f.abs()))
+                        }
+                        (UnaryNumericOp::Round { decimals }, Some(LiteralValue::Int(i))) => {
+                            Some(LiteralValue::Int(round_f(i as f64, *decimals) as i64))
+                        }
+                        (UnaryNumericOp::Round { decimals }, Some(LiteralValue::Float(f))) => {
+                            Some(LiteralValue::Float(round_f(f, *decimals)))
+                        }
+                        (UnaryNumericOp::Floor, Some(LiteralValue::Int(i))) => {
+                            Some(LiteralValue::Float((i as f64).floor()))
+                        }
+                        (UnaryNumericOp::Floor, Some(LiteralValue::Float(f))) => {
+                            Some(LiteralValue::Float(f.floor()))
+                        }
+                        (UnaryNumericOp::Ceil, Some(LiteralValue::Int(i))) => {
+                            Some(LiteralValue::Float((i as f64).ceil()))
+                        }
+                        (UnaryNumericOp::Ceil, Some(LiteralValue::Float(f))) => {
+                            Some(LiteralValue::Float(f.ceil()))
+                        }
+                        _ => None,
+                    })
+                    .collect())
+            }
+            ExprNode::StringUnary { op, inner, .. } => {
+                let vals = inner.eval(ctx, n)?;
+                Ok(vals
+                    .into_iter()
+                    .map(|v| {
+                        let str_like = |s: &str| match op {
+                            StringUnaryOp::Strip => Some(LiteralValue::Str(s.trim().to_string())),
+                            StringUnaryOp::Upper => Some(LiteralValue::Str(s.to_uppercase())),
+                            StringUnaryOp::Lower => Some(LiteralValue::Str(s.to_lowercase())),
+                            StringUnaryOp::StripPrefix(ref p) => Some(LiteralValue::Str(
+                                s.strip_prefix(p.as_str())
+                                    .unwrap_or(s)
+                                    .to_string(),
+                            )),
+                            StringUnaryOp::StripSuffix(ref suf) => Some(LiteralValue::Str(
+                                s.strip_suffix(suf.as_str())
+                                    .unwrap_or(s)
+                                    .to_string(),
+                            )),
+                            StringUnaryOp::StripChars(ref c) => {
+                                Some(LiteralValue::Str(trim_matches_char_set(s, c)))
+                            }
+                        };
+                        match v {
+                            Some(LiteralValue::Str(s)) => str_like(s.as_str()),
+                            Some(LiteralValue::EnumStr(s)) => str_like(s.as_str()),
+                            _ => None,
+                        }
+                    })
+                    .collect())
+            }
+            ExprNode::LogicalBinary {
+                op, left, right, ..
+            } => {
+                let lv = left.eval(ctx, n)?;
+                let rv = right.eval(ctx, n)?;
+                let mut out = Vec::with_capacity(n);
+                for i in 0..n {
+                    let lb = lv.get(i).and_then(|x| x.as_ref());
+                    let rb = rv.get(i).and_then(|x| x.as_ref());
+                    let res = match (op, lb, rb) {
+                        (
+                            LogicalOp::And,
+                            Some(LiteralValue::Bool(a)),
+                            Some(LiteralValue::Bool(b)),
+                        ) => Some(LiteralValue::Bool(*a && *b)),
+                        (
+                            LogicalOp::Or,
+                            Some(LiteralValue::Bool(a)),
+                            Some(LiteralValue::Bool(b)),
+                        ) => Some(LiteralValue::Bool(*a || *b)),
+                        _ => None,
+                    };
+                    out.push(res);
+                }
+                Ok(out)
+            }
+            ExprNode::LogicalNot { inner, .. } => {
+                let vals = inner.eval(ctx, n)?;
+                Ok(vals
+                    .into_iter()
+                    .map(|v| match v {
+                        Some(LiteralValue::Bool(b)) => Some(LiteralValue::Bool(!b)),
+                        _ => None,
+                    })
+                    .collect())
+            }
+            ExprNode::DatetimeToDate { inner, .. } => {
+                let vals = inner.eval(ctx, n)?;
+                Ok(vals
+                    .into_iter()
+                    .map(|v| match v {
+                        None => None,
+                        Some(LiteralValue::DateTimeMicros(us)) => Some(LiteralValue::DateDays(
+                            (us / 86_400_000_000) as i32,
+                        )),
+                        _ => None,
+                    })
+                    .collect())
+            }
+            ExprNode::TemporalPart { part, inner, .. } => {
+                let vals = inner.eval(ctx, n)?;
+                let is_date =
+                    inner.dtype().as_scalar_base_field().flatten() == Some(BaseType::Date);
+                Ok(vals
+                    .into_iter()
+                    .map(|v| match v {
+                        None => None,
+                        Some(LiteralValue::DateTimeMicros(us)) if !is_date => {
+                            let (y, mo, d, h, mi, s) = utc_ymdhms_from_unix_micros(us);
+                            let i = match part {
+                                TemporalPart::Year => i64::from(y),
+                                TemporalPart::Month => i64::from(mo),
+                                TemporalPart::Day => i64::from(d),
+                                TemporalPart::Hour => i64::from(h),
+                                TemporalPart::Minute => i64::from(mi),
+                                TemporalPart::Second => i64::from(s),
+                            };
+                            Some(LiteralValue::Int(i))
+                        }
+                        Some(LiteralValue::DateDays(days)) if is_date => match part {
+                            TemporalPart::Hour | TemporalPart::Minute | TemporalPart::Second => None,
+                            TemporalPart::Year | TemporalPart::Month | TemporalPart::Day => {
+                                let (y, mo, d) = utc_calendar_from_epoch_days(days);
+                                let i = match part {
+                                    TemporalPart::Year => i64::from(y),
+                                    TemporalPart::Month => i64::from(mo),
+                                    TemporalPart::Day => i64::from(d),
+                                    _ => unreachable!(),
+                                };
+                                Some(LiteralValue::Int(i))
+                            }
+                        },
+                        _ => None,
+                    })
+                    .collect())
+            }
+            ExprNode::ListLen { .. }
+            | ExprNode::ListGet { .. }
+            | ExprNode::ListContains { .. }
+            | ExprNode::ListMin { .. }
+            | ExprNode::ListMax { .. }
+            | ExprNode::ListSum { .. } => {
+                Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                    "List expressions are only supported with the Polars execution engine.",
+                ))
+            }
+            ExprNode::StructField { .. } => {
+                Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                    "Struct field access is only supported with the Polars execution engine.",
+                ))
+            }
         }
     }
 }
@@ -1366,7 +2251,10 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             }),
             LiteralValue::DateTimeMicros(_)
             | LiteralValue::DateDays(_)
-            | LiteralValue::DurationMicros(_) => {
+            | LiteralValue::DurationMicros(_)
+            | LiteralValue::Uuid(_)
+            | LiteralValue::Decimal(_)
+            | LiteralValue::EnumStr(_) => {
                 Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "Cannot cast temporal literal to int.",
                 ))
@@ -1381,7 +2269,10 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             }),
             LiteralValue::DateTimeMicros(_)
             | LiteralValue::DateDays(_)
-            | LiteralValue::DurationMicros(_) => {
+            | LiteralValue::DurationMicros(_)
+            | LiteralValue::Uuid(_)
+            | LiteralValue::Decimal(_)
+            | LiteralValue::EnumStr(_) => {
                 Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "Cannot cast temporal literal to float.",
                 ))
@@ -1400,7 +2291,10 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             },
             LiteralValue::DateTimeMicros(_)
             | LiteralValue::DateDays(_)
-            | LiteralValue::DurationMicros(_) => {
+            | LiteralValue::DurationMicros(_)
+            | LiteralValue::Uuid(_)
+            | LiteralValue::Decimal(_)
+            | LiteralValue::EnumStr(_) => {
                 Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "Cannot cast temporal literal to bool.",
                 ))
@@ -1411,17 +2305,82 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             LiteralValue::Float(f) => Ok(LiteralValue::Str(f.to_string())),
             LiteralValue::Bool(b) => Ok(LiteralValue::Str(b.to_string())),
             LiteralValue::Str(s) => Ok(LiteralValue::Str(s)),
-            LiteralValue::DateTimeMicros(_)
-            | LiteralValue::DateDays(_)
-            | LiteralValue::DurationMicros(_) => {
-                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "Cannot cast temporal literal to str.",
-                ))
-            }
+            LiteralValue::EnumStr(s) => Ok(LiteralValue::Str(s)),
+            LiteralValue::Uuid(s) => Ok(LiteralValue::Str(s)),
+            LiteralValue::Decimal(d) => Ok(LiteralValue::Str(
+                crate::dtype::scaled_i128_to_decimal_string(d),
+            )),
+            LiteralValue::DateTimeMicros(us) => Ok(LiteralValue::Str(format!("{us}"))),
+            LiteralValue::DateDays(d) => Ok(LiteralValue::Str(format!("{d}"))),
+            LiteralValue::DurationMicros(us) => Ok(LiteralValue::Str(format!("{us}"))),
         },
-        BaseType::DateTime | BaseType::Date | BaseType::Duration => {
+        BaseType::Enum => match v {
+            LiteralValue::EnumStr(s) => Ok(LiteralValue::EnumStr(s)),
+            LiteralValue::Str(s) => Ok(LiteralValue::EnumStr(s)),
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() to enum supports str-like literals only.",
+            )),
+        },
+        BaseType::Uuid => match v {
+            LiteralValue::Uuid(s) => Ok(LiteralValue::Uuid(s)),
+            LiteralValue::Str(s) => Ok(LiteralValue::Uuid(s)),
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() to uuid supports uuid or str literals only.",
+            )),
+        },
+        BaseType::Decimal => match v {
+            LiteralValue::Decimal(d) => Ok(LiteralValue::Decimal(d)),
+            LiteralValue::Int(i) => Ok(LiteralValue::Decimal(
+                i as i128 * 10_i128.pow(crate::dtype::DECIMAL_SCALE as u32),
+            )),
+            LiteralValue::Float(f) => Ok(LiteralValue::Decimal(
+                (f * 10_f64.powi(crate::dtype::DECIMAL_SCALE as i32)).round() as i128,
+            )),
+            LiteralValue::Str(s) => {
+                let t = s.trim();
+                if t.is_empty() {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Cannot cast empty str to decimal.",
+                    ));
+                }
+                let neg = t.starts_with('-');
+                let t = t.trim_start_matches('-');
+                let (whole_s, frac_s) = match t.split_once('.') {
+                    Some((w, f)) => (w, f),
+                    None => (t, ""),
+                };
+                let whole: i128 = whole_s.parse().map_err(|_| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>("Cannot cast str to decimal.")
+                })?;
+                let mut frac = frac_s.chars().take(crate::dtype::DECIMAL_SCALE).collect::<String>();
+                while frac.len() < crate::dtype::DECIMAL_SCALE {
+                    frac.push('0');
+                }
+                let frac_v: i128 = frac.parse().unwrap_or(0);
+                let p = 10_i128.pow(crate::dtype::DECIMAL_SCALE as u32);
+                let mut v = whole * p + frac_v;
+                if neg {
+                    v = -v;
+                }
+                Ok(LiteralValue::Decimal(v))
+            }
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() to decimal supports decimal, int, float, or str literals only.",
+            )),
+        },
+        BaseType::Date => match v {
+            LiteralValue::DateDays(d) => Ok(LiteralValue::DateDays(d)),
+            LiteralValue::DateTimeMicros(us) => {
+                let days = (us / 86_400_000_000) as i32;
+                Ok(LiteralValue::DateDays(days))
+            }
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() to date supports date or datetime literals only.",
+            )),
+        },
+        BaseType::DateTime | BaseType::Duration => {
             Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "Row-wise cast() for temporal types is not supported.",
+                "Row-wise cast() for this temporal target is not supported.",
             ))
         }
     }

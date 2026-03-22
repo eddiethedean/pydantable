@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import enum
+import uuid
 from contextlib import suppress
+from decimal import Decimal
 from dataclasses import dataclass
 from types import NoneType
 from typing import Any, get_args, get_origin, get_type_hints
@@ -129,6 +132,16 @@ def annotation_to_data_type(annotation: Any) -> DataType:
         return StringType(nullable=False)
     if annotation is bool:
         return BooleanType(nullable=False)
+    if (
+        isinstance(annotation, type)
+        and issubclass(annotation, enum.Enum)
+        and annotation is not enum.Enum
+    ):
+        return StringType(nullable=False)
+    if annotation is uuid.UUID:
+        return StringType(nullable=False)
+    if annotation is Decimal:
+        return StringType(nullable=False)
 
     args = tuple(get_args(annotation))
     if len(args) >= 2 and NoneType in args:

@@ -3,7 +3,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDate, PyDateTime, PyDelta};
 
-use crate::dtype::{py_value_to_dtype, BaseType};
+use crate::dtype::{py_decimal_to_scaled_i128, py_enum_to_wire_string, py_value_to_dtype, BaseType};
 
 use super::ir::{ArithOp, CmpOp, ExprNode, LiteralValue};
 
@@ -39,6 +39,25 @@ impl ExprHandle {
                 ..
             } => LiteralValue::Str(value.extract::<String>()?),
             crate::dtype::DTypeDesc::Scalar {
+                base: Some(BaseType::Enum),
+                ..
+            } => LiteralValue::EnumStr(py_enum_to_wire_string(value)?),
+            crate::dtype::DTypeDesc::Scalar {
+                base: Some(BaseType::Uuid),
+                ..
+            } => {
+                let s = if let Ok(s) = value.extract::<String>() {
+                    s
+                } else {
+                    value.str()?.extract()?
+                };
+                LiteralValue::Uuid(s)
+            }
+            crate::dtype::DTypeDesc::Scalar {
+                base: Some(BaseType::Decimal),
+                ..
+            } => LiteralValue::Decimal(py_decimal_to_scaled_i128(value)?),
+            crate::dtype::DTypeDesc::Scalar {
                 base: Some(BaseType::DateTime),
                 ..
             } => {
@@ -62,10 +81,7 @@ impl ExprHandle {
                 let secs: f64 = td.call_method0("total_seconds")?.extract()?;
                 LiteralValue::DurationMicros((secs * 1_000_000.0).round() as i64)
             }
-            crate::dtype::DTypeDesc::Scalar {
-                base: None,
-                ..
-            } => {
+            crate::dtype::DTypeDesc::Scalar { base: None, .. } => {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "Non-None literal must have known base dtype.",
                 ));

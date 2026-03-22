@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDate, PyDateTime, PyDelta, PyDict, PyList};
 
-use crate::dtype::{BaseType, DTypeDesc};
+use crate::dtype::{py_decimal_to_scaled_i128, py_enum_to_wire_string, BaseType, DTypeDesc};
 use crate::expr::LiteralValue;
 
 #[cfg(not(feature = "polars_engine"))]
@@ -68,6 +68,25 @@ pub fn root_data_to_ctx(
                         ..
                     } => LiteralValue::Str(item.extract::<String>()?),
                     DTypeDesc::Scalar {
+                        base: Some(BaseType::Enum),
+                        ..
+                    } => LiteralValue::EnumStr(py_enum_to_wire_string(item)?),
+                    DTypeDesc::Scalar {
+                        base: Some(BaseType::Uuid),
+                        ..
+                    } => {
+                        let s = if let Ok(s) = item.extract::<String>() {
+                            s
+                        } else {
+                            item.str()?.extract()?
+                        };
+                        LiteralValue::Uuid(s)
+                    }
+                    DTypeDesc::Scalar {
+                        base: Some(BaseType::Decimal),
+                        ..
+                    } => LiteralValue::Decimal(py_decimal_to_scaled_i128(item)?),
+                    DTypeDesc::Scalar {
                         base: Some(BaseType::DateTime),
                         ..
                     } => {
@@ -91,10 +110,7 @@ pub fn root_data_to_ctx(
                         let secs: f64 = td.call_method0("total_seconds")?.extract()?;
                         LiteralValue::DurationMicros((secs * 1_000_000.0).round() as i64)
                     }
-                    DTypeDesc::Scalar {
-                        base: None,
-                        ..
-                    } => {
+                    DTypeDesc::Scalar { base: None, .. } => {
                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                             "Root schema cannot have unknown-base dtype.",
                         ));

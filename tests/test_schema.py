@@ -168,3 +168,45 @@ def test_is_supported_column_annotation_list_variants():
     assert is_supported_column_annotation(list[Inner])
     assert is_supported_column_annotation(list[int] | None)
     assert not is_supported_column_annotation(list[int, str])
+
+
+def test_is_supported_column_annotation_optional_nested_struct():
+    class Inner(Schema):
+        x: int
+
+    class Outer(Schema):
+        inner: Inner | None
+
+    assert is_supported_column_annotation(Outer)
+
+
+def test_descriptor_matches_optional_nested_struct():
+    inner_struct = {
+        "kind": "struct",
+        "nullable": False,
+        "fields": [{"name": "x", "dtype": {"base": "int", "nullable": False}}],
+    }
+    desc = {
+        "kind": "struct",
+        "nullable": False,
+        "fields": [{"name": "inner", "dtype": inner_struct}],
+    }
+    opt_desc = {
+        "kind": "struct",
+        "nullable": False,
+        "fields": [
+            {
+                "name": "inner",
+                "dtype": {**inner_struct, "nullable": True},
+            }
+        ],
+    }
+
+    class Inner(Schema):
+        x: int
+
+    class Outer(Schema):
+        inner: Inner | None
+
+    assert descriptor_matches_column_annotation(opt_desc, Outer)
+    assert not descriptor_matches_column_annotation(desc, Outer)
