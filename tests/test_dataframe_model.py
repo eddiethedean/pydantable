@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 from pydantable import DataFrameModel
+from pydantable.schema import is_supported_scalar_column_annotation
 from pydantic import ValidationError
 
 
@@ -60,6 +61,29 @@ def test_dataframe_model_transformations_return_derived_model():
 def test_dataframe_model_row_input_rejects_bad_item_type():
     with pytest.raises(TypeError, match="mapping objects or Pydantic models"):
         UserDF([1, 2, 3])  # type: ignore[arg-type]
+
+
+def test_dataframe_model_rejects_unsupported_list_type_at_class_definition():
+    with pytest.raises(TypeError, match="unsupported type") as exc:
+        class BadList(DataFrameModel):
+            items: list[int]
+
+    assert "BadList" in str(exc.value)
+    assert "items" in str(exc.value)
+    assert "SUPPORTED_TYPES" in str(exc.value)
+
+
+def test_dataframe_model_rejects_unsupported_union_of_two_scalars_at_class_definition():
+    with pytest.raises(TypeError, match="unsupported type"):
+        class BadUnion(DataFrameModel):
+            x: int | str
+
+
+def test_is_supported_scalar_column_annotation_smoke():
+    assert is_supported_scalar_column_annotation(int)
+    assert is_supported_scalar_column_annotation(int | None)
+    assert not is_supported_scalar_column_annotation(list[int])
+    assert not is_supported_scalar_column_annotation(dict[str, int])
 
 
 def test_dataframe_model_parity_with_dataframe_core_expression_behavior():

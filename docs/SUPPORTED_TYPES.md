@@ -47,6 +47,11 @@ These are **out of scope** for the current schema system:
 - Nested Pydantic models, `list[...]`, `dict[...]`, or arbitrary objects as **per-cell** values
 - `explode` / `unnest` on non-scalar columns (see `INTERFACE_CONTRACT.md`; list/struct columns are not modeled yet)
 
+## When unsupported field types fail
+
+- **`DataFrameModel` subclasses**: each field annotation is validated **when the class is defined** (in `__init_subclass__`). Unsupported types (for example `list[int]`, `dict[str, int]`, `int | str`, or `typing.Any`) raise **`TypeError`** immediately, before `RowModel` is generated. The message lists supported scalar dtypes and points to this page.
+- **`DataFrame[Schema]`** with a hand-written **`Schema`** subclass: the same scalar rules apply in the Rust engine, but there is **no** class-time check on the `Schema` model itself. If an annotation is unsupported, you typically see an error when you **first construct** `DataFrame[YourSchema](...)` (native plan build), or from Pydantic if the annotation is invalid for another reason.
+
 ## Future / planned types (roadmap direction)
 
 The following are **not implemented today**; they are the intended direction for

@@ -1,12 +1,76 @@
 from __future__ import annotations
 
+import types
 from datetime import date, datetime, timedelta
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, Union, cast, get_args, get_origin
 
 from pydantic import BaseModel, ConfigDict, TypeAdapter, create_model
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+_NoneType = type(None)
+_SUPPORTED_NON_NULL_SCALAR_TYPES = frozenset(
+    {int, float, bool, str, datetime, date, timedelta}
+)
+
+
+def _unwrap_annotated(annotation: Any) -> Any:
+    """Strip ``Annotated[T, ...]`` wrappers to the inner ``T``."""
+    ann = annotation
+    origin = get_origin(ann)
+    while origin is Annotated:
+        ann = get_args(ann)[0]
+        origin = get_origin(ann)
+    return ann
+
+
+def _is_supported_non_null_scalar_type(tp: Any) -> bool:
+    return tp in _SUPPORTED_NON_NULL_SCALAR_TYPES
+
+
+def is_supported_scalar_column_annotation(annotation: Any) -> bool:
+    """
+    Return True if ``annotation`` is a pydantable column dtype (Rust ``DTypeDesc``).
+
+    Used by ``DataFrameModel`` at class definition time before ``make_plan``.
+    """
+    ann = _unwrap_annotated(annotation)
+    if ann is Any:
+        return False
+    origin = get_origin(ann)
+    if origin is Union or origin is types.UnionType:
+        args = [a for a in get_args(ann) if a is not _NoneType]
+        if len(args) != 1:
+            return False
+        inner = args[0]
+        inner = _unwrap_annotated(inner)
+        if get_origin(inner) is not None:
+            return False
+        return _is_supported_non_null_scalar_type(inner)
+    if origin is not None:
+        return False
+    return _is_supported_non_null_scalar_type(ann)
+
+
+def validate_dataframe_model_field_annotations(
+    model_name: str, annotations: dict[str, Any]
+) -> None:
+    """
+    Ensure every field annotation is a supported scalar dtype.
+
+    Raises ``TypeError`` with a user-facing message when a ``DataFrameModel`` subclass
+    is defined with an unsupported column type (e.g. ``list[int]``, ``dict[...]``).
+    """
+    for field_name, field_type in annotations.items():
+        if not is_supported_scalar_column_annotation(field_type):
+            raise TypeError(
+                f"DataFrameModel {model_name!r} field {field_name!r} has unsupported "
+                f"type {field_type!r}. Column types must be pydantable scalar dtypes: "
+                "int, float, bool, str, datetime, date, timedelta, or Optional[T] / "
+                "T | None with T one of those (nullable columns). "
+                "See docs/SUPPORTED_TYPES.md."
+            )
 
 
 class Schema(BaseModel):

@@ -24,7 +24,7 @@ The current primary FastAPI-facing API is `DataFrameModel`, a class that:
 - uses replacement semantics for `with_columns` name collisions
 
 See:
-- `docs/SUPPORTED_TYPES.md` for **scalar column dtypes** (and what is not supported)
+- `docs/SUPPORTED_TYPES.md` for **scalar column dtypes**, unsupported cases, and **when** unsupported `DataFrameModel` field types fail (at class definition)
 - `docs/DATAFRAMEMODEL.md` for the DataFrameModel contract
 - `docs/EXECUTION.md` for the Rust execution model and optional UI modules
 - `docs/FASTAPI.md` for end-to-end FastAPI examples

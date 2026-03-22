@@ -8,7 +8,7 @@ from typing import Any, cast
 from pydantic import BaseModel, create_model
 
 from .dataframe import DataFrame
-from .schema import Schema
+from .schema import Schema, validate_dataframe_model_field_annotations
 
 
 def _field_defs_from_annotations(
@@ -92,6 +92,8 @@ class DataFrameModel:
                 annotations[field_name] = field_type
         if not annotations:
             raise TypeError("DataFrameModel subclasses must define annotated fields.")
+
+        validate_dataframe_model_field_annotations(cls.__name__, annotations)
 
         field_defs = _field_defs_from_annotations(annotations)
         cls.RowModel = create_model(  # type: ignore[call-overload]

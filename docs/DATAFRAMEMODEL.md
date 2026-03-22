@@ -30,6 +30,10 @@ class UserDF(DataFrameModel):
 
 Defining the class does not print anything; it registers `UserDF.RowModel` and the schema model used by the internal `DataFrame`.
 
+### Field annotations (supported dtypes)
+
+Column fields must use **scalar** types from **`SUPPORTED_TYPES.md`** (`int`, `float`, `bool`, `str`, `datetime`, `date`, `timedelta`, and nullable forms such as `Optional[T]` / `T | None`). If you declare an unsupported annotation (for example `list[int]` or `int | str` on one field), pydantable raises **`TypeError` while the class body is executing**—before instances can be constructed—so bad schemas fail at import/definition time. Plain **`Schema`** subclasses used with **`DataFrame[Schema]`** do not get this early check; see **`SUPPORTED_TYPES.md`** (“When unsupported field types fail”).
+
 From this definition, `DataFrameModel` generates:
 - `UserDF.RowModel`: a Pydantic model for a single row
 - a schema-backed typed dataframe wrapper used for query building and execution
@@ -182,6 +186,8 @@ Null semantics are SQL-like (`propagate_nulls`):
 
 Error timing expectations:
 
+- **unsupported `DataFrameModel` field types** fail when the **subclass is defined**
+  (see **`SUPPORTED_TYPES.md`**)
 - invalid expressions fail early when the expression AST is built (during
   operator overloads / literal coercion)
 - `filter()` validates that the condition expression is typed as `bool` or
