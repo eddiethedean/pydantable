@@ -31,7 +31,33 @@ source .venv/bin/activate
 - `python/pydantable/rust_engine.py`: calls into `pydantable._core` for execution (single engine)
 - `pydantable-core/src/`: Rust core (`dtype`, `expr`, `plan`, PyO3 exports)
 - `tests/`: Python integration/unit tests for behavior contracts
-- `docs/`: product docs + roadmap/spec docs
+- `docs/`: product docs + roadmap/spec docs (built with **Sphinx** + MyST; see below)
+
+(docs-sphinx-build)=
+
+## Documentation builds (Sphinx)
+
+**Read the Docs** (configured via `.readthedocs.yaml` at the repository root) uses **Sphinx only**, not MkDocs. The published site is the single source of truth for navigation and cross-links.
+
+Local HTML build (from repo root, after `pip install -e ".[docs]"` and a working `pydantable._core` for correct `version` in `conf.py`):
+
+```bash
+sphinx-build -b html docs docs/_build/html
+```
+
+Strict mode (warnings as errors), matching a tightened RTD config:
+
+```bash
+sphinx-build -W -b html docs docs/_build/html
+```
+
+Check external links (optional):
+
+```bash
+sphinx-build -b linkcheck docs docs/_build/linkcheck
+```
+
+User-facing doc changes should keep the repository `README.md` and `docs/` aligned; run `scripts/verify_doc_examples.py` before merging (see below).
 
 ## Architecture (Rust-first)
 
@@ -67,8 +93,10 @@ Phase 4 boundary contract:
 
 ```bash
 .venv/bin/python -m pip install -e ".[docs]"
-.venv/bin/python -m sphinx -b html docs docs/_build
+.venv/bin/python -m sphinx -b html docs docs/_build/html
 ```
+
+See [Documentation builds (Sphinx)](#docs-sphinx-build) for `sphinx-build -W` and `linkcheck`.
 
 ### Verify runnable doc snippets (README + `docs/`)
 
@@ -169,4 +197,5 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 - [ ] Python tests pass in `.venv`
 - [ ] Rust changes compile in package build path (`maturin build`)
 - [ ] Docs updated for behavior/contract changes
+- [ ] `sphinx-build -W -b html docs docs/_build/html` succeeds (matches Read the Docs `fail_on_warning`)
 - [ ] Roadmap status updated when a phase milestone changes

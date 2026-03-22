@@ -1,75 +1,78 @@
 # PydanTable
 
-**Typed dataframe transformations for FastAPI + Pydantic services, powered by a Rust execution core.**
+**Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core.**
 
-**Current release: 0.5.0** — `collect()` materializes **rows as Pydantic models**; use `to_dict()` for columnar `dict[str, list]`. The Python **`polars`** package is **optional** (`pip install 'pydantable[polars]'` for `to_polars()`). See `docs/EXECUTION.md`.
+**Current release: 0.5.0** · Python **3.10+**
 
-PydanTable keeps your Pydantic schemas as the source of truth for:
+---
 
-- column types + nullability (`Optional[T]`)
-- expression validity (type errors fail early during AST building)
-- derived schema migration through chained transforms
+## Documentation
 
-Execution always uses the Rust core; optional `pandas` / `pyspark` **UI modules** only change naming/imports (see `docs/EXECUTION.md`).
+**The full manual lives on Read the Docs:**
 
-## Supported data types
+### **[https://pydantable.readthedocs.io/en/latest/](https://pydantable.readthedocs.io/en/latest/)**
 
-**Scalar columns** (expressions are typed against these bases):
+That site is the supported entry point for concepts, contracts, API notes, and examples. The sections below point to the same pages so you can jump straight from GitHub.
 
-| Type | Nullable form |
-|------|----------------|
-| `int`, `float`, `bool`, `str` | `Optional[T]` / `T \| None` |
-| `datetime`, `date`, `timedelta` (`datetime` stdlib) | same |
-| `UUID`, `Decimal`, concrete `enum.Enum` | same |
+| Topic | Read the Docs |
+|--------|----------------|
+| **Home / overview** | [Documentation home](https://pydantable.readthedocs.io/en/latest/index.html) |
+| **`DataFrameModel` contract** (inputs, transforms, collisions, materialization) | [DataFrameModel (SQLModel-like)](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) |
+| **Column types** (scalars, structs, `list[T]`, nullability, unsupported cases) | [Supported data types](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html) |
+| **FastAPI** (routers, bodies, `collect`, responses) | [FastAPI integration](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) |
+| **Execution model** (`collect`, `to_dict`, `to_polars`, optional Python Polars, UI modules) | [Execution (Rust engine)](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) |
+| **Semantics** (nulls, joins, ordering, reshaping, windows — Polars-style contract) | [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) |
+| **Roadmap** (what shipped in 0.5.0, path to v1.0.0) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
+| **Why not use Polars directly?** | [Why not just use Polars?](https://pydantable.readthedocs.io/en/latest/WHY_NOT_POLARS.html) |
+| **Pandas-style imports** (`pydantable.pandas`) | [Pandas UI](https://pydantable.readthedocs.io/en/latest/PANDAS_UI.html) |
+| **PySpark-style imports** (`pydantable.pyspark`) | [PySpark UI](https://pydantable.readthedocs.io/en/latest/PYSPARK_UI.html) |
+| **PySpark helpers & parity** | [PySpark interface](https://pydantable.readthedocs.io/en/latest/PYSPARK_INTERFACE.html) · [PySpark API parity](https://pydantable.readthedocs.io/en/latest/PYSPARK_PARITY.html) |
+| **Polars parity** (scorecard, workflows, transformation roadmap) | [Parity scorecard](https://pydantable.readthedocs.io/en/latest/PARITY_SCORECARD.html) · [Polars-style workflows](https://pydantable.readthedocs.io/en/latest/POLARS_WORKFLOWS.html) · [Transformation parity roadmap](https://pydantable.readthedocs.io/en/latest/POLARS_TRANSFORMATIONS_ROADMAP.html) |
+| **Contributors** (build, test, benchmarks, releases) | [Developer guide](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html) |
+| **Plan / vision** (architecture phasing) | [Plan document](https://pydantable.readthedocs.io/en/latest/pydantable_plan.html) |
+| **Python API reference** (autodoc) | [API reference](https://pydantable.readthedocs.io/en/latest/api/index.html) |
 
-**Nested `BaseModel` / `Schema` columns** (struct dtypes) and **homogeneous `list[T]`** columns are supported, with **`explode`**, **`unnest`** (structs), and the list/string/temporal **`Expr`** surface described in **`docs/SUPPORTED_TYPES.md`**. That page also lists **types still on the roadmap** (for example map-like cells, `time`, `bytes`) and runtime buffer notes.
+For copy-paste convenience, the site base URL is:
 
-## What You Get
+`https://pydantable.readthedocs.io/en/latest/`
 
-Typed, schema-safe transforms:
+---
 
-- `DataFrameModel.with_columns(...)`
-- `DataFrameModel.select(...)`
-- `DataFrameModel.filter(...)`
-- `DataFrameModel.join(...)`
-- `DataFrameModel.group_by(...).agg(...)`
-- `DataFrameModel.collect()` for materialization into a list of Pydantic row models (current schema)
-- `DataFrameModel.to_dict()` for columnar `dict[str, list]` data
-- `DataFrameModel.rows()` (alias of `collect()`) and `DataFrameModel.to_dicts()` for row-wise workflows
+## What PydanTable does
 
-## Default API (Polars-style contract)
+PydanTable keeps **Pydantic models** as the source of truth for:
 
-PydanTable’s *default* exported interface emulates a Polars-style dataframe contract:
+- column types and nullability (`Optional[T]` / `T | None`)
+- **typed expressions** — invalid combinations fail when the expression is built (Rust AST), not only at runtime
+- **schema evolution** — chained transforms produce new model types with stable rules (e.g. `with_columns` name collisions)
 
-- join collision handling via `suffix` for right-side non-key columns
-- SQL-like null propagation rules for arithmetic/comparisons/filter
-- ordering is not a stable API guarantee (tests compare deterministically on keys)
+The default API feels **Polars-like**; optional **`pydantable.pandas`** and **`pydantable.pyspark`** modules only change naming and imports — execution is always the native core. Details: [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html), [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html).
 
-### Select an interface module (import-based)
+---
 
-```python
-from pydantable.pandas import DataFrameModel as PandasDataFrameModel
-from pydantable.pyspark import DataFrameModel as PySparkDataFrameModel
-from pydantable import DataFrameModel as DefaultDataFrameModel
+## Install
+
+```bash
+pip install pydantable
 ```
 
-Running the three import lines above prints nothing; it only binds names.
+Optional Python **Polars** (for `to_polars()` only):
 
-### `pandas` / `pyspark` interface modules
+```bash
+pip install 'pydantable[polars]'
+```
 
-`pydantable.pandas` and `pydantable.pyspark` are **alternate import surfaces**
-(pandas- or PySpark-style naming where applicable). Execution is always the Rust
-core. See `docs/EXECUTION.md`.
+**From a git checkout**, the Rust extension must be built (e.g. with [maturin](https://www.maturin.rs/)):
 
-For PySpark-style projection helpers (`withColumn`, `withColumnRenamed`, `toDF`,
-`transform`, `select_typed`), see `docs/PYSPARK_INTERFACE.md`.
+```bash
+pip install .
+```
 
-See:
+See [Developer guide — local setup](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html) for `maturin develop`, release builds, and CI parity.
 
-- `docs/EXECUTION.md`
-- `docs/INTERFACE_CONTRACT.md`
+---
 
-## Quick Start
+## Quick start
 
 ```python
 from pydantable import DataFrameModel
@@ -79,99 +82,43 @@ class User(DataFrameModel):
     age: int | None
 
 df = User({"id": [1, 2], "age": [20, None]})
-
 df2 = df.with_columns(age2=df.age * 2)
 df3 = df2.select("id", "age2")
 df4 = df3.filter(df3.age2 > 10)
 
-result = df4.to_dict()
-print(result)
+print(df4.to_dict())
 ```
 
-Output from `print(result)` (one run):
+Example output:
 
 ```text
 {'age2': [40], 'id': [1]}
 ```
 
-### Typed expressions (examples)
+- **Materialization:** [`collect()`](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) returns a list of Pydantic row models; [`to_dict()`](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) returns columnar `dict[str, list]`.
+- **Alternate UIs:**
 
-Boolean filters and datetime parts compose on the Rust-typed `Expr` API:
+  ```python
+  from pydantable.pandas import DataFrameModel as PandasDataFrameModel
+  from pydantable.pyspark import DataFrameModel as PySparkDataFrameModel
+  from pydantable import DataFrameModel as DefaultDataFrameModel
+  ```
 
-```python
-from datetime import datetime, timezone
+More examples: [FastAPI integration](https://pydantable.readthedocs.io/en/latest/FASTAPI.html), [Polars-style workflows](https://pydantable.readthedocs.io/en/latest/POLARS_WORKFLOWS.html).
 
-class Row(DataFrameModel):
-    ts: datetime
-    flag: bool
+---
 
-d = Row(
-    {
-        "ts": [datetime(2024, 3, 1, 12, 0, tzinfo=timezone.utc)],
-        "flag": [True],
-    }
-)
-out = d.filter(d.flag & (d.ts.dt_year() == 2024)).collect(as_lists=True)
-```
-
-Homogeneous list columns (`list[int]`, etc.) support `list_len()`, `list_get`, `list_contains`, and numeric `list_min` / `list_max` / `list_sum`; null cells follow the same null-propagation rules as scalars.
-
-## Semantics Contract (high level)
-
-Null semantics are SQL-like (`propagate_nulls`):
-
-- arithmetic: `NULL` + anything yields `NULL`
-- comparisons: if either side is `NULL`, the comparison result is `NULL`
-- `filter(condition)`: keeps rows where the condition evaluates to exactly `True`
-
-Collision + ordering are explicit:
-
-- `with_columns(...)` uses collision replacement semantics for deterministic schema evolution
-- `join(..., suffix=...)` renames right-side non-key overlaps with the suffix
-- `to_dict()` / `collect(as_lists=True)` row order is not guaranteed; compare by key columns when needed
-
-For the full contract details:
-
-- `docs/INTERFACE_CONTRACT.md`
-
-## Installation
-
-PydanTable requires Python `3.10+`.
-
-From this repo:
+## Development
 
 ```bash
-pip install .
+ruff format . && ruff check .
+pytest -q
 ```
 
-`pip install .` builds the Rust extension via `maturin` when toolchains are
-available. The Rust extension is required for expression typing and execution.
-The Python `polars` package is optional; install with `pip install 'pydantable[polars]'`
-if you need `DataFrame.to_polars()`.
+Rust + Python: see [Developer guide](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html) (formatting, `maturin`, benchmarks, contribution workflow).
 
-## Development & CI
-
-- Format + lint: `ruff format .` and `ruff check .`
-- Tests: `pytest -q`
-- CI runs the full test suite against the Rust extension.
-- Benchmarks vs Polars/pandas: use a **release** native build (`maturin develop --release` or `./benchmarks/run_release.sh`); see `docs/DEVELOPER.md`.
-
-## Docs
-
-- `docs/SUPPORTED_TYPES.md` for **column types** (scalars, nested models, `list[T]`), nullability, and unsupported annotations
-- `docs/EXECUTION.md` for the Rust execution model, materialization (`collect` / `to_dict` / `to_polars`), and UI modules
-- `docs/DATAFRAMEMODEL.md` for the `DataFrameModel` contract/design spec
-- `docs/FASTAPI.md` for end-to-end FastAPI integration examples
-- `docs/WHY_NOT_POLARS.md` for positioning + trade-offs (Python Polars optional; Rust engine uses Polars internally)
-- `docs/PERFORMANCE.md` for where time goes and benchmark scripts
-- `docs/DEVELOPER.md` for local setup, `scripts/verify_doc_examples.py`, and contribution workflow
-- `docs/ROADMAP.md` for project phases
-- `docs/PARITY_SCORECARD.md` for parity coverage status
-- `docs/POLARS_WORKFLOWS.md` for end-to-end Polars-style workflows
-- `docs/PYSPARK_INTERFACE.md` for PySpark interface usage and status
-- `docs/INTERFACE_CONTRACT.md` for null semantics, joins, and ordering guarantees
+---
 
 ## License
 
 MIT
-

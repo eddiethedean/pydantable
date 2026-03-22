@@ -1,4 +1,4 @@
-pydantable.DataFrameModel
+﻿pydantable.DataFrameModel
 =========================
 
 .. currentmodule:: pydantable
@@ -15,17 +15,35 @@ pydantable.DataFrameModel
    
       ~DataFrameModel.__init__
       ~DataFrameModel.collect
+      ~DataFrameModel.concat
+      ~DataFrameModel.distinct
+      ~DataFrameModel.drop
+      ~DataFrameModel.drop_nulls
+      ~DataFrameModel.explode
+      ~DataFrameModel.fill_null
       ~DataFrameModel.filter
       ~DataFrameModel.group_by
+      ~DataFrameModel.group_by_dynamic
+      ~DataFrameModel.head
       ~DataFrameModel.join
+      ~DataFrameModel.melt
+      ~DataFrameModel.pivot
+      ~DataFrameModel.rename
+      ~DataFrameModel.rolling_agg
       ~DataFrameModel.row_model
       ~DataFrameModel.rows
       ~DataFrameModel.schema_fields
       ~DataFrameModel.schema_model
       ~DataFrameModel.select
+      ~DataFrameModel.slice
+      ~DataFrameModel.sort
+      ~DataFrameModel.tail
       ~DataFrameModel.to_dict
       ~DataFrameModel.to_dicts
       ~DataFrameModel.to_polars
+      ~DataFrameModel.unique
+      ~DataFrameModel.unnest
+      ~DataFrameModel.unpivot
       ~DataFrameModel.with_columns
    
    

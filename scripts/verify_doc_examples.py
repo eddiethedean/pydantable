@@ -35,7 +35,7 @@ df3 = df2.select("id", "age2")
 df4 = df3.filter(df3.age2 > 10)
 assert df4.to_dict() == {"id": [1], "age2": [40]}
 
-# docs/pydantable_readme
+# Same pattern as docs index / README quick start
 
 
 class UserReadme(DataFrameModel):

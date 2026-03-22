@@ -17,6 +17,9 @@ dist/
 .mypy_cache/
 .ruff_cache/
 
+# Sphinx (local HTML builds)
+docs/_build/
+
 # Rust
 /target/
 pydantable-core/target/

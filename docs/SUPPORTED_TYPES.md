@@ -167,11 +167,11 @@ compatible row objects). Lists may be plain `list`, `tuple`, or
 `numpy.ndarray` (see `schema.validate_columns_strict`).
 
 With **`validate_data=False`**, trusted bulk paths may pass **NumPy**, **PyArrow**,
-or a **Polars `DataFrame`** as documented in `EXECUTION.md` and `PERFORMANCE.md`;
+or a **Polars `DataFrame`** as documented in {doc}`EXECUTION` and {doc}`PERFORMANCE`;
 scalar dtypes must still match the schema.
 
 ## See also
 
-- `DATAFRAMEMODEL.md` — `DataFrameModel` and row vs column inputs
-- `INTERFACE_CONTRACT.md` — null semantics, joins, reshape constraints
+- {doc}`DATAFRAMEMODEL` — `DataFrameModel` and row vs column inputs
+- {doc}`INTERFACE_CONTRACT` — null semantics, joins, reshape constraints
 - `pydantable-core/src/dtype.rs` — mapping from Python annotations to internal dtypes
