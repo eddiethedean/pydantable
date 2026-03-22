@@ -37,7 +37,7 @@ source .venv/bin/activate
 
 ## Documentation builds (Sphinx)
 
-**Read the Docs** (configured via `.readthedocs.yaml` at the repository root) uses **Sphinx only**, not MkDocs. The published site is the single source of truth for navigation and cross-links.
+**Read the Docs** (configured via `.readthedocs.yaml` at the repository root) uses **Sphinx only**, not MkDocs. The published site is the single source of truth for navigation and cross-links. RTD installs **Sphinx + theme deps only** (not `pip install .[docs]`), because installing the package would compile the Rust extension and typically **exceeds** RTD memory/time limits. `docs/conf.py` puts `python/` on `sys.path`, so autodoc and `import pydantable` work without `pydantable._core`.
 
 Local HTML build (from repo root, after `pip install -e ".[docs]"` and a working `pydantable._core` for correct `version` in `conf.py`):
 
