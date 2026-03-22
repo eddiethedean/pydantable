@@ -234,7 +234,7 @@ jobs:
       - name: Install maturin and test deps
         run: |
           $PY -m pip install -U pip
-          $PY -m pip install maturin pytest "pandas>=2.0"
+          $PY -m pip install maturin pytest "pandas>=2.0" "hypothesis>=6.0"
       - name: Build and install extension
         run: $PY -m maturin develop --release
         env:
