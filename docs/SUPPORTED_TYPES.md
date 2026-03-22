@@ -59,8 +59,9 @@ values matching `T`. Rust uses `DTypeDesc::List` and Polars **list** columns.
 
 - **`explode(...)`** is supported for list-typed columns: it lowers to Polars
   `explode` and sets the column’s dtype to the inner `T` (nullable).
-- **Expressions**: list columns do not support arithmetic; use **`explode`** or
-  project scalars after explode.
+- **Expressions** on list columns (see below): indexing, membership, length, and
+  numeric reductions—**not** element-wise arithmetic between two list columns.
+  Use **`explode`** when you need one row per list element.
 
 ### Descriptor shape (list)
 
@@ -117,13 +118,13 @@ Beyond generic arithmetic and comparisons, the following are supported (see
 `Expr` in the Python API):
 
 - **Numeric:** `abs()`, `round(decimals=...)`, `floor()`, `ceil()` on `int` / `float` columns.
-- **String:** `strip()`, `upper()`, `lower()` (plus existing `substr`, `char_length`, `concat`).
+- **String:** `strip()`, `upper()`, `lower()`, `str_replace(old, new)` (literal substrings), `strip_prefix`, `strip_suffix`, `strip_chars`, plus `substr`, `char_length`, `concat`.
 - **Boolean:** `&`, `|`, `~` for combining boolean-typed expressions.
-- **Datetime / date:** `dt_year()`, `dt_month()`, `dt_day()`, `dt_hour()`, `dt_minute()`, `dt_second()` (time-of-day parts require `datetime`, not plain `date`).
-- **Homogeneous lists:** `list_len()` on `list[T]` columns.
+- **Datetime / date:** `dt_year()`, `dt_month()`, `dt_day()`, `dt_hour()`, `dt_minute()`, `dt_second()` (time-of-day parts require `datetime`, not plain `date`); **`dt_date()`** on `datetime` columns (calendar `date`, Polars `dt.date()`). **`datetime ± timedelta`** and **`date ± timedelta`** use typed binary ops (see Rust `infer_arith_dtype`).
+- **Homogeneous lists:** `list_len()`, **`list_get(index)`** (int index; OOB → null), **`list_contains(value)`**, **`list_min()`** / **`list_max()`** / **`list_sum()`** on `list[int]` or `list[float]` (min/max/sum are numeric lists only).
 - **Cast:** `cast(T)` supports the usual primitive conversions plus `datetime` → `date` / `str` and `date` → `str` where listed in the Rust `cast` typing rules.
 
-Temporal part extraction on timezone-aware `datetime` values follows Polars’ interpretation of the stored dtype.
+Temporal part extraction and `dt_date()` on timezone-aware `datetime` values follow Polars’ interpretation of the stored dtype.
 
 ## Not supported as schema column types
 
@@ -134,7 +135,7 @@ These are **out of scope** for the current schema system:
 
 ## When unsupported field types fail
 
-- **`DataFrameModel` subclasses**: each field annotation is validated **when the class is defined** (in `__init_subclass__`). Unsupported types (for example `list[int]`, `dict[str, int]`, `int | str`, or `typing.Any`) raise **`TypeError`** immediately, before `RowModel` is generated. The message lists supported dtypes and points to this page.
+- **`DataFrameModel` subclasses**: each field annotation is validated **when the class is defined** (in `__init_subclass__`). Unsupported types (for example bare `list` without an inner type, `dict[str, int]` as a cell type, `int | str`, or `typing.Any`) raise **`TypeError`** immediately, before `RowModel` is generated. The message lists supported dtypes and points to this page.
 - **`DataFrame[Schema]`** with a hand-written **`Schema`** subclass: there is **no**
   class-time check on the `Schema` model (unlike `DataFrameModel`). Unsupported
   annotations surface when you **first construct** `DataFrame[YourSchema](...)`
@@ -151,14 +152,12 @@ richer schemas and APIs. Ordering and timing follow project priorities (see
 | Planned category | Examples | Notes |
 |------------------|----------|--------|
 | **Maps / dict-like cells** | `dict[str, T]` with a fixed value type `T`, or a dedicated **map** dtype | Semi-structured columns; stricter than arbitrary JSON `dict`. |
-| **Enums** | `enum.Enum` or `Literal[...]`-backed fields | Discrete categoricals with stable string/value mapping. |
-| **Decimal / money** | `Decimal` | Exact numeric; important for billing and financial APIs. |
+| **Literal / typing-only categoricals** | `Literal["a","b"]` as a distinct dtype (today: use a concrete **`enum.Enum`** subclass). | Narrower validation story than free-form `enum`. |
 | **Binary** | `bytes` | Opaque blobs; execution surface may stay limited (pass-through, equality, length). |
-| **UUID** | `UUID` | Common in APIs; often maps to Polars/Utf8 or dedicated extension dtype. |
 | **Time-of-day** | `time` | Distinct from `datetime` and `timedelta`; useful for schedules. |
 | **Geospatial / extension dtypes** | e.g. WKB, GeoJSON-backed types | Only if there is a clear Polars/Arrow story and API surface. |
 
-**Already shipped:** homogeneous **`list[T]`** columns, **`explode()`**, and list-aware expressions such as **`list_len()`** (see above). **`unnest()`** on **struct** columns promotes nested fields to top-level columns when supported by the executor (see `ROADMAP.md`).
+**Already shipped (scalar columns):** **`uuid.UUID`** (Utf8 / canonical string round-trip), **`decimal.Decimal`** (Polars `Decimal(38, 9)`), and concrete **`enum.Enum`** subclasses (Utf8 wire values). **Homogeneous `list[T]`** columns, **`explode()`**, list **`Expr`** helpers (**`list_len`**, **`list_get`**, **`list_contains`**, **`list_min`/`max`/`sum`**), and **`unnest()`** on **struct** columns (see `ROADMAP.md`).
 
 ## Runtime column payloads (Python)
 

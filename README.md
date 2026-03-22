@@ -14,14 +14,15 @@ Execution always uses the Rust core; optional `pandas` / `pyspark` **UI modules*
 
 ## Supported data types
 
-**Columns and expressions** use scalar Python types only:
+**Scalar columns** (expressions are typed against these bases):
 
 | Type | Nullable form |
 |------|----------------|
 | `int`, `float`, `bool`, `str` | `Optional[T]` / `T \| None` |
 | `datetime`, `date`, `timedelta` (`datetime` stdlib) | same |
+| `UUID`, `Decimal`, concrete `enum.Enum` | same |
 
-Nested models, `list`/`dict` cells, and other non-scalar column values are not supported yet. **`docs/SUPPORTED_TYPES.md`** also lists **planned future types** (including nested models). Full detail and runtime buffer notes live there too.
+**Nested `BaseModel` / `Schema` columns** (struct dtypes) and **homogeneous `list[T]`** columns are supported, with **`explode`**, **`unnest`** (structs), and the list/string/temporal **`Expr`** surface described in **`docs/SUPPORTED_TYPES.md`**. That page also lists **types still on the roadmap** (for example map-like cells, `time`, `bytes`) and runtime buffer notes.
 
 ## What You Get
 
@@ -157,7 +158,7 @@ if you need `DataFrame.to_polars()`.
 
 ## Docs
 
-- `docs/SUPPORTED_TYPES.md` for **scalar dtypes**, nullability, and what is not supported
+- `docs/SUPPORTED_TYPES.md` for **column types** (scalars, nested models, `list[T]`), nullability, and unsupported annotations
 - `docs/EXECUTION.md` for the Rust execution model, materialization (`collect` / `to_dict` / `to_polars`), and UI modules
 - `docs/DATAFRAMEMODEL.md` for the `DataFrameModel` contract/design spec
 - `docs/FASTAPI.md` for end-to-end FastAPI integration examples

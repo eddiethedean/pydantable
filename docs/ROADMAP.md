@@ -191,5 +191,12 @@ Deliverables:
 - [x] **PySpark UI**: `annotation_to_data_type` builds nested `StructType` for nested `BaseModel` columns.
 - [x] **Homogeneous list columns** (`list[T]`) with list dtypes, descriptors, Polars list I/O, and **`explode()`** for list-typed columns.
 - [x] **`unnest()` for struct columns** — promote struct fields to top-level columns (Polars `unnest` with `{parent}_{field}` names); list `explode` remains separate.
-- [ ] **Additional scalars** (`uuid.UUID` as a first-class dtype, `enum.Enum`, `Decimal`, …) with `BaseType` / Polars / descriptor extensions (typically one type per PR).
+- [x] **Additional scalars** — `uuid.UUID`, `decimal.Decimal` (fixed scale 9), and concrete `enum.Enum` subclasses in `BaseType`, descriptors, and Polars I/O (see [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md)).
+- [x] **Extended `Expr` surface** — string helpers (`str_replace`, `strip_prefix` / `strip_suffix` / `strip_chars`), `dt_date()`, `datetime`/`date` ± `timedelta`, and list helpers (`list_get`, `list_contains`, `list_min` / `list_max` / `list_sum`).
+
+## Later (not started)
+
+- [ ] **Map / dict-like cells** with a fixed value type, or a dedicated Arrow map dtype.
+- [ ] **`time` of day** as a distinct column type (separate from `datetime` / `timedelta`).
+- [ ] **`bytes`** / binary blobs with a minimal execution surface.
 
