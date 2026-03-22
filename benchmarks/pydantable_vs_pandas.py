@@ -180,7 +180,7 @@ def _verify_pipeline_rowcount(n: int, pd: Any) -> None:
         df.with_columns(spend2=df.spend * 1.1)
         .filter(df.spend > 50.0)
         .select("user_id", "spend2")
-        .collect()["user_id"]
+        .to_dict()["user_id"]
     )
     pdf = pd.DataFrame(payload)
     pdf = pdf.assign(spend2=pdf["spend"] * 1.1)

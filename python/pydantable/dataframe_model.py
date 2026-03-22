@@ -152,23 +152,17 @@ class DataFrameModel:
     def to_dict(self) -> dict[str, list[Any]]:
         return self._df.to_dict()
 
+    def to_polars(self) -> Any:
+        return self._df.to_polars()
+
     def rows(self) -> list[BaseModel]:
         """
         Materialize this DataFrame into a list of per-row Pydantic models.
 
-        This is intended as the row-wise bridge for FastAPI response
-        serialization workflows.
+        Same as :meth:`collect` with default arguments (validated against the
+        current inner schema type).
         """
-        data = self.collect(as_lists=True)
-        if not data:
-            return []
-
-        n = len(next(iter(data.values())))
-        out: list[BaseModel] = []
-        for i in range(n):
-            row_dict = {name: col[i] for name, col in data.items()}
-            out.append(self.RowModel.model_validate(row_dict))
-        return out
+        return self.collect()
 
     def to_dicts(self) -> list[dict[str, Any]]:
         """

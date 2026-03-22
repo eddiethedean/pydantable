@@ -3,11 +3,11 @@
 This document records the behavior contract that the typed DataFrame API guarantees.
 It is intended to be independent of Python import style (default vs `pandas` / `pyspark` UI)
 at the *type/semantics* level, while allowing implementation-specific physical ordering
-(e.g. row order from `collect()`).
+(e.g. row order from `to_dict()` / `collect(as_lists=True)`).
 
 ## Ordering
 
-`collect()` output order is **not a stable API guarantee**.
+Columnar materialization (`to_dict()`, `collect(as_lists=True)`) output order is **not a stable API guarantee**.
 
 When tests or user assertions need deterministic comparisons, compare on the
 subset of columns that define identity (for example, join keys) rather than

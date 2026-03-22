@@ -191,7 +191,7 @@ def _verify_pipeline_rowcount(n: int, pl: Any) -> None:
         df.with_columns(spend2=df.spend * 1.1)
         .filter(df.spend > 50.0)
         .select("user_id", "spend2")
-        .collect()["user_id"]
+        .to_dict()["user_id"]
     )
     pl_rows = len(
         pl.DataFrame(payload)

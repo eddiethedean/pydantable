@@ -47,6 +47,19 @@ _NoneType = type(None)
 _SUPPORTED_BASE_TYPES = (int, float, bool, str)
 
 
+def _rows_from_column_dict(
+    data: dict[str, list[Any]], row_type: type[BaseModel]
+) -> list[BaseModel]:
+    if not data:
+        return []
+    n = len(next(iter(data.values())))
+    out: list[BaseModel] = []
+    for i in range(n):
+        row_dict = {name: col[i] for name, col in data.items()}
+        out.append(row_type.model_validate(row_dict))
+    return out
+
+
 def _is_bool_or_nullable_bool(dtype: Any) -> bool:
     """
     Return True if `dtype` is either `bool` or `Optional[bool]` / `Union[bool, None]`.
@@ -100,7 +113,7 @@ class DataFrame(Generic[SchemaT]):
     - Schema enforcement at DataFrame construction time.
     - Typed expression AST building.
     - Schema propagation through `select`, `filter`, `with_columns`.
-    - `collect()` materializes via the Rust engine.
+    - `collect()` materializes via the Rust engine into Pydantic row models by default.
     """
 
     _schema_type: type[BaseModel] | None = None
@@ -405,7 +418,7 @@ class DataFrame(Generic[SchemaT]):
             None if value_vars is None else list(value_vars),
             variable_name,
             value_name,
-            as_python_lists=False,
+            as_python_lists=True,
         )
         derived_fields = schema_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
@@ -465,7 +478,7 @@ class DataFrame(Generic[SchemaT]):
             columns_col,
             value_cols,
             aggregate_function,
-            as_python_lists=False,
+            as_python_lists=True,
         )
         derived_fields = schema_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
@@ -583,7 +596,7 @@ class DataFrame(Generic[SchemaT]):
             right_keys,
             how,
             suffix,
-            as_python_lists=False,
+            as_python_lists=True,
         )
         derived_fields = schema_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
@@ -753,43 +766,59 @@ class DataFrame(Generic[SchemaT]):
         """
         Materialize this typed logical DataFrame.
 
-        By default returns a native Polars ``DataFrame`` from the Rust engine
-        (Arrow IPC handoff; requires ``polars``). Use ``as_lists=True`` for the
-        legacy ``dict[str, list]`` representation. With ``as_numpy=True``,
-        returns ``dict[str, numpy.ndarray]`` (requires ``numpy``).
+        By default returns a list of Pydantic models, one per row, validated
+        against :attr:`schema_type` (the current projected schema).
 
-        The ``as_polars`` argument is deprecated; it only toggled the old
-        dict-wrapped Polars path and is mapped to ``as_lists=not as_polars``.
+        Use ``as_lists=True`` for a columnar ``dict[str, list]``. Use
+        :meth:`to_dict` as a readable alias for that shape.
+
+        With ``as_numpy=True``, returns ``dict[str, numpy.ndarray]`` (requires
+        ``numpy``).
+
+        The ``as_polars`` argument is deprecated: use :meth:`to_polars` for a
+        Polars ``DataFrame`` when the optional ``polars`` package is installed.
         """
         if as_polars is not None:
             warnings.warn(
-                "as_polars is deprecated; collect() returns a Polars DataFrame by "
-                "default. Use collect(as_lists=True) for dicts of lists.",
+                "as_polars is deprecated; use to_polars() for a Polars DataFrame, "
+                "or collect(as_lists=True) / to_dict() for columnar dicts.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            as_lists = not as_polars
+            if as_polars:
+                return self.to_polars()
+            return self.to_dict()
         if as_numpy and as_lists:
             raise ValueError(
                 "collect() cannot specify both as_numpy=True and as_lists=True."
             )
-        out = execute_plan(
-            self._rust_plan, self._root_data, as_python_lists=as_lists
+        column_dict = execute_plan(
+            self._rust_plan, self._root_data, as_python_lists=True
         )
-        import polars as pl
-
-        if not as_lists and not isinstance(out, pl.DataFrame):
-            out = pl.DataFrame(out)
+        if as_lists:
+            return column_dict
         if as_numpy:
             import numpy as np
 
-            if isinstance(out, pl.DataFrame):
-                return {c: out[c].to_numpy() for c in out.columns}
-            return {k: np.asarray(v) for k, v in out.items()}
-        return out
+            return {k: np.asarray(v) for k, v in column_dict.items()}
+        return _rows_from_column_dict(column_dict, self._current_schema_type)
 
     def to_dict(self) -> dict[str, list[Any]]:
-        return self.collect(as_lists=True)
+        return execute_plan(self._rust_plan, self._root_data, as_python_lists=True)
+
+    def to_polars(self) -> Any:
+        """
+        Materialize as a Polars ``DataFrame`` (requires the optional ``polars``
+        Python package: ``pip install 'pydantable[polars]'``).
+        """
+        try:
+            import polars as pl
+        except ImportError as e:
+            raise ImportError(
+                "polars is required for to_polars(). Install with: "
+                "pip install 'pydantable[polars]'"
+            ) from e
+        return pl.DataFrame(self.to_dict())
 
     @classmethod
     def concat(
@@ -811,7 +840,7 @@ class DataFrame(Generic[SchemaT]):
                 df._rust_plan,
                 df._root_data,
                 how,
-                as_python_lists=False,
+                as_python_lists=True,
             )
             derived_fields = schema_from_descriptors(schema_descriptors)
             out_schema_type = make_derived_schema_type(out_schema_type, derived_fields)
@@ -862,7 +891,7 @@ class GroupedDataFrame:
             self._df._root_data,
             self._keys,
             agg_specs,
-            as_python_lists=False,
+            as_python_lists=True,
         )
         derived_fields = schema_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
@@ -914,7 +943,7 @@ class DynamicGroupedDataFrame:
             self._period,
             self._by if self._by else None,
             agg_specs,
-            as_python_lists=False,
+            as_python_lists=True,
         )
         derived_fields = schema_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(

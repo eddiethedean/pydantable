@@ -19,8 +19,9 @@ Typed, schema-safe transforms:
 - `DataFrameModel.filter(...)`
 - `DataFrameModel.join(...)`
 - `DataFrameModel.group_by(...).agg(...)`
-- `DataFrameModel.collect()` for materialization into Python column data
-- `DataFrameModel.rows()` and `DataFrameModel.to_dicts()` for row-wise materialization
+- `DataFrameModel.collect()` for materialization into a list of Pydantic row models (current schema)
+- `DataFrameModel.to_dict()` for columnar `dict[str, list]` data
+- `DataFrameModel.rows()` (alias of `collect()`) and `DataFrameModel.to_dicts()` for row-wise workflows
 
 ## Default API (Polars-style contract)
 
@@ -37,6 +38,8 @@ from pydantable.pandas import DataFrameModel as PandasDataFrameModel
 from pydantable.pyspark import DataFrameModel as PySparkDataFrameModel
 from pydantable import DataFrameModel as DefaultDataFrameModel
 ```
+
+Running the three import lines above prints nothing; it only binds names.
 
 ### `pandas` / `pyspark` interface modules
 
@@ -67,8 +70,14 @@ df2 = df.with_columns(age2=df.age * 2)
 df3 = df2.select("id", "age2")
 df4 = df3.filter(df3.age2 > 10)
 
-result = df4.collect()
-print(result)  # {"id": [1], "age2": [40]}
+result = df4.to_dict()
+print(result)
+```
+
+Output from `print(result)`:
+
+```text
+{'id': [1], 'age2': [40]}
 ```
 
 ## Semantics Contract (high level)
@@ -83,7 +92,7 @@ Collision + ordering are explicit:
 
 - `with_columns(...)` uses collision replacement semantics for deterministic schema evolution
 - `join(..., suffix=...)` renames right-side non-key overlaps with the suffix
-- `collect()` row order is not guaranteed; compare by key columns when needed
+- `to_dict()` / `collect(as_lists=True)` row order is not guaranteed; compare by key columns when needed
 
 For the full contract details:
 
@@ -100,8 +109,9 @@ pip install .
 ```
 
 `pip install .` builds the Rust extension via `maturin` when toolchains are
-available. The current skeleton requires the Rust extension for expression
-typing and `collect()`.
+available. The Rust extension is required for expression typing and execution.
+The Python `polars` package is optional; install with `pip install 'pydantable[polars]'`
+if you need `DataFrame.to_polars()`.
 
 ## Development & CI
 

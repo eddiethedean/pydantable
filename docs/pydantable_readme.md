@@ -37,13 +37,19 @@ df2 = df.with_columns(age2=df.age * 2)
 df3 = df2.select("id", "age2")
 df4 = df3.filter(df3.age2 > 40)
 
-result = df4.collect()
-print(result)  # {"id": [2], "age2": [60]}
+result = df4.to_dict()
+print(result)
+```
+
+Output from `print(result)`:
+
+```text
+{'id': [2], 'age2': [60]}
 ```
 
 ## Current Repository Status
 
-In the `0.5.0` release, `DataFrameModel` is available as the primary
+In the `0.6.0` release, `DataFrameModel` is available as the primary
 FastAPI-facing API, backed by the same typed expression and Rust execution core
 as the lower-level `DataFrame[Schema]` API.
 

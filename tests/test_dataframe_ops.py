@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta
 
 import pytest
+from pydantic import BaseModel
 from pydantable import DataFrame, Schema
 from pydantable.expressions import ColumnRef
 
@@ -14,6 +15,12 @@ def test_with_columns_and_collect_python():
     df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
     df2 = df.with_columns(age2=df.age * 2)
     assert df2.schema_fields()["age2"] is int
+
+    rows = df2.collect()
+    assert len(rows) == 2
+    assert isinstance(rows[0], BaseModel)
+    assert rows[0].model_dump() == {"id": 1, "age": 20, "age2": 40}
+    assert rows[1].model_dump() == {"id": 2, "age": 30, "age2": 60}
 
     result = df2.collect(as_lists=True)
     assert result == {"id": [1, 2], "age": [20, 30], "age2": [40, 60]}
@@ -343,3 +350,11 @@ def test_collect_as_numpy() -> None:
     assert set(out.keys()) == {"id", "age"}
     assert np.asarray(out["id"]).tolist() == [1, 2]
     assert np.asarray(out["age"]).tolist() == [20, 30]
+
+
+def test_to_polars_when_installed() -> None:
+    pytest.importorskip("polars")
+    df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
+    pdf = df.to_polars()
+    assert list(pdf.columns) == ["id", "age"]
+    assert pdf["id"].to_list() == [1, 2]

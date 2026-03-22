@@ -205,6 +205,8 @@ mod polars_engine_tests {
         });
     }
 
+    // `as_python_lists=false` uses IPC to Python `polars` (optional dep); the
+    // default Python API uses `as_python_lists=true`.
     #[test]
     fn execute_plan_default_returns_polars_dataframe() {
         ensure_python_initialized();

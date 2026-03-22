@@ -30,8 +30,17 @@ out = (
     orders.join(users, on="user_id", how="left")
     .group_by("country")
     .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
-    .collect()
+    .to_dict()
 )
+# Stable row order for printing (group_by order is not guaranteed; see INTERFACE_CONTRACT.md).
+order = sorted(range(len(out["country"])), key=lambda i: out["country"][i])
+print({k: [out[k][i] for i in order] for k in out})
+```
+
+Output:
+
+```text
+{'country': ['CA', 'US'], 'total': [20.0, 50.0], 'n_orders': [1, 2]}
 ```
 
 ## 2) Reshape long-to-wide
@@ -51,8 +60,15 @@ df = Metrics({
 })
 
 wide = df.pivot(index="id", columns="metric", values="value", aggregate_function="first")
-out = wide.collect()
-# Output columns follow contract naming (for example: "A_first", "B_first").
+out = wide.to_dict()
+print(out)
+# Column names follow the contract (for example: "A_first", "B_first").
+```
+
+Output:
+
+```text
+{'id': [1, 2], 'A_first': [10, None], 'B_first': [20, 40]}
 ```
 
 ## 3) Time-series rolling + dynamic windows
@@ -75,4 +91,13 @@ dynamic = df.group_by_dynamic("ts", every="1h", by=["id"]).agg(
     v_sum=("sum", "v"),
     v_count=("count", "v"),
 )
+print(rolled.to_dict())
+print(dynamic.to_dict())
+```
+
+Output:
+
+```text
+{'v': [10, None, 30], 'id': [1, 1, 1], 'v_roll': [10, 10, 40], 'ts': [0, 3600, 7200]}
+{'ts': [0, 3600, 7200], 'id': [1, 1, 1], 'v_sum': [10, None, 30], 'v_count': [1, 0, 1]}
 ```

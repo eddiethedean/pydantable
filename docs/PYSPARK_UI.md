@@ -19,6 +19,13 @@ class User(DataFrameModel):
 
 df = User({"id": [1], "name": ["Ada"]})
 out = df.withColumn("greeting", F.concat(F.col("name", dtype=str), F.lit("!")))
+print(out.to_dict())
+```
+
+Output:
+
+```text
+{'id': [1], 'name': ['Ada'], 'greeting': ['Ada!']}
 ```
 
 ## Imports
@@ -70,6 +77,8 @@ Mirrors **common import paths** only—not binary or behavioral parity with Spar
 ```python
 from pydantable.pyspark.sql import functions as F, Column, IntegerType, StructType
 ```
+
+This block only checks that imports resolve; it has no printed output.
 
 - **`functions`** — `lit`, typed **`col(..., dtype=...)`**, `isnull` / `isnotnull`, `coalesce`, `when` / `otherwise`, `cast`, `between`, `isin`, `concat`, `substring`, `length`, and aggregate stubs that direct you to **`group_by().agg`**.
 - **`Column`** — type alias for pydantable **`Expr`**.

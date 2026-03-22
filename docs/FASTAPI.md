@@ -61,9 +61,15 @@ def users_age2(payload: UsersPayload) -> UsersOut:
     # Typed expression + schema migration.
     df2 = df.with_columns(age2=df.age + 1).select("id", "age2")
 
-    # Rust executes the plan; returns Dict[str, list[Any]].
-    result = df2.collect()
+    # Rust executes the plan; columnar response uses to_dict().
+    result = df2.to_dict()
     return UsersOut(**result)
+```
+
+If the request body is `UsersPayload(id=[1, 2], age=[20, None])`, then `df2.to_dict()` is:
+
+```text
+{'age2': [21, None], 'id': [1, 2]}
 ```
 
 Behavior notes:
@@ -109,7 +115,7 @@ def adults(payload: UsersPayload) -> AdultOut:
 
     # condition dtype: Optional[bool]
     df2 = df.filter(df.age >= 18)
-    result = df2.collect()
+    result = df2.to_dict()
     return AdultOut(**result)
 ```
 
@@ -119,10 +125,10 @@ With input:
 {"id": [1, 2, 3], "age": [22, None, 15]}
 ```
 
-Output is:
+Output (`df2.to_dict()`):
 
-```python
-{"id": [1], "age": [22]}
+```text
+{'id': [1], 'age': [22]}
 ```
 
 ## Example 3: Chained transformation endpoint (DataFrameModel)
@@ -165,7 +171,13 @@ def high_value(payload: EventsPayload) -> HighValueOut:
         .filter(df.spend > 100.0)
         .select("user_id", "spend_usd")
     )
-    return HighValueOut(**df2.collect())
+    return HighValueOut(**df2.to_dict())
+```
+
+For `EventsPayload(user_id=[1, 2], spend=[150.0, 50.0])`, `df2.to_dict()` is:
+
+```text
+{'user_id': [1], 'spend_usd': [150.0]}
 ```
 
 ## Error timing and API safety

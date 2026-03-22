@@ -9,6 +9,8 @@ DataFrame contract.
 from pydantable.pyspark import DataFrameModel
 ```
 
+This import succeeds when pydantable is installed; it prints nothing by itself.
+
 ## Execution model
 
 The PySpark interface uses the same **Rust execution core** (Polars engine) as
@@ -65,8 +67,16 @@ result = (
     .fill_null(0, subset=["amount"])
     .group_by("country")
     .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
-    .collect()
+    .to_dict()
 )
+order = sorted(range(len(result["country"])), key=lambda i: result["country"][i])
+print({k: [result[k][i] for i in order] for k in result})
+```
+
+Output:
+
+```text
+{'country': ['CA', 'US'], 'total': [20.0, 50.0], 'n_orders': [1, 2]}
 ```
 
 ### Select-style wrappers example
@@ -80,14 +90,24 @@ class User(DataFrameModel):
     age: int | None
 
 df = User({"id": [1], "name": ["a"], "age": [10]})
-
+step = df.withColumn("age2", df.age * 2)
 out = (
-    df.withColumn("age2", df.age * 2)
-    .withColumnRenamed("name", "name_new")
-    .select_typed("id", "name_new", age_x4=df.age2 * 2)
-    .toDF("uid", "uname", "uage_x4")
+    step.withColumnRenamed("name", "name_new")
+    .select_typed("id", "name_new", age_x4=step.age2 * 2)
+    .rename({"id": "uid", "name_new": "uname", "age_x4": "uage_x4"})
     .collect()
 )
+print([row.model_dump() for row in out])
+```
+
+`toDF(...)` names columns in **schema field order**, which may not match the
+order of arguments in `select_typed`; use `rename({...})` when you need explicit
+names.
+
+Output:
+
+```text
+[{'uage_x4': 40, 'uid': 1, 'uname': 'a'}]
 ```
 
 Supported operation families mirror the default interface, including core table

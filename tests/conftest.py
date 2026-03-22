@@ -3,11 +3,27 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 
 
 def _materialized_table_to_dict(table: Any) -> dict[str, list[Any]]:
     if isinstance(table, dict):
         return table
+    if isinstance(table, list):
+        if not table:
+            return {}
+        first = table[0]
+        if isinstance(first, BaseModel):
+            keys = list(first.model_dump().keys())
+            out: dict[str, list[Any]] = {k: [] for k in keys}
+            for row in table:
+                d = row.model_dump()
+                for k in keys:
+                    out[k].append(d[k])
+            return out
+        raise TypeError(
+            f"Unsupported list table type (expected rows of BaseModel): {type(first)!r}"
+        )
     typ = type(table)
     mod = getattr(typ, "__module__", "") or ""
     if mod.startswith("polars") and typ.__name__ == "DataFrame":

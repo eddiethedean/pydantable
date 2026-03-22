@@ -16,6 +16,13 @@ class Sales(DataFrameModel):
 
 df = Sales({"region": ["US", "EU"], "amount": [10, 20]})
 df2 = df.assign(doubled=df.amount * 2)
+print(df2.to_dict())
+```
+
+Output:
+
+```text
+{'doubled': [20, 40], 'region': ['US', 'EU'], 'amount': [10, 20]}
 ```
 
 ## Imports

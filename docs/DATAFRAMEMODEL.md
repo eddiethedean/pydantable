@@ -28,6 +28,8 @@ class UserDF(DataFrameModel):
     age: int
 ```
 
+Defining the class does not print anything; it registers `UserDF.RowModel` and the schema model used by the internal `DataFrame`.
+
 From this definition, `DataFrameModel` generates:
 - `UserDF.RowModel`: a Pydantic model for a single row
 - a schema-backed typed dataframe wrapper used for query building and execution
@@ -40,6 +42,13 @@ From this definition, `DataFrameModel` generates:
 
 ```python
 df1 = UserDF({"id": [1, 2], "age": [20, 30]})
+print(df1.to_dict())
+```
+
+Output:
+
+```text
+{'id': [1, 2], 'age': [20, 30]}
 ```
 
 This format is ideal for analytic/calc workflows because it matches Rust-side
@@ -52,6 +61,13 @@ df2 = UserDF([
     {"id": 1, "age": 20},
     {"id": 2, "age": 30},
 ])
+print(df2.to_dict())
+```
+
+Output:
+
+```text
+{'id': [1, 2], 'age': [20, 30]}
 ```
 
 This format is ideal for REST/JSON APIs and works naturally with FastAPI.
@@ -86,8 +102,17 @@ For `with_columns(...)`, column name collisions must use **replacement** semanti
 Example:
 
 ```python
+df1 = UserDF({"id": [1, 2], "age": [20, 40]})
 df2 = df1.with_columns(age2=df1.age * 2)
-# age2 is added if missing; if age2 already exists, it is replaced.
+print(df2.to_dict())
+```
+
+`age2` is added if missing; if `age2` already exists, it is replaced.
+
+Output:
+
+```text
+{'id': [1, 2], 'age': [20, 40], 'age2': [40, 80]}
 ```
 
 ## Query-building and typed expressions
@@ -95,9 +120,17 @@ df2 = df1.with_columns(age2=df1.age * 2)
 Transformations rely on a typed expression AST built from column references:
 
 ```python
+df1 = UserDF({"id": [1, 2, 3], "age": [10, 50, 60]})
 df2 = df1.with_columns(age2=df1.age * 2)
 df3 = df2.select("id", "age2")
 df4 = df3.filter(df3.age2 > 40)
+print(df4.to_dict())
+```
+
+Output:
+
+```text
+{'id': [2, 3], 'age2': [100, 120]}
 ```
 
 The expression system must:
@@ -170,6 +203,10 @@ def create_users(payload: UserDF):
     return df.select("id", "age")  # returns a new model type
 ```
 
+The handler body is the same idea as running `UserDF(...).select("id", "age")` on
+the validated payload; defining the app registers routes but does not print output
+until you serve it (for example with Uvicorn).
+
 ### Typical response flow
 
 Because transformations migrate the model type, response types can become
@@ -178,10 +215,12 @@ as precise as the query’s projected schema.
 ## Materializing row models
 
 When you need row-wise output (e.g. for response serialization), the DataFrameModel
-should be able to produce:
+produces:
 
-- `df.rows()` -> `list[UserDF.RowModel]`
-- `df.to_dicts()` -> list of dicts (JSON-friendly)
+- `df.collect()` -> `list` of Pydantic models validated against the **current** inner schema type
+- `df.rows()` -> same as `collect()` (default arguments)
+- `df.to_dict()` -> columnar `dict[str, list]` (use for column-shaped API responses)
+- `df.to_dicts()` -> list of dicts (JSON-friendly), derived from row models
 
 This is the “bridge” between columnar execution and Pydantic row semantics.
 

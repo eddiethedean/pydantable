@@ -113,11 +113,11 @@ def test_rows_materializes_row_models_with_nulls():
     rows = df.rows()
 
     assert len(rows) == 2
-    assert isinstance(rows[0], UserDF.row_model())
+    assert isinstance(rows[0], df.schema_type)
     assert rows[0].id == 1
     assert rows[0].age == 20
 
-    assert isinstance(rows[1], UserDF.row_model())
+    assert isinstance(rows[1], df.schema_type)
     assert rows[1].id == 2
     assert rows[1].age is None
 
