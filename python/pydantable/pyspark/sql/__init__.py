@@ -29,6 +29,7 @@ from .types import (
     StructType,
     annotation_to_data_type,
 )
+from .window import Window, WindowSpec
 
 __all__ = [
     "ArrayType",
@@ -41,6 +42,8 @@ __all__ = [
     "StringType",
     "StructField",
     "StructType",
+    "Window",
+    "WindowSpec",
     "annotation_to_data_type",
     "between",
     "cast",

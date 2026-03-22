@@ -9,6 +9,45 @@ use crate::expr::{ExprNode, LiteralValue};
 
 use super::ir::{PlanInner, PlanStep};
 
+pub fn plan_global_select(plan: &PlanInner, items: Vec<(String, ExprNode)>) -> PyResult<PlanInner> {
+    if items.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "global select requires at least one aggregate.",
+        ));
+    }
+
+    let mut new_schema = HashMap::new();
+    for (name, expr) in &items {
+        if !matches!(expr, ExprNode::GlobalAgg { .. }) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "global select only supports global aggregate expressions (e.g. functions.sum / functions.avg).",
+            ));
+        }
+        let referenced = expr.referenced_columns();
+        for c in referenced.iter() {
+            if !plan.schema.contains_key(c) {
+                let mut available: Vec<String> = plan.schema.keys().cloned().collect();
+                available.sort();
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Aggregate references unknown column '{}'. Available columns: [{}].",
+                    c,
+                    available.join(", ")
+                )));
+            }
+        }
+        new_schema.insert(name.clone(), expr.dtype());
+    }
+
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::GlobalSelect { items });
+
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: new_schema,
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
 pub fn plan_select(plan: &PlanInner, columns: Vec<String>) -> PyResult<PlanInner> {
     if columns.is_empty() {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -323,6 +362,10 @@ pub fn plan_fill_null(
                     },
                     DTypeDesc::List { inner, .. } => DTypeDesc::List {
                         inner,
+                        nullable: false,
+                    },
+                    DTypeDesc::Map { value, .. } => DTypeDesc::Map {
+                        value,
                         nullable: false,
                     },
                 };

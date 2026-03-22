@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.5.0 → v1.0.0)
+# PydanTable roadmap (0.6.0 → v1.0.0)
 
-**Current release: `0.5.0`.** This document summarizes what that release includes, how it relates to the original phase plan, and what is still open before calling **`v1.0.0`**.
+**Current release: `0.6.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
 
 For Polars-style API parity at the method level, see
 [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md).
@@ -74,13 +74,20 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 ---
 
+## Shipped in 0.6.0 (schema additions)
+
+- [x] **`time`** (`datetime.time`) — Polars **Time**; clock time distinct from `datetime` / `timedelta`.
+- [x] **`bytes`** — Polars **Binary**; small execution surface (I/O, equality, `len` where supported).
+- [x] **Homogeneous `dict[str, T]`** map-like cells — logical map dtype (Polars list-of-struct physical encoding); limited `Expr` surface vs full Polars map ops.
+
+---
+
 ## Later (not started)
 
-Schema / engine directions **not** in 0.5.0:
+Directions beyond **0.6.0** (non-exhaustive):
 
-- [ ] **Map / dict-like cells** with a fixed value type, or a dedicated Arrow **map** dtype.
-- [ ] **`time`** (clock time) as a first-class column type (distinct from `datetime` / `timedelta`).
-- [ ] **`bytes`** / binary blobs with a deliberately small execution surface.
+- [ ] **Arrow-native map dtype** or heterogeneous map keys (beyond `dict[str, T]` v1).
+- [ ] Richer **window** / **global aggregate** stories where not yet covered in release notes.
 
 ---
 

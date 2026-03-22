@@ -13,10 +13,11 @@ use crate::expr::{
 use crate::plan::{
     execute_plan as execute_plan_inner, make_plan as make_plan_inner, plan_drop as plan_drop_inner,
     plan_drop_nulls as plan_drop_nulls_inner, plan_fill_null as plan_fill_null_inner,
-    plan_filter as plan_filter_inner, plan_rename as plan_rename_inner,
-    plan_select as plan_select_inner, plan_slice as plan_slice_inner, plan_sort as plan_sort_inner,
-    plan_unique as plan_unique_inner, plan_with_columns as plan_with_columns_inner,
-    planinner_to_serializable, schema_descriptors_as_py, schema_fields_as_py, PlanInner,
+    plan_filter as plan_filter_inner, plan_global_select as build_plan_global_select,
+    plan_rename as plan_rename_inner, plan_select as plan_select_inner,
+    plan_slice as plan_slice_inner, plan_sort as plan_sort_inner, plan_unique as plan_unique_inner,
+    plan_with_columns as plan_with_columns_inner, planinner_to_serializable,
+    schema_descriptors_as_py, schema_fields_as_py, PlanInner,
 };
 
 #[cfg(feature = "polars_engine")]
@@ -84,7 +85,7 @@ impl PyPlan {
 
 #[pyfunction]
 fn rust_version() -> &'static str {
-    "0.5.0"
+    "0.6.0"
 }
 
 #[pyfunction]
@@ -430,6 +431,73 @@ fn expr_datetime_to_date(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
 }
 
 #[pyfunction]
+fn expr_window_row_number(
+    partition_by: Vec<String>,
+    order_by: Vec<(String, bool)>,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_window_row_number(partition_by, order_by)?,
+    })
+}
+
+#[pyfunction]
+fn expr_window_rank(
+    dense: bool,
+    partition_by: Vec<String>,
+    order_by: Vec<(String, bool)>,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_window_rank(dense, partition_by, order_by)?,
+    })
+}
+
+#[pyfunction]
+fn expr_window_sum(
+    inner: Bound<'_, PyExpr>,
+    partition_by: Vec<String>,
+    order_by: Vec<(String, bool)>,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_window_sum(inner.borrow().node.clone(), partition_by, order_by)?,
+    })
+}
+
+#[pyfunction]
+fn expr_window_mean(
+    inner: Bound<'_, PyExpr>,
+    partition_by: Vec<String>,
+    order_by: Vec<(String, bool)>,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_window_mean(inner.borrow().node.clone(), partition_by, order_by)?,
+    })
+}
+
+#[pyfunction]
+fn expr_global_sum(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_global_sum(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_global_mean(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_global_mean(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_global_default_alias(expr: &Bound<'_, PyExpr>) -> Option<String> {
+    expr.borrow().node.global_agg_default_alias()
+}
+
+#[pyfunction]
+fn expr_is_global_agg(expr: &Bound<'_, PyExpr>) -> bool {
+    matches!(expr.borrow().node, ExprNode::GlobalAgg { .. })
+}
+
+#[pyfunction]
 fn make_plan(py: Python<'_>, schema_fields: &Bound<'_, PyAny>) -> PyResult<PyPlan> {
     let dict: &Bound<'_, pyo3::types::PyDict> = schema_fields.downcast()?;
     let mut schema: std::collections::HashMap<String, DTypeDesc> = std::collections::HashMap::new();
@@ -447,6 +515,17 @@ fn make_plan(py: Python<'_>, schema_fields: &Bound<'_, PyAny>) -> PyResult<PyPla
 fn plan_select(plan: &PyPlan, columns: Vec<String>) -> PyResult<PyPlan> {
     Ok(PyPlan {
         inner: plan_select_inner(&plan.inner, columns)?,
+    })
+}
+
+#[pyfunction]
+fn plan_global_select(plan: &PyPlan, items: Vec<(String, Bound<'_, PyExpr>)>) -> PyResult<PyPlan> {
+    let mut pairs: Vec<(String, ExprNode)> = Vec::with_capacity(items.len());
+    for (name, e) in items {
+        pairs.push((name, e.borrow().node.clone()));
+    }
+    Ok(PyPlan {
+        inner: build_plan_global_select(&plan.inner, pairs)?,
     })
 }
 
@@ -940,8 +1019,17 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr_list_max, m)?)?;
     m.add_function(wrap_pyfunction!(expr_list_sum, m)?)?;
     m.add_function(wrap_pyfunction!(expr_datetime_to_date, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_window_row_number, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_window_rank, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_window_sum, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_window_mean, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_global_sum, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_global_mean, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_global_default_alias, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_is_global_agg, m)?)?;
     m.add_function(wrap_pyfunction!(make_plan, m)?)?;
     m.add_function(wrap_pyfunction!(plan_select, m)?)?;
+    m.add_function(wrap_pyfunction!(plan_global_select, m)?)?;
     m.add_function(wrap_pyfunction!(plan_with_columns, m)?)?;
     m.add_function(wrap_pyfunction!(plan_filter, m)?)?;
     m.add_function(wrap_pyfunction!(plan_sort, m)?)?;

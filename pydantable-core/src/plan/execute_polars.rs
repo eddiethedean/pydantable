@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Cursor;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDate, PyDateTime, PyDelta, PyDict, PyList};
+use pyo3::types::{PyAny, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyList, PyTime};
 
 use crate::dtype::{
     py_decimal_to_scaled_i128, py_enum_to_wire_string, scaled_i128_to_py_decimal, BaseType,
@@ -199,6 +199,76 @@ fn micros_to_py_timedelta(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
 }
 
 #[cfg(feature = "polars_engine")]
+fn py_time_to_nanos(item: &Bound<'_, PyAny>) -> PyResult<i64> {
+    let t = item.downcast::<PyTime>()?;
+    let h: i64 = t.getattr("hour")?.extract()?;
+    let m: i64 = t.getattr("minute")?.extract()?;
+    let s: i64 = t.getattr("second")?.extract()?;
+    let micro: i64 = t.getattr("microsecond")?.extract()?;
+    Ok(((h * 3600 + m * 60 + s) * 1_000_000_000) + micro * 1000)
+}
+
+#[cfg(feature = "polars_engine")]
+fn nanos_to_py_time(py: Python<'_>, ns: i64) -> PyResult<PyObject> {
+    let dt_mod = py.import_bound("datetime")?;
+    let time_cls = dt_mod.getattr("time")?;
+    let nanos = ns.rem_euclid(86_400 * 1_000_000_000);
+    let secs = nanos / 1_000_000_000;
+    let nsub = nanos % 1_000_000_000;
+    let micro = (nsub / 1000) as i32;
+    let h = (secs / 3600) as i32;
+    let m = ((secs % 3600) / 60) as i32;
+    let s = (secs % 60) as i32;
+    Ok(time_cls.call1((h, m, s, micro))?.into_py(py))
+}
+
+#[cfg(feature = "polars_engine")]
+fn map_list_series_to_py_dict(
+    py: Python<'_>,
+    s: &Series,
+    val_dt: &DTypeDesc,
+) -> PyResult<PyObject> {
+    let d = PyDict::new_bound(py);
+    let ca = s.struct_().map_err(|_| {
+        PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "Map cells must be encoded as a struct list (key/value pairs).",
+        )
+    })?;
+    let key_s = ca.field_by_name("key").map_err(polars_err)?;
+    let val_s = ca.field_by_name("value").map_err(polars_err)?;
+    for i in 0..ca.len() {
+        let k_av = key_s.get(i).map_err(polars_err)?;
+        let v_av = val_s.get(i).map_err(polars_err)?;
+        if matches!(k_av, AnyValue::Null) {
+            continue;
+        }
+        let k = match k_av {
+            AnyValue::String(x) => x.to_string(),
+            AnyValue::StringOwned(x) => x.to_string(),
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Map key must be a string.",
+                ));
+            }
+        };
+        let py_v = polars_anyvalue_to_py(py, v_av, val_dt)?;
+        d.set_item(k, py_v)?;
+    }
+    Ok(d.into_py(py))
+}
+
+#[cfg(feature = "polars_engine")]
+fn map_av_to_py_dict(py: Python<'_>, av: AnyValue<'_>, val_dt: &DTypeDesc) -> PyResult<PyObject> {
+    let avs = av.into_static();
+    let AnyValue::List(s) = avs else {
+        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "Map cell must be a Polars list of key/value structs.",
+        ));
+    };
+    map_list_series_to_py_dict(py, &s, val_dt)
+}
+
+#[cfg(feature = "polars_engine")]
 fn py_row_get_field<'py>(item: &Bound<'py, PyAny>, fname: &str) -> PyResult<Bound<'py, PyAny>> {
     if let Ok(d) = item.downcast::<PyDict>() {
         return d.call_method1("get", (fname, item.py().None()));
@@ -268,6 +338,14 @@ fn dtype_desc_to_polars_data_type(d: &DTypeDesc) -> PyResult<DataType> {
             base: Some(BaseType::Duration),
             ..
         } => Ok(DataType::Duration(TimeUnit::Microseconds)),
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Time),
+            ..
+        } => Ok(DataType::Time),
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Binary),
+            ..
+        } => Ok(DataType::Binary),
         DTypeDesc::Scalar { base: None, .. } => {
             Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Root schema cannot have unknown-base dtype.",
@@ -288,6 +366,13 @@ fn dtype_desc_to_polars_data_type(d: &DTypeDesc) -> PyResult<DataType> {
         DTypeDesc::List { inner, .. } => Ok(DataType::List(Box::new(
             dtype_desc_to_polars_data_type(inner)?,
         ))),
+        DTypeDesc::Map { value, .. } => {
+            let vdt = dtype_desc_to_polars_data_type(value)?;
+            Ok(DataType::List(Box::new(DataType::Struct(vec![
+                Field::new(PlSmallStr::from("key"), DataType::String),
+                Field::new(PlSmallStr::from("value"), vdt),
+            ]))))
+        }
     }
 }
 
@@ -461,10 +546,93 @@ fn py_list_to_series(
                 .cast(&DataType::Duration(polars::prelude::TimeUnit::Microseconds))
                 .map_err(polars_err)
         }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Time),
+            ..
+        } => {
+            let mut v: Vec<Option<i64>> = Vec::with_capacity(list.len());
+            for item in list.iter() {
+                if item.is_none() {
+                    v.push(None);
+                } else {
+                    v.push(Some(py_time_to_nanos(&item)?));
+                }
+            }
+            Int64Chunked::from_iter_options(name.into(), v.into_iter())
+                .into_series()
+                .cast(&DataType::Time)
+                .map_err(polars_err)
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Binary),
+            ..
+        } => {
+            let mut v: Vec<Option<Vec<u8>>> = Vec::with_capacity(list.len());
+            for item in list.iter() {
+                if item.is_none() {
+                    v.push(None);
+                } else {
+                    v.push(Some(item.extract::<Vec<u8>>()?));
+                }
+            }
+            Ok(
+                polars::chunked_array::ChunkedArray::<polars::datatypes::BinaryType>::from_iter_options(
+                    name.into(),
+                    v.into_iter(),
+                )
+                .into_series(),
+            )
+        }
         DTypeDesc::Scalar { base: None, .. } => {
             Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Root schema cannot have unknown-base dtype.",
             ))
+        }
+        DTypeDesc::Map { value, .. } => {
+            let vdt = dtype_desc_to_polars_data_type(value)?;
+            let inner_struct = DataType::Struct(vec![
+                Field::new(PlSmallStr::from("key"), DataType::String),
+                Field::new(PlSmallStr::from("value"), vdt),
+            ]);
+            let est_vals = list.len().saturating_mul(8).max(8);
+            let mut builder =
+                get_list_builder(&inner_struct, est_vals, list.len(), PlSmallStr::from(name));
+            for item in list.iter() {
+                if item.is_none() {
+                    builder.append_null();
+                } else {
+                    let d = item.downcast::<PyDict>()?;
+                    let mut pairs: Vec<(String, Bound<'_, PyAny>)> = Vec::new();
+                    for (k, v) in d.iter() {
+                        pairs.push((k.extract::<String>()?, v));
+                    }
+                    pairs.sort_by(|a, b| a.0.cmp(&b.0));
+                    let n = pairs.len();
+                    let key_list = PyList::empty_bound(py);
+                    let val_list = PyList::empty_bound(py);
+                    for (k, v) in pairs {
+                        key_list.append(k)?;
+                        val_list.append(v)?;
+                    }
+                    let ks = py_list_to_series(
+                        py,
+                        "key",
+                        &key_list,
+                        &DTypeDesc::non_nullable(BaseType::Str),
+                    )?;
+                    let vs = py_list_to_series(py, "value", &val_list, value.as_ref())?;
+                    let ca = StructChunked::from_series(
+                        PlSmallStr::from("item"),
+                        n,
+                        vec![&ks, &vs].into_iter(),
+                    )
+                    .map_err(polars_err)?;
+                    builder
+                        .append_series(&ca.into_series())
+                        .map_err(polars_err)?;
+                }
+            }
+            Ok(builder.finish().into_series())
         }
         DTypeDesc::List { inner, .. } => {
             let inner_polars = dtype_desc_to_polars_data_type(inner)?;
@@ -573,6 +741,14 @@ impl PolarsPlanRunner {
                 let exprs = columns.iter().map(col).collect::<Vec<_>>();
                 lf = lf.select(exprs);
             }
+            PlanStep::GlobalSelect { items } => {
+                let mut exprs = Vec::with_capacity(items.len());
+                for (name, expr) in items.iter() {
+                    let pe = expr.to_polars_expr()?.alias(name.as_str());
+                    exprs.push(pe);
+                }
+                lf = lf.select(exprs);
+            }
             PlanStep::WithColumns { columns } => {
                 let mut exprs = Vec::with_capacity(columns.len());
                 for (name, expr) in columns.iter() {
@@ -655,6 +831,12 @@ impl PolarsPlanRunner {
                                 LiteralValue::DurationMicros(v) => base.fill_null(lit(*v).cast(
                                     DataType::Duration(polars::prelude::TimeUnit::Microseconds),
                                 )),
+                                LiteralValue::TimeNanos(ns) => {
+                                    base.fill_null(lit(*ns).cast(DataType::Time))
+                                }
+                                LiteralValue::Binary(b) => {
+                                    base.fill_null(lit(b.as_slice()).cast(DataType::Binary))
+                                }
                             }
                         } else {
                             match strategy.as_ref().expect("validated strategy").as_str() {
@@ -704,6 +886,7 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
         return Ok(py.None());
     }
     match fd {
+        DTypeDesc::Map { value, .. } => map_av_to_py_dict(py, av, value.as_ref()),
         DTypeDesc::Scalar {
             base: Some(BaseType::Int),
             ..
@@ -826,6 +1009,30 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             };
             micros_to_py_timedelta(py, micros)
         }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Time),
+            ..
+        } => {
+            let ns = match av {
+                AnyValue::Time(v) => v,
+                _ => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Expected time AnyValue.",
+                    ));
+                }
+            };
+            nanos_to_py_time(py, ns)
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Binary),
+            ..
+        } => match av {
+            AnyValue::Binary(b) => Ok(PyBytes::new(py, b).into_py(py)),
+            AnyValue::BinaryOwned(b) => Ok(PyBytes::new(py, b.as_slice()).into_py(py)),
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Expected binary AnyValue.",
+            )),
+        },
         DTypeDesc::List { inner, .. } => {
             let av_static = av.into_static();
             let AnyValue::List(series) = av_static else {
@@ -1009,6 +1216,51 @@ fn series_to_py_list(py: Python<'_>, series: &Series, dtype: &DTypeDesc) -> PyRe
                 }
             }
         }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Time),
+            ..
+        } => {
+            let casted = series.cast(&DataType::Time).map_err(polars_err)?;
+            for av in casted.iter() {
+                let py_v = match av {
+                    AnyValue::Null => py.None(),
+                    AnyValue::Time(ns) => nanos_to_py_time(py, ns)?,
+                    _ => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                            "Expected time AnyValue in series.",
+                        ));
+                    }
+                };
+                values.push(py_v);
+            }
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Binary),
+            ..
+        } => {
+            for av in series.iter() {
+                let py_v = match av {
+                    AnyValue::Null => py.None(),
+                    AnyValue::Binary(b) => PyBytes::new(py, b).into_py(py),
+                    AnyValue::BinaryOwned(b) => PyBytes::new(py, b.as_slice()).into_py(py),
+                    _ => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                            "Expected binary AnyValue.",
+                        ));
+                    }
+                };
+                values.push(py_v);
+            }
+        }
+        DTypeDesc::Map { value, .. } => {
+            for av in series.iter() {
+                let py_v = match av {
+                    AnyValue::Null => py.None(),
+                    _ => map_av_to_py_dict(py, av, value.as_ref())?,
+                };
+                values.push(py_v);
+            }
+        }
         DTypeDesc::Scalar { base: None, .. } => {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Output schema cannot have unknown-base dtype.",
@@ -1081,6 +1333,14 @@ fn dtype_from_polars(dt: &DataType) -> PyResult<DTypeDesc> {
             base: Some(BaseType::Duration),
             nullable: true,
         }),
+        DataType::Time => Ok(DTypeDesc::Scalar {
+            base: Some(BaseType::Time),
+            nullable: true,
+        }),
+        DataType::Binary => Ok(DTypeDesc::Scalar {
+            base: Some(BaseType::Binary),
+            nullable: true,
+        }),
         DataType::Struct(flds) => {
             let mut fields: Vec<(String, DTypeDesc)> = Vec::with_capacity(flds.len());
             for f in flds {
@@ -1091,10 +1351,27 @@ fn dtype_from_polars(dt: &DataType) -> PyResult<DTypeDesc> {
                 nullable: true,
             })
         }
-        DataType::List(inner) => Ok(DTypeDesc::List {
-            inner: Box::new(dtype_from_polars(inner)?),
-            nullable: true,
-        }),
+        DataType::List(inner) => {
+            if let DataType::Struct(flds) = inner.as_ref() {
+                if flds.len() == 2 {
+                    let f0 = &flds[0];
+                    let f1 = &flds[1];
+                    if f0.name.as_str() == "key"
+                        && f1.name.as_str() == "value"
+                        && f0.dtype == DataType::String
+                    {
+                        return Ok(DTypeDesc::Map {
+                            value: Box::new(dtype_from_polars(&f1.dtype)?),
+                            nullable: true,
+                        });
+                    }
+                }
+            }
+            Ok(DTypeDesc::List {
+                inner: Box::new(dtype_from_polars(inner)?),
+                nullable: true,
+            })
+        }
         other => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
             "Unsupported Polars dtype in result schema: {other:?}"
         ))),
@@ -1784,6 +2061,12 @@ fn py_dict_to_literal_ctx(
                 Some(crate::dtype::BaseType::Duration) => {
                     LiteralValue::DurationMicros(py_timedelta_to_micros(&item)?)
                 }
+                Some(crate::dtype::BaseType::Time) => {
+                    LiteralValue::TimeNanos(py_time_to_nanos(&item)?)
+                }
+                Some(crate::dtype::BaseType::Binary) => {
+                    LiteralValue::Binary(item.extract::<Vec<u8>>()?)
+                }
                 None => {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "Unsupported unknown-base dtype in reshape path.",
@@ -1821,6 +2104,8 @@ fn literal_to_py(py: Python<'_>, v: &LiteralValue) -> PyObject {
         LiteralValue::DurationMicros(v) => {
             micros_to_py_timedelta(py, *v).unwrap_or_else(|_| v.into_py(py))
         }
+        LiteralValue::TimeNanos(ns) => nanos_to_py_time(py, *ns).unwrap_or_else(|_| ns.into_py(py)),
+        LiteralValue::Binary(b) => PyBytes::new(py, b).into_py(py),
     }
 }
 
@@ -2176,6 +2461,8 @@ pub fn execute_pivot_polars(
             Some(LiteralValue::DateTimeMicros(v)) => v.to_string(),
             Some(LiteralValue::DateDays(v)) => v.to_string(),
             Some(LiteralValue::DurationMicros(v)) => v.to_string(),
+            Some(LiteralValue::TimeNanos(v)) => v.to_string(),
+            Some(LiteralValue::Binary(b)) => format!("B:{}", b.len()),
             None => "null".to_string(),
         };
         if seen_pivot.insert(key.clone()) {
@@ -2275,6 +2562,8 @@ pub fn execute_pivot_polars(
                         Some(LiteralValue::DateTimeMicros(v)) => v.to_string(),
                         Some(LiteralValue::DateDays(v)) => v.to_string(),
                         Some(LiteralValue::DurationMicros(v)) => v.to_string(),
+                        Some(LiteralValue::TimeNanos(v)) => v.to_string(),
+                        Some(LiteralValue::Binary(b)) => format!("B:{}", b.len()),
                         None => "null".to_string(),
                     };
                     &key == pv
@@ -2398,6 +2687,8 @@ fn dynamic_group_key_fragment(value: &Option<LiteralValue>) -> String {
         Some(LiteralValue::DateTimeMicros(v)) => format!("DT:{v}"),
         Some(LiteralValue::DateDays(v)) => format!("D:{v}"),
         Some(LiteralValue::DurationMicros(v)) => format!("TD:{v}"),
+        Some(LiteralValue::TimeNanos(v)) => format!("T:{v}"),
+        Some(LiteralValue::Binary(b)) => format!("BIN:{}", b.len()),
     }
 }
 
@@ -2627,6 +2918,10 @@ fn dtype_after_explode(inner: &DTypeDesc) -> DTypeDesc {
             nullable: _,
         } => DTypeDesc::List {
             inner: i.clone(),
+            nullable: true,
+        },
+        DTypeDesc::Map { value, .. } => DTypeDesc::Map {
+            value: value.clone(),
             nullable: true,
         },
     }

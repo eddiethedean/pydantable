@@ -1,12 +1,13 @@
 //! JSON-ish serialization of [`ExprNode`] for planners / Python.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::{PyBytes, PyDict, PyList};
 
 use crate::dtype::{dtype_to_descriptor_py, BaseType};
 
 use super::ir::{
-    ArithOp, CmpOp, ExprNode, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart, UnaryNumericOp,
+    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart,
+    UnaryNumericOp, WindowOp,
 };
 
 fn base_type_json(b: BaseType) -> &'static str {
@@ -21,6 +22,8 @@ fn base_type_json(b: BaseType) -> &'static str {
         BaseType::DateTime => "datetime",
         BaseType::Date => "date",
         BaseType::Duration => "duration",
+        BaseType::Time => "time",
+        BaseType::Binary => "binary",
     }
 }
 
@@ -68,6 +71,8 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
                 Some(LiteralValue::DateTimeMicros(v)) => v.into_py(py),
                 Some(LiteralValue::DateDays(v)) => v.into_py(py),
                 Some(LiteralValue::DurationMicros(v)) => v.into_py(py),
+                Some(LiteralValue::TimeNanos(v)) => v.into_py(py),
+                Some(LiteralValue::Binary(b)) => PyBytes::new(py, b).into_py(py),
             };
             dict.set_item("value", value_obj)?;
         }
@@ -143,6 +148,8 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
                     LiteralValue::DateTimeMicros(v) => v.into_py(py),
                     LiteralValue::DateDays(v) => v.into_py(py),
                     LiteralValue::DurationMicros(v) => v.into_py(py),
+                    LiteralValue::TimeNanos(v) => v.into_py(py),
+                    LiteralValue::Binary(b) => PyBytes::new(py, b).into_py(py),
                 };
                 list.append(pyv)?;
             }
@@ -304,6 +311,46 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
         }
         ExprNode::DatetimeToDate { inner, .. } => {
             dict.set_item("kind", "datetime_to_date")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+        }
+        ExprNode::Window {
+            op,
+            operand,
+            partition_by,
+            order_by,
+            ..
+        } => {
+            dict.set_item("kind", "window")?;
+            dict.set_item(
+                "op",
+                match op {
+                    WindowOp::RowNumber => "row_number",
+                    WindowOp::Rank => "rank",
+                    WindowOp::DenseRank => "dense_rank",
+                    WindowOp::Sum => "sum",
+                    WindowOp::Mean => "mean",
+                },
+            )?;
+            if let Some(op) = operand {
+                dict.set_item("operand", exprnode_to_serializable(py, op)?)?;
+            }
+            dict.set_item("partition_by", partition_by.clone().into_py(py))?;
+            let ord_list = PyList::empty_bound(py);
+            for (name, asc) in order_by {
+                let t = PyList::new_bound(py, [name.into_py(py), (*asc).into_py(py)]);
+                ord_list.append(t)?;
+            }
+            dict.set_item("order_by", ord_list)?;
+        }
+        ExprNode::GlobalAgg { op, inner, .. } => {
+            dict.set_item("kind", "global_agg")?;
+            dict.set_item(
+                "op",
+                match op {
+                    GlobalAggOp::Sum => "sum",
+                    GlobalAggOp::Mean => "mean",
+                },
+            )?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
         }
     }

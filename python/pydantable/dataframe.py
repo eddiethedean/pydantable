@@ -230,23 +230,59 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
-    def select(self, *cols: str | ColumnRef) -> DataFrame[Any]:
+    def select(self, *cols: str | ColumnRef | Expr, **named: Any) -> DataFrame[Any]:
         rust = _require_rust_core()
-        selected: list[str] = []
+
+        named_items: list[tuple[str, Any]] = []
+        for name, e in named.items():
+            if not isinstance(e, Expr):
+                raise TypeError(
+                    "select() keyword arguments must be Expr instances "
+                    "(global aggregates)."
+                )
+            named_items.append((name, e._rust_expr))
+
+        aggs: list[tuple[str, Any]] = []
+        projects: list[str] = []
         for col in cols:
             if isinstance(col, str):
-                selected.append(col)
+                projects.append(col)
             elif isinstance(col, Expr):
-                referenced = col.referenced_columns()
-                if len(referenced) != 1:
-                    raise TypeError(
-                        "select() accepts column names or a ColumnRef expression."
-                    )
-                selected.append(next(iter(referenced)))
+                if rust.expr_is_global_agg(col._rust_expr):
+                    alias = rust.expr_global_default_alias(col._rust_expr)
+                    if alias is None:
+                        raise TypeError(
+                            "global aggregate in select() is missing a default "
+                            "output name."
+                        )
+                    aggs.append((alias, col._rust_expr))
+                else:
+                    referenced = col.referenced_columns()
+                    if len(referenced) != 1:
+                        raise TypeError(
+                            "select() accepts column names or a ColumnRef expression."
+                        )
+                    projects.append(next(iter(referenced)))
             else:
-                raise TypeError("select() accepts column names or ColumnRef objects.")
+                raise TypeError("select() accepts column names or Expr objects.")
 
-        rust_plan = rust.plan_select(self._rust_plan, selected)
+        if named_items and (projects or aggs):
+            raise TypeError(
+                "select() cannot mix keyword aggregates with positional column "
+                "names or aggregates."
+            )
+        if aggs and projects:
+            raise TypeError(
+                "select() cannot mix global aggregates with plain column projections."
+            )
+        if named_items:
+            rust_plan = rust.plan_global_select(self._rust_plan, named_items)
+        elif aggs:
+            rust_plan = rust.plan_global_select(self._rust_plan, aggs)
+        else:
+            if not projects:
+                raise ValueError("select() requires at least one column.")
+            rust_plan = rust.plan_select(self._rust_plan, projects)
         desc = rust_plan.schema_descriptors()
         derived_fields = self._field_types_from_descriptors(desc)
         derived_schema_type = make_derived_schema_type(

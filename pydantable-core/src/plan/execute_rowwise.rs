@@ -46,6 +46,11 @@ pub(crate) fn execute_plan_rowwise(
                 ctx.retain(|k, _| columns.contains(k));
                 n = ctx_len(&ctx)?;
             }
+            PlanStep::GlobalSelect { .. } => {
+                return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                    "Global aggregate select requires pydantable-core built with the Polars engine.",
+                ));
+            }
             PlanStep::WithColumns { columns } => {
                 for (name, expr) in columns.iter() {
                     let out = expr.eval(&ctx, n)?;

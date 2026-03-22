@@ -24,7 +24,9 @@ Each column in your schema is one **scalar** Python type from this set:
 | `enum.Enum` subclass | `import enum` | `enum` (Polars **Utf8**; wire value is the member’s `.value` when it is a string, otherwise `str(member)`) |
 | `datetime` | `from datetime import datetime` | `datetime` |
 | `date` | `from datetime import date` | `date` |
+| `time` | `from datetime import time` | `time` (Polars **Time**; wall clock, distinct from `datetime` / `timedelta`) |
 | `timedelta` | `from datetime import timedelta` | `duration` |
+| `bytes` | built-in | `binary` (Polars **Binary**; limited `Expr` surface) |
 
 Use these types in **Pydantic field annotations** on `DataFrameModel` subclasses (or
 `Schema` models for `DataFrame[Schema]`). Runtime cell values must be instances
@@ -51,6 +53,10 @@ support for struct columns is intentionally limited** (for example, no arithmeti
 on whole structs; equality is allowed only when struct shapes match). Prefer
 scalar fields or `Expr.struct_field(...)` for field projection.
 
+## Map-like columns (`dict[str, T]`)
+
+Homogeneous **string-keyed** maps: **`dict[str, T]`** where **`T`** is any supported scalar or nested type allowed elsewhere. Cells are Python `dict` values; the engine stores a logical map as Polars **`List(Struct{key: str, value: T})`**. Expression support is intentionally small (equality, membership-style operations where implemented); not all Polars map ops are exposed.
+
 ## Homogeneous list columns (`list[T]` / `List[T]`)
 
 Use **`list[T]`** (or `typing.List[T]`) where **`T`** is any supported column type
@@ -58,7 +64,12 @@ Use **`list[T]`** (or `typing.List[T]`) where **`T`** is any supported column ty
 values matching `T`. Rust uses `DTypeDesc::List` and Polars **list** columns.
 
 - **`explode(...)`** is supported for list-typed columns: it lowers to Polars
-  `explode` and sets the column’s dtype to the inner `T` (nullable).
+  `explode` and sets the column’s dtype to the inner `T` (**nullable**, even when
+  the list column was non-nullable). Multi-column explode requires **equal list
+  lengths** on each row; empty list cells produce **no** output rows for that row.
+- **`unnest(...)`** is supported for **struct** columns (nested models): fields
+  become top-level columns named **`{struct_column}_{field}`** (separator `_`), with
+  dtypes and nullability derived from the nested schema.
 - **Expressions** on list columns (see below): indexing, membership, length, and
   numeric reductions—**not** element-wise arithmetic between two list columns.
   Use **`explode`** when you need one row per list element.
@@ -130,12 +141,14 @@ Temporal part extraction and `dt_date()` on timezone-aware `datetime` values fol
 
 These are **out of scope** for the current schema system:
 
-- `dict[...]` or arbitrary objects as **per-cell** values (except nested
-  **`BaseModel`** columns and homogeneous **`list[T]`** as documented above)
+- `dict` types **other than** homogeneous **`dict[str, T]`** maps (non-string keys,
+  heterogeneous value types, or JSON-style arbitrary dicts)
+- Arbitrary objects as **per-cell** values (except nested **`BaseModel`** columns,
+  homogeneous **`list[T]`**, and **`dict[str, T]`** maps as documented above)
 
 ## When unsupported field types fail
 
-- **`DataFrameModel` subclasses**: each field annotation is validated **when the class is defined** (in `__init_subclass__`). Unsupported types (for example bare `list` without an inner type, `dict[str, int]` as a cell type, `int | str`, or `typing.Any`) raise **`TypeError`** immediately, before `RowModel` is generated. The message lists supported dtypes and points to this page.
+- **`DataFrameModel` subclasses**: each field annotation is validated **when the class is defined** (in `__init_subclass__`). Unsupported types (for example bare `list` without an inner type, `dict[int, str]` (non-string keys), `int | str`, or `typing.Any`) raise **`TypeError`** immediately, before `RowModel` is generated. The message lists supported dtypes and points to this page.
 - **`DataFrame[Schema]`** with a hand-written **`Schema`** subclass: there is **no**
   class-time check on the `Schema` model (unlike `DataFrameModel`). Unsupported
   annotations surface when you **first construct** `DataFrame[YourSchema](...)`
@@ -151,13 +164,10 @@ richer schemas and APIs. Ordering and timing follow project priorities (see
 
 | Planned category | Examples | Notes |
 |------------------|----------|--------|
-| **Maps / dict-like cells** | `dict[str, T]` with a fixed value type `T`, or a dedicated **map** dtype | Semi-structured columns; stricter than arbitrary JSON `dict`. |
 | **Literal / typing-only categoricals** | `Literal["a","b"]` as a distinct dtype (today: use a concrete **`enum.Enum`** subclass). | Narrower validation story than free-form `enum`. |
-| **Binary** | `bytes` | Opaque blobs; execution surface may stay limited (pass-through, equality, length). |
-| **Time-of-day** | `time` | Distinct from `datetime` and `timedelta`; useful for schedules. |
 | **Geospatial / extension dtypes** | e.g. WKB, GeoJSON-backed types | Only if there is a clear Polars/Arrow story and API surface. |
 
-**Already shipped (scalar columns):** **`uuid.UUID`** (Utf8 / canonical string round-trip), **`decimal.Decimal`** (Polars `Decimal(38, 9)`), and concrete **`enum.Enum`** subclasses (Utf8 wire values). **Homogeneous `list[T]`** columns, **`explode()`**, list **`Expr`** helpers (**`list_len`**, **`list_get`**, **`list_contains`**, **`list_min`/`max`/`sum`**), and **`unnest()`** on **struct** columns (see `ROADMAP.md`).
+**Already shipped (scalar columns):** **`uuid.UUID`**, **`decimal.Decimal`**, concrete **`enum.Enum`**, **`datetime`**, **`date`**, **`time`**, **`timedelta`**, **`bytes`**, plus homogeneous **`dict[str, T]`** map columns. **Homogeneous `list[T]`** columns, **`explode()`**, list **`Expr`** helpers, and **`unnest()`** on **struct** columns (see `ROADMAP.md`).
 
 ## Runtime column payloads (Python)
 

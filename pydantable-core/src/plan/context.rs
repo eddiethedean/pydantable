@@ -38,9 +38,12 @@ pub fn root_data_to_ctx(
             ))
         })?;
 
-        if matches!(expected, DTypeDesc::Struct { .. } | DTypeDesc::List { .. }) {
+        if matches!(
+            expected,
+            DTypeDesc::Struct { .. } | DTypeDesc::List { .. } | DTypeDesc::Map { .. }
+        ) {
             return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-                "Struct/list columns require the Polars execution engine (polars_engine feature).",
+                "Struct/list/map columns require the Polars execution engine (polars_engine feature).",
             ));
         }
 

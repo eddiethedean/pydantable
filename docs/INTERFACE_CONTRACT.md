@@ -93,8 +93,10 @@ Supported reshape methods:
   - multiple value columns: `<pivot_value>_<value_col>_<agg>`
 
 `explode` / `unnest`:
-- **Homogeneous list** columns (`list[T]` / `List[T]` with supported `T`) are modeled end-to-end; `explode(columns)` unwraps one list level and updates the schema to the inner dtype (nullable). See [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md).
-- **`unnest`** for **struct** columns (nested model columns) is implemented: named struct fields are promoted to top-level columns with Polars `unnest`, and the logical schema is migrated accordingly.
+- **Homogeneous list** columns (`list[T]` / `List[T]` with supported `T`) are modeled end-to-end; `explode(columns)` unwraps **one** list level and updates the schema to the inner dtype (**always nullable** after explode, matching Polars’ post-explode nullability for element cells). Execution uses Polars `explode` with `empty_as_null=false` and `keep_nulls=true` (same defaults as the Rust engine’s Polars call).
+- **Multi-column explode:** all named columns must be list-typed; Polars requires **matching list lengths per row**. Mismatched lengths for the same row raise at execution (contract-tested).
+- **Empty lists:** an empty list cell yields **no output rows** for that input row (Polars behavior); other columns are not replicated for that row.
+- **`unnest`** for **struct** columns (nested model columns) uses Polars `unnest` with separator **`_`**: each struct field becomes a top-level column named **`{parent}_{field}`** (e.g. `addr_street`). The logical schema follows that naming; struct nullability is propagated to field columns per the Rust descriptor rules. See [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md).
 
 ## Row-wise expression evaluation (`polars_engine` disabled)
 

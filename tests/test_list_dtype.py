@@ -103,6 +103,21 @@ def test_explode_empty_list_rows() -> None:
     assert ex.collect(as_lists=True) == {"id": [2, 2], "tags": [1, 2]}
 
 
+def test_explode_null_list_cell_keeps_row() -> None:
+    """Nullable list column: None cell survives as null inner with keep_nulls."""
+    df = DataFrame[_TagsOpt](
+        {
+            "id": [1, 2],
+            "tags": [None, [1]],
+        }
+    )
+    ex = df.explode("tags")
+    out = ex.collect(as_lists=True)
+    assert out["id"] == [1, 2]
+    assert out["tags"][0] is None
+    assert out["tags"][1] == 1
+
+
 def test_explode_multi_column_requires_matching_lengths() -> None:
     df = DataFrame[_TwoLists](
         {

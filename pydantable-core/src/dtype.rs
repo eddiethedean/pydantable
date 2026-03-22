@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{
-    PyAny, PyBool, PyDate, PyDateTime, PyDelta, PyFloat, PyInt, PyString, PyTuple, PyType,
+    PyAny, PyBool, PyBytes, PyDate, PyDateTime, PyDelta, PyFloat, PyInt, PyString, PyTime, PyTuple,
+    PyType,
 };
 
 /// Polars precision for [`BaseType::Decimal`] columns and literals.
@@ -23,6 +24,10 @@ pub enum BaseType {
     DateTime,
     Date,
     Duration,
+    /// Wall clock time (`datetime.time`); Polars `Time` (nanoseconds since midnight).
+    Time,
+    /// Raw bytes (`bytes`); Polars `Binary`.
+    Binary,
 }
 
 /// DType descriptor for expression typing and nullability.
@@ -31,6 +36,7 @@ pub enum BaseType {
 ///   The base must be inferred from the other operand during operator typing.
 /// - `Struct` represents nested Pydantic models (recursive).
 /// - `List` is a homogeneous list column (`list[T]` / `List[T]`).
+/// - `Map` is `dict[str, V]` with a homogeneous value dtype (string keys only).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DTypeDesc {
     Scalar {
@@ -43,6 +49,10 @@ pub enum DTypeDesc {
     },
     List {
         inner: Box<DTypeDesc>,
+        nullable: bool,
+    },
+    Map {
+        value: Box<DTypeDesc>,
         nullable: bool,
     },
 }
@@ -84,7 +94,8 @@ impl DTypeDesc {
         match self {
             DTypeDesc::Scalar { nullable, .. }
             | DTypeDesc::Struct { nullable, .. }
-            | DTypeDesc::List { nullable, .. } => *nullable,
+            | DTypeDesc::List { nullable, .. }
+            | DTypeDesc::Map { nullable, .. } => *nullable,
         }
     }
 
@@ -103,6 +114,10 @@ impl DTypeDesc {
                 inner,
                 nullable: true,
             },
+            DTypeDesc::Map { value, .. } => DTypeDesc::Map {
+                value,
+                nullable: true,
+            },
         }
     }
 
@@ -116,12 +131,17 @@ impl DTypeDesc {
         matches!(self, DTypeDesc::List { .. })
     }
 
+    #[inline]
+    pub fn is_map(&self) -> bool {
+        matches!(self, DTypeDesc::Map { .. })
+    }
+
     /// `Some(base_field)` for [`DTypeDesc::Scalar`]; [`None`] for composite dtypes.
     #[inline]
     pub fn as_scalar_base_field(&self) -> Option<Option<BaseType>> {
         match self {
             DTypeDesc::Scalar { base, .. } => Some(*base),
-            DTypeDesc::Struct { .. } | DTypeDesc::List { .. } => None,
+            DTypeDesc::Struct { .. } | DTypeDesc::List { .. } | DTypeDesc::Map { .. } => None,
         }
     }
 }
@@ -165,6 +185,16 @@ pub fn dtype_structural_eq(a: &DTypeDesc, b: &DTypeDesc) -> bool {
                 nullable: nb,
             },
         ) => na == nb && dtype_structural_eq(ia, ib),
+        (
+            DTypeDesc::Map {
+                value: va,
+                nullable: na,
+            },
+            DTypeDesc::Map {
+                value: vb,
+                nullable: nb,
+            },
+        ) => na == nb && dtype_structural_eq(va, vb),
         _ => false,
     }
 }
@@ -296,6 +326,10 @@ pub fn py_annotation_to_dtype(py: Python<'_>, dtype_obj: &Bound<'_, PyAny>) -> P
                 inner,
                 nullable: true,
             },
+            DTypeDesc::Map { value, .. } => DTypeDesc::Map {
+                value,
+                nullable: true,
+            },
         };
     }
     Ok(dt)
@@ -339,6 +373,15 @@ fn py_annotation_to_dtype_impl(
         if is_py_type(py_type, "timedelta") {
             return Ok(DTypeDesc::non_nullable(BaseType::Duration));
         }
+        if is_py_type(py_type, "time") {
+            let module: String = py_type.getattr("__module__")?.extract()?;
+            if module == "datetime" {
+                return Ok(DTypeDesc::non_nullable(BaseType::Time));
+            }
+        }
+        if is_py_type(py_type, "bytes") {
+            return Ok(DTypeDesc::non_nullable(BaseType::Binary));
+        }
         if is_py_type(py_type, "NoneType") {
             return Ok(DTypeDesc::unknown_nullable());
         }
@@ -367,6 +410,36 @@ fn py_annotation_to_dtype_impl(
                 inner: Box::new(inner),
                 nullable: false,
             });
+        }
+
+        let dict_cls = builtins.getattr("dict")?;
+        if origin.eq(&dict_cls)? && tuple.len() == 2 {
+            let key_dt = py_annotation_to_dtype_impl(py, &tuple.get_item(0)?)?;
+            let val_dt = py_annotation_to_dtype_impl(py, &tuple.get_item(1)?)?;
+            match key_dt {
+                DTypeDesc::Scalar {
+                    base: Some(BaseType::Str),
+                    nullable: false,
+                } => {
+                    if matches!(
+                        val_dt,
+                        DTypeDesc::Struct { .. } | DTypeDesc::List { .. } | DTypeDesc::Map { .. }
+                    ) {
+                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                            "dict[str, V] map columns (v1) support only scalar value types.",
+                        ));
+                    }
+                    return Ok(DTypeDesc::Map {
+                        value: Box::new(val_dt),
+                        nullable: false,
+                    });
+                }
+                _ => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Map columns must be typed as dict[str, V] (string keys only).",
+                    ));
+                }
+            }
         }
     }
 
@@ -407,6 +480,13 @@ fn py_annotation_to_dtype_impl(
                 seen_inner = Some(DTypeDesc::non_nullable(BaseType::Date));
             } else if is_py_type(arg_type, "timedelta") {
                 seen_inner = Some(DTypeDesc::non_nullable(BaseType::Duration));
+            } else if is_py_type(arg_type, "time") {
+                let module: String = arg_type.getattr("__module__")?.extract()?;
+                if module == "datetime" {
+                    seen_inner = Some(DTypeDesc::non_nullable(BaseType::Time));
+                }
+            } else if is_py_type(arg_type, "bytes") {
+                seen_inner = Some(DTypeDesc::non_nullable(BaseType::Binary));
             } else if is_py_type(arg_type, "NoneType") {
                 seen_none = true;
             } else if is_pydantic_model_class(py, arg_type)? {
@@ -436,6 +516,10 @@ fn py_annotation_to_dtype_impl(
                 },
                 DTypeDesc::List { inner, .. } => DTypeDesc::List {
                     inner,
+                    nullable: true,
+                },
+                DTypeDesc::Map { value, .. } => DTypeDesc::Map {
+                    value,
                     nullable: true,
                 },
             });
@@ -502,6 +586,12 @@ pub fn py_value_to_dtype(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<D
     }
     if value.downcast::<PyDelta>().is_ok() {
         return Ok(DTypeDesc::non_nullable(BaseType::Duration));
+    }
+    if value.downcast::<PyTime>().is_ok() {
+        return Ok(DTypeDesc::non_nullable(BaseType::Time));
+    }
+    if value.downcast::<PyBytes>().is_ok() {
+        return Ok(DTypeDesc::non_nullable(BaseType::Binary));
     }
 
     Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -573,6 +663,24 @@ fn create_model_for_struct_dtype(
                 Ok(model.into_py(py))
             }
         }
+        DTypeDesc::Map { value, nullable } => {
+            let builtins = py.import_bound("builtins")?;
+            let types_mod = py.import_bound("types")?;
+            let generic_alias = types_mod.getattr("GenericAlias")?;
+            let dict_cls = builtins.getattr("dict")?;
+            let str_t = builtins.getattr("str")?;
+            let val_ann = create_model_for_struct_dtype(py, value, counter)?;
+            let val_b = val_ann.into_bound(py);
+            let tup = pyo3::types::PyTuple::new_bound(py, [str_t, val_b]);
+            let map_ann = generic_alias.call1((dict_cls, tup))?;
+            if *nullable {
+                let typing = py.import_bound("typing")?;
+                let opt = typing.getattr("Optional")?;
+                Ok(opt.get_item(map_ann)?.into_py(py))
+            } else {
+                Ok(map_ann.into_py(py))
+            }
+        }
     }
 }
 
@@ -598,6 +706,8 @@ fn scalar_base_to_py_type(py: Python<'_>, base: BaseType) -> PyResult<PyObject> 
             .import_bound("datetime")?
             .getattr("timedelta")?
             .into_py(py),
+        BaseType::Time => py.import_bound("datetime")?.getattr("time")?.into_py(py),
+        BaseType::Binary => builtins.getattr("bytes")?.into_py(py),
     })
 }
 
@@ -621,6 +731,8 @@ pub fn dtype_to_descriptor_py(py: Python<'_>, dtype: &DTypeDesc) -> PyResult<PyO
                 Some(BaseType::DateTime) => "datetime",
                 Some(BaseType::Date) => "date",
                 Some(BaseType::Duration) => "duration",
+                Some(BaseType::Time) => "time",
+                Some(BaseType::Binary) => "binary",
                 None => "unknown",
             };
             dict.set_item("base", base_s)?;
@@ -642,6 +754,11 @@ pub fn dtype_to_descriptor_py(py: Python<'_>, dtype: &DTypeDesc) -> PyResult<PyO
             dict.set_item("kind", "list")?;
             dict.set_item("nullable", *nullable)?;
             dict.set_item("inner", dtype_to_descriptor_py(py, inner)?)?;
+        }
+        DTypeDesc::Map { value, nullable } => {
+            dict.set_item("kind", "map")?;
+            dict.set_item("nullable", *nullable)?;
+            dict.set_item("value", dtype_to_descriptor_py(py, value)?)?;
         }
     }
     Ok(dict.into_py(py))

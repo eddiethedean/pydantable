@@ -255,8 +255,17 @@ def test_functions_coalesce_isnull_orderby_limit() -> None:
     assert dup.distinct().collect(as_lists=True) == {"x": [1], "y": [1]}
 
 
-def test_aggregate_function_stubs_raise() -> None:
-    with pytest.raises(NotImplementedError, match="group_by"):
-        F.sum()
-    with pytest.raises(NotImplementedError, match="group_by"):
-        F.avg()
+def test_aggregate_functions_global_sum_in_select() -> None:
+    class S(Schema):
+        v: int
+
+    df = DataFrame[S]({"v": [1, 2, 3]})
+    out = df.select(F.sum(F.col("v", dtype=int))).collect(as_lists=True)
+    assert out == {"sum_v": [6]}
+
+
+def test_aggregate_sum_requires_column() -> None:
+    with pytest.raises(TypeError):
+        F.sum()  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        F.avg()  # type: ignore[call-arg]

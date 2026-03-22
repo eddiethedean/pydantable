@@ -15,8 +15,24 @@ from pydantable.expressions import (
     concat as concat_expr,
 )
 from pydantable.expressions import (
+    dense_rank as dense_rank_expr,
+)
+from pydantable.expressions import (
+    rank as rank_expr,
+)
+from pydantable.expressions import (
+    row_number as row_number_expr,
+)
+from pydantable.expressions import (
     when as when_chain,
 )
+from pydantable.expressions import (
+    window_mean as window_mean_expr,
+)
+from pydantable.expressions import (
+    window_sum as window_sum_expr,
+)
+from pydantable.rust_engine import _require_rust_core as _rust_core
 
 
 def lit(value: Any) -> Literal:
@@ -99,22 +115,92 @@ def isin(column: Expr, *values: Any) -> Expr:
     return column.isin(*values)
 
 
+# Date/datetime: thin Spark-named wrappers over Expr.dt_* (Rust lowering).
+def year(column: Expr) -> Expr:
+    """Calendar year (Spark ``year``); ``date`` or ``datetime`` columns."""
+    return column.dt_year()
+
+
+def month(column: Expr) -> Expr:
+    """Calendar month 1-12 (Spark ``month``)."""
+    return column.dt_month()
+
+
+def day(column: Expr) -> Expr:
+    """Day of month (Spark ``day`` / ``dayofmonth``)."""
+    return column.dt_day()
+
+
+def hour(column: Expr) -> Expr:
+    """Hour 0-23 (Spark ``hour``); requires ``datetime`` column."""
+    return column.dt_hour()
+
+
+def minute(column: Expr) -> Expr:
+    """Minute (Spark ``minute``); requires ``datetime`` column."""
+    return column.dt_minute()
+
+
+def second(column: Expr) -> Expr:
+    """Second (Spark ``second``); requires ``datetime`` column."""
+    return column.dt_second()
+
+
+def to_date(column: Expr) -> Expr:
+    """``datetime`` to calendar ``date`` (Spark ``to_date`` on timestamps)."""
+    return column.dt_date()
+
+
+def row_number() -> Any:
+    """Spark ``row_number``; use ``.over(Window.partitionBy(...).orderBy(...))``."""
+    return row_number_expr()
+
+
+def rank() -> Any:
+    """Spark ``rank`` over a window."""
+    return rank_expr()
+
+
+def dense_rank() -> Any:
+    """Spark ``dense_rank`` over a window."""
+    return dense_rank_expr()
+
+
+def window_sum(column: Expr) -> Any:
+    """Windowed ``sum`` (not ``group_by``); finish with ``.over(Window...)``."""
+    return window_sum_expr(column)
+
+
+def window_avg(column: Expr) -> Any:
+    """Windowed ``avg`` / mean."""
+    return window_mean_expr(column)
+
+
+def sum(column: Expr) -> Expr:
+    """Global ``sum`` for :meth:`~pydantable.dataframe.DataFrame.select`."""
+    if not isinstance(column, Expr):
+        raise TypeError(
+            "functions.sum() expects a typed column Expr (use col(..., dtype=...))."
+        )
+    return Expr(rust_expr=_rust_core().expr_global_sum(column._rust_expr))
+
+
+def avg(column: Expr) -> Expr:
+    """Global ``avg`` / mean for :meth:`~pydantable.dataframe.DataFrame.select`."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.avg() expects a typed column Expr.")
+    return Expr(rust_expr=_rust_core().expr_global_mean(column._rust_expr))
+
+
+def mean(column: Expr) -> Expr:
+    """Alias of :func:`avg`."""
+    return avg(column)
+
+
 _AGG_HINT = (
     "functions.{name} is not implemented as a lazy column in pydantable. "
     "Use DataFrame.group_by(...).agg(output_name=('sum'|'mean'|'count', column))."
 )
-
-
-def sum(*_args: Any, **_kwargs: Any) -> Any:
-    raise NotImplementedError(_AGG_HINT.format(name="sum"))
-
-
-def avg(*_args: Any, **_kwargs: Any) -> Any:
-    raise NotImplementedError(_AGG_HINT.format(name="avg"))
-
-
-def mean(*_args: Any, **_kwargs: Any) -> Any:
-    raise NotImplementedError(_AGG_HINT.format(name="mean"))
 
 
 def max(*_args: Any, **_kwargs: Any) -> Any:
@@ -138,6 +224,9 @@ __all__ = [
     "column",
     "concat",
     "count",
+    "day",
+    "dense_rank",
+    "hour",
     "isin",
     "isnotnull",
     "isnull",
@@ -146,7 +235,16 @@ __all__ = [
     "max",
     "mean",
     "min",
+    "minute",
+    "month",
+    "rank",
+    "row_number",
+    "second",
     "substring",
     "sum",
+    "to_date",
     "when",
+    "window_avg",
+    "window_sum",
+    "year",
 ]

@@ -378,12 +378,10 @@ def test_p6_expr_over_without_args_no_warning() -> None:
     assert out["age2"] == [21, 31]
 
 
-def test_p6_expr_over_warns_when_partition_or_order_given() -> None:
+def test_expr_over_with_partition_raises() -> None:
     df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
-    with pytest.warns(UserWarning, match="not yet implemented"):
-        expr = (df.age + 1).over(partition_by="id", order_by="age")
-    out = df.with_columns(age2=expr).collect(as_lists=True)
-    assert out["age2"] == [21, 31]
+    with pytest.raises(TypeError, match=r"Expr\.over"):
+        _ = (df.age + 1).over(partition_by="id", order_by="age")
 
 
 def test_temporal_columns_and_literals_core_paths() -> None:

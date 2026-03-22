@@ -53,8 +53,8 @@ Core operations (`collect`, `join`, `group_by`, typed `filter`, …) behave like
 | `drop(*cols)` | `drop(*cols)` |
 | `distinct()` | All-column distinct rows |
 | `withColumnRenamed(existing, new)` | `with_column_renamed` |
-| `dropDuplicates(subset=None)` | `distinct()` if `subset is None`; otherwise **raises** (`subset=` not implemented) |
-| `union` / `unionAll` | Core `union` (may raise if vertical concat is not implemented in the planner) |
+| `dropDuplicates(subset=None)` | Core `distinct(subset=...)` when `subset` is set; else all-column `distinct()` |
+| `union` / `unionAll` | Core vertical `concat` (same schema required) |
 
 ### Schema and columns
 
@@ -80,7 +80,7 @@ from pydantable.pyspark.sql import functions as F, Column, IntegerType, StructTy
 
 This block only checks that imports resolve; it has no printed output.
 
-- **`functions`** — `lit`, typed **`col(..., dtype=...)`**, `isnull` / `isnotnull`, `coalesce`, `when` / `otherwise`, `cast`, `between`, `isin`, `concat`, `substring`, `length`, and aggregate stubs that direct you to **`group_by().agg`**.
+- **`functions`** — `lit`, typed **`col(..., dtype=...)`**, `isnull` / `isnotnull`, `coalesce`, `when` / `otherwise`, `cast`, `between`, `isin`, `concat`, `substring`, `length`, **`year` / `month` / `day` / `hour` / `minute` / `second` / `to_date`** (wrappers over core `Expr` temporal APIs), and aggregate helpers (see parity matrix for global vs grouped).
 - **`Column`** — type alias for pydantable **`Expr`**.
 - **`types`** — simple `IntegerType`, `StringType`, `StructField`, `StructType`, … for documentation and `schema` views.
 
@@ -89,7 +89,7 @@ Full coverage vs Spark is summarized in **[PySpark parity matrix](PYSPARK_PARITY
 ## What is intentionally out of scope
 
 - **`SparkSession`**, **`spark.sql("...")`**, streaming, catalogs.
-- **`Window`** and window functions (roadmapped separately).
+- **`Window`** / **`WindowSpec`** — see `pydantable.pyspark.sql.window` (partition + order keys; no full frame API yet).
 - Untyped **`F.col("x")`** without **`dtype=`** (pydantable requires static types at build time).
 - Interop with a real **`pyspark.sql.DataFrame`** unless a dedicated integration is added later.
 

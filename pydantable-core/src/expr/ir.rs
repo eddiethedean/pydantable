@@ -35,6 +35,9 @@ pub enum LiteralValue {
     DateTimeMicros(i64),
     DateDays(i32),
     DurationMicros(i64),
+    /// Nanoseconds since midnight (Polars `Time`).
+    TimeNanos(i64),
+    Binary(Vec<u8>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -214,4 +217,35 @@ pub enum ExprNode {
         inner: Box<ExprNode>,
         dtype: DTypeDesc,
     },
+    /// Windowed aggregate or ranking function (Polars `.over(...)`).
+    Window {
+        op: WindowOp,
+        operand: Option<Box<ExprNode>>,
+        partition_by: Vec<String>,
+        order_by: Vec<(String, bool)>,
+        dtype: DTypeDesc,
+    },
+    /// Reduction over the full table (no `group_by`): `sum`, `mean`, …
+    GlobalAgg {
+        op: GlobalAggOp,
+        inner: Box<ExprNode>,
+        dtype: DTypeDesc,
+    },
+}
+
+/// Built-in window operations lowered to Polars window expressions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WindowOp {
+    RowNumber,
+    Rank,
+    DenseRank,
+    Sum,
+    Mean,
+}
+
+/// Whole-frame aggregation (Polars `select(sum(col))` — single output row).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GlobalAggOp {
+    Sum,
+    Mean,
 }

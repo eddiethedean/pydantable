@@ -17,13 +17,13 @@ Status definitions:
 | Join | `inner/left/right/full/semi/anti/cross` | Implemented | Includes expression key support and suffix collision policy. |
 | GroupBy | `count/sum/mean/min/max/median/std/var/first/last/n_unique` | Implemented | SQL-like all-null-group behavior documented/tested. |
 | Reshape | `melt/unpivot`, `pivot` | Implemented | Deterministic output naming and validation rules. |
-| Reshape | `explode`, `unnest` | Partial | API exists; full list/struct-native behavior remains constrained by typed-schema model. |
-| Window/time | `Expr.over`, `rolling_agg`, `group_by_dynamic(...).agg(...)` | Implemented | Includes time-like support and parity smoke coverage. |
+| Reshape | `explode`, `unnest` | Implemented | Polars-backed; multi-column explode, empty lists, struct `unnest` naming, and mismatch errors are contract-tested. Typed-schema rules (homogeneous lists, nested models as structs) are the intentional boundary vs raw Polars. |
+| Window/time | `row_number`/`rank`/`window_sum` + `WindowSpec`, `rolling_agg`, `group_by_dynamic(...).agg(...)` | Implemented | `row_number` requires `order_by`; `Expr.over(...)` with args removed (use window fns). |
 | Temporal typing | `datetime`, `date`, `duration` (+ nullable) | Implemented | End-to-end descriptor roundtrip and execution materialization paths. |
 | Performance | Guardrails for major transforms | Implemented | Lightweight regression checks in test suite. |
 | Ecosystem | Optional interfaces `pandas` and `pyspark` | Implemented | Alternate import/naming surfaces; execution is the same Rust core as default (not native pandas/Spark). |
 
 ## Remaining parity gaps
 
-- Full Polars-native list/struct expansion semantics beyond current typed constraints.
+- Arbitrary Polars **nested/list dtypes** without a matching Pydantic `list[T]` / struct annotation are out of scope; the engine stays schema-first.
 - Additional advanced analytical APIs outside the current roadmap scope.

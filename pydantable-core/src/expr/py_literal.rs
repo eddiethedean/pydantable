@@ -1,7 +1,7 @@
 //! Python literal parsing and operator symbol helpers.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDate, PyDateTime, PyDelta};
+use pyo3::types::{PyAny, PyBytes, PyDate, PyDateTime, PyDelta, PyTime};
 
 use crate::dtype::{
     py_decimal_to_scaled_i128, py_enum_to_wire_string, py_value_to_dtype, BaseType,
@@ -83,6 +83,25 @@ impl ExprHandle {
                 let secs: f64 = td.call_method0("total_seconds")?.extract()?;
                 LiteralValue::DurationMicros((secs * 1_000_000.0).round() as i64)
             }
+            crate::dtype::DTypeDesc::Scalar {
+                base: Some(BaseType::Time),
+                ..
+            } => {
+                let t = value.downcast::<PyTime>()?;
+                let h: i64 = t.getattr("hour")?.extract()?;
+                let m: i64 = t.getattr("minute")?.extract()?;
+                let s: i64 = t.getattr("second")?.extract()?;
+                let micro: i64 = t.getattr("microsecond")?.extract()?;
+                let ns = ((h * 3600 + m * 60 + s) * 1_000_000_000i64) + micro * 1000;
+                LiteralValue::TimeNanos(ns)
+            }
+            crate::dtype::DTypeDesc::Scalar {
+                base: Some(BaseType::Binary),
+                ..
+            } => {
+                let b = value.downcast::<PyBytes>()?;
+                LiteralValue::Binary(b.as_bytes().to_vec())
+            }
             crate::dtype::DTypeDesc::Scalar { base: None, .. } => {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "Non-None literal must have known base dtype.",
@@ -96,6 +115,11 @@ impl ExprHandle {
             crate::dtype::DTypeDesc::List { .. } => {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "List literals are not supported.",
+                ));
+            }
+            crate::dtype::DTypeDesc::Map { .. } => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Map literals are not supported.",
                 ));
             }
         };

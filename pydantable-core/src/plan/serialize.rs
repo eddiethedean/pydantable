@@ -1,7 +1,7 @@
 //! Serialization of `PlanInner` to Python dict structures.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::{PyBytes, PyDict, PyList};
 
 use crate::expr::{exprnode_to_serializable, LiteralValue};
 
@@ -28,6 +28,14 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
             PlanStep::Select { columns } => {
                 step_out.set_item("kind", "select")?;
                 step_out.set_item("columns", columns)?;
+            }
+            PlanStep::GlobalSelect { items } => {
+                step_out.set_item("kind", "global_select")?;
+                let cols = PyDict::new_bound(py);
+                for (name, expr) in items {
+                    cols.set_item(name, exprnode_to_serializable(py, expr)?)?;
+                }
+                step_out.set_item("columns", cols)?;
             }
             PlanStep::WithColumns { columns } => {
                 step_out.set_item("kind", "with_columns")?;
@@ -79,6 +87,8 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
                     Some(LiteralValue::DateTimeMicros(v)) => v.into_py(py),
                     Some(LiteralValue::DateDays(v)) => v.into_py(py),
                     Some(LiteralValue::DurationMicros(v)) => v.into_py(py),
+                    Some(LiteralValue::TimeNanos(v)) => v.into_py(py),
+                    Some(LiteralValue::Binary(b)) => PyBytes::new(py, b).into_py(py),
                 };
                 step_out.set_item("value", value_obj)?;
                 step_out.set_item("strategy", strategy)?;

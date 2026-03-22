@@ -8,7 +8,7 @@
 
 **Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core.**
 
-**Current release: 0.5.0** · Python **3.10+**
+**Current release: 0.6.0** · Python **3.10+**
 
 ---
 

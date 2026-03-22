@@ -4,7 +4,7 @@ import enum
 import types
 import uuid
 from collections.abc import Mapping
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import (
     Annotated,
@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, TypeAdapter, create_model
 
 _NoneType = type(None)
 _SUPPORTED_NON_NULL_SCALAR_TYPES = frozenset(
-    {int, float, bool, str, uuid.UUID, Decimal, datetime, date, timedelta}
+    {int, float, bool, str, bytes, uuid.UUID, Decimal, datetime, date, time, timedelta}
 )
 
 
@@ -99,6 +99,19 @@ def _is_supported_column_annotation_inner(
         return _is_supported_column_annotation_inner(
             _unwrap_annotated(list_args[0]), _model_stack=_model_stack
         )
+    if origin is dict:
+        dict_args = get_args(ann)
+        if len(dict_args) != 2:
+            return False
+        key_t, val_t = dict_args
+        if key_t is not str:
+            return False
+        val_un = _unwrap_annotated(val_t)
+        if get_origin(val_un) in (list, dict) or (
+            isinstance(val_un, type) and issubclass(val_un, BaseModel)
+        ):
+            return False
+        return _is_supported_column_annotation_inner(val_t, _model_stack=_model_stack)
     if origin is not None:
         return False
     if isinstance(ann, type) and issubclass(ann, BaseModel):
@@ -312,7 +325,22 @@ def dtype_descriptor_to_annotation(descriptor: Mapping[str, Any]) -> Any:
     - Scalar: ``{"base": "int" | ... | "unknown", "nullable": bool}``
     - Struct: ``{"kind": "struct", "nullable": bool, "fields": [...]}``
     - List: ``{"kind": "list", "nullable": bool, "inner": <descriptor>}``
+    - Map: ``{"kind": "map", "nullable": bool, "value": <descriptor>}``
+      for ``dict[str, V]``
     """
+    if descriptor.get("kind") == "map":
+        nullable = bool(descriptor.get("nullable", False))
+        inner = descriptor.get("value")
+        if not isinstance(inner, Mapping):
+            raise TypeError(
+                "Invalid map dtype descriptor (expected mapping 'value'): "
+                f"{descriptor!r}"
+            )
+        val_ann = dtype_descriptor_to_annotation(inner)
+        map_ann = dict[str, val_ann]  # type: ignore[valid-type,misc]
+        if nullable:
+            return map_ann | None
+        return map_ann
     if descriptor.get("kind") == "list":
         nullable = bool(descriptor.get("nullable", False))
         inner = descriptor.get("inner")
@@ -322,10 +350,10 @@ def dtype_descriptor_to_annotation(descriptor: Mapping[str, Any]) -> Any:
                 f"{descriptor!r}"
             )
         inner_ann = dtype_descriptor_to_annotation(inner)
-        out = list[inner_ann]  # type: ignore[valid-type]
+        list_ann = list[inner_ann]  # type: ignore[valid-type]
         if nullable:
-            return out | None
-        return out
+            return list_ann | None
+        return list_ann
     if descriptor.get("kind") == "struct":
         nullable = bool(descriptor.get("nullable", False))
         fields_raw = descriptor.get("fields")
@@ -369,6 +397,8 @@ def dtype_descriptor_to_annotation(descriptor: Mapping[str, Any]) -> Any:
         "datetime": datetime,
         "date": date,
         "duration": timedelta,
+        "time": time,
+        "binary": bytes,
         "unknown": Any,
     }
     if base not in base_map:
@@ -411,6 +441,8 @@ _RUST_BASE_FOR_PY_SCALAR: dict[type, str] = {
     datetime: "datetime",
     date: "date",
     timedelta: "duration",
+    time: "time",
+    bytes: "binary",
 }
 
 
@@ -464,6 +496,18 @@ def descriptor_matches_column_annotation(
         if len(la) != 1:
             return False
         return descriptor_matches_column_annotation(inner_d, la[0])
+
+    if descriptor.get("kind") == "map":
+        val_d = descriptor.get("value")
+        if not isinstance(val_d, Mapping):
+            return False
+        origin = get_origin(inner)
+        if origin is not dict:
+            return False
+        la = get_args(inner)
+        if len(la) != 2 or la[0] is not str:
+            return False
+        return descriptor_matches_column_annotation(val_d, la[1])
 
     exp_base = descriptor.get("base")
     if not isinstance(exp_base, str):

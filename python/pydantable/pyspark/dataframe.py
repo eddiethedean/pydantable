@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantable.dataframe import DataFrame as CoreDataFrame
 from pydantable.dataframe_model import DataFrameModel as CoreDataFrameModel
-from pydantable.expressions import ColumnRef  # noqa: TC001
+from pydantable.expressions import ColumnRef, Expr  # noqa: TC001
 from pydantable.schema import make_derived_schema_type
 
 from .sql.types import StructField, StructType, annotation_to_data_type
@@ -99,9 +99,9 @@ class DataFrame(CoreDataFrame):
         """Filter rows (Spark ``filter``)."""
         return cast("DataFrame", super().filter(condition))
 
-    def select(self, *cols: Any) -> DataFrame:
+    def select(self, *cols: str | ColumnRef | Expr, **named: Any) -> DataFrame:
         """Project columns (Spark ``select``)."""
-        return cast("DataFrame", super().select(*cols))
+        return cast("DataFrame", super().select(*cols, **named))
 
     def orderBy(
         self,
@@ -141,13 +141,8 @@ class DataFrame(CoreDataFrame):
         return cast("DataFrame", super().distinct(subset=subset, keep=keep))
 
     def dropDuplicates(self, subset: list[str] | None = None) -> DataFrame:
-        """Spark ``dropDuplicates``; subset-based dedup is not implemented."""
-        if subset is not None:
-            raise NotImplementedError(
-                "dropDuplicates(subset=...) is not implemented; use distinct() "
-                "for all-column deduplication."
-            )
-        return self.distinct()
+        """Spark ``dropDuplicates``; delegates to :meth:`distinct`."""
+        return self.distinct(subset=subset) if subset is not None else self.distinct()
 
     def union(self, other: DataFrame) -> DataFrame:
         return cast(
@@ -235,8 +230,11 @@ class DataFrameModel(CoreDataFrameModel):
     def filter(self, condition: Any) -> DataFrameModel:
         return cast("DataFrameModel", self._from_dataframe(self._df.filter(condition)))
 
-    def select(self, *cols: Any) -> DataFrameModel:
-        return cast("DataFrameModel", self._from_dataframe(self._df.select(*cols)))
+    def select(self, *cols: str | ColumnRef | Expr, **named: Any) -> DataFrameModel:
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(self._df.select(*cols, **named)),
+        )
 
     def orderBy(
         self,
@@ -266,11 +264,7 @@ class DataFrameModel(CoreDataFrameModel):
         )
 
     def dropDuplicates(self, subset: list[str] | None = None) -> DataFrameModel:
-        if subset is not None:
-            raise NotImplementedError(
-                "dropDuplicates(subset=...) is not implemented; use distinct()."
-            )
-        return self.distinct()
+        return self.distinct(subset=subset) if subset is not None else self.distinct()
 
     def union(self, other: DataFrameModel | DataFrame) -> DataFrameModel:
         od = other._df if isinstance(other, DataFrameModel) else other

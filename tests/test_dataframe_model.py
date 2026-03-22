@@ -77,7 +77,7 @@ def test_dataframe_model_rejects_unsupported_dict_type_at_class_definition():
     with pytest.raises(TypeError, match="unsupported type") as exc:
 
         class BadDict(DataFrameModel):
-            m: dict[str, int]
+            m: dict[int, str]
 
     assert "BadDict" in str(exc.value)
     assert "m" in str(exc.value)

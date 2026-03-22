@@ -5,13 +5,14 @@ use pyo3::prelude::*;
 use crate::dtype::{BaseType, DECIMAL_PRECISION, DECIMAL_SCALE};
 
 use super::ir::{
-    ArithOp, CmpOp, ExprNode, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart, UnaryNumericOp,
+    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart,
+    UnaryNumericOp, WindowOp,
 };
 
 use polars::lazy::dsl::{coalesce, col, concat_str, lit, ternary_expr, Expr as PolarsExpr};
 use polars::prelude::{
     ClosedInterval, DataType, Int128Chunked, IntoSeries, Literal, NamedFrom, NewChunkedArray, Null,
-    RoundMode, Scalar, Series, TimeUnit,
+    RankMethod, RankOptions, RoundMode, Scalar, Series, SortOptions, TimeUnit, WindowMapping,
 };
 
 /// Polars lowering hook (dependency inversion / extension point for new variants).
@@ -124,6 +125,32 @@ fn literals_to_series(values: &[LiteralValue], base: BaseType) -> PyResult<Serie
     }
 }
 
+fn apply_window_over(
+    inner: PolarsExpr,
+    partition_by: &[String],
+    order_by: &[(String, bool)],
+) -> PyResult<PolarsExpr> {
+    let part_cols: Vec<PolarsExpr> = partition_by.iter().map(|n| col(n.as_str())).collect();
+    let partition_arg = if part_cols.is_empty() {
+        None
+    } else {
+        Some(part_cols.as_slice())
+    };
+    let order_cols: Vec<PolarsExpr> = order_by.iter().map(|(n, _)| col(n.as_str())).collect();
+    let order_arg = if order_cols.is_empty() {
+        None
+    } else {
+        let opts = SortOptions {
+            descending: !order_by[0].1,
+            ..Default::default()
+        };
+        Some((order_cols.as_slice(), opts))
+    };
+    inner
+        .over_with_options(partition_arg, order_arg, WindowMapping::default())
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("{e}")))
+}
+
 impl ExprNode {
     pub fn to_polars_expr(&self) -> PyResult<PolarsExpr> {
         match self {
@@ -145,6 +172,8 @@ impl ExprNode {
                 Some(LiteralValue::DurationMicros(v)) => {
                     Ok(lit(*v).cast(DataType::Duration(TimeUnit::Microseconds)))
                 }
+                Some(LiteralValue::TimeNanos(ns)) => Ok(lit(*ns).cast(DataType::Time)),
+                Some(LiteralValue::Binary(b)) => Ok(lit(b.as_slice()).cast(DataType::Binary)),
                 None => {
                     let null_expr = Null {}.lit();
                     match dtype {
@@ -186,6 +215,14 @@ impl ExprNode {
                             base: Some(BaseType::Duration),
                             ..
                         } => Ok(null_expr.cast(DataType::Duration(TimeUnit::Microseconds))),
+                        crate::dtype::DTypeDesc::Scalar {
+                            base: Some(BaseType::Time),
+                            ..
+                        } => Ok(null_expr.cast(DataType::Time)),
+                        crate::dtype::DTypeDesc::Scalar {
+                            base: Some(BaseType::Binary),
+                            ..
+                        } => Ok(null_expr.cast(DataType::Binary)),
                         crate::dtype::DTypeDesc::Scalar { base: None, .. } => Ok(null_expr),
                         crate::dtype::DTypeDesc::Struct { .. } => Err(PyErr::new::<
                             pyo3::exceptions::PyTypeError,
@@ -196,6 +233,11 @@ impl ExprNode {
                         crate::dtype::DTypeDesc::List { .. } => {
                             Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                                 "Null list literals must be lowered via schema-typed plan context.",
+                            ))
+                        }
+                        crate::dtype::DTypeDesc::Map { .. } => {
+                            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                "Null map literals must be lowered via schema-typed plan context.",
                             ))
                         }
                     }
@@ -405,6 +447,88 @@ impl ExprNode {
             ExprNode::ListMax { inner, .. } => Ok(inner.to_polars_expr()?.list().max()),
             ExprNode::ListSum { inner, .. } => Ok(inner.to_polars_expr()?.list().sum()),
             ExprNode::DatetimeToDate { inner, .. } => Ok(inner.to_polars_expr()?.dt().date()),
+            ExprNode::Window {
+                op,
+                operand,
+                partition_by,
+                order_by,
+                ..
+            } => {
+                let part = partition_by.as_slice();
+                let ord = order_by.as_slice();
+                match op {
+                    WindowOp::RowNumber => {
+                        let order_name = ord.first().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "row_number() requires order_by columns.",
+                            )
+                        })?;
+                        let inner = col(order_name.0.as_str()).rank(
+                            RankOptions {
+                                method: RankMethod::Ordinal,
+                                descending: !order_name.1,
+                            },
+                            None,
+                        );
+                        apply_window_over(inner, part, ord)
+                    }
+                    WindowOp::Rank => {
+                        let order_name = ord.first().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "rank() requires order_by columns.",
+                            )
+                        })?;
+                        let inner = col(order_name.0.as_str()).rank(
+                            RankOptions {
+                                method: RankMethod::Min,
+                                descending: !order_name.1,
+                            },
+                            None,
+                        );
+                        apply_window_over(inner, part, ord)
+                    }
+                    WindowOp::DenseRank => {
+                        let order_name = ord.first().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "dense_rank() requires order_by columns.",
+                            )
+                        })?;
+                        let inner = col(order_name.0.as_str()).rank(
+                            RankOptions {
+                                method: RankMethod::Dense,
+                                descending: !order_name.1,
+                            },
+                            None,
+                        );
+                        apply_window_over(inner, part, ord)
+                    }
+                    WindowOp::Sum => {
+                        let op_inner = operand.as_ref().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "internal: window sum missing operand",
+                            )
+                        })?;
+                        let inner = op_inner.to_polars_expr()?.sum();
+                        apply_window_over(inner, part, ord)
+                    }
+                    WindowOp::Mean => {
+                        let op_inner = operand.as_ref().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "internal: window mean missing operand",
+                            )
+                        })?;
+                        let inner = op_inner.to_polars_expr()?.mean();
+                        apply_window_over(inner, part, ord)
+                    }
+                }
+            }
+            ExprNode::GlobalAgg { op, inner, .. } => {
+                let e = inner.to_polars_expr()?;
+                match op {
+                    GlobalAggOp::Sum => Ok(e.sum()),
+                    GlobalAggOp::Mean => Ok(e.mean()),
+                }
+            }
         }
     }
 }

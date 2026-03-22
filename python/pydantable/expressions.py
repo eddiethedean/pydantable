@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import warnings
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .rust_engine import _require_rust_core
+
+if TYPE_CHECKING:
+    from .window_spec import WindowSpec
 
 
 class Expr:  # type: ignore[override]
@@ -67,15 +69,13 @@ class Expr:  # type: ignore[override]
         partition_by: str | list[str] | tuple[str, ...] | None = None,
         order_by: str | list[str] | tuple[str, ...] | None = None,
     ) -> Expr:
-        if partition_by is not None or order_by is not None:
-            warnings.warn(
-                "Expr.over(partition_by=..., order_by=...) is not yet implemented; "
-                "arguments are ignored and the expression is evaluated without "
-                "window framing.",
-                UserWarning,
-                stacklevel=2,
-            )
-        return self
+        if partition_by is None and order_by is None:
+            return self
+        raise TypeError(
+            "Expr.over(partition_by=..., order_by=...) is not supported. "
+            "Use window functions such as row_number().over(WindowSpec(...)) "
+            "or pydantable.window_spec.Window.partitionBy(...).orderBy(...)."
+        )
 
     # Arithmetic
     def __add__(self, other: Any) -> Expr:
@@ -377,3 +377,85 @@ def concat(*exprs: Expr) -> Expr:
             raise TypeError("concat() arguments must be Expr instances.")
     rust = _require_rust_core()
     return Expr(rust_expr=rust.expr_string_concat([e._rust_expr for e in exprs]))
+
+
+class _WindowFnPending:
+    """Spark-style ``fn().over(WindowSpec(...))`` for one window expression."""
+
+    def __init__(self, kind: str):
+        self._kind = kind
+
+    def over(self, window: WindowSpec) -> Expr:
+        rust = _require_rust_core()
+        part = list(window.partition_by)
+        order = list(window.order_by)
+        if self._kind == "row_number":
+            return Expr(rust_expr=rust.expr_window_row_number(part, order))
+        if self._kind == "rank":
+            return Expr(rust_expr=rust.expr_window_rank(False, part, order))
+        if self._kind == "dense_rank":
+            return Expr(rust_expr=rust.expr_window_rank(True, part, order))
+        raise AssertionError(self._kind)
+
+
+class _WindowAggPending:
+    def __init__(self, inner: Expr, kind: str):
+        self._inner = inner
+        self._kind = kind
+
+    def over(self, window: WindowSpec) -> Expr:
+        rust = _require_rust_core()
+        part = list(window.partition_by)
+        order = list(window.order_by)
+        if self._kind == "sum":
+            return Expr(
+                rust_expr=rust.expr_window_sum(self._inner._rust_expr, part, order)
+            )
+        if self._kind == "mean":
+            return Expr(
+                rust_expr=rust.expr_window_mean(self._inner._rust_expr, part, order)
+            )
+        raise AssertionError(self._kind)
+
+
+def row_number() -> _WindowFnPending:
+    """Spark ``row_number``; finish with ``.over(WindowSpec(...))``."""
+    return _WindowFnPending("row_number")
+
+
+def rank() -> _WindowFnPending:
+    """Spark ``rank`` (ties share rank; gaps after ties)."""
+    return _WindowFnPending("rank")
+
+
+def dense_rank() -> _WindowFnPending:
+    """Spark ``dense_rank`` (ties share rank; no gaps)."""
+    return _WindowFnPending("dense_rank")
+
+
+def window_sum(column: Expr) -> _WindowAggPending:
+    """``sum`` over a window (not ``group_by`` aggregation)."""
+    if not isinstance(column, Expr):
+        raise TypeError("window_sum() expects an Expr.")
+    return _WindowAggPending(column, "sum")
+
+
+def window_mean(column: Expr) -> _WindowAggPending:
+    """``avg`` / mean over a window."""
+    if not isinstance(column, Expr):
+        raise TypeError("window_mean() expects an Expr.")
+    return _WindowAggPending(column, "mean")
+
+
+def global_sum(column: Expr) -> Expr:
+    """Whole-frame ``sum`` for :meth:`~pydantable.dataframe.DataFrame.select`."""
+    if not isinstance(column, Expr):
+        raise TypeError("global_sum() expects an Expr.")
+    return Expr(rust_expr=_require_rust_core().expr_global_sum(column._rust_expr))
+
+
+def global_mean(column: Expr) -> Expr:
+    """Whole-frame mean for :meth:`~pydantable.dataframe.DataFrame.select`."""
+    if not isinstance(column, Expr):
+        raise TypeError("global_mean() expects an Expr.")
+    return Expr(rust_expr=_require_rust_core().expr_global_mean(column._rust_expr))

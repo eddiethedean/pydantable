@@ -10,6 +10,10 @@ pub enum PlanStep {
     Select {
         columns: Vec<String>,
     },
+    /// Replace the frame with a single row of global aggregates (Polars `select(agg1, agg2, ...)`).
+    GlobalSelect {
+        items: Vec<(String, ExprNode)>,
+    },
     WithColumns {
         columns: HashMap<String, ExprNode>,
     },

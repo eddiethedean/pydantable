@@ -9,7 +9,8 @@ use pyo3::prelude::*;
 use crate::dtype::{dtype_structural_eq, BaseType, DTypeDesc};
 
 use super::ir::{
-    ArithOp, CmpOp, ExprNode, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart, UnaryNumericOp,
+    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart,
+    UnaryNumericOp, WindowOp,
 };
 
 enum ListAggKind {
@@ -129,7 +130,9 @@ impl ExprNode {
             | ExprNode::ListMin { dtype, .. }
             | ExprNode::ListMax { dtype, .. }
             | ExprNode::ListSum { dtype, .. }
-            | ExprNode::DatetimeToDate { dtype, .. } => dtype.clone(),
+            | ExprNode::DatetimeToDate { dtype, .. }
+            | ExprNode::Window { dtype, .. }
+            | ExprNode::GlobalAgg { dtype, .. } => dtype.clone(),
         }
     }
 
@@ -223,6 +226,25 @@ impl ExprNode {
                 out
             }
             ExprNode::StructField { base, .. } => base.referenced_columns(),
+            ExprNode::GlobalAgg { inner, .. } => inner.referenced_columns(),
+            ExprNode::Window {
+                operand,
+                partition_by,
+                order_by,
+                ..
+            } => {
+                let mut out = HashSet::new();
+                for n in partition_by {
+                    out.insert(n.clone());
+                }
+                for (n, _) in order_by {
+                    out.insert(n.clone());
+                }
+                if let Some(op) = operand {
+                    out.extend(op.referenced_columns());
+                }
+                out
+            }
         }
     }
 
@@ -349,6 +371,11 @@ impl ExprNode {
                         "Equality comparisons for list columns are not supported yet.",
                     ));
                 }
+                if left.is_map() || right.is_map() {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Equality comparisons for map columns are not supported yet.",
+                    ));
+                }
 
                 let lb = left.as_scalar_base_field().unwrap();
                 let rb = right.as_scalar_base_field().unwrap();
@@ -377,7 +404,9 @@ impl ExprNode {
                     || (lb == BaseType::Decimal && rb == BaseType::Decimal)
                     || (lb == BaseType::DateTime && rb == BaseType::DateTime)
                     || (lb == BaseType::Date && rb == BaseType::Date)
-                    || (lb == BaseType::Duration && rb == BaseType::Duration));
+                    || (lb == BaseType::Duration && rb == BaseType::Duration)
+                    || (lb == BaseType::Time && rb == BaseType::Time)
+                    || (lb == BaseType::Binary && rb == BaseType::Binary));
 
                 if !allowed {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -391,9 +420,15 @@ impl ExprNode {
                 })
             }
             CmpOp::Lt | CmpOp::Le | CmpOp::Gt | CmpOp::Ge => {
-                if left.is_struct() || right.is_struct() || left.is_list() || right.is_list() {
+                if left.is_struct()
+                    || right.is_struct()
+                    || left.is_list()
+                    || right.is_list()
+                    || left.is_map()
+                    || right.is_map()
+                {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "Ordering comparisons do not support struct- or list-typed columns.",
+                        "Ordering comparisons do not support struct-, list-, or map-typed columns.",
                     ));
                 }
 
@@ -424,7 +459,8 @@ impl ExprNode {
                 let allowed_decimal = lb == BaseType::Decimal && rb == BaseType::Decimal;
                 let allowed_temporal = (lb == BaseType::DateTime && rb == BaseType::DateTime)
                     || (lb == BaseType::Date && rb == BaseType::Date)
-                    || (lb == BaseType::Duration && rb == BaseType::Duration);
+                    || (lb == BaseType::Duration && rb == BaseType::Duration)
+                    || (lb == BaseType::Time && rb == BaseType::Time);
 
                 if !(allowed_numeric
                     || allowed_str
@@ -485,6 +521,17 @@ impl ExprNode {
                     "Literal(None) cannot target a non-nullable list column.",
                 ));
             }
+            (None, DTypeDesc::Map { nullable: true, .. }) => {}
+            (
+                None,
+                DTypeDesc::Map {
+                    nullable: false, ..
+                },
+            ) => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Literal(None) cannot target a non-nullable map column.",
+                ));
+            }
             (Some(_), DTypeDesc::Scalar { base: None, .. }) => {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "Non-None Literal must have a known scalar base dtype.",
@@ -498,6 +545,11 @@ impl ExprNode {
             (Some(_), DTypeDesc::List { .. }) => {
                 return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "List literals are not supported; use column references.",
+                ));
+            }
+            (Some(_), DTypeDesc::Map { .. }) => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Map literals are not supported; use column references.",
                 ));
             }
             (Some(_), _) => {}
@@ -530,9 +582,11 @@ impl ExprNode {
             || input.dtype().is_struct()
             || target.is_list()
             || input.dtype().is_list()
+            || target.is_map()
+            || input.dtype().is_map()
         {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "cast() does not support struct or list dtypes.",
+                "cast() does not support struct, list, or map dtypes.",
             ));
         }
         let base = match &target {
@@ -727,6 +781,8 @@ impl ExprNode {
                 LiteralValue::DateTimeMicros(_)
                 | LiteralValue::DateDays(_)
                 | LiteralValue::DurationMicros(_) => None,
+                LiteralValue::TimeNanos(_) => Some(BaseType::Time),
+                LiteralValue::Binary(_) => Some(BaseType::Binary),
             };
             let ok = match (ib, vb) {
                 (a, Some(b)) if a == b => true,
@@ -925,6 +981,10 @@ impl ExprNode {
                             inner,
                             nullable: true,
                         },
+                        DTypeDesc::Map { value, .. } => DTypeDesc::Map {
+                            value,
+                            nullable: true,
+                        },
                     };
                 }
                 out
@@ -1114,6 +1174,11 @@ impl ExprNode {
                 "list_get() does not support nested list columns.",
             ));
         }
+        if matches!(&element, DTypeDesc::Map { .. }) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "list_get() does not support list columns whose element type is a map.",
+            ));
+        }
         if index.dtype().is_struct()
             || index.dtype().is_list()
             || index.dtype().as_scalar_base_field().flatten() != Some(BaseType::Int)
@@ -1131,6 +1196,7 @@ impl ExprNode {
                 fields,
                 nullable: true,
             },
+            DTypeDesc::Map { .. } => unreachable!(),
             DTypeDesc::List { .. } => unreachable!(),
         };
         Ok(ExprNode::ListGet {
@@ -1149,6 +1215,11 @@ impl ExprNode {
                 ));
             }
         };
+        if matches!(&elt, DTypeDesc::Map { .. }) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "list_contains() does not support list columns whose element type is a map.",
+            ));
+        }
         if !dtype_structural_eq(&elt, &value.dtype()) {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "list_contains() value dtype must match the list element dtype.",
@@ -1234,6 +1305,176 @@ impl ExprNode {
                 nullable,
             },
         })
+    }
+
+    pub fn make_window_row_number(
+        partition_by: Vec<String>,
+        order_by: Vec<(String, bool)>,
+    ) -> PyResult<Self> {
+        if partition_by.is_empty() && order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "window expression requires at least one partition_by or order_by column.",
+            ));
+        }
+        if order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "row_number() requires at least one order_by column.",
+            ));
+        }
+        Ok(ExprNode::Window {
+            op: WindowOp::RowNumber,
+            operand: None,
+            partition_by,
+            order_by,
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Int),
+                nullable: true,
+            },
+        })
+    }
+
+    pub fn make_window_rank(
+        dense: bool,
+        partition_by: Vec<String>,
+        order_by: Vec<(String, bool)>,
+    ) -> PyResult<Self> {
+        if order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "rank() and dense_rank() require at least one order_by column.",
+            ));
+        }
+        Ok(ExprNode::Window {
+            op: if dense {
+                WindowOp::DenseRank
+            } else {
+                WindowOp::Rank
+            },
+            operand: None,
+            partition_by,
+            order_by,
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Int),
+                nullable: true,
+            },
+        })
+    }
+
+    fn infer_window_sum_mean_dtype(inner: &ExprNode, mean: bool) -> PyResult<DTypeDesc> {
+        let d = inner.dtype();
+        if d.is_struct() || d.is_list() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "window sum/mean expect a numeric scalar column.",
+            ));
+        }
+        let b = d.as_scalar_base_field().flatten().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "window sum/mean require a column with known scalar dtype.",
+            )
+        })?;
+        match b {
+            BaseType::Int => Ok(DTypeDesc::Scalar {
+                base: Some(if mean { BaseType::Float } else { BaseType::Int }),
+                nullable: true,
+            }),
+            BaseType::Float => Ok(DTypeDesc::Scalar {
+                base: Some(BaseType::Float),
+                nullable: true,
+            }),
+            BaseType::Decimal => Ok(DTypeDesc::Scalar {
+                base: Some(if mean {
+                    BaseType::Float
+                } else {
+                    BaseType::Decimal
+                }),
+                nullable: true,
+            }),
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "window sum/mean require int, float, or decimal column.",
+            )),
+        }
+    }
+
+    pub fn make_window_sum(
+        inner: ExprNode,
+        partition_by: Vec<String>,
+        order_by: Vec<(String, bool)>,
+    ) -> PyResult<Self> {
+        if partition_by.is_empty() && order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "window expression requires at least one partition_by or order_by column.",
+            ));
+        }
+        let dtype = Self::infer_window_sum_mean_dtype(&inner, false)?;
+        Ok(ExprNode::Window {
+            op: WindowOp::Sum,
+            operand: Some(Box::new(inner)),
+            partition_by,
+            order_by,
+            dtype,
+        })
+    }
+
+    pub fn make_window_mean(
+        inner: ExprNode,
+        partition_by: Vec<String>,
+        order_by: Vec<(String, bool)>,
+    ) -> PyResult<Self> {
+        if partition_by.is_empty() && order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "window expression requires at least one partition_by or order_by column.",
+            ));
+        }
+        let dtype = Self::infer_window_sum_mean_dtype(&inner, true)?;
+        Ok(ExprNode::Window {
+            op: WindowOp::Mean,
+            operand: Some(Box::new(inner)),
+            partition_by,
+            order_by,
+            dtype,
+        })
+    }
+
+    pub fn make_global_sum(inner: ExprNode) -> PyResult<Self> {
+        if !matches!(&inner, ExprNode::ColumnRef { .. }) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "global sum() expects a column reference expression.",
+            ));
+        }
+        let dtype = Self::infer_window_sum_mean_dtype(&inner, false)?;
+        Ok(ExprNode::GlobalAgg {
+            op: GlobalAggOp::Sum,
+            inner: Box::new(inner),
+            dtype,
+        })
+    }
+
+    pub fn make_global_mean(inner: ExprNode) -> PyResult<Self> {
+        if !matches!(&inner, ExprNode::ColumnRef { .. }) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "global mean() expects a column reference expression.",
+            ));
+        }
+        let dtype = Self::infer_window_sum_mean_dtype(&inner, true)?;
+        Ok(ExprNode::GlobalAgg {
+            op: GlobalAggOp::Mean,
+            inner: Box::new(inner),
+            dtype,
+        })
+    }
+
+    pub fn global_agg_default_alias(&self) -> Option<String> {
+        match self {
+            ExprNode::GlobalAgg { op, inner, .. } => {
+                let ExprNode::ColumnRef { name, .. } = inner.as_ref() else {
+                    return None;
+                };
+                Some(match op {
+                    GlobalAggOp::Sum => format!("sum_{name}"),
+                    GlobalAggOp::Mean => format!("mean_{name}"),
+                })
+            }
+            _ => None,
+        }
     }
 
     #[cfg(not(feature = "polars_engine"))]
@@ -2248,6 +2489,17 @@ impl ExprNode {
                     "Struct field access is only supported with the Polars execution engine.",
                 ))
             }
+            ExprNode::Window { .. } => {
+                Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                    "Window expressions are only supported with the Polars execution engine.",
+                ))
+            }
+            ExprNode::GlobalAgg { .. } => Err(PyErr::new::<
+                pyo3::exceptions::PyNotImplementedError,
+                _,
+            >(
+                "Global aggregate expressions are only supported with the Polars execution engine.",
+            )),
         }
     }
 }
