@@ -8,4 +8,4 @@ from .expressions import Expr
 from .schema import Schema
 
 __all__ = ["DataFrame", "DataFrameModel", "Expr", "Schema", "pandas", "pyspark"]
-__version__ = "0.6.0"
+__version__ = "0.5.0"

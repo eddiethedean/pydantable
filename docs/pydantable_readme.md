@@ -5,7 +5,7 @@
 PydanTable enforces schemas and tracks types through transformations, with a
 SQLModel-like developer experience that integrates cleanly with FastAPI.
 
-**0.6.x materialization:** `collect()` returns a **list of Pydantic row models** for the
+**0.5.x materialization:** `collect()` returns a **list of Pydantic row models** for the
 current schema; use **`to_dict()`** for columnar **`dict[str, list]`**. A Polars
 **`DataFrame`** in Python is optional via **`to_polars()`** after
 `pip install 'pydantable[polars]'`. See `docs/EXECUTION.md`.
@@ -56,7 +56,7 @@ Output from `print(result)` (one run):
 
 ## Current Repository Status
 
-In the `0.6.0` release, `DataFrameModel` is available as the primary
+In the `0.5.0` release, `DataFrameModel` is available as the primary
 FastAPI-facing API, backed by the same typed expression and Rust execution core
 as the lower-level `DataFrame[Schema]` API.
 

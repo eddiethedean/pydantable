@@ -2,7 +2,7 @@
 
 **Typed dataframe transformations for FastAPI + Pydantic services, powered by a Rust execution core.**
 
-**Current release: 0.6.x** — `collect()` materializes **rows as Pydantic models**; use `to_dict()` for columnar `dict[str, list]`. The Python **`polars`** package is **optional** (`pip install 'pydantable[polars]'` for `to_polars()`). See `docs/EXECUTION.md`.
+**Current release: 0.5.0** — `collect()` materializes **rows as Pydantic models**; use `to_dict()` for columnar `dict[str, list]`. The Python **`polars`** package is **optional** (`pip install 'pydantable[polars]'` for `to_polars()`). See `docs/EXECUTION.md`.
 
 PydanTable keeps your Pydantic schemas as the source of truth for:
 
