@@ -21,6 +21,19 @@ def test_dataframe_model_row_input_happy_path():
     assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
 
 
+def test_dataframe_model_row_input_sequence_of_pydantic_models():
+    rm = UserDF.row_model()
+    rows = [rm(id=1, age=20), rm(id=2, age=None)]
+    df = UserDF(rows)
+    assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
+
+
+def test_dataframe_model_row_input_mixed_dict_and_model():
+    rm = UserDF.row_model()
+    df = UserDF([{"id": 1, "age": 20}, rm(id=2, age=None)])
+    assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
+
+
 def test_dataframe_model_row_model_generation_and_validation():
     row_model = UserDF.row_model()
     ok = row_model.model_validate({"id": 1, "age": None})
@@ -45,7 +58,7 @@ def test_dataframe_model_transformations_return_derived_model():
 
 
 def test_dataframe_model_row_input_rejects_bad_item_type():
-    with pytest.raises(TypeError, match="sequence of mapping objects"):
+    with pytest.raises(TypeError, match="mapping objects or Pydantic models"):
         UserDF([1, 2, 3])  # type: ignore[arg-type]
 
 

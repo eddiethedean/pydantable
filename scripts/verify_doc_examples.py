@@ -227,12 +227,20 @@ class UserFastApi(DataFrameModel):
     age: int | None
 
 
-df = UserFastApi({"id": [1, 2], "age": [20, None]})
+RM = UserFastApi.row_model()
+df = UserFastApi([RM(id=1, age=20), RM(id=2, age=None)])
 df2 = df.with_columns(age2=df.age + 1).select("id", "age2")
-assert df2.to_dict() == {"age2": [21, None], "id": [1, 2]}
+assert [m.model_dump() for m in df2.collect()] == [
+    {"id": 1, "age2": 21},
+    {"id": 2, "age2": None},
+]
 
-df = UserFastApi({"id": [1, 2, 3], "age": [22, None, 15]})
-assert df.filter(df.age >= 18).to_dict() == {"id": [1], "age": [22]}
+df = UserFastApi(
+    [RM(id=1, age=22), RM(id=2, age=None), RM(id=3, age=15)]
+)
+assert [m.model_dump() for m in df.filter(df.age >= 18).collect()] == [
+    {"id": 1, "age": 22},
+]
 
 
 class EventDF(DataFrameModel):
@@ -240,12 +248,15 @@ class EventDF(DataFrameModel):
     spend: float | None
 
 
-df = EventDF({"user_id": [1, 2], "spend": [150.0, 50.0]})
+ERM = EventDF.row_model()
+df = EventDF([ERM(user_id=1, spend=150.0), ERM(user_id=2, spend=50.0)])
 df2 = (
     df.with_columns(spend_usd=df.spend * 1.0)
     .filter(df.spend > 100.0)
     .select("user_id", "spend_usd")
 )
-assert df2.to_dict() == {"user_id": [1], "spend_usd": [150.0]}
+assert [m.model_dump() for m in df2.collect()] == [
+    {"user_id": 1, "spend_usd": 150.0},
+]
 
 print("verify_doc_examples: ok")

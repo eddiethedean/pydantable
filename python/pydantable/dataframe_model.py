@@ -19,7 +19,7 @@ def _field_defs_from_annotations(
 
 def _normalize_input(
     *,
-    data: Mapping[str, Any] | Sequence[Mapping[str, Any]],
+    data: Mapping[str, Any] | Sequence[Mapping[str, Any] | BaseModel],
     row_model: type[BaseModel],
 ) -> dict[str, list[Any]]:
     expected_fields = list(row_model.model_fields.keys())
@@ -38,9 +38,14 @@ def _normalize_input(
 
         normalized_rows: list[BaseModel] = []
         for row in rows:
-            if not isinstance(row, Mapping):
-                raise TypeError("Row input must be a sequence of mapping objects.")
-            normalized_rows.append(row_model.model_validate(row))
+            if isinstance(row, BaseModel):
+                normalized_rows.append(row_model.model_validate(row))
+            elif isinstance(row, Mapping):
+                normalized_rows.append(row_model.model_validate(row))
+            else:
+                raise TypeError(
+                    "Row input must be a sequence of mapping objects or Pydantic models."
+                )
 
         columns: dict[str, list[Any]] = {name: [] for name in expected_fields}
         for model_row in normalized_rows:
@@ -58,7 +63,7 @@ class DataFrameModel:
 
     - user defines fields on subclass annotations
     - class auto-generates a per-row `RowModel`
-    - accepts both row-list and column-dict inputs
+    - accepts column-dict inputs and row lists (mappings or Pydantic model instances)
     - composes the existing `DataFrame[Schema]` engine
     """
 
@@ -103,7 +108,7 @@ class DataFrameModel:
 
     def __init__(
         self,
-        data: Mapping[str, Any] | Sequence[Mapping[str, Any]],
+        data: Mapping[str, Any] | Sequence[Mapping[str, Any] | BaseModel],
         *,
         validate_data: bool = True,
     ) -> None:

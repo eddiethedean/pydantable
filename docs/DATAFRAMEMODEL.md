@@ -34,9 +34,9 @@ From this definition, `DataFrameModel` generates:
 - `UserDF.RowModel`: a Pydantic model for a single row
 - a schema-backed typed dataframe wrapper used for query building and execution
 
-## Input formats (both supported)
+## Input formats (all supported)
 
-`UserDF(...)` must accept **both** representations:
+`UserDF(...)` accepts **columnar data**, **row dicts**, or **sequences of Pydantic models** (including `UserDF.RowModel` instances).
 
 ### Column format
 
@@ -71,6 +71,22 @@ Output:
 ```
 
 This format is ideal for REST/JSON APIs and works naturally with FastAPI.
+
+### Row models (Pydantic instances)
+
+```python
+RM = UserDF.row_model()
+df3 = UserDF([RM(id=1, age=20), RM(id=2, age=30)])
+print(df3.to_dict())
+```
+
+Output:
+
+```text
+{'id': [1, 2], 'age': [20, 30]}
+```
+
+Use this when you already have validated row objects—for example **`list[UserDF.RowModel]`** from a FastAPI request body (see `docs/FASTAPI.md`).
 
 ### Current implementation note
 
@@ -189,28 +205,41 @@ The primary reason for this design:
   types in FastAPI.
 - every transformation returns a *new* Pydantic-validated model type.
 
-### Typical request flow
+### Typical request flow (JSON array of row objects)
+
+For endpoints that receive `[{"id": 1, "age": 20}, ...]`, type the body as
+`list[UserDF.RowModel]` and pass it straight into `UserDF`:
 
 ```python
 from fastapi import FastAPI
 
+from pydantable import DataFrameModel
+
+
+class UserDF(DataFrameModel):
+    id: int
+    age: int
+
+
 app = FastAPI()
 
+
 @app.post("/users")
-def create_users(payload: UserDF):
-    # payload is validated (supports both input formats)
-    df: UserDF = payload
+def create_users(rows: list[UserDF.RowModel]) -> UserDF:
+    df = UserDF(rows)
     return df.select("id", "age")  # returns a new model type
 ```
 
-The handler body is the same idea as running `UserDF(...).select("id", "age")` on
-the validated payload; defining the app registers routes but does not print output
+The handler body is the same idea as running `UserDF([...]).select("id", "age")` on
+validated row models; defining the app registers routes but does not print output
 until you serve it (for example with Uvicorn).
 
 ### Typical response flow
 
 Because transformations migrate the model type, response types can become
-as precise as the query’s projected schema.
+as precise as the query’s projected schema. For a **JSON array of objects**, return
+**`collect()`** (optionally mapping each row with `YourDto.model_validate(m.model_dump())`
+for a stable OpenAPI type—see `docs/FASTAPI.md`).
 
 ## Materializing row models
 

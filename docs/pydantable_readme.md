@@ -16,9 +16,10 @@ The current primary FastAPI-facing API is `DataFrameModel`, a class that:
 
 - represents the *whole DataFrame*
 - generates a per-row Pydantic `RowModel` for request/response typing
-- accepts both input formats:
+- accepts column dicts, row dicts, or sequences of Pydantic row models:
   - column dict: `{"id": [1,2], "age": [20,30]}`
-  - row list: `[{"id": 1, "age": 20}, ...]`
+  - row dict list: `[{"id": 1, "age": 20}, ...]`
+  - row model list: `[User.RowModel(id=1, age=20), ...]` (e.g. from `list[User.RowModel]` in FastAPI)
 - returns a new model type for every transformation (schema migration)
 - uses replacement semantics for `with_columns` name collisions
 

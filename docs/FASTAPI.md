@@ -9,7 +9,8 @@ For FastAPI services, `pydantable` gives you:
 
 - Pydantic schema validation at API boundaries
 - typed dataframe transformations in service logic
-- Rust execution for `to_dict()` / `collect()` on supported operations (`collect()` returns Pydantic row models by default)
+- `DataFrameModel` construction from column dicts, row dicts, or **sequences of Pydantic models** (including `YourDF.RowModel` from a typed request body)
+- Rust execution for `to_dict()` (columnar) and **`collect()`** (row list: **`list`** of Pydantic models for the **current** projected schema)
 
 ## Install
 
@@ -23,11 +24,15 @@ pip install .
 
 ## Example 1: Request payload -> transformed response (DataFrameModel)
 
-This endpoint accepts a typed payload, applies typed dataframe operations, and
-returns transformed columns.
+This endpoint accepts a **JSON array of row objects** typed as `list[UserDF.RowModel]`,
+builds the `DataFrameModel` from those Pydantic instances, applies typed dataframe
+operations, and returns a **JSON array of row objects** using **`collect()`** (each
+element is a Pydantic model for the projected schema). The handler maps those models
+onto stable **`UserAge2Row`** DTOs for OpenAPI; you can **`return df2.collect()`**
+directly when you do not need a separate response class.
 
 ```python
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -40,36 +45,32 @@ class UserDF(DataFrameModel):
     age: Optional[int]
 
 
-class UsersPayload(BaseModel):
-    id: List[int]
-    age: List[Optional[int]]
+class UserAge2Row(BaseModel):
+    """API response row; fields match the transformed projection."""
 
-
-class UsersOut(BaseModel):
-    id: List[int]
-    age2: List[Optional[int]]
+    id: int
+    age2: Optional[int]
 
 
 app = FastAPI()
 
 
-@app.post("/users/age2", response_model=UsersOut)
-def users_age2(payload: UsersPayload) -> UsersOut:
-    # Pydantic validates request shape before DataFrameModel construction.
-    df = UserDF(payload.model_dump())
+@app.post("/users/age2", response_model=list[UserAge2Row])
+def users_age2(rows: list[UserDF.RowModel]) -> list[UserAge2Row]:
+    # Pydantic validates each row before DataFrameModel construction.
+    df = UserDF(rows)
 
     # Typed expression + schema migration.
     df2 = df.with_columns(age2=df.age + 1).select("id", "age2")
 
-    # Rust executes the plan; columnar response uses to_dict().
-    result = df2.to_dict()
-    return UsersOut(**result)
+    # Rust executes the plan; collect() -> list of Pydantic models (df2.schema_type).
+    return [UserAge2Row.model_validate(m.model_dump()) for m in df2.collect()]
 ```
 
-If the request body is `UsersPayload(id=[1, 2], age=[20, None])`, then `df2.to_dict()` is:
+If the request body is `[{"id": 1, "age": 20}, {"id": 2, "age": null}]`, the response body is:
 
-```text
-{'age2': [21, None], 'id': [1, 2]}
+```json
+[{"id": 1, "age2": 21}, {"id": 2, "age2": null}]
 ```
 
 Behavior notes:
@@ -83,7 +84,7 @@ Behavior notes:
 rows where it is `False` or `NULL`.
 
 ```python
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -96,39 +97,33 @@ class UserDF(DataFrameModel):
     age: Optional[int]
 
 
-class UsersPayload(BaseModel):
-    id: List[int]
-    age: List[Optional[int]]
-
-
-class AdultOut(BaseModel):
-    id: List[int]
-    age: List[Optional[int]]
+class AdultRow(BaseModel):
+    id: int
+    age: Optional[int]
 
 
 app = FastAPI()
 
 
-@app.post("/users/adults", response_model=AdultOut)
-def adults(payload: UsersPayload) -> AdultOut:
-    df = UserDF(payload.model_dump())
+@app.post("/users/adults", response_model=list[AdultRow])
+def adults(rows: list[UserDF.RowModel]) -> list[AdultRow]:
+    df = UserDF(rows)
 
     # condition dtype: Optional[bool]
     df2 = df.filter(df.age >= 18)
-    result = df2.to_dict()
-    return AdultOut(**result)
+    return [AdultRow.model_validate(m.model_dump()) for m in df2.collect()]
 ```
 
 With input:
 
-```python
-{"id": [1, 2, 3], "age": [22, None, 15]}
+```json
+[{"id": 1, "age": 22}, {"id": 2, "age": null}, {"id": 3, "age": 15}]
 ```
 
-Output (`df2.to_dict()`):
+Response body:
 
-```text
-{'id': [1], 'age': [22]}
+```json
+[{"id": 1, "age": 22}]
 ```
 
 ## Example 3: Chained transformation endpoint (DataFrameModel)
@@ -136,7 +131,7 @@ Output (`df2.to_dict()`):
 This example shows a realistic service flow: enrich, filter, project.
 
 ```python
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -149,36 +144,36 @@ class EventDF(DataFrameModel):
     spend: Optional[float]
 
 
-class EventsPayload(BaseModel):
-    user_id: List[int]
-    spend: List[Optional[float]]
-
-
-class HighValueOut(BaseModel):
-    user_id: List[int]
-    spend_usd: List[Optional[float]]
+class HighValueRow(BaseModel):
+    user_id: int
+    spend_usd: Optional[float]
 
 
 app = FastAPI()
 
 
-@app.post("/events/high-value", response_model=HighValueOut)
-def high_value(payload: EventsPayload) -> HighValueOut:
-    df = EventDF(payload.model_dump())
+@app.post("/events/high-value", response_model=list[HighValueRow])
+def high_value(rows: list[EventDF.RowModel]) -> list[HighValueRow]:
+    df = EventDF(rows)
 
     df2 = (
         df.with_columns(spend_usd=df.spend * 1.0)
         .filter(df.spend > 100.0)
         .select("user_id", "spend_usd")
     )
-    return HighValueOut(**df2.to_dict())
+    return [HighValueRow.model_validate(m.model_dump()) for m in df2.collect()]
 ```
 
-For `EventsPayload(user_id=[1, 2], spend=[150.0, 50.0])`, `df2.to_dict()` is:
+For a request body `[{"user_id": 1, "spend": 150.0}, {"user_id": 2, "spend": 50.0}]`, the response body is:
 
-```text
-{'user_id': [1], 'spend_usd': [150.0]}
+```json
+[{"user_id": 1, "spend_usd": 150.0}]
 ```
+
+## Columnar vs row-shaped responses
+
+- **`to_dict()`** — `dict[str, list]`; use when your API returns **columns** (e.g. bulk arrays in one JSON object).
+- **`collect()`** — `list` of Pydantic models for the **current** projected schema (`df.schema_type`); use for **row arrays** in JSON. For OpenAPI, map with `YourRowDto.model_validate(m.model_dump())` when you want a stable named type, or return **`df.collect()`** directly if the generated row type is enough.
 
 ## Error timing and API safety
 
@@ -197,7 +192,7 @@ Phase 3 (basic transformations) is complete:
 
 - `select()`, `with_columns()`, and `filter()` behavior is locked
 - `with_columns()` replacement semantics are deterministic for collisions
-- row-input and column-input transformation parity is validated
+- row-input (dict rows, Pydantic row models) and column-input transformation parity is validated
 
 Phase 4 (logical-plan boundary hardening) is complete:
 
@@ -209,7 +204,7 @@ Phase 4 (logical-plan boundary hardening) is complete:
 
 For larger apps, a clean split is:
 
-- **Route layer**: Pydantic request/response models
+- **Route layer**: Pydantic request/response models; materialize rows with **`collect()`** when responses are row lists
 - **Service layer**: `DataFrameModel` transforms
 - **Persistence layer**: source/sink adapters (db, queue, storage)
 
