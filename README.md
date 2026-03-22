@@ -1,10 +1,10 @@
-# Pydantable
+# PydanTable
 
 **Typed dataframe transformations for FastAPI + Pydantic services, powered by a Rust execution core.**
 
 **Current release: 0.6.x** — `collect()` materializes **rows as Pydantic models**; use `to_dict()` for columnar `dict[str, list]`. The Python **`polars`** package is **optional** (`pip install 'pydantable[polars]'` for `to_polars()`). See `docs/EXECUTION.md`.
 
-Pydantable keeps your Pydantic schemas as the source of truth for:
+PydanTable keeps your Pydantic schemas as the source of truth for:
 
 - column types + nullability (`Optional[T]`)
 - expression validity (type errors fail early during AST building)
@@ -39,7 +39,7 @@ Typed, schema-safe transforms:
 
 ## Default API (Polars-style contract)
 
-Pydantable’s *default* exported interface emulates a Polars-style dataframe contract:
+PydanTable’s *default* exported interface emulates a Polars-style dataframe contract:
 
 - join collision handling via `suffix` for right-side non-key columns
 - SQL-like null propagation rules for arithmetic/comparisons/filter
@@ -136,7 +136,7 @@ For the full contract details:
 
 ## Installation
 
-Pydantable requires Python `3.10+`.
+PydanTable requires Python `3.10+`.
 
 From this repo:
 

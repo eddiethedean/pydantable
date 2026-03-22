@@ -1,4 +1,4 @@
-# Pydantable Roadmap (to v1.0.0)
+# PydanTable Roadmap (to v1.0.0)
 
 This document tracks implementation phases for `pydantable` from the `0.5.x` era
 through the current **`0.6.x`** line, targeting `v1.0.0`.

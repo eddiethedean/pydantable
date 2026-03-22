@@ -114,7 +114,7 @@ Use a release extension (see above), then:
 .venv/bin/python benchmarks/phase5_collect_baseline.py
 ```
 
-### Compare pydantable vs native Polars (Python)
+### Compare PydanTable vs native Polars (Python)
 
 Install the optional benchmark extra (pulls in Polars for the comparison side):
 

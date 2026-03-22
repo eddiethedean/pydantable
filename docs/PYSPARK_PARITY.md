@@ -6,7 +6,7 @@ facade. It is not a guarantee of behavioral identity with Spark.
 For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 **[PySpark UI](PYSPARK_UI.md)**.
 
-| Spark API area | Pydantable status | Notes |
+| Spark API area | PydanTable status | Notes |
 |----------------|-------------------|--------|
 | `SparkSession`, `spark.sql(...)` | **Out of scope** | No distributed engine or SQL parser in pydantable. |
 | `DataFrame.select`, `filter`, `where` | **Supported** | Typed `Expr`; `where` mirrors Spark. |
@@ -39,7 +39,7 @@ Delivered in-tree: **`IsNull`**, **`IsNotNull`**, **`Coalesce`**, **`CaseWhen`**
 
 ### Phase D — Aggregates as `functions.sum(Column)`
 
-PySpark allows `select(F.sum("amount"))` without an explicit `groupBy`. Pydantable keeps
+PySpark allows `select(F.sum("amount"))` without an explicit `groupBy`. PydanTable keeps
 aggregations on **`group_by(...).agg(out_name=("sum"|"mean"|"count", column))`** for now.
 `functions.sum` / `avg` / … raise with a message pointing at `group_by().agg`. Adding
 lazy aggregate expressions would duplicate group-by semantics in the Rust planner (see

@@ -1,4 +1,4 @@
-# Pydantable Interface Contract (Polars-style)
+# PydanTable Interface Contract (Polars-style)
 
 This document records the behavior contract that the typed DataFrame API guarantees.
 It is intended to be independent of Python import style (default vs `pandas` / `pyspark` UI)
@@ -123,7 +123,7 @@ Rolling/dynamic contracts:
 - Dynamic windows support `every` / `period` with `s/m/h/d` suffixes and explicit aggregation contracts.
 - Nulls are ignored for numeric aggregations; all-null windows yield `None` for nullable aggregates and `0` for `count`.
 
-## Migration Notes (Polars -> Pydantable)
+## Migration Notes (Polars -> PydanTable)
 
 - Keep schema-first modeling: declare columns on `DataFrameModel` before transforms.
 - Prefer `out_name=(op, column)` aggregation specs instead of ad-hoc expression maps.

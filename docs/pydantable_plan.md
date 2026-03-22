@@ -1,8 +1,8 @@
-# Pydantable -- Plan Document
+# PydanTable -- Plan Document
 
 ## Vision
 
-Pydantable is a strongly-typed DataFrame system for Python, combining
+PydanTable is a strongly-typed DataFrame system for Python, combining
 Pydantic schemas with a Rust execution engine.
 
 ## Goals

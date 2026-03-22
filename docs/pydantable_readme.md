@@ -1,8 +1,8 @@
-# Pydantable
+# PydanTable
 
 **The dataframe layer built for FastAPI + Pydantic services.**
 
-Pydantable enforces schemas and tracks types through transformations, with a
+PydanTable enforces schemas and tracks types through transformations, with a
 SQLModel-like developer experience that integrates cleanly with FastAPI.
 
 **0.6.x materialization:** `collect()` returns a **list of Pydantic row models** for the
