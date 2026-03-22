@@ -111,12 +111,12 @@ def test_dataframe_model_row_vs_column_input_transformation_parity():
     col_df = UserDF({"id": [1, 2, 3], "age": [10, None, 30]})
 
     row_df2 = row_df.with_columns(age2=row_df.age + 1)
-    row_out = row_df2.filter(row_df2.age2 > 20).select("id", "age2").collect(
-        as_lists=True
+    row_out = (
+        row_df2.filter(row_df2.age2 > 20).select("id", "age2").collect(as_lists=True)
     )
     col_df2 = col_df.with_columns(age2=col_df.age + 1)
-    col_out = col_df2.filter(col_df2.age2 > 20).select("id", "age2").collect(
-        as_lists=True
+    col_out = (
+        col_df2.filter(col_df2.age2 > 20).select("id", "age2").collect(as_lists=True)
     )
     assert row_out == col_out == {"id": [3], "age2": [31]}
 

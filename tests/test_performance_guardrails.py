@@ -41,10 +41,14 @@ def test_performance_guardrails_major_transforms() -> None:
     join_s = perf_counter() - t0
 
     t1 = perf_counter()
-    _ = left.group_by("key").agg(
-        v_sum=("sum", "v"),
-        v_count=("count", "v"),
-    ).collect(as_lists=True)
+    _ = (
+        left.group_by("key")
+        .agg(
+            v_sum=("sum", "v"),
+            v_count=("count", "v"),
+        )
+        .collect(as_lists=True)
+    )
     group_s = perf_counter() - t1
 
     t2 = perf_counter()

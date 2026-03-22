@@ -307,8 +307,7 @@ def main() -> None:
             )
         ratio = t_dt / t_pl if t_pl > 0 else float("inf")
         line = (
-            f"{'join_inner_on_2':<22} {n:>8} {t_dt:>14.6f} "
-            f"{t_pl:>12.6f} {ratio:>8.2f}x"
+            f"{'join_inner_on_2':<22} {n:>8} {t_dt:>14.6f} {t_pl:>12.6f} {ratio:>8.2f}x"
         )
         print(line)
 

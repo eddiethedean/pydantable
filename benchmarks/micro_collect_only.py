@@ -25,9 +25,7 @@ def main() -> None:
     p.add_argument("--rounds", type=int, default=5)
     args = p.parse_args()
     n = args.rows
-    df = DataFrame[T](
-        {"a": list(range(n)), "b": [float(i % 100) for i in range(n)]}
-    )
+    df = DataFrame[T]({"a": list(range(n)), "b": [float(i % 100) for i in range(n)]})
     df2 = df.select("a", "b")
 
     samples: list[float] = []

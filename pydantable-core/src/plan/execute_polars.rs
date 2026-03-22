@@ -60,11 +60,7 @@ fn try_series_from_numpy(
         }
         (crate::dtype::BaseType::Int, "u") => {
             let arr: PyReadonlyArray1<u64> = obj.extract()?;
-            let v: Vec<i64> = arr
-                .as_slice()?
-                .iter()
-                .map(|&x| x as i64)
-                .collect();
+            let v: Vec<i64> = arr.as_slice()?.iter().map(|&x| x as i64).collect();
             Series::new(name_pl, v.as_slice())
         }
         (crate::dtype::BaseType::Bool, "b") => {
@@ -1407,6 +1403,7 @@ fn agg_literal(
 }
 
 #[cfg(feature = "polars_engine")]
+#[allow(clippy::too_many_arguments)]
 pub fn execute_melt_polars(
     py: Python<'_>,
     plan: &PlanInner,
@@ -1526,6 +1523,7 @@ pub fn execute_melt_polars(
 
 #[cfg(feature = "polars_engine")]
 #[allow(clippy::needless_range_loop)]
+#[allow(clippy::too_many_arguments)]
 pub fn execute_pivot_polars(
     py: Python<'_>,
     plan: &PlanInner,
@@ -1868,7 +1866,7 @@ pub fn execute_groupby_dynamic_agg_polars(
 
     let data_obj = super::execute_plan(py, plan, root_data, true)?;
     let data_bound = data_obj.bind(py);
-    let ctx = py_dict_to_literal_ctx(&plan.schema, &data_bound)?;
+    let ctx = py_dict_to_literal_ctx(&plan.schema, data_bound)?;
 
     let dict: &Bound<'_, PyDict> = data_bound.downcast()?;
     let index_list_any = dict.get_item(&index_column)?.ok_or_else(|| {

@@ -1,9 +1,9 @@
 from datetime import date, datetime, timedelta
 
 import pytest
-from pydantic import BaseModel
 from pydantable import DataFrame, Schema
 from pydantable.expressions import ColumnRef
+from pydantic import BaseModel
 
 
 class User(Schema):
@@ -323,10 +323,14 @@ def test_temporal_groupby_and_join_paths() -> None:
     joined = left.join(right, on=["id", "ts"], how="inner").collect(as_lists=True)
     assert joined["id"] == [1, 2]
 
-    grouped = left.group_by("id").agg(
-        ts_min=("min", "ts"),
-        ts_max=("max", "ts"),
-    ).collect(as_lists=True)
+    grouped = (
+        left.group_by("id")
+        .agg(
+            ts_min=("min", "ts"),
+            ts_max=("max", "ts"),
+        )
+        .collect(as_lists=True)
+    )
     assert sorted(grouped["id"]) == [1, 2]
 
 

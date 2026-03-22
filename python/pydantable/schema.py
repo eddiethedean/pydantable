@@ -102,7 +102,7 @@ def validate_columns_strict(
                 "(per-element validation is skipped for columnar buffers)."
             )
         field_types = schema_field_types(schema_type)
-        cols = {str(c) for c in data.columns}
+        cols = {str(c) for c in cast("Any", data).columns}
         field_keys = set(field_types.keys())
         missing = sorted(field_keys - cols)
         extra = sorted(cols - field_keys)

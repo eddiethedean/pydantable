@@ -798,7 +798,7 @@ class DataFrame(Generic[SchemaT]):
         if as_lists:
             return column_dict
         if as_numpy:
-            import numpy as np
+            import numpy as np  # type: ignore[import-not-found]
 
             return {k: np.asarray(v) for k, v in column_dict.items()}
         return _rows_from_column_dict(column_dict, self._current_schema_type)
@@ -812,7 +812,7 @@ class DataFrame(Generic[SchemaT]):
         Python package: ``pip install 'pydantable[polars]'``).
         """
         try:
-            import polars as pl
+            import polars as pl  # type: ignore[import-not-found]
         except ImportError as e:
             raise ImportError(
                 "polars is required for to_polars(). Install with: "

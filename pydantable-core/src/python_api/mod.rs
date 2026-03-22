@@ -499,6 +499,7 @@ fn execute_concat(
 
 #[pyfunction]
 #[pyo3(signature = (plan, root_data, id_vars, value_vars, variable_name, value_name, as_python_lists=false))]
+#[allow(clippy::too_many_arguments)]
 fn execute_melt(
     py: Python<'_>,
     plan: &PyPlan,

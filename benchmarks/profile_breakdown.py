@@ -1,5 +1,5 @@
 """
-Split timing for a representative pipeline: where time goes (validation vs plan vs collect).
+Split timing for a representative pipeline: validation vs plan vs collect.
 
 Run from repo root with release extension:
 
@@ -69,9 +69,12 @@ def main() -> None:
 
     total = t_validate + t_construct + t_pipeline
     print(f"rows={n}")
-    print(f"  validate_columns_strict: {t_validate:.4f}s ({100 * t_validate / total:.1f}%)")
-    print(f"  DataFrame construct+plan: {t_construct:.4f}s ({100 * t_construct / total:.1f}%)")
-    print(f"  transform+collect:       {t_pipeline:.4f}s ({100 * t_pipeline / total:.1f}%)")
+    v_pct = 100 * t_validate / total
+    c_pct = 100 * t_construct / total
+    p_pct = 100 * t_pipeline / total
+    print(f"  validate_columns_strict: {t_validate:.4f}s ({v_pct:.1f}%)")
+    print(f"  DataFrame construct+plan: {t_construct:.4f}s ({c_pct:.1f}%)")
+    print(f"  transform+collect:       {t_pipeline:.4f}s ({p_pct:.1f}%)")
     print(f"  total:                   {total:.4f}s")
     print(f"  collect rows (sample):   {len(out['user_id'])}")
 

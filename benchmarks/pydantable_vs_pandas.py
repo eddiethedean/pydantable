@@ -288,8 +288,7 @@ def main() -> None:
             )
         ratio = t_dt / t_pd if t_pd > 0 else float("inf")
         line = (
-            f"{'join_inner_on_2':<22} {n:>8} {t_dt:>14.6f} "
-            f"{t_pd:>12.6f} {ratio:>8.2f}x"
+            f"{'join_inner_on_2':<22} {n:>8} {t_dt:>14.6f} {t_pd:>12.6f} {ratio:>8.2f}x"
         )
         print(line)
 
@@ -304,9 +303,7 @@ def main() -> None:
             t_dt = _mean_time(
                 lambda df_dt=df_dt: _run_group_pydantable_ops(df_dt), args.rounds
             )
-            t_pd = _mean_time(
-                lambda pdf=pdf: _run_group_pandas_ops(pdf), args.rounds
-            )
+            t_pd = _mean_time(lambda pdf=pdf: _run_group_pandas_ops(pdf), args.rounds)
         ratio = t_dt / t_pd if t_pd > 0 else float("inf")
         line = (
             f"{'groupby_agg_sum_count':<22} {n:>8} {t_dt:>14.6f} "

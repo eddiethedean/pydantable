@@ -38,13 +38,12 @@ def _normalize_input(
 
         normalized_rows: list[BaseModel] = []
         for row in rows:
-            if isinstance(row, BaseModel):
-                normalized_rows.append(row_model.model_validate(row))
-            elif isinstance(row, Mapping):
+            if isinstance(row, (BaseModel, Mapping)):
                 normalized_rows.append(row_model.model_validate(row))
             else:
                 raise TypeError(
-                    "Row input must be a sequence of mapping objects or Pydantic models."
+                    "Row input must be a sequence of mapping objects or "
+                    "Pydantic models."
                 )
 
         columns: dict[str, list[Any]] = {name: [] for name in expected_fields}

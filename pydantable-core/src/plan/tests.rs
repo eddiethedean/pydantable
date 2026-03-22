@@ -199,7 +199,13 @@ mod polars_engine_tests {
                 .unwrap()
                 .extract::<i64>()
                 .unwrap();
-            assert!(dict.get_item("age").unwrap().unwrap().get_item(1).unwrap().is_none());
+            assert!(dict
+                .get_item("age")
+                .unwrap()
+                .unwrap()
+                .get_item(1)
+                .unwrap()
+                .is_none());
             assert_eq!(ids, vec![1, 2]);
             assert_eq!(age0, 20);
         });
@@ -278,10 +284,8 @@ mod polars_engine_tests {
             let keys: Vec<i64> = dict.get_item("k").unwrap().unwrap().extract().unwrap();
             let sums: Vec<Option<i64>> = dict.get_item("s").unwrap().unwrap().extract().unwrap();
 
-            let mut pairs: Vec<(i64, Option<i64>)> = keys
-                .into_iter()
-                .zip(sums.into_iter())
-                .collect();
+            let mut pairs: Vec<(i64, Option<i64>)> =
+                keys.into_iter().zip(sums.into_iter()).collect();
             pairs.sort_by_key(|(k, _)| *k);
             assert_eq!(pairs, vec![(1, None), (2, Some(5))]);
         });
@@ -312,7 +316,8 @@ mod polars_engine_tests {
             .unwrap();
 
             let root2 = PyDict::new_bound(py);
-            root2.set_item("k", PyList::new_bound(py, [1_i64, 1_i64, 2_i64]))
+            root2
+                .set_item("k", PyList::new_bound(py, [1_i64, 1_i64, 2_i64]))
                 .unwrap();
             let vs2 = PyList::empty_bound(py);
             vs2.append(py.None()).unwrap();
@@ -334,18 +339,25 @@ mod polars_engine_tests {
             let df_class = polars.getattr("DataFrame").unwrap();
             let builtins = py.import_bound("builtins").unwrap();
             let isinstance = builtins.getattr("isinstance").unwrap();
-            assert!(
-                isinstance
-                    .call1((data_ipc.bind(py), df_class.as_any()))
-                    .unwrap()
-                    .extract::<bool>()
-                    .unwrap()
-            );
+            assert!(isinstance
+                .call1((data_ipc.bind(py), df_class.as_any()))
+                .unwrap()
+                .extract::<bool>()
+                .unwrap());
 
             let dict_lists = data_lists.bind(py).downcast::<PyDict>().unwrap();
-            let k_lists: Vec<i64> = dict_lists.get_item("k").unwrap().unwrap().extract().unwrap();
-            let s_lists: Vec<Option<i64>> =
-                dict_lists.get_item("s").unwrap().unwrap().extract().unwrap();
+            let k_lists: Vec<i64> = dict_lists
+                .get_item("k")
+                .unwrap()
+                .unwrap()
+                .extract()
+                .unwrap();
+            let s_lists: Vec<Option<i64>> = dict_lists
+                .get_item("s")
+                .unwrap()
+                .unwrap()
+                .extract()
+                .unwrap();
 
             let k_ipc: Vec<i64> = data_ipc
                 .bind(py)

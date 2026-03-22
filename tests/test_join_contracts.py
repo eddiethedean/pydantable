@@ -111,9 +111,9 @@ def test_join_supports_expression_keys() -> None:
     right = DataFrame[RightSchema](
         {"id": [2, 1], "age": [20, 10], "country": ["US", "CA"], "score": [200, 100]}
     )
-    out = left.join(
-        right, left_on=left.id, right_on=right.id, how="inner"
-    ).collect(as_lists=True)
+    out = left.join(right, left_on=left.id, right_on=right.id, how="inner").collect(
+        as_lists=True
+    )
     assert_table_eq_sorted(
         out,
         {

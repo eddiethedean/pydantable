@@ -100,7 +100,9 @@ def test_pyspark_interface_temporal_columns_and_literals() -> None:
             "delta": [timedelta(minutes=5), timedelta(minutes=10), None],
         }
     )
-    out = rows.filter(rows.ts >= t0).filter(
-        rows.d >= date(2024, 1, 1)
-    ).collect(as_lists=True)
+    out = (
+        rows.filter(rows.ts >= t0)
+        .filter(rows.d >= date(2024, 1, 1))
+        .collect(as_lists=True)
+    )
     assert out["id"] == [1, 2]

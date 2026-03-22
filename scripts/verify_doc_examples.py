@@ -263,9 +263,7 @@ assert [m.model_dump() for m in df2.collect()] == [
     {"id": 2, "age2": None},
 ]
 
-df = UserFastApi(
-    [RM(id=1, age=22), RM(id=2, age=None), RM(id=3, age=15)]
-)
+df = UserFastApi([RM(id=1, age=22), RM(id=2, age=None), RM(id=3, age=15)])
 assert [m.model_dump() for m in df.filter(df.age >= 18).collect()] == [
     {"id": 1, "age": 22},
 ]
