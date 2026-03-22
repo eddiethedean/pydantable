@@ -12,6 +12,11 @@ engine. It is trying to solve a different product problem:
 Polars remains a great execution engine choice, and `pydantable` can sit above
 it conceptually as an API/backend contract layer.
 
+**Python package:** installing `pydantable` does **not** require the PyPI **`polars`**
+package. Execution uses a **Rust** Polars engine inside `pydantable._core`. If you want a
+**Polars `DataFrame` in Python**, install the extra: `pip install 'pydantable[polars]'`
+and use **`DataFrame.to_polars()`**.
+
 ## The real question
 
 For a backend team, the practical question is usually:

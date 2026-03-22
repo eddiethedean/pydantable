@@ -1,4 +1,4 @@
-﻿pydantable.DataFrameModel
+pydantable.DataFrameModel
 =========================
 
 .. currentmodule:: pydantable
@@ -25,6 +25,7 @@
       ~DataFrameModel.select
       ~DataFrameModel.to_dict
       ~DataFrameModel.to_dicts
+      ~DataFrameModel.to_polars
       ~DataFrameModel.with_columns
    
    

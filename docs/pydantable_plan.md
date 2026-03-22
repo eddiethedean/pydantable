@@ -42,10 +42,19 @@ Python API → Typed AST → Rust Planner → Rust Polars Engine
 -   Python<->Rust schema metadata boundary standardized via descriptors (`base`, `nullable`)
 -   Rust unit tests + Python integration tests for metadata flow
 
-### Phase 5 (next)
+### Phase 5 (completed)
 
--   Advanced ops (join, groupby)
--   Performance optimization
+-   Rust Polars-backed execution for advanced ops (`join`, `group_by` / agg, reshape, windows)
+-   Baseline benchmarks and performance guardrails
+
+### Phase 6 (completed)
+
+-   `DataFrameModel` row materialization aligned with schema migration
+-   Docs + API surface for FastAPI-oriented workflows
+
+### Phase 7 (current / ongoing)
+
+-   Parity expansion, docs, and polish toward `v1.0.0` (see `docs/ROADMAP.md`)
 
 ## Key Components
 

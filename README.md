@@ -2,6 +2,8 @@
 
 **Typed dataframe transformations for FastAPI + Pydantic services, powered by a Rust execution core.**
 
+**Current release: 0.6.x** — `collect()` materializes **rows as Pydantic models**; use `to_dict()` for columnar `dict[str, list]`. The Python **`polars`** package is **optional** (`pip install 'pydantable[polars]'` for `to_polars()`). See `docs/EXECUTION.md`.
+
 Pydantable keeps your Pydantic schemas as the source of truth for:
 
 - column types + nullability (`Optional[T]`)
@@ -122,15 +124,17 @@ if you need `DataFrame.to_polars()`.
 
 ## Docs
 
-- `docs/EXECUTION.md` for the Rust execution model and UI modules
+- `docs/EXECUTION.md` for the Rust execution model, materialization (`collect` / `to_dict` / `to_polars`), and UI modules
 - `docs/DATAFRAMEMODEL.md` for the `DataFrameModel` contract/design spec
 - `docs/FASTAPI.md` for end-to-end FastAPI integration examples
-- `docs/WHY_NOT_POLARS.md` for positioning + trade-offs
-- `docs/DEVELOPER.md` for local setup and contribution workflow
+- `docs/WHY_NOT_POLARS.md` for positioning + trade-offs (Python Polars optional; Rust engine uses Polars internally)
+- `docs/PERFORMANCE.md` for where time goes and benchmark scripts
+- `docs/DEVELOPER.md` for local setup, `scripts/verify_doc_examples.py`, and contribution workflow
 - `docs/ROADMAP.md` for project phases
 - `docs/PARITY_SCORECARD.md` for parity coverage status
 - `docs/POLARS_WORKFLOWS.md` for end-to-end Polars-style workflows
 - `docs/PYSPARK_INTERFACE.md` for PySpark interface usage and status
+- `docs/INTERFACE_CONTRACT.md` for null semantics, joins, and ordering guarantees
 
 ## License
 

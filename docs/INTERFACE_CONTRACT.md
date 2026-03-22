@@ -5,6 +5,10 @@ It is intended to be independent of Python import style (default vs `pandas` / `
 at the *type/semantics* level, while allowing implementation-specific physical ordering
 (e.g. row order from `to_dict()` / `collect(as_lists=True)`).
 
+**Row models:** `collect()` with default arguments returns a **list of Pydantic models**;
+order of that list follows the same non-guarantee as columnar materialization unless
+documented otherwise for a specific op.
+
 ## Ordering
 
 Columnar materialization (`to_dict()`, `collect(as_lists=True)`) output order is **not a stable API guarantee**.

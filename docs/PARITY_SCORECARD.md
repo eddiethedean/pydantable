@@ -11,6 +11,7 @@ Status definitions:
 | Area | Method/Capability | Status | Notes |
 |---|---|---|---|
 | Core | `select`, `with_columns`, `filter` | Implemented | Typed expression validation and SQL-like null filter behavior. |
+| Materialization | `collect()` (default), `to_dict()`, `to_polars()` | Implemented | Default `collect()` → `list[BaseModel]`; `to_dict()` columnar dict; `to_polars()` requires optional Python `polars` (`pydantable[polars]`). |
 | Core | `sort`, `unique/distinct`, `drop`, `rename`, `slice/head/tail`, `concat` | Implemented | Contract-tested; deterministic schema propagation. |
 | Null/type | `fill_null`, `drop_nulls`, `cast`, `is_null`, `is_not_null` | Implemented | Includes error contracts and nullable schema derivation. |
 | Join | `inner/left/right/full/semi/anti/cross` | Implemented | Includes expression key support and suffix collision policy. |

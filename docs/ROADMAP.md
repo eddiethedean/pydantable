@@ -1,7 +1,7 @@
 # Pydantable Roadmap (to v1.0.0)
 
-This document tracks implementation phases for `pydantable` starting at `0.5.0`
-and targeting `v1.0.0`.
+This document tracks implementation phases for `pydantable` from the `0.5.x` era
+through the current **`0.6.x`** line, targeting `v1.0.0`.
 
 For detailed method-by-method Polars parity planning, see:
 `docs/POLARS_TRANSFORMATIONS_ROADMAP.md`.
@@ -27,6 +27,12 @@ Spec: `docs/DATAFRAMEMODEL.md`.
 - MVP: end of Phase 3
 - Beta: end of Phase 6
 - v1.0.0: end of Phase 7
+
+## 0.6.x API note (materialization)
+
+- **Python `polars` is optional**; core installs use Pydantic + `typing-extensions` only.
+- Default **`collect()`** returns **`list[BaseModel]`** (validated against the current projected schema). Columnar data: **`to_dict()`**. Polars **`DataFrame`**: **`to_polars()`** with the `[polars]` extra.
+- Eager Rust paths from Python use **dict-of-lists** handoff (no Python `import polars` required for normal execution).
 
 ## Progress Snapshot (current)
 

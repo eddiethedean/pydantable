@@ -1,4 +1,4 @@
-﻿pydantable.DataFrame
+pydantable.DataFrame
 ====================
 
 .. currentmodule:: pydantable
@@ -19,9 +19,13 @@
       ~DataFrame.filter
       ~DataFrame.group_by
       ~DataFrame.join
+      ~DataFrame.melt
+      ~DataFrame.pivot
+      ~DataFrame.concat
       ~DataFrame.schema_fields
       ~DataFrame.select
       ~DataFrame.to_dict
+      ~DataFrame.to_polars
       ~DataFrame.with_columns
    
    

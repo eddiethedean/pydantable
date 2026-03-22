@@ -3,6 +3,10 @@
 This document tracks the plan to reach broad transformation-method parity with
 Polars while preserving `pydantable`'s typed schema contracts.
 
+Notes that say **Implemented on branch `v0.5.0`** refer to the 0.5.x release line.
+The current release is **0.6.x** (Pydantic-first `collect()`, optional Python `polars`;
+see `docs/EXECUTION.md`).
+
 ## Current baseline (implemented)
 
 - `select`

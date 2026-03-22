@@ -9,7 +9,7 @@ For FastAPI services, `pydantable` gives you:
 
 - Pydantic schema validation at API boundaries
 - typed dataframe transformations in service logic
-- Rust execution for `collect()` on supported skeleton operations
+- Rust execution for `to_dict()` / `collect()` on supported operations (`collect()` returns Pydantic row models by default)
 
 ## Install
 

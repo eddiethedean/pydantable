@@ -70,6 +70,18 @@ Phase 4 boundary contract:
 .venv/bin/python -m sphinx -b html docs docs/_build
 ```
 
+### Verify runnable doc snippets (README + `docs/`)
+
+After a normal editable install (so `pydantable._core` is built), run from repo root:
+
+```bash
+PYTHONPATH=python .venv/bin/python scripts/verify_doc_examples.py
+```
+
+This executes the same patterns as the Quick Start and several doc examples (no network). Fix failures before merging user-facing doc changes.
+
+Optional Python **`polars`** for local `to_polars()` / benchmark comparisons: `pip install -e ".[polars]"` or `".[benchmark]"` (see benchmark sections below).
+
 ### Build package wheel (mixed Python/Rust)
 
 ```bash
