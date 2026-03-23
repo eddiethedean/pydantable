@@ -472,4 +472,6 @@ def test_pyspark_window_range_between_rejects_lag() -> None:
     df = DataFrame[S]({"g": [1, 1, 1], "v": [10, 20, 30]})
     w = Window.partitionBy("g").orderBy("v").rangeBetween(-1, 0)
     with pytest.raises(TypeError, match=r"lag\(\) does not support rangeBetween"):
-        df.withColumn("lg", F.lag(F.col("v", dtype=int), 1).over(w)).collect(as_lists=True)
+        df.withColumn("lg", F.lag(F.col("v", dtype=int), 1).over(w)).collect(
+            as_lists=True
+        )
