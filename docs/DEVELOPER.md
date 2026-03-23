@@ -75,11 +75,39 @@ Phase 4 boundary contract:
 
 ## Build and Test Commands
 
+### Which tests are authoritative
+
+- **`cargo test` in `pydantable-core/`** exercises Rust plan/expr contracts and PyO3 wiring.
+- **`pytest` on `tests/`** is the **CI-facing** check for end-to-end behavior (`collect`, joins, UIs). Prefer adding user-visible regressions here when behavior crosses the Python boundary.
+
 ### Run Python tests
 
 ```bash
 .venv/bin/python -m pytest -q
 ```
+
+Parallel (uses `pytest-xdist` from the `dev` extra):
+
+```bash
+.venv/bin/python -m pip install -e ".[dev]"
+.venv/bin/python -m pytest -q -n auto
+```
+
+Exclude timing-based guardrails (`tests/test_performance_guardrails.py`) for a quicker loop:
+
+```bash
+.venv/bin/python -m pytest -q -m "not slow"
+```
+
+### Coverage (optional)
+
+Install the `dev` extra, then measure line/branch coverage of `python/pydantable/` (no enforced threshold yet):
+
+```bash
+.venv/bin/python -m pytest -q --cov=pydantable --cov-report=term-missing
+```
+
+XML for CI or tooling: add `--cov-report=xml` (writes `coverage.xml`; gitignored).
 
 ### Lint/format/type-check
 
@@ -108,7 +136,9 @@ PYTHONPATH=python .venv/bin/python scripts/verify_doc_examples.py
 
 This executes the same patterns as the Quick Start and several doc examples (no network). Fix failures before merging user-facing doc changes.
 
-Optional Python **`polars`** for local `to_polars()` / benchmark comparisons: `pip install -e ".[polars]"` or `".[benchmark]"` (see benchmark sections below).
+**CI** runs `scripts/verify_doc_examples.py` on **Ubuntu + Python 3.11** after tests (see `.github/workflows/ci.yml`).
+
+Optional Python **`polars`** for local `to_polars()` / benchmark comparisons: `pip install -e ".[polars]"` or `".[benchmark]"` (see benchmark sections below). CI installs Polars on the **Ubuntu 3.11** matrix leg so `import polars` / `to_polars()` tests are not skipped there.
 
 ### Build package wheel (mixed Python/Rust)
 

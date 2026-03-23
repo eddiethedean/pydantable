@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import os
 from time import perf_counter
 
+import pytest
 from pydantable import DataFrameModel
+
+# CI runners are slower and noisier than a typical laptop; scale guardrails there.
+_PERF_LIMIT_S = 20.0 * (2.5 if os.environ.get("GITHUB_ACTIONS") == "true" else 1.0)
 
 
 class PerfLeft(DataFrameModel):
@@ -18,6 +23,7 @@ class PerfRight(DataFrameModel):
     tag: str
 
 
+@pytest.mark.slow
 def test_performance_guardrails_major_transforms() -> None:
     n = 3000
     left = PerfLeft(
@@ -69,7 +75,7 @@ def test_performance_guardrails_major_transforms() -> None:
 
     # Guardrails are intentionally generous to avoid flakiness while still
     # catching major accidental regressions.
-    assert join_s < 20
-    assert group_s < 20
-    assert reshape_s < 20
-    assert window_s < 20
+    assert join_s < _PERF_LIMIT_S
+    assert group_s < _PERF_LIMIT_S
+    assert reshape_s < _PERF_LIMIT_S
+    assert window_s < _PERF_LIMIT_S

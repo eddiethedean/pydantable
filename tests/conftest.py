@@ -72,3 +72,9 @@ def assert_table_eq_sorted(
 def _keys_for_sort() -> list[str]:
     # Small fixture for future reuse.
     return ["id"]
+
+
+@pytest.fixture
+def small_two_int_column_dict() -> dict[str, list[int]]:
+    """Shared columnar payload for contract tests (id + v)."""
+    return {"id": [1, 2, 3], "v": [10, 20, 30]}

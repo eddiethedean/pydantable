@@ -1,4 +1,12 @@
+"""PySpark UI and ``sql.functions`` contracts.
+
+Parity intent is summarized in ``docs/PYSPARK_PARITY.md``; add tests alongside
+new façade APIs rather than chasing full Spark coverage here.
+"""
+
 from __future__ import annotations
+
+from datetime import date, datetime
 
 import pytest
 from conftest import assert_table_eq_sorted
@@ -269,3 +277,53 @@ def test_aggregate_sum_requires_column() -> None:
         F.sum()  # type: ignore[call-arg]
     with pytest.raises(TypeError):
         F.avg()  # type: ignore[call-arg]
+
+
+def test_drop_duplicates_subset_keeps_first_row_per_key() -> None:
+    class S(Schema):
+        a: int
+        b: int
+
+    df = DataFrame[S]({"a": [1, 1, 2], "b": [1, 2, 2]})
+    out = df.dropDuplicates(["a"]).collect(as_lists=True)
+    assert_table_eq_sorted(out, {"a": [1, 2], "b": [1, 2]}, keys=["a"])
+
+
+def test_functions_to_date_year_month_on_datetime() -> None:
+    class S(Schema):
+        ts: datetime
+
+    df = DataFrame[S]({"ts": [datetime(2024, 6, 15, 12, 30, 45)]})
+    ts = F.col("ts", dtype=datetime)
+    out = (
+        df.withColumn("d", F.to_date(ts))
+        .withColumn("y", F.year(ts))
+        .withColumn("mo", F.month(ts))
+        .collect(as_lists=True)
+    )
+    assert out["d"] == [date(2024, 6, 15)]
+    assert out["y"] == [2024]
+    assert out["mo"] == [6]
+
+
+def test_functions_avg_mean_global_select_match() -> None:
+    class S(Schema):
+        v: int
+
+    df = DataFrame[S]({"v": [10, 20, 30]})
+    out_avg = df.select(F.avg(F.col("v", dtype=int))).collect(as_lists=True)
+    out_mean = df.select(F.mean(F.col("v", dtype=int))).collect(as_lists=True)
+    assert out_avg == out_mean == {"mean_v": [20.0]}
+
+
+def test_window_functions_reexported_from_sql_functions() -> None:
+    from pydantable.pyspark.sql import Window
+
+    class S(Schema):
+        g: int
+        v: int
+
+    df = DataFrame[S]({"g": [1, 1], "v": [1, 2]})
+    w = Window.partitionBy("g").orderBy("v", ascending=True)
+    out = df.withColumn("rn", F.row_number().over(w)).collect(as_lists=True)
+    assert out["rn"] == [1, 2]

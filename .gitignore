@@ -38,6 +38,7 @@ pydantable-core/Cargo.lock
 .env.*
 .coverage
 .coverage.*
+coverage.xml
 htmlcov/
 .tox/
 .nox/

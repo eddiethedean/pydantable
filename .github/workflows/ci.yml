@@ -234,12 +234,31 @@ jobs:
       - name: Install maturin and test deps
         run: |
           $PY -m pip install -U pip
-          $PY -m pip install maturin pytest "pandas>=2.0" "hypothesis>=6.0"
+          $PY -m pip install maturin pytest pytest-xdist pytest-cov "numpy>=1.24" "pandas>=2.0" "hypothesis>=6.0"
+
       - name: Build and install extension
         run: $PY -m maturin develop --release
         env:
           VIRTUAL_ENV: ${{ github.workspace }}/.venv
 
+      - name: Install Polars (Ubuntu Python 3.11 — Python-side to_polars() tests)
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        run: $PY -m pip install "polars>=1.0.0,<2"
+
       - name: Pytest
-        run: $PY -m pytest -q
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+          PYVER: ${{ matrix.python-version }}
+        run: |
+          if [ "$MATRIX_OS" = "ubuntu-latest" ] && [ "$PYVER" = "3.11" ]; then
+            $PY -m pytest -q -n auto --cov=pydantable --cov-report=term-missing --cov-report=xml
+          elif [ "$MATRIX_OS" = "ubuntu-latest" ]; then
+            $PY -m pytest -q -n auto
+          else
+            $PY -m pytest -q
+          fi
+
+      - name: Verify doc examples (Ubuntu Python 3.11)
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        run: PYTHONPATH=python $PY scripts/verify_doc_examples.py
 

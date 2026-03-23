@@ -170,6 +170,17 @@ def test_filter_self_eq_keeps_all_rows(data: dict[str, list]) -> None:
     assert_table_eq_sorted(out, data, ["id"])
 
 
+@given(data=aligned_two_int_columns())
+@settings(max_examples=40)
+def test_filter_gt_min_id_select_id_pipeline(data: dict[str, list]) -> None:
+    assume(len(data["id"]) > 0)
+    df = DataFrame[TwoInt](data)
+    min_id = min(data["id"])
+    out = df.filter(df.id > min_id).select("id").collect(as_lists=True)
+    expected_ids = [i for i in data["id"] if i > min_id]
+    assert_table_eq_sorted(out, {"id": expected_ids}, ["id"])
+
+
 @given(data=aligned_int_and_optional_int())
 @settings(max_examples=50)
 def test_nullable_int_column_roundtrip(data: dict[str, list]) -> None:
