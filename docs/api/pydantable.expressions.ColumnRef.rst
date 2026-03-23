@@ -28,6 +28,7 @@
       ~ColumnRef.dt_nanosecond
       ~ColumnRef.dt_second
       ~ColumnRef.dt_year
+      ~ColumnRef.element_at
       ~ColumnRef.floor
       ~ColumnRef.is_not_null
       ~ColumnRef.is_null
@@ -41,6 +42,7 @@
       ~ColumnRef.lower
       ~ColumnRef.map_contains_key
       ~ColumnRef.map_entries
+      ~ColumnRef.map_from_entries
       ~ColumnRef.map_get
       ~ColumnRef.map_keys
       ~ColumnRef.map_len

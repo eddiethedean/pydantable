@@ -12,6 +12,10 @@ All notable changes to this project are documented here. The format is inspired 
 - **Parity coverage expansion:** add dedicated DataFrame/DataFrameModel parity tests and additional PySpark map parity contracts.
 - **Release hardening:** update docs/contracts and version metadata for the 0.11.0 line.
 
+### Details
+
+See {doc}`INTERFACE_CONTRACT`, {doc}`PYSPARK_PARITY`, {doc}`SUPPORTED_TYPES`, and {doc}`ROADMAP`.
+
 ## [0.10.0] — 2026-03-23
 
 ### Highlights

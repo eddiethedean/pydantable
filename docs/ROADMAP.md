@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.10.0 → v1.0.0)
+# PydanTable roadmap (0.11.0 → v1.0.0)
 
-**Current release: `0.10.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
+**Current release: `0.11.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
 
 For Polars-style API parity at the method level, see
 [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md).
@@ -117,14 +117,22 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 ---
 
+## Shipped in 0.11.0 (range v2, map completion, trusted modes)
+
+- [x] **Window range semantics v2:** `rangeBetween` on numeric, `date`, `datetime`, and `duration` order keys (still single `orderBy` column for aggregates).
+- [x] **Map ergonomics:** `map_from_entries()`, `Expr.element_at()` / `functions.element_at()` (map lookup alias).
+- [x] **Trusted ingest:** `trusted_mode` (`off` / `shape_only` / `strict`) on `DataFrame` / `DataFrameModel`, with `validate_data` as the compatibility bridge.
+- [x] **CI:** newer GitHub Actions (`actions/checkout@v5`, `actions/setup-python@v6`) to align with Node 24 runner defaults.
+
+---
+
 ## Later (not started)
 
-Directions beyond **0.10.0** (non-exhaustive):
+Directions beyond **0.11.0** (non-exhaustive):
 
 - [ ] **Arrow-native map dtype** or heterogeneous map keys (beyond `dict[str, T]` v1) — optional I/O spike.
-- [ ] Full SQL-grade `rangeBetween` semantics over multi-key orderings and non-integer order dtypes.
-- [ ] Expand map parity with `map_entries` and broader PySpark map helper coverage.
-- [ ] Harden trusted interop validation for optional DataFrame inputs.
+- [ ] Full SQL-grade `rangeBetween` semantics over **multi-key** orderings (single-axis range today).
+- [ ] Broader Spark semantic parity and additional façade helpers as needed.
 
 ---
 

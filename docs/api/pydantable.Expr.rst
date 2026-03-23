@@ -28,6 +28,7 @@
       ~Expr.dt_nanosecond
       ~Expr.dt_second
       ~Expr.dt_year
+      ~Expr.element_at
       ~Expr.floor
       ~Expr.is_not_null
       ~Expr.is_null
@@ -41,6 +42,7 @@
       ~Expr.lower
       ~Expr.map_contains_key
       ~Expr.map_entries
+      ~Expr.map_from_entries
       ~Expr.map_get
       ~Expr.map_keys
       ~Expr.map_len

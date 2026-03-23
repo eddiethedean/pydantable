@@ -185,7 +185,10 @@ compatible row objects). Lists may be plain `list`, `tuple`, or
 
 With **`validate_data=False`**, trusted bulk paths may pass **NumPy**, **PyArrow**,
 or a **Polars `DataFrame`** as documented in {doc}`EXECUTION` and {doc}`PERFORMANCE`;
-scalar dtypes must still match the schema.
+scalar dtypes must still match the schema. As of **0.11.0**, use **`trusted_mode`**
+on **`DataFrame` / `DataFrameModel`** for explicit **`shape_only`** vs **`strict`**
+checks (see `schema.validate_columns_strict`); **`validate_data`** remains a
+compatibility alias mapped onto those modes.
 
 ## See also
 
