@@ -63,6 +63,10 @@ are Python `dict` values; the engine stores a logical map as Polars
 **`map_values()`**, and **`map_entries()`** (see *Expression typing* below); not all
 Polars map ops are exposed.
 
+**`map_from_entries()`** builds map cells from a list of `{key, value}` entry structs.
+If the entry list contains **duplicate string keys**, the **last** entry for that key
+wins (Polars map semantics); do not rely on raising an error for duplicates.
+
 ## Homogeneous list columns (`list[T]` / `List[T]`)
 
 Use **`list[T]`** (or `typing.List[T]`) where **`T`** is any supported column type
@@ -189,6 +193,11 @@ scalar dtypes must still match the schema. As of **0.11.0**, use **`trusted_mode
 on **`DataFrame` / `DataFrameModel`** for explicit **`shape_only`** vs **`strict`**
 checks (see `schema.validate_columns_strict`); **`validate_data`** remains a
 compatibility alias mapped onto those modes.
+
+**Migration (recommended):** replace `validate_data=False` with `trusted_mode="shape_only"`
+(or `trusted_mode="strict"` when you want Polars dtype-shape checks on nested columns).
+Replace `validate_data=True` with `trusted_mode="off"` or omit the argument. See
+{doc}`DATAFRAMEMODEL` (“Trusted ingest”).
 
 ## See also
 

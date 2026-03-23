@@ -117,6 +117,83 @@ def test_map_from_entries_roundtrip() -> None:
     assert out["rebuilt"] == [{"a": {"x": 1}, "b": None}, {}]
 
 
+def test_map_from_entries_duplicate_keys_last_entry_wins() -> None:
+    """Polars map construction: later duplicate keys overwrite earlier ones."""
+
+    pl = pytest.importorskip("polars")
+
+    class Entry(Schema):
+        key: str
+        value: int
+
+    class Row(Schema):
+        entries: list[Entry]
+
+    pdf = pl.DataFrame(
+        {
+            "entries": [
+                [{"key": "a", "value": 1}, {"key": "a", "value": 2}],
+            ]
+        }
+    )
+    df = DataFrame[Row](pdf, trusted_mode="shape_only")
+    out = df.with_columns(m=df.entries.map_from_entries()).collect(as_lists=True)
+    assert out["m"] == [{"a": 2}]
+
+
+def test_map_from_entries_duplicate_keys_three_entries_last_wins() -> None:
+    pl = pytest.importorskip("polars")
+
+    class Entry(Schema):
+        key: str
+        value: int
+
+    class Row(Schema):
+        entries: list[Entry]
+
+    pdf = pl.DataFrame(
+        {
+            "entries": [
+                [
+                    {"key": "a", "value": 1},
+                    {"key": "a", "value": 2},
+                    {"key": "a", "value": 3},
+                ],
+            ]
+        }
+    )
+    df = DataFrame[Row](pdf, trusted_mode="shape_only")
+    out = df.with_columns(m=df.entries.map_from_entries()).collect(as_lists=True)
+    assert out["m"] == [{"a": 3}]
+
+
+def test_map_from_entries_duplicate_keys_distinct_keys_independent() -> None:
+    pl = pytest.importorskip("polars")
+
+    class Entry(Schema):
+        key: str
+        value: int
+
+    class Row(Schema):
+        entries: list[Entry]
+
+    pdf = pl.DataFrame(
+        {
+            "entries": [
+                [
+                    {"key": "a", "value": 1},
+                    {"key": "a", "value": 9},
+                    {"key": "b", "value": 2},
+                    {"key": "b", "value": 8},
+                ],
+            ]
+        }
+    )
+    df = DataFrame[Row](pdf, trusted_mode="shape_only")
+    out = df.with_columns(m=df.entries.map_from_entries()).collect(as_lists=True)
+    assert out["m"] == [{"a": 9, "b": 8}]
+
+
 def test_map_from_entries_requires_entry_struct_shape() -> None:
     class BadEntries(Schema):
         entries: list[dict[str, int]]

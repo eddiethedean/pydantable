@@ -30,7 +30,11 @@ class WindowSpec:
         )
 
     def rangeBetween(self, start: int, end: int) -> WindowSpec:
-        """Attach an inclusive range frame with Spark-style bounds."""
+        """Attach an inclusive range frame.
+
+        Bounds apply to the **first** ``orderBy`` column; further keys sort only.
+        See ``docs/WINDOW_SQL_SEMANTICS.md``.
+        """
         return WindowSpec(
             partition_by=self.partition_by,
             order_by=self.order_by,

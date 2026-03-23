@@ -1379,9 +1379,10 @@ impl ExprNode {
         order_by: &[(String, bool)],
         op_name: &str,
     ) -> PyResult<()> {
-        if matches!(frame, Some(WindowFrame::Range { .. })) && order_by.len() != 1 {
-            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
-                "{op_name}() with rangeBetween requires exactly one order_by column."
+        if matches!(frame, Some(WindowFrame::Range { .. })) && order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "{op_name}() with rangeBetween requires at least one order_by column; \
+                 range bounds apply to the first order column (PostgreSQL-style)."
             )));
         }
         Ok(())

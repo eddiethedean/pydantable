@@ -1,9 +1,11 @@
-# PydanTable roadmap (0.11.0 → v1.0.0)
+# PydanTable roadmap (0.12.0 → 0.13.0 → 0.16.x → v1.0.0)
 
-**Current release: `0.11.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
+**Current release: `0.12.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
+
+Release history (high level): [`changelog.md`](changelog.md).
 
 For Polars-style API parity at the method level, see
-[`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md).
+[`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md). Window **RANGE** rules for multi-column `orderBy` are documented in [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md) (PostgreSQL-style first-key axis; not universal SQL parity).
 
 ---
 
@@ -18,6 +20,8 @@ The public API stays **SQLModel-like**:
 - `with_columns(...)` uses **replacement** semantics when names collide.
 
 Details: [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md).
+
+**FastAPI / ASGI:** today’s patterns live in [`FASTAPI.md`](FASTAPI.md) (`response_model`, row-list bodies, joins/aggregations). The **planned** sections below deepen **integration** (trusted ingest in routes, testing, OpenAPI, **async** handlers once **async I/O** ships in **0.16.0**).
 
 ---
 
@@ -68,9 +72,12 @@ Beyond the original Phase 7 checklist, **0.5.0** also ships:
 
 No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability and commitment** milestone when maintainers are comfortable locking semver semantics and publishing “1.0” messaging. Practical inputs:
 
-- Close or explicitly defer remaining gaps in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) (and related parity docs).
-- Keep CI green across supported Python versions and platforms.
-- Optional: release notes, migration guide if numbering ever jumps in a breaking way.
+- Close or explicitly defer remaining gaps in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) (and related parity docs: [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md), [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md)).
+- Keep CI green across supported Python versions and platforms; keep extension + optional **`[polars]`** matrices exercised in CI.
+- Decide whether **`validate_data`** should emit **`DeprecationWarning`** with a documented removal timeline (today it remains a compatibility alias for **`trusted_mode`**).
+- Optional: consolidated **migration guide** if semver ever jumps in a breaking way; keep [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) the semantics source of truth.
+- **Async I/O:** ship **full `async` read/write** coverage for stable materialization and interchange (see **Planned 0.16.0**) so ASGI stacks can avoid blocking the event loop without ad-hoc wrappers.
+- **FastAPI integration maturity:** treat [`FASTAPI.md`](FASTAPI.md) as the **canonical service guide**—expand it with **multipart / file** ingestion, **`Depends`** and **lifespan** patterns, **background tasks**, **error → HTTP status** mapping for validation vs engine errors, and **OpenAPI** notes for **row-list vs columnar** JSON bodies. Add **recipe tests** or **docs-only CI checks** so examples stay in sync with releases.
 
 ---
 
@@ -96,7 +103,7 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 - [x] **Global row count** without a column (`global_row_count`, PySpark `count()` with no arg).
 - [x] **`str` → `date` / `datetime`** `cast` (Polars); `strptime` remains the fixed-format path.
 - [x] **Map ops:** `map_get`, `map_contains_key` (string keys; physical list-of-struct).
-- [x] **Window min/max** over partitions; **`WindowFrame::Rows`** in Rust IR (serialization-ready; Polars lowering for frames still **TODO**).
+- [x] **Window min/max** over partitions; **`WindowFrame::Rows`** in Rust IR (serialization-ready). **Framed execution** (`rowsBetween` / `rangeBetween`) shipped in **0.9.0+**; see [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md).
 
 ---
 
@@ -112,27 +119,86 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 - [x] **Framed windows expanded:** `window_mean`, `window_min`, `window_max`, `lag`, `lead`, `rank`, and `dense_rank`.
 - [x] **Map utilities:** `map_keys()`, `map_values()`, and `map_entries()`.
-- [x] **Range frame guardrails:** `rangeBetween` aggregate windows enforce exactly one order key with typed errors for unsupported combinations.
+- [x] **Range frame guardrails:** `rangeBetween` aggregate windows require at least one `orderBy` key; multi-key ordering is allowed starting in **0.12.0** (see [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md)).
 - [x] **Parity and interop hardening:** expanded PySpark parity wrappers/tests and trusted constructor coverage.
 
 ---
 
 ## Shipped in 0.11.0 (range v2, map completion, trusted modes)
 
-- [x] **Window range semantics v2:** `rangeBetween` on numeric, `date`, `datetime`, and `duration` order keys (still single `orderBy` column for aggregates).
+- [x] **Window range semantics v2:** `rangeBetween` on numeric, `date`, `datetime`, and `duration` **first** `orderBy` keys (multi-column `orderBy` shipped in **0.12.0**).
 - [x] **Map ergonomics:** `map_from_entries()`, `Expr.element_at()` / `functions.element_at()` (map lookup alias).
 - [x] **Trusted ingest:** `trusted_mode` (`off` / `shape_only` / `strict`) on `DataFrame` / `DataFrameModel`, with `validate_data` as the compatibility bridge.
 - [x] **CI:** newer GitHub Actions (`actions/checkout@v5`, `actions/setup-python@v6`) to align with Node 24 runner defaults.
 
 ---
 
+## Shipped in 0.12.0 (multi-key range + contract cleanup)
+
+- [x] **Multi-key `rangeBetween`:** lexicographic `orderBy`; range offsets on the **first** sort column (PostgreSQL-style); see [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md).
+- [x] **Trusted `strict` nested dtypes:** stricter Polars dtype checks for list / struct / map columns in trusted ingest; columnar Python paths get nested shape checks for list / dict / struct cells.
+- [x] **Docs:** `INTERFACE_CONTRACT`, PySpark UI / parity scorecard, `map_from_entries` duplicate-key policy (`SUPPORTED_TYPES`), `validate_data` → `trusted_mode` migration notes (`DATAFRAMEMODEL`, `SUPPORTED_TYPES`).
+- [x] **Regression tests:** multi-key range (asc/desc/mixed order, partitions, `date`/`datetime` axis, `window_mean`/`window_min`); PySpark mirror tests; strict nested + map duplicate-key cases; `DataFrame` / `DataFrameModel` strict parity.
+
+---
+
+## Planned 0.13.0 (stabilization + follow-through)
+
+**Themes:** absorb **0.12.0** feedback, tighten docs and CI, and ship small fixes without the larger semantic work slated for **0.14.0+**. Items are **not** committed until shipped.
+
+- [ ] **Hardening:** regression fixes, error messages, and contract clarifications for multi-key **`rangeBetween`**, trusted **`strict`** nested ingest, and **`map_from_entries`** edge cases.
+- [ ] **Docs:** refresh guides and examples so **0.12.0** behavior ([`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md), [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md), trusted ingest) stays easy to discover; align **README** / doc site landing copy if needed.
+- [ ] **FastAPI guide refresh:** extend [`FASTAPI.md`](FASTAPI.md) with **`trusted_mode` / `validate_data`** in route handlers, **column-shaped** `dict[str, list]` request bodies (where appropriate), and links to trusted-ingest docs ([`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md), [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md)); state clearly that handlers are **sync** until **0.16.0** **async I/O** lands.
+- [ ] **CI and tooling:** routine **GitHub Actions** / runner compatibility bumps, dependency pins, and quality gates (no intentional API breakage).
+- [ ] **Tests:** close any remaining parity or façade gaps that are **test-only** or **one-line** API wrappers (no new `ExprNode` families unless trivial).
+- [ ] **I/O documentation:** explicitly label **sync-only** materialization and interchange entry points today, and point forward to **0.16.0** **async I/O** work ([`EXECUTION.md`](EXECUTION.md), [`PERFORMANCE.md`](PERFORMANCE.md)).
+
+**Patch releases (0.13.1, …)** may follow for fixes without redefining this minor’s scope.
+
+---
+
+## Planned 0.14.0 (windows + trusted ingest)
+
+**Themes:** execution semantics polish and safer bulk ingest. Items are **not** committed until shipped; reorder or split across releases as needed.
+
+- [ ] **Window polish:** optional **`NULLS FIRST` / `LAST`** (or explicit documented mapping to Polars null ordering); clarify peer-group / `CURRENT ROW` behavior vs other engines if frame surface grows beyond numeric `rangeBetween`.
+- [ ] **Trusted ingest:** extend **`strict`** to more **PyArrow** buffer paths and tighter **enum** / **decimal** Polars dtype matches; optional **warnings** when `shape_only` would hide dtype drift.
+- [ ] **Performance:** add or extend benchmarks for **framed windows** and **large trusted Polars** ingest (see [`PERFORMANCE.md`](PERFORMANCE.md)).
+- [ ] **FastAPI + trusted bulk paths:** document safe patterns for **large** or **pre-validated** tables behind APIs (e.g. **`trusted_mode="strict"`** with Polars/Arrow inputs, boundaries for **who may skip** full `RowModel` validation), and cross-link **trusted ingest** bullets above.
+
+---
+
+## Planned 0.15.0 (parity + API breadth)
+
+**Themes:** close documented gaps in alternate APIs and strengthen regression depth.
+
+- [ ] **Polars parity:** burn down high-value items in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) and reflect outcomes in [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md).
+- [ ] **PySpark façade:** additional **`functions`** / **`Column`** helpers that map cleanly onto existing `ExprNode` (see [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md)).
+- [ ] **Property-based tests:** selective **Hypothesis** (or similar) coverage for expression typing and small plan round-trips where behavior is deterministic.
+- [ ] **`validate_data` policy:** decide on **`DeprecationWarning`** and a documented removal timeline in favor of **`trusted_mode`**.
+- [ ] **FastAPI testing & DX:** add **copy-paste recipes** (and optional small **test helpers** if worthwhile) for **`TestClient`** / **`httpx`** against `DataFrameModel` routes; document stable **`openapi.json`** patterns for **`RowModel`** and nested columns; optional **`Depends()`** patterns for injecting schema-typed dataframe builders or shared **`APIRouter`** factories.
+
+---
+
+## Planned 0.16.0 (schema / I/O depth)
+
+**Themes:** richer dtypes, **async I/O**, and semantic parity without committing to post-1.0 engines.
+
+- [ ] **Maps and keys:** spike **Arrow-native map** dtype and/or **heterogeneous map keys** (beyond `dict[str, T]` v1); document I/O and expression limits.
+- [ ] **Async I/O (reads and writes, full coverage):** first-class **`async`** APIs for **every stable I/O path** the library documents for user-facing **reads** and **writes**—including **materialization** (`collect`, `to_dict` / `collect(as_lists=True)`, row models) and **interchange** (e.g. **`to_polars()`** when the **`[polars]`** extra is installed, plus any **Arrow / Parquet / IPC / file** helpers added in earlier releases). Document how **blocking Rust + Polars** work is isolated (**`asyncio.to_thread`**, dedicated executors, or native async only where upstream supports it). Update [`FASTAPI.md`](FASTAPI.md) and [`EXECUTION.md`](EXECUTION.md) with **non-blocking** patterns and limits (GIL, copy costs, cancellation).
+- [ ] **FastAPI `async` routes:** first-class **`async def`** handler examples using the new **async materialization** APIs; cover **`StreamingResponse`** / **chunked** JSON (row or column) **if** stable APIs exist; **lifespan** hooks for warm-up or shared resources used by dataframe pipelines.
+- [ ] **Spark façade depth:** broader **semantic parity** where the Polars-backed core can match Spark names and behavior; stay clear this is **not** a distributed Spark engine (see **After v1.0.0**).
+- [ ] **Docs and migration:** optional consolidated **0.13–0.16 migration** notes if any release introduces user-visible contract changes (including **FastAPI** handler **sync → async** migration if APIs change).
+
+---
+
 ## Later (not started)
 
-Directions beyond **0.11.0** (non-exhaustive):
+Directions beyond **0.16.x** and still before (or orthogonal to) calling **v1.0.0**:
 
-- [ ] **Arrow-native map dtype** or heterogeneous map keys (beyond `dict[str, T]` v1) — optional I/O spike.
-- [ ] Full SQL-grade `rangeBetween` semantics over **multi-key** orderings (single-axis range today).
-- [ ] Broader Spark semantic parity and additional façade helpers as needed.
+- [ ] Items deferred from **0.13.0–0.16.0** above when scope slips or priorities change.
+- [ ] Longer-horizon experimental work that does not fit a minor release train.
+- [ ] **FastAPI ecosystem (optional):** thin **`pydantable[fastapi]`** extra with **pinned** compatible **`fastapi` / `starlette`** ranges, reusable **middleware**, or **router** kits—**only** if demand and maintenance bandwidth are clear.
 
 ---
 

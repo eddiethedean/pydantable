@@ -100,6 +100,18 @@ building the logical plan (and before storing the current schema).
 Row validation uses the generated `RowModel` so errors point to concrete row
 fields.
 
+### Trusted ingest: `validate_data` vs `trusted_mode`
+
+For **`DataFrameModel`** and **`DataFrame[Schema]`**, prefer explicit **`trusted_mode`** over the legacy **`validate_data`** flag:
+
+| Goal | Use |
+|------|-----|
+| Full per-cell Pydantic validation (default) | `trusted_mode="off"` (or omit; same as `validate_data=True`) |
+| Skip element validation; keep shape / column names | `trusted_mode="shape_only"` (replaces `validate_data=False`) |
+| Trusted bulk input plus light dtype checks (including nested list/struct/map shapes for Polars columns) | `trusted_mode="strict"` |
+
+`validate_data=True/False` remains supported as a **compatibility alias** mapped onto those modes. There is **no deprecation warning** yet; migrate at your own pace. See {doc}`SUPPORTED_TYPES` (“Runtime column payloads”) and `pydantable.schema.validate_columns_strict`.
+
 ### Handling bad input rows (`ignore_errors`)
 
 By default, construction is strict: the first invalid row raises a validation

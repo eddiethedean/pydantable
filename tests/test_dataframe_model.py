@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from pydantable import DataFrameModel, Schema
+from pydantable import DataFrame, DataFrameModel, Schema
 from pydantable.schema import is_supported_scalar_column_annotation
 from pydantic import ValidationError
 
@@ -602,3 +602,121 @@ def test_dataframe_model_numpy_trusted_strict_rejects_float_for_int_column() -> 
             },
             trusted_mode="strict",
         )
+
+
+def test_dataframe_model_trusted_strict_nested_list_shape() -> None:
+    class S(Schema):
+        xs: list[int]
+
+    DataFrame[S]({"xs": [[1, 2], [3]]}, trusted_mode="strict")
+    with pytest.raises(ValueError, match="strict trusted mode"):
+        DataFrame[S]({"xs": [[1.0, 2.0]]}, trusted_mode="strict")
+
+
+def test_dataframe_model_trusted_strict_nested_struct_polars() -> None:
+    pl = pytest.importorskip("polars")
+
+    class Inner(Schema):
+        a: int
+
+    class Outer(Schema):
+        s: Inner
+
+    pdf = pl.DataFrame({"s": [{"a": 1}, {"a": 2}]})
+    DataFrame[Outer](pdf, trusted_mode="strict")
+    bad = pl.DataFrame({"s": [{"a": "x"}, {"a": "y"}]})
+    with pytest.raises(ValueError, match="strict trusted mode"):
+        DataFrame[Outer](bad, trusted_mode="strict")
+
+
+def test_dataframe_model_trusted_strict_map_entries_polars() -> None:
+    pl = pytest.importorskip("polars")
+
+    class M(Schema):
+        m: dict[str, int]
+
+    pdf = pl.DataFrame(
+        {
+            "m": [
+                [{"key": "a", "value": 1}, {"key": "b", "value": 2}],
+                [{"key": "c", "value": 3}],
+            ]
+        }
+    )
+    DataFrame[M](pdf, trusted_mode="strict")
+    bad = pl.DataFrame(
+        {
+            "m": [
+                [{"key": "a", "value": 1.5}],
+            ]
+        }
+    )
+    with pytest.raises(ValueError, match="strict trusted mode"):
+        DataFrame[M](bad, trusted_mode="strict")
+
+
+def test_dataframe_model_trusted_strict_nested_dict_python_path() -> None:
+    class M(Schema):
+        m: dict[str, int]
+
+    DataFrame[M]({"m": [{"a": 1}, {"b": 2}]}, trusted_mode="strict")
+    with pytest.raises(ValueError, match="strict trusted mode"):
+        DataFrame[M]({"m": [{"a": 1.0}]}, trusted_mode="strict")
+
+
+def test_dataframe_model_trusted_strict_nested_list_of_lists() -> None:
+    class S(Schema):
+        xss: list[list[int]]
+
+    DataFrame[S]({"xss": [[[1, 2], [3]], [[4]]]}, trusted_mode="strict")
+    with pytest.raises(ValueError, match="strict trusted mode"):
+        DataFrame[S]({"xss": [[[1.0]]]}, trusted_mode="strict")
+
+
+def test_dataframe_model_trusted_strict_optional_nested_list_cell() -> None:
+    class S(Schema):
+        xs: list[int] | None
+
+    DataFrame[S]({"xs": [[1, 2], None]}, trusted_mode="strict")
+
+
+def test_dataframe_model_trusted_strict_polars_struct_extra_field_rejected() -> None:
+    pl = pytest.importorskip("polars")
+
+    class Inner(Schema):
+        a: int
+
+    class Outer(Schema):
+        s: Inner
+
+    bad = pl.DataFrame({"s": [{"a": 1, "b": 2}]})
+    with pytest.raises(ValueError, match="strict trusted mode"):
+        DataFrame[Outer](bad, trusted_mode="strict")
+
+
+def test_dataframe_model_trusted_strict_polars_struct_missing_field_rejected() -> None:
+    pl = pytest.importorskip("polars")
+
+    class Inner(Schema):
+        a: int
+        b: int
+
+    class Outer(Schema):
+        s: Inner
+
+    bad = pl.DataFrame({"s": [{"a": 1}]})
+    with pytest.raises(ValueError, match="strict trusted mode"):
+        DataFrame[Outer](bad, trusted_mode="strict")
+
+
+def test_dataframe_model_shape_only_allows_polars_dtype_mismatch_nested() -> None:
+    pl = pytest.importorskip("polars")
+
+    class Inner(Schema):
+        a: int
+
+    class Outer(Schema):
+        s: Inner
+
+    pdf = pl.DataFrame({"s": [{"a": "x"}, {"a": "y"}]})
+    DataFrame[Outer](pdf, trusted_mode="shape_only")

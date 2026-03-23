@@ -59,6 +59,20 @@ def test_dataframe_and_model_strict_error_parity() -> None:
         PM(bad, trusted_mode="strict")
 
 
+def test_dataframe_and_model_strict_nested_dict_error_parity() -> None:
+    class M(Schema):
+        m: dict[str, int]
+
+    class MM(DataFrameModel):
+        m: dict[str, int]
+
+    bad = {"m": [{"a": 1.0}]}
+    with pytest.raises(ValueError, match="strict trusted mode"):
+        DataFrame[M](bad, trusted_mode="strict")
+    with pytest.raises(ValueError, match="strict trusted mode"):
+        MM(bad, trusted_mode="strict")
+
+
 class MapSchema(Schema):
     m: dict[str, int]
 

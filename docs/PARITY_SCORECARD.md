@@ -18,7 +18,7 @@ Status definitions:
 | GroupBy | `count/sum/mean/min/max/median/std/var/first/last/n_unique` | Implemented | SQL-like all-null-group behavior documented/tested. |
 | Reshape | `melt/unpivot`, `pivot` | Implemented | Deterministic output naming and validation rules. |
 | Reshape | `explode`, `unnest` | Implemented | Polars-backed; multi-column explode, empty lists, struct `unnest` naming, and mismatch errors are contract-tested. Typed-schema rules (homogeneous lists, nested models as structs) are the intentional boundary vs raw Polars. |
-| Window/time | `row_number`/`rank`/`dense_rank`/`window_sum`/`window_mean`/`window_min`/`window_max`/`lag`/`lead` + `WindowSpec`, `rolling_agg`, `group_by_dynamic(...).agg(...)` | Implemented | `row_number` requires `order_by`; `lag`/`lead` require `order_by`; `Expr.over(...)` with args removed (use window fns). |
+| Window/time | `row_number`/`rank`/`dense_rank`/`window_sum`/`window_mean`/`window_min`/`window_max`/`lag`/`lead` + `WindowSpec`, `rolling_agg`, `group_by_dynamic(...).agg(...)` | Implemented | `row_number` requires `order_by`; `lag`/`lead` require `order_by`; generic `Expr.over(partition_by=..., order_by=...)` raises `TypeError` (use named window fns + `WindowSpec`). `rowsBetween` / `rangeBetween` framed windows use the Rust executor path; `rangeBetween` uses the first `orderBy` column as the range axis ([`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md)). |
 | Temporal typing | `datetime`, `date`, `duration`, `time` (+ nullable) | Implemented | End-to-end descriptor roundtrip and execution materialization paths. |
 | Globals in `select` | `sum`/`mean`/`count`/`min`/`max` over a column, **`global_row_count`** / `count(*)` | Implemented | Single-row `DataFrame.select`; see `INTERFACE_CONTRACT`. |
 | Expr helpers | `strptime`, `unix_timestamp`, `cast(str→date/datetime)`, `map_len`/`map_get`/`map_contains_key`, `binary_len`, `dt_nanosecond` | Implemented | Rust `ExprNode` + Polars lowering; contract tests. |
@@ -28,5 +28,5 @@ Status definitions:
 ## Remaining parity gaps
 
 - Arbitrary Polars **nested/list dtypes** without a matching Pydantic `list[T]` / struct annotation are out of scope; the engine stays schema-first.
-- SQL-style **window frames** (`rowsBetween` / `rangeBetween`): **IR** field exists (`WindowFrame::Rows`); **Polars lowering** is not implemented yet (execution raises if set).
+- Window frame semantics match the documented **PostgreSQL-style** `RANGE` rules for multi-key `orderBy`, not every SQL dialect; see [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md).
 - Additional advanced analytical APIs outside the current roadmap scope.

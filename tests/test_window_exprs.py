@@ -414,8 +414,158 @@ def test_range_between_rejects_dense_rank_and_lead() -> None:
         df.with_columns(l=lead(df.v, 1).over(w))
 
 
-def test_range_between_requires_single_order_by_key() -> None:
-    df = DataFrame[W5]({"g": [1, 1], "o1": [1, 2], "o2": [1, 1], "v": [10, 20]})
+def test_range_between_multi_order_columns_uses_first_key_for_range() -> None:
+    """RANGE bounds use the first order column; extra keys only break ties."""
+    df = DataFrame[W5](
+        {
+            "g": [1, 1, 1, 1],
+            "o1": [1, 1, 2, 2],
+            "o2": [1, 2, 0, 1],
+            "v": [10, 20, 30, 40],
+        }
+    )
+    w = Window.partitionBy("g").orderBy("o1", "o2").rangeBetween(0, 0)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [30, 30, 70, 70]
+
+
+def test_range_between_multi_order_wide_frame_on_first_key() -> None:
+    df = DataFrame[W5](
+        {
+            "g": [1, 1, 1, 1],
+            "o1": [1, 1, 2, 2],
+            "o2": [2, 1, 1, 2],
+            "v": [100, 200, 300, 400],
+        }
+    )
     w = Window.partitionBy("g").orderBy("o1", "o2").rangeBetween(-1, 0)
-    with pytest.raises(TypeError, match="requires exactly one order_by column"):
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [300, 300, 1000, 1000]
+
+
+def test_range_between_requires_order_by_when_range_frame() -> None:
+    df = DataFrame[W]({"g": [1, 1], "v": [10, 20]})
+    w = Window.partitionBy("g").rangeBetween(-1, 0)
+    with pytest.raises(ValueError, match="at least one order_by"):
         df.with_columns(s=window_sum(df.v).over(w))
+
+
+def test_range_between_multi_order_desc_first_key_range_on_that_axis() -> None:
+    """Descending first order column: range deltas still use first key values."""
+    df = DataFrame[W5](
+        {
+            "g": [1, 1, 1, 1],
+            "o1": [3, 3, 2, 2],
+            "o2": [1, 2, 0, 1],
+            "v": [10, 20, 30, 40],
+        }
+    )
+    w = (
+        Window.partitionBy("g")
+        .orderBy("o1", "o2", ascending=[False, True])
+        .rangeBetween(0, 0)
+    )
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [30, 30, 70, 70]
+
+
+def test_range_between_multi_order_mixed_asc_desc_second_key() -> None:
+    df = DataFrame[W5](
+        {
+            "g": [1, 1, 1, 1],
+            "o1": [1, 1, 2, 2],
+            "o2": [2, 1, 5, 0],
+            "v": [100, 200, 300, 400],
+        }
+    )
+    w = (
+        Window.partitionBy("g")
+        .orderBy("o1", "o2", ascending=[True, False])
+        .rangeBetween(0, 0)
+    )
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [300, 300, 700, 700]
+
+
+def test_range_between_multi_order_across_partitions_independent() -> None:
+    df = DataFrame[W5](
+        {
+            "g": [1, 1, 2, 2],
+            "o1": [1, 1, 10, 10],
+            "o2": [1, 2, 1, 2],
+            "v": [1, 2, 100, 200],
+        }
+    )
+    w = Window.partitionBy("g").orderBy("o1", "o2").rangeBetween(0, 0)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [3, 3, 300, 300]
+
+
+def test_range_between_multi_order_window_mean_and_min() -> None:
+    df = DataFrame[W5](
+        {
+            "g": [1, 1, 1],
+            "o1": [1, 1, 2],
+            "o2": [1, 2, 0],
+            "v": [10, 30, 100],
+        }
+    )
+    w = Window.partitionBy("g").orderBy("o1", "o2").rangeBetween(0, 0)
+    out = df.with_columns(
+        m=window_mean(df.v).over(w),
+        lo=window_min(df.v).over(w),
+    ).collect(as_lists=True)
+    assert out["m"] == [20.0, 20.0, 100.0]
+    assert out["lo"] == [10, 10, 100]
+
+
+class WDate(Schema):
+    g: int
+    d: date
+    tb: int
+    v: int
+
+
+def test_range_between_multi_order_date_first_key() -> None:
+    df = DataFrame[WDate](
+        {
+            "g": [1, 1, 1, 1],
+            "d": [
+                date(2024, 1, 1),
+                date(2024, 1, 1),
+                date(2024, 1, 3),
+                date(2024, 1, 3),
+            ],
+            "tb": [1, 2, 0, 1],
+            "v": [10, 20, 30, 40],
+        }
+    )
+    w = Window.partitionBy("g").orderBy("d", "tb").rangeBetween(0, 0)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [30, 30, 70, 70]
+
+
+class WDt(Schema):
+    g: int
+    ts: datetime
+    tb: int
+    v: int
+
+
+def test_range_between_multi_order_datetime_first_key() -> None:
+    df = DataFrame[WDt](
+        {
+            "g": [1, 1, 1, 1],
+            "ts": [
+                datetime(2024, 1, 1, 12, 0, 0),
+                datetime(2024, 1, 1, 12, 0, 0),
+                datetime(2024, 1, 1, 14, 0, 0),
+                datetime(2024, 1, 1, 14, 0, 0),
+            ],
+            "tb": [1, 2, 0, 1],
+            "v": [1, 2, 4, 8],
+        }
+    )
+    w = Window.partitionBy("g").orderBy("ts", "tb").rangeBetween(0, 0)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [3, 3, 12, 12]

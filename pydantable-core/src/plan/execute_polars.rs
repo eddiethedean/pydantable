@@ -1012,6 +1012,8 @@ impl PolarsPlanRunner {
                 .map_err(polars_err)?
                 .as_materialized_series()
                 .clone();
+            // RANGE frame: sort uses all order_by keys (lexicographic); start/end offsets
+            // compare only the first order column (same rule as PostgreSQL multi-column RANGE).
             let ord_series = df
                 .column(order_by[0].0.as_str())
                 .map_err(polars_err)?

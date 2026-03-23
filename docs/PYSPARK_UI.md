@@ -89,7 +89,7 @@ Full coverage vs Spark is summarized in **[PySpark parity matrix](PYSPARK_PARITY
 ## What is intentionally out of scope
 
 - **`SparkSession`**, **`spark.sql("...")`**, streaming, catalogs.
-- **SQL window frames** (`rowsBetween` / `rangeBetween`): partition + order via **`Window`** / **`WindowSpec`** are supported (see `pydantable.pyspark.sql.window`); frame lowering is not implemented yet (`INTERFACE_CONTRACT.md`).
+- **SQL window frames** (`rowsBetween` / `rangeBetween`): partition + order via **`Window`** / **`WindowSpec`** are supported (see `pydantable.pyspark.sql.window`); frames execute on the Polars-backed core per [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) (including `rangeBetween` multi-key rules in [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md)).
 - Untyped **`F.col("x")`** without **`dtype=`** (pydantable requires static types at build time).
 - Interop with a real **`pyspark.sql.DataFrame`** unless a dedicated integration is added later.
 

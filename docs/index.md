@@ -45,6 +45,7 @@ EXECUTION
 :caption: Semantics and contracts
 
 INTERFACE_CONTRACT
+WINDOW_SQL_SEMANTICS
 WHY_NOT_POLARS
 ```
 

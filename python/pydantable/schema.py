@@ -273,8 +273,182 @@ def _trusted_column_has_nulls(col: Any) -> bool:
     return False
 
 
+def _polars_integer_dtype_classes(pl: Any) -> frozenset[type]:
+    names = (
+        "Int8",
+        "Int16",
+        "Int32",
+        "Int64",
+        "Int128",
+        "UInt8",
+        "UInt16",
+        "UInt32",
+        "UInt64",
+        "UInt128",
+    )
+    return frozenset(c for n in names if (c := getattr(pl, n, None)) is not None)
+
+
+def _polars_float_dtype_classes(pl: Any) -> frozenset[type]:
+    names = ("Float32", "Float64")
+    return frozenset(c for n in names if (c := getattr(pl, n, None)) is not None)
+
+
+def _polars_scalar_dtype_matches(inner: Any, dt: Any, pl: Any) -> bool:
+    if inner is int:
+        return dt.__class__ in _polars_integer_dtype_classes(pl)
+    if inner is float:
+        return dt.__class__ in _polars_float_dtype_classes(pl)
+    if inner is bool:
+        return dt == pl.Boolean
+    if inner is str:
+        return dt == pl.Utf8 or dt == pl.String
+    if inner is bytes:
+        return dt == pl.Binary
+    if inner is datetime:
+        return isinstance(dt, pl.Datetime)
+    if inner is date:
+        return dt == pl.Date
+    if inner is time:
+        return dt == pl.Time
+    if inner is timedelta:
+        return isinstance(dt, pl.Duration)
+    if inner is uuid.UUID:
+        return dt == pl.Object
+    if inner is Decimal:
+        return isinstance(dt, pl.Decimal)
+    if (
+        isinstance(inner, type)
+        and issubclass(inner, enum.Enum)
+        and inner is not enum.Enum
+    ):
+        return dt.__class__ in _polars_integer_dtype_classes(pl)
+    return True
+
+
+def _polars_dtype_matches_annotation(dt: Any, annotation: Any) -> bool:
+    """Check Polars dtype against a pydantable column annotation (strict trusted)."""
+    try:
+        import polars as pl
+    except ImportError:
+        return True
+
+    inner, _nullable = _annotation_nullable_inner(annotation)
+    origin = get_origin(inner)
+
+    if origin is list:
+        la = get_args(inner)
+        if len(la) != 1:
+            return False
+        if not isinstance(dt, pl.List):
+            return False
+        return _polars_dtype_matches_annotation(dt.inner, la[0])
+
+    if origin is dict:
+        la = get_args(inner)
+        if len(la) != 2 or la[0] is not str:
+            return False
+        val_ann = la[1]
+        if isinstance(dt, pl.List):
+            idt = dt.inner
+            if isinstance(idt, pl.Struct):
+                by_field = {f.name: f.dtype for f in idt.fields}
+                if set(by_field.keys()) != {"key", "value"}:
+                    return False
+                if not _polars_dtype_matches_annotation(by_field["key"], str):
+                    return False
+                return _polars_dtype_matches_annotation(by_field["value"], val_ann)
+        return False
+
+    if isinstance(inner, type) and issubclass(inner, BaseModel):
+        if not isinstance(dt, pl.Struct):
+            return False
+        by_name = {f.name: f.dtype for f in dt.fields}
+        try:
+            get_type_hints(inner, include_extras=True)
+        except Exception:
+            return False
+        if set(by_name.keys()) != set(inner.model_fields.keys()):
+            return False
+        for fname, finfo in inner.model_fields.items():
+            ann_f = finfo.annotation
+            if ann_f is None:
+                return False
+            if not _polars_dtype_matches_annotation(by_name[fname], ann_f):
+                return False
+        return True
+
+    if get_origin(inner) is not None:
+        return False
+    if inner is Any:
+        return True
+    return _polars_scalar_dtype_matches(inner, dt, pl)
+
+
+def _trusted_nested_value_strict(annotation: Any, value: Any) -> bool:
+    inner, nullable = _annotation_nullable_inner(annotation)
+    if value is None:
+        return nullable
+    origin = get_origin(inner)
+    if origin is list:
+        la = get_args(inner)
+        if len(la) != 1:
+            return False
+        if not isinstance(value, (list, tuple)):
+            return False
+        el_a = la[0]
+        for item in value:
+            if item is not None and not _trusted_nested_value_strict(el_a, item):
+                return False
+        return True
+    if origin is dict:
+        la = get_args(inner)
+        if len(la) != 2 or la[0] is not str:
+            return False
+        if not isinstance(value, Mapping):
+            return False
+        val_a = la[1]
+        for kk, vv in value.items():
+            if not isinstance(kk, str):
+                return False
+            if vv is not None and not _trusted_nested_value_strict(val_a, vv):
+                return False
+        return True
+    if isinstance(inner, type) and issubclass(inner, BaseModel):
+        if not isinstance(value, Mapping):
+            return False
+        try:
+            hints = get_type_hints(inner, include_extras=True)
+        except Exception:
+            return False
+        keys = set(value.keys())
+        if keys != set(inner.model_fields.keys()):
+            return False
+        for fname in inner.model_fields:
+            fa = hints.get(fname)
+            if fa is None:
+                return False
+            if not _trusted_nested_value_strict(fa, value[fname]):
+                return False
+        return True
+    return _trusted_scalar_compatible(annotation, value)
+
+
 def _trusted_column_strict_compatible(annotation: Any, col: Any) -> bool:
+    inner, _nullable = _annotation_nullable_inner(annotation)
+    origin = get_origin(inner)
+
     if isinstance(col, (list, tuple)):
+        if origin is list or origin is dict:
+            for v in col:
+                if v is not None and not _trusted_nested_value_strict(annotation, v):
+                    return False
+            return True
+        if isinstance(inner, type) and issubclass(inner, BaseModel):
+            for v in col:
+                if v is not None and not _trusted_nested_value_strict(annotation, v):
+                    return False
+            return True
         for v in col:
             if v is not None:
                 return _trusted_scalar_compatible(annotation, v)
@@ -324,7 +498,8 @@ def validate_columns_strict(
     ``trusted_mode`` controls validation depth:
     - ``off``: full per-element validation.
     - ``shape_only``: schema/shape/nullability checks only.
-    - ``strict``: shape checks plus lightweight dtype-compatibility checks.
+    - ``strict``: shape checks plus dtype-compatibility checks (scalars; for Polars,
+      nested ``list`` / ``dict[str, T]`` / struct columns vs annotations).
 
     ``validate_elements`` remains as a compatibility alias:
     ``True`` maps to ``trusted_mode='off'`` and ``False`` maps to
@@ -367,8 +542,8 @@ def validate_columns_strict(
                     "but contains null values."
                 )
             if mode == "strict":
-                sample = polars_df.get_column(name).head(1).to_list()
-                if sample and not _trusted_scalar_compatible(annotation, sample[0]):
+                series = polars_df.get_column(name)
+                if not _polars_dtype_matches_annotation(series.dtype, annotation):
                     raise ValueError(
                         f"Column '{name}' is incompatible with schema annotation "
                         f"{annotation!r} in strict trusted mode."

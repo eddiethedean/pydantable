@@ -525,6 +525,82 @@ def test_pyspark_window_range_between_mean_contract() -> None:
     assert out["m"] == [10.0, 10.5, 14.0]
 
 
+def test_pyspark_window_range_between_multi_order_by() -> None:
+    from pydantable.pyspark.sql import Window
+
+    class S(Schema):
+        g: int
+        o1: int
+        o2: int
+        v: int
+
+    df = DataFrame[S](
+        {
+            "g": [1, 1, 1, 1],
+            "o1": [1, 1, 2, 2],
+            "o2": [1, 2, 0, 1],
+            "v": [10, 20, 30, 40],
+        }
+    )
+    w = Window.partitionBy("g").orderBy("o1", "o2").rangeBetween(0, 0)
+    out = df.withColumn("s", F.window_sum(F.col("v", dtype=int)).over(w)).collect(
+        as_lists=True
+    )
+    assert out["s"] == [30, 30, 70, 70]
+
+
+def test_pyspark_window_range_between_multi_order_by_mean() -> None:
+    from pydantable.pyspark.sql import Window
+
+    class S(Schema):
+        g: int
+        o1: int
+        o2: int
+        v: int
+
+    df = DataFrame[S](
+        {
+            "g": [1, 1, 1],
+            "o1": [1, 1, 2],
+            "o2": [1, 2, 0],
+            "v": [10, 30, 100],
+        }
+    )
+    w = Window.partitionBy("g").orderBy("o1", "o2").rangeBetween(0, 0)
+    out = df.withColumn("m", F.window_avg(F.col("v", dtype=int)).over(w)).collect(
+        as_lists=True
+    )
+    assert out["m"] == [20.0, 20.0, 100.0]
+
+
+def test_pyspark_window_range_between_multi_order_desc_first_key() -> None:
+    from pydantable.pyspark.sql import Window
+
+    class S(Schema):
+        g: int
+        o1: int
+        o2: int
+        v: int
+
+    df = DataFrame[S](
+        {
+            "g": [1, 1, 1, 1],
+            "o1": [3, 3, 2, 2],
+            "o2": [1, 2, 0, 1],
+            "v": [10, 20, 30, 40],
+        }
+    )
+    w = (
+        Window.partitionBy("g")
+        .orderBy("o1", "o2", ascending=[False, True])
+        .rangeBetween(0, 0)
+    )
+    out = df.withColumn("s", F.window_sum(F.col("v", dtype=int)).over(w)).collect(
+        as_lists=True
+    )
+    assert out["s"] == [30, 30, 70, 70]
+
+
 def test_pyspark_window_range_between_rejects_lag() -> None:
     from pydantable.pyspark.sql import Window
 
