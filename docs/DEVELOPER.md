@@ -237,3 +237,5 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 ### Publishing (PyPI)
 
 Pushing a git tag matching `v*` (for example `v0.13.1`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then `maturin publish` for multiple platforms. The repository needs a **`PYPI_API_TOKEN`** secret (see workflow env `MATURIN_PYPI_TOKEN`). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit.
+
+**0.13.x line:** `docs/changelog.md` records **0.13.0** (stabilization baseline) and **0.13.1** (follow-up scope) as separate entries. The version in `pyproject.toml` on `main` is the one PyPI receives — tag **`v` + that version** (for example **`v0.13.1`**) on the commit you intend to ship. To publish an older line member only, tag the corresponding historical commit instead of `main`.
