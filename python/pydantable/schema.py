@@ -7,8 +7,10 @@ Functions such as :func:`is_supported_column_annotation` define allowed field ty
 from __future__ import annotations
 
 import enum
+import os
 import types
 import uuid
+import warnings
 from collections.abc import Callable, Mapping
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -26,6 +28,57 @@ from typing import (
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError, create_model
 
 _NoneType = type(None)
+
+# Sentinel for ``DataFrame(..., validate_data=...)`` / ``DataFrameModel``: warn when
+# the caller passes ``validate_data`` explicitly while ``trusted_mode`` is unset.
+_VALIDATE_DATA_KW_UNSET = object()
+
+
+def _warn_validate_data_kw_deprecated(
+    *,
+    validate_data: Any,
+    trusted_mode: Literal["off", "shape_only", "strict"] | None,
+    stacklevel: int,
+) -> None:
+    if trusted_mode is not None or validate_data is _VALIDATE_DATA_KW_UNSET:
+        return
+    warnings.warn(
+        "validate_data is deprecated and will be removed after pydantable 0.16.0; "
+        "use trusted_mode instead (trusted_mode='off' for full per-element validation, "
+        "trusted_mode='shape_only' for trusted bulk ingest, trusted_mode='strict' for "
+        "dtype-checked trusted ingest).",
+        DeprecationWarning,
+        stacklevel=stacklevel,
+    )
+
+
+def _coerce_validate_data_kw(validate_data: Any) -> bool:
+    if validate_data is _VALIDATE_DATA_KW_UNSET:
+        return True
+    return bool(validate_data)
+
+
+class DtypeDriftWarning(UserWarning):
+    """Emitted for ``trusted_mode='shape_only'`` when ``strict`` would reject values."""
+
+
+def _shape_only_drift_warnings_enabled() -> bool:
+    v = os.environ.get("PYDANTABLE_SUPPRESS_SHAPE_ONLY_DRIFT_WARNINGS", "")
+    return v.lower() not in ("1", "true", "yes")
+
+
+def _warn_shape_only_would_fail_strict(name: str, annotation: Any) -> None:
+    if not _shape_only_drift_warnings_enabled():
+        return
+    warnings.warn(
+        f"Column {name!r}: accepted under trusted_mode='shape_only' but would be "
+        f"rejected under trusted_mode='strict' for schema annotation {annotation!r}. "
+        f"Use strict mode or fix dtypes upstream.",
+        DtypeDriftWarning,
+        stacklevel=3,
+    )
+
+
 _SUPPORTED_NON_NULL_SCALAR_TYPES = frozenset(
     {int, float, bool, str, bytes, uuid.UUID, Decimal, datetime, date, time, timedelta}
 )
@@ -587,9 +640,12 @@ def validate_columns_strict(
     - ``strict``: shape checks plus dtype-compatibility checks (scalars; for Polars,
       nested ``list`` / ``dict[str, T]`` / struct columns vs annotations).
 
-    ``validate_elements`` remains as a compatibility alias:
-    ``True`` maps to ``trusted_mode='off'`` and ``False`` maps to
-    ``trusted_mode='shape_only'``.
+    ``validate_elements`` remains as a compatibility alias (deprecated for direct
+    callers; prefer ``trusted_mode``): ``True`` maps to ``trusted_mode='off'`` and
+    ``False`` maps to ``trusted_mode='shape_only'``. Passing ``validate_data=`` on
+    :class:`~pydantable.dataframe.DataFrame` or
+    :class:`~pydantable.dataframe_model.DataFrameModel` emits :exc:`DeprecationWarning`
+    when ``trusted_mode`` is not set.
 
     With ``validate_elements=False``, a Polars ``DataFrame`` may be passed
     directly so the Rust engine can ingest it via Arrow IPC without per-cell
@@ -634,6 +690,10 @@ def validate_columns_strict(
                         f"Column '{name}' is incompatible with schema annotation "
                         f"{annotation!r} in strict trusted mode."
                     )
+            elif mode == "shape_only":
+                series = polars_df.get_column(name)
+                if not _polars_dtype_matches_annotation(series.dtype, annotation):
+                    _warn_shape_only_would_fail_strict(name, annotation)
         return data
 
     field_types = schema_field_types(schema_type)
@@ -721,6 +781,10 @@ def validate_columns_strict(
                     f"Column '{name}' is incompatible with schema annotation "
                     f"{annotation!r} in strict trusted mode."
                 )
+            if mode == "shape_only" and not _trusted_column_strict_compatible(
+                annotation, col
+            ):
+                _warn_shape_only_would_fail_strict(name, annotation)
 
     return normalized
 

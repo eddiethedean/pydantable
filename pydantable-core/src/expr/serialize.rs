@@ -418,8 +418,15 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             }
             dict.set_item("partition_by", partition_by.clone().into_py(py))?;
             let ord_list = PyList::empty_bound(py);
-            for (name, asc) in order_by {
-                let t = PyList::new_bound(py, [name.into_py(py), (*asc).into_py(py)]);
+            for (name, asc, nulls_last) in order_by {
+                let t = PyList::new_bound(
+                    py,
+                    [
+                        name.into_py(py),
+                        (*asc).into_py(py),
+                        (*nulls_last).into_py(py),
+                    ],
+                );
                 ord_list.append(t)?;
             }
             dict.set_item("order_by", ord_list)?;

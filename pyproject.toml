@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "pydantable"
-version = "0.13.0"
+version = "0.14.0"
 description = "Strongly-typed DataFrames for Python, powered by Rust."
 readme = "README.md"
 license = { text = "MIT" }
@@ -24,6 +24,8 @@ dependencies = [
 [project.optional-dependencies]
 polars = ["polars>=1.0.0,<2"]
 dev = [
+    "fastapi>=0.100",
+    "httpx>=0.24",
     "hypothesis>=6.0",
     "numpy>=1.24",
     "pyarrow>=14.0",

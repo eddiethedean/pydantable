@@ -810,11 +810,23 @@ impl PolarsPlanRunner {
         }
     }
 
-    fn anyvalue_sort_cmp(a: AnyValue<'_>, b: AnyValue<'_>) -> Ordering {
+    fn anyvalue_sort_cmp_nulls(a: AnyValue<'_>, b: AnyValue<'_>, nulls_last: bool) -> Ordering {
         match (a.clone(), b.clone()) {
             (AnyValue::Null, AnyValue::Null) => Ordering::Equal,
-            (AnyValue::Null, _) => Ordering::Less,
-            (_, AnyValue::Null) => Ordering::Greater,
+            (AnyValue::Null, _) => {
+                if nulls_last {
+                    Ordering::Greater
+                } else {
+                    Ordering::Less
+                }
+            }
+            (_, AnyValue::Null) => {
+                if nulls_last {
+                    Ordering::Less
+                } else {
+                    Ordering::Greater
+                }
+            }
             (AnyValue::Int64(x), AnyValue::Int64(y)) => x.cmp(&y),
             (AnyValue::Int32(x), AnyValue::Int32(y)) => x.cmp(&y),
             (AnyValue::UInt64(x), AnyValue::UInt64(y)) => x.cmp(&y),
@@ -942,11 +954,11 @@ impl PolarsPlanRunner {
 
         for (_pk, mut idxs) in groups {
             idxs.sort_by(|a, b| {
-                for (c, asc) in order_by.iter() {
+                for (c, asc, nulls_last) in order_by.iter() {
                     let s = df.column(c).expect("column").as_materialized_series();
                     let av_a = s.get(*a).expect("value");
                     let av_b = s.get(*b).expect("value");
-                    let cmp = Self::anyvalue_sort_cmp(av_a, av_b);
+                    let cmp = Self::anyvalue_sort_cmp_nulls(av_a, av_b, *nulls_last);
                     if cmp != Ordering::Equal {
                         return if *asc { cmp } else { cmp.reverse() };
                     }
@@ -966,11 +978,11 @@ impl PolarsPlanRunner {
                     if pos > 0 {
                         let prev = idxs[pos - 1];
                         let mut all_equal = true;
-                        for (c, _asc) in order_by.iter() {
+                        for (c, _asc, nl) in order_by.iter() {
                             let s = df.column(c).map_err(polars_err)?.as_materialized_series();
                             let a = s.get(prev).map_err(polars_err)?;
                             let b = s.get(*idx).map_err(polars_err)?;
-                            if Self::anyvalue_sort_cmp(a, b) != Ordering::Equal {
+                            if Self::anyvalue_sort_cmp_nulls(a, b, *nl) != Ordering::Equal {
                                 all_equal = false;
                                 break;
                             }
@@ -989,11 +1001,11 @@ impl PolarsPlanRunner {
                     if pos > 0 {
                         let prev = idxs[pos - 1];
                         let mut all_equal = true;
-                        for (c, _asc) in order_by.iter() {
+                        for (c, _asc, nl) in order_by.iter() {
                             let s = df.column(c).map_err(polars_err)?.as_materialized_series();
                             let a = s.get(prev).map_err(polars_err)?;
                             let b = s.get(*idx).map_err(polars_err)?;
-                            if Self::anyvalue_sort_cmp(a, b) != Ordering::Equal {
+                            if Self::anyvalue_sort_cmp_nulls(a, b, *nl) != Ordering::Equal {
                                 all_equal = false;
                                 break;
                             }

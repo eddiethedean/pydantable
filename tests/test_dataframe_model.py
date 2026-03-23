@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import warnings
+
 import pytest
 from pydantable import DataFrame, DataFrameModel, Schema
-from pydantable.schema import is_supported_scalar_column_annotation
+from pydantable.schema import DtypeDriftWarning, is_supported_scalar_column_annotation
 from pydantic import ValidationError
 
 
@@ -499,7 +501,7 @@ def test_p6_dataframe_model_rolling_and_dynamic() -> None:
 def test_dataframe_model_accepts_polars_dataframe_when_validate_data_false() -> None:
     pl = pytest.importorskip("polars")
     pdf = pl.DataFrame({"id": [1, 2], "age": [20, None]})
-    df = UserDF(pdf, validate_data=False)
+    df = UserDF(pdf, trusted_mode="shape_only")
     assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
 
 
@@ -507,19 +509,29 @@ def test_dataframe_model_polars_dataframe_rejects_column_mismatch() -> None:
     pl = pytest.importorskip("polars")
     pdf = pl.DataFrame({"id": [1], "bad": [2]})
     with pytest.raises(ValueError, match="columns exactly"):
-        UserDF(pdf, validate_data=False)
+        UserDF(pdf, trusted_mode="shape_only")
 
 
 def test_dataframe_model_polars_dataframe_rejects_null_in_non_nullable_column() -> None:
     pl = pytest.importorskip("polars")
     pdf = pl.DataFrame({"id": [1, None], "age": [10, 20]})
     with pytest.raises(ValueError, match="non-nullable"):
-        UserDF(pdf, validate_data=False)
+        UserDF(pdf, trusted_mode="shape_only")
 
 
 def test_dataframe_model_trusted_shape_only_allows_dtype_mismatch() -> None:
-    df = UserDF({"id": ["1", "2"], "age": [20, None]}, trusted_mode="shape_only")
+    with pytest.warns(DtypeDriftWarning, match="shape_only"):
+        df = UserDF({"id": ["1", "2"], "age": [20, None]}, trusted_mode="shape_only")
     assert isinstance(df, UserDF)
+
+
+def test_shape_only_drift_suppressed_by_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PYDANTABLE_SUPPRESS_SHAPE_ONLY_DRIFT_WARNINGS", "1")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DtypeDriftWarning)
+        UserDF({"id": ["1", "2"], "age": [20, None]}, trusted_mode="shape_only")
 
 
 def test_dataframe_model_trusted_strict_rejects_dtype_mismatch() -> None:
@@ -564,9 +576,31 @@ def test_dataframe_model_validate_data_false_collect_matches_trusted_shape_only(
     None
 ):
     data = {"id": [1, 2], "age": [20, None]}
-    a = UserDF(data, validate_data=False).collect(as_lists=True)
+    with pytest.warns(DeprecationWarning, match="trusted_mode"):
+        a = UserDF(data, validate_data=False).collect(as_lists=True)
     b = UserDF(data, trusted_mode="shape_only").collect(as_lists=True)
     assert a == b == data
+
+
+def test_validate_data_kw_deprecation_warning_once() -> None:
+    with pytest.warns(DeprecationWarning, match="0\\.16\\.0"):
+        UserDF({"id": [1], "age": [10]}, validate_data=True)
+
+
+def test_default_constructors_no_validate_data_deprecation() -> None:
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        UserDF({"id": [1], "age": [10]})
+        DataFrame[UserDF._SchemaModel]({"id": [1], "age": [10]})
+
+
+def test_dataframe_model_polars_shape_only_warns_on_strict_dtype_mismatch() -> None:
+    pl = pytest.importorskip("polars")
+    pdf = pl.DataFrame({"id": ["x", "y"], "age": [1, 2]})
+    with pytest.warns(DtypeDriftWarning, match="shape_only"):
+        UserDF(pdf, trusted_mode="shape_only")
 
 
 def test_dataframe_model_polars_trusted_strict_rejects_wrong_scalar_dtype() -> None:
@@ -719,4 +753,5 @@ def test_dataframe_model_shape_only_allows_polars_dtype_mismatch_nested() -> Non
         s: Inner
 
     pdf = pl.DataFrame({"s": [{"a": "x"}, {"a": "y"}]})
-    DataFrame[Outer](pdf, trusted_mode="shape_only")
+    with pytest.warns(DtypeDriftWarning):
+        DataFrame[Outer](pdf, trusted_mode="shape_only")

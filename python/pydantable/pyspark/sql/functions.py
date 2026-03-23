@@ -149,6 +149,21 @@ def day(column: Expr) -> Expr:
     return column.dt_day()
 
 
+def dayofmonth(column: Expr) -> Expr:
+    """Spark ``dayofmonth``; alias of :func:`day`."""
+    return column.dt_day()
+
+
+def lower(column: Expr) -> Expr:
+    """Lowercase string column (Spark ``lower``)."""
+    return column.lower()
+
+
+def upper(column: Expr) -> Expr:
+    """Uppercase string column (Spark ``upper``)."""
+    return column.upper()
+
+
 def hour(column: Expr) -> Expr:
     """Hour 0-23 (Spark ``hour``); ``datetime`` or ``time`` column."""
     return column.dt_hour()

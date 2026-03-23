@@ -163,6 +163,14 @@ def test_select_identity_subset(data: dict[str, list]) -> None:
 
 
 @given(data=aligned_two_int_columns())
+@settings(max_examples=30, deadline=None)
+def test_with_columns_identity_age_column(data: dict[str, list]) -> None:
+    df = DataFrame[TwoInt](data)
+    out = df.with_columns(age=df.age).collect(as_lists=True)
+    assert_table_eq_sorted(out, data, ["id"])
+
+
+@given(data=aligned_two_int_columns())
 @settings(max_examples=50)
 def test_filter_self_eq_keeps_all_rows(data: dict[str, list]) -> None:
     df = DataFrame[TwoInt](data)

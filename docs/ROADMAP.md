@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.13.x → 0.14.0 → 0.15.x → v1.0.0)
+# PydanTable roadmap (0.14.x → 0.15.0 → v1.0.0)
 
-**Current release: `0.13.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
+**Current release: `0.14.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
@@ -21,7 +21,7 @@ The public API stays **SQLModel-like**:
 
 Details: [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md).
 
-**FastAPI / ASGI:** [`FASTAPI.md`](FASTAPI.md) covers `response_model`, row-list and **column-shaped** bodies, **`trusted_mode`** / **`validate_data`**, joins/aggregations, and **sync** materialization (with **0.15.0** **async I/O** called out on the roadmap). Still **planned** for later minors: multipart/file ingestion, **`Depends`** / **lifespan** recipes, **`TestClient`** helpers, and richer error → HTTP status mapping (see **0.14.0** and **Toward v1.0.0** below).
+**FastAPI / ASGI:** [`FASTAPI.md`](FASTAPI.md) covers `response_model`, row-list and **column-shaped** bodies, **`trusted_mode`** / **`validate_data`**, **`TestClient`** recipes, joins/aggregations, and **sync** materialization (with **0.15.0** **async I/O** on the roadmap). Still **planned** for later minors: multipart/file ingestion, **`Depends`** / **lifespan** patterns, and richer error → HTTP status mapping (see **Toward v1.0.0** below).
 
 ---
 
@@ -74,10 +74,10 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 - Close or explicitly defer remaining gaps in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) (and related parity docs: [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md), [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md)).
 - Keep CI green across supported Python versions and platforms; keep extension + optional **`[polars]`** matrices exercised in CI.
-- Decide whether **`validate_data`** should emit **`DeprecationWarning`** with a documented removal timeline (today it remains a compatibility alias for **`trusted_mode`**).
+- **`validate_data`:** **0.14.0** emits **`DeprecationWarning`** when **`validate_data=`** is passed without **`trusted_mode`**; removal after **0.16.0** (see [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md)).
 - Optional: consolidated **migration guide** if semver ever jumps in a breaking way; keep [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) the semantics source of truth.
 - **Async I/O:** ship **full `async` read/write** coverage for stable materialization and interchange (see **Planned 0.15.0**) so ASGI stacks can avoid blocking the event loop without ad-hoc wrappers.
-- **FastAPI integration maturity:** treat [`FASTAPI.md`](FASTAPI.md) as the **canonical service guide**—expand it with **multipart / file** ingestion, **`Depends`** and **lifespan** patterns, **background tasks**, **error → HTTP status** mapping for validation vs engine errors, and **OpenAPI** notes for **row-list vs columnar** JSON bodies. Add **recipe tests** or **docs-only CI checks** so examples stay in sync with releases.
+- **FastAPI integration maturity:** treat [`FASTAPI.md`](FASTAPI.md) as the **canonical service guide**—expand it with **multipart / file** ingestion, **`Depends`** and **lifespan** patterns, **background tasks**, and **error → HTTP status** mapping for validation vs engine errors. **0.14.0** added **`TestClient`** / OpenAPI notes and `tests/test_fastapi_recipes.py`.
 
 ---
 
@@ -154,23 +154,23 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 - [x] **CI and tooling:** reviewed **GitHub Actions** (`actions/checkout@v5`, `actions/setup-python@v6`, `actions/cache@v4`); documented **`cargo audit`** ignore for **RUSTSEC-2025-0141** in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 - [x] **Tests / examples:** extended [`scripts/verify_doc_examples.py`](../scripts/verify_doc_examples.py) for new FastAPI patterns; no trivial remaining **PySpark**/**pandas** one-line façade gaps identified in that release.
 - [x] **I/O documentation:** [`EXECUTION.md`](EXECUTION.md) and [`PERFORMANCE.md`](PERFORMANCE.md) label **sync-only** materialization/interchange and point to **0.15.0** async work; [`PERFORMANCE.md`](PERFORMANCE.md) cross-links **FastAPI** bulk guidance.
-- [x] **Window polish (docs):** null ordering and **`CURRENT ROW`** / peer framing in [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md) and [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md); module docstring on `Window` in [`window_spec.py`](../python/pydantable/window_spec.py). **No** new **`NULLS FIRST` / `LAST`** API yet (defer to **0.14.0** if needed).
-- [x] **Trusted ingest:** **`strict`** dtype checks for **PyArrow** `Array` / `ChunkedArray` columns (including **decimal** and **enum**-compatible Arrow types); accept all concrete Arrow array classes in trusted column buffers (`isinstance(..., pa.Array)`). Tests in `tests/test_trusted_strict_pyarrow.py`; **`pyarrow`** added to **`[dev]`** and CI install. Optional **`shape_only`** drift **warnings** still **deferred**.
+- [x] **Window polish (docs):** null ordering and **`CURRENT ROW`** / peer framing in [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md) and [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md); module docstring on `Window` in [`window_spec.py`](../python/pydantable/window_spec.py). User-facing **`NULLS FIRST` / `LAST`** via **`orderBy(..., nulls_last=...)`** shipped in **0.14.0**.
+- [x] **Trusted ingest:** **`strict`** dtype checks for **PyArrow** `Array` / `ChunkedArray` columns (including **decimal** and **enum**-compatible Arrow types); accept all concrete Arrow array classes in trusted column buffers (`isinstance(..., pa.Array)`). Tests in `tests/test_trusted_strict_pyarrow.py`; **`pyarrow`** added to **`[dev]`** and CI install. **`shape_only`** dtype-drift **`DtypeDriftWarning`** shipped in **0.14.0**.
 - [x] **Performance:** [`framed_window_bench.py`](../benchmarks/framed_window_bench.py) and [`trusted_polars_ingest_bench.py`](../benchmarks/trusted_polars_ingest_bench.py); [`PERFORMANCE.md`](PERFORMANCE.md) table updated.
 
 ---
 
-## Planned 0.14.0 (parity + API breadth)
+## Shipped in 0.14.0 (parity + API breadth)
 
-**Themes:** close documented gaps in alternate APIs and strengthen regression depth.
+**Themes:** window null ordering, trusted-ingest warnings, PySpark façade helpers, **`validate_data`** deprecation, FastAPI testing docs/tests, and selective **Hypothesis** expansion.
 
-- [ ] **Window API (optional):** user-facing **`NULLS FIRST` / `NULLS LAST`** (or equivalent) on window `orderBy`, if demand is clear after **0.13.0** docs.
-- [ ] **Trusted ingest:** optional **warnings** when **`shape_only`** would hide scalar dtype drift; any further **PyArrow** / **Polars** **`strict`** edge cases discovered in the field.
-- [ ] **Polars parity:** burn down high-value items in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) and reflect outcomes in [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md).
-- [ ] **PySpark façade:** additional **`functions`** / **`Column`** helpers that map cleanly onto existing `ExprNode` (see [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md)).
-- [ ] **Property-based tests:** selective **Hypothesis** (or similar) coverage for expression typing and small plan round-trips where behavior is deterministic.
-- [ ] **`validate_data` policy:** decide on **`DeprecationWarning`** and a documented removal timeline in favor of **`trusted_mode`**.
-- [ ] **FastAPI testing & DX:** add **copy-paste recipes** (and optional small **test helpers** if worthwhile) for **`TestClient`** / **`httpx`** against `DataFrameModel` routes; document stable **`openapi.json`** patterns for **`RowModel`** and nested columns; optional **`Depends()`** patterns for injecting schema-typed dataframe builders or shared **`APIRouter`** factories.
+- [x] **Window API:** **`Window.orderBy(..., nulls_last=...)`** (**NULLS FIRST** / **LAST** per key; framed windows honor all keys; unframed Polars `.over` uses the first key’s flag for **`SortOptions`** — see [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md)).
+- [x] **Trusted ingest:** **`DtypeDriftWarning`** when **`trusted_mode='shape_only'`** would accept data **`strict`** would reject; opt-out env **`PYDANTABLE_SUPPRESS_SHAPE_ONLY_DRIFT_WARNINGS=1`**.
+- [x] **Polars parity docs:** scorecard and [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) updated for **0.14.0** (transformation phases P1–P7 remain complete; this release is façade / contract polish).
+- [x] **PySpark façade:** **`dayofmonth`**, **`lower`**, **`upper`** in **`pydantable.pyspark.sql.functions`** (thin wrappers over core **`Expr`**).
+- [x] **Hypothesis:** additional pipeline property (`with_columns` identity) in `tests/test_hypothesis_properties.py`; documented in [`DEVELOPER.md`](DEVELOPER.md).
+- [x] **`validate_data` policy:** **`DeprecationWarning`** when **`validate_data=`** is passed without **`trusted_mode`**; documented removal after **0.16.0**.
+- [x] **FastAPI testing & DX:** **`TestClient`** / columnar body examples in [`FASTAPI.md`](FASTAPI.md); **`tests/test_fastapi_recipes.py`**; **`fastapi`** / **`httpx`** in **`[dev]`** and CI pytest install.
 
 ---
 

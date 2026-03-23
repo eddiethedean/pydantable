@@ -129,7 +129,7 @@ fn window_range_frame_serializes_with_kind_and_bounds() {
         let node = ExprNode::make_window_sum(
             inner,
             vec!["g".to_string()],
-            vec![("v".to_string(), true)],
+            vec![("v".to_string(), true, false)],
             Some("range".to_string()),
             Some(-2),
             Some(0),

@@ -10,7 +10,7 @@ use crate::dtype::{dtype_structural_eq, BaseType, DTypeDesc};
 
 use super::ir::{
     ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart,
-    UnaryNumericOp, UnixTimestampUnit, WindowFrame, WindowOp,
+    UnaryNumericOp, UnixTimestampUnit, WindowFrame, WindowOp, WindowOrderKey,
 };
 
 enum ListAggKind {
@@ -259,7 +259,7 @@ impl ExprNode {
                 for n in partition_by {
                     out.insert(n.clone());
                 }
-                for (n, _) in order_by {
+                for (n, _, _) in order_by {
                     out.insert(n.clone());
                 }
                 if let Some(op) = operand {
@@ -1376,7 +1376,7 @@ impl ExprNode {
 
     fn validate_range_frame_order_keys(
         frame: &Option<WindowFrame>,
-        order_by: &[(String, bool)],
+        order_by: &[WindowOrderKey],
         op_name: &str,
     ) -> PyResult<()> {
         if matches!(frame, Some(WindowFrame::Range { .. })) && order_by.is_empty() {
@@ -1390,7 +1390,7 @@ impl ExprNode {
 
     pub fn make_window_row_number(
         partition_by: Vec<String>,
-        order_by: Vec<(String, bool)>,
+        order_by: Vec<WindowOrderKey>,
         frame_kind: Option<String>,
         frame_start: Option<i64>,
         frame_end: Option<i64>,
@@ -1423,7 +1423,7 @@ impl ExprNode {
     pub fn make_window_rank(
         dense: bool,
         partition_by: Vec<String>,
-        order_by: Vec<(String, bool)>,
+        order_by: Vec<WindowOrderKey>,
         frame_kind: Option<String>,
         frame_start: Option<i64>,
         frame_end: Option<i64>,
@@ -1490,7 +1490,7 @@ impl ExprNode {
     pub fn make_window_sum(
         inner: ExprNode,
         partition_by: Vec<String>,
-        order_by: Vec<(String, bool)>,
+        order_by: Vec<WindowOrderKey>,
         frame_kind: Option<String>,
         frame_start: Option<i64>,
         frame_end: Option<i64>,
@@ -1516,7 +1516,7 @@ impl ExprNode {
     pub fn make_window_mean(
         inner: ExprNode,
         partition_by: Vec<String>,
-        order_by: Vec<(String, bool)>,
+        order_by: Vec<WindowOrderKey>,
         frame_kind: Option<String>,
         frame_start: Option<i64>,
         frame_end: Option<i64>,
@@ -1542,7 +1542,7 @@ impl ExprNode {
     pub fn make_window_min(
         inner: ExprNode,
         partition_by: Vec<String>,
-        order_by: Vec<(String, bool)>,
+        order_by: Vec<WindowOrderKey>,
         frame_kind: Option<String>,
         frame_start: Option<i64>,
         frame_end: Option<i64>,
@@ -1568,7 +1568,7 @@ impl ExprNode {
     pub fn make_window_max(
         inner: ExprNode,
         partition_by: Vec<String>,
-        order_by: Vec<(String, bool)>,
+        order_by: Vec<WindowOrderKey>,
         frame_kind: Option<String>,
         frame_start: Option<i64>,
         frame_end: Option<i64>,
@@ -1954,7 +1954,7 @@ impl ExprNode {
         inner: ExprNode,
         n: u32,
         partition_by: Vec<String>,
-        order_by: Vec<(String, bool)>,
+        order_by: Vec<WindowOrderKey>,
         frame_kind: Option<String>,
         frame_start: Option<i64>,
         frame_end: Option<i64>,
@@ -1986,7 +1986,7 @@ impl ExprNode {
         inner: ExprNode,
         n: u32,
         partition_by: Vec<String>,
-        order_by: Vec<(String, bool)>,
+        order_by: Vec<WindowOrderKey>,
         frame_kind: Option<String>,
         frame_start: Option<i64>,
         frame_end: Option<i64>,

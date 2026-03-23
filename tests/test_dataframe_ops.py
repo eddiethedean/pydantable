@@ -455,7 +455,7 @@ def test_validate_data_false_numpy_ingest_collect() -> None:
 
     df = DataFrame[N](
         {"x": np.array([1, 2, 3], dtype=np.int64)},
-        validate_data=False,
+        trusted_mode="shape_only",
     )
     assert df.collect(as_lists=True)["x"] == [1, 2, 3]
 

@@ -20,7 +20,6 @@ class PM(DataFrameModel):
     "kwargs",
     [
         {},
-        {"validate_data": False},
         {"trusted_mode": "shape_only"},
         {"trusted_mode": "strict"},
     ],

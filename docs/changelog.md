@@ -2,14 +2,29 @@
 
 All notable changes to this project are documented here. The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.14.0] — 2026-03-23
+
+### Highlights
+
+- **Window `orderBy` null placement:** **`nulls_last`** on **`Window.partitionBy(...).orderBy(...)`** (per-column list or bool); framed windows use all keys; unframed Polars **`.over`** uses the first key for **`SortOptions`**. Docs: {doc}`WINDOW_SQL_SEMANTICS`, {doc}`INTERFACE_CONTRACT`.
+- **Trusted `shape_only`:** **`pydantable.DtypeDriftWarning`** when data would fail **`strict`**; env **`PYDANTABLE_SUPPRESS_SHAPE_ONLY_DRIFT_WARNINGS=1`** to silence. See {doc}`SUPPORTED_TYPES`.
+- **`validate_data` deprecation:** explicit **`validate_data=`** without **`trusted_mode`** raises **`DeprecationWarning`** (removal after **0.16.0**). See {doc}`DATAFRAMEMODEL`, {doc}`FASTAPI`.
+- **PySpark façade:** **`dayofmonth`**, **`lower`**, **`upper`** in **`pydantable.pyspark.sql.functions`**. {doc}`PYSPARK_PARITY` updated.
+- **FastAPI DX:** **`TestClient`** recipes and OpenAPI notes in {doc}`FASTAPI`; **`tests/test_fastapi_recipes.py`**; **`fastapi`** / **`httpx`** in **`[dev]`** and CI.
+- **Hypothesis:** extra property test for **`with_columns`** identity; {doc}`DEVELOPER` documents running property tests.
+
+### Details
+
+See {doc}`ROADMAP` **Shipped in 0.14.0**.
+
 ## [0.13.0] — 2026-03-23
 
 ### Highlights
 
 - **Stabilization + combined scope:** {doc}`FASTAPI` — **`trusted_mode`** / **`validate_data`**, column-shaped **`dict[str, list]`** bodies, **sync** materialization and **0.15.0** async pointers; trust-boundary guidance for large / pre-validated tables and **Polars** / **Arrow**; install notes for PyPI wheels vs git builds.
 - **Sync-only I/O:** {doc}`EXECUTION` and {doc}`PERFORMANCE` call out **blocking** materialization and interchange today; link to **Planned 0.15.0** async work. Tuning text prefers **`trusted_mode`** alongside **`validate_data`**.
-- **Window semantics (docs):** null ordering and **`CURRENT ROW`** / peer framing in {doc}`WINDOW_SQL_SEMANTICS` and {doc}`INTERFACE_CONTRACT`; `Window` docstring in `window_spec.py`. Optional **`NULLS FIRST` / `LAST`** API remains deferred to {doc}`ROADMAP` **Planned 0.14.0**.
-- **Trusted `strict` + PyArrow:** `isinstance(..., pa.Array | pa.ChunkedArray)` in trusted buffers (concrete array types such as `Int64Array`); stricter scalars for **int**, **float**, **decimal**, **enum**, **uuid**, and temporal Arrow types. Tests in `tests/test_trusted_strict_pyarrow.py`; **`pyarrow>=14`** in **`[dev]`** and CI. Optional **`shape_only`** drift **warnings** deferred to **Planned 0.14.0**.
+- **Window semantics (docs):** null ordering and **`CURRENT ROW`** / peer framing in {doc}`WINDOW_SQL_SEMANTICS` and {doc}`INTERFACE_CONTRACT`; `Window` docstring in `window_spec.py`. (**User-facing `NULLS FIRST` / `LAST`** shipped in **0.14.0**.)
+- **Trusted `strict` + PyArrow:** `isinstance(..., pa.Array | pa.ChunkedArray)` in trusted buffers (concrete array types such as `Int64Array`); stricter scalars for **int**, **float**, **decimal**, **enum**, **uuid**, and temporal Arrow types. Tests in `tests/test_trusted_strict_pyarrow.py`; **`pyarrow>=14`** in **`[dev]`** and CI. (**`shape_only` drift warnings** shipped in **0.14.0**.)
 - **Performance:** `benchmarks/framed_window_bench.py`, `benchmarks/trusted_polars_ingest_bench.py`; {doc}`PERFORMANCE` table and cross-links.
 - **Discoverability:** {doc}`index`, {doc}`README` roadmap table, and cross-links across {doc}`INTERFACE_CONTRACT`, {doc}`WINDOW_SQL_SEMANTICS`, {doc}`POLARS_TRANSFORMATIONS_ROADMAP`.
 - **CI:** **`RUSTSEC-2025-0141`** audit-step comment; GitHub Actions versions reviewed (**`actions/cache@v4`**, etc.).

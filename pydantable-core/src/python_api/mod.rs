@@ -85,7 +85,7 @@ impl PyPlan {
 
 #[pyfunction]
 fn rust_version() -> &'static str {
-    "0.13.0"
+    "0.14.0"
 }
 
 #[pyfunction]
@@ -434,7 +434,7 @@ fn expr_datetime_to_date(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
 #[pyfunction]
 fn expr_window_row_number(
     partition_by: Vec<String>,
-    order_by: Vec<(String, bool)>,
+    order_by: Vec<(String, bool, bool)>,
     frame_kind: Option<String>,
     frame_start: Option<i64>,
     frame_end: Option<i64>,
@@ -454,7 +454,7 @@ fn expr_window_row_number(
 fn expr_window_rank(
     dense: bool,
     partition_by: Vec<String>,
-    order_by: Vec<(String, bool)>,
+    order_by: Vec<(String, bool, bool)>,
     frame_kind: Option<String>,
     frame_start: Option<i64>,
     frame_end: Option<i64>,
@@ -475,7 +475,7 @@ fn expr_window_rank(
 fn expr_window_sum(
     inner: Bound<'_, PyExpr>,
     partition_by: Vec<String>,
-    order_by: Vec<(String, bool)>,
+    order_by: Vec<(String, bool, bool)>,
     frame_kind: Option<String>,
     frame_start: Option<i64>,
     frame_end: Option<i64>,
@@ -496,7 +496,7 @@ fn expr_window_sum(
 fn expr_window_mean(
     inner: Bound<'_, PyExpr>,
     partition_by: Vec<String>,
-    order_by: Vec<(String, bool)>,
+    order_by: Vec<(String, bool, bool)>,
     frame_kind: Option<String>,
     frame_start: Option<i64>,
     frame_end: Option<i64>,
@@ -517,7 +517,7 @@ fn expr_window_mean(
 fn expr_window_min(
     inner: Bound<'_, PyExpr>,
     partition_by: Vec<String>,
-    order_by: Vec<(String, bool)>,
+    order_by: Vec<(String, bool, bool)>,
     frame_kind: Option<String>,
     frame_start: Option<i64>,
     frame_end: Option<i64>,
@@ -538,7 +538,7 @@ fn expr_window_min(
 fn expr_window_max(
     inner: Bound<'_, PyExpr>,
     partition_by: Vec<String>,
-    order_by: Vec<(String, bool)>,
+    order_by: Vec<(String, bool, bool)>,
     frame_kind: Option<String>,
     frame_start: Option<i64>,
     frame_end: Option<i64>,
@@ -674,7 +674,7 @@ fn expr_window_lag(
     inner: Bound<'_, PyExpr>,
     n: u32,
     partition_by: Vec<String>,
-    order_by: Vec<(String, bool)>,
+    order_by: Vec<(String, bool, bool)>,
     frame_kind: Option<String>,
     frame_start: Option<i64>,
     frame_end: Option<i64>,
@@ -697,7 +697,7 @@ fn expr_window_lead(
     inner: Bound<'_, PyExpr>,
     n: u32,
     partition_by: Vec<String>,
-    order_by: Vec<(String, bool)>,
+    order_by: Vec<(String, bool, bool)>,
     frame_kind: Option<String>,
     frame_start: Option<i64>,
     frame_end: Option<i64>,

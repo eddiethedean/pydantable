@@ -10,7 +10,7 @@ use super::ir::{
 };
 
 use polars::lazy::dsl::{
-    coalesce, col, concat_str, element, len, lit, ternary_expr, Expr as PolarsExpr,
+    coalesce, col, concat_str, element, int_range, len, lit, ternary_expr, Expr as PolarsExpr,
 };
 use polars::prelude::{
     ClosedInterval, DataType, Int128Chunked, IntoSeries, Literal, NamedFrom, NewChunkedArray, Null,
@@ -131,7 +131,7 @@ fn literals_to_series(values: &[LiteralValue], base: BaseType) -> PyResult<Serie
 fn apply_window_over(
     inner: PolarsExpr,
     partition_by: &[String],
-    order_by: &[(String, bool)],
+    order_by: &[(String, bool, bool)],
 ) -> PyResult<PolarsExpr> {
     let part_cols: Vec<PolarsExpr> = partition_by.iter().map(|n| col(n.as_str())).collect();
     let partition_arg = if part_cols.is_empty() {
@@ -139,12 +139,13 @@ fn apply_window_over(
     } else {
         Some(part_cols.as_slice())
     };
-    let order_cols: Vec<PolarsExpr> = order_by.iter().map(|(n, _)| col(n.as_str())).collect();
+    let order_cols: Vec<PolarsExpr> = order_by.iter().map(|(n, _, _)| col(n.as_str())).collect();
     let order_arg = if order_cols.is_empty() {
         None
     } else {
         let opts = SortOptions {
             descending: !order_by[0].1,
+            nulls_last: order_by[0].2,
             ..Default::default()
         };
         Some((order_cols.as_slice(), opts))
@@ -542,18 +543,15 @@ impl ExprNode {
                 let ord = order_by.as_slice();
                 match op {
                     WindowOp::RowNumber => {
-                        let order_name = ord.first().ok_or_else(|| {
-                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        if ord.is_empty() {
+                            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                                 "row_number() requires order_by columns.",
-                            )
-                        })?;
-                        let inner = col(order_name.0.as_str()).rank(
-                            RankOptions {
-                                method: RankMethod::Ordinal,
-                                descending: !order_name.1,
-                            },
-                            None,
-                        );
+                            ));
+                        }
+                        // Polars `rank(Ordinal)` ignores `nulls_last` on the window sort (it uses a
+                        // fixed null placement internally). `int_range(0, len)+1` matches SQL
+                        // `ROW_NUMBER()` and respects `over_with_options` sort keys.
+                        let inner = int_range(lit(0i64), len(), 1, DataType::Int64) + lit(1i64);
                         apply_window_over(inner, part, ord)
                     }
                     WindowOp::Rank => {

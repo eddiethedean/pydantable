@@ -39,7 +39,10 @@ from .rust_engine import (
     execute_unnest,
 )
 from .schema import (
+    _VALIDATE_DATA_KW_UNSET,
     _annotation_nullable_inner,
+    _coerce_validate_data_kw,
+    _warn_validate_data_kw_deprecated,
     make_derived_schema_type,
     merge_field_types_preserving_identity,
     previous_field_types_for_join,
@@ -154,20 +157,26 @@ class DataFrame(Generic[SchemaT]):
         self,
         data: Mapping[str, Sequence[Any]] | Any,
         *,
-        validate_data: bool = True,
+        validate_data: Any = _VALIDATE_DATA_KW_UNSET,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        _skip_validate_data_deprecation: bool = False,
     ) -> None:
         if self._schema_type is None:
             raise TypeError(
                 "Use DataFrame[SchemaType](data) to construct a typed DataFrame."
             )
 
+        if not _skip_validate_data_deprecation:
+            _warn_validate_data_kw_deprecated(
+                validate_data=validate_data, trusted_mode=trusted_mode, stacklevel=2
+            )
+        effective_validate = _coerce_validate_data_kw(validate_data)
         root_data = validate_columns_strict(
             data,
             self._schema_type,
-            validate_elements=validate_data if trusted_mode is None else None,
+            validate_elements=effective_validate if trusted_mode is None else None,
             trusted_mode=trusted_mode,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,

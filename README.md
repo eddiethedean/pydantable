@@ -8,7 +8,7 @@
 
 **Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core.**
 
-**Current release: 0.13.0** · Python **3.10+**
+**Current release: 0.14.0** · Python **3.10+**
 
 ---
 
@@ -28,7 +28,7 @@ That site is the supported entry point for concepts, contracts, API notes, and e
 | **FastAPI** (routers, bodies, `collect`, responses) | [FastAPI integration](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) |
 | **Execution model** (`collect`, `to_dict`, `to_polars`, optional Python Polars, UI modules) | [Execution (Rust engine)](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) |
 | **Semantics** (nulls, joins, ordering, reshaping, windows — Polars-style contract) | [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) |
-| **Roadmap** (0.5.0–0.13.0 shipped, path to v1.0.0) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
+| **Roadmap** (0.5.0–0.14.0 shipped, path to v1.0.0) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
 | **Why not use Polars directly?** | [Why not just use Polars?](https://pydantable.readthedocs.io/en/latest/WHY_NOT_POLARS.html) |
 | **Pandas-style imports** (`pydantable.pandas`) | [Pandas UI](https://pydantable.readthedocs.io/en/latest/PANDAS_UI.html) |
 | **PySpark-style imports** (`pydantable.pyspark`) | [PySpark UI](https://pydantable.readthedocs.io/en/latest/PYSPARK_UI.html) |
@@ -54,12 +54,12 @@ PydanTable keeps **Pydantic models** as the source of truth for:
 
 The default API feels **Polars-like**; optional **`pydantable.pandas`** and **`pydantable.pyspark`** modules only change naming and imports — execution is always the native core. Details: [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html), [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html).
 
-**0.13.0** ships stabilization docs, roadmap realignment, and the combined scope formerly tracked as **Remaining in 0.13.x**—FastAPI trust boundaries for bulk/Polars/Arrow, window null/`CURRENT ROW` contract docs, **`strict`** **PyArrow** dtype checks (and correct handling of all Arrow array types in trusted buffers), framed-window and trusted-Polars benchmark scripts, plus **`pyarrow`** in dev/CI for tests. See [changelog](https://pydantable.readthedocs.io/en/latest/changelog.html) and [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html).
+**0.14.0** adds window **`orderBy(..., nulls_last=...)`** (**NULLS FIRST/LAST**), **`DtypeDriftWarning`** for **`trusted_mode='shape_only'`**, **`validate_data`** deprecation (use **`trusted_mode`**; removal after **0.16.0**), **FastAPI `TestClient`** docs/tests, extra **Hypothesis** coverage, and PySpark **`dayofmonth` / `lower` / `upper`**. **0.13.0** delivered stabilization docs, trusted **PyArrow** **`strict`**, framed-window benchmarks, and related trust-boundary guidance. See [changelog](https://pydantable.readthedocs.io/en/latest/changelog.html) and [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html).
 
 **Expression surface (current release, Rust-typed `Expr`):**
 
 - **Globals in `select`:** `global_sum`, `global_mean`, `global_count`, `global_min`, `global_max`, and **`global_row_count()`** (row count / `COUNT(*)`). PySpark: `F.count()` with no argument for row count; `F.count(F.col(...))` for non-null column count.
-- **Windows:** `row_number`, `rank`, `dense_rank`, `window_sum`, `window_mean`, **`window_min`**, **`window_max`**, `lag`, `lead` with `Window.partitionBy(...).orderBy(...)` / `.spec()`, plus framed windows (`rowsBetween`, `rangeBetween`) for supported operations.
+- **Windows:** `row_number`, `rank`, `dense_rank`, `window_sum`, `window_mean`, **`window_min`**, **`window_max`**, `lag`, `lead` with `Window.partitionBy(...).orderBy(..., nulls_last=...)` / `.spec()`, plus framed windows (`rowsBetween`, `rangeBetween`) for supported operations.
 - **Temporal:** `strptime`, `unix_timestamp`, **`cast` from `str` → `date` / `datetime`** (Polars parsing; use `strptime` for fixed formats), `dt_*` parts, `dt_nanosecond` on `datetime` / `time`.
 - **Maps / binary:** `map_len`, **`map_get`**, **`map_contains_key`**, `binary_len`, including nested JSON-like map value dtypes with string keys.
 - **Map utilities:** `map_keys()`, `map_values()`, `map_entries()`, and `map_from_entries()` for per-row key/value extraction and reconstruction on `dict[str, T]` columns.

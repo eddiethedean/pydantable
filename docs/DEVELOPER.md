@@ -93,6 +93,8 @@ Parallel (uses `pytest-xdist` from the `dev` extra):
 .venv/bin/python -m pytest -q -n auto
 ```
 
+**Hypothesis** property tests live in `tests/test_hypothesis_properties.py` (installed via **`[dev]`**). They run under the same `pytest` command; examples use bounded `max_examples` for CI speed.
+
 Exclude timing-based guardrails (`tests/test_performance_guardrails.py`) for a quicker loop:
 
 ```bash
@@ -236,6 +238,6 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 
 ### Publishing (PyPI)
 
-Pushing a git tag matching `v*` (for example `v0.13.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then `maturin publish` for multiple platforms. The repository needs a **`PYPI_API_TOKEN`** secret (see workflow env `MATURIN_PYPI_TOKEN`). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit.
+Pushing a git tag matching `v*` (for example `v0.14.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then `maturin publish` for multiple platforms. The repository needs a **`PYPI_API_TOKEN`** secret (see workflow env `MATURIN_PYPI_TOKEN`). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit.
 
-The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v0.13.0`**).
+The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v0.14.0`**).

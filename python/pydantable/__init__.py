@@ -15,7 +15,15 @@ from . import pyspark as pyspark
 from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
 from .expressions import Expr
-from .schema import Schema
+from .schema import DtypeDriftWarning, Schema
 
-__all__ = ["DataFrame", "DataFrameModel", "Expr", "Schema", "pandas", "pyspark"]
-__version__ = "0.13.0"
+__all__ = [
+    "DataFrame",
+    "DataFrameModel",
+    "DtypeDriftWarning",
+    "Expr",
+    "Schema",
+    "pandas",
+    "pyspark",
+]
+__version__ = "0.14.0"

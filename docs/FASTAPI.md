@@ -36,10 +36,10 @@ For **`DataFrameModel(...)`** and **`DataFrame[Schema](...)`**, ingestion defaul
 | Mode | Meaning |
 |------|---------|
 | **`trusted_mode="off"`** | Default: full Pydantic validation per cell (same as omitting the argument). |
-| **`trusted_mode="shape_only"`** | Skip element validation; still checks column names and row counts. Replaces legacy **`validate_data=False`**. |
+| **`trusted_mode="shape_only"`** | Skip element validation; still checks column names and row counts. Replaces legacy **`validate_data=False`**. May emit **`DtypeDriftWarning`** when payloads would fail **`strict`** (see {doc}`SUPPORTED_TYPES`). |
 | **`trusted_mode="strict"`** | Trusted bulk input plus dtype / nested-shape checks against the schema (including Polars columns). |
 
-**`validate_data=True` / `False`** remains a **compatibility alias** mapped onto those modes; prefer **`trusted_mode`** in new code. Details, nested rules, and runtime payloads: [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md), [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md).
+**`validate_data=True` / `False`** remains a **compatibility alias**; passing it **explicitly** without **`trusted_mode`** triggers a **`DeprecationWarning`** (removal after **0.16.0**). Prefer **`trusted_mode`** in new code. Details: [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md), [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md).
 
 ```python
 from pydantable import DataFrameModel
@@ -305,3 +305,44 @@ That keeps handlers predictable: many errors surface before **`collect()`** runs
 - **Adapters**: load/save column dicts or row lists from databases, queues, or object storage.
 
 This keeps schema and transformation contracts in one typed layer.
+
+## Testing routes (`TestClient`)
+
+Use FastAPI’s **`TestClient`** (synchronous) to exercise handlers without a live server. Install **`fastapi`** and **`httpx`** (included in the **`[dev]`** extra).
+
+```python
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from pydantic import BaseModel
+
+from pydantable import DataFrameModel
+
+
+class UserDF(DataFrameModel):
+    id: int
+    age: int | None
+
+
+class UserRow(BaseModel):
+    id: int
+    age: int | None
+
+
+app = FastAPI()
+
+
+@app.post("/users", response_model=list[UserRow])
+def create_users(rows: list[UserDF.RowModel]):
+    df = UserDF(rows)
+    return df.collect()
+
+
+client = TestClient(app)
+r = client.post("/users", json=[{"id": 1, "age": 20}])
+assert r.status_code == 200
+assert r.json() == [{"id": 1, "age": 20}]
+```
+
+**Column-shaped bodies** are plain **`dict[str, list]`** JSON; use a **`dict`** parameter (or a Pydantic model wrapping that shape) and construct **`DataFrameModel(..., trusted_mode="shape_only")`** when the payload is trusted.
+
+**OpenAPI:** `list[YourDF.RowModel]` and nested Pydantic fields follow **Pydantic v2** JSON Schema generation; there is nothing pydantable-specific beyond the generated `RowModel` types. Inspect **`GET /openapi.json`** in tests when you need stable schema snapshots.

@@ -4,7 +4,7 @@ This document tracks the plan to reach broad transformation-method parity with
 Polars while preserving `pydantable`'s typed schema contracts.
 
 Notes that say **Implemented on branch `v0.5.0`** refer to historical work landed in the 0.5.x line.
-The current release is **0.13.0** (see `docs/changelog.md`); older bullets below still record the 0.5.x baseline plus later additions.
+The current release is **0.14.0** (see `docs/changelog.md`); older bullets below still record the 0.5.x baseline plus later additions.
 For execution details (Pydantic-first `collect()`, optional Python `polars`), see `docs/EXECUTION.md`.
 
 ## Current baseline (implemented)
@@ -165,6 +165,7 @@ Validation:
 - [x] Full docs pass completed with migration guidance
 
 Progress note:
+- **0.14.0:** window **`orderBy` `nulls_last`** (SQL **NULLS FIRST/LAST**), **`DtypeDriftWarning`** for **`shape_only`**, **`validate_data`** deprecation, **Hypothesis** + **FastAPI `TestClient`** coverage, PySpark **`dayofmonth` / `lower` / `upper`** helpers — see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.14.0**.
 - Implemented on branch `v0.5.0`:
   - Added docs parity scorecard (`Implemented`/`Partial`/`Missing`) and linked it in docs nav.
   - Added end-to-end Polars-style workflow examples for join/groupby, reshape, and time-series operations.

@@ -93,6 +93,23 @@ def test_window_min_max_over_partition() -> None:
     assert out["hi"] == [20, 20, 30]
 
 
+def test_row_number_respects_nulls_last() -> None:
+    """Polars `.over` path: `nulls_last` must change ordinal rank vs default."""
+    df = DataFrame[W3]({"g": [1, 1, 1, 1], "v": [None, 5, None, 10]})
+    w_first = Window.partitionBy("g").orderBy("v", ascending=True, nulls_last=False)
+    out_first = df.with_columns(rn=row_number().over(w_first)).collect(as_lists=True)
+    w_last = Window.partitionBy("g").orderBy("v", ascending=True, nulls_last=True)
+    out_last = df.with_columns(rn=row_number().over(w_last)).collect(as_lists=True)
+    assert out_first["rn"] != out_last["rn"]
+    assert sorted(out_first["rn"]) == [1, 2, 3, 4]
+    assert sorted(out_last["rn"]) == [1, 2, 3, 4]
+
+
+def test_order_by_nulls_last_length_mismatch_raises() -> None:
+    with pytest.raises(ValueError, match="nulls_last length"):
+        Window.partitionBy("g").orderBy("a", "b", nulls_last=[True])
+
+
 def test_row_number_descending_order_by() -> None:
     df = DataFrame[W]({"g": [1, 1, 1], "v": [10, 20, 30]})
     w = Window.partitionBy("g").orderBy("v", ascending=False)

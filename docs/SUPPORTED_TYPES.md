@@ -202,6 +202,12 @@ remains a compatibility alias mapped onto those modes.
 Replace `validate_data=True` with `trusted_mode="off"` or omit the argument. See
 {doc}`DATAFRAMEMODEL` (“Trusted ingest”).
 
+**0.14.0 — `shape_only` dtype drift:** when **`trusted_mode="shape_only"`**, pydantable
+may emit **`pydantable.DtypeDriftWarning`** if a column would be **rejected under
+`strict`** (e.g. string cells for an **`int`** field). Set environment variable
+**`PYDANTABLE_SUPPRESS_SHAPE_ONLY_DRIFT_WARNINGS=1`** to silence these warnings in
+noisy pipelines.
+
 ## See also
 
 - {doc}`DATAFRAMEMODEL` — `DataFrameModel` and row vs column inputs

@@ -110,7 +110,10 @@ For **`DataFrameModel`** and **`DataFrame[Schema]`**, prefer explicit **`trusted
 | Skip element validation; keep shape / column names | `trusted_mode="shape_only"` (replaces `validate_data=False`) |
 | Trusted bulk input plus light dtype checks (including nested list/struct/map shapes for Polars columns) | `trusted_mode="strict"` |
 
-`validate_data=True/False` remains supported as a **compatibility alias** mapped onto those modes. There is **no deprecation warning** yet; migrate at your own pace. See {doc}`SUPPORTED_TYPES` (“Runtime column payloads”) and `pydantable.schema.validate_columns_strict`.
+Under **`trusted_mode="shape_only"`**, **`DtypeDriftWarning`** may be emitted when data
+would fail **`strict`** checks; see {doc}`SUPPORTED_TYPES` (“Runtime column payloads”).
+
+`validate_data=True/False` remains supported as a **compatibility alias** mapped onto those modes. Passing **`validate_data=` explicitly** while **`trusted_mode`** is omitted emits a **`DeprecationWarning`** (removal planned after **0.16.0**); omit `validate_data` or set **`trusted_mode`** directly. See {doc}`SUPPORTED_TYPES` (“Runtime column payloads”) and `pydantable.schema.validate_columns_strict`.
 
 ### Handling bad input rows (`ignore_errors`)
 

@@ -295,7 +295,7 @@ pub enum ExprNode {
         op: WindowOp,
         operand: Option<Box<ExprNode>>,
         partition_by: Vec<String>,
-        order_by: Vec<(String, bool)>,
+        order_by: Vec<WindowOrderKey>,
         /// Optional row-based frame; `None` uses engine default (partition + order only).
         frame: Option<WindowFrame>,
         dtype: DTypeDesc,
@@ -311,6 +311,10 @@ pub enum ExprNode {
         dtype: DTypeDesc,
     },
 }
+
+/// Window `orderBy` key: column name, ascending, **`nulls_last`** (Polars `SortOptions`).
+/// `nulls_last == false` places nulls before non-nulls for that key (**NULLS FIRST**).
+pub type WindowOrderKey = (String, bool, bool);
 
 /// Built-in window operations lowered to Polars window expressions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
