@@ -9,10 +9,11 @@ All notable changes to this project are documented here. The format is inspired 
 - **Multi-key `rangeBetween`:** aggregate window frames may use multiple `orderBy` columns; sort is lexicographic and **range bounds apply to the first** sort key (PostgreSQL-style). Documented in {doc}`WINDOW_SQL_SEMANTICS`.
 - **Trusted `strict` ingest:** Polars columns are matched structurally to nested annotations (`list` / `dict[str, T]` / nested `Schema` structs); columnar Python paths get the same nested shape checks.
 - **Contracts and parity docs:** refresh `INTERFACE_CONTRACT`, PySpark UI/scorecard, roadmap; add duplicate-key policy for `map_from_entries` ({doc}`SUPPORTED_TYPES`).
+- **Regression tests:** broader coverage for multi-key `rangeBetween` (desc/mixed `orderBy`, partitions, `date`/`datetime` axis, `window_mean`/`window_min`), PySpark window mirrors, trusted `strict` nested paths (Python + Polars), `map_from_entries` duplicate keys, and `DataFrame` / `DataFrameModel` strict parity.
 
 ### Details
 
-See {doc}`INTERFACE_CONTRACT`, {doc}`PYSPARK_PARITY`, {doc}`PARITY_SCORECARD`, and {doc}`ROADMAP`.
+See {doc}`INTERFACE_CONTRACT`, {doc}`PYSPARK_PARITY`, {doc}`PARITY_SCORECARD`, {doc}`WINDOW_SQL_SEMANTICS`, and {doc}`ROADMAP`.
 
 ## [0.11.0] — 2026-03-23
 

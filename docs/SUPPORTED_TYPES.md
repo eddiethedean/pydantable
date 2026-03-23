@@ -189,10 +189,11 @@ compatible row objects). Lists may be plain `list`, `tuple`, or
 
 With **`validate_data=False`**, trusted bulk paths may pass **NumPy**, **PyArrow**,
 or a **Polars `DataFrame`** as documented in {doc}`EXECUTION` and {doc}`PERFORMANCE`;
-scalar dtypes must still match the schema. As of **0.11.0**, use **`trusted_mode`**
-on **`DataFrame` / `DataFrameModel`** for explicit **`shape_only`** vs **`strict`**
-checks (see `schema.validate_columns_strict`); **`validate_data`** remains a
-compatibility alias mapped onto those modes.
+scalar dtypes must still match the schema. Use **`trusted_mode`** on **`DataFrame` /
+`DataFrameModel`** for explicit **`shape_only`** vs **`strict`** checks (introduced in
+**0.11.0**; **0.12.0** extends **`strict`** to nested list / dict / struct shapes on
+Polars and columnar Python paths; see `schema.validate_columns_strict`); **`validate_data`**
+remains a compatibility alias mapped onto those modes.
 
 **Migration (recommended):** replace `validate_data=False` with `trusted_mode="shape_only"`
 (or `trusted_mode="strict"` when you want Polars dtype-shape checks on nested columns).
