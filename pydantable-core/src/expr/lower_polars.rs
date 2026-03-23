@@ -513,6 +513,16 @@ impl ExprNode {
                 let filtered = element().filter(pred);
                 Ok(list_e.list().eval(filtered).list().len().gt(lit(0u32)))
             }
+            ExprNode::MapKeys { inner, .. } => {
+                let list_e = inner.to_polars_expr()?;
+                let projected = element().struct_().field_by_name("key");
+                Ok(list_e.list().eval(projected))
+            }
+            ExprNode::MapValues { inner, .. } => {
+                let list_e = inner.to_polars_expr()?;
+                let projected = element().struct_().field_by_name("value");
+                Ok(list_e.list().eval(projected))
+            }
             ExprNode::Window {
                 op,
                 operand,

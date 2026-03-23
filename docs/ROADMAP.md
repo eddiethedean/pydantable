@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.8.0 → v1.0.0)
+# PydanTable roadmap (0.10.0 → v1.0.0)
 
-**Current release: `0.8.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
+**Current release: `0.10.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
 
 For Polars-style API parity at the method level, see
 [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md).
@@ -100,12 +100,28 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 ---
 
+## Shipped in 0.9.0 (framing and map v2 baseline)
+
+- [x] **Input quality controls:** `ignore_errors` + `on_validation_errors` callback payload contract.
+- [x] **Framed execution baseline:** `rowsBetween` / `rangeBetween` execution support for initial operators, with explicit typed constraints.
+- [x] **Map v2 values:** nested JSON-like map value dtypes with string keys.
+
+---
+
+## Shipped in 0.10.0 (framing completion + map ergonomics)
+
+- [x] **Framed windows expanded:** `window_mean`, `window_min`, `window_max`, `lag`, `lead`, `rank`, and `dense_rank`.
+- [x] **Map utilities:** `map_keys()` and `map_values()`.
+- [x] **Parity and interop hardening:** expanded PySpark parity and trusted constructor test coverage.
+
+---
+
 ## Later (not started)
 
-Directions beyond **0.8.0** (non-exhaustive):
+Directions beyond **0.10.0** (non-exhaustive):
 
 - [ ] **Arrow-native map dtype** or heterogeneous map keys (beyond `dict[str, T]` v1) — optional I/O spike.
-- [ ] SQL-style **window frames** (`rowsBetween` / `rangeBetween`) **lowering** to Polars (IR field exists; execution raises until implemented).
+- [ ] Full SQL-grade `rangeBetween` semantics over multi-key orderings and non-integer order dtypes.
 
 ---
 

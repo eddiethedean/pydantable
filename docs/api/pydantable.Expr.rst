@@ -41,7 +41,9 @@
       ~Expr.lower
       ~Expr.map_contains_key
       ~Expr.map_get
+      ~Expr.map_keys
       ~Expr.map_len
+      ~Expr.map_values
       ~Expr.over
       ~Expr.referenced_columns
       ~Expr.round

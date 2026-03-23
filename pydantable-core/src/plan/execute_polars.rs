@@ -764,6 +764,8 @@ impl PolarsPlanRunner {
             | ExprNode::MapLen { inner, .. }
             | ExprNode::MapGet { inner, .. }
             | ExprNode::MapContainsKey { inner, .. }
+            | ExprNode::MapKeys { inner, .. }
+            | ExprNode::MapValues { inner, .. }
             | ExprNode::LogicalNot { inner, .. }
             | ExprNode::UnaryNumeric { inner, .. }
             | ExprNode::StringUnary { inner, .. }
@@ -837,6 +839,18 @@ impl PolarsPlanRunner {
         }
     }
 
+    fn anyvalue_as_f64(av: AnyValue<'_>) -> Option<f64> {
+        match av {
+            AnyValue::Float64(v) => Some(v),
+            AnyValue::Float32(v) => Some(v as f64),
+            AnyValue::Int64(v) => Some(v as f64),
+            AnyValue::Int32(v) => Some(v as f64),
+            AnyValue::UInt64(v) => Some(v as f64),
+            AnyValue::UInt32(v) => Some(v as f64),
+            _ => None,
+        }
+    }
+
     fn eval_framed_window_expr(df: &DataFrame, name: &str, expr: &ExprNode) -> PyResult<Series> {
         let ExprNode::Window {
             op,
@@ -870,29 +884,29 @@ impl PolarsPlanRunner {
             groups.entry(key).or_default().push(idx);
         }
 
-        let mut out: Vec<Option<i64>> = vec![None; n];
-        let mut out_row_number: Vec<Option<i64>> = vec![None; n];
+        let mut out_i64: Vec<Option<i64>> = vec![None; n];
+        let mut out_f64: Vec<Option<f64>> = vec![None; n];
 
         let value_col_name = match op {
-            WindowOp::Sum => {
+            WindowOp::Sum
+            | WindowOp::Mean
+            | WindowOp::Min
+            | WindowOp::Max
+            | WindowOp::Lag { .. }
+            | WindowOp::Lead { .. } => {
                 let Some(opnd) = operand.as_ref() else {
                     return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "window sum missing operand.",
+                        "window operation missing operand.",
                     ));
                 };
                 let ExprNode::ColumnRef { name, .. } = opnd.as_ref() else {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "framed window sum currently supports column operands only.",
+                        "framed window operations currently support column operands only.",
                     ));
                 };
                 Some(name.clone())
             }
-            WindowOp::RowNumber => None,
-            _ => {
-                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "framed execution currently supports row_number and window_sum.",
-                ));
-            }
+            WindowOp::RowNumber | WindowOp::Rank | WindowOp::DenseRank => None,
         };
 
         for (_pk, mut idxs) in groups {
@@ -911,7 +925,53 @@ impl PolarsPlanRunner {
 
             if matches!(op, WindowOp::RowNumber) {
                 for (pos, idx) in idxs.iter().enumerate() {
-                    out_row_number[*idx] = Some((pos + 1) as i64);
+                    out_i64[*idx] = Some((pos + 1) as i64);
+                }
+                continue;
+            }
+            if matches!(op, WindowOp::Rank) {
+                let mut rank = 1_i64;
+                for (pos, idx) in idxs.iter().enumerate() {
+                    if pos > 0 {
+                        let prev = idxs[pos - 1];
+                        let mut all_equal = true;
+                        for (c, _asc) in order_by.iter() {
+                            let s = df.column(c).map_err(polars_err)?.as_materialized_series();
+                            let a = s.get(prev).map_err(polars_err)?;
+                            let b = s.get(*idx).map_err(polars_err)?;
+                            if Self::anyvalue_sort_cmp(a, b) != Ordering::Equal {
+                                all_equal = false;
+                                break;
+                            }
+                        }
+                        if !all_equal {
+                            rank = (pos + 1) as i64;
+                        }
+                    }
+                    out_i64[*idx] = Some(rank);
+                }
+                continue;
+            }
+            if matches!(op, WindowOp::DenseRank) {
+                let mut dense = 1_i64;
+                for (pos, idx) in idxs.iter().enumerate() {
+                    if pos > 0 {
+                        let prev = idxs[pos - 1];
+                        let mut all_equal = true;
+                        for (c, _asc) in order_by.iter() {
+                            let s = df.column(c).map_err(polars_err)?.as_materialized_series();
+                            let a = s.get(prev).map_err(polars_err)?;
+                            let b = s.get(*idx).map_err(polars_err)?;
+                            if Self::anyvalue_sort_cmp(a, b) != Ordering::Equal {
+                                all_equal = false;
+                                break;
+                            }
+                        }
+                        if !all_equal {
+                            dense += 1;
+                        }
+                    }
+                    out_i64[*idx] = Some(dense);
                 }
                 continue;
             }
@@ -928,20 +988,13 @@ impl PolarsPlanRunner {
                 .clone();
 
             for (pos, idx) in idxs.iter().enumerate() {
-                let mut acc: i64 = 0;
-                let mut saw = false;
+                let mut frame_members: Vec<usize> = Vec::new();
                 match frame {
                     WindowFrame::Rows { start, end } => {
                         let lo = (pos as i64 + *start).max(0) as usize;
                         let hi = (pos as i64 + *end).min((idxs.len() as i64) - 1) as usize;
                         if lo <= hi {
-                            for cand_idx in idxs.iter().take(hi + 1).skip(lo) {
-                                let av = val_col.get(*cand_idx).map_err(polars_err)?;
-                                if let Some(v) = Self::anyvalue_as_i64(av) {
-                                    acc += v;
-                                    saw = true;
-                                }
-                            }
+                            frame_members.extend(idxs.iter().take(hi + 1).skip(lo).copied());
                         }
                     }
                     WindowFrame::Range { start, end } => {
@@ -956,24 +1009,88 @@ impl PolarsPlanRunner {
                             if let Some(v) = Self::anyvalue_as_i64(ord) {
                                 let delta = v - cur_v;
                                 if delta >= *start && delta <= *end {
-                                    let av = val_col.get(*cand_idx).map_err(polars_err)?;
-                                    if let Some(x) = Self::anyvalue_as_i64(av) {
-                                        acc += x;
-                                        saw = true;
-                                    }
+                                    frame_members.push(*cand_idx);
                                 }
                             }
                         }
                     }
                 }
-                out[*idx] = if saw { Some(acc) } else { None };
+
+                match op {
+                    WindowOp::Sum => {
+                        let mut acc: i64 = 0;
+                        let mut saw = false;
+                        for cand_idx in frame_members.iter() {
+                            let av = val_col.get(*cand_idx).map_err(polars_err)?;
+                            if let Some(v) = Self::anyvalue_as_i64(av) {
+                                acc += v;
+                                saw = true;
+                            }
+                        }
+                        out_i64[*idx] = if saw { Some(acc) } else { None };
+                    }
+                    WindowOp::Mean => {
+                        let mut acc: f64 = 0.0;
+                        let mut cnt: usize = 0;
+                        for cand_idx in frame_members.iter() {
+                            let av = val_col.get(*cand_idx).map_err(polars_err)?;
+                            if let Some(v) = Self::anyvalue_as_f64(av) {
+                                acc += v;
+                                cnt += 1;
+                            }
+                        }
+                        out_f64[*idx] = if cnt > 0 {
+                            Some(acc / (cnt as f64))
+                        } else {
+                            None
+                        };
+                    }
+                    WindowOp::Min => {
+                        let mut best: Option<i64> = None;
+                        for cand_idx in frame_members.iter() {
+                            let av = val_col.get(*cand_idx).map_err(polars_err)?;
+                            if let Some(v) = Self::anyvalue_as_i64(av) {
+                                best = Some(best.map_or(v, |b| b.min(v)));
+                            }
+                        }
+                        out_i64[*idx] = best;
+                    }
+                    WindowOp::Max => {
+                        let mut best: Option<i64> = None;
+                        for cand_idx in frame_members.iter() {
+                            let av = val_col.get(*cand_idx).map_err(polars_err)?;
+                            if let Some(v) = Self::anyvalue_as_i64(av) {
+                                best = Some(best.map_or(v, |b| b.max(v)));
+                            }
+                        }
+                        out_i64[*idx] = best;
+                    }
+                    WindowOp::Lag { n } => {
+                        let target = pos as i64 - (*n as i64);
+                        if target >= 0 {
+                            let av = val_col.get(idxs[target as usize]).map_err(polars_err)?;
+                            out_i64[*idx] = Self::anyvalue_as_i64(av);
+                        } else {
+                            out_i64[*idx] = None;
+                        }
+                    }
+                    WindowOp::Lead { n } => {
+                        let target = pos + (*n as usize);
+                        if target < idxs.len() {
+                            let av = val_col.get(idxs[target]).map_err(polars_err)?;
+                            out_i64[*idx] = Self::anyvalue_as_i64(av);
+                        } else {
+                            out_i64[*idx] = None;
+                        }
+                    }
+                    WindowOp::RowNumber | WindowOp::Rank | WindowOp::DenseRank => {}
+                }
             }
         }
 
-        if matches!(op, WindowOp::RowNumber) {
-            Ok(Series::new(name.into(), out_row_number))
-        } else {
-            Ok(Series::new(name.into(), out))
+        match op {
+            WindowOp::Mean => Ok(Series::new(name.into(), out_f64)),
+            _ => Ok(Series::new(name.into(), out_i64)),
         }
     }
 

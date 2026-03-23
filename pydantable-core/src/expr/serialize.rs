@@ -354,6 +354,14 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
             dict.set_item("key", key)?;
         }
+        ExprNode::MapKeys { inner, .. } => {
+            dict.set_item("kind", "map_keys")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+        }
+        ExprNode::MapValues { inner, .. } => {
+            dict.set_item("kind", "map_values")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+        }
         ExprNode::Window {
             op,
             operand,

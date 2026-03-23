@@ -494,3 +494,17 @@ def test_p6_dataframe_model_rolling_and_dynamic() -> None:
         v_count=("count", "v")
     )
     assert "v_count" in grouped.collect(as_lists=True)
+
+
+def test_dataframe_model_accepts_polars_dataframe_when_validate_data_false() -> None:
+    pl = pytest.importorskip("polars")
+    pdf = pl.DataFrame({"id": [1, 2], "age": [20, None]})
+    df = UserDF(pdf, validate_data=False)
+    assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
+
+
+def test_dataframe_model_polars_dataframe_rejects_column_mismatch() -> None:
+    pl = pytest.importorskip("polars")
+    pdf = pl.DataFrame({"id": [1], "bad": [2]})
+    with pytest.raises(ValueError, match="columns exactly"):
+        UserDF(pdf, validate_data=False)

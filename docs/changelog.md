@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here. The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.10.0] — 2026-03-23
+
+### Highlights
+
+- **Framed windows expanded:** framed execution now covers `window_mean`, `window_min`, `window_max`, `lag`, `lead`, `rank`, and `dense_rank` in addition to `row_number` / `window_sum`.
+- **Map utilities:** add `map_keys()` and `map_values()` to complement `map_len`, `map_get`, and `map_contains_key`.
+- **Parity and interop hardening:** PySpark parity tests for framed windows/map utilities plus trusted constructor coverage for Polars DataFrame input (`validate_data=False`).
+
+### Details
+
+See {doc}`INTERFACE_CONTRACT`, {doc}`PYSPARK_PARITY`, {doc}`SUPPORTED_TYPES`, and {doc}`ROADMAP`.
+
 ## [0.9.0] — 2026-03-23
 
 ### Highlights

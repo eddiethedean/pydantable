@@ -402,3 +402,74 @@ def test_pyspark_window_rows_between_ir_threading() -> None:
     payload = F.row_number().over(w)._rust_expr.to_serializable()
     assert payload["kind"] == "window"
     assert payload["frame"]["kind"] == "rows"
+
+
+def test_pyspark_map_keys_and_values_helpers() -> None:
+    class S(Schema):
+        m: dict[str, int]
+
+    df = DataFrame[S]({"m": [{"a": 1, "b": 2}]})
+    out = df.withColumn("k", F.map_keys(F.col("m", dtype=dict[str, int]))).withColumn(
+        "v", F.map_values(F.col("m", dtype=dict[str, int]))
+    )
+    got = out.select("k", "v").collect(as_lists=True)
+    assert got["k"] == [["a", "b"]]
+    assert got["v"] == [[1, 2]]
+
+
+def test_pyspark_window_rows_between_mean_contract() -> None:
+    from pydantable.pyspark.sql import Window
+
+    class S(Schema):
+        g: int
+        v: int
+
+    df = DataFrame[S]({"g": [1, 1, 1], "v": [10, 20, 30]})
+    w = Window.partitionBy("g").orderBy("v").rowsBetween(-1, 0)
+    out = df.withColumn("m", F.window_avg(F.col("v", dtype=int)).over(w)).collect(
+        as_lists=True
+    )
+    assert out["m"] == [10.0, 15.0, 25.0]
+
+
+def test_pyspark_window_rows_between_lag_contract() -> None:
+    from pydantable.pyspark.sql import Window
+
+    class S(Schema):
+        g: int
+        v: int
+
+    df = DataFrame[S]({"g": [1, 1, 1], "v": [10, 20, 30]})
+    w = Window.partitionBy("g").orderBy("v").rowsBetween(-1, 1)
+    out = df.withColumn("lg", F.lag(F.col("v", dtype=int), 1).over(w)).collect(
+        as_lists=True
+    )
+    assert out["lg"] == [None, 10, 20]
+
+
+def test_pyspark_window_range_between_mean_contract() -> None:
+    from pydantable.pyspark.sql import Window
+
+    class S(Schema):
+        g: int
+        v: int
+
+    df = DataFrame[S]({"g": [1, 1, 1], "v": [10, 11, 14]})
+    w = Window.partitionBy("g").orderBy("v").rangeBetween(-2, 0)
+    out = df.withColumn("m", F.window_avg(F.col("v", dtype=int)).over(w)).collect(
+        as_lists=True
+    )
+    assert out["m"] == [10.0, 10.5, 14.0]
+
+
+def test_pyspark_window_range_between_rejects_lag() -> None:
+    from pydantable.pyspark.sql import Window
+
+    class S(Schema):
+        g: int
+        v: int
+
+    df = DataFrame[S]({"g": [1, 1, 1], "v": [10, 20, 30]})
+    w = Window.partitionBy("g").orderBy("v").rangeBetween(-1, 0)
+    with pytest.raises(TypeError, match=r"lag\(\) does not support rangeBetween"):
+        df.withColumn("lg", F.lag(F.col("v", dtype=int), 1).over(w)).collect(as_lists=True)

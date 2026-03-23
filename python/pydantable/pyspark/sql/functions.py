@@ -273,6 +273,20 @@ def lead(column: Expr, n: int = 1) -> Any:
     return lead_expr(column, n)
 
 
+def map_keys(column: Expr) -> Expr:
+    """Per-row list of keys for ``dict[str, T]`` map columns."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.map_keys() expects a typed column Expr.")
+    return column.map_keys()
+
+
+def map_values(column: Expr) -> Expr:
+    """Per-row list of values for ``dict[str, T]`` map columns."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.map_values() expects a typed column Expr.")
+    return column.map_values()
+
+
 __all__ = [
     "avg",
     "between",
@@ -292,6 +306,8 @@ __all__ = [
     "lead",
     "length",
     "lit",
+    "map_keys",
+    "map_values",
     "max",
     "mean",
     "min",

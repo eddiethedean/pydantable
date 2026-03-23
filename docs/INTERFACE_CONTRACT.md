@@ -125,9 +125,9 @@ When the extension is built **without** the Polars execution engine, a small sub
 Supported P6 API surface:
 - `Expr.over(partition_by=..., order_by=...)` exists for API compatibility, but **window framing is not implemented yet**. Calling `.over()` with no arguments is silent; if you pass `partition_by` or `order_by`, pydantable emits a **runtime warning** and still evaluates the underlying expression as a non-window expression (no partition/order semantics).
 - **Named window functions** (`row_number`, `rank`, `dense_rank`, `window_sum`, `window_mean`, `window_min`, `window_max`, `lag`, `lead`) use Rust `ExprNode::Window` and lower to Polars **`.over_with_options(..., WindowMapping::default())`** when no frame is present. Framed windows now use a dedicated executor fallback path:
-  - `rowsBetween(start, end)`: supported for `row_number` and `window_sum`.
-  - `rangeBetween(start, end)`: supported for `window_sum` on integer order keys (range offsets are computed from the first `orderBy` key).
-  - Other framed operators currently raise a typed error.
+  - `rowsBetween(start, end)`: supported for `row_number`, `rank`, `dense_rank`, `window_sum`, `window_mean`, `window_min`, `window_max`, `lag`, and `lead`.
+  - `rangeBetween(start, end)`: supported for numeric aggregates (`window_sum`, `window_mean`, `window_min`, `window_max`) on integer order keys (range offsets are computed from the first `orderBy` key).
+  - Unsupported framed combinations raise typed errors.
   - Unframed behavior remains unchanged; **`lag` / `lead`** are implemented as **`shift(±n)`** in that window context and require **`order_by`**.
 - `rolling_agg(...)`
 - `group_by_dynamic(...).agg(...)` requires **positive** `every` and `period` duration strings (e.g. `every="0s"` raises `ValueError` to avoid infinite loops in the reference dynamic implementation).

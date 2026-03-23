@@ -313,6 +313,16 @@ class Expr:  # type: ignore[override]
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_map_contains_key(self._rust_expr, str(key)))
 
+    def map_keys(self) -> Expr:
+        """List of keys for each map cell."""
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_map_keys(self._rust_expr))
+
+    def map_values(self) -> Expr:
+        """List of values for each map cell."""
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_map_values(self._rust_expr))
+
     # List columns
     def list_len(self) -> Expr:
         rust = _require_rust_core()

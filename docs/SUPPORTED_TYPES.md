@@ -138,7 +138,7 @@ Beyond generic arithmetic and comparisons, the following are supported (see
 - **Boolean:** `&`, `|`, `~` for combining boolean-typed expressions.
 - **Datetime / date / time:** `dt_year()` … `dt_day()` on **`date`** or **`datetime`**; `dt_hour()` … **`dt_nanosecond()`** on **`datetime`** or **`time`**; **`dt_date()`** on **`datetime`** (calendar `date`). **`strptime(format, to_datetime=...)`** parses **`str`** → **`date`** or **`datetime`**. **`unix_timestamp(unit=...)`** returns epoch **`int`** from **`date`** / **`datetime`**. **`datetime ± timedelta`** and **`date ± timedelta`** use typed binary ops (see Rust `infer_arith_dtype`).
 - **Homogeneous lists:** `list_len()`, **`list_get(index)`** (int index; OOB → null), **`list_contains(value)`**, **`list_min()`** / **`list_max()`** / **`list_sum()`** on `list[int]` or `list[float]` (min/max/sum are numeric lists only).
-- **Maps (`dict[str, T]`):** **`map_len()`** (number of entries), **`map_get(key)`** (value or null), **`map_contains_key(key)`** (boolean; physical encoding is `List(Struct{key, value})`).
+- **Maps (`dict[str, T]`):** **`map_len()`** (number of entries), **`map_get(key)`** (value or null), **`map_contains_key(key)`** (boolean), **`map_keys()`** (list of keys), **`map_values()`** (list of values); physical encoding is `List(Struct{key, value})`.
 - **Binary (`bytes`):** **`binary_len()`** (per-row byte length).
 - **Cast:** `cast(T)` supports the usual primitive conversions plus `datetime` → `date` / `str` and `date` → `str`, and **`str` → `date` / `datetime`** using Polars’ string parsing (ISO-8601-shaped strings; behavior follows Polars). For a **fixed format**, use **`strptime(format, ...)`** instead of `cast`.
 

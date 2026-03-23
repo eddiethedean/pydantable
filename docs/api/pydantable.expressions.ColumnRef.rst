@@ -41,7 +41,9 @@
       ~ColumnRef.lower
       ~ColumnRef.map_contains_key
       ~ColumnRef.map_get
+      ~ColumnRef.map_keys
       ~ColumnRef.map_len
+      ~ColumnRef.map_values
       ~ColumnRef.over
       ~ColumnRef.referenced_columns
       ~ColumnRef.round

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from pydantable import DataFrame
 from pydantable.schema import Schema
 
@@ -61,3 +62,30 @@ def test_map_contains_key_and_nullable_map_behavior() -> None:
     ).collect(as_lists=True)
     assert out["has_a"] == [True, None, False]
     assert out["len_"] == [1, None, 1]
+
+
+def test_map_keys_and_map_values_roundtrip() -> None:
+    df = DataFrame[MapStruct]({"payload": [{"a": {"x": 1}, "b": None}]})
+    out = df.with_columns(k=df.payload.map_keys(), v=df.payload.map_values()).collect(
+        as_lists=True
+    )
+    assert out["k"] == [["a", "b"]]
+    assert out["v"] == [[{"x": 1}, None]]
+
+
+def test_map_keys_and_values_nullable_map_propagates_null() -> None:
+    df = DataFrame[MapNullable]({"payload": [{"a": [1]}, None]})
+    out = df.with_columns(k=df.payload.map_keys(), v=df.payload.map_values()).collect(
+        as_lists=True
+    )
+    assert out["k"] == [["a"], None]
+    assert out["v"] == [[[1]], None]
+
+
+def test_map_keys_requires_map_column() -> None:
+    class NotMap(Schema):
+        payload: list[int]
+
+    df = DataFrame[NotMap]({"payload": [[1, 2]]})
+    with pytest.raises(TypeError, match=r"map_keys\(\) requires a map column"):
+        df.with_columns(k=df.payload.map_keys())

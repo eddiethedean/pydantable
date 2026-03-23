@@ -137,6 +137,8 @@ impl ExprNode {
             | ExprNode::MapLen { dtype, .. }
             | ExprNode::MapGet { dtype, .. }
             | ExprNode::MapContainsKey { dtype, .. }
+            | ExprNode::MapKeys { dtype, .. }
+            | ExprNode::MapValues { dtype, .. }
             | ExprNode::Window { dtype, .. }
             | ExprNode::GlobalAgg { dtype, .. }
             | ExprNode::GlobalRowCount { dtype, .. } => dtype.clone(),
@@ -222,7 +224,9 @@ impl ExprNode {
             | ExprNode::BinaryLength { inner, .. }
             | ExprNode::MapLen { inner, .. }
             | ExprNode::MapGet { inner, .. }
-            | ExprNode::MapContainsKey { inner, .. } => inner.referenced_columns(),
+            | ExprNode::MapContainsKey { inner, .. }
+            | ExprNode::MapKeys { inner, .. }
+            | ExprNode::MapValues { inner, .. } => inner.referenced_columns(),
             ExprNode::ListGet { inner, index, .. } => {
                 let mut out = inner.referenced_columns();
                 out.extend(index.referenced_columns());
@@ -1357,6 +1361,15 @@ impl ExprNode {
         }
     }
 
+    fn reject_range_frame(frame: &Option<WindowFrame>, op_name: &str) -> PyResult<()> {
+        if matches!(frame, Some(WindowFrame::Range { .. })) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+                "{op_name}() does not support rangeBetween frames."
+            )));
+        }
+        Ok(())
+    }
+
     pub fn make_window_row_number(
         partition_by: Vec<String>,
         order_by: Vec<(String, bool)>,
@@ -1375,6 +1388,7 @@ impl ExprNode {
             ));
         }
         let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
+        Self::reject_range_frame(&frame, "row_number")?;
         Ok(ExprNode::Window {
             op: WindowOp::RowNumber,
             operand: None,
@@ -1402,6 +1416,7 @@ impl ExprNode {
             ));
         }
         let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
+        Self::reject_range_frame(&frame, "rank")?;
         Ok(ExprNode::Window {
             op: if dense {
                 WindowOp::DenseRank
@@ -1791,6 +1806,44 @@ impl ExprNode {
         })
     }
 
+    pub fn make_map_keys(inner: ExprNode) -> PyResult<Self> {
+        if !inner.dtype().is_map() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "map_keys() requires a map column.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::MapKeys {
+            inner: Box::new(inner),
+            dtype: DTypeDesc::List {
+                inner: Box::new(DTypeDesc::Scalar {
+                    base: Some(BaseType::Str),
+                    nullable: false,
+                }),
+                nullable,
+            },
+        })
+    }
+
+    pub fn make_map_values(inner: ExprNode) -> PyResult<Self> {
+        if !inner.dtype().is_map() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "map_values() requires a map column.",
+            ));
+        }
+        let DTypeDesc::Map { value, .. } = inner.dtype() else {
+            unreachable!("is_map checked");
+        };
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::MapValues {
+            inner: Box::new(inner),
+            dtype: DTypeDesc::List {
+                inner: Box::new(value.as_ref().clone()),
+                nullable,
+            },
+        })
+    }
+
     fn window_shift_operand_dtype(inner: &ExprNode) -> PyResult<DTypeDesc> {
         let d = inner.dtype();
         if d.is_struct() || d.is_list() || d.is_map() {
@@ -1830,6 +1883,7 @@ impl ExprNode {
         }
         let dtype = Self::window_shift_operand_dtype(&inner)?;
         let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
+        Self::reject_range_frame(&frame, "lag")?;
         Ok(ExprNode::Window {
             op: WindowOp::Lag { n },
             operand: Some(Box::new(inner)),
@@ -1861,6 +1915,7 @@ impl ExprNode {
         }
         let dtype = Self::window_shift_operand_dtype(&inner)?;
         let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
+        Self::reject_range_frame(&frame, "lead")?;
         Ok(ExprNode::Window {
             op: WindowOp::Lead { n },
             operand: Some(Box::new(inner)),
@@ -2923,7 +2978,9 @@ impl ExprNode {
             | ExprNode::BinaryLength { .. }
             | ExprNode::MapLen { .. }
             | ExprNode::MapGet { .. }
-            | ExprNode::MapContainsKey { .. } => {
+            | ExprNode::MapContainsKey { .. }
+            | ExprNode::MapKeys { .. }
+            | ExprNode::MapValues { .. } => {
                 Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
                     "This expression is only supported with the Polars execution engine.",
                 ))
