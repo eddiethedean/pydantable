@@ -115,3 +115,15 @@ def test_lag_and_lead_shift_within_partition() -> None:
     ).collect(as_lists=True)
     assert out["lg"] == [None, 10, 20, None]
     assert out["ld"] == [20, 30, None, None]
+
+
+def test_lag_and_lead_offset_two_within_partition() -> None:
+    """0.7.0 ``lag`` / ``lead`` with default offset 1; larger *n* shifts further."""
+    df = DataFrame[W]({"g": [1, 1, 1, 1], "v": [10, 20, 30, 40]})
+    w = Window.partitionBy("g").orderBy("v", ascending=True)
+    out = df.with_columns(
+        lg2=lag(df.v, 2).over(w),
+        ld2=lead(df.v, 2).over(w),
+    ).collect(as_lists=True)
+    assert out["lg2"] == [None, None, 10, 20]
+    assert out["ld2"] == [30, 40, None, None]

@@ -6,7 +6,7 @@ new façade APIs rather than chasing full Spark coverage here.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 import pytest
 from conftest import assert_table_eq_sorted
@@ -272,6 +272,26 @@ def test_aggregate_functions_global_sum_in_select() -> None:
     assert out == {"sum_v": [6]}
 
 
+def test_aggregate_count_star_global_select() -> None:
+    """``F.count()`` with no column is ``count(*)`` / row count (0.8.0)."""
+    class S(Schema):
+        v: int
+
+    df = DataFrame[S]({"v": [1, 2, 3]})
+    assert df.select(F.count()).collect(as_lists=True) == {"row_count": [3]}
+
+
+def test_aggregate_count_star_vs_count_column_with_nulls() -> None:
+    class S(Schema):
+        v: int | None
+
+    df = DataFrame[S]({"v": [1, None, 3]})
+    assert df.select(F.count()).collect(as_lists=True) == {"row_count": [3]}
+    assert df.select(F.count(F.col("v", dtype=int | None))).collect(
+        as_lists=True
+    ) == {"count_v": [2]}
+
+
 def test_aggregate_sum_requires_column() -> None:
     with pytest.raises(TypeError):
         F.sum()  # type: ignore[call-arg]
@@ -304,6 +324,46 @@ def test_functions_to_date_year_month_on_datetime() -> None:
     assert out["d"] == [date(2024, 6, 15)]
     assert out["y"] == [2024]
     assert out["mo"] == [6]
+
+
+def test_functions_to_date_string_with_format_uses_strptime() -> None:
+    """PySpark ``to_date(col, format=...)`` maps to ``strptime`` (0.7.0)."""
+    class S(Schema):
+        s: str
+
+    df = DataFrame[S]({"s": ["2024-06-01"]})
+    s = F.col("s", dtype=str)
+    out = df.withColumn("d", F.to_date(s, format="%Y-%m-%d")).collect(as_lists=True)
+    assert out["d"] == [date(2024, 6, 1)]
+
+
+def test_functions_unix_timestamp_seconds_and_ms() -> None:
+    import calendar
+
+    class S(Schema):
+        ts: datetime
+
+    ts = datetime(2020, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    df = DataFrame[S]({"ts": [ts]})
+    col = F.col("ts", dtype=datetime)
+    sec = df.withColumn("u", F.unix_timestamp(col, unit="seconds")).collect(
+        as_lists=True
+    )
+    ms = df.withColumn("u", F.unix_timestamp(col, unit="ms")).collect(as_lists=True)
+    exp = int(calendar.timegm((2020, 1, 1, 12, 0, 0, 0, 0, 0)))
+    assert sec["u"] == [exp]
+    assert ms["u"] == [exp * 1000]
+
+
+def test_functions_nanosecond_on_datetime() -> None:
+    class S(Schema):
+        ts: datetime
+
+    df = DataFrame[S]({"ts": [datetime(2024, 1, 1, 0, 0, 0, 500000)]})
+    out = df.withColumn("ns", F.nanosecond(F.col("ts", dtype=datetime))).collect(
+        as_lists=True
+    )
+    assert out["ns"] == [500_000_000]
 
 
 def test_functions_avg_mean_global_select_match() -> None:
