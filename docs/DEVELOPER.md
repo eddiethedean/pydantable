@@ -236,4 +236,4 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 
 ### Publishing (PyPI)
 
-Pushing a git tag matching `v*` (for example `v0.11.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then `maturin publish` for multiple platforms. The repository needs a **`PYPI_API_TOKEN`** secret (see workflow env `MATURIN_PYPI_TOKEN`). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit.
+Pushing a git tag matching `v*` (for example `v0.10.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then `maturin publish` for multiple platforms. The repository needs a **`PYPI_API_TOKEN`** secret (see workflow env `MATURIN_PYPI_TOKEN`). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit.

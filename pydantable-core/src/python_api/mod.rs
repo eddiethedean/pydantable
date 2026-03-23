@@ -85,7 +85,7 @@ impl PyPlan {
 
 #[pyfunction]
 fn rust_version() -> &'static str {
-    "0.11.0"
+    "0.10.0"
 }
 
 #[pyfunction]
