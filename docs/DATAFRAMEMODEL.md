@@ -160,7 +160,14 @@ The expression system must:
 - keep parity with the lower-level `DataFrame[Schema]` expression behavior
   (including reflected arithmetic such as `2 + df.age`)
 
-## Typed Dtypes + Null Semantics (skeleton contract)
+### Global aggregates in `select` (0.7–0.8)
+
+`select` can collapse the frame to **one row** using globals such as `global_sum`,
+`global_row_count()`, or PySpark `F.count()` with no argument. Rules (mixing projections
+vs globals, row count vs non-null count) are documented in **`INTERFACE_CONTRACT.md`**
+under *Global aggregates in `select`*.
+
+## Typed Dtypes + Null Semantics
 
 Supported **scalar** dtypes for schema fields and expressions:
 

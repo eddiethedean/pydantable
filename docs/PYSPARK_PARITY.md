@@ -23,7 +23,7 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `functions.isnull`, `isnotnull`, `coalesce` | **Supported** | Via Rust `ExprNode`. |
 | `functions.when` / `otherwise` | **Supported** | `CaseWhen` in Rust; chain `.when(...).otherwise(...)`. |
 | `functions.cast`, `between`, `isin`, `concat`, `substring`, `length` | **Supported** | Base types only; `substring` is 1-based (Spark-style). |
-| `functions.sum`, `avg`, `count`, `min`, `max`, … as column exprs | **Partial** | Global `sum`/`avg`/`mean`/`count`/`min`/`max` on a typed `Expr` work in `DataFrame.select(...)` (single-row); grouped paths use `group_by().agg`. |
+| `functions.sum`, `avg`, `count`, `min`, `max`, … as column exprs | **Supported** (global) | Global `sum`/`avg`/`mean`/`count`/`min`/`max` on a typed `Expr` in `DataFrame.select(...)` (single-row). **`count()`** with **no** argument → row count (**0.8.0**). Grouped paths use `group_by().agg`. |
 | `Column.cast`, `isin`, `between`, `substr`/`char_length` | **Supported** | On `Expr` / `Column`; includes **`str` → `date` / `datetime`** via Polars parsing (use `strptime` for fixed formats). |
 | `Window`, window functions | **Partial** | `Window.partitionBy().orderBy()`, `row_number`, `rank`, `dense_rank`, `window_sum`, `window_avg`, `window_min`, `window_max`, `lag`, `lead` + core `Expr` lowering; SQL-style framing (`rowsBetween`, …) IR-only (lowering not implemented). |
 | `types` (Array, Map, nested Struct, Decimal, Timestamp) | **Partial** | Engine supports nested structs/lists, `Decimal`, `datetime`/`date`, homogeneous `dict[str, T]` maps, `bytes`, and `time`; PySpark `types` mirrors annotations for docs/schema views. |

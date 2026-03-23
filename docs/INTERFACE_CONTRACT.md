@@ -57,6 +57,24 @@ comparisons. Null propagation follows **Polars** (Kleene / three-valued) rules f
 still keeps rows where the predicate is exactly `True`; combined expressions may
 produce `NULL` boolean cells where operands are null.
 
+## Global aggregates in `select` (whole-frame)
+
+`DataFrame.select(...)` can return a **single-row** frame of **global** aggregates:
+
+- **Positional:** either only global aggregate expressions (e.g. `global_sum(df.v)`,
+  `global_row_count()`) **or** only plain column name projections — **not both** in the
+  same call.
+- **Keyword:** only named global aggregates (each value is an `Expr`, e.g.
+  `total=global_sum(df.v)`); cannot mix keywords with positional column names or
+  positional aggregates in the same call.
+- **`global_row_count()`** counts **rows** in the current logical frame (SQL `COUNT(*)`).
+  **`global_count(column)`** counts **non-null** values of that column (SQL `COUNT(col)`).
+- **PySpark façade:** `functions.count()` with **no** column argument matches
+  **`global_row_count()`**; `functions.count(F.col(...))` matches **`global_count`** on
+  that column.
+- Global aggregate expressions may also appear in **`with_columns`**, where they lower to
+  a scalar **broadcast** to every row (same height as the frame).
+
 ## Group-by aggregation semantics (all-null groups)
 
 Supported aggregation operators:

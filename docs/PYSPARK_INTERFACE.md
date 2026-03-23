@@ -26,7 +26,7 @@ See:
 
 | PySpark API | Typed pydantable API | Status | Notes |
 |---|---|---|---|
-| `select` | `select` | Implemented | Name/column-ref selection. |
+| `select` | `select` | Implemented | Column names/refs; **global** aggregates (`F.sum`, `F.count(col)`, **`F.count()`** with no arg for row count — **0.8.0**) yield a single-row frame per `INTERFACE_CONTRACT.md`. |
 | `withColumn` | `withColumn` | Implemented | PySpark-style wrapper over `with_columns`. |
 | `withColumns` | `withColumns` | Implemented | Mapping wrapper over `with_columns`. |
 | `withColumnRenamed` | `withColumnRenamed` | Implemented | Wrapper over `rename({old: new})`. |

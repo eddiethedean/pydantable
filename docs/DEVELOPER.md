@@ -224,11 +224,16 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 
 ## Release Notes Checklist (for contributors)
 
-- [ ] Version matches everywhere: `pyproject.toml`, `pydantable-core/Cargo.toml`, `python/pydantable/__init__.py`, and `rust_version()` in `pydantable-core/src/python_api/mod.rs`
+- [ ] Version matches everywhere: `pyproject.toml`, `pydantable-core/Cargo.toml`, `python/pydantable/__init__.py`, and `rust_version()` in `pydantable-core/src/python_api/mod.rs` (CI also runs `tests/test_version_alignment.py`, which asserts `__version__ == _core.rust_version()`)
 - [ ] `docs/changelog.md` has a section for the release with highlights
 - [ ] `make check-full` passes (Ruff, mypy, `cargo fmt --check`, `clippy -D warnings`, `cargo test --all-features`)
-- [ ] Python tests pass in `.venv` (`pytest`); optional: `scripts/verify_doc_examples.py` after a release build
+- [ ] Python tests pass in `.venv` (`pytest`)
+- [ ] `scripts/verify_doc_examples.py` passes (requires a built `pydantable._core`)
 - [ ] Rust changes compile in package build path (`maturin build --release`)
 - [ ] Docs updated for behavior/contract changes
 - [ ] `sphinx-build -W -b html docs docs/_build/html` succeeds (matches Read the Docs `fail_on_warning`)
 - [ ] Roadmap status updated when a phase milestone changes
+
+### Publishing (PyPI)
+
+Pushing a git tag matching `v*` (for example `v0.8.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then `maturin publish` for multiple platforms. The repository needs a **`PYPI_API_TOKEN`** secret (see workflow env `MATURIN_PYPI_TOKEN`). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit.

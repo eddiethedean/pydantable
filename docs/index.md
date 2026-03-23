@@ -16,7 +16,7 @@ This **documentation site** is the detailed manual. The repository **README** on
 
 **Scalar dtypes** include `int`, `float`, `bool`, `str`, `datetime`, `date`, `time`, `timedelta`, `bytes`, homogeneous **`dict[str, T]`** maps, each nullable via `Optional` / `| None`. **Structs**, **lists**, **UUID**, **Decimal**, and **Enum** columns are documented in {doc}`SUPPORTED_TYPES`. Unsupported `DataFrameModel` field annotations fail at **class definition** time.
 
-**Expressions (0.7+):** typed **`Expr`** builds a Rust AST — globals (`global_sum`, `global_row_count`, …), window ranks, **`window_min`/`window_max`**, **`lag`/`lead`**, temporal parse/extract and **`str`→temporal `cast`**, **`map_len`/`map_get`/`map_contains_key`**, **`binary_len`**, and PySpark mirrors in {doc}`PYSPARK_PARITY`. Semantics: {doc}`INTERFACE_CONTRACT` and {doc}`changelog`.
+**Expressions (through 0.8.0):** typed **`Expr`** builds a Rust AST — whole-frame globals including **`global_row_count()`** vs **`global_count(col)`**, window **`window_min`/`window_max`** plus ranks/shifts, **`str`→`date`/`datetime` `cast`** (and **`strptime`** for fixed formats), **`map_get`/`map_contains_key`** on **`dict[str, T]`**, **`binary_len`**, and PySpark mirrors in {doc}`PYSPARK_PARITY`. Semantics: {doc}`INTERFACE_CONTRACT` and {doc}`changelog`.
 
 ## Where to go next
 

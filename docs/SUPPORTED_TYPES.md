@@ -55,7 +55,7 @@ scalar fields or `Expr.struct_field(...)` for field projection.
 
 ## Map-like columns (`dict[str, T]`)
 
-Homogeneous **string-keyed** maps: **`dict[str, T]`** where **`T`** is any supported scalar or nested type allowed elsewhere. Cells are Python `dict` values; the engine stores a logical map as Polars **`List(Struct{key: str, value: T})`**. Expression support is intentionally small (equality, **`Expr.map_len()`** entry count, membership-style operations where implemented); not all Polars map ops are exposed.
+Homogeneous **string-keyed** maps: **`dict[str, T]`** where **`T`** is any supported scalar or nested type allowed elsewhere. Cells are Python `dict` values; the engine stores a logical map as Polars **`List(Struct{key: str, value: T})`**. Expression support is intentionally small: equality, **`map_len()`**, **`map_get(key)`**, **`map_contains_key(key)`** (see *Expression typing* below); not all Polars map ops are exposed.
 
 ## Homogeneous list columns (`list[T]` / `List[T]`)
 

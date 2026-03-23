@@ -17,10 +17,12 @@ names and imports** (e.g. `assign` vs `withColumn`). They do not select a differ
 execution engine.
 
 **Typed expressions** (`Expr`, `Column`, PySpark `F.col(...)`) are validated in Rust
-(`ExprNode`), then lowered to Polars inside the extension. As of **0.8.0**, this includes
-whole-frame global aggregates, window **`lag`/`lead`**, **`strptime`** / **`unix_timestamp`**,
-**`map_len`**, **`binary_len`**, and related PySpark helpers — see {doc}`INTERFACE_CONTRACT`,
-{doc}`SUPPORTED_TYPES`, and {doc}`changelog`.
+(`ExprNode`), then lowered to Polars inside the extension. **0.8.0** extends the surface with:
+**`global_row_count()`** and PySpark **`count()`** with no argument (row count in global
+**`select`**), **`window_min`/`window_max`**, **`map_get`/`map_contains_key`** on map columns,
+**`str`→`date`/`datetime` `cast`**, plus the **0.7.0** additions (**`global_count`/`min`/`max`**,
+**`lag`/`lead`**, **`strptime`/`unix_timestamp`**, **`dt_nanosecond`**, **`map_len`**, **`binary_len`**).
+See {doc}`INTERFACE_CONTRACT`, {doc}`SUPPORTED_TYPES`, and {doc}`changelog`.
 
 Use the default package exports for Polars-style names:
 

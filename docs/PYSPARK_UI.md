@@ -80,7 +80,7 @@ from pydantable.pyspark.sql import functions as F, Column, IntegerType, StructTy
 
 This block only checks that imports resolve; it has no printed output.
 
-- **`functions`** — `lit`, typed **`col(..., dtype=...)`**, `isnull` / `isnotnull`, `coalesce`, `when` / `otherwise`, `cast`, `between`, `isin`, `concat`, `substring`, `length`, **`year` / `month` / `day` / `hour` / `minute` / `second` / `to_date`** (wrappers over core `Expr` temporal APIs), and aggregate helpers (see parity matrix for global vs grouped).
+- **`functions`** — `lit`, typed **`col(..., dtype=...)`**, `isnull` / `isnotnull`, `coalesce`, `when` / `otherwise`, `cast`, `between`, `isin`, `concat`, `substring`, `length`, **`year` / `month` / `day` / `hour` / `minute` / `second` / `nanosecond` / `to_date` / `unix_timestamp`** (wrappers over core `Expr` temporal APIs), global **`sum`/`avg`/`mean`/`count`/`min`/`max`** for **`select`** (including **`count()`** with no args → row count), and window helpers — see the parity matrix.
 - **`Column`** — type alias for pydantable **`Expr`**.
 - **`types`** — simple `IntegerType`, `StringType`, `StructField`, `StructType`, … for documentation and `schema` views.
 
@@ -89,7 +89,7 @@ Full coverage vs Spark is summarized in **[PySpark parity matrix](PYSPARK_PARITY
 ## What is intentionally out of scope
 
 - **`SparkSession`**, **`spark.sql("...")`**, streaming, catalogs.
-- **`Window`** / **`WindowSpec`** — see `pydantable.pyspark.sql.window` (partition + order keys; no full frame API yet).
+- **SQL window frames** (`rowsBetween` / `rangeBetween`): partition + order via **`Window`** / **`WindowSpec`** are supported (see `pydantable.pyspark.sql.window`); frame lowering is not implemented yet (`INTERFACE_CONTRACT.md`).
 - Untyped **`F.col("x")`** without **`dtype=`** (pydantable requires static types at build time).
 - Interop with a real **`pyspark.sql.DataFrame`** unless a dedicated integration is added later.
 

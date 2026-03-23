@@ -54,7 +54,14 @@ PydanTable keeps **Pydantic models** as the source of truth for:
 
 The default API feels **Polars-like**; optional **`pydantable.pandas`** and **`pydantable.pyspark`** modules only change naming and imports — execution is always the native core. Details: [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html), [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html).
 
-**0.8.0+ expression surface (Rust-typed `Expr`):** whole-frame **`global_*`** aggregates and **`global_row_count`** / `count(*)`, **window** `lag` / `lead` / `window_min` / `window_max` (with `Window.partitionBy(...).orderBy(...)`), **temporal** helpers (`strptime`, `unix_timestamp`, `cast` from ISO strings), **map** `map_len` / `map_get` / `map_contains_key`, and **binary** byte length (`binary_len`). PySpark-named wrappers live under `pydantable.pyspark.sql.functions`. See [CHANGELOG](https://pydantable.readthedocs.io/en/latest/changelog.html).
+**Expression surface (current release, Rust-typed `Expr`):**
+
+- **Globals in `select`:** `global_sum`, `global_mean`, `global_count`, `global_min`, `global_max`, and **`global_row_count()`** (row count / `COUNT(*)`). PySpark: `F.count()` with no argument for row count; `F.count(F.col(...))` for non-null column count.
+- **Windows:** `row_number`, `rank`, `dense_rank`, `window_sum`, `window_mean`, **`window_min`**, **`window_max`**, `lag`, `lead` with `Window.partitionBy(...).orderBy(...)` / `.spec()`.
+- **Temporal:** `strptime`, `unix_timestamp`, **`cast` from `str` → `date` / `datetime`** (Polars parsing; use `strptime` for fixed formats), `dt_*` parts, `dt_nanosecond` on `datetime` / `time`.
+- **Maps / binary:** `map_len`, **`map_get`**, **`map_contains_key`**, `binary_len`.
+
+PySpark-named helpers live under `pydantable.pyspark.sql.functions`. Details: [Supported types](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html), [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html), [CHANGELOG](https://pydantable.readthedocs.io/en/latest/changelog.html).
 
 ---
 

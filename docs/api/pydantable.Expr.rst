@@ -16,6 +16,7 @@
       ~Expr.__init__
       ~Expr.abs
       ~Expr.between
+      ~Expr.binary_len
       ~Expr.cast
       ~Expr.ceil
       ~Expr.char_length
@@ -24,6 +25,7 @@
       ~Expr.dt_hour
       ~Expr.dt_minute
       ~Expr.dt_month
+      ~Expr.dt_nanosecond
       ~Expr.dt_second
       ~Expr.dt_year
       ~Expr.floor
@@ -37,6 +39,9 @@
       ~Expr.list_min
       ~Expr.list_sum
       ~Expr.lower
+      ~Expr.map_contains_key
+      ~Expr.map_get
+      ~Expr.map_len
       ~Expr.over
       ~Expr.referenced_columns
       ~Expr.round
@@ -45,8 +50,10 @@
       ~Expr.strip_chars
       ~Expr.strip_prefix
       ~Expr.strip_suffix
+      ~Expr.strptime
       ~Expr.struct_field
       ~Expr.substr
+      ~Expr.unix_timestamp
       ~Expr.upper
    
    

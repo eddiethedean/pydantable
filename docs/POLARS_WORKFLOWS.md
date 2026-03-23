@@ -100,3 +100,39 @@ Output (one run):
 {'v': [10, None, 30], 'ts': [0, 3600, 7200], 'id': [1, 1, 1], 'v_roll': [10, 10, 40]}
 {'ts': [0, 3600, 7200], 'id': [1, 1, 1], 'v_sum': [10, None, 30], 'v_count': [1, 0, 1]}
 ```
+
+## 4) Single-row metrics (`select` globals, 0.8.0)
+
+Whole-frame aggregates return one row — useful for dashboards or summaries after `filter`:
+
+```python
+from pydantable import DataFrameModel
+from pydantable.expressions import global_count, global_row_count, global_sum
+
+class Sales(DataFrameModel):
+    region: str
+    amount: int | None
+
+df = Sales(
+    {
+        "region": ["US", "US", "EU"],
+        "amount": [10, None, 5],
+    }
+)
+hot = df.filter(df.region == "US")
+out = hot.select(
+    global_row_count(),
+    global_count(hot.amount),
+    global_sum(hot.amount),
+).to_dict()
+print(out)
+```
+
+Output (one run):
+
+```text
+{'row_count': [2], 'sum_amount': [10], 'count_amount': [1]}
+```
+
+PySpark UI: same idea with `from pydantable.pyspark.sql import functions as F` and
+`df.select(F.count(), F.count(F.col("amount", dtype=int | None)), F.sum(F.col("amount", dtype=int | None)))`.
