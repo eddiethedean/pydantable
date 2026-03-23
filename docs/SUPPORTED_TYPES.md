@@ -192,7 +192,7 @@ or a **Polars `DataFrame`** as documented in {doc}`EXECUTION` and {doc}`PERFORMA
 scalar dtypes must still match the schema. Use **`trusted_mode`** on **`DataFrame` /
 `DataFrameModel`** for explicit **`shape_only`** vs **`strict`** checks (introduced in
 **0.11.0**; **0.12.0** extends **`strict`** to nested list / dict / struct shapes on
-Polars and columnar Python paths; **0.13.1** adds **`strict`** dtype checks for **PyArrow**
+Polars and columnar Python paths; **0.13.0** adds **`strict`** dtype checks for **PyArrow**
 `Array` / `ChunkedArray` columns (and accepts all concrete Arrow array classes as trusted
 buffers). See `schema.validate_columns_strict`); **`validate_data`**
 remains a compatibility alias mapped onto those modes.

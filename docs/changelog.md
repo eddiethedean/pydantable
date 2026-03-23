@@ -2,33 +2,24 @@
 
 All notable changes to this project are documented here. The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.13.1] — 2026-03-23
-
-### Highlights
-
-- **0.13.x roadmap closure:** completes **Remaining in 0.13.x** (see {doc}`ROADMAP`): FastAPI trust-boundary guidance for large/pre-validated tables and Polars/Arrow; window **null ordering** and **`CURRENT ROW`** / peer framing documentation; benchmark scripts for **framed windows** and **trusted strict** Polars ingest.
-- **Trusted `strict` + PyArrow:** dtype checks for **PyArrow** columns using `isinstance(..., pa.Array | pa.ChunkedArray)` in trusted buffers (fixes acceptance of concrete array types such as `Int64Array`); stricter scalar matching for **int**, **float**, **decimal**, **enum**, **uuid**, and temporal Arrow types. New tests in `tests/test_trusted_strict_pyarrow.py`; **`pyarrow>=14`** added to **`[dev]`** and CI test install.
-- **Docs:** {doc}`FASTAPI`, {doc}`PERFORMANCE`, {doc}`WINDOW_SQL_SEMANTICS`, {doc}`INTERFACE_CONTRACT`, {doc}`README`, {doc}`POLARS_TRANSFORMATIONS_ROADMAP`.
-
-### Details
-
-Optional **window `NULLS FIRST` / `LAST` API** and **`shape_only`** dtype-drift **warnings** are deferred to {doc}`ROADMAP` **Planned 0.14.0**.
-
 ## [0.13.0] — 2026-03-23
 
 ### Highlights
 
-- **Documentation / DX (stabilization):** {doc}`FASTAPI` guide expanded — **`trusted_mode`** and legacy **`validate_data`**, column-shaped **`dict[str, list]`** request bodies (Pydantic body models), **sync** materialization and async roadmap pointers in {doc}`ROADMAP` (async I/O: **Planned 0.15.0**); install notes aligned with PyPI wheels vs git builds.
-- **Sync-only I/O called out:** {doc}`EXECUTION` and {doc}`PERFORMANCE` state that materialization and interchange are **blocking** today; link forward to {doc}`ROADMAP` **Planned 0.15.0** async work. {doc}`PERFORMANCE` tuning text prefers **`trusted_mode`** wording alongside **`validate_data`**.
-- **Discoverability:** {doc}`index` landing copy updated (current expression/trusted-ingest summary); {doc}`INTERFACE_CONTRACT` and {doc}`WINDOW_SQL_SEMANTICS` gain “related documentation” cross-links; {doc}`README` roadmap table refreshed.
-- **CI:** comment documenting **`RUSTSEC-2025-0141`** ignore in GitHub Actions audit step; actions versions reviewed (no bump required).
-- **Examples:** `scripts/verify_doc_examples.py` covers new FastAPI doc patterns (trusted ingest + columnar body).
+- **Stabilization + combined scope:** {doc}`FASTAPI` — **`trusted_mode`** / **`validate_data`**, column-shaped **`dict[str, list]`** bodies, **sync** materialization and **0.15.0** async pointers; trust-boundary guidance for large / pre-validated tables and **Polars** / **Arrow**; install notes for PyPI wheels vs git builds.
+- **Sync-only I/O:** {doc}`EXECUTION` and {doc}`PERFORMANCE` call out **blocking** materialization and interchange today; link to **Planned 0.15.0** async work. Tuning text prefers **`trusted_mode`** alongside **`validate_data`**.
+- **Window semantics (docs):** null ordering and **`CURRENT ROW`** / peer framing in {doc}`WINDOW_SQL_SEMANTICS` and {doc}`INTERFACE_CONTRACT`; `Window` docstring in `window_spec.py`. Optional **`NULLS FIRST` / `LAST`** API remains deferred to {doc}`ROADMAP` **Planned 0.14.0**.
+- **Trusted `strict` + PyArrow:** `isinstance(..., pa.Array | pa.ChunkedArray)` in trusted buffers (concrete array types such as `Int64Array`); stricter scalars for **int**, **float**, **decimal**, **enum**, **uuid**, and temporal Arrow types. Tests in `tests/test_trusted_strict_pyarrow.py`; **`pyarrow>=14`** in **`[dev]`** and CI. Optional **`shape_only`** drift **warnings** deferred to **Planned 0.14.0**.
+- **Performance:** `benchmarks/framed_window_bench.py`, `benchmarks/trusted_polars_ingest_bench.py`; {doc}`PERFORMANCE` table and cross-links.
+- **Discoverability:** {doc}`index`, {doc}`README` roadmap table, and cross-links across {doc}`INTERFACE_CONTRACT`, {doc}`WINDOW_SQL_SEMANTICS`, {doc}`POLARS_TRANSFORMATIONS_ROADMAP`.
+- **CI:** **`RUSTSEC-2025-0141`** audit-step comment; GitHub Actions versions reviewed (**`actions/cache@v4`**, etc.).
+- **Examples:** `scripts/verify_doc_examples.py` covers new FastAPI patterns (trusted ingest + columnar body).
 
 ### Details
 
-Release audit: `make check-full` and full **pytest** green with a **release** `maturin` build. No API or semantic changes to **`rangeBetween`**, trusted **`strict`**, or **`map_from_entries`** beyond documentation clarity.
+Release audit: `make check-full` and full **pytest** green with a **release** `maturin` build. No regressions to **`rangeBetween`**, trusted **`strict`**, or **`map_from_entries`** beyond documentation and **PyArrow** **`strict`** hardening above.
 
-**Roadmap (editorial):** **0.13.x** combines shipped **0.13.0** with the scope formerly planned as **0.14.0** (**Remaining in 0.13.x**). Former **0.15.0** / **0.16.0** rows are renumbered to **Planned 0.14.0** and **Planned 0.15.0**; async I/O targets **0.15.0**.
+**Roadmap (editorial):** **0.13.0** ships the documentation-first stabilization track together with the scope formerly planned as **Remaining in 0.13.x** / **0.14.0**. Former **0.15.0** / **0.16.0** rows are renumbered to **Planned 0.14.0** and **Planned 0.15.0**; async I/O targets **0.15.0**.
 
 See {doc}`FASTAPI`, {doc}`EXECUTION`, {doc}`PERFORMANCE`, {doc}`ROADMAP`, and {doc}`INTERFACE_CONTRACT`.
 
