@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import pytest
 from conftest import assert_table_eq_sorted
 from hypothesis import assume, given, settings
@@ -9,6 +11,7 @@ from hypothesis import strategies as st
 from hypothesis.strategies import composite
 from pydantable import DataFrame, Schema
 from pydantable.schema import (
+    DtypeDriftWarning,
     dtype_descriptor_to_annotation,
     schema_from_descriptors,
     validate_columns_strict,
@@ -168,6 +171,19 @@ def test_with_columns_identity_age_column(data: dict[str, list]) -> None:
     df = DataFrame[TwoInt](data)
     out = df.with_columns(age=df.age).collect(as_lists=True)
     assert_table_eq_sorted(out, data, ["id"])
+
+
+@given(data=aligned_two_int_columns())
+@settings(max_examples=35, deadline=None)
+def test_shape_only_trusted_int_columns_never_dtype_drift(
+    data: dict[str, list],
+) -> None:
+    """``shape_only`` must not warn when values satisfy strict scalar checks."""
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter("always")
+        DataFrame[TwoInt](data, trusted_mode="shape_only")
+    drift = [w for w in rec if issubclass(w.category, DtypeDriftWarning)]
+    assert not drift
 
 
 @given(data=aligned_two_int_columns())

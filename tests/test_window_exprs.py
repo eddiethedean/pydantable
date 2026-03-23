@@ -100,9 +100,8 @@ def test_row_number_respects_nulls_last() -> None:
     out_first = df.with_columns(rn=row_number().over(w_first)).collect(as_lists=True)
     w_last = Window.partitionBy("g").orderBy("v", ascending=True, nulls_last=True)
     out_last = df.with_columns(rn=row_number().over(w_last)).collect(as_lists=True)
-    assert out_first["rn"] != out_last["rn"]
-    assert sorted(out_first["rn"]) == [1, 2, 3, 4]
-    assert sorted(out_last["rn"]) == [1, 2, 3, 4]
+    assert out_first["rn"] == [1, 3, 2, 4]
+    assert out_last["rn"] == [3, 1, 4, 2]
 
 
 def test_order_by_nulls_last_length_mismatch_raises() -> None:
