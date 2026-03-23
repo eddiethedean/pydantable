@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import sys
 import typing
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, cast
 
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, ValidationError, create_model
 
 from .dataframe import DataFrame
 from .schema import Schema, validate_dataframe_model_field_annotations
@@ -27,6 +27,8 @@ def _normalize_input(
     *,
     data: Mapping[str, Any] | Sequence[Mapping[str, Any] | BaseModel],
     row_model: type[BaseModel],
+    ignore_errors: bool = False,
+    on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> dict[str, list[Any]]:
     expected_fields = list(row_model.model_fields.keys())
 
@@ -42,19 +44,50 @@ def _normalize_input(
         if not rows:
             return {name: [] for name in expected_fields}
 
-        normalized_rows: list[BaseModel] = []
-        for row in rows:
-            if isinstance(row, (BaseModel, Mapping)):
-                normalized_rows.append(row_model.model_validate(row))
-            else:
-                raise TypeError(
-                    "Row input must be a sequence of mapping objects or "
-                    "Pydantic models."
+        valid_rows: list[dict[str, Any]] = []
+        failures: list[dict[str, Any]] = []
+        for idx, row in enumerate(rows):
+            if not isinstance(row, (BaseModel, Mapping)):
+                if not ignore_errors:
+                    raise TypeError(
+                        "Row input must be a sequence of mapping objects or "
+                        "Pydantic models."
+                    )
+                failures.append(
+                    {
+                        "row_index": idx,
+                        "row": {"_raw_row": row},
+                        "errors": [
+                            {
+                                "type": "type_error",
+                                "loc": (),
+                                "msg": (
+                                    "Row input must be a mapping object or "
+                                    "Pydantic model."
+                                ),
+                                "input": row,
+                            }
+                        ],
+                    }
                 )
+                continue
+            row_dict = row.model_dump() if isinstance(row, BaseModel) else dict(row)
+            try:
+                parsed = row_model.model_validate(row)
+            except ValidationError as exc:
+                if not ignore_errors:
+                    raise
+                failures.append(
+                    {"row_index": idx, "row": row_dict, "errors": exc.errors()}
+                )
+                continue
+            valid_rows.append(parsed.model_dump())
+
+        if failures and on_validation_errors is not None:
+            on_validation_errors(failures)
 
         columns: dict[str, list[Any]] = {name: [] for name in expected_fields}
-        for model_row in normalized_rows:
-            row_dict = model_row.model_dump()
+        for row_dict in valid_rows:
             for name in expected_fields:
                 columns[name].append(row_dict[name])
         return columns
@@ -116,16 +149,27 @@ class DataFrameModel:
         data: Mapping[str, Any] | Sequence[Mapping[str, Any] | BaseModel],
         *,
         validate_data: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ) -> None:
         """Load columnar data or rows.
 
         Use ``validate_data=False`` only for trusted bulk input (layout still
-        validated).
+        validated). When ``ignore_errors=True``, invalid rows are skipped and
+        details can be observed via ``on_validation_errors``.
         """
-        normalized = _normalize_input(data=data, row_model=self.RowModel)
+        normalized = _normalize_input(
+            data=data,
+            row_model=self.RowModel,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
         dataframe_cls = cast("Any", self._dataframe_cls)
         self._df = dataframe_cls[self._SchemaModel](
-            normalized, validate_data=validate_data
+            normalized,
+            validate_data=validate_data,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
         )
 
     @classmethod

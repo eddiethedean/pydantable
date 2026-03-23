@@ -48,7 +48,7 @@ from .schema import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
@@ -154,6 +154,8 @@ class DataFrame(Generic[SchemaT]):
         data: Mapping[str, Sequence[Any]] | Any,
         *,
         validate_data: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ) -> None:
         if self._schema_type is None:
             raise TypeError(
@@ -161,7 +163,11 @@ class DataFrame(Generic[SchemaT]):
             )
 
         root_data = validate_columns_strict(
-            data, self._schema_type, validate_elements=validate_data
+            data,
+            self._schema_type,
+            validate_elements=validate_data,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
         )
         self._root_data: Any = root_data
         self._root_schema_type: type[BaseModel] = self._schema_type

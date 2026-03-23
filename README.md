@@ -121,6 +121,11 @@ Example output:
 
 More examples: [FastAPI integration](https://pydantable.readthedocs.io/en/latest/FASTAPI.html), [Polars-style workflows](https://pydantable.readthedocs.io/en/latest/POLARS_WORKFLOWS.html).
 
+Input quality policy (optional): constructors are strict by default, and can be
+switched to best-effort ingestion with `ignore_errors=True` plus
+`on_validation_errors=...` to receive failed rows (`row_index`, `row`,
+validation `errors`). See [DataFrameModel docs](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html).
+
 ---
 
 ## Development

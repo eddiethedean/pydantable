@@ -9,7 +9,7 @@ from __future__ import annotations
 import enum
 import types
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import (
@@ -22,7 +22,7 @@ from typing import (
     get_type_hints,
 )
 
-from pydantic import BaseModel, ConfigDict, TypeAdapter, create_model
+from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError, create_model
 
 _NoneType = type(None)
 _SUPPORTED_NON_NULL_SCALAR_TYPES = frozenset(
@@ -230,6 +230,8 @@ def validate_columns_strict(
     schema_type: type[BaseModel],
     *,
     validate_elements: bool = True,
+    ignore_errors: bool = False,
+    on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> dict[str, Any] | Any:
     """
     Validate that `data` matches `schema_type` and return normalized columns.
@@ -273,14 +275,11 @@ def validate_columns_strict(
 
     normalized: dict[str, Any] = {}
     lengths = set()
-    for name, expected_type in field_types.items():
+    for name, _expected_type in field_types.items():
         col = data[name]
         if validate_elements:
             values = _sequence_column_to_list(name, col)
             lengths.add(len(values))
-            adapter = TypeAdapter(expected_type)
-            for v in values:
-                adapter.validate_python(v)
         else:
             values = _column_buffer_for_trusted(name, col)
             lengths.add(len(values))
@@ -291,6 +290,47 @@ def validate_columns_strict(
         raise ValueError(
             f"All columns must have the same length; got {sorted(lengths)}"
         )
+
+    if validate_elements and ignore_errors:
+        n_rows = next(iter(lengths), 0)
+        adapters = {name: TypeAdapter(field_types[name]) for name in field_types}
+        valid_rows: list[dict[str, Any]] = []
+        failures: list[dict[str, Any]] = []
+        for i in range(n_rows):
+            row = {name: normalized[name][i] for name in field_types}
+            typed_row: dict[str, Any] = {}
+            row_errors: list[Any] = []
+            for name, adapter in adapters.items():
+                try:
+                    typed_row[name] = adapter.validate_python(row[name])
+                except ValidationError as exc:
+                    row_errors.extend(exc.errors())
+                except Exception as exc:  # pragma: no cover - defensive adapter path
+                    row_errors.append(
+                        {
+                            "type": "validation_error",
+                            "loc": (name,),
+                            "msg": str(exc),
+                            "input": row[name],
+                        }
+                    )
+            if row_errors:
+                failures.append({"row_index": i, "row": row, "errors": row_errors})
+            else:
+                valid_rows.append(typed_row)
+        if failures and on_validation_errors is not None:
+            on_validation_errors(failures)
+        out: dict[str, list[Any]] = {name: [] for name in field_types}
+        for row in valid_rows:
+            for name in field_types:
+                out[name].append(row[name])
+        return out
+
+    if validate_elements:
+        for name, expected_type in field_types.items():
+            adapter = TypeAdapter(expected_type)
+            for v in normalized[name]:
+                adapter.validate_python(v)
 
     return normalized
 

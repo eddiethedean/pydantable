@@ -100,6 +100,41 @@ building the logical plan (and before storing the current schema).
 Row validation uses the generated `RowModel` so errors point to concrete row
 fields.
 
+### Handling bad input rows (`ignore_errors`)
+
+By default, construction is strict: the first invalid row raises a validation
+error. You can opt into best-effort ingestion:
+
+```python
+failed: list[dict[str, object]] = []
+
+def on_bad_rows(items: list[dict[str, object]]) -> None:
+    failed.extend(items)
+
+df = UserDF(
+    [{"id": 1, "age": 20}, {"id": "bad", "age": 30}, {"id": 2, "age": None}],
+    ignore_errors=True,
+    on_validation_errors=on_bad_rows,
+)
+print(df.to_dict())
+```
+
+Output (one run):
+
+```text
+{'id': [1, 2], 'age': [20, None]}
+```
+
+Behavior contract:
+
+- `ignore_errors=False` (default): strict; invalid input raises.
+- `ignore_errors=True`: invalid rows are skipped; valid rows continue.
+- `on_validation_errors` is called once with detailed failure payload entries:
+  `{"row_index": int, "row": dict[str, Any], "errors": list[dict[str, Any]]}`.
+- If all rows fail, the result is an empty dataframe with schema columns.
+- Columnar input (`dict[str, list]`) also supports best-effort skipping in
+  `ignore_errors=True` mode.
+
 ## Transformations always return new models
 
 Unlike “view” style APIs, this design treats transformations as **schema migration**:

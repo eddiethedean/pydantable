@@ -32,6 +32,152 @@ def test_dataframe_model_row_input_happy_path():
     assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
 
 
+def test_dataframe_model_row_input_strict_mode_still_raises() -> None:
+    with pytest.raises(ValidationError):
+        UserDF([{"id": 1, "age": 20}, {"id": "bad", "age": 30}])
+
+
+def test_dataframe_model_ignore_errors_row_input_keeps_valid_rows() -> None:
+    failures: list[dict[str, object]] = []
+
+    def on_fail(items: list[dict[str, object]]) -> None:
+        failures.extend(items)
+
+    df = UserDF(
+        [{"id": 1, "age": 20}, {"id": "bad", "age": 30}, {"id": 2, "age": None}],
+        ignore_errors=True,
+        on_validation_errors=on_fail,
+    )
+    assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
+    assert len(failures) == 1
+    assert failures[0]["row_index"] == 1
+    assert failures[0]["row"] == {"id": "bad", "age": 30}
+    assert isinstance(failures[0]["errors"], list)
+
+
+def test_dataframe_model_ignore_errors_columnar_input_best_effort() -> None:
+    failures: list[dict[str, object]] = []
+
+    def on_fail(items: list[dict[str, object]]) -> None:
+        failures.extend(items)
+
+    df = UserDF(
+        {"id": [1, "bad", 2], "age": [20, 30, None]},
+        ignore_errors=True,
+        on_validation_errors=on_fail,
+    )
+    assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
+    assert len(failures) == 1
+    assert failures[0]["row_index"] == 1
+    assert failures[0]["row"] == {"id": "bad", "age": 30}
+
+
+def test_dataframe_model_ignore_errors_all_invalid_rows_returns_empty() -> None:
+    failures: list[dict[str, object]] = []
+
+    def on_fail(items: list[dict[str, object]]) -> None:
+        failures.extend(items)
+
+    df = UserDF(
+        [{"id": "bad1", "age": 20}, {"id": "bad2", "age": None}],
+        ignore_errors=True,
+        on_validation_errors=on_fail,
+    )
+    assert df.collect(as_lists=True) == {"id": [], "age": []}
+    assert len(failures) == 2
+
+
+def test_dataframe_model_ignore_errors_callback_not_called_when_clean() -> None:
+    called = False
+
+    def on_fail(_items: list[dict[str, object]]) -> None:
+        nonlocal called
+        called = True
+
+    df = UserDF(
+        [{"id": 1, "age": 20}, {"id": 2, "age": None}],
+        ignore_errors=True,
+        on_validation_errors=on_fail,
+    )
+    assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
+    assert called is False
+
+
+def test_dataframe_model_ignore_errors_callback_collects_multiple_row_failures(
+) -> None:
+    failures: list[dict[str, object]] = []
+
+    def on_fail(items: list[dict[str, object]]) -> None:
+        failures.extend(items)
+
+    df = UserDF(
+        [
+            {"id": 1, "age": 20},
+            {"id": "bad-1", "age": 30},
+            {"id": 2, "age": None},
+            {"id": "bad-2", "age": None},
+        ],
+        ignore_errors=True,
+        on_validation_errors=on_fail,
+    )
+    assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
+    assert [f["row_index"] for f in failures] == [1, 3]
+    assert failures[0]["row"] == {"id": "bad-1", "age": 30}
+    assert failures[1]["row"] == {"id": "bad-2", "age": None}
+
+
+def test_dataframe_model_ignore_errors_non_mapping_row_is_reported_and_skipped(
+) -> None:
+    failures: list[dict[str, object]] = []
+
+    def on_fail(items: list[dict[str, object]]) -> None:
+        failures.extend(items)
+
+    df = UserDF(
+        [
+            {"id": 1, "age": 20},
+            123,  # type: ignore[list-item]
+            {"id": 2, "age": None},
+        ],
+        ignore_errors=True,
+        on_validation_errors=on_fail,
+    )
+    assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
+    assert len(failures) == 1
+    assert failures[0]["row_index"] == 1
+    assert failures[0]["row"] == {"_raw_row": 123}
+
+
+def test_dataframe_model_ignore_errors_columnar_multiple_failures_payload() -> None:
+    failures: list[dict[str, object]] = []
+
+    def on_fail(items: list[dict[str, object]]) -> None:
+        failures.extend(items)
+
+    df = UserDF(
+        {"id": [1, "bad-1", 2, "bad-2"], "age": [20, 30, None, 40]},
+        ignore_errors=True,
+        on_validation_errors=on_fail,
+    )
+    assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
+    assert [f["row_index"] for f in failures] == [1, 3]
+    assert failures[0]["row"] == {"id": "bad-1", "age": 30}
+    assert failures[1]["row"] == {"id": "bad-2", "age": 40}
+
+
+def test_dataframe_model_columnar_strict_mode_raises_without_ignore_errors() -> None:
+    with pytest.raises(ValidationError):
+        UserDF({"id": [1, "bad", 2], "age": [20, 30, None]})
+
+
+def test_dataframe_model_ignore_errors_still_checks_column_lengths() -> None:
+    with pytest.raises(ValueError, match="same length"):
+        UserDF(
+            {"id": [1, "bad", 2], "age": [20, 30]},
+            ignore_errors=True,
+        )
+
+
 def test_dataframe_model_row_input_sequence_of_pydantic_models():
     rm = UserDF.row_model()
     rows = [rm(id=1, age=20), rm(id=2, age=None)]
