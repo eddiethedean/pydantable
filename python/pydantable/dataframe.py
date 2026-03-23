@@ -15,6 +15,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Generic,
+    Literal,
     TypeVar,
     Union,
     cast,
@@ -154,6 +155,7 @@ class DataFrame(Generic[SchemaT]):
         data: Mapping[str, Sequence[Any]] | Any,
         *,
         validate_data: bool = True,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ) -> None:
@@ -165,7 +167,8 @@ class DataFrame(Generic[SchemaT]):
         root_data = validate_columns_strict(
             data,
             self._schema_type,
-            validate_elements=validate_data,
+            validate_elements=validate_data if trusted_mode is None else None,
+            trusted_mode=trusted_mode,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )

@@ -435,6 +435,51 @@ def test_pyspark_map_parity_wrappers() -> None:
     assert out["entries"][0][0]["key"] == "a"
 
 
+def test_pyspark_map_from_entries_and_element_at_aliases() -> None:
+    class S(Schema):
+        m: dict[str, int]
+
+    df = DataFrame[S]({"m": [{"a": 1, "b": 2}, {"b": 5}]})
+    out = (
+        df.withColumn(
+            "rebuilt",
+            F.map_from_entries(F.map_entries(F.col("m", dtype=dict[str, int]))),
+        )
+        .withColumn("a1", F.map_get(F.col("m", dtype=dict[str, int]), "a"))
+        .withColumn("a2", F.element_at(F.col("m", dtype=dict[str, int]), "a"))
+        .collect(as_lists=True)
+    )
+    assert out["rebuilt"] == out["m"]
+    assert out["a1"] == out["a2"]
+
+
+def test_pyspark_element_at_missing_key_returns_null() -> None:
+    class S(Schema):
+        m: dict[str, int]
+
+    df = DataFrame[S]({"m": [{"a": 1}, {"b": 2}]})
+    out = df.withColumn(
+        "x", F.element_at(F.col("m", dtype=dict[str, int]), "z")
+    ).collect(as_lists=True)
+    assert out["x"] == [None, None]
+
+
+def test_pyspark_window_range_between_float_order_mean() -> None:
+    from pydantable.pyspark.sql import Window
+
+    class S(Schema):
+        g: int
+        o: float
+        v: int
+
+    df = DataFrame[S]({"g": [1, 1, 1], "o": [1.0, 2.0, 4.0], "v": [10, 20, 30]})
+    w = Window.partitionBy("g").orderBy("o").rangeBetween(-1.0, 0.0)
+    out = df.withColumn("m", F.window_avg(F.col("v", dtype=int)).over(w)).collect(
+        as_lists=True
+    )
+    assert out["m"] == [10.0, 15.0, 30.0]
+
+
 def test_pyspark_window_rows_between_mean_contract() -> None:
     from pydantable.pyspark.sql import Window
 

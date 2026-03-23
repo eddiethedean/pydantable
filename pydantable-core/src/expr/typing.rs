@@ -140,6 +140,7 @@ impl ExprNode {
             | ExprNode::MapKeys { dtype, .. }
             | ExprNode::MapValues { dtype, .. }
             | ExprNode::MapEntries { dtype, .. }
+            | ExprNode::MapFromEntries { dtype, .. }
             | ExprNode::Window { dtype, .. }
             | ExprNode::GlobalAgg { dtype, .. }
             | ExprNode::GlobalRowCount { dtype, .. } => dtype.clone(),
@@ -228,7 +229,8 @@ impl ExprNode {
             | ExprNode::MapContainsKey { inner, .. }
             | ExprNode::MapKeys { inner, .. }
             | ExprNode::MapValues { inner, .. }
-            | ExprNode::MapEntries { inner, .. } => inner.referenced_columns(),
+            | ExprNode::MapEntries { inner, .. }
+            | ExprNode::MapFromEntries { inner, .. } => inner.referenced_columns(),
             ExprNode::ListGet { inner, index, .. } => {
                 let mut out = inner.referenced_columns();
                 out.extend(index.referenced_columns());
@@ -1894,6 +1896,41 @@ impl ExprNode {
         })
     }
 
+    pub fn make_map_from_entries(inner: ExprNode) -> PyResult<Self> {
+        let DTypeDesc::List {
+            inner: entry_dtype, ..
+        } = inner.dtype()
+        else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "map_from_entries() requires a list of entry structs.",
+            ));
+        };
+        let DTypeDesc::Struct { fields, .. } = entry_dtype.as_ref() else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "map_from_entries() requires a list of entry structs.",
+            ));
+        };
+        if fields.len() != 2 || fields[0].0 != "key" || fields[1].0 != "value" {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "map_from_entries() requires struct fields ['key', 'value'] in order.",
+            ));
+        }
+        let key_dtype = &fields[0].1;
+        if key_dtype.as_scalar_base_field().flatten() != Some(BaseType::Str) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "map_from_entries() requires a string key field.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::MapFromEntries {
+            inner: Box::new(inner),
+            dtype: DTypeDesc::Map {
+                value: Box::new(fields[1].1.clone()),
+                nullable,
+            },
+        })
+    }
+
     fn window_shift_operand_dtype(inner: &ExprNode) -> PyResult<DTypeDesc> {
         let d = inner.dtype();
         if d.is_struct() || d.is_list() || d.is_map() {
@@ -3031,7 +3068,8 @@ impl ExprNode {
             | ExprNode::MapContainsKey { .. }
             | ExprNode::MapKeys { .. }
             | ExprNode::MapValues { .. }
-            | ExprNode::MapEntries { .. } => {
+            | ExprNode::MapEntries { .. }
+            | ExprNode::MapFromEntries { .. } => {
                 Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
                     "This expression is only supported with the Polars execution engine.",
                 ))

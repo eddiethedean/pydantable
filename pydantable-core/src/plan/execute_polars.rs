@@ -767,6 +767,7 @@ impl PolarsPlanRunner {
             | ExprNode::MapKeys { inner, .. }
             | ExprNode::MapValues { inner, .. }
             | ExprNode::MapEntries { inner, .. }
+            | ExprNode::MapFromEntries { inner, .. }
             | ExprNode::LogicalNot { inner, .. }
             | ExprNode::UnaryNumeric { inner, .. }
             | ExprNode::StringUnary { inner, .. }
@@ -848,6 +849,35 @@ impl PolarsPlanRunner {
             AnyValue::Int32(v) => Some(v as f64),
             AnyValue::UInt64(v) => Some(v as f64),
             AnyValue::UInt32(v) => Some(v as f64),
+            _ => None,
+        }
+    }
+
+    fn anyvalue_as_range_ord(av: AnyValue<'_>) -> Option<(bool, i128, f64)> {
+        match av {
+            AnyValue::Int64(v) => Some((false, v as i128, 0.0)),
+            AnyValue::Int32(v) => Some((false, v as i128, 0.0)),
+            AnyValue::UInt64(v) => Some((false, v as i128, 0.0)),
+            AnyValue::UInt32(v) => Some((false, v as i128, 0.0)),
+            AnyValue::Date(v) => Some((false, v as i128, 0.0)),
+            AnyValue::Datetime(v, tu, _) => {
+                let micros = match tu {
+                    TimeUnit::Microseconds => v,
+                    TimeUnit::Milliseconds => v.saturating_mul(1000),
+                    TimeUnit::Nanoseconds => v / 1000,
+                };
+                Some((false, micros as i128, 0.0))
+            }
+            AnyValue::Duration(v, tu) => {
+                let micros = match tu {
+                    TimeUnit::Microseconds => v,
+                    TimeUnit::Milliseconds => v.saturating_mul(1000),
+                    TimeUnit::Nanoseconds => v / 1000,
+                };
+                Some((false, micros as i128, 0.0))
+            }
+            AnyValue::Float64(v) => Some((true, 0, v)),
+            AnyValue::Float32(v) => Some((true, 0, v as f64)),
             _ => None,
         }
     }
@@ -1000,16 +1030,29 @@ impl PolarsPlanRunner {
                     }
                     WindowFrame::Range { start, end } => {
                         let cur = ord_series.get(*idx).map_err(polars_err)?;
-                        let Some(cur_v) = Self::anyvalue_as_i64(cur) else {
+                        let Some((is_float, cur_i, cur_f)) = Self::anyvalue_as_range_ord(cur)
+                        else {
                             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                                "rangeBetween currently supports integer order columns.",
+                                "rangeBetween supports numeric/date/datetime/duration order columns.",
                             ));
                         };
                         for cand_idx in idxs.iter() {
                             let ord = ord_series.get(*cand_idx).map_err(polars_err)?;
-                            if let Some(v) = Self::anyvalue_as_i64(ord) {
-                                let delta = v - cur_v;
-                                if delta >= *start && delta <= *end {
+                            if let Some((cand_is_float, cand_i, cand_f)) =
+                                Self::anyvalue_as_range_ord(ord)
+                            {
+                                let in_frame = if is_float && cand_is_float {
+                                    let delta = cand_f - cur_f;
+                                    let lo = *start as f64;
+                                    let hi = *end as f64;
+                                    delta >= lo && delta <= hi
+                                } else if !is_float && !cand_is_float {
+                                    let delta = cand_i - cur_i;
+                                    delta >= *start as i128 && delta <= *end as i128
+                                } else {
+                                    false
+                                };
+                                if in_frame {
                                     frame_members.push(*cand_idx);
                                 }
                             }

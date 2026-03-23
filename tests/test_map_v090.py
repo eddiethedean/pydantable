@@ -107,3 +107,60 @@ def test_map_keys_values_entries_on_empty_map() -> None:
     assert out["k"] == [[]]
     assert out["v"] == [[]]
     assert out["e"] == [[]]
+
+
+def test_map_from_entries_roundtrip() -> None:
+    df = DataFrame[MapStruct]({"payload": [{"a": {"x": 1}, "b": None}, {}]})
+    out = df.with_columns(rebuilt=df.payload.map_entries().map_from_entries()).collect(
+        as_lists=True
+    )
+    assert out["rebuilt"] == [{"a": {"x": 1}, "b": None}, {}]
+
+
+def test_map_from_entries_requires_entry_struct_shape() -> None:
+    class BadEntries(Schema):
+        entries: list[dict[str, int]]
+
+    df = DataFrame[BadEntries]({"entries": [[{"x": 1}]]})
+    with pytest.raises(TypeError, match=r"list of entry structs"):
+        df.with_columns(m=df.entries.map_from_entries())
+
+
+def test_map_from_entries_nullable_map_roundtrip() -> None:
+    df = DataFrame[MapNullable]({"payload": [{"a": [1]}, None]})
+    out = df.with_columns(r=df.payload.map_entries().map_from_entries()).collect(
+        as_lists=True
+    )
+    assert out["r"] == [{"a": [1]}, None]
+
+
+def test_expr_element_at_matches_map_get() -> None:
+    df = DataFrame[MapStruct]({"payload": [{"a": {"x": 1}, "b": None}]})
+    out = df.with_columns(
+        g1=df.payload.map_get("a"),
+        g2=df.payload.element_at("a"),
+    ).collect(as_lists=True)
+    assert out["g1"] == out["g2"] == [{"x": 1}]
+
+
+def test_expr_element_at_missing_key_returns_null() -> None:
+    df = DataFrame[MapList]({"payload": [{"a": [1]}, {"b": [2]}]})
+    out = df.with_columns(m=df.payload.element_at("missing")).collect(as_lists=True)
+    assert out["m"] == [None, None]
+
+
+def test_expr_element_at_requires_map_column() -> None:
+    class NotMap(Schema):
+        x: int
+
+    df = DataFrame[NotMap]({"x": [1]})
+    with pytest.raises(TypeError, match=r"map_get\(\) requires a map column"):
+        df.with_columns(y=df.x.element_at("k"))
+
+
+def test_map_from_entries_expr_serializable_kind() -> None:
+    df = DataFrame[MapStruct]({"payload": [{"a": {"x": 1}}]})
+    expr = df.payload.map_entries().map_from_entries()
+    payload = expr._rust_expr.to_serializable()
+    assert payload["kind"] == "map_from_entries"
+    assert payload["inner"]["kind"] == "map_entries"

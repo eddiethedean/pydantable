@@ -285,6 +285,11 @@ pub enum ExprNode {
         inner: Box<ExprNode>,
         dtype: DTypeDesc,
     },
+    /// Map built from a list of entry structs (`list[struct{key, value}]`).
+    MapFromEntries {
+        inner: Box<ExprNode>,
+        dtype: DTypeDesc,
+    },
     /// Windowed aggregate or ranking function (Polars `.over(...)`).
     Window {
         op: WindowOp,

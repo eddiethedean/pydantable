@@ -9,7 +9,7 @@ from __future__ import annotations
 import sys
 import typing
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ValidationError, create_model
 
@@ -156,6 +156,7 @@ class DataFrameModel:
         data: Any,
         *,
         validate_data: bool = True,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ) -> None:
@@ -175,6 +176,7 @@ class DataFrameModel:
         self._df = dataframe_cls[self._SchemaModel](
             normalized,
             validate_data=validate_data,
+            trusted_mode=trusted_mode,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )

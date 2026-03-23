@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta
+
 import pytest
 from pydantable import DataFrame
 from pydantable.expressions import (
@@ -224,7 +226,7 @@ def test_rows_between_window_sum_skips_nulls() -> None:
     assert out["s"] == [10, 10, 20]
 
 
-def test_range_between_requires_int_order_column() -> None:
+def test_range_between_rejects_unsupported_order_column() -> None:
     class R(Schema):
         g: int
         v: str
@@ -232,8 +234,123 @@ def test_range_between_requires_int_order_column() -> None:
 
     df = DataFrame[R]({"g": [1, 1], "v": ["a", "b"], "x": [10, 20]})
     w = Window.partitionBy("g").orderBy("v").rangeBetween(-1, 0)
-    with pytest.raises(TypeError, match="integer order columns"):
+    with pytest.raises(TypeError, match="numeric/date/datetime/duration"):
         df.with_columns(s=window_sum(df.x).over(w)).collect(as_lists=True)
+
+
+def test_range_between_running_sum_float_order_contract() -> None:
+    class RF(Schema):
+        g: int
+        o: float
+        v: int
+
+    df = DataFrame[RF]({"g": [1, 1, 1], "o": [1.0, 1.5, 3.0], "v": [10, 20, 30]})
+    w = Window.partitionBy("g").orderBy("o").rangeBetween(-1, 0)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [10, 30, 30]
+
+
+def test_range_between_running_sum_date_order_contract() -> None:
+    class RD(Schema):
+        g: int
+        o: date
+        v: int
+
+    df = DataFrame[RD](
+        {
+            "g": [1, 1, 1],
+            "o": [date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 4)],
+            "v": [10, 20, 30],
+        }
+    )
+    w = Window.partitionBy("g").orderBy("o").rangeBetween(-1, 0)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [10, 30, 30]
+
+
+def test_range_between_running_sum_datetime_order_contract() -> None:
+    class RDT(Schema):
+        g: int
+        o: datetime
+        v: int
+
+    base = datetime(2024, 1, 1, 0, 0, 0)
+    df = DataFrame[RDT](
+        {
+            "g": [1, 1, 1],
+            "o": [base, base + timedelta(seconds=1), base + timedelta(seconds=3)],
+            "v": [10, 20, 30],
+        }
+    )
+    # Datetime range bounds are interpreted in microseconds.
+    w = Window.partitionBy("g").orderBy("o").rangeBetween(-1_000_000, 0)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [10, 30, 30]
+
+
+def test_range_between_duration_order_running_sum_contract() -> None:
+    """``rangeBetween`` bounds on ``timedelta`` order keys use microseconds."""
+
+    class RDur(Schema):
+        g: int
+        o: timedelta
+        v: int
+
+    df = DataFrame[RDur](
+        {
+            "g": [1, 1, 1],
+            "o": [
+                timedelta(seconds=0),
+                timedelta(seconds=1),
+                timedelta(seconds=3),
+            ],
+            "v": [10, 20, 30],
+        }
+    )
+    w = Window.partitionBy("g").orderBy("o").rangeBetween(-1_000_000, 0)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [10, 30, 30]
+
+
+def test_range_between_float_order_mean_min_max_contract() -> None:
+    class RF(Schema):
+        g: int
+        o: float
+        v: int
+
+    df = DataFrame[RF]({"g": [1, 1, 1], "o": [1.0, 2.0, 4.0], "v": [10, 20, 30]})
+    w = Window.partitionBy("g").orderBy("o").rangeBetween(-1.0, 0.0)
+    out = df.with_columns(
+        m=window_mean(df.v).over(w),
+        lo=window_min(df.v).over(w),
+        hi=window_max(df.v).over(w),
+    ).collect(as_lists=True)
+    assert out["m"] == [10.0, 15.0, 30.0]
+    assert out["lo"] == [10, 10, 30]
+    assert out["hi"] == [10, 20, 30]
+
+
+def test_range_between_date_order_respects_partitions() -> None:
+    class RD(Schema):
+        g: int
+        o: date
+        v: int
+
+    df = DataFrame[RD](
+        {
+            "g": [1, 1, 2, 2],
+            "o": [
+                date(2024, 1, 1),
+                date(2024, 1, 2),
+                date(2024, 1, 1),
+                date(2024, 1, 3),
+            ],
+            "v": [100, 200, 1000, 2000],
+        }
+    )
+    w = Window.partitionBy("g").orderBy("o").rangeBetween(-1, 0)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [100, 300, 1000, 2000]
 
 
 def test_rows_between_mean_min_max_contract() -> None:

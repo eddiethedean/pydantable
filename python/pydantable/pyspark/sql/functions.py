@@ -315,6 +315,20 @@ def map_entries(column: Expr) -> Expr:
     return column.map_entries()
 
 
+def map_from_entries(column: Expr) -> Expr:
+    """Per-row map construction from ``list[{key, value}]`` entry structs."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.map_from_entries() expects a typed column Expr.")
+    return column.map_from_entries()
+
+
+def element_at(column: Expr, key: str) -> Expr:
+    """Map lookup alias with PySpark-style naming."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.element_at() expects a typed column Expr.")
+    return column.element_at(key)
+
+
 __all__ = [
     "avg",
     "between",
@@ -326,6 +340,7 @@ __all__ = [
     "count",
     "day",
     "dense_rank",
+    "element_at",
     "hour",
     "isin",
     "isnotnull",
@@ -336,6 +351,7 @@ __all__ = [
     "lit",
     "map_contains_key",
     "map_entries",
+    "map_from_entries",
     "map_get",
     "map_keys",
     "map_len",

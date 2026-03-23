@@ -328,6 +328,15 @@ class Expr:  # type: ignore[override]
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_map_entries(self._rust_expr))
 
+    def map_from_entries(self) -> Expr:
+        """Build ``dict[str, T]`` map cells from ``list[{key, value}]`` entries."""
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_map_from_entries(self._rust_expr))
+
+    def element_at(self, key: str) -> Expr:
+        """Alias of :meth:`map_get` for map columns."""
+        return self.map_get(key)
+
     # List columns
     def list_len(self) -> Expr:
         rust = _require_rust_core()

@@ -15,6 +15,7 @@ from decimal import Decimal
 from typing import (
     Annotated,
     Any,
+    Literal,
     Union,
     cast,
     get_args,
@@ -220,31 +221,129 @@ def _column_buffer_for_trusted(name: str, col: Any) -> Any:
     )
 
 
+def _trusted_mode_from_legacy(
+    *,
+    validate_elements: bool | None,
+    trusted_mode: Literal["off", "shape_only", "strict"] | None,
+) -> Literal["off", "shape_only", "strict"]:
+    if trusted_mode is None:
+        if validate_elements is None:
+            return "off"
+        return "off" if validate_elements else "shape_only"
+    if validate_elements is not None:
+        if validate_elements and trusted_mode != "off":
+            raise ValueError(
+                "validate_elements=True conflicts with trusted_mode; "
+                "use trusted_mode='off'."
+            )
+        if not validate_elements and trusted_mode == "off":
+            raise ValueError(
+                "validate_elements=False conflicts with trusted_mode='off'."
+            )
+    return trusted_mode
+
+
+def _trusted_scalar_compatible(annotation: Any, value: Any) -> bool:
+    inner, nullable = _annotation_nullable_inner(annotation)
+    if value is None:
+        return nullable
+    origin = get_origin(inner)
+    if origin is not None:
+        return True
+    if inner is Any:
+        return True
+    if isinstance(inner, type) and issubclass(inner, BaseModel):
+        return isinstance(value, (Mapping, BaseModel))
+    if isinstance(inner, type):
+        return isinstance(value, inner)
+    return True
+
+
+def _trusted_column_has_nulls(col: Any) -> bool:
+    if isinstance(col, (list, tuple)):
+        return any(v is None for v in col)
+    if hasattr(col, "null_count"):
+        try:
+            return int(col.null_count) > 0
+        except Exception:
+            pass
+    typ = type(col)
+    if typ.__module__ == "numpy" and typ.__name__ == "ndarray":
+        return bool((col == None).any())  # noqa: E711
+    return False
+
+
+def _trusted_column_strict_compatible(annotation: Any, col: Any) -> bool:
+    if isinstance(col, (list, tuple)):
+        for v in col:
+            if v is not None:
+                return _trusted_scalar_compatible(annotation, v)
+        return True
+    typ = type(col)
+    if typ.__module__ == "numpy" and typ.__name__ == "ndarray":
+        dtype_obj = getattr(col, "dtype", None)
+        kind = str(getattr(dtype_obj, "kind", ""))
+        inner, _nullable = _annotation_nullable_inner(annotation)
+        if inner in (int,):
+            return kind in ("i", "u")
+        if inner in (float,):
+            return kind in ("i", "u", "f")
+        if inner in (bool,):
+            return kind == "b"
+        if inner in (str,):
+            return kind in ("U", "S", "O")
+        return True
+    mod = getattr(typ, "__module__", "") or ""
+    if mod.startswith("pyarrow"):
+        dt = str(getattr(col, "type", "")).lower()
+        inner, _nullable = _annotation_nullable_inner(annotation)
+        if inner in (int,):
+            return "int" in dt or "uint" in dt
+        if inner in (float,):
+            return "float" in dt or "double" in dt or "int" in dt
+        if inner in (bool,):
+            return "bool" in dt
+        if inner in (str,):
+            return "string" in dt or "large_string" in dt
+        return True
+    return True
+
+
 def validate_columns_strict(
     data: Mapping[str, Any] | Any,
     schema_type: type[BaseModel],
     *,
-    validate_elements: bool = True,
+    validate_elements: bool | None = None,
+    trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
     ignore_errors: bool = False,
     on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> dict[str, Any] | Any:
     """
     Validate that `data` matches `schema_type` and return normalized columns.
 
-    When ``validate_elements`` is True (default), each element is validated with
-    Pydantic ``TypeAdapter``. Set to False for trusted bulk inputs (keys and row
-    lengths are still checked; numpy columns are converted via ``tolist()``).
+    ``trusted_mode`` controls validation depth:
+    - ``off``: full per-element validation.
+    - ``shape_only``: schema/shape/nullability checks only.
+    - ``strict``: shape checks plus lightweight dtype-compatibility checks.
+
+    ``validate_elements`` remains as a compatibility alias:
+    ``True`` maps to ``trusted_mode='off'`` and ``False`` maps to
+    ``trusted_mode='shape_only'``.
 
     With ``validate_elements=False``, a Polars ``DataFrame`` may be passed
     directly so the Rust engine can ingest it via Arrow IPC without per-cell
     Python materialization.
     """
 
+    mode = _trusted_mode_from_legacy(
+        validate_elements=validate_elements, trusted_mode=trusted_mode
+    )
+
     if _is_polars_dataframe(data):
-        if validate_elements:
+        if mode == "off":
             raise TypeError(
-                "Passing a Polars DataFrame requires validate_data=False "
-                "(per-element validation is skipped for columnar buffers)."
+                "Passing a Polars DataFrame requires trusted ingest mode "
+                "('shape_only' or 'strict')."
             )
         field_types = schema_field_types(schema_type)
         polars_df = cast("Any", data)
@@ -261,13 +360,19 @@ def validate_columns_strict(
         for name, annotation in field_types.items():
             _, nullable = _annotation_nullable_inner(annotation)
             if nullable:
-                continue
-            null_count = int(polars_df.get_column(name).null_count())
-            if null_count > 0:
+                pass
+            elif int(polars_df.get_column(name).null_count()) > 0:
                 raise ValueError(
                     f"Column '{name}' is non-nullable in schema "
                     "but contains null values."
                 )
+            if mode == "strict":
+                sample = polars_df.get_column(name).head(1).to_list()
+                if sample and not _trusted_scalar_compatible(annotation, sample[0]):
+                    raise ValueError(
+                        f"Column '{name}' is incompatible with schema annotation "
+                        f"{annotation!r} in strict trusted mode."
+                    )
         return data
 
     field_types = schema_field_types(schema_type)
@@ -285,7 +390,7 @@ def validate_columns_strict(
     lengths = set()
     for name, _expected_type in field_types.items():
         col = data[name]
-        if validate_elements:
+        if mode == "off":
             values = _sequence_column_to_list(name, col)
             lengths.add(len(values))
         else:
@@ -299,7 +404,7 @@ def validate_columns_strict(
             f"All columns must have the same length; got {sorted(lengths)}"
         )
 
-    if validate_elements and ignore_errors:
+    if mode == "off" and ignore_errors:
         n_rows = next(iter(lengths), 0)
         adapters = {name: TypeAdapter(field_types[name]) for name in field_types}
         valid_rows: list[dict[str, Any]] = []
@@ -334,11 +439,27 @@ def validate_columns_strict(
                 out[name].append(row[name])
         return out
 
-    if validate_elements:
+    if mode == "off":
         for name, expected_type in field_types.items():
             adapter = TypeAdapter(expected_type)
             for v in normalized[name]:
                 adapter.validate_python(v)
+    else:
+        for name, annotation in field_types.items():
+            _, nullable = _annotation_nullable_inner(annotation)
+            col = normalized[name]
+            if not nullable and _trusted_column_has_nulls(col):
+                raise ValueError(
+                    f"Column '{name}' is non-nullable in schema "
+                    "but contains null values."
+                )
+            if mode == "strict" and not _trusted_column_strict_compatible(
+                annotation, col
+            ):
+                raise ValueError(
+                    f"Column '{name}' is incompatible with schema annotation "
+                    f"{annotation!r} in strict trusted mode."
+                )
 
     return normalized
 

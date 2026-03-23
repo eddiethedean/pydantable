@@ -8,7 +8,7 @@
 
 **Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core.**
 
-**Current release: 0.10.0** · Python **3.10+**
+**Current release: 0.11.0** · Python **3.10+**
 
 ---
 
@@ -28,7 +28,7 @@ That site is the supported entry point for concepts, contracts, API notes, and e
 | **FastAPI** (routers, bodies, `collect`, responses) | [FastAPI integration](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) |
 | **Execution model** (`collect`, `to_dict`, `to_polars`, optional Python Polars, UI modules) | [Execution (Rust engine)](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) |
 | **Semantics** (nulls, joins, ordering, reshaping, windows — Polars-style contract) | [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) |
-| **Roadmap** (0.5.0–0.10.0 shipped, path to v1.0.0) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
+| **Roadmap** (0.5.0–0.11.0 shipped, path to v1.0.0) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
 | **Why not use Polars directly?** | [Why not just use Polars?](https://pydantable.readthedocs.io/en/latest/WHY_NOT_POLARS.html) |
 | **Pandas-style imports** (`pydantable.pandas`) | [Pandas UI](https://pydantable.readthedocs.io/en/latest/PANDAS_UI.html) |
 | **PySpark-style imports** (`pydantable.pyspark`) | [PySpark UI](https://pydantable.readthedocs.io/en/latest/PYSPARK_UI.html) |
@@ -60,7 +60,7 @@ The default API feels **Polars-like**; optional **`pydantable.pandas`** and **`p
 - **Windows:** `row_number`, `rank`, `dense_rank`, `window_sum`, `window_mean`, **`window_min`**, **`window_max`**, `lag`, `lead` with `Window.partitionBy(...).orderBy(...)` / `.spec()`, plus framed windows (`rowsBetween`, `rangeBetween`) for supported operations.
 - **Temporal:** `strptime`, `unix_timestamp`, **`cast` from `str` → `date` / `datetime`** (Polars parsing; use `strptime` for fixed formats), `dt_*` parts, `dt_nanosecond` on `datetime` / `time`.
 - **Maps / binary:** `map_len`, **`map_get`**, **`map_contains_key`**, `binary_len`, including nested JSON-like map value dtypes with string keys.
-- **Map utilities:** `map_keys()`, `map_values()`, and `map_entries()` for per-row key/value extraction on `dict[str, T]` columns.
+- **Map utilities:** `map_keys()`, `map_values()`, `map_entries()`, and `map_from_entries()` for per-row key/value extraction and reconstruction on `dict[str, T]` columns.
 
 PySpark-named helpers live under `pydantable.pyspark.sql.functions`. Details: [Supported types](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html), [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html), [CHANGELOG](https://pydantable.readthedocs.io/en/latest/changelog.html).
 

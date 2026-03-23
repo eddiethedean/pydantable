@@ -515,3 +515,90 @@ def test_dataframe_model_polars_dataframe_rejects_null_in_non_nullable_column() 
     pdf = pl.DataFrame({"id": [1, None], "age": [10, 20]})
     with pytest.raises(ValueError, match="non-nullable"):
         UserDF(pdf, validate_data=False)
+
+
+def test_dataframe_model_trusted_shape_only_allows_dtype_mismatch() -> None:
+    df = UserDF({"id": ["1", "2"], "age": [20, None]}, trusted_mode="shape_only")
+    assert isinstance(df, UserDF)
+
+
+def test_dataframe_model_trusted_strict_rejects_dtype_mismatch() -> None:
+    with pytest.raises(ValueError, match="strict trusted mode"):
+        UserDF({"id": ["1", "2"], "age": [20, None]}, trusted_mode="strict")
+
+
+def test_dataframe_model_trusted_strict_rejects_null_in_non_nullable_column() -> None:
+    with pytest.raises(ValueError, match="non-nullable"):
+        UserDF({"id": [1, None], "age": [20, 30]}, trusted_mode="strict")
+
+
+def test_validate_columns_strict_trusted_mode_conflicts_with_validate_elements() -> (
+    None
+):
+    from pydantable.schema import validate_columns_strict
+
+    with pytest.raises(ValueError, match="conflicts with trusted_mode"):
+        validate_columns_strict(
+            {"id": [1], "age": [10]},
+            UserDF._SchemaModel,
+            validate_elements=True,
+            trusted_mode="shape_only",
+        )
+
+
+def test_validate_columns_strict_validate_elements_false_and_trusted_off_conflict() -> (
+    None
+):
+    from pydantable.schema import validate_columns_strict
+
+    with pytest.raises(ValueError, match="conflicts with trusted_mode"):
+        validate_columns_strict(
+            {"id": [1], "age": [10]},
+            UserDF._SchemaModel,
+            validate_elements=False,
+            trusted_mode="off",
+        )
+
+
+def test_dataframe_model_validate_data_false_collect_matches_trusted_shape_only() -> (
+    None
+):
+    data = {"id": [1, 2], "age": [20, None]}
+    a = UserDF(data, validate_data=False).collect(as_lists=True)
+    b = UserDF(data, trusted_mode="shape_only").collect(as_lists=True)
+    assert a == b == data
+
+
+def test_dataframe_model_polars_trusted_strict_rejects_wrong_scalar_dtype() -> None:
+    pl = pytest.importorskip("polars")
+    pdf = pl.DataFrame({"id": ["x", "y"], "age": [1, 2]})
+    with pytest.raises(ValueError, match="strict trusted mode"):
+        UserDF(pdf, trusted_mode="strict")
+
+
+def test_dataframe_model_polars_trusted_strict_accepts_int_columns() -> None:
+    pl = pytest.importorskip("polars")
+    pdf = pl.DataFrame({"id": [1, 2], "age": [10, 20]})
+    df = UserDF(pdf, trusted_mode="strict")
+    assert df.collect(as_lists=True) == {"id": [1, 2], "age": [10, 20]}
+
+
+def test_dataframe_model_numpy_trusted_strict_int_array() -> None:
+    np = pytest.importorskip("numpy")
+    df = UserDF(
+        {"id": np.array([1, 2, 3], dtype=np.int64), "age": [10, 20, 30]},
+        trusted_mode="strict",
+    )
+    assert df.collect(as_lists=True) == {"id": [1, 2, 3], "age": [10, 20, 30]}
+
+
+def test_dataframe_model_numpy_trusted_strict_rejects_float_for_int_column() -> None:
+    np = pytest.importorskip("numpy")
+    with pytest.raises(ValueError, match="strict trusted mode"):
+        UserDF(
+            {
+                "id": np.array([1.0, 2.0], dtype=np.float64),
+                "age": [10, 20],
+            },
+            trusted_mode="strict",
+        )

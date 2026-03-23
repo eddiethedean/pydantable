@@ -524,6 +524,7 @@ impl ExprNode {
                 Ok(list_e.list().eval(projected))
             }
             ExprNode::MapEntries { inner, .. } => Ok(inner.to_polars_expr()?),
+            ExprNode::MapFromEntries { inner, .. } => Ok(inner.to_polars_expr()?),
             ExprNode::Window {
                 op,
                 operand,
