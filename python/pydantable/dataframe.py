@@ -921,7 +921,7 @@ class DataFrame(Generic[SchemaT]):
         Python package: ``pip install 'pydantable[polars]'``).
         """
         try:
-            import polars as pl  # type: ignore[import-not-found]
+            import polars as pl  # type: ignore
         except ImportError as e:
             raise ImportError(
                 "polars is required for to_polars(). Install with: "
