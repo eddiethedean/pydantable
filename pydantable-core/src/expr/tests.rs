@@ -116,3 +116,58 @@ fn exprnode_to_serializable_column_ref_roundtrip_shape() {
         );
     });
 }
+
+#[test]
+fn window_range_frame_serializes_with_kind_and_bounds() {
+    ensure_python_initialized();
+    Python::with_gil(|py| {
+        let inner = ExprNode::make_column_ref(
+            "v".to_string(),
+            DTypeDesc::non_nullable(BaseType::Int),
+        )
+        .expect("column");
+        let node = ExprNode::make_window_sum(
+            inner,
+            vec!["g".to_string()],
+            vec![("v".to_string(), true)],
+            Some("range".to_string()),
+            Some(-2),
+            Some(0),
+        )
+        .expect("window");
+        let obj = exprnode_to_serializable(py, &node).expect("serialize");
+        let d: &Bound<'_, PyDict> = obj.downcast_bound(py).expect("dict");
+        let frame_obj = d
+            .get_item("frame")
+            .expect("frame key")
+            .expect("frame value");
+        let frame: &Bound<'_, PyDict> = frame_obj.downcast().expect("frame dict");
+        assert_eq!(
+            frame
+                .get_item("kind")
+                .unwrap()
+                .unwrap()
+                .extract::<String>()
+                .unwrap(),
+            "range"
+        );
+        assert_eq!(
+            frame
+                .get_item("start")
+                .unwrap()
+                .unwrap()
+                .extract::<i64>()
+                .unwrap(),
+            -2
+        );
+        assert_eq!(
+            frame
+                .get_item("end")
+                .unwrap()
+                .unwrap()
+                .extract::<i64>()
+                .unwrap(),
+            0
+        );
+    });
+}

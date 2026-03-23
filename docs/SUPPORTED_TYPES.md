@@ -55,7 +55,12 @@ scalar fields or `Expr.struct_field(...)` for field projection.
 
 ## Map-like columns (`dict[str, T]`)
 
-Homogeneous **string-keyed** maps: **`dict[str, T]`** where **`T`** is any supported scalar or nested type allowed elsewhere. Cells are Python `dict` values; the engine stores a logical map as Polars **`List(Struct{key: str, value: T})`**. Expression support is intentionally small: equality, **`map_len()`**, **`map_get(key)`**, **`map_contains_key(key)`** (see *Expression typing* below); not all Polars map ops are exposed.
+String-keyed maps are supported as **`dict[str, T]`** where **`T`** can be scalar,
+list, map, struct, or unions with `None` (JSON-like payloads). Cells
+are Python `dict` values; the engine stores a logical map as Polars
+**`List(Struct{key: str, value: T})`**. Expression support is intentionally small:
+equality, **`map_len()`**, **`map_get(key)`**, **`map_contains_key(key)`** (see
+*Expression typing* below); not all Polars map ops are exposed.
 
 ## Homogeneous list columns (`list[T]` / `List[T]`)
 
@@ -143,8 +148,7 @@ Temporal part extraction and `dt_date()` on timezone-aware `datetime` values fol
 
 These are **out of scope** for the current schema system:
 
-- `dict` types **other than** homogeneous **`dict[str, T]`** maps (non-string keys,
-  heterogeneous value types, or JSON-style arbitrary dicts)
+- `dict` types with **non-string keys** (`dict[int, ...]`, etc.)
 - Arbitrary objects as **per-cell** values (except nested **`BaseModel`** columns,
   homogeneous **`list[T]`**, and **`dict[str, T]`** maps as documented above)
 

@@ -523,7 +523,7 @@ impl ExprNode {
             } => {
                 if frame.is_some() {
                     return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "window row frames (rowsBetween) are not yet supported by the Polars lowering path.",
+                        "framed window execution (rowsBetween/rangeBetween) is not yet supported by the Polars lowering path.",
                     ));
                 }
                 let part = partition_by.as_slice();

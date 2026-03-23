@@ -415,20 +415,12 @@ fn py_annotation_to_dtype_impl(
         let dict_cls = builtins.getattr("dict")?;
         if origin.eq(&dict_cls)? && tuple.len() == 2 {
             let key_dt = py_annotation_to_dtype_impl(py, &tuple.get_item(0)?)?;
-            let val_dt = py_annotation_to_dtype_impl(py, &tuple.get_item(1)?)?;
+            let val_dt = py_annotation_to_dtype(py, &tuple.get_item(1)?)?;
             match key_dt {
                 DTypeDesc::Scalar {
                     base: Some(BaseType::Str),
                     nullable: false,
                 } => {
-                    if matches!(
-                        val_dt,
-                        DTypeDesc::Struct { .. } | DTypeDesc::List { .. } | DTypeDesc::Map { .. }
-                    ) {
-                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                            "dict[str, V] map columns (v1) support only scalar value types.",
-                        ));
-                    }
                     return Ok(DTypeDesc::Map {
                         value: Box::new(val_dt),
                         nullable: false,

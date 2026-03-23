@@ -1,5 +1,6 @@
 //! Polars-backed physical execution for logical plans.
 
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Cursor;
 
@@ -10,7 +11,7 @@ use crate::dtype::{
     py_decimal_to_scaled_i128, py_enum_to_wire_string, scaled_i128_to_py_decimal, BaseType,
     DTypeDesc, DECIMAL_PRECISION, DECIMAL_SCALE,
 };
-use crate::expr::LiteralValue;
+use crate::expr::{ExprNode, LiteralValue, WindowFrame, WindowOp};
 
 use super::ir::{PlanInner, PlanStep};
 use super::schema_py::schema_descriptors_as_py;
@@ -728,6 +729,254 @@ pub struct PolarsPlanRunner;
 
 #[cfg(feature = "polars_engine")]
 impl PolarsPlanRunner {
+    fn expr_has_framed_window(expr: &ExprNode) -> bool {
+        match expr {
+            ExprNode::Window { frame: Some(_), .. } => true,
+            ExprNode::BinaryOp { left, right, .. }
+            | ExprNode::CompareOp { left, right, .. }
+            | ExprNode::LogicalBinary { left, right, .. } => {
+                Self::expr_has_framed_window(left) || Self::expr_has_framed_window(right)
+            }
+            ExprNode::Cast { input, .. }
+            | ExprNode::IsNull { input, .. }
+            | ExprNode::IsNotNull { input, .. } => Self::expr_has_framed_window(input),
+            ExprNode::Coalesce { exprs, .. } | ExprNode::StringConcat { parts: exprs, .. } => {
+                exprs.iter().any(Self::expr_has_framed_window)
+            }
+            ExprNode::CaseWhen {
+                branches, else_, ..
+            } => {
+                branches.iter().any(|(a, b)| {
+                    Self::expr_has_framed_window(a) || Self::expr_has_framed_window(b)
+                }) || Self::expr_has_framed_window(else_)
+            }
+            ExprNode::InList { inner, .. }
+            | ExprNode::StringLength { inner, .. }
+            | ExprNode::StringReplace { inner, .. }
+            | ExprNode::ListLen { inner, .. }
+            | ExprNode::ListMin { inner, .. }
+            | ExprNode::ListMax { inner, .. }
+            | ExprNode::ListSum { inner, .. }
+            | ExprNode::DatetimeToDate { inner, .. }
+            | ExprNode::Strptime { inner, .. }
+            | ExprNode::UnixTimestamp { inner, .. }
+            | ExprNode::BinaryLength { inner, .. }
+            | ExprNode::MapLen { inner, .. }
+            | ExprNode::MapGet { inner, .. }
+            | ExprNode::MapContainsKey { inner, .. }
+            | ExprNode::LogicalNot { inner, .. }
+            | ExprNode::UnaryNumeric { inner, .. }
+            | ExprNode::StringUnary { inner, .. }
+            | ExprNode::TemporalPart { inner, .. }
+            | ExprNode::GlobalAgg { inner, .. } => Self::expr_has_framed_window(inner),
+            ExprNode::Between {
+                inner, low, high, ..
+            } => {
+                Self::expr_has_framed_window(inner)
+                    || Self::expr_has_framed_window(low)
+                    || Self::expr_has_framed_window(high)
+            }
+            ExprNode::Substring {
+                inner,
+                start,
+                length,
+                ..
+            } => {
+                Self::expr_has_framed_window(inner)
+                    || Self::expr_has_framed_window(start)
+                    || length
+                        .as_ref()
+                        .map(|e| Self::expr_has_framed_window(e))
+                        .unwrap_or(false)
+            }
+            ExprNode::StructField { base, .. } => Self::expr_has_framed_window(base),
+            ExprNode::ListGet { inner, index, .. }
+            | ExprNode::ListContains {
+                inner,
+                value: index,
+                ..
+            } => Self::expr_has_framed_window(inner) || Self::expr_has_framed_window(index),
+            ExprNode::Window { operand, .. } => operand
+                .as_ref()
+                .map(|e| Self::expr_has_framed_window(e))
+                .unwrap_or(false),
+            ExprNode::ColumnRef { .. }
+            | ExprNode::Literal { .. }
+            | ExprNode::GlobalRowCount { .. } => false,
+        }
+    }
+
+    fn anyvalue_sort_cmp(a: AnyValue<'_>, b: AnyValue<'_>) -> Ordering {
+        match (a.clone(), b.clone()) {
+            (AnyValue::Null, AnyValue::Null) => Ordering::Equal,
+            (AnyValue::Null, _) => Ordering::Less,
+            (_, AnyValue::Null) => Ordering::Greater,
+            (AnyValue::Int64(x), AnyValue::Int64(y)) => x.cmp(&y),
+            (AnyValue::Int32(x), AnyValue::Int32(y)) => x.cmp(&y),
+            (AnyValue::UInt64(x), AnyValue::UInt64(y)) => x.cmp(&y),
+            (AnyValue::UInt32(x), AnyValue::UInt32(y)) => x.cmp(&y),
+            (AnyValue::Float64(x), AnyValue::Float64(y)) => {
+                x.partial_cmp(&y).unwrap_or(Ordering::Equal)
+            }
+            (AnyValue::Float32(x), AnyValue::Float32(y)) => {
+                x.partial_cmp(&y).unwrap_or(Ordering::Equal)
+            }
+            (AnyValue::String(x), AnyValue::String(y)) => x.cmp(y),
+            (AnyValue::StringOwned(x), AnyValue::StringOwned(y)) => x.as_str().cmp(y.as_str()),
+            _ => format!("{a:?}").cmp(&format!("{b:?}")),
+        }
+    }
+
+    fn anyvalue_as_i64(av: AnyValue<'_>) -> Option<i64> {
+        match av {
+            AnyValue::Int64(v) => Some(v),
+            AnyValue::Int32(v) => Some(v as i64),
+            AnyValue::UInt64(v) => Some(v as i64),
+            AnyValue::UInt32(v) => Some(v as i64),
+            _ => None,
+        }
+    }
+
+    fn eval_framed_window_expr(df: &DataFrame, name: &str, expr: &ExprNode) -> PyResult<Series> {
+        let ExprNode::Window {
+            op,
+            operand,
+            partition_by,
+            order_by,
+            frame: Some(frame),
+            ..
+        } = expr
+        else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "internal: expected framed window expression.",
+            ));
+        };
+
+        if order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Framed windows require order_by columns.",
+            ));
+        }
+
+        let n = df.height();
+        let mut groups: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+        for idx in 0..n {
+            let mut key = String::new();
+            for p in partition_by.iter() {
+                let s = df.column(p).map_err(polars_err)?.as_materialized_series();
+                let av = s.get(idx).map_err(polars_err)?;
+                key.push_str(&format!("{av:?}|"));
+            }
+            groups.entry(key).or_default().push(idx);
+        }
+
+        let mut out: Vec<Option<i64>> = vec![None; n];
+        let mut out_row_number: Vec<Option<i64>> = vec![None; n];
+
+        let value_col_name = match op {
+            WindowOp::Sum => {
+                let Some(opnd) = operand.as_ref() else {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "window sum missing operand.",
+                    ));
+                };
+                let ExprNode::ColumnRef { name, .. } = opnd.as_ref() else {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "framed window sum currently supports column operands only.",
+                    ));
+                };
+                Some(name.clone())
+            }
+            WindowOp::RowNumber => None,
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "framed execution currently supports row_number and window_sum.",
+                ));
+            }
+        };
+
+        for (_pk, mut idxs) in groups {
+            idxs.sort_by(|a, b| {
+                for (c, asc) in order_by.iter() {
+                    let s = df.column(c).expect("column").as_materialized_series();
+                    let av_a = s.get(*a).expect("value");
+                    let av_b = s.get(*b).expect("value");
+                    let cmp = Self::anyvalue_sort_cmp(av_a, av_b);
+                    if cmp != Ordering::Equal {
+                        return if *asc { cmp } else { cmp.reverse() };
+                    }
+                }
+                a.cmp(b)
+            });
+
+            if matches!(op, WindowOp::RowNumber) {
+                for (pos, idx) in idxs.iter().enumerate() {
+                    out_row_number[*idx] = Some((pos + 1) as i64);
+                }
+                continue;
+            }
+
+            let val_col = df
+                .column(value_col_name.as_deref().unwrap_or(""))
+                .map_err(polars_err)?
+                .as_materialized_series()
+                .clone();
+            let ord_series = df
+                .column(order_by[0].0.as_str())
+                .map_err(polars_err)?
+                .as_materialized_series()
+                .clone();
+
+            for (pos, idx) in idxs.iter().enumerate() {
+                let mut acc: i64 = 0;
+                let mut saw = false;
+                match frame {
+                    WindowFrame::Rows { start, end } => {
+                        let lo = (pos as i64 + *start).max(0) as usize;
+                        let hi = (pos as i64 + *end).min((idxs.len() as i64) - 1) as usize;
+                        if lo <= hi {
+                            for cand_idx in idxs.iter().take(hi + 1).skip(lo) {
+                                let av = val_col.get(*cand_idx).map_err(polars_err)?;
+                                if let Some(v) = Self::anyvalue_as_i64(av) {
+                                    acc += v;
+                                    saw = true;
+                                }
+                            }
+                        }
+                    }
+                    WindowFrame::Range { start, end } => {
+                        let cur = ord_series.get(*idx).map_err(polars_err)?;
+                        let Some(cur_v) = Self::anyvalue_as_i64(cur) else {
+                            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                "rangeBetween currently supports integer order columns.",
+                            ));
+                        };
+                        for cand_idx in idxs.iter() {
+                            let ord = ord_series.get(*cand_idx).map_err(polars_err)?;
+                            if let Some(v) = Self::anyvalue_as_i64(ord) {
+                                let delta = v - cur_v;
+                                if delta >= *start && delta <= *end {
+                                    let av = val_col.get(*cand_idx).map_err(polars_err)?;
+                                    if let Some(x) = Self::anyvalue_as_i64(av) {
+                                        acc += x;
+                                        saw = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                out[*idx] = if saw { Some(acc) } else { None };
+            }
+        }
+
+        if matches!(op, WindowOp::RowNumber) {
+            Ok(Series::new(name.into(), out_row_number))
+        } else {
+            Ok(Series::new(name.into(), out))
+        }
+    }
+
     pub fn apply_steps(mut lf: LazyFrame, steps: &[PlanStep]) -> PyResult<LazyFrame> {
         for step in steps.iter() {
             lf = Self::apply_step(lf, step)?;
@@ -750,12 +999,39 @@ impl PolarsPlanRunner {
                 lf = lf.select(exprs);
             }
             PlanStep::WithColumns { columns } => {
-                let mut exprs = Vec::with_capacity(columns.len());
-                for (name, expr) in columns.iter() {
-                    let pe = expr.to_polars_expr()?.alias(name);
-                    exprs.push(pe);
+                let has_framed = columns.values().any(Self::expr_has_framed_window);
+                if has_framed {
+                    let mut df = lf.collect().map_err(polars_err)?;
+                    let mut regular_exprs = Vec::new();
+                    for (name, expr) in columns.iter() {
+                        if Self::expr_has_framed_window(expr) {
+                            continue;
+                        }
+                        regular_exprs.push(expr.to_polars_expr()?.alias(name));
+                    }
+                    if !regular_exprs.is_empty() {
+                        df = df
+                            .lazy()
+                            .with_columns(regular_exprs)
+                            .collect()
+                            .map_err(polars_err)?;
+                    }
+                    for (name, expr) in columns.iter() {
+                        if !Self::expr_has_framed_window(expr) {
+                            continue;
+                        }
+                        let s = Self::eval_framed_window_expr(&df, name, expr)?;
+                        df.with_column(s.into_column()).map_err(polars_err)?;
+                    }
+                    lf = df.lazy();
+                } else {
+                    let mut exprs = Vec::with_capacity(columns.len());
+                    for (name, expr) in columns.iter() {
+                        let pe = expr.to_polars_expr()?.alias(name);
+                        exprs.push(pe);
+                    }
+                    lf = lf.with_columns(exprs);
                 }
-                lf = lf.with_columns(exprs);
             }
             PlanStep::Filter { condition } => {
                 // SQL-like null semantics for filter: keep exactly True; drop False/NULL.

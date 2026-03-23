@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from pydantable import DataFrame
 from pydantable.expressions import (
     dense_rank,
@@ -27,6 +28,17 @@ class W2(Schema):
     g: int
     h: int
     v: int
+
+
+class W3(Schema):
+    g: int
+    v: int | None
+
+
+class W4(Schema):
+    g: int
+    o: int
+    v: int | None
 
 
 def test_row_number_over_partition_order() -> None:
@@ -127,3 +139,63 @@ def test_lag_and_lead_offset_two_within_partition() -> None:
     ).collect(as_lists=True)
     assert out["lg2"] == [None, None, 10, 20]
     assert out["ld2"] == [30, 40, None, None]
+
+
+def test_window_spec_rows_between_is_threaded_to_expr_ir() -> None:
+    spec = Window.partitionBy("g").orderBy("v").rowsBetween(-1, 1)
+    expr = window_sum(DataFrame[W]({"g": [1], "v": [1]}).v).over(spec)
+    payload = expr._rust_expr.to_serializable()
+    assert payload["kind"] == "window"
+    assert payload["frame"]["kind"] == "rows"
+    assert payload["frame"]["start"] == -1
+    assert payload["frame"]["end"] == 1
+
+
+def test_window_spec_range_between_is_threaded_to_expr_ir() -> None:
+    spec = Window.partitionBy("g").orderBy("v").rangeBetween(-2, 0)
+    expr = window_sum(DataFrame[W]({"g": [1], "v": [1]}).v).over(spec)
+    payload = expr._rust_expr.to_serializable()
+    assert payload["kind"] == "window"
+    assert payload["frame"]["kind"] == "range"
+    assert payload["frame"]["start"] == -2
+    assert payload["frame"]["end"] == 0
+
+
+def test_rows_between_running_sum_contract() -> None:
+    df = DataFrame[W]({"g": [1, 1, 1], "v": [10, 20, 30]})
+    w = Window.partitionBy("g").orderBy("v").rowsBetween(-1, 0)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [10, 30, 50]
+
+
+def test_range_between_running_sum_contract() -> None:
+    df = DataFrame[W]({"g": [1, 1, 1], "v": [10, 11, 14]})
+    w = Window.partitionBy("g").orderBy("v").rangeBetween(-2, 0)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [10, 21, 14]
+
+
+def test_rows_between_respects_partitions() -> None:
+    df = DataFrame[W]({"g": [1, 1, 2, 2], "v": [10, 20, 100, 200]})
+    w = Window.partitionBy("g").orderBy("v").rowsBetween(-1, 0)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [10, 30, 100, 300]
+
+
+def test_rows_between_window_sum_skips_nulls() -> None:
+    df = DataFrame[W4]({"g": [1, 1, 1], "o": [1, 2, 3], "v": [10, None, 20]})
+    w = Window.partitionBy("g").orderBy("o").rowsBetween(-1, 0)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [10, 10, 20]
+
+
+def test_range_between_requires_int_order_column() -> None:
+    class R(Schema):
+        g: int
+        v: str
+        x: int
+
+    df = DataFrame[R]({"g": [1, 1], "v": ["a", "b"], "x": [10, 20]})
+    w = Window.partitionBy("g").orderBy("v").rangeBetween(-1, 0)
+    with pytest.raises(TypeError, match="integer order columns"):
+        df.with_columns(s=window_sum(df.x).over(w)).collect(as_lists=True)

@@ -86,12 +86,13 @@ pub enum UnixTimestampUnit {
     Milliseconds,
 }
 
-/// Spark-style row window (reserved; lowering may be added in a future release).
+/// Spark-style window frame bounds.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum WindowFrame {
     /// Inclusive bounds relative to the current row (`0` = current row), matching Spark `rowsBetween`.
-    #[allow(dead_code)]
     Rows { start: i64, end: i64 },
+    /// Inclusive bounds on ordered values, matching Spark `rangeBetween`.
+    Range { start: i64, end: i64 },
 }
 
 #[derive(Clone, Debug)]

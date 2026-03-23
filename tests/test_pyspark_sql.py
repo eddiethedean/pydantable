@@ -389,3 +389,16 @@ def test_window_functions_reexported_from_sql_functions() -> None:
     w = Window.partitionBy("g").orderBy("v", ascending=True)
     out = df.withColumn("rn", F.row_number().over(w)).collect(as_lists=True)
     assert out["rn"] == [1, 2]
+
+
+def test_pyspark_window_rows_between_ir_threading() -> None:
+    from pydantable.pyspark.sql import Window
+
+    class S(Schema):
+        g: int
+        v: int
+
+    w = Window.partitionBy("g").orderBy("v").rowsBetween(-1, 0)
+    payload = F.row_number().over(w)._rust_expr.to_serializable()
+    assert payload["kind"] == "window"
+    assert payload["frame"]["kind"] == "rows"

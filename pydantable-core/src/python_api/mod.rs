@@ -435,9 +435,18 @@ fn expr_datetime_to_date(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
 fn expr_window_row_number(
     partition_by: Vec<String>,
     order_by: Vec<(String, bool)>,
+    frame_kind: Option<String>,
+    frame_start: Option<i64>,
+    frame_end: Option<i64>,
 ) -> PyResult<PyExpr> {
     Ok(PyExpr {
-        node: ExprNode::make_window_row_number(partition_by, order_by)?,
+        node: ExprNode::make_window_row_number(
+            partition_by,
+            order_by,
+            frame_kind,
+            frame_start,
+            frame_end,
+        )?,
     })
 }
 
@@ -446,9 +455,19 @@ fn expr_window_rank(
     dense: bool,
     partition_by: Vec<String>,
     order_by: Vec<(String, bool)>,
+    frame_kind: Option<String>,
+    frame_start: Option<i64>,
+    frame_end: Option<i64>,
 ) -> PyResult<PyExpr> {
     Ok(PyExpr {
-        node: ExprNode::make_window_rank(dense, partition_by, order_by)?,
+        node: ExprNode::make_window_rank(
+            dense,
+            partition_by,
+            order_by,
+            frame_kind,
+            frame_start,
+            frame_end,
+        )?,
     })
 }
 
@@ -457,9 +476,19 @@ fn expr_window_sum(
     inner: Bound<'_, PyExpr>,
     partition_by: Vec<String>,
     order_by: Vec<(String, bool)>,
+    frame_kind: Option<String>,
+    frame_start: Option<i64>,
+    frame_end: Option<i64>,
 ) -> PyResult<PyExpr> {
     Ok(PyExpr {
-        node: ExprNode::make_window_sum(inner.borrow().node.clone(), partition_by, order_by)?,
+        node: ExprNode::make_window_sum(
+            inner.borrow().node.clone(),
+            partition_by,
+            order_by,
+            frame_kind,
+            frame_start,
+            frame_end,
+        )?,
     })
 }
 
@@ -468,9 +497,19 @@ fn expr_window_mean(
     inner: Bound<'_, PyExpr>,
     partition_by: Vec<String>,
     order_by: Vec<(String, bool)>,
+    frame_kind: Option<String>,
+    frame_start: Option<i64>,
+    frame_end: Option<i64>,
 ) -> PyResult<PyExpr> {
     Ok(PyExpr {
-        node: ExprNode::make_window_mean(inner.borrow().node.clone(), partition_by, order_by)?,
+        node: ExprNode::make_window_mean(
+            inner.borrow().node.clone(),
+            partition_by,
+            order_by,
+            frame_kind,
+            frame_start,
+            frame_end,
+        )?,
     })
 }
 
@@ -479,9 +518,19 @@ fn expr_window_min(
     inner: Bound<'_, PyExpr>,
     partition_by: Vec<String>,
     order_by: Vec<(String, bool)>,
+    frame_kind: Option<String>,
+    frame_start: Option<i64>,
+    frame_end: Option<i64>,
 ) -> PyResult<PyExpr> {
     Ok(PyExpr {
-        node: ExprNode::make_window_min(inner.borrow().node.clone(), partition_by, order_by)?,
+        node: ExprNode::make_window_min(
+            inner.borrow().node.clone(),
+            partition_by,
+            order_by,
+            frame_kind,
+            frame_start,
+            frame_end,
+        )?,
     })
 }
 
@@ -490,9 +539,19 @@ fn expr_window_max(
     inner: Bound<'_, PyExpr>,
     partition_by: Vec<String>,
     order_by: Vec<(String, bool)>,
+    frame_kind: Option<String>,
+    frame_start: Option<i64>,
+    frame_end: Option<i64>,
 ) -> PyResult<PyExpr> {
     Ok(PyExpr {
-        node: ExprNode::make_window_max(inner.borrow().node.clone(), partition_by, order_by)?,
+        node: ExprNode::make_window_max(
+            inner.borrow().node.clone(),
+            partition_by,
+            order_by,
+            frame_kind,
+            frame_start,
+            frame_end,
+        )?,
     })
 }
 
@@ -588,9 +647,20 @@ fn expr_window_lag(
     n: u32,
     partition_by: Vec<String>,
     order_by: Vec<(String, bool)>,
+    frame_kind: Option<String>,
+    frame_start: Option<i64>,
+    frame_end: Option<i64>,
 ) -> PyResult<PyExpr> {
     Ok(PyExpr {
-        node: ExprNode::make_window_lag(inner.borrow().node.clone(), n, partition_by, order_by)?,
+        node: ExprNode::make_window_lag(
+            inner.borrow().node.clone(),
+            n,
+            partition_by,
+            order_by,
+            frame_kind,
+            frame_start,
+            frame_end,
+        )?,
     })
 }
 
@@ -600,9 +670,20 @@ fn expr_window_lead(
     n: u32,
     partition_by: Vec<String>,
     order_by: Vec<(String, bool)>,
+    frame_kind: Option<String>,
+    frame_start: Option<i64>,
+    frame_end: Option<i64>,
 ) -> PyResult<PyExpr> {
     Ok(PyExpr {
-        node: ExprNode::make_window_lead(inner.borrow().node.clone(), n, partition_by, order_by)?,
+        node: ExprNode::make_window_lead(
+            inner.borrow().node.clone(),
+            n,
+            partition_by,
+            order_by,
+            frame_kind,
+            frame_start,
+            frame_end,
+        )?,
     })
 }
 

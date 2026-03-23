@@ -25,7 +25,7 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `functions.cast`, `between`, `isin`, `concat`, `substring`, `length` | **Supported** | Base types only; `substring` is 1-based (Spark-style). |
 | `functions.sum`, `avg`, `count`, `min`, `max`, … as column exprs | **Supported** (global) | Global `sum`/`avg`/`mean`/`count`/`min`/`max` on a typed `Expr` in `DataFrame.select(...)` (single-row). **`count()`** with **no** argument → row count (**0.8.0**). Grouped paths use `group_by().agg`. |
 | `Column.cast`, `isin`, `between`, `substr`/`char_length` | **Supported** | On `Expr` / `Column`; includes **`str` → `date` / `datetime`** via Polars parsing (use `strptime` for fixed formats). |
-| `Window`, window functions | **Partial** | `Window.partitionBy().orderBy()`, `row_number`, `rank`, `dense_rank`, `window_sum`, `window_avg`, `window_min`, `window_max`, `lag`, `lead` + core `Expr` lowering; SQL-style framing (`rowsBetween`, …) IR-only (lowering not implemented). |
+| `Window`, window functions | **Partial** | `Window.partitionBy().orderBy()`, `row_number`, `rank`, `dense_rank`, `window_sum`, `window_avg`, `window_min`, `window_max`, `lag`, `lead` + core `Expr` lowering. Framing support is partial: `rowsBetween` for `row_number`/`window_sum`, and `rangeBetween` for `window_sum` on integer order keys (range offset uses the first `orderBy` key). |
 | `types` (Array, Map, nested Struct, Decimal, Timestamp) | **Partial** | Engine supports nested structs/lists, `Decimal`, `datetime`/`date`, homogeneous `dict[str, T]` maps, `bytes`, and `time`; PySpark `types` mirrors annotations for docs/schema views. |
 | `Row`, encoders, streaming | **Out of scope** | |
 
@@ -54,7 +54,11 @@ Delivered: **Rust `ExprNode::Window`** with Polars `.over(...)` lowering; Python
 `row_number()`, `rank()`, `dense_rank()`, `window_sum()`, `window_mean()`, `lag()`, `lead()` finished with
 `Window.partitionBy(...).orderBy(...)` / `.spec()` (see `pydantable.window_spec` and
 `pydantable.pyspark.sql.window`). **`row_number` requires `order_by`** in the window spec
-(Spark-style ordering). **`lag` / `lead` require `order_by`.** Not yet: arbitrary SQL window frames (`rowsBetween`, etc.).
+(Spark-style ordering). **`lag` / `lead` require `order_by`.**
+Framed status:
+- `rowsBetween`: supported for `row_number` and `window_sum`.
+- `rangeBetween`: supported for `window_sum` on integer order keys (range offset is computed from the first `orderBy` key).
+- Remaining framed operators are not implemented yet.
 
 ## Phases F–G — Nested types and real Spark
 

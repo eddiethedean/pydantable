@@ -439,12 +439,27 @@ class _WindowFnPending:
         rust = _require_rust_core()
         part = list(window.partition_by)
         order = list(window.order_by)
+        frame_kind = window.frame_kind
+        frame_start = window.frame_start
+        frame_end = window.frame_end
         if self._kind == "row_number":
-            return Expr(rust_expr=rust.expr_window_row_number(part, order))
+            return Expr(
+                rust_expr=rust.expr_window_row_number(
+                    part, order, frame_kind, frame_start, frame_end
+                )
+            )
         if self._kind == "rank":
-            return Expr(rust_expr=rust.expr_window_rank(False, part, order))
+            return Expr(
+                rust_expr=rust.expr_window_rank(
+                    False, part, order, frame_kind, frame_start, frame_end
+                )
+            )
         if self._kind == "dense_rank":
-            return Expr(rust_expr=rust.expr_window_rank(True, part, order))
+            return Expr(
+                rust_expr=rust.expr_window_rank(
+                    True, part, order, frame_kind, frame_start, frame_end
+                )
+            )
         raise AssertionError(self._kind)
 
 
@@ -459,21 +474,52 @@ class _WindowAggPending:
         rust = _require_rust_core()
         part = list(window.partition_by)
         order = list(window.order_by)
+        frame_kind = window.frame_kind
+        frame_start = window.frame_start
+        frame_end = window.frame_end
         if self._kind == "sum":
             return Expr(
-                rust_expr=rust.expr_window_sum(self._inner._rust_expr, part, order)
+                rust_expr=rust.expr_window_sum(
+                    self._inner._rust_expr,
+                    part,
+                    order,
+                    frame_kind,
+                    frame_start,
+                    frame_end,
+                )
             )
         if self._kind == "mean":
             return Expr(
-                rust_expr=rust.expr_window_mean(self._inner._rust_expr, part, order)
+                rust_expr=rust.expr_window_mean(
+                    self._inner._rust_expr,
+                    part,
+                    order,
+                    frame_kind,
+                    frame_start,
+                    frame_end,
+                )
             )
         if self._kind == "min":
             return Expr(
-                rust_expr=rust.expr_window_min(self._inner._rust_expr, part, order)
+                rust_expr=rust.expr_window_min(
+                    self._inner._rust_expr,
+                    part,
+                    order,
+                    frame_kind,
+                    frame_start,
+                    frame_end,
+                )
             )
         if self._kind == "max":
             return Expr(
-                rust_expr=rust.expr_window_max(self._inner._rust_expr, part, order)
+                rust_expr=rust.expr_window_max(
+                    self._inner._rust_expr,
+                    part,
+                    order,
+                    frame_kind,
+                    frame_start,
+                    frame_end,
+                )
             )
         raise AssertionError(self._kind)
 
@@ -490,16 +536,31 @@ class _WindowShiftPending:
         rust = _require_rust_core()
         part = list(window.partition_by)
         order = list(window.order_by)
+        frame_kind = window.frame_kind
+        frame_start = window.frame_start
+        frame_end = window.frame_end
         if self._kind == "lag":
             return Expr(
                 rust_expr=rust.expr_window_lag(
-                    self._inner._rust_expr, self._n, part, order
+                    self._inner._rust_expr,
+                    self._n,
+                    part,
+                    order,
+                    frame_kind,
+                    frame_start,
+                    frame_end,
                 )
             )
         if self._kind == "lead":
             return Expr(
                 rust_expr=rust.expr_window_lead(
-                    self._inner._rust_expr, self._n, part, order
+                    self._inner._rust_expr,
+                    self._n,
+                    part,
+                    order,
+                    frame_kind,
+                    frame_start,
+                    frame_end,
                 )
             )
         raise AssertionError(self._kind)

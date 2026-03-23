@@ -389,6 +389,13 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
                     f.set_item("end", *end)?;
                     dict.set_item("frame", f)?;
                 }
+                Some(WindowFrame::Range { start, end }) => {
+                    let f = PyDict::new_bound(py);
+                    f.set_item("kind", "range")?;
+                    f.set_item("start", *start)?;
+                    f.set_item("end", *end)?;
+                    dict.set_item("frame", f)?;
+                }
             }
             if let Some(op) = operand {
                 dict.set_item("operand", exprnode_to_serializable(py, op)?)?;

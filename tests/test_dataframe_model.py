@@ -103,8 +103,9 @@ def test_dataframe_model_ignore_errors_callback_not_called_when_clean() -> None:
     assert called is False
 
 
-def test_dataframe_model_ignore_errors_callback_collects_multiple_row_failures(
-) -> None:
+def test_dataframe_model_ignore_errors_callback_collects_multiple_row_failures() -> (
+    None
+):
     failures: list[dict[str, object]] = []
 
     def on_fail(items: list[dict[str, object]]) -> None:
@@ -126,8 +127,29 @@ def test_dataframe_model_ignore_errors_callback_collects_multiple_row_failures(
     assert failures[1]["row"] == {"id": "bad-2", "age": None}
 
 
-def test_dataframe_model_ignore_errors_non_mapping_row_is_reported_and_skipped(
-) -> None:
+def test_dataframe_model_ignore_errors_callback_invoked_once_with_all_failures() -> (
+    None
+):
+    invocations = 0
+    seen_indices: list[int] = []
+
+    def on_fail(items: list[dict[str, object]]) -> None:
+        nonlocal invocations
+        invocations += 1
+        seen_indices.extend(int(item["row_index"]) for item in items)
+
+    _ = UserDF(
+        {"id": ["bad-0", 1, "bad-2"], "age": [10, 20, 30]},
+        ignore_errors=True,
+        on_validation_errors=on_fail,
+    )
+    assert invocations == 1
+    assert seen_indices == [0, 2]
+
+
+def test_dataframe_model_ignore_errors_non_mapping_row_is_reported_and_skipped() -> (
+    None
+):
     failures: list[dict[str, object]] = []
 
     def on_fail(items: list[dict[str, object]]) -> None:

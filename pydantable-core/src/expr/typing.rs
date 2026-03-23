@@ -10,7 +10,7 @@ use crate::dtype::{dtype_structural_eq, BaseType, DTypeDesc};
 
 use super::ir::{
     ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart,
-    UnaryNumericOp, UnixTimestampUnit, WindowOp,
+    UnaryNumericOp, UnixTimestampUnit, WindowFrame, WindowOp,
 };
 
 enum ListAggKind {
@@ -1330,9 +1330,39 @@ impl ExprNode {
         })
     }
 
+    fn parse_window_frame(
+        frame_kind: Option<String>,
+        frame_start: Option<i64>,
+        frame_end: Option<i64>,
+    ) -> PyResult<Option<WindowFrame>> {
+        match (frame_kind, frame_start, frame_end) {
+            (None, None, None) => Ok(None),
+            (Some(kind), Some(start), Some(end)) => {
+                if start > end {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "Window frame requires start <= end.",
+                    ));
+                }
+                match kind.as_str() {
+                    "rows" => Ok(Some(WindowFrame::Rows { start, end })),
+                    "range" => Ok(Some(WindowFrame::Range { start, end })),
+                    _ => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "Window frame kind must be 'rows' or 'range'.",
+                    )),
+                }
+            }
+            _ => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Window frame requires kind/start/end together.",
+            )),
+        }
+    }
+
     pub fn make_window_row_number(
         partition_by: Vec<String>,
         order_by: Vec<(String, bool)>,
+        frame_kind: Option<String>,
+        frame_start: Option<i64>,
+        frame_end: Option<i64>,
     ) -> PyResult<Self> {
         if partition_by.is_empty() && order_by.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -1344,12 +1374,13 @@ impl ExprNode {
                 "row_number() requires at least one order_by column.",
             ));
         }
+        let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
         Ok(ExprNode::Window {
             op: WindowOp::RowNumber,
             operand: None,
             partition_by,
             order_by,
-            frame: None,
+            frame,
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable: true,
@@ -1361,12 +1392,16 @@ impl ExprNode {
         dense: bool,
         partition_by: Vec<String>,
         order_by: Vec<(String, bool)>,
+        frame_kind: Option<String>,
+        frame_start: Option<i64>,
+        frame_end: Option<i64>,
     ) -> PyResult<Self> {
         if order_by.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "rank() and dense_rank() require at least one order_by column.",
             ));
         }
+        let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
         Ok(ExprNode::Window {
             op: if dense {
                 WindowOp::DenseRank
@@ -1376,7 +1411,7 @@ impl ExprNode {
             operand: None,
             partition_by,
             order_by,
-            frame: None,
+            frame,
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable: true,
@@ -1423,6 +1458,9 @@ impl ExprNode {
         inner: ExprNode,
         partition_by: Vec<String>,
         order_by: Vec<(String, bool)>,
+        frame_kind: Option<String>,
+        frame_start: Option<i64>,
+        frame_end: Option<i64>,
     ) -> PyResult<Self> {
         if partition_by.is_empty() && order_by.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -1430,12 +1468,13 @@ impl ExprNode {
             ));
         }
         let dtype = Self::infer_window_sum_mean_dtype(&inner, false)?;
+        let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
         Ok(ExprNode::Window {
             op: WindowOp::Sum,
             operand: Some(Box::new(inner)),
             partition_by,
             order_by,
-            frame: None,
+            frame,
             dtype,
         })
     }
@@ -1444,6 +1483,9 @@ impl ExprNode {
         inner: ExprNode,
         partition_by: Vec<String>,
         order_by: Vec<(String, bool)>,
+        frame_kind: Option<String>,
+        frame_start: Option<i64>,
+        frame_end: Option<i64>,
     ) -> PyResult<Self> {
         if partition_by.is_empty() && order_by.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -1451,12 +1493,13 @@ impl ExprNode {
             ));
         }
         let dtype = Self::infer_window_sum_mean_dtype(&inner, true)?;
+        let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
         Ok(ExprNode::Window {
             op: WindowOp::Mean,
             operand: Some(Box::new(inner)),
             partition_by,
             order_by,
-            frame: None,
+            frame,
             dtype,
         })
     }
@@ -1465,6 +1508,9 @@ impl ExprNode {
         inner: ExprNode,
         partition_by: Vec<String>,
         order_by: Vec<(String, bool)>,
+        frame_kind: Option<String>,
+        frame_start: Option<i64>,
+        frame_end: Option<i64>,
     ) -> PyResult<Self> {
         if partition_by.is_empty() && order_by.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -1472,12 +1518,13 @@ impl ExprNode {
             ));
         }
         let dtype = Self::infer_global_min_max_dtype(&inner)?;
+        let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
         Ok(ExprNode::Window {
             op: WindowOp::Min,
             operand: Some(Box::new(inner)),
             partition_by,
             order_by,
-            frame: None,
+            frame,
             dtype,
         })
     }
@@ -1486,6 +1533,9 @@ impl ExprNode {
         inner: ExprNode,
         partition_by: Vec<String>,
         order_by: Vec<(String, bool)>,
+        frame_kind: Option<String>,
+        frame_start: Option<i64>,
+        frame_end: Option<i64>,
     ) -> PyResult<Self> {
         if partition_by.is_empty() && order_by.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -1493,12 +1543,13 @@ impl ExprNode {
             ));
         }
         let dtype = Self::infer_global_min_max_dtype(&inner)?;
+        let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
         Ok(ExprNode::Window {
             op: WindowOp::Max,
             operand: Some(Box::new(inner)),
             partition_by,
             order_by,
-            frame: None,
+            frame,
             dtype,
         })
     }
@@ -1763,6 +1814,9 @@ impl ExprNode {
         n: u32,
         partition_by: Vec<String>,
         order_by: Vec<(String, bool)>,
+        frame_kind: Option<String>,
+        frame_start: Option<i64>,
+        frame_end: Option<i64>,
     ) -> PyResult<Self> {
         if partition_by.is_empty() && order_by.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -1775,12 +1829,13 @@ impl ExprNode {
             ));
         }
         let dtype = Self::window_shift_operand_dtype(&inner)?;
+        let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
         Ok(ExprNode::Window {
             op: WindowOp::Lag { n },
             operand: Some(Box::new(inner)),
             partition_by,
             order_by,
-            frame: None,
+            frame,
             dtype,
         })
     }
@@ -1790,6 +1845,9 @@ impl ExprNode {
         n: u32,
         partition_by: Vec<String>,
         order_by: Vec<(String, bool)>,
+        frame_kind: Option<String>,
+        frame_start: Option<i64>,
+        frame_end: Option<i64>,
     ) -> PyResult<Self> {
         if partition_by.is_empty() && order_by.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -1802,12 +1860,13 @@ impl ExprNode {
             ));
         }
         let dtype = Self::window_shift_operand_dtype(&inner)?;
+        let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
         Ok(ExprNode::Window {
             op: WindowOp::Lead { n },
             operand: Some(Box::new(inner)),
             partition_by,
             order_by,
-            frame: None,
+            frame,
             dtype,
         })
     }

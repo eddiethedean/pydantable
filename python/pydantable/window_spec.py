@@ -15,6 +15,29 @@ class WindowSpec:
 
     partition_by: tuple[str, ...]
     order_by: tuple[tuple[str, bool], ...]
+    frame_kind: str | None = None
+    frame_start: int | None = None
+    frame_end: int | None = None
+
+    def rowsBetween(self, start: int, end: int) -> WindowSpec:
+        """Attach an inclusive row frame with Spark-style offsets."""
+        return WindowSpec(
+            partition_by=self.partition_by,
+            order_by=self.order_by,
+            frame_kind="rows",
+            frame_start=int(start),
+            frame_end=int(end),
+        )
+
+    def rangeBetween(self, start: int, end: int) -> WindowSpec:
+        """Attach an inclusive range frame with Spark-style bounds."""
+        return WindowSpec(
+            partition_by=self.partition_by,
+            order_by=self.order_by,
+            frame_kind="range",
+            frame_start=int(start),
+            frame_end=int(end),
+        )
 
 
 class Window:
@@ -54,3 +77,11 @@ class _WindowPartitionBuilder:
     def spec(self) -> WindowSpec:
         """Partition keys only (no ``orderBy``)."""
         return WindowSpec(partition_by=self._partition_by, order_by=())
+
+    def rowsBetween(self, start: int, end: int) -> WindowSpec:
+        """Build a partition-only row frame window spec."""
+        return self.spec().rowsBetween(start, end)
+
+    def rangeBetween(self, start: int, end: int) -> WindowSpec:
+        """Build a partition-only range frame window spec."""
+        return self.spec().rangeBetween(start, end)

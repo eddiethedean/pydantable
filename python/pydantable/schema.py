@@ -113,11 +113,6 @@ def _is_supported_column_annotation_inner(
         key_t, val_t = dict_args
         if key_t is not str:
             return False
-        val_un = _unwrap_annotated(val_t)
-        if get_origin(val_un) in (list, dict) or (
-            isinstance(val_un, type) and issubclass(val_un, BaseModel)
-        ):
-            return False
         return _is_supported_column_annotation_inner(val_t, _model_stack=_model_stack)
     if origin is not None:
         return False
