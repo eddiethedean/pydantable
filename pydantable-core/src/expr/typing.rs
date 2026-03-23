@@ -139,6 +139,7 @@ impl ExprNode {
             | ExprNode::MapContainsKey { dtype, .. }
             | ExprNode::MapKeys { dtype, .. }
             | ExprNode::MapValues { dtype, .. }
+            | ExprNode::MapEntries { dtype, .. }
             | ExprNode::Window { dtype, .. }
             | ExprNode::GlobalAgg { dtype, .. }
             | ExprNode::GlobalRowCount { dtype, .. } => dtype.clone(),
@@ -226,7 +227,8 @@ impl ExprNode {
             | ExprNode::MapGet { inner, .. }
             | ExprNode::MapContainsKey { inner, .. }
             | ExprNode::MapKeys { inner, .. }
-            | ExprNode::MapValues { inner, .. } => inner.referenced_columns(),
+            | ExprNode::MapValues { inner, .. }
+            | ExprNode::MapEntries { inner, .. } => inner.referenced_columns(),
             ExprNode::ListGet { inner, index, .. } => {
                 let mut out = inner.referenced_columns();
                 out.extend(index.referenced_columns());
@@ -1370,6 +1372,19 @@ impl ExprNode {
         Ok(())
     }
 
+    fn validate_range_frame_order_keys(
+        frame: &Option<WindowFrame>,
+        order_by: &[(String, bool)],
+        op_name: &str,
+    ) -> PyResult<()> {
+        if matches!(frame, Some(WindowFrame::Range { .. })) && order_by.len() != 1 {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+                "{op_name}() with rangeBetween requires exactly one order_by column."
+            )));
+        }
+        Ok(())
+    }
+
     pub fn make_window_row_number(
         partition_by: Vec<String>,
         order_by: Vec<(String, bool)>,
@@ -1484,6 +1499,7 @@ impl ExprNode {
         }
         let dtype = Self::infer_window_sum_mean_dtype(&inner, false)?;
         let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
+        Self::validate_range_frame_order_keys(&frame, &order_by, "window_sum")?;
         Ok(ExprNode::Window {
             op: WindowOp::Sum,
             operand: Some(Box::new(inner)),
@@ -1509,6 +1525,7 @@ impl ExprNode {
         }
         let dtype = Self::infer_window_sum_mean_dtype(&inner, true)?;
         let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
+        Self::validate_range_frame_order_keys(&frame, &order_by, "window_mean")?;
         Ok(ExprNode::Window {
             op: WindowOp::Mean,
             operand: Some(Box::new(inner)),
@@ -1534,6 +1551,7 @@ impl ExprNode {
         }
         let dtype = Self::infer_global_min_max_dtype(&inner)?;
         let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
+        Self::validate_range_frame_order_keys(&frame, &order_by, "window_min")?;
         Ok(ExprNode::Window {
             op: WindowOp::Min,
             operand: Some(Box::new(inner)),
@@ -1559,6 +1577,7 @@ impl ExprNode {
         }
         let dtype = Self::infer_global_min_max_dtype(&inner)?;
         let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
+        Self::validate_range_frame_order_keys(&frame, &order_by, "window_max")?;
         Ok(ExprNode::Window {
             op: WindowOp::Max,
             operand: Some(Box::new(inner)),
@@ -1839,6 +1858,37 @@ impl ExprNode {
             inner: Box::new(inner),
             dtype: DTypeDesc::List {
                 inner: Box::new(value.as_ref().clone()),
+                nullable,
+            },
+        })
+    }
+
+    pub fn make_map_entries(inner: ExprNode) -> PyResult<Self> {
+        if !inner.dtype().is_map() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "map_entries() requires a map column.",
+            ));
+        }
+        let DTypeDesc::Map { value, .. } = inner.dtype() else {
+            unreachable!("is_map checked");
+        };
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::MapEntries {
+            inner: Box::new(inner),
+            dtype: DTypeDesc::List {
+                inner: Box::new(DTypeDesc::Struct {
+                    fields: vec![
+                        (
+                            "key".to_string(),
+                            DTypeDesc::Scalar {
+                                base: Some(BaseType::Str),
+                                nullable: false,
+                            },
+                        ),
+                        ("value".to_string(), value.as_ref().clone()),
+                    ],
+                    nullable: false,
+                }),
                 nullable,
             },
         })
@@ -2980,7 +3030,8 @@ impl ExprNode {
             | ExprNode::MapGet { .. }
             | ExprNode::MapContainsKey { .. }
             | ExprNode::MapKeys { .. }
-            | ExprNode::MapValues { .. } => {
+            | ExprNode::MapValues { .. }
+            | ExprNode::MapEntries { .. } => {
                 Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
                     "This expression is only supported with the Polars execution engine.",
                 ))

@@ -40,6 +40,7 @@
       ~Expr.list_sum
       ~Expr.lower
       ~Expr.map_contains_key
+      ~Expr.map_entries
       ~Expr.map_get
       ~Expr.map_keys
       ~Expr.map_len

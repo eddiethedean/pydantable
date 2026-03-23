@@ -25,8 +25,8 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `functions.cast`, `between`, `isin`, `concat`, `substring`, `length` | **Supported** | Base types only; `substring` is 1-based (Spark-style). |
 | `functions.sum`, `avg`, `count`, `min`, `max`, … as column exprs | **Supported** (global) | Global `sum`/`avg`/`mean`/`count`/`min`/`max` on a typed `Expr` in `DataFrame.select(...)` (single-row). **`count()`** with **no** argument → row count (**0.8.0**). Grouped paths use `group_by().agg`. |
 | `Column.cast`, `isin`, `between`, `substr`/`char_length` | **Supported** | On `Expr` / `Column`; includes **`str` → `date` / `datetime`** via Polars parsing (use `strptime` for fixed formats). |
-| `Window`, window functions | **Partial** | `Window.partitionBy().orderBy()`, `row_number`, `rank`, `dense_rank`, `window_sum`, `window_avg`, `window_min`, `window_max`, `lag`, `lead` + core `Expr` lowering. Framing support includes `rowsBetween` for all named window ops and `rangeBetween` for numeric aggregates on integer order keys (range offset uses the first `orderBy` key). |
-| `functions.map_keys`, `functions.map_values` | **Supported** | Per-row key and value list extraction on `dict[str, T]` columns. |
+| `Window`, window functions | **Partial** | `Window.partitionBy().orderBy()`, `row_number`, `rank`, `dense_rank`, `window_sum`, `window_avg`, `window_min`, `window_max`, `lag`, `lead` + core `Expr` lowering. Framing support includes `rowsBetween` for all named window ops and `rangeBetween` for numeric aggregates on integer order keys with exactly one `orderBy` column. |
+| `functions.map_len`, `map_get`, `map_contains_key`, `map_keys`, `map_values`, `map_entries` | **Supported** | Per-row map cardinality, lookup, membership, key/value lists, and entry structs on `dict[str, T]` columns. |
 | `types` (Array, Map, nested Struct, Decimal, Timestamp) | **Partial** | Engine supports nested structs/lists, `Decimal`, `datetime`/`date`, homogeneous `dict[str, T]` maps, `bytes`, and `time`; PySpark `types` mirrors annotations for docs/schema views. |
 | `Row`, encoders, streaming | **Out of scope** | |
 
@@ -58,7 +58,7 @@ Delivered: **Rust `ExprNode::Window`** with Polars `.over(...)` lowering; Python
 (Spark-style ordering). **`lag` / `lead` require `order_by`.**
 Framed status:
 - `rowsBetween`: supported for `row_number`, `rank`, `dense_rank`, `window_sum`, `window_avg`, `window_min`, `window_max`, `lag`, and `lead`.
-- `rangeBetween`: supported for `window_sum`, `window_avg`, `window_min`, and `window_max` on integer order keys (range offset is computed from the first `orderBy` key).
+- `rangeBetween`: supported for `window_sum`, `window_avg`, `window_min`, and `window_max` on integer order keys with exactly one `orderBy` key.
 - Unsupported framed combinations raise typed errors.
 
 ## Phases F–G — Nested types and real Spark

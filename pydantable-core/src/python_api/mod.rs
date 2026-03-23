@@ -85,7 +85,7 @@ impl PyPlan {
 
 #[pyfunction]
 fn rust_version() -> &'static str {
-    "0.10.0"
+    "0.11.0"
 }
 
 #[pyfunction]
@@ -631,6 +631,13 @@ fn expr_map_keys(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
 fn expr_map_values(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
     Ok(PyExpr {
         node: ExprNode::make_map_values(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_map_entries(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_map_entries(inner.borrow().node.clone())?,
     })
 }
 
@@ -1259,6 +1266,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr_map_contains_key, m)?)?;
     m.add_function(wrap_pyfunction!(expr_map_keys, m)?)?;
     m.add_function(wrap_pyfunction!(expr_map_values, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_map_entries, m)?)?;
     m.add_function(wrap_pyfunction!(expr_global_count, m)?)?;
     m.add_function(wrap_pyfunction!(expr_global_min, m)?)?;
     m.add_function(wrap_pyfunction!(expr_global_max, m)?)?;

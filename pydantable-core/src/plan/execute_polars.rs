@@ -766,6 +766,7 @@ impl PolarsPlanRunner {
             | ExprNode::MapContainsKey { inner, .. }
             | ExprNode::MapKeys { inner, .. }
             | ExprNode::MapValues { inner, .. }
+            | ExprNode::MapEntries { inner, .. }
             | ExprNode::LogicalNot { inner, .. }
             | ExprNode::UnaryNumeric { inner, .. }
             | ExprNode::StringUnary { inner, .. }

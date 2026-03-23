@@ -40,6 +40,7 @@
       ~ColumnRef.list_sum
       ~ColumnRef.lower
       ~ColumnRef.map_contains_key
+      ~ColumnRef.map_entries
       ~ColumnRef.map_get
       ~ColumnRef.map_keys
       ~ColumnRef.map_len

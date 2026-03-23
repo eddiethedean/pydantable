@@ -508,3 +508,10 @@ def test_dataframe_model_polars_dataframe_rejects_column_mismatch() -> None:
     pdf = pl.DataFrame({"id": [1], "bad": [2]})
     with pytest.raises(ValueError, match="columns exactly"):
         UserDF(pdf, validate_data=False)
+
+
+def test_dataframe_model_polars_dataframe_rejects_null_in_non_nullable_column() -> None:
+    pl = pytest.importorskip("polars")
+    pdf = pl.DataFrame({"id": [1, None], "age": [10, 20]})
+    with pytest.raises(ValueError, match="non-nullable"):
+        UserDF(pdf, validate_data=False)

@@ -247,7 +247,8 @@ def validate_columns_strict(
                 "(per-element validation is skipped for columnar buffers)."
             )
         field_types = schema_field_types(schema_type)
-        cols = {str(c) for c in cast("Any", data).columns}
+        polars_df = cast("Any", data)
+        cols = {str(c) for c in polars_df.columns}
         field_keys = set(field_types.keys())
         missing = sorted(field_keys - cols)
         extra = sorted(cols - field_keys)
@@ -255,6 +256,16 @@ def validate_columns_strict(
             raise ValueError(f"Missing required columns: {missing}")
         if extra:
             raise ValueError(f"Unknown columns for schema: {extra}")
+        for name, annotation in field_types.items():
+            _, nullable = _annotation_nullable_inner(annotation)
+            if nullable:
+                continue
+            null_count = int(polars_df.get_column(name).null_count())
+            if null_count > 0:
+                raise ValueError(
+                    f"Column '{name}' is non-nullable in schema "
+                    "but contains null values."
+                )
         return data
 
     field_types = schema_field_types(schema_type)

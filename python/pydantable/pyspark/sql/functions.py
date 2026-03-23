@@ -287,6 +287,34 @@ def map_values(column: Expr) -> Expr:
     return column.map_values()
 
 
+def map_len(column: Expr) -> Expr:
+    """Per-row map cardinality for ``dict[str, T]`` columns."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.map_len() expects a typed column Expr.")
+    return column.map_len()
+
+
+def map_get(column: Expr, key: str) -> Expr:
+    """Per-row map lookup by string key (missing key -> null)."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.map_get() expects a typed column Expr.")
+    return column.map_get(key)
+
+
+def map_contains_key(column: Expr, key: str) -> Expr:
+    """Per-row key membership for ``dict[str, T]`` columns."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.map_contains_key() expects a typed column Expr.")
+    return column.map_contains_key(key)
+
+
+def map_entries(column: Expr) -> Expr:
+    """Per-row list of map entry structs ``{key, value}``."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.map_entries() expects a typed column Expr.")
+    return column.map_entries()
+
+
 __all__ = [
     "avg",
     "between",
@@ -306,7 +334,11 @@ __all__ = [
     "lead",
     "length",
     "lit",
+    "map_contains_key",
+    "map_entries",
+    "map_get",
     "map_keys",
+    "map_len",
     "map_values",
     "max",
     "mean",

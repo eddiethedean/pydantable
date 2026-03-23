@@ -41,6 +41,13 @@ class W4(Schema):
     v: int | None
 
 
+class W5(Schema):
+    g: int
+    o1: int
+    o2: int
+    v: int
+
+
 def test_row_number_over_partition_order() -> None:
     df = DataFrame[W]({"g": [1, 1, 2], "v": [10, 20, 30]})
     w = Window.partitionBy("g").orderBy("v", ascending=True)
@@ -182,11 +189,32 @@ def test_range_between_running_mean_contract() -> None:
     assert out["m"] == [10.0, 10.5, 14.0]
 
 
+def test_range_between_includes_boundary_values() -> None:
+    df = DataFrame[W]({"g": [1, 1, 1], "v": [10, 12, 14]})
+    w = Window.partitionBy("g").orderBy("v").rangeBetween(-2, 0)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [10, 22, 26]
+
+
 def test_rows_between_respects_partitions() -> None:
     df = DataFrame[W]({"g": [1, 1, 2, 2], "v": [10, 20, 100, 200]})
     w = Window.partitionBy("g").orderBy("v").rowsBetween(-1, 0)
     out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
     assert out["s"] == [10, 30, 100, 300]
+
+
+def test_rows_between_large_bounds_cover_full_partition() -> None:
+    df = DataFrame[W]({"g": [1, 1, 1], "v": [10, 20, 30]})
+    w = Window.partitionBy("g").orderBy("v").rowsBetween(-999, 999)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [60, 60, 60]
+
+
+def test_rows_between_descending_order_running_sum() -> None:
+    df = DataFrame[W]({"g": [1, 1, 1], "v": [10, 20, 30]})
+    w = Window.partitionBy("g").orderBy("v", ascending=False).rowsBetween(-1, 0)
+    out = df.with_columns(s=window_sum(df.v).over(w)).collect(as_lists=True)
+    assert out["s"] == [30, 50, 30]
 
 
 def test_rows_between_window_sum_skips_nulls() -> None:
@@ -267,3 +295,10 @@ def test_range_between_rejects_dense_rank_and_lead() -> None:
         df.with_columns(d=dense_rank().over(w))
     with pytest.raises(TypeError, match=r"lead\(\) does not support rangeBetween"):
         df.with_columns(l=lead(df.v, 1).over(w))
+
+
+def test_range_between_requires_single_order_by_key() -> None:
+    df = DataFrame[W5]({"g": [1, 1], "o1": [1, 2], "o2": [1, 1], "v": [10, 20]})
+    w = Window.partitionBy("g").orderBy("o1", "o2").rangeBetween(-1, 0)
+    with pytest.raises(TypeError, match="requires exactly one order_by column"):
+        df.with_columns(s=window_sum(df.v).over(w))

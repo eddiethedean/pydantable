@@ -126,7 +126,7 @@ Supported P6 API surface:
 - `Expr.over(partition_by=..., order_by=...)` exists for API compatibility, but **window framing is not implemented yet**. Calling `.over()` with no arguments is silent; if you pass `partition_by` or `order_by`, pydantable emits a **runtime warning** and still evaluates the underlying expression as a non-window expression (no partition/order semantics).
 - **Named window functions** (`row_number`, `rank`, `dense_rank`, `window_sum`, `window_mean`, `window_min`, `window_max`, `lag`, `lead`) use Rust `ExprNode::Window` and lower to Polars **`.over_with_options(..., WindowMapping::default())`** when no frame is present. Framed windows now use a dedicated executor fallback path:
   - `rowsBetween(start, end)`: supported for `row_number`, `rank`, `dense_rank`, `window_sum`, `window_mean`, `window_min`, `window_max`, `lag`, and `lead`.
-  - `rangeBetween(start, end)`: supported for numeric aggregates (`window_sum`, `window_mean`, `window_min`, `window_max`) on integer order keys (range offsets are computed from the first `orderBy` key).
+  - `rangeBetween(start, end)`: supported for numeric aggregates (`window_sum`, `window_mean`, `window_min`, `window_max`) on integer order keys with exactly one `orderBy` column.
   - Unsupported framed combinations raise typed errors.
   - Unframed behavior remains unchanged; **`lag` / `lead`** are implemented as **`shift(±n)`** in that window context and require **`order_by`**.
 - `rolling_agg(...)`

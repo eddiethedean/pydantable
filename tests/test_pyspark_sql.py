@@ -417,6 +417,24 @@ def test_pyspark_map_keys_and_values_helpers() -> None:
     assert got["v"] == [[1, 2]]
 
 
+def test_pyspark_map_parity_wrappers() -> None:
+    class S(Schema):
+        m: dict[str, int]
+
+    df = DataFrame[S]({"m": [{"a": 1, "b": 2}, {"b": 5}]})
+    out = (
+        df.withColumn("n", F.map_len(F.col("m", dtype=dict[str, int])))
+        .withColumn("a", F.map_get(F.col("m", dtype=dict[str, int]), "a"))
+        .withColumn("has_a", F.map_contains_key(F.col("m", dtype=dict[str, int]), "a"))
+        .withColumn("entries", F.map_entries(F.col("m", dtype=dict[str, int])))
+        .collect(as_lists=True)
+    )
+    assert out["n"] == [2, 1]
+    assert out["a"] == [1, None]
+    assert out["has_a"] == [True, False]
+    assert out["entries"][0][0]["key"] == "a"
+
+
 def test_pyspark_window_rows_between_mean_contract() -> None:
     from pydantable.pyspark.sql import Window
 

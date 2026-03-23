@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.10.0 → v1.0.0)
+# PydanTable roadmap (0.11.0 → v1.0.0)
 
-**Current release: `0.10.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
+**Current release: `0.11.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
 
 For Polars-style API parity at the method level, see
 [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md).
@@ -116,9 +116,17 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 ---
 
+## Shipped in 0.11.0 (range contracts + map parity)
+
+- [x] **Range frame guardrails:** `rangeBetween` aggregate windows now require exactly one order key and keep explicit typed errors for unsupported operator/frame combinations.
+- [x] **Map parity expansion:** add `map_entries` plus PySpark wrappers for `map_len`, `map_get`, and `map_contains_key`.
+- [x] **Trusted interop hardening:** `validate_data=False` Polars ingestion now rejects nulls in non-nullable schema fields.
+
+---
+
 ## Later (not started)
 
-Directions beyond **0.10.0** (non-exhaustive):
+Directions beyond **0.11.0** (non-exhaustive):
 
 - [ ] **Arrow-native map dtype** or heterogeneous map keys (beyond `dict[str, T]` v1) — optional I/O spike.
 - [ ] Full SQL-grade `rangeBetween` semantics over multi-key orderings and non-integer order dtypes.

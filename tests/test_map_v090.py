@@ -89,3 +89,21 @@ def test_map_keys_requires_map_column() -> None:
     df = DataFrame[NotMap]({"payload": [[1, 2]]})
     with pytest.raises(TypeError, match=r"map_keys\(\) requires a map column"):
         df.with_columns(k=df.payload.map_keys())
+
+
+def test_map_entries_roundtrip_shape() -> None:
+    df = DataFrame[MapStruct]({"payload": [{"a": {"x": 1}, "b": None}]})
+    out = df.with_columns(e=df.payload.map_entries()).collect(as_lists=True)
+    assert out["e"] == [[{"key": "a", "value": {"x": 1}}, {"key": "b", "value": None}]]
+
+
+def test_map_keys_values_entries_on_empty_map() -> None:
+    df = DataFrame[MapStruct]({"payload": [{}]})
+    out = df.with_columns(
+        k=df.payload.map_keys(),
+        v=df.payload.map_values(),
+        e=df.payload.map_entries(),
+    ).collect(as_lists=True)
+    assert out["k"] == [[]]
+    assert out["v"] == [[]]
+    assert out["e"] == [[]]

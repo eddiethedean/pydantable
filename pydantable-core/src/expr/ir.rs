@@ -280,6 +280,11 @@ pub enum ExprNode {
         inner: Box<ExprNode>,
         dtype: DTypeDesc,
     },
+    /// List of map entries for each row (`list[struct{key, value}]`).
+    MapEntries {
+        inner: Box<ExprNode>,
+        dtype: DTypeDesc,
+    },
     /// Windowed aggregate or ranking function (Polars `.over(...)`).
     Window {
         op: WindowOp,
