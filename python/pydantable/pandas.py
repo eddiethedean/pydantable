@@ -1,4 +1,9 @@
-"""pandas-flavored DataFrame / DataFrameModel (method names and ergonomics)."""
+"""pandas-like method names on the core :class:`DataFrame` and :class:`DataFrameModel`.
+
+``merge``/``assign``/``query`` mirror familiar pandas entry points where supported;
+execution remains the Rust engine. Import ``DataFrame`` from this module for the
+pandas-shaped API.
+"""
 
 from __future__ import annotations
 
@@ -20,7 +25,7 @@ def _is_pandas_series(value: object) -> bool:
 
 
 class PandasDataFrame(CoreDataFrame):
-    """Pandas-style method names on top of the typed logical DataFrame API."""
+    """``assign``, ``merge``, ``query``, ``columns``, ``shape``, and related."""
 
     def assign(self, **kwargs: Any) -> CoreDataFrame:
         for name, value in kwargs.items():
@@ -160,6 +165,8 @@ class PandasDataFrame(CoreDataFrame):
 
 
 class PandasGroupedDataFrame(CoreGroupedDataFrame):
+    """Grouped frame with shorthand ``sum`` / ``mean`` / ``count`` over columns."""
+
     def sum(self, *columns: str) -> CoreDataFrame:
         if not columns:
             raise TypeError("sum() requires at least one column name.")
@@ -177,6 +184,8 @@ class PandasGroupedDataFrame(CoreGroupedDataFrame):
 
 
 class PandasDataFrameModel(CoreDataFrameModel):
+    """:class:`DataFrameModel` using :class:`PandasDataFrame` under the hood."""
+
     def assign(self, **kwargs: Any) -> CoreDataFrameModel:
         return type(self)._from_dataframe(self._df.assign(**kwargs))
 
@@ -222,6 +231,8 @@ class PandasDataFrameModel(CoreDataFrameModel):
 
 
 class PandasGroupedDataFrameModel(CoreGroupedDataFrameModel):
+    """Model-level grouped aggregations with pandas naming."""
+
     def sum(self, *columns: str) -> CoreDataFrameModel:
         return self._model_type._from_dataframe(self._grouped_df.sum(*columns))
 
@@ -233,7 +244,7 @@ class PandasGroupedDataFrameModel(CoreGroupedDataFrameModel):
 
 
 class DataFrame(PandasDataFrame):
-    """pandas-flavored interface; execution uses the Rust engine."""
+    """Default export: pandas-flavored typed ``DataFrame``."""
 
 
 class DataFrameModel(PandasDataFrameModel):

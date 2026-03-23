@@ -1,3 +1,10 @@
+"""Typed column expressions (:class:`Expr`) validated and lowered in Rust.
+
+Use operators and methods on :class:`Expr` to build trees; window helpers return
+pending objects finished with ``.over(WindowSpec(...))``. Globals such as
+:func:`global_sum` are only valid inside :meth:`pydantable.dataframe.DataFrame.select`.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -9,11 +16,7 @@ if TYPE_CHECKING:
 
 
 class Expr:  # type: ignore[override]
-    """
-    Thin wrapper around Rust-typed expression nodes.
-
-    Operator/type validation happens in Rust at AST-build time.
-    """
+    """Column expression: operators/methods build a Rust AST with static dtypes."""
 
     def __init__(self, *, rust_expr: Any):
         self._rust_expr = rust_expr
@@ -371,6 +374,8 @@ def when(condition: Expr, value: Expr) -> WhenChain:
 
 
 class ColumnRef(Expr):  # type: ignore[override]
+    """Named column with an explicit Python annotation used for Rust typing."""
+
     def __init__(self, *, name: str, dtype: Any):
         rust_expr = _require_rust_core().make_column_ref(
             name=name, dtype_annotation=dtype
@@ -379,6 +384,8 @@ class ColumnRef(Expr):  # type: ignore[override]
 
 
 class Literal(Expr):  # type: ignore[override]
+    """Scalar constant repeated on every row (dtype inferred from the value)."""
+
     def __init__(self, *, value: Any, dtype: Any = None):
         # `dtype` is accepted for backwards compatibility with the old skeleton.
         # Rust derives the actual dtype from the provided scalar value.
@@ -388,11 +395,15 @@ class Literal(Expr):  # type: ignore[override]
 
 
 class BinaryOp(Expr):  # type: ignore[override]
+    """Arithmetic expression node (internal)."""
+
     def __init__(self, *, rust_expr: Any):
         super().__init__(rust_expr=rust_expr)
 
 
 class CompareOp(Expr):  # type: ignore[override]
+    """Comparison expression node (internal)."""
+
     def __init__(self, *, rust_expr: Any):
         super().__init__(rust_expr=rust_expr)
 
@@ -438,6 +449,8 @@ class _WindowFnPending:
 
 
 class _WindowAggPending:
+    """Deferred window aggregate; complete with ``.over(WindowSpec(...))``."""
+
     def __init__(self, inner: Expr, kind: str):
         self._inner = inner
         self._kind = kind

@@ -1,4 +1,7 @@
-"""Stronger coverage for 0.8.0 surfaces: global row count, str→temporal cast, map helpers, window min/max."""
+"""Stronger coverage for 0.8.0 surfaces.
+
+Global row count, str casts to date/datetime, map helpers, window min/max.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +10,6 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
-
 from pydantable import DataFrame
 from pydantable.expressions import (
     global_count,
@@ -30,7 +32,7 @@ class Nullable(Schema):
 
 
 def test_global_row_count_differs_from_column_count_when_nulls() -> None:
-    """``global_row_count`` counts rows; ``global_count(col)`` counts non-null *col* values."""
+    """Row count vs non-null count: ``global_row_count`` vs ``global_count(col)``."""
     df = DataFrame[Nullable]({"v": [1, None, 3]})
     out = df.select(global_row_count(), global_count(df.v)).collect(as_lists=True)
     assert out == {"row_count": [3], "count_v": [2]}
@@ -49,7 +51,7 @@ def test_global_row_count_after_head() -> None:
 
 
 def test_global_row_count_replicated_in_with_columns() -> None:
-    """Global row count lowers to a scalar broadcast across rows (like other global aggs)."""
+    """Scalar row count is broadcast to every row (same as other global aggs)."""
     df = DataFrame[T]({"id": [1, 2, 3], "v": [10, 20, 30]})
     out = df.with_columns(n=global_row_count()).collect(as_lists=True)
     assert out["n"] == [3, 3, 3]
@@ -137,7 +139,7 @@ class WDec(Schema):
 
 
 def test_window_min_max_with_order_by_still_partition_extrema() -> None:
-    """Polars ``min().over(partition, order_by=...)`` is still the partition min for each row."""
+    """With order_by, partition min/max are still full-partition extrema per row."""
     df = DataFrame[W]({"g": [1, 1, 1], "v": [3, 1, 2]})
     w = Window.partitionBy("g").orderBy("v", ascending=True)
     out = df.with_columns(
@@ -160,9 +162,7 @@ def test_window_min_max_skip_nulls_in_partition() -> None:
 
 
 def test_window_min_max_decimal_partition() -> None:
-    df = DataFrame[WDec](
-        {"g": [1, 1], "v": [Decimal("1.5"), Decimal("2.5")]}
-    )
+    df = DataFrame[WDec]({"g": [1, 1], "v": [Decimal("1.5"), Decimal("2.5")]})
     w = Window.partitionBy("g").spec()
     out = df.with_columns(
         lo=window_min(df.v).over(w),

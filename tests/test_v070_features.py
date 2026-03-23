@@ -1,4 +1,7 @@
-"""Stronger coverage for 0.7.0 surfaces: globals, strptime/unix_timestamp, map/binary len, temporal parts."""
+"""Stronger coverage for 0.7.0 surfaces.
+
+Globals, strptime/unix_timestamp, map/binary len, temporal parts.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +9,6 @@ import calendar
 from datetime import date, datetime, time, timezone
 
 import pytest
-
 from pydantable import DataFrame
 from pydantable.expressions import (
     global_count,
@@ -75,7 +77,7 @@ def test_strptime_to_date_returns_date() -> None:
 
 def test_strptime_invalid_string_raises_on_collect() -> None:
     df = DataFrame[StrCol]({"s": ["not-a-date"]})
-    with pytest.raises(ValueError, match="strptime|conversion|str"):
+    with pytest.raises(ValueError, match=r"strptime|conversion|str"):
         df.with_columns(d=df.s.strptime("%Y-%m-%d", to_datetime=False)).collect()
 
 
@@ -110,15 +112,15 @@ def test_unix_timestamp_seconds_matches_utc_instant() -> None:
 def test_unix_timestamp_milliseconds_is_seconds_times_1000() -> None:
     ts = datetime(2020, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
     df = DataFrame[DT]({"ts": [ts]})
-    out = df.with_columns(sec=df.ts.unix_timestamp("seconds"), ms=df.ts.unix_timestamp("ms")).collect(
-        as_lists=True
-    )
+    out = df.with_columns(
+        sec=df.ts.unix_timestamp("seconds"), ms=df.ts.unix_timestamp("ms")
+    ).collect(as_lists=True)
     assert out["ms"][0] == out["sec"][0] * 1000
 
 
 def test_unix_timestamp_invalid_unit_raises() -> None:
     df = DataFrame[D]({"d": [date(2020, 1, 1)]})
-    with pytest.raises(ValueError, match="seconds|milliseconds"):
+    with pytest.raises(ValueError, match=r"seconds|milliseconds"):
         df.with_columns(u=df.d.unix_timestamp("micros"))
 
 
@@ -162,7 +164,7 @@ def test_binary_len_empty_and_nullable() -> None:
 
 def test_binary_len_requires_bytes_column() -> None:
     df = DataFrame[T]({"id": [1], "v": [1]})
-    with pytest.raises(TypeError, match="binary_len|bytes"):
+    with pytest.raises(TypeError, match=r"binary_len|bytes"):
         df.with_columns(n=df.v.binary_len())
 
 

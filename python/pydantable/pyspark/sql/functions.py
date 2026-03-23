@@ -1,3 +1,9 @@
+"""Spark-named wrappers around :class:`~pydantable.expressions.Expr` and globals.
+
+``col``/``lit``/``when`` and date helpers mirror PySpark signatures where possible;
+static typing requires ``dtype=`` on ``col`` (or use ``df.col()`` on a typed frame).
+"""
+
 from __future__ import annotations
 
 from typing import Any

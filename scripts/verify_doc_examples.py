@@ -1,9 +1,11 @@
-"""
-Run the runnable snippets from user-facing docs (no network; requires built _core).
+"""Run doc snippets as tests (offline; requires built ``pydantable._core``).
 
-Usage from repo root:
+Run from the repository root::
 
     PYTHONPATH=python .venv/bin/python scripts/verify_doc_examples.py
+
+Fails on assertion errors or import failures so README and Sphinx snippets stay
+in sync with the API.
 """
 
 from __future__ import annotations

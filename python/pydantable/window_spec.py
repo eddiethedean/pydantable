@@ -1,4 +1,8 @@
-"""Spark-style window specifications for typed window expressions."""
+"""Spark-style :class:`Window` / :class:`WindowSpec` for partition and order keys.
+
+Used with window functions in :mod:`pydantable.expressions` (e.g. ``row_number``,
+``lag``) via ``.over(...)``.
+"""
 
 from __future__ import annotations
 
@@ -14,16 +18,19 @@ class WindowSpec:
 
 
 class Window:
-    """Minimal PySpark-shaped ``Window.partitionBy(...).orderBy(...)`` surface."""
+    """Entry point matching PySpark: ``Window.partitionBy(...).orderBy(...)``."""
 
     @staticmethod
     def partitionBy(*cols: str) -> _WindowPartitionBuilder:
+        """Start a spec with one or more partition key column names."""
         if not cols:
             raise ValueError("partitionBy() requires at least one column name.")
         return _WindowPartitionBuilder(cols)
 
 
 class _WindowPartitionBuilder:
+    """Fluent builder after :meth:`Window.partitionBy`."""
+
     def __init__(self, partition_by: tuple[str, ...]):
         self._partition_by = partition_by
 
@@ -32,6 +39,7 @@ class _WindowPartitionBuilder:
         *cols: str,
         ascending: bool | list[bool] = True,
     ) -> WindowSpec:
+        """Add sort keys; use one bool or a list matching ``cols`` for direction."""
         if not cols:
             raise ValueError("orderBy() requires at least one column.")
         if isinstance(ascending, bool):

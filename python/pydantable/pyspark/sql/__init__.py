@@ -1,3 +1,5 @@
+"""PySpark-like SQL façade: ``Column``, ``functions``, dtypes, ``Window``."""
+
 from __future__ import annotations
 
 from . import functions

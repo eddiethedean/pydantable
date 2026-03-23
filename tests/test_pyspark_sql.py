@@ -274,6 +274,7 @@ def test_aggregate_functions_global_sum_in_select() -> None:
 
 def test_aggregate_count_star_global_select() -> None:
     """``F.count()`` with no column is ``count(*)`` / row count (0.8.0)."""
+
     class S(Schema):
         v: int
 
@@ -287,9 +288,9 @@ def test_aggregate_count_star_vs_count_column_with_nulls() -> None:
 
     df = DataFrame[S]({"v": [1, None, 3]})
     assert df.select(F.count()).collect(as_lists=True) == {"row_count": [3]}
-    assert df.select(F.count(F.col("v", dtype=int | None))).collect(
-        as_lists=True
-    ) == {"count_v": [2]}
+    assert df.select(F.count(F.col("v", dtype=int | None))).collect(as_lists=True) == {
+        "count_v": [2]
+    }
 
 
 def test_aggregate_sum_requires_column() -> None:
@@ -328,6 +329,7 @@ def test_functions_to_date_year_month_on_datetime() -> None:
 
 def test_functions_to_date_string_with_format_uses_strptime() -> None:
     """PySpark ``to_date(col, format=...)`` maps to ``strptime`` (0.7.0)."""
+
     class S(Schema):
         s: str
 

@@ -1,3 +1,9 @@
+"""Pydantic schema base, column dtype rules, and validation for :class:`DataFrame`.
+
+Functions such as :func:`is_supported_column_annotation` define allowed field types.
+:func:`validate_columns_strict` normalizes constructor input against a schema model.
+"""
+
 from __future__ import annotations
 
 import enum
@@ -35,6 +41,7 @@ def _unwrap_annotated(annotation: Any) -> Any:
 
 
 def _is_supported_non_null_scalar_type(tp: Any) -> bool:
+    """True if ``tp`` is one allowed non-null scalar or enum (before ``| None``)."""
     if tp in _SUPPORTED_NON_NULL_SCALAR_TYPES:
         return True
     return isinstance(tp, type) and issubclass(tp, enum.Enum) and tp is not enum.Enum
@@ -156,24 +163,19 @@ def validate_dataframe_model_field_annotations(
 
 
 class Schema(BaseModel):
-    """
-    Base class for Pydantic-backed schemas used by `DataFrame[SchemaType]`.
+    """Base model for ``DataFrame[YourSchema]`` column definitions.
 
-    We keep `extra="forbid"` so runtime schema enforcement is strict by default.
+    Uses ``extra="forbid"`` so unexpected fields fail validation at construction.
     """
 
     model_config = ConfigDict(extra="forbid")
 
 
 def schema_field_types(schema_type: type[BaseModel]) -> dict[str, Any]:
-    """
-    Extract `field_name -> python_type` from a Pydantic model.
+    """Map field names to annotations from a Pydantic model (v2 ``model_fields``).
 
-    Notes:
-    - We preserve Optional[T] / Union[T, None] in the returned annotation types so
-      expression typing can propagate nullability into derived schemas.
-    - This skeleton intentionally supports only a small set of expression dtypes;
-      runtime validation of DataFrame column values is delegated to Pydantic.
+    Optional / ``| None`` wrappers are preserved so nullability flows into derived
+    schemas and expression typing. Element validation uses Pydantic adapters.
     """
 
     # Pydantic v2: `model_fields` holds `FieldInfo` with `.annotation`.

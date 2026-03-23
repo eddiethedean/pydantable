@@ -1,3 +1,9 @@
+"""Subclass ``DataFrameModel``, annotate fields, get ``RowModel`` and DataFrame ops.
+
+Wraps :class:`pydantable.dataframe.DataFrame` for class-body schemas (FastAPI-style).
+Input may be column dicts or row sequences (mappings / Pydantic).
+"""
+
 from __future__ import annotations
 
 import sys
@@ -57,13 +63,11 @@ def _normalize_input(
 
 
 class DataFrameModel:
-    """
-    FastAPI-friendly DataFrame container abstraction.
+    """Columns on a subclass → generated ``RowModel`` and DataFrame-like methods.
 
-    - user defines fields on subclass annotations
-    - class auto-generates a per-row `RowModel`
-    - accepts column-dict inputs and row lists (mappings or Pydantic model instances)
-    - composes the existing `DataFrame[Schema]` engine
+    Annotate every field with a supported column type. :attr:`RowModel` validates
+    one row. Data is a column map ``{name: list}`` or a sequence of row dicts /
+    models.
     """
 
     RowModel: type[BaseModel]
@@ -113,6 +117,11 @@ class DataFrameModel:
         *,
         validate_data: bool = True,
     ) -> None:
+        """Load columnar data or rows.
+
+        Use ``validate_data=False`` only for trusted bulk input (layout still
+        validated).
+        """
         normalized = _normalize_input(data=data, row_model=self.RowModel)
         dataframe_cls = cast("Any", self._dataframe_cls)
         self._df = dataframe_cls[self._SchemaModel](
@@ -378,18 +387,24 @@ class DataFrameModel:
 
 
 class GroupedDataFrameModel:
+    """Result of ``DataFrameModel.group_by``; use :meth:`agg` to produce a new model."""
+
     def __init__(self, grouped_df: Any, model_type: type[DataFrameModel]) -> None:
         self._grouped_df = grouped_df
         self._model_type = model_type
 
     def agg(self, **aggregations: Any) -> DataFrameModel:
+        """Same kwargs as :meth:`pydantable.dataframe.GroupedDataFrame.agg`."""
         return self._model_type._from_dataframe(self._grouped_df.agg(**aggregations))
 
 
 class DynamicGroupedDataFrameModel:
+    """Time-based ``group_by_dynamic`` grouping; call :meth:`agg` to finalize."""
+
     def __init__(self, grouped_df: Any, model_type: type[DataFrameModel]) -> None:
         self._grouped_df = grouped_df
         self._model_type = model_type
 
     def agg(self, **aggregations: Any) -> DataFrameModel:
+        """Same rules as :meth:`pydantable.dataframe.DynamicGroupedDataFrame.agg`."""
         return self._model_type._from_dataframe(self._grouped_df.agg(**aggregations))

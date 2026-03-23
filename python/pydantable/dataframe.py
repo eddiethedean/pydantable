@@ -1,3 +1,10 @@
+"""Typed :class:`DataFrame`, plan chaining, and grouped aggregation handles.
+
+Logical plans and expression typing live in Rust; Python holds schema state and
+forwards transforms. Materialization is via :meth:`DataFrame.collect`,
+:meth:`DataFrame.to_dict`, or :meth:`DataFrame.to_polars`.
+"""
+
 from __future__ import annotations
 
 import enum
@@ -78,6 +85,7 @@ def _coerce_enum_columns(
 def _rows_from_column_dict(
     data: dict[str, list[Any]], row_type: type[BaseModel]
 ) -> list[BaseModel]:
+    """Build validated row models from aligned column lists (same length per column)."""
     if not data:
         return []
     n = len(next(iter(data.values())))
@@ -89,9 +97,7 @@ def _rows_from_column_dict(
 
 
 def _is_bool_or_nullable_bool(dtype: Any) -> bool:
-    """
-    Return True if `dtype` is either `bool` or `Optional[bool]` / `Union[bool, None]`.
-    """
+    """True if ``dtype`` is ``bool`` or optional bool (``| None`` / ``Union``)."""
     if dtype is bool:
         return True
     origin = get_origin(dtype)
@@ -104,28 +110,32 @@ def _is_bool_or_nullable_bool(dtype: Any) -> bool:
 
 @dataclass(frozen=True)
 class SelectStep:
+    """Internal: plain column projection step (names only)."""
+
     columns: list[str]
 
 
 @dataclass(frozen=True)
 class FilterStep:
+    """Internal: boolean mask step."""
+
     condition: Expr
 
 
 @dataclass(frozen=True)
 class WithColumnsStep:
+    """Internal: add or replace columns from expressions."""
+
     columns: dict[str, Expr]
 
 
 class DataFrame(Generic[SchemaT]):
-    """
-    Strongly-typed DataFrame.
+    """Strongly typed lazy table: schema at construction, transforms, then ``collect``.
 
-    This skeleton focuses on:
-    - Schema enforcement at DataFrame construction time.
-    - Typed expression AST building.
-    - Schema propagation through `select`, `filter`, `with_columns`.
-    - `collect()` materializes via the Rust engine into Pydantic row models by default.
+    Construct with ``DataFrame[SchemaSubclass](data)``. Column types come from the
+    schema model; expressions are built with :class:`~pydantable.expressions.Expr`
+    or attribute access (``df.colname``). The Rust core validates operators and
+    lowers plans to Polars for execution.
     """
 
     _schema_type: type[BaseModel] | None = None
@@ -207,6 +217,10 @@ class DataFrame(Generic[SchemaT]):
         raise AttributeError(item)
 
     def with_columns(self, **new_columns: Expr | Any) -> DataFrame[Any]:
+        """Add or replace columns.
+
+        Values are :class:`~pydantable.expressions.Expr` or plain literals.
+        """
         rust = _require_rust_core()
         rust_columns: dict[str, Any] = {}
 
@@ -231,6 +245,12 @@ class DataFrame(Generic[SchemaT]):
         )
 
     def select(self, *cols: str | ColumnRef | Expr, **named: Any) -> DataFrame[Any]:
+        """Project columns and/or compute a **single-row** frame of global aggregates.
+
+        Positional arguments: base column names, single-column refs, or globals such
+        as :func:`~pydantable.expressions.global_sum`. Keyword arguments are only for
+        named global aggregates. Plain projections and globals cannot be mixed.
+        """
         rust = _require_rust_core()
 
         named_items: list[tuple[str, Any]] = []
@@ -296,6 +316,7 @@ class DataFrame(Generic[SchemaT]):
         )
 
     def filter(self, condition: Expr) -> DataFrame[Any]:
+        """Keep rows where the boolean ``condition`` is true."""
         rust = _require_rust_core()
 
         if not isinstance(condition, Expr):
@@ -312,6 +333,7 @@ class DataFrame(Generic[SchemaT]):
     def sort(
         self, *by: str | ColumnRef, descending: bool | Sequence[bool] = False
     ) -> DataFrame[Any]:
+        """Sort by one or more columns (names or single-column expressions)."""
         rust = _require_rust_core()
         keys: list[str] = []
         for key in by:
@@ -604,6 +626,7 @@ class DataFrame(Generic[SchemaT]):
         how: str = "inner",
         suffix: str = "_right",
     ) -> DataFrame[Any]:
+        """Join two frames on key column(s); ``how`` is e.g. ``inner``, ``left``."""
         if not isinstance(other, DataFrame):
             raise TypeError("join(other=...) expects another DataFrame.")
         if on is not None and (left_on is not None or right_on is not None):
@@ -687,6 +710,7 @@ class DataFrame(Generic[SchemaT]):
         )
 
     def group_by(self, *keys: str | ColumnRef) -> GroupedDataFrame:
+        """Group by key column(s); finish with :meth:`GroupedDataFrame.agg`."""
         selected: list[str] = []
         for key in keys:
             if isinstance(key, str):
@@ -881,6 +905,7 @@ class DataFrame(Generic[SchemaT]):
         return _rows_from_column_dict(column_dict, self._current_schema_type)
 
     def to_dict(self) -> dict[str, list[Any]]:
+        """Columnar materialization (alias for ``collect(as_lists=True)`` shape)."""
         raw = execute_plan(self._rust_plan, self._root_data, as_python_lists=True)
         return _coerce_enum_columns(raw, self._current_field_types)
 
@@ -905,6 +930,7 @@ class DataFrame(Generic[SchemaT]):
         *,
         how: str = "vertical",
     ) -> DataFrame[Any]:
+        """Stack or otherwise combine two or more frames (see Rust ``how`` values)."""
         if len(dfs) < 2:
             raise ValueError("concat() requires at least two DataFrame inputs.")
         base = dfs[0]
@@ -936,11 +962,14 @@ class DataFrame(Generic[SchemaT]):
 
 
 class GroupedDataFrame:
+    """Result of :meth:`DataFrame.group_by`; call :meth:`agg` to finalize."""
+
     def __init__(self, df: DataFrame[Any], keys: Sequence[str]):
         self._df = df
         self._keys = list(keys)
 
     def agg(self, **aggregations: tuple[str, str] | tuple[str, Expr]) -> DataFrame[Any]:
+        """One output column per kwarg: ``name=(op, column_or_expr)``."""
         agg_specs: dict[str, tuple[str, str]] = {}
         for out_name, spec in aggregations.items():
             if not isinstance(spec, tuple) or len(spec) != 2:
@@ -989,6 +1018,8 @@ class GroupedDataFrame:
 
 
 class DynamicGroupedDataFrame:
+    """Time buckets from :meth:`DataFrame.group_by_dynamic`; then :meth:`agg`."""
+
     def __init__(
         self,
         df: DataFrame[Any],
@@ -1005,6 +1036,7 @@ class DynamicGroupedDataFrame:
         self._by = list(by)
 
     def agg(self, **aggregations: tuple[str, str]) -> DataFrame[Any]:
+        """Same as :meth:`GroupedDataFrame.agg`; column specs are strings only."""
         agg_specs: dict[str, tuple[str, str]] = {}
         for out_name, spec in aggregations.items():
             if not isinstance(spec, tuple) or len(spec) != 2:

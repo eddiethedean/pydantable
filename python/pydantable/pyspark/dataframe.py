@@ -1,3 +1,5 @@
+"""Spark-style :class:`DataFrame` and :class:`DataFrameModel` (core API underneath)."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence  # noqa: TC003
@@ -15,12 +17,7 @@ if TYPE_CHECKING:
 
 
 class DataFrame(CoreDataFrame):
-    """
-    PySpark-flavored method names on the typed logical DataFrame.
-
-    This is not an Apache Spark DataFrame; execution uses the pydantable Rust
-    core (Polars engine).
-    """
+    """Typed table with PySpark method names; runs in-process via the Rust core."""
 
     @staticmethod
     def _as_pyspark_df(df: CoreDataFrame) -> DataFrame:
@@ -76,6 +73,7 @@ class DataFrame(CoreDataFrame):
         *args: Any,
         **kwargs: Any,
     ) -> DataFrame:
+        """Apply ``func(self, ...)``; must return a :class:`DataFrame`."""
         out = func(self, *args, **kwargs)
         if not isinstance(out, CoreDataFrame):
             raise TypeError("transform(func, ...) expects func to return a DataFrame.")
@@ -145,12 +143,14 @@ class DataFrame(CoreDataFrame):
         return self.distinct(subset=subset) if subset is not None else self.distinct()
 
     def union(self, other: DataFrame) -> DataFrame:
+        """Append rows from ``other`` (vertical concat; schemas must align)."""
         return cast(
             "DataFrame",
             CoreDataFrame.concat([self, other], how="vertical"),
         )
 
     def unionAll(self, other: DataFrame) -> DataFrame:
+        """Alias of :meth:`union` (Spark naming)."""
         return self.union(other)
 
     @property
@@ -178,6 +178,8 @@ class DataFrame(CoreDataFrame):
 
 
 class DataFrameModel(CoreDataFrameModel):
+    """Class-based container using :class:`DataFrame` for Spark-shaped methods."""
+
     _dataframe_cls = DataFrame
 
     def withColumn(self, name: str, col: Any) -> DataFrameModel:

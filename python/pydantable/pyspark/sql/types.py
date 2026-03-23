@@ -1,3 +1,9 @@
+"""Lightweight Spark-like type tokens (``IntegerType``, ``StructType``, …) for schemas.
+
+These map to Python annotations for documentation and ``DataFrame.schema``; they
+are not JVM PySpark types.
+"""
+
 from __future__ import annotations
 
 import enum
