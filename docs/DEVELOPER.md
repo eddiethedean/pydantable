@@ -224,8 +224,11 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 
 ## Release Notes Checklist (for contributors)
 
-- [ ] Python tests pass in `.venv`
-- [ ] Rust changes compile in package build path (`maturin build`)
+- [ ] Version matches everywhere: `pyproject.toml`, `pydantable-core/Cargo.toml`, `python/pydantable/__init__.py`, and `rust_version()` in `pydantable-core/src/python_api/mod.rs`
+- [ ] `docs/changelog.md` has a section for the release with highlights
+- [ ] `make check-full` passes (Ruff, mypy, `cargo fmt --check`, `clippy -D warnings`, `cargo test --all-features`)
+- [ ] Python tests pass in `.venv` (`pytest`); optional: `scripts/verify_doc_examples.py` after a release build
+- [ ] Rust changes compile in package build path (`maturin build --release`)
 - [ ] Docs updated for behavior/contract changes
 - [ ] `sphinx-build -W -b html docs docs/_build/html` succeeds (matches Read the Docs `fail_on_warning`)
 - [ ] Roadmap status updated when a phase milestone changes
