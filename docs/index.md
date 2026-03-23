@@ -16,7 +16,9 @@ This **documentation site** is the detailed manual. The repository **README** on
 
 **Scalar dtypes** include `int`, `float`, `bool`, `str`, `datetime`, `date`, `time`, `timedelta`, `bytes`, homogeneous **`dict[str, T]`** maps, each nullable via `Optional` / `| None`. **Structs**, **lists**, **UUID**, **Decimal**, and **Enum** columns are documented in {doc}`SUPPORTED_TYPES`. Unsupported `DataFrameModel` field annotations fail at **class definition** time.
 
-**Expressions (through 0.8.0):** typed **`Expr`** builds a Rust AST — whole-frame globals including **`global_row_count()`** vs **`global_count(col)`**, window **`window_min`/`window_max`** plus ranks/shifts, **`str`→`date`/`datetime` `cast`** (and **`strptime`** for fixed formats), **`map_get`/`map_contains_key`** on **`dict[str, T]`**, **`binary_len`**, and PySpark mirrors in {doc}`PYSPARK_PARITY`. Semantics: {doc}`INTERFACE_CONTRACT` and {doc}`changelog`.
+**Expressions (0.7+ through current):** typed **`Expr`** builds a Rust AST — globals (**`global_row_count`**, **`global_sum`**, …), ranked and framed windows (including multi-key **`rangeBetween`**; see {doc}`WINDOW_SQL_SEMANTICS`), maps and temporal helpers, PySpark mirrors in {doc}`PYSPARK_PARITY`. Semantics: {doc}`INTERFACE_CONTRACT` and {doc}`changelog`.
+
+**Trusted ingest:** **`trusted_mode`** (`off` / `shape_only` / `strict`) and legacy **`validate_data`** on constructors — {doc}`DATAFRAMEMODEL`, {doc}`SUPPORTED_TYPES`. **I/O:** materialization and interchange are **synchronous** today; async coverage is on the roadmap ({doc}`EXECUTION`, {doc}`ROADMAP`).
 
 ## Where to go next
 

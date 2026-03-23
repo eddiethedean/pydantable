@@ -13,15 +13,78 @@ For FastAPI services, `pydantable` gives you:
 - **`collect()`** — `list` of Pydantic models for the **current** projection (ideal for `response_model=list[YourRow]`)
 - **`to_dict()`** — `dict[str, list]` when the response is **column-shaped** JSON
 
+**Materialization is synchronous:** `collect()`, `to_dict()`, `collect(as_lists=True)`, and optional `to_polars()` run **blocking** work (Rust + Polars inside the extension). For ASGI stacks, plan on **`asyncio.to_thread`** or similar until **async I/O** lands in **0.15.0** (see [`EXECUTION.md`](EXECUTION.md) and [`ROADMAP.md`](ROADMAP.md)).
+
 ## Install
 
-From this repository:
+From PyPI (prebuilt wheels include the native extension on supported platforms):
+
+```bash
+pip install pydantable
+```
+
+From a git checkout, build the extension (for example with [Maturin](https://www.maturin.rs/)):
 
 ```bash
 pip install .
 ```
 
-`pydantable` requires the Rust extension in the current skeleton.
+## Trusted ingest (`trusted_mode` and `validate_data`)
+
+For **`DataFrameModel(...)`** and **`DataFrame[Schema](...)`**, ingestion defaults to full per-cell validation (`trusted_mode="off"`). For **trusted** bulk paths (pre-validated upstream data, internal services), use:
+
+| Mode | Meaning |
+|------|---------|
+| **`trusted_mode="off"`** | Default: full Pydantic validation per cell (same as omitting the argument). |
+| **`trusted_mode="shape_only"`** | Skip element validation; still checks column names and row counts. Replaces legacy **`validate_data=False`**. |
+| **`trusted_mode="strict"`** | Trusted bulk input plus dtype / nested-shape checks against the schema (including Polars columns). |
+
+**`validate_data=True` / `False`** remains a **compatibility alias** mapped onto those modes; prefer **`trusted_mode`** in new code. Details, nested rules, and runtime payloads: [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md), [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md).
+
+```python
+from pydantable import DataFrameModel
+
+
+class UserDF(DataFrameModel):
+    id: int
+    age: int | None
+
+
+# Trusted path: caller guarantees rows already match RowModel (e.g. validated earlier in the pipeline).
+df = UserDF(
+    [{"id": 1, "age": 20}, {"id": 2, "age": None}],
+    trusted_mode="shape_only",
+)
+```
+
+## Column-shaped JSON request bodies
+
+Row lists are natural for OpenAPI (`list[YourRowModel]`). Some clients send **columnar** JSON (`parallel arrays`). Model that with a Pydantic body whose fields are lists, then pass a **`dict[str, list]`** into **`DataFrameModel`**:
+
+```python
+from pydantic import BaseModel
+
+from pydantable import DataFrameModel
+
+
+class UserDF(DataFrameModel):
+    id: int
+    age: int | None
+
+
+class UsersColumnarBody(BaseModel):
+    """OpenAPI-friendly columnar payload: keys match dataframe columns."""
+
+    id: list[int]
+    age: list[int | None]
+
+
+# In a route: UsersColumnarBody validated by FastAPI, then:
+body = UsersColumnarBody(id=[1, 2], age=[20, None])
+df = UserDF({"id": body.id, "age": body.age})
+```
+
+Same schema rules apply as for columnar constructors in [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md) (equal-length columns, types per field).
 
 ## Example 1: Router + multi-table body — revenue by country
 

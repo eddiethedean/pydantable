@@ -106,6 +106,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      # RUSTSEC-2025-0141: transitive advisory in optional Polars stack; tracked upstream.
       - name: Audit
         working-directory: pydantable-core
         run: cargo audit --ignore RUSTSEC-2025-0141

@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.12.0 → 0.13.0 → 0.16.x → v1.0.0)
+# PydanTable roadmap (0.13.x → 0.14.0 → 0.15.x → v1.0.0)
 
-**Current release: `0.12.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
+**Current release: `0.13.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
@@ -21,7 +21,7 @@ The public API stays **SQLModel-like**:
 
 Details: [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md).
 
-**FastAPI / ASGI:** today’s patterns live in [`FASTAPI.md`](FASTAPI.md) (`response_model`, row-list bodies, joins/aggregations). The **planned** sections below deepen **integration** (trusted ingest in routes, testing, OpenAPI, **async** handlers once **async I/O** ships in **0.16.0**).
+**FastAPI / ASGI:** [`FASTAPI.md`](FASTAPI.md) covers `response_model`, row-list and **column-shaped** bodies, **`trusted_mode`** / **`validate_data`**, joins/aggregations, and **sync** materialization (with **0.15.0** **async I/O** called out on the roadmap). Still **planned** for later minors: multipart/file ingestion, **`Depends`** / **lifespan** recipes, **`TestClient`** helpers, and richer error → HTTP status mapping (see **0.14.0** and **Toward v1.0.0** below).
 
 ---
 
@@ -76,7 +76,7 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 - Keep CI green across supported Python versions and platforms; keep extension + optional **`[polars]`** matrices exercised in CI.
 - Decide whether **`validate_data`** should emit **`DeprecationWarning`** with a documented removal timeline (today it remains a compatibility alias for **`trusted_mode`**).
 - Optional: consolidated **migration guide** if semver ever jumps in a breaking way; keep [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) the semantics source of truth.
-- **Async I/O:** ship **full `async` read/write** coverage for stable materialization and interchange (see **Planned 0.16.0**) so ASGI stacks can avoid blocking the event loop without ad-hoc wrappers.
+- **Async I/O:** ship **full `async` read/write** coverage for stable materialization and interchange (see **Planned 0.15.0**) so ASGI stacks can avoid blocking the event loop without ad-hoc wrappers.
 - **FastAPI integration maturity:** treat [`FASTAPI.md`](FASTAPI.md) as the **canonical service guide**—expand it with **multipart / file** ingestion, **`Depends`** and **lifespan** patterns, **background tasks**, **error → HTTP status** mapping for validation vs engine errors, and **OpenAPI** notes for **row-list vs columnar** JSON bodies. Add **recipe tests** or **docs-only CI checks** so examples stay in sync with releases.
 
 ---
@@ -142,24 +142,24 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 ---
 
-## Planned 0.13.0 (stabilization + follow-through)
+## 0.13.x — stabilization + windows / trusted ingest (combined track)
 
-**Themes:** absorb **0.12.0** feedback, tighten docs and CI, and ship small fixes without the larger semantic work slated for **0.14.0+**. Items are **not** committed until shipped.
+The **0.13.0** tag shipped documentation-first stabilization; **remaining** execution semantics, trusted-ingest depth, benchmarks, and FastAPI bulk patterns that were previously filed under **Planned 0.14.0** stay on the **same minor line** as **Remaining in 0.13.x** below (patch **`0.13.1+`** or a later **0.13.x** minor as maintainers prefer).
 
-- [ ] **Hardening:** regression fixes, error messages, and contract clarifications for multi-key **`rangeBetween`**, trusted **`strict`** nested ingest, and **`map_from_entries`** edge cases.
-- [ ] **Docs:** refresh guides and examples so **0.12.0** behavior ([`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md), [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md), trusted ingest) stays easy to discover; align **README** / doc site landing copy if needed.
-- [ ] **FastAPI guide refresh:** extend [`FASTAPI.md`](FASTAPI.md) with **`trusted_mode` / `validate_data`** in route handlers, **column-shaped** `dict[str, list]` request bodies (where appropriate), and links to trusted-ingest docs ([`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md), [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md)); state clearly that handlers are **sync** until **0.16.0** **async I/O** lands.
-- [ ] **CI and tooling:** routine **GitHub Actions** / runner compatibility bumps, dependency pins, and quality gates (no intentional API breakage).
-- [ ] **Tests:** close any remaining parity or façade gaps that are **test-only** or **one-line** API wrappers (no new `ExprNode` families unless trivial).
-- [ ] **I/O documentation:** explicitly label **sync-only** materialization and interchange entry points today, and point forward to **0.16.0** **async I/O** work ([`EXECUTION.md`](EXECUTION.md), [`PERFORMANCE.md`](PERFORMANCE.md)).
+### Shipped in 0.13.0 (stabilization baseline)
 
-**Patch releases (0.13.1, …)** may follow for fixes without redefining this minor’s scope.
+**Themes:** absorb **0.12.0** feedback, tighten docs and CI, and clarify sync-only I/O and FastAPI patterns.
 
----
+- [x] **Hardening / audit:** `make check-full` and full **pytest** on a **release** extension build; no regressions requiring code changes in that cycle (continue to report confusing errors as **0.13.1+** patches or under **Remaining in 0.13.x** below).
+- [x] **Docs:** cross-links and “related documentation” sections in [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md) and [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md); [`README.md`](../README.md) and doc site [`index.md`](index.md) aligned with current behavior.
+- [x] **FastAPI guide refresh:** [`FASTAPI.md`](FASTAPI.md) — **`trusted_mode` / `validate_data`**, column-shaped JSON bodies, links to [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md) / [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md), **sync** handlers and **0.15.0** async pointer.
+- [x] **CI and tooling:** reviewed **GitHub Actions** (`actions/checkout@v5`, `actions/setup-python@v6`, `actions/cache@v4`); documented **`cargo audit`** ignore for **RUSTSEC-2025-0141** in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
+- [x] **Tests / examples:** extended [`scripts/verify_doc_examples.py`](../scripts/verify_doc_examples.py) for new FastAPI patterns; no trivial remaining **PySpark**/**pandas** one-line façade gaps identified in that release.
+- [x] **I/O documentation:** [`EXECUTION.md`](EXECUTION.md) and [`PERFORMANCE.md`](PERFORMANCE.md) label **sync-only** materialization/interchange and point to **0.15.0** async work.
 
-## Planned 0.14.0 (windows + trusted ingest)
+### Remaining in 0.13.x (windows + trusted ingest; formerly planned as **0.14.0**)
 
-**Themes:** execution semantics polish and safer bulk ingest. Items are **not** committed until shipped; reorder or split across releases as needed.
+**Themes:** execution semantics polish and safer bulk ingest. Items are **not** committed until shipped; reorder or split across **0.13.x** patches as needed.
 
 - [ ] **Window polish:** optional **`NULLS FIRST` / `LAST`** (or explicit documented mapping to Polars null ordering); clarify peer-group / `CURRENT ROW` behavior vs other engines if frame surface grows beyond numeric `rangeBetween`.
 - [ ] **Trusted ingest:** extend **`strict`** to more **PyArrow** buffer paths and tighter **enum** / **decimal** Polars dtype matches; optional **warnings** when `shape_only` would hide dtype drift.
@@ -168,7 +168,7 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 ---
 
-## Planned 0.15.0 (parity + API breadth)
+## Planned 0.14.0 (parity + API breadth)
 
 **Themes:** close documented gaps in alternate APIs and strengthen regression depth.
 
@@ -180,7 +180,7 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 ---
 
-## Planned 0.16.0 (schema / I/O depth)
+## Planned 0.15.0 (schema / I/O depth)
 
 **Themes:** richer dtypes, **async I/O**, and semantic parity without committing to post-1.0 engines.
 
@@ -188,15 +188,15 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 - [ ] **Async I/O (reads and writes, full coverage):** first-class **`async`** APIs for **every stable I/O path** the library documents for user-facing **reads** and **writes**—including **materialization** (`collect`, `to_dict` / `collect(as_lists=True)`, row models) and **interchange** (e.g. **`to_polars()`** when the **`[polars]`** extra is installed, plus any **Arrow / Parquet / IPC / file** helpers added in earlier releases). Document how **blocking Rust + Polars** work is isolated (**`asyncio.to_thread`**, dedicated executors, or native async only where upstream supports it). Update [`FASTAPI.md`](FASTAPI.md) and [`EXECUTION.md`](EXECUTION.md) with **non-blocking** patterns and limits (GIL, copy costs, cancellation).
 - [ ] **FastAPI `async` routes:** first-class **`async def`** handler examples using the new **async materialization** APIs; cover **`StreamingResponse`** / **chunked** JSON (row or column) **if** stable APIs exist; **lifespan** hooks for warm-up or shared resources used by dataframe pipelines.
 - [ ] **Spark façade depth:** broader **semantic parity** where the Polars-backed core can match Spark names and behavior; stay clear this is **not** a distributed Spark engine (see **After v1.0.0**).
-- [ ] **Docs and migration:** optional consolidated **0.13–0.16 migration** notes if any release introduces user-visible contract changes (including **FastAPI** handler **sync → async** migration if APIs change).
+- [ ] **Docs and migration:** optional consolidated **0.13–0.15 migration** notes if any release introduces user-visible contract changes (including **FastAPI** handler **sync → async** migration if APIs change).
 
 ---
 
 ## Later (not started)
 
-Directions beyond **0.16.x** and still before (or orthogonal to) calling **v1.0.0**:
+Directions beyond **0.15.x** and still before (or orthogonal to) calling **v1.0.0**:
 
-- [ ] Items deferred from **0.13.0–0.16.0** above when scope slips or priorities change.
+- [ ] Items deferred from **0.13.x–0.15.0** above when scope slips or priorities change.
 - [ ] Longer-horizon experimental work that does not fit a minor release train.
 - [ ] **FastAPI ecosystem (optional):** thin **`pydantable[fastapi]`** extra with **pinned** compatible **`fastapi` / `starlette`** ranges, reusable **middleware**, or **router** kits—**only** if demand and maintenance bandwidth are clear.
 

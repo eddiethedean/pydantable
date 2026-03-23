@@ -14,6 +14,7 @@ from pydantable import DataFrameModel
 from pydantable.pandas import DataFrameModel as PandasDataFrameModel
 from pydantable.pyspark import DataFrameModel as PySparkDataFrameModel
 from pydantable.pyspark.sql import functions as F
+from pydantic import BaseModel
 
 
 def _sort_rows_by_country(out: dict[str, list]) -> dict[str, list]:
@@ -332,5 +333,26 @@ df3 = (
 assert [m.model_dump() for m in df3.collect()] == [
     {"sku": "A", "qty": 2, "line_total": 20.0},
 ]
+
+# docs/FASTAPI — trusted_mode + columnar body (mirrors new guide sections)
+
+df_trusted = UserFastApi(
+    [{"id": 1, "age": 20}, {"id": 2, "age": None}],
+    trusted_mode="shape_only",
+)
+assert [m.model_dump() for m in df_trusted.collect()] == [
+    {"id": 1, "age": 20},
+    {"id": 2, "age": None},
+]
+
+
+class UsersColumnarBody(BaseModel):
+    id: list[int]
+    age: list[int | None]
+
+
+body = UsersColumnarBody(id=[1, 2], age=[20, None])
+df_col = UserFastApi({"id": body.id, "age": body.age})
+assert df_col.to_dict() == {"id": [1, 2], "age": [20, None]}
 
 print("verify_doc_examples: ok")

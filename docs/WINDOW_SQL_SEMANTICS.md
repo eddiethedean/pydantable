@@ -20,3 +20,5 @@ Apache Spark’s `rangeBetween` also uses the **ordering expression** for frame 
 
 - [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) — supported window API surface.
 - [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md) — façade coverage vs Spark names.
+- [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md) / [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md) — trusted ingest (**`strict`**) and nested column rules when building dataframes used in windowed queries.
+- [`ROADMAP.md`](ROADMAP.md) — release train; async I/O is **not** part of window semantics today.

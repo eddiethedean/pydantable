@@ -148,6 +148,12 @@ Rolling/dynamic contracts:
 - Dynamic windows support `every` / `period` with `s/m/h/d` suffixes and explicit aggregation contracts.
 - Nulls are ignored for numeric aggregations; all-null windows yield `None` for nullable aggregates and `0` for `count`.
 
+## Related documentation
+
+- **Multi-key `RANGE` window frames:** {doc}`WINDOW_SQL_SEMANTICS` (sort keys vs range axis on the first `orderBy` column).
+- **Trusted ingest (`trusted_mode`, legacy `validate_data`):** {doc}`DATAFRAMEMODEL`, {doc}`SUPPORTED_TYPES`.
+- **Synchronous materialization; async roadmap:** {doc}`EXECUTION`, {doc}`ROADMAP`, {doc}`FASTAPI`.
+
 ## Migration Notes (Polars -> PydanTable)
 
 - Keep schema-first modeling: declare columns on `DataFrameModel` before transforms.

@@ -4,6 +4,8 @@ All materialization — `collect()`, joins, group-by, reshape, etc. — runs thr
 **compiled Rust extension** (`pydantable._core`), which uses Polars for physical execution
 inside the native extension. Python does **not** require the `polars` package for core use.
 
+**Synchronous I/O only (today):** Every documented user-facing **read/write** path for materialization and interchange is **blocking** — including **`collect()`**, **`to_dict()`**, **`collect(as_lists=True)`**, optional **`to_polars()`**, and related helpers. There are no **`async def`** dataframe APIs in the library yet. **0.15.0** is planned to add **async** coverage for stable materialization and interchange; see {doc}`ROADMAP` and {doc}`FASTAPI` for service-oriented notes.
+
 By default, `collect()` returns a **list of Pydantic models** (one per row), validated
 against the current projected schema. Use **`to_dict()`** or **`collect(as_lists=True)`**
 for a columnar **`dict[str, list]`**. Install **`pydantable[polars]`** and use **`to_polars()`**
@@ -17,12 +19,10 @@ names and imports** (e.g. `assign` vs `withColumn`). They do not select a differ
 execution engine.
 
 **Typed expressions** (`Expr`, `Column`, PySpark `F.col(...)`) are validated in Rust
-(`ExprNode`), then lowered to Polars inside the extension. **0.8.0** extends the surface with:
-**`global_row_count()`** and PySpark **`count()`** with no argument (row count in global
-**`select`**), **`window_min`/`window_max`**, **`map_get`/`map_contains_key`** on map columns,
-**`str`→`date`/`datetime` `cast`**, plus the **0.7.0** additions (**`global_count`/`min`/`max`**,
-**`lag`/`lead`**, **`strptime`/`unix_timestamp`**, **`dt_nanosecond`**, **`map_len`**, **`binary_len`**).
-See {doc}`INTERFACE_CONTRACT`, {doc}`SUPPORTED_TYPES`, and {doc}`changelog`.
+(`ExprNode`), then lowered to Polars inside the extension. The expression and window surface
+has grown across releases (globals, framed windows, maps, temporal helpers, multi-key
+**`rangeBetween`**, etc.). The authoritative feature list and semantics are {doc}`INTERFACE_CONTRACT`,
+{doc}`WINDOW_SQL_SEMANTICS`, {doc}`SUPPORTED_TYPES`, and {doc}`changelog`.
 
 Use the default package exports for Polars-style names:
 

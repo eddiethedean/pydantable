@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented here. The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.13.0] — 2026-03-23
+
+### Highlights
+
+- **Documentation / DX (stabilization):** {doc}`FASTAPI` guide expanded — **`trusted_mode`** and legacy **`validate_data`**, column-shaped **`dict[str, list]`** request bodies (Pydantic body models), **sync** materialization and async roadmap pointers in {doc}`ROADMAP` (async I/O: **Planned 0.15.0**); install notes aligned with PyPI wheels vs git builds.
+- **Sync-only I/O called out:** {doc}`EXECUTION` and {doc}`PERFORMANCE` state that materialization and interchange are **blocking** today; link forward to {doc}`ROADMAP` **Planned 0.15.0** async work. {doc}`PERFORMANCE` tuning text prefers **`trusted_mode`** wording alongside **`validate_data`**.
+- **Discoverability:** {doc}`index` landing copy updated (current expression/trusted-ingest summary); {doc}`INTERFACE_CONTRACT` and {doc}`WINDOW_SQL_SEMANTICS` gain “related documentation” cross-links; {doc}`README` roadmap table refreshed.
+- **CI:** comment documenting **`RUSTSEC-2025-0141`** ignore in GitHub Actions audit step; actions versions reviewed (no bump required).
+- **Examples:** `scripts/verify_doc_examples.py` covers new FastAPI doc patterns (trusted ingest + columnar body).
+
+### Details
+
+Release audit: `make check-full` and full **pytest** green with a **release** `maturin` build. No API or semantic changes to **`rangeBetween`**, trusted **`strict`**, or **`map_from_entries`** beyond documentation clarity.
+
+**Roadmap (editorial):** **0.13.x** combines shipped **0.13.0** with the scope formerly planned as **0.14.0** (**Remaining in 0.13.x**). Former **0.15.0** / **0.16.0** rows are renumbered to **Planned 0.14.0** and **Planned 0.15.0**; async I/O targets **0.15.0**.
+
+See {doc}`FASTAPI`, {doc}`EXECUTION`, {doc}`PERFORMANCE`, {doc}`ROADMAP`, and {doc}`INTERFACE_CONTRACT`.
+
 ## [0.12.0] — 2026-03-22
 
 ### Highlights
