@@ -86,6 +86,29 @@ df = UserDF({"id": body.id, "age": body.age})
 
 Same schema rules apply as for columnar constructors in [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md) (equal-length columns, types per field).
 
+## Large tables, Polars, Arrow, and trust boundaries
+
+**Default (`trusted_mode="off"`)** is the right choice for **public** or **untrusted** HTTP bodies: every cell is validated against your `RowModel` types before any Rust work runs. Use it when clients can send arbitrary JSON.
+
+**When `trusted_mode` is appropriate in routes**
+
+| Situation | Suggested mode | Notes |
+|-----------|----------------|--------|
+| Internal service-to-service batch (same org, authN/Z at gateway) | `shape_only` or `strict` | You still enforce column names and row counts; `strict` adds dtype / nested-shape checks for Polars and columnar buffers. |
+| Upstream already validated rows (e.g. warehouse export, replay from your own DB) | `shape_only` | Fastest path; assumes wire format matches schema. |
+| Polars `DataFrame` or NumPy / **PyArrow** columns built **inside** your stack | `strict` | Checks Polars dtypes (and Python column buffers where implemented) against annotations; see [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md) (“Runtime column payloads”). |
+
+**Who may skip full `RowModel` validation**
+
+- Only code paths where **mis-typed data cannot reach the constructor** without a deliberate privilege break (private workers, ETL you own, or payloads already validated by Pydantic at an earlier hop).
+- **Do not** attach `trusted_mode="shape_only"` / `strict` directly to a public upload endpoint that accepts raw user JSON unless another layer has already validated every cell.
+
+**Polars and Arrow in handlers**
+
+- Passing a **Polars `DataFrame`** requires trusted mode (`shape_only` or `strict`); see [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md).
+- **`strict`** rejects Polars columns whose dtypes do not match the schema (including nested list / struct / map shapes). Prefer **`strict`** when the frame comes from Arrow/Parquet/IPC and you want a safety net without per-cell Pydantic.
+- For performance characteristics (validation vs ingest vs `collect()`), see [`PERFORMANCE.md`](PERFORMANCE.md) and [`EXECUTION.md`](EXECUTION.md).
+
 ## Example 1: Router + multi-table body — revenue by country
 
 Real services often receive **more than one related table** (partner feed, staged

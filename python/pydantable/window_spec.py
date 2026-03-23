@@ -2,6 +2,10 @@
 
 Used with window functions in :mod:`pydantable.expressions` (e.g. ``row_number``,
 ``lag``) via ``.over(...)``.
+
+Window ``orderBy`` uses Polars ordering semantics (including null ordering); there
+is no ``NULLS FIRST`` / ``LAST`` toggle yet. Multi-key ``rangeBetween`` and related
+rules are documented in ``docs/WINDOW_SQL_SEMANTICS.md``.
 """
 
 from __future__ import annotations

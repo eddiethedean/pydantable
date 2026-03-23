@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here. The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.13.1] — 2026-03-23
+
+### Highlights
+
+- **0.13.x roadmap closure:** completes **Remaining in 0.13.x** (see {doc}`ROADMAP`): FastAPI trust-boundary guidance for large/pre-validated tables and Polars/Arrow; window **null ordering** and **`CURRENT ROW`** / peer framing documentation; benchmark scripts for **framed windows** and **trusted strict** Polars ingest.
+- **Trusted `strict` + PyArrow:** dtype checks for **PyArrow** columns using `isinstance(..., pa.Array | pa.ChunkedArray)` in trusted buffers (fixes acceptance of concrete array types such as `Int64Array`); stricter scalar matching for **int**, **float**, **decimal**, **enum**, **uuid**, and temporal Arrow types. New tests in `tests/test_trusted_strict_pyarrow.py`; **`pyarrow>=14`** added to **`[dev]`** and CI test install.
+- **Docs:** {doc}`FASTAPI`, {doc}`PERFORMANCE`, {doc}`WINDOW_SQL_SEMANTICS`, {doc}`INTERFACE_CONTRACT`, {doc}`README`, {doc}`POLARS_TRANSFORMATIONS_ROADMAP`.
+
+### Details
+
+Optional **window `NULLS FIRST` / `LAST` API** and **`shape_only`** dtype-drift **warnings** are deferred to {doc}`ROADMAP` **Planned 0.14.0**.
+
 ## [0.13.0] — 2026-03-23
 
 ### Highlights

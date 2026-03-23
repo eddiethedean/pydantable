@@ -21,12 +21,18 @@ End-to-end work splits roughly into:
 
 Ratios vs raw Polars/pandas in `benchmarks/pydantable_vs_*.py` reflect this stack, not only step (3).
 
+## FastAPI and bulk ingest
+
+HTTP handlers that build `DataFrameModel` from **large** or **pre-validated** tables often use **`trusted_mode="shape_only"`** or **`strict`** to skip per-cell Pydantic while keeping shape (and, with **`strict`**, dtype) guarantees. Threat modeling—**who may skip `RowModel` validation**—and Polars/Arrow patterns are covered in [FASTAPI.md](FASTAPI.md) (“Large tables, Polars, Arrow, and trust boundaries”).
+
 ## Profiling scripts
 
 | Script | Purpose |
 |--------|---------|
 | [`benchmarks/profile_breakdown.py`](../benchmarks/profile_breakdown.py) | Wall-time split: validation vs `DataFrame` construction vs transform+`collect()` |
 | [`benchmarks/micro_collect_only.py`](../benchmarks/micro_collect_only.py) | Mean time for `collect()` only on a pre-built `DataFrame` (execution + egress) |
+| [`benchmarks/framed_window_bench.py`](../benchmarks/framed_window_bench.py) | Mean time for `collect()` on a framed `rowsBetween` + `window_sum` pipeline |
+| [`benchmarks/trusted_polars_ingest_bench.py`](../benchmarks/trusted_polars_ingest_bench.py) | Polars root + `trusted_mode="strict"` ingest plus trivial `select` + `collect()` |
 | `python -m cProfile` / `py-spy` | Deeper Python stacks; Rust: `perf` / Instruments on the `_core` shared library |
 
 Run `profile_breakdown.py --cprofile` for a cumulative profile of one pipeline.

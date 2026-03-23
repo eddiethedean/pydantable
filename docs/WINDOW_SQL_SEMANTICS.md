@@ -12,6 +12,21 @@ pydantable does **not** guarantee identical window results across PostgreSQL, Sp
 
 This matches the common SQL rule that **offset** bounds in `RANGE` apply to the **first** sort key when multiple keys are listed.
 
+## Null ordering in window `orderBy`
+
+pydantable does **not** expose **`NULLS FIRST` / `NULLS LAST`** on `Window.partitionBy(...).orderBy(...)` today. Window sort order follows **Polars** defaults for the underlying `over` / framed-window path: nulls are ordered relative to non-null values according to Polars’ rules for the expression dtypes (and may differ from PostgreSQL or Spark for the same SQL-shaped intent).
+
+**Contract:** treat **null ordering in window `orderBy`** as **implementation-defined** unless you pin a library version and validate for your dtypes. For deterministic tests, avoid nulls in `orderBy` keys or sort explicit columns first with `sort()` and then use windows only when the contract you need is covered by tests.
+
+## Peer rows, `CURRENT ROW`, and framed windows
+
+For **`rowsBetween`** and **`rangeBetween`**, the engine evaluates frames over rows in **partition sort order** (all `orderBy` keys, with stable tie-breaking as described above for multi-key `RANGE`).
+
+- **`CURRENT ROW`** in SQL terms corresponds to the row being evaluated; peer rows share the same **sort key vector** (for unframed ranking functions, ties get the same rank where `rank` / `dense_rank` semantics apply).
+- **Framed** aggregates include or exclude peers based on the frame bounds; exact inclusion for ties at frame edges follows Polars’ window implementation. Do not assume identical edge behavior vs Spark or ANSI SQL without testing your partition/`orderBy`/frame combination.
+
+See [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) for the supported window API surface.
+
 ## Spark / PySpark notes
 
 Apache Spark’s `rangeBetween` also uses the **ordering expression** for frame bounds; with multiple `orderBy` columns, behavior is engine-specific. pydantable’s contract is the rule above—do not assume Spark parity for every edge case without testing.

@@ -1,6 +1,6 @@
 # PydanTable roadmap (0.13.x → 0.14.0 → 0.15.x → v1.0.0)
 
-**Current release: `0.13.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
+**Current release: `0.13.1`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
@@ -144,27 +144,27 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 ## 0.13.x — stabilization + windows / trusted ingest (combined track)
 
-The **0.13.0** tag shipped documentation-first stabilization; **remaining** execution semantics, trusted-ingest depth, benchmarks, and FastAPI bulk patterns that were previously filed under **Planned 0.14.0** stay on the **same minor line** as **Remaining in 0.13.x** below (patch **`0.13.1+`** or a later **0.13.x** minor as maintainers prefer).
+The **0.13.x** line combined documentation-first stabilization (**0.13.0**) with follow-up items formerly scoped as **0.14.0**; **0.13.1** closes that remainder (see **Shipped in 0.13.1**). Optional **`NULLS FIRST` / `LAST`** window API and **`shape_only`** dtype-drift **warnings** remain for **Planned 0.14.0** if prioritized.
 
 ### Shipped in 0.13.0 (stabilization baseline)
 
 **Themes:** absorb **0.12.0** feedback, tighten docs and CI, and clarify sync-only I/O and FastAPI patterns.
 
-- [x] **Hardening / audit:** `make check-full` and full **pytest** on a **release** extension build; no regressions requiring code changes in that cycle (continue to report confusing errors as **0.13.1+** patches or under **Remaining in 0.13.x** below).
+- [x] **Hardening / audit:** `make check-full` and full **pytest** on a **release** extension build; no regressions requiring code changes in that cycle (follow-up patches use **0.13.2+** as needed).
 - [x] **Docs:** cross-links and “related documentation” sections in [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md) and [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md); [`README.md`](../README.md) and doc site [`index.md`](index.md) aligned with current behavior.
 - [x] **FastAPI guide refresh:** [`FASTAPI.md`](FASTAPI.md) — **`trusted_mode` / `validate_data`**, column-shaped JSON bodies, links to [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md) / [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md), **sync** handlers and **0.15.0** async pointer.
 - [x] **CI and tooling:** reviewed **GitHub Actions** (`actions/checkout@v5`, `actions/setup-python@v6`, `actions/cache@v4`); documented **`cargo audit`** ignore for **RUSTSEC-2025-0141** in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 - [x] **Tests / examples:** extended [`scripts/verify_doc_examples.py`](../scripts/verify_doc_examples.py) for new FastAPI patterns; no trivial remaining **PySpark**/**pandas** one-line façade gaps identified in that release.
 - [x] **I/O documentation:** [`EXECUTION.md`](EXECUTION.md) and [`PERFORMANCE.md`](PERFORMANCE.md) label **sync-only** materialization/interchange and point to **0.15.0** async work.
 
-### Remaining in 0.13.x (windows + trusted ingest; formerly planned as **0.14.0**)
+### Shipped in 0.13.1 (windows / trusted / benchmarks / FastAPI bulk)
 
-**Themes:** execution semantics polish and safer bulk ingest. Items are **not** committed until shipped; reorder or split across **0.13.x** patches as needed.
+**Themes:** execution semantics documentation, safer **PyArrow** **`strict`** paths, benchmarks, and service trust-boundary docs.
 
-- [ ] **Window polish:** optional **`NULLS FIRST` / `LAST`** (or explicit documented mapping to Polars null ordering); clarify peer-group / `CURRENT ROW` behavior vs other engines if frame surface grows beyond numeric `rangeBetween`.
-- [ ] **Trusted ingest:** extend **`strict`** to more **PyArrow** buffer paths and tighter **enum** / **decimal** Polars dtype matches; optional **warnings** when `shape_only` would hide dtype drift.
-- [ ] **Performance:** add or extend benchmarks for **framed windows** and **large trusted Polars** ingest (see [`PERFORMANCE.md`](PERFORMANCE.md)).
-- [ ] **FastAPI + trusted bulk paths:** document safe patterns for **large** or **pre-validated** tables behind APIs (e.g. **`trusted_mode="strict"`** with Polars/Arrow inputs, boundaries for **who may skip** full `RowModel` validation), and cross-link **trusted ingest** bullets above.
+- [x] **Window polish (docs):** null ordering and **`CURRENT ROW`** / peer framing called out in [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md) and [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md); module docstring on `Window` in [`window_spec.py`](../python/pydantable/window_spec.py). **No** new **`NULLS FIRST` / `LAST`** API yet (defer to **0.14.0** if needed).
+- [x] **Trusted ingest:** **`strict`** dtype checks for **PyArrow** `Array` / `ChunkedArray` columns (including **decimal** and **enum**-compatible Arrow types); accept all concrete Arrow array classes in trusted column buffers (`isinstance(..., pa.Array)`). Tests in `tests/test_trusted_strict_pyarrow.py`; **`pyarrow`** added to **`[dev]`** and CI install. Optional **`shape_only`** drift **warnings** still **deferred**.
+- [x] **Performance:** [`framed_window_bench.py`](../benchmarks/framed_window_bench.py) and [`trusted_polars_ingest_bench.py`](../benchmarks/trusted_polars_ingest_bench.py); [`PERFORMANCE.md`](PERFORMANCE.md) table updated.
+- [x] **FastAPI + trusted bulk:** “Large tables, Polars, Arrow, and trust boundaries” in [`FASTAPI.md`](FASTAPI.md); [`PERFORMANCE.md`](PERFORMANCE.md) cross-link.
 
 ---
 
@@ -172,6 +172,8 @@ The **0.13.0** tag shipped documentation-first stabilization; **remaining** exec
 
 **Themes:** close documented gaps in alternate APIs and strengthen regression depth.
 
+- [ ] **Window API (optional):** user-facing **`NULLS FIRST` / `NULLS LAST`** (or equivalent) on window `orderBy`, if demand is clear after **0.13.1** docs.
+- [ ] **Trusted ingest:** optional **warnings** when **`shape_only`** would hide scalar dtype drift; any further **PyArrow** / **Polars** **`strict`** edge cases discovered in the field.
 - [ ] **Polars parity:** burn down high-value items in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) and reflect outcomes in [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md).
 - [ ] **PySpark façade:** additional **`functions`** / **`Column`** helpers that map cleanly onto existing `ExprNode` (see [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md)).
 - [ ] **Property-based tests:** selective **Hypothesis** (or similar) coverage for expression typing and small plan round-trips where behavior is deterministic.

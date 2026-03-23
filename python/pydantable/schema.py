@@ -212,8 +212,11 @@ def _column_buffer_for_trusted(name: str, col: Any) -> Any:
     typ = type(col)
     if typ.__module__ == "numpy" and typ.__name__ == "ndarray":
         return col
-    mod = getattr(typ, "__module__", "") or ""
-    if mod.startswith("pyarrow") and typ.__name__ in ("Array", "ChunkedArray"):
+    try:
+        import pyarrow as pa  # type: ignore[import-untyped]
+    except ImportError:
+        pa = None  # type: ignore[assignment]
+    if pa is not None and isinstance(col, (pa.Array, pa.ChunkedArray)):
         return col
     raise TypeError(
         f"Column {name!r} must be a list, tuple, numpy.ndarray, or pyarrow "
@@ -434,6 +437,85 @@ def _trusted_nested_value_strict(annotation: Any, value: Any) -> bool:
     return _trusted_scalar_compatible(annotation, value)
 
 
+def _pyarrow_type_str_lower(col: Any) -> str | None:
+    """Return ``str(col.type).lower()`` for Arrow arrays/chunked arrays, else None."""
+    try:
+        import pyarrow as pa  # type: ignore[import-untyped]
+    except ImportError:
+        return None
+    if isinstance(col, (pa.Array, pa.ChunkedArray)):
+        return str(col.type).lower()
+    return None
+
+
+def _trusted_pyarrow_strict_scalar(annotation_inner: Any, dt_low: str) -> bool:
+    """Match a scalar annotation to a PyArrow type string (strict trusted)."""
+    import enum
+    import uuid
+    from datetime import date, datetime, time, timedelta
+    from decimal import Decimal
+
+    if annotation_inner is int:
+        if "decimal" in dt_low:
+            return False
+        _int_tokens = (
+            "int8",
+            "int16",
+            "int32",
+            "int64",
+            "int128",
+            "uint8",
+            "uint16",
+            "uint32",
+            "uint64",
+            "uint128",
+        )
+        return any(tok in dt_low for tok in _int_tokens)
+    if annotation_inner is float:
+        return any(s in dt_low for s in ("float", "double", "halffloat"))
+    if annotation_inner is bool:
+        return "bool" in dt_low
+    if annotation_inner is str:
+        return any(s in dt_low for s in ("string", "utf8", "large_string"))
+    if annotation_inner is bytes:
+        return "binary" in dt_low
+    if annotation_inner is datetime:
+        return "timestamp" in dt_low
+    if annotation_inner is date:
+        return "date32" in dt_low or "date64" in dt_low
+    if annotation_inner is time:
+        return "time32" in dt_low or "time64" in dt_low
+    if annotation_inner is timedelta:
+        return "duration" in dt_low
+    if annotation_inner is Decimal:
+        return "decimal" in dt_low
+    if annotation_inner is uuid.UUID:
+        return any(s in dt_low for s in ("uuid", "string", "utf8", "large_string"))
+    if (
+        isinstance(annotation_inner, type)
+        and issubclass(annotation_inner, enum.Enum)
+        and annotation_inner is not enum.Enum
+    ):
+        _e_int = (
+            "int8",
+            "int16",
+            "int32",
+            "int64",
+            "uint8",
+            "uint16",
+            "uint32",
+            "uint64",
+        )
+        return (
+            any(tok in dt_low for tok in _e_int)
+            or "dictionary" in dt_low
+            or "string" in dt_low
+            or "utf8" in dt_low
+            or "large_string" in dt_low
+        )
+    return True
+
+
 def _trusted_column_strict_compatible(annotation: Any, col: Any) -> bool:
     inner, _nullable = _annotation_nullable_inner(annotation)
     origin = get_origin(inner)
@@ -467,19 +549,23 @@ def _trusted_column_strict_compatible(annotation: Any, col: Any) -> bool:
         if inner in (str,):
             return kind in ("U", "S", "O")
         return True
-    mod = getattr(typ, "__module__", "") or ""
-    if mod.startswith("pyarrow"):
-        dt = str(getattr(col, "type", "")).lower()
-        inner, _nullable = _annotation_nullable_inner(annotation)
-        if inner in (int,):
-            return "int" in dt or "uint" in dt
-        if inner in (float,):
-            return "float" in dt or "double" in dt or "int" in dt
-        if inner in (bool,):
-            return "bool" in dt
-        if inner in (str,):
-            return "string" in dt or "large_string" in dt
-        return True
+    try:
+        import pyarrow as pa  # type: ignore[import-untyped]
+    except ImportError:
+        pa = None  # type: ignore[assignment]
+    if pa is not None and isinstance(col, (pa.Array, pa.ChunkedArray)):
+        dt_low = _pyarrow_type_str_lower(col)
+        if dt_low is None:
+            return True
+        inner_u, _n = _annotation_nullable_inner(annotation)
+        origin_u = get_origin(inner_u)
+        if origin_u in (list, dict):
+            return True
+        if isinstance(inner_u, type) and issubclass(inner_u, BaseModel):
+            return True
+        if inner_u is Any or get_origin(inner_u) is not None:
+            return True
+        return _trusted_pyarrow_strict_scalar(inner_u, dt_low)
     return True
 
 
