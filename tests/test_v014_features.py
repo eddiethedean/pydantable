@@ -8,6 +8,8 @@ from datetime import date
 import pytest
 from pydantable import DataFrame
 from pydantable.expressions import lag, row_number
+from pydantable.pyspark import DataFrame as PSDataFrame
+from pydantable.pyspark.sql import functions as F
 from pydantable.schema import DtypeDriftWarning, Schema
 from pydantable.window_spec import Window
 
@@ -125,6 +127,29 @@ def test_lag_respects_nulls_last_in_window_order() -> None:
     assert out_nl["x"] == [10, None, 5]
 
 
+class _Dates(Schema):
+    d: date
+    s: str
+
+
+def test_pyspark_dayofmonth_lower_upper() -> None:
+    df = PSDataFrame[_Dates](
+        {
+            "d": [date(2024, 3, 15), date(2025, 12, 1)],
+            "s": ["HeLLo", "PySpark"],
+        }
+    )
+    out = (
+        df.withColumn("dom", F.dayofmonth(df.d))
+        .withColumn("sl", F.lower(F.col("s", dtype=str)))
+        .withColumn("su", F.upper(F.col("s", dtype=str)))
+        .collect(as_lists=True)
+    )
+    assert out["dom"] == [15, 1]
+    assert out["sl"] == ["hello", "pyspark"]
+    assert out["su"] == ["HELLO", "PYSPARK"]
+
+
 pytest.importorskip("fastapi")
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -165,31 +190,3 @@ def test_fastapi_openapi_contains_request_body_schema() -> None:
     spec = TestClient(app).get("/openapi.json").json()
     post = spec["paths"]["/bulk"]["post"]
     assert "requestBody" in post
-
-
-pytest.importorskip("pydantable.pyspark")
-from pydantable.pyspark import DataFrame as PSDataFrame  # noqa: E402
-from pydantable.pyspark.sql import functions as F  # noqa: E402
-
-
-class _Dates(Schema):
-    d: date
-    s: str
-
-
-def test_pyspark_dayofmonth_lower_upper() -> None:
-    df = PSDataFrame[_Dates](
-        {
-            "d": [date(2024, 3, 15), date(2025, 12, 1)],
-            "s": ["HeLLo", "PySpark"],
-        }
-    )
-    out = (
-        df.withColumn("dom", F.dayofmonth(df.d))
-        .withColumn("sl", F.lower(F.col("s", dtype=str)))
-        .withColumn("su", F.upper(F.col("s", dtype=str)))
-        .collect(as_lists=True)
-    )
-    assert out["dom"] == [15, 1]
-    assert out["sl"] == ["hello", "pyspark"]
-    assert out["su"] == ["HELLO", "PYSPARK"]

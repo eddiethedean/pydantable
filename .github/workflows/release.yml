@@ -181,7 +181,7 @@ jobs:
       - name: Install test deps
         run: |
           $PY -m pip install -U pip
-          $PY -m pip install maturin pytest pytest-xdist pytest-cov "numpy>=1.24" "pandas>=2.0" "hypothesis>=6.0"
+          $PY -m pip install maturin pytest pytest-xdist pytest-cov "numpy>=1.24" "pandas>=2.0" "hypothesis>=6.0" "pyarrow>=14.0" "fastapi>=0.100" "httpx>=0.24"
 
       - name: Build and install extension
         run: $PY -m maturin develop --release

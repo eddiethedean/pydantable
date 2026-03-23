@@ -144,7 +144,7 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 ## Shipped in 0.13.0 (stabilization + windows / trusted / benchmarks / FastAPI)
 
-**0.13.0** combines documentation-first stabilization with items formerly scoped as **Remaining in 0.13.x** / **0.14.0**. Optional **`NULLS FIRST` / `LAST`** window API and **`shape_only`** dtype-drift **warnings** remain for **Planned 0.14.0** if prioritized.
+**0.13.0** combines documentation-first stabilization with items formerly scoped as **Remaining in 0.13.x** / early **0.14.0** planning. User-facing **`NULLS FIRST` / `LAST`** (`orderBy(..., nulls_last=...)`) and **`shape_only`** **`DtypeDriftWarning`** shipped in **0.14.0** (see **Shipped in 0.14.0** below).
 
 **Themes:** absorb **0.12.0** feedback, tighten docs and CI, clarify sync-only I/O and FastAPI patterns (including bulk / Polars / Arrow trust boundaries), document window null / peer semantics, and harden **PyArrow** **`strict`** ingest.
 
@@ -171,6 +171,7 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 - [x] **Hypothesis:** additional pipeline property (`with_columns` identity) in `tests/test_hypothesis_properties.py`; documented in [`DEVELOPER.md`](DEVELOPER.md).
 - [x] **`validate_data` policy:** **`DeprecationWarning`** when **`validate_data=`** is passed without **`trusted_mode`**; documented removal after **0.16.0**.
 - [x] **FastAPI testing & DX:** **`TestClient`** / columnar body examples in [`FASTAPI.md`](FASTAPI.md); **`tests/test_fastapi_recipes.py`**; **`fastapi`** / **`httpx`** in **`[dev]`** and CI pytest install.
+- [x] **Regression tests:** **`tests/test_v014_features.py`** (deprecation, drift, windows, PySpark, FastAPI); extra Hypothesis coverage for **`shape_only`** without drift on int columns.
 
 ---
 
