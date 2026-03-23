@@ -14,7 +14,9 @@ This **documentation site** is the detailed manual. The repository **README** on
 
 **Materialization (0.5+):** `collect()` returns a **list of Pydantic row models** for the current schema. Use **`to_dict()`** (or **`collect(as_lists=True)`**) for columnar **`dict[str, list]`** responses. **`to_polars()`** is available when the optional Python **`polars`** package is installed. Details: {doc}`EXECUTION` and {doc}`DATAFRAMEMODEL`.
 
-**Scalar dtypes** include `int`, `float`, `bool`, `str`, `datetime`, `date`, `timedelta`, each nullable via `Optional` / `| None`. **Structs**, **lists**, **UUID**, **Decimal**, and **Enum** columns are documented in {doc}`SUPPORTED_TYPES`. Unsupported `DataFrameModel` field annotations fail at **class definition** time.
+**Scalar dtypes** include `int`, `float`, `bool`, `str`, `datetime`, `date`, `time`, `timedelta`, `bytes`, homogeneous **`dict[str, T]`** maps, each nullable via `Optional` / `| None`. **Structs**, **lists**, **UUID**, **Decimal**, and **Enum** columns are documented in {doc}`SUPPORTED_TYPES`. Unsupported `DataFrameModel` field annotations fail at **class definition** time.
+
+**Expressions (0.7+):** typed **`Expr`** builds a Rust AST — globals (`global_sum`, `global_count`, …), window ranks and **`lag`/`lead`**, temporal parse/extract (`strptime`, `unix_timestamp`, `dt_*`), **`map_len`**, **`binary_len`**, and PySpark mirrors in {doc}`PYSPARK_PARITY`. Semantics: {doc}`INTERFACE_CONTRACT` and {doc}`changelog`.
 
 ## Where to go next
 

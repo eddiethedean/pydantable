@@ -77,7 +77,7 @@ Phase 4 boundary contract:
 
 ### Which tests are authoritative
 
-- **`cargo test` in `pydantable-core/`** exercises Rust plan/expr contracts and PyO3 wiring.
+- **`cargo test` in `pydantable-core/`** exercises Rust plan/expr contracts and PyO3 wiring. From the **repo root**, prefer **`make rust-test`** (or set `PYO3_PYTHON` to `.venv/bin/python` and `PYTHONPATH` to the venv’s `site-packages`, as in the `Makefile`): PyO3’s embedded interpreter does not always load `site-packages`, and some Polars-backed plan tests **import Python `polars`** — without that env, two tests can fail with `ModuleNotFoundError: polars`.
 - **`pytest` on `tests/`** is the **CI-facing** check for end-to-end behavior (`collect`, joins, UIs). Prefer adding user-visible regressions here when behavior crosses the Python boundary.
 
 ### Run Python tests

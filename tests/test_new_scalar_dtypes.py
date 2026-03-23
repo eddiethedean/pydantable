@@ -1,4 +1,4 @@
-"""Tests for time, bytes, and dict[str, V] map columns (0.6.0)."""
+"""Tests for time, bytes, and dict[str, V] map columns (0.6.0+)."""
 
 from __future__ import annotations
 

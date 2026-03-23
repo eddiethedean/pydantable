@@ -131,9 +131,11 @@ Beyond generic arithmetic and comparisons, the following are supported (see
 - **Numeric:** `abs()`, `round(decimals=...)`, `floor()`, `ceil()` on `int` / `float` columns.
 - **String:** `strip()`, `upper()`, `lower()`, `str_replace(old, new)` (literal substrings), `strip_prefix`, `strip_suffix`, `strip_chars`, plus `substr`, `char_length`, `concat`.
 - **Boolean:** `&`, `|`, `~` for combining boolean-typed expressions.
-- **Datetime / date:** `dt_year()`, `dt_month()`, `dt_day()`, `dt_hour()`, `dt_minute()`, `dt_second()` (time-of-day parts require `datetime`, not plain `date`); **`dt_date()`** on `datetime` columns (calendar `date`, Polars `dt.date()`). **`datetime ± timedelta`** and **`date ± timedelta`** use typed binary ops (see Rust `infer_arith_dtype`).
+- **Datetime / date / time:** `dt_year()` … `dt_day()` on **`date`** or **`datetime`**; `dt_hour()` … **`dt_nanosecond()`** on **`datetime`** or **`time`**; **`dt_date()`** on **`datetime`** (calendar `date`). **`strptime(format, to_datetime=...)`** parses **`str`** → **`date`** or **`datetime`**. **`unix_timestamp(unit=...)`** returns epoch **`int`** from **`date`** / **`datetime`**. **`datetime ± timedelta`** and **`date ± timedelta`** use typed binary ops (see Rust `infer_arith_dtype`).
 - **Homogeneous lists:** `list_len()`, **`list_get(index)`** (int index; OOB → null), **`list_contains(value)`**, **`list_min()`** / **`list_max()`** / **`list_sum()`** on `list[int]` or `list[float]` (min/max/sum are numeric lists only).
-- **Cast:** `cast(T)` supports the usual primitive conversions plus `datetime` → `date` / `str` and `date` → `str` where listed in the Rust `cast` typing rules.
+- **Maps (`dict[str, T]`):** **`map_len()`** (number of entries; logical list length in the physical encoding).
+- **Binary (`bytes`):** **`binary_len()`** (per-row byte length).
+- **Cast:** `cast(T)` supports the usual primitive conversions plus `datetime` → `date` / `str` and `date` → `str` where listed in the Rust `cast` typing rules (string → temporal via **`strptime`** is separate from generic `cast`).
 
 Temporal part extraction and `dt_date()` on timezone-aware `datetime` values follow Polars’ interpretation of the stored dtype.
 

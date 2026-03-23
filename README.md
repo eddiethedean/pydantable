@@ -54,6 +54,8 @@ PydanTable keeps **Pydantic models** as the source of truth for:
 
 The default API feels **Polars-like**; optional **`pydantable.pandas`** and **`pydantable.pyspark`** modules only change naming and imports — execution is always the native core. Details: [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html), [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html).
 
+**0.7.0+ expression surface (Rust-typed `Expr`):** whole-frame **`global_*`** aggregates (`sum`, `mean`, `count`, `min`, `max`), **window** `lag` / `lead` (with `Window.partitionBy(...).orderBy(...)`), **temporal** helpers (`strptime`, `unix_timestamp`, `dt_nanosecond`), **map** entry count (`map_len`), and **binary** byte length (`binary_len`). PySpark-named wrappers live under `pydantable.pyspark.sql.functions`. See [CHANGELOG](https://pydantable.readthedocs.io/en/latest/changelog.html).
+
 ---
 
 ## Install
@@ -117,11 +119,11 @@ More examples: [FastAPI integration](https://pydantable.readthedocs.io/en/latest
 ## Development
 
 ```bash
-ruff format . && ruff check .
-pytest -q
+make check-full   # Ruff, mypy, Rust fmt/clippy/tests (see Makefile for `rust-test` env)
+pytest -q         # or: pytest -n auto  with the [dev] extra
 ```
 
-Rust + Python: see [Developer guide](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html) (formatting, `maturin`, benchmarks, contribution workflow).
+Rust + Python: see [Developer guide](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html) (formatting, `maturin`, `make rust-test` for `cargo test` with the venv `PYTHONPATH`, benchmarks, contribution workflow).
 
 ---
 

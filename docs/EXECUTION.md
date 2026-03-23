@@ -16,6 +16,12 @@ Optional **UI modules** (`pydantable.pandas`, `pydantable.pyspark`) only change 
 names and imports** (e.g. `assign` vs `withColumn`). They do not select a different
 execution engine.
 
+**Typed expressions** (`Expr`, `Column`, PySpark `F.col(...)`) are validated in Rust
+(`ExprNode`), then lowered to Polars inside the extension. As of **0.7.0**, this includes
+whole-frame global aggregates, window **`lag`/`lead`**, **`strptime`** / **`unix_timestamp`**,
+**`map_len`**, **`binary_len`**, and related PySpark helpers — see {doc}`INTERFACE_CONTRACT`,
+{doc}`SUPPORTED_TYPES`, and {doc}`changelog`.
+
 Use the default package exports for Polars-style names:
 
 ```python
