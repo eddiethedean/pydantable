@@ -72,6 +72,15 @@ explicit_package_bases = true
 module = "tests.*"
 ignore_errors = true
 
+# Optional runtime deps: CI python-lint job does not install them; imports are guarded.
+[[tool.mypy.overrides]]
+module = "pyarrow"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "polars"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 pythonpath = ["python"]
 testpaths = ["tests"]
