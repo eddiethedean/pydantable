@@ -85,7 +85,7 @@ impl PyPlan {
 
 #[pyfunction]
 fn rust_version() -> &'static str {
-    "0.7.0"
+    "0.8.0"
 }
 
 #[pyfunction]
@@ -475,6 +475,28 @@ fn expr_window_mean(
 }
 
 #[pyfunction]
+fn expr_window_min(
+    inner: Bound<'_, PyExpr>,
+    partition_by: Vec<String>,
+    order_by: Vec<(String, bool)>,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_window_min(inner.borrow().node.clone(), partition_by, order_by)?,
+    })
+}
+
+#[pyfunction]
+fn expr_window_max(
+    inner: Bound<'_, PyExpr>,
+    partition_by: Vec<String>,
+    order_by: Vec<(String, bool)>,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_window_max(inner.borrow().node.clone(), partition_by, order_by)?,
+    })
+}
+
+#[pyfunction]
 fn expr_global_sum(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
     Ok(PyExpr {
         node: ExprNode::make_global_sum(inner.borrow().node.clone())?,
@@ -522,6 +544,20 @@ fn expr_binary_length(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
 fn expr_map_len(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
     Ok(PyExpr {
         node: ExprNode::make_map_len(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_map_get(inner: Bound<'_, PyExpr>, key: String) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_map_get(inner.borrow().node.clone(), key)?,
+    })
+}
+
+#[pyfunction]
+fn expr_map_contains_key(inner: Bound<'_, PyExpr>, key: String) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_map_contains_key(inner.borrow().node.clone(), key)?,
     })
 }
 
@@ -577,7 +613,17 @@ fn expr_global_default_alias(expr: &Bound<'_, PyExpr>) -> Option<String> {
 
 #[pyfunction]
 fn expr_is_global_agg(expr: &Bound<'_, PyExpr>) -> bool {
-    matches!(expr.borrow().node, ExprNode::GlobalAgg { .. })
+    matches!(
+        expr.borrow().node,
+        ExprNode::GlobalAgg { .. } | ExprNode::GlobalRowCount { .. }
+    )
+}
+
+#[pyfunction]
+fn expr_global_row_count() -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_global_row_count(),
+    })
 }
 
 #[pyfunction]
@@ -1106,15 +1152,20 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr_window_rank, m)?)?;
     m.add_function(wrap_pyfunction!(expr_window_sum, m)?)?;
     m.add_function(wrap_pyfunction!(expr_window_mean, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_window_min, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_window_max, m)?)?;
     m.add_function(wrap_pyfunction!(expr_global_sum, m)?)?;
     m.add_function(wrap_pyfunction!(expr_global_mean, m)?)?;
     m.add_function(wrap_pyfunction!(expr_strptime, m)?)?;
     m.add_function(wrap_pyfunction!(expr_unix_timestamp, m)?)?;
     m.add_function(wrap_pyfunction!(expr_binary_length, m)?)?;
     m.add_function(wrap_pyfunction!(expr_map_len, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_map_get, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_map_contains_key, m)?)?;
     m.add_function(wrap_pyfunction!(expr_global_count, m)?)?;
     m.add_function(wrap_pyfunction!(expr_global_min, m)?)?;
     m.add_function(wrap_pyfunction!(expr_global_max, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_global_row_count, m)?)?;
     m.add_function(wrap_pyfunction!(expr_window_lag, m)?)?;
     m.add_function(wrap_pyfunction!(expr_window_lead, m)?)?;
     m.add_function(wrap_pyfunction!(expr_global_default_alias, m)?)?;

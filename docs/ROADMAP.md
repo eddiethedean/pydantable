@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.7.0 → v1.0.0)
+# PydanTable roadmap (0.8.0 → v1.0.0)
 
-**Current release: `0.7.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
+**Current release: `0.8.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
 
 For Polars-style API parity at the method level, see
 [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md).
@@ -91,12 +91,30 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 ---
 
+## Shipped in 0.8.0 (maps, windows, casts, globals)
+
+- [x] **Global row count** without a column (`global_row_count`, PySpark `count()` with no arg).
+- [x] **`str` → `date` / `datetime`** `cast` (Polars); `strptime` remains the fixed-format path.
+- [x] **Map ops:** `map_get`, `map_contains_key` (string keys; physical list-of-struct).
+- [x] **Window min/max** over partitions; **`WindowFrame::Rows`** in Rust IR (serialization-ready; Polars lowering for frames still **TODO**).
+
+---
+
 ## Later (not started)
 
-Directions beyond **0.7.0** (non-exhaustive):
+Directions beyond **0.8.0** (non-exhaustive):
 
-- [ ] **Arrow-native map dtype** or heterogeneous map keys (beyond `dict[str, T]` v1).
-- [ ] SQL-style **window frames** (`rowsBetween` / `rangeBetween`) in the IR and Polars lowering.
+- [ ] **Arrow-native map dtype** or heterogeneous map keys (beyond `dict[str, T]` v1) — optional I/O spike.
+- [ ] SQL-style **window frames** (`rowsBetween` / `rangeBetween`) **lowering** to Polars (IR field exists; execution raises until implemented).
+
+---
+
+## After v1.0.0 (future engines)
+
+These are **explicitly not** part of the path to **v1.0.0**; they would be major new execution or language surfaces on top of the existing Rust logical plan and typed schema.
+
+- [ ] **Spark engine:** compile pydantable logical plans to a real **Apache Spark** `DataFrame` (JVM / `pyspark` driver), for distributed execution. This is separate from the current **PySpark-shaped façade** (`pydantable.pyspark`), which reuses the Polars-backed core with no Spark runtime.
+- [ ] **SQL-backed execution engine:** lower pydantable **logical plans** to **SQL** (e.g. PostgreSQL dialect) and run them against a live database, instead of (or alongside) the in-process Polars path. Integration could follow **SQLAlchemy / SQLModel**-style sessions and connection management; scope, supported plan ops, and escape hatches for unsupported expressions would need an explicit contract. This is **not** “parse arbitrary user SQL into `ExprNode`” as the primary story—it is **execute our plan via SQL**. **Python Moltres** is very similar to this SQL engine concept: same idea of keeping the typed logical plan and targeting a SQL-capable runtime rather than embedded Polars.
 
 ---
 

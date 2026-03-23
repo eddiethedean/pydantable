@@ -300,6 +300,16 @@ class Expr:  # type: ignore[override]
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_map_len(self._rust_expr))
 
+    def map_get(self, key: str) -> Expr:
+        """Value for a string key (missing key → null)."""
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_map_get(self._rust_expr, str(key)))
+
+    def map_contains_key(self, key: str) -> Expr:
+        """Whether the map contains the given string key."""
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_map_contains_key(self._rust_expr, str(key)))
+
     # List columns
     def list_len(self) -> Expr:
         rust = _require_rust_core()
@@ -444,6 +454,14 @@ class _WindowAggPending:
             return Expr(
                 rust_expr=rust.expr_window_mean(self._inner._rust_expr, part, order)
             )
+        if self._kind == "min":
+            return Expr(
+                rust_expr=rust.expr_window_min(self._inner._rust_expr, part, order)
+            )
+        if self._kind == "max":
+            return Expr(
+                rust_expr=rust.expr_window_max(self._inner._rust_expr, part, order)
+            )
         raise AssertionError(self._kind)
 
 
@@ -503,6 +521,20 @@ def window_mean(column: Expr) -> _WindowAggPending:
     return _WindowAggPending(column, "mean")
 
 
+def window_min(column: Expr) -> _WindowAggPending:
+    """``min`` over a window."""
+    if not isinstance(column, Expr):
+        raise TypeError("window_min() expects an Expr.")
+    return _WindowAggPending(column, "min")
+
+
+def window_max(column: Expr) -> _WindowAggPending:
+    """``max`` over a window."""
+    if not isinstance(column, Expr):
+        raise TypeError("window_max() expects an Expr.")
+    return _WindowAggPending(column, "max")
+
+
 def lag(column: Expr, n: int = 1) -> _WindowShiftPending:
     """Previous row value within partition/order (``shift(n)``)."""
     if not isinstance(column, Expr):
@@ -550,3 +582,8 @@ def global_max(column: Expr) -> Expr:
     if not isinstance(column, Expr):
         raise TypeError("global_max() expects an Expr.")
     return Expr(rust_expr=_require_rust_core().expr_global_max(column._rust_expr))
+
+
+def global_row_count() -> Expr:
+    """Row count for the current frame (Spark ``count(*)``); global ``select`` only."""
+    return Expr(rust_expr=_require_rust_core().expr_global_row_count())

@@ -9,7 +9,9 @@ use super::ir::{
     UnaryNumericOp, UnixTimestampUnit, WindowOp,
 };
 
-use polars::lazy::dsl::{coalesce, col, concat_str, lit, ternary_expr, Expr as PolarsExpr};
+use polars::lazy::dsl::{
+    coalesce, col, concat_str, element, len, lit, ternary_expr, Expr as PolarsExpr,
+};
 use polars::prelude::{
     ClosedInterval, DataType, Int128Chunked, IntoSeries, Literal, NamedFrom, NewChunkedArray, Null,
     RankMethod, RankOptions, RoundMode, Scalar, Series, SortOptions, StrptimeOptions, TimeUnit,
@@ -487,13 +489,43 @@ impl ExprNode {
                 Ok(inner.to_polars_expr()?.binary().size_bytes())
             }
             ExprNode::MapLen { inner, .. } => Ok(inner.to_polars_expr()?.list().len()),
+            ExprNode::MapGet { inner, key, .. } => {
+                let list_e = inner.to_polars_expr()?;
+                let pred = element()
+                    .struct_()
+                    .field_by_name("key")
+                    .eq(lit(key.as_str()));
+                let filtered = element().filter(pred);
+                Ok(list_e
+                    .list()
+                    .eval(filtered)
+                    .list()
+                    .first()
+                    .struct_()
+                    .field_by_name("value"))
+            }
+            ExprNode::MapContainsKey { inner, key, .. } => {
+                let list_e = inner.to_polars_expr()?;
+                let pred = element()
+                    .struct_()
+                    .field_by_name("key")
+                    .eq(lit(key.as_str()));
+                let filtered = element().filter(pred);
+                Ok(list_e.list().eval(filtered).list().len().gt(lit(0u32)))
+            }
             ExprNode::Window {
                 op,
                 operand,
                 partition_by,
                 order_by,
+                frame,
                 ..
             } => {
+                if frame.is_some() {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "window row frames (rowsBetween) are not yet supported by the Polars lowering path.",
+                    ));
+                }
                 let part = partition_by.as_slice();
                 let ord = order_by.as_slice();
                 match op {
@@ -560,6 +592,24 @@ impl ExprNode {
                         let inner = op_inner.to_polars_expr()?.mean();
                         apply_window_over(inner, part, ord)
                     }
+                    WindowOp::Min => {
+                        let op_inner = operand.as_ref().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "internal: window min missing operand",
+                            )
+                        })?;
+                        let inner = op_inner.to_polars_expr()?.min();
+                        apply_window_over(inner, part, ord)
+                    }
+                    WindowOp::Max => {
+                        let op_inner = operand.as_ref().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "internal: window max missing operand",
+                            )
+                        })?;
+                        let inner = op_inner.to_polars_expr()?.max();
+                        apply_window_over(inner, part, ord)
+                    }
                     WindowOp::Lag { n } => {
                         if ord.is_empty() {
                             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -600,6 +650,7 @@ impl ExprNode {
                     GlobalAggOp::Max => Ok(e.max()),
                 }
             }
+            ExprNode::GlobalRowCount { .. } => Ok(len().cast(DataType::Int64)),
         }
     }
 }

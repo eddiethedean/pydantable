@@ -135,8 +135,11 @@ impl ExprNode {
             | ExprNode::UnixTimestamp { dtype, .. }
             | ExprNode::BinaryLength { dtype, .. }
             | ExprNode::MapLen { dtype, .. }
+            | ExprNode::MapGet { dtype, .. }
+            | ExprNode::MapContainsKey { dtype, .. }
             | ExprNode::Window { dtype, .. }
-            | ExprNode::GlobalAgg { dtype, .. } => dtype.clone(),
+            | ExprNode::GlobalAgg { dtype, .. }
+            | ExprNode::GlobalRowCount { dtype, .. } => dtype.clone(),
         }
     }
 
@@ -217,7 +220,9 @@ impl ExprNode {
             | ExprNode::Strptime { inner, .. }
             | ExprNode::UnixTimestamp { inner, .. }
             | ExprNode::BinaryLength { inner, .. }
-            | ExprNode::MapLen { inner, .. } => inner.referenced_columns(),
+            | ExprNode::MapLen { inner, .. }
+            | ExprNode::MapGet { inner, .. }
+            | ExprNode::MapContainsKey { inner, .. } => inner.referenced_columns(),
             ExprNode::ListGet { inner, index, .. } => {
                 let mut out = inner.referenced_columns();
                 out.extend(index.referenced_columns());
@@ -235,6 +240,7 @@ impl ExprNode {
             }
             ExprNode::StructField { base, .. } => base.referenced_columns(),
             ExprNode::GlobalAgg { inner, .. } => inner.referenced_columns(),
+            ExprNode::GlobalRowCount { .. } => HashSet::new(),
             ExprNode::Window {
                 operand,
                 partition_by,
@@ -636,6 +642,8 @@ impl ExprNode {
                 | (BaseType::DateTime, BaseType::Date)
                 | (BaseType::DateTime, BaseType::Str)
                 | (BaseType::Date, BaseType::Str)
+                | (BaseType::Str, BaseType::Date)
+                | (BaseType::Str, BaseType::DateTime)
         );
         if !allowed {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -1341,6 +1349,7 @@ impl ExprNode {
             operand: None,
             partition_by,
             order_by,
+            frame: None,
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable: true,
@@ -1367,6 +1376,7 @@ impl ExprNode {
             operand: None,
             partition_by,
             order_by,
+            frame: None,
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable: true,
@@ -1425,6 +1435,7 @@ impl ExprNode {
             operand: Some(Box::new(inner)),
             partition_by,
             order_by,
+            frame: None,
             dtype,
         })
     }
@@ -1445,6 +1456,49 @@ impl ExprNode {
             operand: Some(Box::new(inner)),
             partition_by,
             order_by,
+            frame: None,
+            dtype,
+        })
+    }
+
+    pub fn make_window_min(
+        inner: ExprNode,
+        partition_by: Vec<String>,
+        order_by: Vec<(String, bool)>,
+    ) -> PyResult<Self> {
+        if partition_by.is_empty() && order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "window expression requires at least one partition_by or order_by column.",
+            ));
+        }
+        let dtype = Self::infer_global_min_max_dtype(&inner)?;
+        Ok(ExprNode::Window {
+            op: WindowOp::Min,
+            operand: Some(Box::new(inner)),
+            partition_by,
+            order_by,
+            frame: None,
+            dtype,
+        })
+    }
+
+    pub fn make_window_max(
+        inner: ExprNode,
+        partition_by: Vec<String>,
+        order_by: Vec<(String, bool)>,
+    ) -> PyResult<Self> {
+        if partition_by.is_empty() && order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "window expression requires at least one partition_by or order_by column.",
+            ));
+        }
+        let dtype = Self::infer_global_min_max_dtype(&inner)?;
+        Ok(ExprNode::Window {
+            op: WindowOp::Max,
+            operand: Some(Box::new(inner)),
+            partition_by,
+            order_by,
+            frame: None,
             dtype,
         })
     }
@@ -1544,6 +1598,16 @@ impl ExprNode {
         })
     }
 
+    /// Whole-frame row count (Spark `count(*)`-style), for [`DataFrame.select`] only.
+    pub fn make_global_row_count() -> Self {
+        ExprNode::GlobalRowCount {
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Int),
+                nullable: false,
+            },
+        }
+    }
+
     pub fn make_strptime(inner: ExprNode, format: String, to_datetime: bool) -> PyResult<Self> {
         if format.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -1625,6 +1689,57 @@ impl ExprNode {
         })
     }
 
+    pub fn make_map_get(inner: ExprNode, key: String) -> PyResult<Self> {
+        if !inner.dtype().is_map() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "map_get() requires a map column.",
+            ));
+        }
+        let DTypeDesc::Map { value, .. } = inner.dtype() else {
+            unreachable!("is_map checked");
+        };
+        let dtype = match value.as_ref().clone() {
+            DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
+                base,
+                nullable: true,
+            },
+            DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
+                fields,
+                nullable: true,
+            },
+            DTypeDesc::List { inner: li, .. } => DTypeDesc::List {
+                inner: li,
+                nullable: true,
+            },
+            DTypeDesc::Map { value: v, .. } => DTypeDesc::Map {
+                value: v,
+                nullable: true,
+            },
+        };
+        Ok(ExprNode::MapGet {
+            inner: Box::new(inner),
+            key,
+            dtype,
+        })
+    }
+
+    pub fn make_map_contains_key(inner: ExprNode, key: String) -> PyResult<Self> {
+        if !inner.dtype().is_map() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "map_contains_key() requires a map column.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::MapContainsKey {
+            inner: Box::new(inner),
+            key,
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Bool),
+                nullable,
+            },
+        })
+    }
+
     fn window_shift_operand_dtype(inner: &ExprNode) -> PyResult<DTypeDesc> {
         let d = inner.dtype();
         if d.is_struct() || d.is_list() || d.is_map() {
@@ -1665,6 +1780,7 @@ impl ExprNode {
             operand: Some(Box::new(inner)),
             partition_by,
             order_by,
+            frame: None,
             dtype,
         })
     }
@@ -1691,6 +1807,7 @@ impl ExprNode {
             operand: Some(Box::new(inner)),
             partition_by,
             order_by,
+            frame: None,
             dtype,
         })
     }
@@ -1709,6 +1826,7 @@ impl ExprNode {
                     GlobalAggOp::Max => format!("max_{name}"),
                 })
             }
+            ExprNode::GlobalRowCount { .. } => Some("row_count".to_string()),
             _ => None,
         }
     }
@@ -2744,7 +2862,9 @@ impl ExprNode {
             | ExprNode::Strptime { .. }
             | ExprNode::UnixTimestamp { .. }
             | ExprNode::BinaryLength { .. }
-            | ExprNode::MapLen { .. } => {
+            | ExprNode::MapLen { .. }
+            | ExprNode::MapGet { .. }
+            | ExprNode::MapContainsKey { .. } => {
                 Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
                     "This expression is only supported with the Polars execution engine.",
                 ))
@@ -2759,7 +2879,7 @@ impl ExprNode {
                     "Window expressions are only supported with the Polars execution engine.",
                 ))
             }
-            ExprNode::GlobalAgg { .. } => Err(PyErr::new::<
+            ExprNode::GlobalAgg { .. } | ExprNode::GlobalRowCount { .. } => Err(PyErr::new::<
                 pyo3::exceptions::PyNotImplementedError,
                 _,
             >(
@@ -2767,6 +2887,165 @@ impl ExprNode {
             )),
         }
     }
+}
+
+/// Gregorian calendar date to Julian day number (proleptic), matching Python/Wikipedia formula.
+#[cfg(not(feature = "polars_engine"))]
+fn civil_to_jdn(y: i32, m: i32, d: i32) -> i32 {
+    let a = (14 - m) / 12;
+    let y = y + 4800 - a;
+    let m = m + 12 * a - 3;
+    d + (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32045
+}
+
+/// [`LiteralValue::DateDays`]: days since Unix epoch (1970-01-01).
+#[cfg(not(feature = "polars_engine"))]
+fn parse_iso8601_date_str_to_unix_days(s: &str) -> PyResult<i32> {
+    let mut parts = s.trim().split('-');
+    let y: i32 = parts
+        .next()
+        .ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() str to date: expected YYYY-MM-DD.",
+            )
+        })?
+        .parse()
+        .map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() str to date: invalid year in YYYY-MM-DD.",
+            )
+        })?;
+    let mo: i32 = parts
+        .next()
+        .ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() str to date: expected YYYY-MM-DD.",
+            )
+        })?
+        .parse()
+        .map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() str to date: invalid month in YYYY-MM-DD.",
+            )
+        })?;
+    let d: i32 = parts
+        .next()
+        .ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() str to date: expected YYYY-MM-DD.",
+            )
+        })?
+        .parse()
+        .map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() str to date: invalid day in YYYY-MM-DD.",
+            )
+        })?;
+    if parts.next().is_some() {
+        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "cast() str to date: trailing text in date string.",
+        ));
+    }
+    const UNIX_EPOCH_JDN: i32 = 2_440_588;
+    Ok(civil_to_jdn(y, mo, d) - UNIX_EPOCH_JDN)
+}
+
+/// Time-of-day to microseconds since midnight; supports optional fractional seconds (up to 6 digits = µs).
+#[cfg(not(feature = "polars_engine"))]
+fn parse_hms_str_to_micros_in_day(time_s: &str) -> PyResult<i64> {
+    let time_s = time_s.trim().trim_end_matches('Z');
+    // Strip trailing `+hh:mm` / `-hh:mm` offsets; naive strings are the common case.
+    let time_s = time_s
+        .split_once('+')
+        .map(|(a, _)| a)
+        .unwrap_or(time_s)
+        .trim();
+    let (base, frac) = match time_s.split_once('.') {
+        Some((b, f)) => (b, Some(f)),
+        None => (time_s, None),
+    };
+    let mut iter = base.split(':');
+    let h: i64 = iter
+        .next()
+        .ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() str to datetime: expected HH:MM:SS time.",
+            )
+        })?
+        .parse()
+        .map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>("cast() str to datetime: invalid hour.")
+        })?;
+    let mi: i64 = iter
+        .next()
+        .ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() str to datetime: expected HH:MM:SS time.",
+            )
+        })?
+        .parse()
+        .map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() str to datetime: invalid minute.",
+            )
+        })?;
+    let sec: i64 = iter
+        .next()
+        .ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() str to datetime: expected HH:MM:SS time.",
+            )
+        })?
+        .parse()
+        .map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() str to datetime: invalid second.",
+            )
+        })?;
+    if iter.next().is_some() {
+        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "cast() str to datetime: invalid time (extra segments).",
+        ));
+    }
+    let mut micros = h * 3_600_000_000 + mi * 60_000_000 + sec * 1_000_000;
+    if let Some(f) = frac {
+        let digits: String = f.chars().take_while(|c| c.is_ascii_digit()).collect();
+        if digits.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() str to datetime: invalid fractional seconds.",
+            ));
+        }
+        let mut padded = digits;
+        if padded.len() > 6 {
+            padded.truncate(6);
+        }
+        while padded.len() < 6 {
+            padded.push('0');
+        }
+        let frac_us: i64 = padded.parse().map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() str to datetime: invalid fractional seconds.",
+            )
+        })?;
+        micros += frac_us;
+    }
+    Ok(micros)
+}
+
+#[cfg(not(feature = "polars_engine"))]
+fn parse_iso8601_datetime_str_to_unix_micros(s: &str) -> PyResult<i64> {
+    let s = s.trim();
+    let (date_part, time_part) = if let Some(i) = s.find('T') {
+        (&s[..i], &s[i + 1..])
+    } else if let Some(i) = s.find(' ') {
+        (&s[..i], &s[i + 1..])
+    } else {
+        let days = parse_iso8601_date_str_to_unix_days(s)?;
+        return Ok(i64::from(days) * 86_400_000_000);
+    };
+    let days = parse_iso8601_date_str_to_unix_days(date_part)?;
+    let micros_day = parse_hms_str_to_micros_in_day(time_part)?;
+    Ok(i64::from(days) * 86_400_000_000 + micros_day)
 }
 
 #[cfg(not(feature = "polars_engine"))]
@@ -2901,14 +3180,24 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
                 let days = (us / 86_400_000_000) as i32;
                 Ok(LiteralValue::DateDays(days))
             }
+            LiteralValue::Str(s) => Ok(LiteralValue::DateDays(
+                parse_iso8601_date_str_to_unix_days(s.trim())?,
+            )),
             _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "cast() to date supports date or datetime literals only.",
+                "cast() to date supports date, datetime, or ISO-8601 date str literals.",
             )),
         },
-        BaseType::DateTime | BaseType::Duration => {
-            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "Row-wise cast() for this temporal target is not supported.",
-            ))
-        }
+        BaseType::DateTime => match v {
+            LiteralValue::DateTimeMicros(us) => Ok(LiteralValue::DateTimeMicros(us)),
+            LiteralValue::Str(s) => Ok(LiteralValue::DateTimeMicros(
+                parse_iso8601_datetime_str_to_unix_micros(s.trim())?,
+            )),
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() to datetime supports datetime or ISO-8601 datetime str literals.",
+            )),
+        },
+        BaseType::Duration => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "Row-wise cast() for duration target is not supported.",
+        )),
     }
 }

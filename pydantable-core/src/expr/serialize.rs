@@ -7,7 +7,7 @@ use crate::dtype::{dtype_to_descriptor_py, BaseType};
 
 use super::ir::{
     ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart,
-    UnaryNumericOp, UnixTimestampUnit, WindowOp,
+    UnaryNumericOp, UnixTimestampUnit, WindowFrame, WindowOp,
 };
 
 fn base_type_json(b: BaseType) -> &'static str {
@@ -344,11 +344,22 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             dict.set_item("kind", "map_len")?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
         }
+        ExprNode::MapGet { inner, key, .. } => {
+            dict.set_item("kind", "map_get")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+            dict.set_item("key", key)?;
+        }
+        ExprNode::MapContainsKey { inner, key, .. } => {
+            dict.set_item("kind", "map_contains_key")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+            dict.set_item("key", key)?;
+        }
         ExprNode::Window {
             op,
             operand,
             partition_by,
             order_by,
+            frame,
             ..
         } => {
             dict.set_item("kind", "window")?;
@@ -358,6 +369,8 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
                 WindowOp::DenseRank => dict.set_item("op", "dense_rank")?,
                 WindowOp::Sum => dict.set_item("op", "sum")?,
                 WindowOp::Mean => dict.set_item("op", "mean")?,
+                WindowOp::Min => dict.set_item("op", "min")?,
+                WindowOp::Max => dict.set_item("op", "max")?,
                 WindowOp::Lag { n } => {
                     dict.set_item("op", "lag")?;
                     dict.set_item("n", *n)?;
@@ -365,6 +378,16 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
                 WindowOp::Lead { n } => {
                     dict.set_item("op", "lead")?;
                     dict.set_item("n", *n)?;
+                }
+            }
+            match frame {
+                None => dict.set_item("frame", py.None())?,
+                Some(WindowFrame::Rows { start, end }) => {
+                    let f = PyDict::new_bound(py);
+                    f.set_item("kind", "rows")?;
+                    f.set_item("start", *start)?;
+                    f.set_item("end", *end)?;
+                    dict.set_item("frame", f)?;
                 }
             }
             if let Some(op) = operand {
@@ -391,6 +414,9 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
                 },
             )?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+        }
+        ExprNode::GlobalRowCount { .. } => {
+            dict.set_item("kind", "global_row_count")?;
         }
     }
 

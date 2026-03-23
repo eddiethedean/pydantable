@@ -17,7 +17,7 @@ names and imports** (e.g. `assign` vs `withColumn`). They do not select a differ
 execution engine.
 
 **Typed expressions** (`Expr`, `Column`, PySpark `F.col(...)`) are validated in Rust
-(`ExprNode`), then lowered to Polars inside the extension. As of **0.7.0**, this includes
+(`ExprNode`), then lowered to Polars inside the extension. As of **0.8.0**, this includes
 whole-frame global aggregates, window **`lag`/`lead`**, **`strptime`** / **`unix_timestamp`**,
 **`map_len`**, **`binary_len`**, and related PySpark helpers — see {doc}`INTERFACE_CONTRACT`,
 {doc}`SUPPORTED_TYPES`, and {doc}`changelog`.

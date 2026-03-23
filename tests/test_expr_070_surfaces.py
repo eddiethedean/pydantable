@@ -17,6 +17,25 @@ def test_map_len_counts_entries() -> None:
     assert out["n"] == [2, 0]
 
 
+def test_map_get_and_contains_key() -> None:
+    class M(Schema):
+        id: int
+        m: dict[str, int] | None
+
+    df = DataFrame[M](
+        {
+            "id": [1, 2, 3],
+            "m": [{"a": 1, "b": 2}, {}, None],
+        }
+    )
+    out = df.with_columns(
+        av=df.m.map_get("a"),
+        has_b=df.m.map_contains_key("b"),
+    ).collect(as_lists=True)
+    assert out["av"] == [1, None, None]
+    assert out["has_b"] == [True, False, None]
+
+
 def test_binary_len_byte_count() -> None:
     class B(Schema):
         id: int

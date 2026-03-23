@@ -18,9 +18,12 @@ pub fn plan_global_select(plan: &PlanInner, items: Vec<(String, ExprNode)>) -> P
 
     let mut new_schema = HashMap::new();
     for (name, expr) in &items {
-        if !matches!(expr, ExprNode::GlobalAgg { .. }) {
+        if !matches!(
+            expr,
+            ExprNode::GlobalAgg { .. } | ExprNode::GlobalRowCount { .. }
+        ) {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "global select only supports global aggregate expressions (e.g. functions.sum / functions.avg).",
+                "global select only supports global aggregate expressions (e.g. functions.sum / functions.avg) or global_row_count().",
             ));
         }
         let referenced = expr.referenced_columns();

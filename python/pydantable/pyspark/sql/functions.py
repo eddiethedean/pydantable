@@ -33,7 +33,13 @@ from pydantable.expressions import (
     when as when_chain,
 )
 from pydantable.expressions import (
+    window_max as window_max_expr,
+)
+from pydantable.expressions import (
     window_mean as window_mean_expr,
+)
+from pydantable.expressions import (
+    window_min as window_min_expr,
 )
 from pydantable.expressions import (
     window_sum as window_sum_expr,
@@ -197,6 +203,16 @@ def window_avg(column: Expr) -> Any:
     return window_mean_expr(column)
 
 
+def window_min(column: Expr) -> Any:
+    """Windowed ``min``; finish with ``.over(Window...)``."""
+    return window_min_expr(column)
+
+
+def window_max(column: Expr) -> Any:
+    """Windowed ``max``; finish with ``.over(Window...)``."""
+    return window_max_expr(column)
+
+
 def sum(column: Expr) -> Expr:
     """Global ``sum`` for :meth:`~pydantable.dataframe.DataFrame.select`."""
     if not isinstance(column, Expr):
@@ -232,10 +248,12 @@ def min(column: Expr) -> Expr:
     return Expr(rust_expr=_rust_core().expr_global_min(column._rust_expr))
 
 
-def count(column: Expr) -> Expr:
-    """Global non-null count for :meth:`~pydantable.dataframe.DataFrame.select`."""
+def count(column: Expr | None = None) -> Expr:
+    """Non-null count of *column*, or row count if omitted (``count(*)``)."""
+    if column is None:
+        return Expr(rust_expr=_rust_core().expr_global_row_count())
     if not isinstance(column, Expr):
-        raise TypeError("functions.count() expects a typed column Expr.")
+        raise TypeError("functions.count() expects a typed column Expr or None.")
     return Expr(rust_expr=_rust_core().expr_global_count(column._rust_expr))
 
 
@@ -283,6 +301,8 @@ __all__ = [
     "unix_timestamp",
     "when",
     "window_avg",
+    "window_max",
+    "window_min",
     "window_sum",
     "year",
 ]

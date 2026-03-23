@@ -8,6 +8,7 @@ from pydantable.expressions import (
     global_max,
     global_mean,
     global_min,
+    global_row_count,
     global_sum,
 )
 from pydantable.schema import Schema
@@ -84,3 +85,27 @@ def test_global_count_all_nulls_is_zero() -> None:
     df = DataFrame[Nullable]({"v": [None, None]})
     out = df.select(global_count(df.v)).collect(as_lists=True)
     assert out == {"count_v": [0]}
+
+
+def test_global_row_count_matches_height() -> None:
+    df = DataFrame[T]({"id": [1, 2, 3], "v": [10, 5, 20]})
+    out = df.select(global_row_count()).collect(as_lists=True)
+    assert out == {"row_count": [3]}
+
+
+def test_global_row_count_after_filter() -> None:
+    df = DataFrame[T]({"id": [1, 2, 3], "v": [10, 5, 20]})
+    out = df.filter(df.v >= 10).select(global_row_count()).collect(as_lists=True)
+    assert out == {"row_count": [2]}
+
+
+def test_global_row_count_empty_frame() -> None:
+    df = DataFrame[X]({"x": []})
+    out = df.select(global_row_count()).collect(as_lists=True)
+    assert out == {"row_count": [0]}
+
+
+def test_global_row_count_named() -> None:
+    df = DataFrame[T]({"id": [1], "v": [1]})
+    out = df.select(n=global_row_count()).collect(as_lists=True)
+    assert out == {"n": [1]}

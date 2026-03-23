@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import calendar
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
@@ -14,6 +15,10 @@ class _Num(Schema):
 
 
 class _Str(Schema):
+    s: str
+
+
+class _StrDate(Schema):
     s: str
 
 
@@ -147,6 +152,29 @@ def test_cast_datetime_to_date_and_str() -> None:
     assert out["as_date"] == [date(2024, 6, 10)]
     assert isinstance(out["as_str"][0], str)
     assert "2024" in out["as_str"][0]
+
+
+def test_cast_str_to_date_iso8601() -> None:
+    df = DataFrame[_StrDate]({"s": ["2024-06-10", "2000-01-02"]})
+    out = df.with_columns(as_date=df.s.cast(date)).collect(as_lists=True)
+    assert out["as_date"] == [date(2024, 6, 10), date(2000, 1, 2)]
+
+
+def test_cast_str_to_datetime_iso8601_instant() -> None:
+    """Cast uses Polars; collect uses local `datetime.fromtimestamp` for display."""
+    df = DataFrame[_StrDate]({"s": ["2024-06-10T00:00:00", "2000-01-02T12:30:45"]})
+    out = df.with_columns(as_dt=df.s.cast(datetime)).collect(as_lists=True)
+    exp0 = calendar.timegm((2024, 6, 10, 0, 0, 0, 0, 0, 0))
+    exp1 = calendar.timegm((2000, 1, 2, 12, 30, 45, 0, 0, 0))
+    assert abs(out["as_dt"][0].timestamp() - exp0) < 1.0
+    assert abs(out["as_dt"][1].timestamp() - exp1) < 1.0
+
+
+def test_cast_str_to_datetime_with_time_instant() -> None:
+    df = DataFrame[_StrDate]({"s": ["2024-03-15T14:07:09"]})
+    out = df.with_columns(ts=df.s.cast(datetime)).collect(as_lists=True)
+    exp = calendar.timegm((2024, 3, 15, 14, 7, 9, 0, 0, 0))
+    assert abs(out["ts"][0].timestamp() - exp) < 1.0
 
 
 def test_dt_date_method_matches_cast() -> None:

@@ -9,7 +9,9 @@ from pydantable.expressions import (
     lead,
     rank,
     row_number,
+    window_max,
     window_mean,
+    window_min,
     window_sum,
 )
 from pydantable.schema import Schema
@@ -57,6 +59,17 @@ def test_window_mean_over_partition_without_order() -> None:
     w = Window.partitionBy("g").spec()
     out = df.with_columns(m=window_mean(df.v).over(w)).collect(as_lists=True)
     assert out["m"] == [15.0, 15.0, 30.0]
+
+
+def test_window_min_max_over_partition() -> None:
+    df = DataFrame[W]({"g": [1, 1, 2], "v": [10, 20, 30]})
+    w = Window.partitionBy("g").spec()
+    out = df.with_columns(
+        lo=window_min(df.v).over(w),
+        hi=window_max(df.v).over(w),
+    ).collect(as_lists=True)
+    assert out["lo"] == [10, 10, 30]
+    assert out["hi"] == [20, 20, 30]
 
 
 def test_row_number_descending_order_by() -> None:

@@ -86,6 +86,14 @@ pub enum UnixTimestampUnit {
     Milliseconds,
 }
 
+/// Spark-style row window (reserved; lowering may be added in a future release).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WindowFrame {
+    /// Inclusive bounds relative to the current row (`0` = current row), matching Spark `rowsBetween`.
+    #[allow(dead_code)]
+    Rows { start: i64, end: i64 },
+}
+
 #[derive(Clone, Debug)]
 pub enum ExprNode {
     ColumnRef {
@@ -249,18 +257,36 @@ pub enum ExprNode {
         inner: Box<ExprNode>,
         dtype: DTypeDesc,
     },
+    /// Value for a string key in a `dict[str, T]` map (physical list-of-struct).
+    MapGet {
+        inner: Box<ExprNode>,
+        key: String,
+        dtype: DTypeDesc,
+    },
+    /// Whether `key` is present in a map column.
+    MapContainsKey {
+        inner: Box<ExprNode>,
+        key: String,
+        dtype: DTypeDesc,
+    },
     /// Windowed aggregate or ranking function (Polars `.over(...)`).
     Window {
         op: WindowOp,
         operand: Option<Box<ExprNode>>,
         partition_by: Vec<String>,
         order_by: Vec<(String, bool)>,
+        /// Optional row-based frame; `None` uses engine default (partition + order only).
+        frame: Option<WindowFrame>,
         dtype: DTypeDesc,
     },
     /// Reduction over the full table (no `group_by`): `sum`, `mean`, …
     GlobalAgg {
         op: GlobalAggOp,
         inner: Box<ExprNode>,
+        dtype: DTypeDesc,
+    },
+    /// Row count of the current frame (`Polars len()`), for global `select` only.
+    GlobalRowCount {
         dtype: DTypeDesc,
     },
 }
@@ -273,6 +299,8 @@ pub enum WindowOp {
     DenseRank,
     Sum,
     Mean,
+    Min,
+    Max,
     /// Previous row within partition/order (`shift(n)`).
     Lag {
         n: u32,

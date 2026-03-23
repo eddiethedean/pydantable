@@ -24,8 +24,8 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `functions.when` / `otherwise` | **Supported** | `CaseWhen` in Rust; chain `.when(...).otherwise(...)`. |
 | `functions.cast`, `between`, `isin`, `concat`, `substring`, `length` | **Supported** | Base types only; `substring` is 1-based (Spark-style). |
 | `functions.sum`, `avg`, `count`, `min`, `max`, … as column exprs | **Partial** | Global `sum`/`avg`/`mean`/`count`/`min`/`max` on a typed `Expr` work in `DataFrame.select(...)` (single-row); grouped paths use `group_by().agg`. |
-| `Column.cast`, `isin`, `between`, `substr`/`char_length` | **Supported** | On `Expr` / `Column`; date/timestamp casts **not yet**. |
-| `Window`, window functions | **Partial** | `Window.partitionBy().orderBy()`, `row_number`, `rank`, `dense_rank`, `window_sum`, `window_avg`, `lag`, `lead` + core `Expr` lowering; SQL-style framing (`rowsBetween`, …) not exposed. |
+| `Column.cast`, `isin`, `between`, `substr`/`char_length` | **Supported** | On `Expr` / `Column`; includes **`str` → `date` / `datetime`** via Polars parsing (use `strptime` for fixed formats). |
+| `Window`, window functions | **Partial** | `Window.partitionBy().orderBy()`, `row_number`, `rank`, `dense_rank`, `window_sum`, `window_avg`, `window_min`, `window_max`, `lag`, `lead` + core `Expr` lowering; SQL-style framing (`rowsBetween`, …) IR-only (lowering not implemented). |
 | `types` (Array, Map, nested Struct, Decimal, Timestamp) | **Partial** | Engine supports nested structs/lists, `Decimal`, `datetime`/`date`, homogeneous `dict[str, T]` maps, `bytes`, and `time`; PySpark `types` mirrors annotations for docs/schema views. |
 | `Row`, encoders, streaming | **Out of scope** | |
 
@@ -37,7 +37,7 @@ Delivered in-tree: **`IsNull`**, **`IsNotNull`**, **`Coalesce`**, **`CaseWhen`**
 
 **Also delivered:** Spark-named **date/datetime** helpers in `pydantable.pyspark.sql.functions` — `year`, `month`, `day`, `hour`, `minute`, `second`, `nanosecond`, `to_date` (with optional `format=` for string columns), `unix_timestamp` — thin wrappers over core `Expr` methods (same Rust lowering as the core API).
 
-**Deferred:** `count(*)` / `count(1)` as a global expression without a column; other Spark-specific temporal helpers not yet modeled.
+**Global row count:** use `pydantable.expressions.global_row_count()` or `functions.count()` with no argument (row count / `count(*)`-style). **Deferred:** other Spark-specific temporal helpers not yet modeled.
 
 ## Phase D — Aggregates as `functions.sum(Column)`
 
@@ -46,7 +46,7 @@ Delivered in-tree: **`IsNull`**, **`IsNotNull`**, **`Coalesce`**, **`CaseWhen`**
 keyword) to get a **single-row** frame, matching Spark’s `select(F.sum(...))` without a
 `groupBy`. **Grouped** aggregations remain **`group_by(...).agg(...)`**.
 
-**Not yet:** `count(*)` / `count(1)` as a global select expression without referencing a column (use `group_by` or a dedicated plan step later).
+**Row count without a column:** `global_row_count()` or `functions.count()` with no argument in global `select`.
 
 ## Phase E — Windows
 
