@@ -18,6 +18,12 @@ from pydantable.expressions import (
     dense_rank as dense_rank_expr,
 )
 from pydantable.expressions import (
+    lag as lag_expr,
+)
+from pydantable.expressions import (
+    lead as lead_expr,
+)
+from pydantable.expressions import (
     rank as rank_expr,
 )
 from pydantable.expressions import (
@@ -132,23 +138,38 @@ def day(column: Expr) -> Expr:
 
 
 def hour(column: Expr) -> Expr:
-    """Hour 0-23 (Spark ``hour``); requires ``datetime`` column."""
+    """Hour 0-23 (Spark ``hour``); ``datetime`` or ``time`` column."""
     return column.dt_hour()
 
 
 def minute(column: Expr) -> Expr:
-    """Minute (Spark ``minute``); requires ``datetime`` column."""
+    """Minute (Spark ``minute``); ``datetime`` or ``time`` column."""
     return column.dt_minute()
 
 
 def second(column: Expr) -> Expr:
-    """Second (Spark ``second``); requires ``datetime`` column."""
+    """Second (Spark ``second``); ``datetime`` or ``time`` column."""
     return column.dt_second()
 
 
-def to_date(column: Expr) -> Expr:
-    """``datetime`` to calendar ``date`` (Spark ``to_date`` on timestamps)."""
-    return column.dt_date()
+def nanosecond(column: Expr) -> Expr:
+    """Nanosecond-of-second (Spark ``nanosecond``); ``datetime`` or ``time`` column."""
+    return column.dt_nanosecond()
+
+
+def to_date(column: Expr, format: str | None = None) -> Expr:
+    """
+    Calendar ``date`` from ``datetime``, or parse ``str`` when ``format`` is set
+    (``strftime`` pattern, must match the data).
+    """
+    if format is None:
+        return column.dt_date()
+    return column.strptime(format, to_datetime=False)
+
+
+def unix_timestamp(column: Expr, unit: str = "seconds") -> Expr:
+    """Seconds or milliseconds since Unix epoch from ``date`` / ``datetime``."""
+    return column.unix_timestamp(unit)
 
 
 def row_number() -> Any:
@@ -197,22 +218,35 @@ def mean(column: Expr) -> Expr:
     return avg(column)
 
 
-_AGG_HINT = (
-    "functions.{name} is not implemented as a lazy column in pydantable. "
-    "Use DataFrame.group_by(...).agg(output_name=('sum'|'mean'|'count', column))."
-)
+def max(column: Expr) -> Expr:
+    """Global ``max`` for :meth:`~pydantable.dataframe.DataFrame.select`."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.max() expects a typed column Expr.")
+    return Expr(rust_expr=_rust_core().expr_global_max(column._rust_expr))
 
 
-def max(*_args: Any, **_kwargs: Any) -> Any:
-    raise NotImplementedError(_AGG_HINT.format(name="max"))
+def min(column: Expr) -> Expr:
+    """Global ``min`` for :meth:`~pydantable.dataframe.DataFrame.select`."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.min() expects a typed column Expr.")
+    return Expr(rust_expr=_rust_core().expr_global_min(column._rust_expr))
 
 
-def min(*_args: Any, **_kwargs: Any) -> Any:
-    raise NotImplementedError(_AGG_HINT.format(name="min"))
+def count(column: Expr) -> Expr:
+    """Global non-null count for :meth:`~pydantable.dataframe.DataFrame.select`."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.count() expects a typed column Expr.")
+    return Expr(rust_expr=_rust_core().expr_global_count(column._rust_expr))
 
 
-def count(*_args: Any, **_kwargs: Any) -> Any:
-    raise NotImplementedError(_AGG_HINT.format(name="count"))
+def lag(column: Expr, n: int = 1) -> Any:
+    """Windowed ``lag``; finish with ``.over(Window...)``."""
+    return lag_expr(column, n)
+
+
+def lead(column: Expr, n: int = 1) -> Any:
+    """Windowed ``lead``; finish with ``.over(Window...)``."""
+    return lead_expr(column, n)
 
 
 __all__ = [
@@ -230,6 +264,8 @@ __all__ = [
     "isin",
     "isnotnull",
     "isnull",
+    "lag",
+    "lead",
     "length",
     "lit",
     "max",
@@ -237,12 +273,14 @@ __all__ = [
     "min",
     "minute",
     "month",
+    "nanosecond",
     "rank",
     "row_number",
     "second",
     "substring",
     "sum",
     "to_date",
+    "unix_timestamp",
     "when",
     "window_avg",
     "window_sum",

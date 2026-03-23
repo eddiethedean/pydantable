@@ -6,13 +6,14 @@ use crate::dtype::{BaseType, DECIMAL_PRECISION, DECIMAL_SCALE};
 
 use super::ir::{
     ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart,
-    UnaryNumericOp, WindowOp,
+    UnaryNumericOp, UnixTimestampUnit, WindowOp,
 };
 
 use polars::lazy::dsl::{coalesce, col, concat_str, lit, ternary_expr, Expr as PolarsExpr};
 use polars::prelude::{
     ClosedInterval, DataType, Int128Chunked, IntoSeries, Literal, NamedFrom, NewChunkedArray, Null,
-    RankMethod, RankOptions, RoundMode, Scalar, Series, SortOptions, TimeUnit, WindowMapping,
+    RankMethod, RankOptions, RoundMode, Scalar, Series, SortOptions, StrptimeOptions, TimeUnit,
+    WindowMapping,
 };
 
 /// Polars lowering hook (dependency inversion / extension point for new variants).
@@ -432,6 +433,7 @@ impl ExprNode {
                     TemporalPart::Hour => Ok(dt.hour()),
                     TemporalPart::Minute => Ok(dt.minute()),
                     TemporalPart::Second => Ok(dt.second()),
+                    TemporalPart::Nanosecond => Ok(dt.nanosecond()),
                 }
             }
             ExprNode::ListLen { inner, .. } => Ok(inner.to_polars_expr()?.list().len()),
@@ -447,6 +449,44 @@ impl ExprNode {
             ExprNode::ListMax { inner, .. } => Ok(inner.to_polars_expr()?.list().max()),
             ExprNode::ListSum { inner, .. } => Ok(inner.to_polars_expr()?.list().sum()),
             ExprNode::DatetimeToDate { inner, .. } => Ok(inner.to_polars_expr()?.dt().date()),
+            ExprNode::Strptime {
+                inner,
+                format,
+                to_datetime,
+                ..
+            } => {
+                let e = inner.to_polars_expr()?;
+                let target = if *to_datetime {
+                    DataType::Datetime(TimeUnit::Microseconds, None)
+                } else {
+                    DataType::Date
+                };
+                let opts = StrptimeOptions {
+                    format: Some(format.as_str().into()),
+                    ..Default::default()
+                };
+                Ok(e.str().strptime(target, opts, lit("raise")))
+            }
+            ExprNode::UnixTimestamp { inner, unit, .. } => {
+                let mut e = inner.to_polars_expr()?;
+                if matches!(
+                    inner.dtype().as_scalar_base_field().flatten(),
+                    Some(BaseType::Date)
+                ) {
+                    e = e.cast(DataType::Datetime(TimeUnit::Microseconds, None));
+                }
+                let dt = e.dt();
+                match unit {
+                    UnixTimestampUnit::Seconds => Ok((dt.timestamp(TimeUnit::Milliseconds)
+                        / lit(1000i64))
+                    .cast(DataType::Int64)),
+                    UnixTimestampUnit::Milliseconds => Ok(dt.timestamp(TimeUnit::Milliseconds)),
+                }
+            }
+            ExprNode::BinaryLength { inner, .. } => {
+                Ok(inner.to_polars_expr()?.binary().size_bytes())
+            }
+            ExprNode::MapLen { inner, .. } => Ok(inner.to_polars_expr()?.list().len()),
             ExprNode::Window {
                 op,
                 operand,
@@ -520,6 +560,34 @@ impl ExprNode {
                         let inner = op_inner.to_polars_expr()?.mean();
                         apply_window_over(inner, part, ord)
                     }
+                    WindowOp::Lag { n } => {
+                        if ord.is_empty() {
+                            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "lag() requires order_by columns.",
+                            ));
+                        }
+                        let op_inner = operand.as_ref().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "internal: lag missing operand",
+                            )
+                        })?;
+                        let shifted = op_inner.to_polars_expr()?.shift(lit(i64::from(*n)));
+                        apply_window_over(shifted, part, ord)
+                    }
+                    WindowOp::Lead { n } => {
+                        if ord.is_empty() {
+                            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "lead() requires order_by columns.",
+                            ));
+                        }
+                        let op_inner = operand.as_ref().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "internal: lead missing operand",
+                            )
+                        })?;
+                        let shifted = op_inner.to_polars_expr()?.shift(lit(-i64::from(*n)));
+                        apply_window_over(shifted, part, ord)
+                    }
                 }
             }
             ExprNode::GlobalAgg { op, inner, .. } => {
@@ -527,6 +595,9 @@ impl ExprNode {
                 match op {
                     GlobalAggOp::Sum => Ok(e.sum()),
                     GlobalAggOp::Mean => Ok(e.mean()),
+                    GlobalAggOp::Count => Ok(e.count()),
+                    GlobalAggOp::Min => Ok(e.min()),
+                    GlobalAggOp::Max => Ok(e.max()),
                 }
             }
         }

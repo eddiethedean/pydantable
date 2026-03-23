@@ -23,9 +23,9 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `functions.isnull`, `isnotnull`, `coalesce` | **Supported** | Via Rust `ExprNode`. |
 | `functions.when` / `otherwise` | **Supported** | `CaseWhen` in Rust; chain `.when(...).otherwise(...)`. |
 | `functions.cast`, `between`, `isin`, `concat`, `substring`, `length` | **Supported** | Base types only; `substring` is 1-based (Spark-style). |
-| `functions.sum`, `avg`, … as column exprs | **Partial** | Global `sum`/`avg`/`mean` on a typed `Expr` work in `DataFrame.select(...)` (single-row); grouped paths use `group_by().agg`. |
+| `functions.sum`, `avg`, `count`, `min`, `max`, … as column exprs | **Partial** | Global `sum`/`avg`/`mean`/`count`/`min`/`max` on a typed `Expr` work in `DataFrame.select(...)` (single-row); grouped paths use `group_by().agg`. |
 | `Column.cast`, `isin`, `between`, `substr`/`char_length` | **Supported** | On `Expr` / `Column`; date/timestamp casts **not yet**. |
-| `Window`, window functions | **Partial** | `Window.partitionBy().orderBy()`, `row_number`, `rank`, `dense_rank`, `window_sum`, `window_avg` + core `Expr` lowering; framing APIs not exposed. |
+| `Window`, window functions | **Partial** | `Window.partitionBy().orderBy()`, `row_number`, `rank`, `dense_rank`, `window_sum`, `window_avg`, `lag`, `lead` + core `Expr` lowering; SQL-style framing (`rowsBetween`, …) not exposed. |
 | `types` (Array, Map, nested Struct, Decimal, Timestamp) | **Partial** | Engine supports nested structs/lists, `Decimal`, `datetime`/`date`, homogeneous `dict[str, T]` maps, `bytes`, and `time`; PySpark `types` mirrors annotations for docs/schema views. |
 | `Row`, encoders, streaming | **Out of scope** | |
 
@@ -35,9 +35,9 @@ For execution, the PySpark UI uses the same Rust/Polars path as the default expo
 
 Delivered in-tree: **`IsNull`**, **`IsNotNull`**, **`Coalesce`**, **`CaseWhen`** (`when` / `otherwise`), **`Cast`**, **`InList`**, **`Between`**, **`StringConcat`**, **`Substring`**, **`StringLength`** — Rust `ExprNode`, Polars lowering, and `pydantable.pyspark.sql.functions` / `Expr` methods.
 
-**Also delivered:** Spark-named **date/datetime** helpers in `pydantable.pyspark.sql.functions` — `year`, `month`, `day`, `hour`, `minute`, `second`, `to_date` — thin wrappers over core `Expr.dt_*` / `dt_date()` (same Rust lowering as the core API).
+**Also delivered:** Spark-named **date/datetime** helpers in `pydantable.pyspark.sql.functions` — `year`, `month`, `day`, `hour`, `minute`, `second`, `nanosecond`, `to_date` (with optional `format=` for string columns), `unix_timestamp` — thin wrappers over core `Expr` methods (same Rust lowering as the core API).
 
-**Deferred:** `unix_timestamp`, string-parsed `to_date`, and other Spark-specific temporal helpers without a dedicated `ExprNode` path.
+**Deferred:** `count(*)` / `count(1)` as a global expression without a column; other Spark-specific temporal helpers not yet modeled.
 
 ## Phase D — Aggregates as `functions.sum(Column)`
 
@@ -46,16 +46,15 @@ Delivered in-tree: **`IsNull`**, **`IsNotNull`**, **`Coalesce`**, **`CaseWhen`**
 keyword) to get a **single-row** frame, matching Spark’s `select(F.sum(...))` without a
 `groupBy`. **Grouped** aggregations remain **`group_by(...).agg(...)`**.
 
-**Not yet:** `count(*)` / `count(1)` as a global select expression (use `group_by` or
-add a dedicated plan step later).
+**Not yet:** `count(*)` / `count(1)` as a global select expression without referencing a column (use `group_by` or a dedicated plan step later).
 
 ## Phase E — Windows
 
 Delivered: **Rust `ExprNode::Window`** with Polars `.over(...)` lowering; Python
-`row_number()`, `rank()`, `dense_rank()`, `window_sum()`, `window_mean()` finished with
+`row_number()`, `rank()`, `dense_rank()`, `window_sum()`, `window_mean()`, `lag()`, `lead()` finished with
 `Window.partitionBy(...).orderBy(...)` / `.spec()` (see `pydantable.window_spec` and
 `pydantable.pyspark.sql.window`). **`row_number` requires `order_by`** in the window spec
-(Spark-style ordering). Not yet: arbitrary SQL window frames (`rowsBetween`, etc.).
+(Spark-style ordering). **`lag` / `lead` require `order_by`.** Not yet: arbitrary SQL window frames (`rowsBetween`, etc.).
 
 ## Phases F–G — Nested types and real Spark
 

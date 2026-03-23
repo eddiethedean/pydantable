@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from pydantable import DataFrame
-from pydantable.expressions import global_mean, global_sum
+from pydantable.expressions import (
+    global_count,
+    global_max,
+    global_mean,
+    global_min,
+    global_sum,
+)
 from pydantable.schema import Schema
 
 
@@ -64,3 +70,17 @@ def test_global_sum_mean_all_nulls() -> None:
     df = DataFrame[Nullable]({"v": [None, None]})
     out = df.select(global_sum(df.v), global_mean(df.v)).collect(as_lists=True)
     assert out == {"sum_v": [0], "mean_v": [None]}
+
+
+def test_select_global_count_min_max() -> None:
+    df = DataFrame[T]({"id": [1, 2, 3], "v": [10, 5, 20]})
+    out = df.select(global_count(df.v), global_min(df.v), global_max(df.v)).collect(
+        as_lists=True
+    )
+    assert out == {"count_v": [3], "min_v": [5], "max_v": [20]}
+
+
+def test_global_count_all_nulls_is_zero() -> None:
+    df = DataFrame[Nullable]({"v": [None, None]})
+    out = df.select(global_count(df.v)).collect(as_lists=True)
+    assert out == {"count_v": [0]}

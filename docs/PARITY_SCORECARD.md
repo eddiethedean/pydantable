@@ -18,12 +18,15 @@ Status definitions:
 | GroupBy | `count/sum/mean/min/max/median/std/var/first/last/n_unique` | Implemented | SQL-like all-null-group behavior documented/tested. |
 | Reshape | `melt/unpivot`, `pivot` | Implemented | Deterministic output naming and validation rules. |
 | Reshape | `explode`, `unnest` | Implemented | Polars-backed; multi-column explode, empty lists, struct `unnest` naming, and mismatch errors are contract-tested. Typed-schema rules (homogeneous lists, nested models as structs) are the intentional boundary vs raw Polars. |
-| Window/time | `row_number`/`rank`/`window_sum` + `WindowSpec`, `rolling_agg`, `group_by_dynamic(...).agg(...)` | Implemented | `row_number` requires `order_by`; `Expr.over(...)` with args removed (use window fns). |
-| Temporal typing | `datetime`, `date`, `duration` (+ nullable) | Implemented | End-to-end descriptor roundtrip and execution materialization paths. |
+| Window/time | `row_number`/`rank`/`dense_rank`/`window_sum`/`window_mean`/`lag`/`lead` + `WindowSpec`, `rolling_agg`, `group_by_dynamic(...).agg(...)` | Implemented | `row_number` requires `order_by`; `lag`/`lead` require `order_by`; `Expr.over(...)` with args removed (use window fns). |
+| Temporal typing | `datetime`, `date`, `duration`, `time` (+ nullable) | Implemented | End-to-end descriptor roundtrip and execution materialization paths. |
+| Globals in `select` | `sum`/`mean`/`count`/`min`/`max` over a column | Implemented | Single-row `DataFrame.select`; see `INTERFACE_CONTRACT`. |
+| Expr helpers | `strptime`, `unix_timestamp`, `map_len`, `binary_len`, `dt_nanosecond` | Implemented | Rust `ExprNode` + Polars lowering; contract tests. |
 | Performance | Guardrails for major transforms | Implemented | Lightweight regression checks in test suite. |
 | Ecosystem | Optional interfaces `pandas` and `pyspark` | Implemented | Alternate import/naming surfaces; execution is the same Rust core as default (not native pandas/Spark). |
 
 ## Remaining parity gaps
 
 - Arbitrary Polars **nested/list dtypes** without a matching Pydantic `list[T]` / struct annotation are out of scope; the engine stays schema-first.
+- SQL-style **window frames** (`rowsBetween` / `rangeBetween`) are not in the IR.
 - Additional advanced analytical APIs outside the current roadmap scope.

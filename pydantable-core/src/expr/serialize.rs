@@ -7,7 +7,7 @@ use crate::dtype::{dtype_to_descriptor_py, BaseType};
 
 use super::ir::{
     ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart,
-    UnaryNumericOp, WindowOp,
+    UnaryNumericOp, UnixTimestampUnit, WindowOp,
 };
 
 fn base_type_json(b: BaseType) -> &'static str {
@@ -279,6 +279,7 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
                     TemporalPart::Hour => "hour",
                     TemporalPart::Minute => "minute",
                     TemporalPart::Second => "second",
+                    TemporalPart::Nanosecond => "nanosecond",
                 },
             )?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
@@ -313,6 +314,36 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             dict.set_item("kind", "datetime_to_date")?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
         }
+        ExprNode::Strptime {
+            inner,
+            format,
+            to_datetime,
+            ..
+        } => {
+            dict.set_item("kind", "strptime")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+            dict.set_item("format", format.as_str())?;
+            dict.set_item("to_datetime", *to_datetime)?;
+        }
+        ExprNode::UnixTimestamp { inner, unit, .. } => {
+            dict.set_item("kind", "unix_timestamp")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+            dict.set_item(
+                "unit",
+                match unit {
+                    UnixTimestampUnit::Seconds => "seconds",
+                    UnixTimestampUnit::Milliseconds => "milliseconds",
+                },
+            )?;
+        }
+        ExprNode::BinaryLength { inner, .. } => {
+            dict.set_item("kind", "binary_length")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+        }
+        ExprNode::MapLen { inner, .. } => {
+            dict.set_item("kind", "map_len")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+        }
         ExprNode::Window {
             op,
             operand,
@@ -321,16 +352,21 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             ..
         } => {
             dict.set_item("kind", "window")?;
-            dict.set_item(
-                "op",
-                match op {
-                    WindowOp::RowNumber => "row_number",
-                    WindowOp::Rank => "rank",
-                    WindowOp::DenseRank => "dense_rank",
-                    WindowOp::Sum => "sum",
-                    WindowOp::Mean => "mean",
-                },
-            )?;
+            match op {
+                WindowOp::RowNumber => dict.set_item("op", "row_number")?,
+                WindowOp::Rank => dict.set_item("op", "rank")?,
+                WindowOp::DenseRank => dict.set_item("op", "dense_rank")?,
+                WindowOp::Sum => dict.set_item("op", "sum")?,
+                WindowOp::Mean => dict.set_item("op", "mean")?,
+                WindowOp::Lag { n } => {
+                    dict.set_item("op", "lag")?;
+                    dict.set_item("n", *n)?;
+                }
+                WindowOp::Lead { n } => {
+                    dict.set_item("op", "lead")?;
+                    dict.set_item("n", *n)?;
+                }
+            }
             if let Some(op) = operand {
                 dict.set_item("operand", exprnode_to_serializable(py, op)?)?;
             }
@@ -349,6 +385,9 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
                 match op {
                     GlobalAggOp::Sum => "sum",
                     GlobalAggOp::Mean => "mean",
+                    GlobalAggOp::Count => "count",
+                    GlobalAggOp::Min => "min",
+                    GlobalAggOp::Max => "max",
                 },
             )?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;

@@ -267,9 +267,38 @@ class Expr:  # type: ignore[override]
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "second"))
 
+    def dt_nanosecond(self) -> Expr:
+        """Sub-second nanoseconds component (``datetime`` or ``time`` columns)."""
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "nanosecond"))
+
     def dt_date(self) -> Expr:
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_datetime_to_date(self._rust_expr))
+
+    def strptime(self, format: str, *, to_datetime: bool = False) -> Expr:
+        """Parse strings to ``date`` or ``datetime`` (``strftime`` format string)."""
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_strptime(
+                self._rust_expr, str(format), bool(to_datetime)
+            ),
+        )
+
+    def unix_timestamp(self, unit: str = "seconds") -> Expr:
+        """Unix epoch from ``date``/``datetime``; ``unit`` is ``seconds`` or ``ms``."""
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_unix_timestamp(self._rust_expr, str(unit)))
+
+    def binary_len(self) -> Expr:
+        """Byte length of a ``bytes`` column."""
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_binary_length(self._rust_expr))
+
+    def map_len(self) -> Expr:
+        """Number of entries in a ``dict[str, T]`` map column."""
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_map_len(self._rust_expr))
 
     # List columns
     def list_len(self) -> Expr:
@@ -418,6 +447,33 @@ class _WindowAggPending:
         raise AssertionError(self._kind)
 
 
+class _WindowShiftPending:
+    """``lag`` / ``lead`` with ``.over(WindowSpec(...))``."""
+
+    def __init__(self, inner: Expr, kind: str, n: int):
+        self._inner = inner
+        self._kind = kind
+        self._n = int(n)
+
+    def over(self, window: WindowSpec) -> Expr:
+        rust = _require_rust_core()
+        part = list(window.partition_by)
+        order = list(window.order_by)
+        if self._kind == "lag":
+            return Expr(
+                rust_expr=rust.expr_window_lag(
+                    self._inner._rust_expr, self._n, part, order
+                )
+            )
+        if self._kind == "lead":
+            return Expr(
+                rust_expr=rust.expr_window_lead(
+                    self._inner._rust_expr, self._n, part, order
+                )
+            )
+        raise AssertionError(self._kind)
+
+
 def row_number() -> _WindowFnPending:
     """Spark ``row_number``; finish with ``.over(WindowSpec(...))``."""
     return _WindowFnPending("row_number")
@@ -447,6 +503,20 @@ def window_mean(column: Expr) -> _WindowAggPending:
     return _WindowAggPending(column, "mean")
 
 
+def lag(column: Expr, n: int = 1) -> _WindowShiftPending:
+    """Previous row value within partition/order (``shift(n)``)."""
+    if not isinstance(column, Expr):
+        raise TypeError("lag() expects an Expr.")
+    return _WindowShiftPending(column, "lag", n)
+
+
+def lead(column: Expr, n: int = 1) -> _WindowShiftPending:
+    """Next row value within partition/order (``shift(-n)``)."""
+    if not isinstance(column, Expr):
+        raise TypeError("lead() expects an Expr.")
+    return _WindowShiftPending(column, "lead", n)
+
+
 def global_sum(column: Expr) -> Expr:
     """Whole-frame ``sum`` for :meth:`~pydantable.dataframe.DataFrame.select`."""
     if not isinstance(column, Expr):
@@ -459,3 +529,24 @@ def global_mean(column: Expr) -> Expr:
     if not isinstance(column, Expr):
         raise TypeError("global_mean() expects an Expr.")
     return Expr(rust_expr=_require_rust_core().expr_global_mean(column._rust_expr))
+
+
+def global_count(column: Expr) -> Expr:
+    """Whole-frame non-null ``count`` for ``DataFrame.select``."""
+    if not isinstance(column, Expr):
+        raise TypeError("global_count() expects an Expr.")
+    return Expr(rust_expr=_require_rust_core().expr_global_count(column._rust_expr))
+
+
+def global_min(column: Expr) -> Expr:
+    """Whole-frame minimum for :meth:`~pydantable.dataframe.DataFrame.select`."""
+    if not isinstance(column, Expr):
+        raise TypeError("global_min() expects an Expr.")
+    return Expr(rust_expr=_require_rust_core().expr_global_min(column._rust_expr))
+
+
+def global_max(column: Expr) -> Expr:
+    """Whole-frame maximum for :meth:`~pydantable.dataframe.DataFrame.select`."""
+    if not isinstance(column, Expr):
+        raise TypeError("global_max() expects an Expr.")
+    return Expr(rust_expr=_require_rust_core().expr_global_max(column._rust_expr))

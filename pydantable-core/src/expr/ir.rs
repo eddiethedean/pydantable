@@ -75,6 +75,15 @@ pub enum TemporalPart {
     Hour,
     Minute,
     Second,
+    /// Sub-second component (`datetime` and `time` columns).
+    Nanosecond,
+}
+
+/// Unit for [`ExprNode::UnixTimestamp`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnixTimestampUnit {
+    Seconds,
+    Milliseconds,
 }
 
 #[derive(Clone, Debug)]
@@ -217,6 +226,29 @@ pub enum ExprNode {
         inner: Box<ExprNode>,
         dtype: DTypeDesc,
     },
+    /// `str` column → `date` / `datetime` using Polars `str.strptime` (format must match data).
+    Strptime {
+        inner: Box<ExprNode>,
+        format: String,
+        to_datetime: bool,
+        dtype: DTypeDesc,
+    },
+    /// `datetime` / `date` → Unix timestamp (integer).
+    UnixTimestamp {
+        inner: Box<ExprNode>,
+        unit: UnixTimestampUnit,
+        dtype: DTypeDesc,
+    },
+    /// Byte length of a `bytes` column (`Binary`).
+    BinaryLength {
+        inner: Box<ExprNode>,
+        dtype: DTypeDesc,
+    },
+    /// Number of entries in a `dict[str, T]` map column (logical list length).
+    MapLen {
+        inner: Box<ExprNode>,
+        dtype: DTypeDesc,
+    },
     /// Windowed aggregate or ranking function (Polars `.over(...)`).
     Window {
         op: WindowOp,
@@ -241,6 +273,14 @@ pub enum WindowOp {
     DenseRank,
     Sum,
     Mean,
+    /// Previous row within partition/order (`shift(n)`).
+    Lag {
+        n: u32,
+    },
+    /// Next row within partition/order (`shift(-n)`).
+    Lead {
+        n: u32,
+    },
 }
 
 /// Whole-frame aggregation (Polars `select(sum(col))` — single output row).
@@ -248,4 +288,8 @@ pub enum WindowOp {
 pub enum GlobalAggOp {
     Sum,
     Mean,
+    /// Count of non-null cells (Polars `count`).
+    Count,
+    Min,
+    Max,
 }

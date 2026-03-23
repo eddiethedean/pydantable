@@ -8,7 +8,7 @@ use pyo3::types::PyAny;
 use crate::dtype::{dtype_to_python_type, py_annotation_to_dtype, DTypeDesc};
 use crate::expr::{
     exprnode_to_serializable, op_symbol_to_arith, op_symbol_to_cmp, ArithOp, CmpOp, ExprHandle,
-    ExprNode, LogicalOp, StringUnaryOp, TemporalPart, UnaryNumericOp,
+    ExprNode, LogicalOp, StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit,
 };
 use crate::plan::{
     execute_plan as execute_plan_inner, make_plan as make_plan_inner, plan_drop as plan_drop_inner,
@@ -85,7 +85,7 @@ impl PyPlan {
 
 #[pyfunction]
 fn rust_version() -> &'static str {
-    "0.6.0"
+    "0.7.0"
 }
 
 #[pyfunction]
@@ -367,9 +367,10 @@ fn expr_temporal_part(inner: Bound<'_, PyExpr>, part: String) -> PyResult<PyExpr
         "hour" => TemporalPart::Hour,
         "minute" => TemporalPart::Minute,
         "second" => TemporalPart::Second,
+        "nanosecond" => TemporalPart::Nanosecond,
         _ => {
             return Err(pyo3::exceptions::PyValueError::new_err(
-                "temporal part must be year|month|day|hour|minute|second",
+                "temporal part must be year|month|day|hour|minute|second|nanosecond",
             ));
         }
     };
@@ -484,6 +485,88 @@ fn expr_global_sum(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
 fn expr_global_mean(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
     Ok(PyExpr {
         node: ExprNode::make_global_mean(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_strptime(inner: Bound<'_, PyExpr>, format: String, to_datetime: bool) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_strptime(inner.borrow().node.clone(), format, to_datetime)?,
+    })
+}
+
+#[pyfunction]
+fn expr_unix_timestamp(inner: Bound<'_, PyExpr>, unit: String) -> PyResult<PyExpr> {
+    let u = match unit.as_str() {
+        "seconds" | "s" => UnixTimestampUnit::Seconds,
+        "milliseconds" | "ms" => UnixTimestampUnit::Milliseconds,
+        _ => {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "unix_timestamp unit must be 'seconds' or 'milliseconds'.",
+            ));
+        }
+    };
+    Ok(PyExpr {
+        node: ExprNode::make_unix_timestamp(inner.borrow().node.clone(), u)?,
+    })
+}
+
+#[pyfunction]
+fn expr_binary_length(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_binary_length(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_map_len(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_map_len(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_global_count(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_global_count(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_global_min(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_global_min(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_global_max(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_global_max(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_window_lag(
+    inner: Bound<'_, PyExpr>,
+    n: u32,
+    partition_by: Vec<String>,
+    order_by: Vec<(String, bool)>,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_window_lag(inner.borrow().node.clone(), n, partition_by, order_by)?,
+    })
+}
+
+#[pyfunction]
+fn expr_window_lead(
+    inner: Bound<'_, PyExpr>,
+    n: u32,
+    partition_by: Vec<String>,
+    order_by: Vec<(String, bool)>,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_window_lead(inner.borrow().node.clone(), n, partition_by, order_by)?,
     })
 }
 
@@ -1025,6 +1108,15 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr_window_mean, m)?)?;
     m.add_function(wrap_pyfunction!(expr_global_sum, m)?)?;
     m.add_function(wrap_pyfunction!(expr_global_mean, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_strptime, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_unix_timestamp, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_binary_length, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_map_len, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_global_count, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_global_min, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_global_max, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_window_lag, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_window_lead, m)?)?;
     m.add_function(wrap_pyfunction!(expr_global_default_alias, m)?)?;
     m.add_function(wrap_pyfunction!(expr_is_global_agg, m)?)?;
     m.add_function(wrap_pyfunction!(make_plan, m)?)?;

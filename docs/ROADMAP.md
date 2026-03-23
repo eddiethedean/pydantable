@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.6.0 → v1.0.0)
+# PydanTable roadmap (0.7.0 → v1.0.0)
 
-**Current release: `0.6.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
+**Current release: `0.7.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
 
 For Polars-style API parity at the method level, see
 [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md).
@@ -82,12 +82,21 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 ---
 
+## Shipped in 0.7.0 (expressions + globals)
+
+- [x] **Global `select` aggregates:** `count` / `min` / `max` on a typed column (plus existing `sum` / `mean`).
+- [x] **Window shifts:** `lag` / `lead` via Polars `shift` + window `over` (requires `order_by`).
+- [x] **Temporal helpers:** `strptime`, `unix_timestamp` (seconds or milliseconds), `dt_nanosecond`, string `to_date` with format in PySpark façade.
+- [x] **Map / binary:** `map_len`, `binary_len`.
+
+---
+
 ## Later (not started)
 
-Directions beyond **0.6.0** (non-exhaustive):
+Directions beyond **0.7.0** (non-exhaustive):
 
 - [ ] **Arrow-native map dtype** or heterogeneous map keys (beyond `dict[str, T]` v1).
-- [ ] Richer **window** / **global aggregate** stories where not yet covered in release notes.
+- [ ] SQL-style **window frames** (`rowsBetween` / `rangeBetween`) in the IR and Polars lowering.
 
 ---
 

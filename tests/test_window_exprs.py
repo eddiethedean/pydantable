@@ -5,6 +5,8 @@ from __future__ import annotations
 from pydantable import DataFrame
 from pydantable.expressions import (
     dense_rank,
+    lag,
+    lead,
     rank,
     row_number,
     window_mean,
@@ -89,3 +91,14 @@ def test_order_by_per_column_ascending_flags() -> None:
     w_desc = Window.partitionBy("g").orderBy("v", ascending=[False])
     out_desc = df.with_columns(rn=row_number().over(w_desc)).collect(as_lists=True)
     assert out_desc["rn"] == [1, 3, 2]
+
+
+def test_lag_and_lead_shift_within_partition() -> None:
+    df = DataFrame[W]({"g": [1, 1, 1, 2], "v": [10, 20, 30, 40]})
+    w = Window.partitionBy("g").orderBy("v", ascending=True)
+    out = df.with_columns(
+        lg=lag(df.v, 1).over(w),
+        ld=lead(df.v, 1).over(w),
+    ).collect(as_lists=True)
+    assert out["lg"] == [None, 10, 20, None]
+    assert out["ld"] == [20, 30, None, None]

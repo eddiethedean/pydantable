@@ -10,7 +10,7 @@ use crate::dtype::{dtype_structural_eq, BaseType, DTypeDesc};
 
 use super::ir::{
     ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart,
-    UnaryNumericOp, WindowOp,
+    UnaryNumericOp, UnixTimestampUnit, WindowOp,
 };
 
 enum ListAggKind {
@@ -131,6 +131,10 @@ impl ExprNode {
             | ExprNode::ListMax { dtype, .. }
             | ExprNode::ListSum { dtype, .. }
             | ExprNode::DatetimeToDate { dtype, .. }
+            | ExprNode::Strptime { dtype, .. }
+            | ExprNode::UnixTimestamp { dtype, .. }
+            | ExprNode::BinaryLength { dtype, .. }
+            | ExprNode::MapLen { dtype, .. }
             | ExprNode::Window { dtype, .. }
             | ExprNode::GlobalAgg { dtype, .. } => dtype.clone(),
         }
@@ -209,7 +213,11 @@ impl ExprNode {
             | ExprNode::ListMin { inner, .. }
             | ExprNode::ListMax { inner, .. }
             | ExprNode::ListSum { inner, .. }
-            | ExprNode::DatetimeToDate { inner, .. } => inner.referenced_columns(),
+            | ExprNode::DatetimeToDate { inner, .. }
+            | ExprNode::Strptime { inner, .. }
+            | ExprNode::UnixTimestamp { inner, .. }
+            | ExprNode::BinaryLength { inner, .. }
+            | ExprNode::MapLen { inner, .. } => inner.referenced_columns(),
             ExprNode::ListGet { inner, index, .. } => {
                 let mut out = inner.referenced_columns();
                 out.extend(index.referenced_columns());
@@ -1112,26 +1120,33 @@ impl ExprNode {
 
     pub fn make_temporal_part(inner: ExprNode, part: TemporalPart) -> PyResult<Self> {
         let d = inner.dtype();
-        if d.is_struct() || d.is_list() {
+        if d.is_struct() || d.is_list() || d.is_map() {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "Temporal extraction requires a datetime or date column.",
+                "Temporal extraction requires a datetime, date, or time column.",
             ));
         }
         let base = d.as_scalar_base_field().flatten();
         let is_dt = base == Some(BaseType::DateTime);
         let is_date = base == Some(BaseType::Date);
-        if !is_dt && !is_date {
-            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "Temporal extraction requires a datetime or date column.",
-            ));
-        }
+        let is_time = base == Some(BaseType::Time);
         match part {
-            TemporalPart::Hour | TemporalPart::Minute | TemporalPart::Second if !is_dt => {
-                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "hour(), minute(), second() require a datetime column.",
-                ));
+            TemporalPart::Year | TemporalPart::Month | TemporalPart::Day => {
+                if !(is_dt || is_date) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "year(), month(), day() require a datetime or date column.",
+                    ));
+                }
             }
-            _ => {}
+            TemporalPart::Hour
+            | TemporalPart::Minute
+            | TemporalPart::Second
+            | TemporalPart::Nanosecond => {
+                if !(is_dt || is_time) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "hour(), minute(), second(), nanosecond() require a datetime or time column.",
+                    ));
+                }
+            }
         }
         let nullable = d.nullable_flag();
         Ok(ExprNode::TemporalPart {
@@ -1462,6 +1477,224 @@ impl ExprNode {
         })
     }
 
+    pub fn make_global_count(inner: ExprNode) -> PyResult<Self> {
+        if !matches!(&inner, ExprNode::ColumnRef { .. }) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "global count() expects a column reference expression.",
+            ));
+        }
+        Ok(ExprNode::GlobalAgg {
+            op: GlobalAggOp::Count,
+            inner: Box::new(inner),
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Int),
+                nullable: true,
+            },
+        })
+    }
+
+    fn infer_global_min_max_dtype(inner: &ExprNode) -> PyResult<DTypeDesc> {
+        let d = inner.dtype();
+        if d.is_struct() || d.is_list() || d.is_map() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "global min/max expect a numeric scalar column.",
+            ));
+        }
+        let b = d.as_scalar_base_field().flatten().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "global min/max require a column with known scalar dtype.",
+            )
+        })?;
+        match b {
+            BaseType::Int | BaseType::Float | BaseType::Decimal => Ok(DTypeDesc::Scalar {
+                base: Some(b),
+                nullable: true,
+            }),
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "global min/max require int, float, or decimal column.",
+            )),
+        }
+    }
+
+    pub fn make_global_min(inner: ExprNode) -> PyResult<Self> {
+        if !matches!(&inner, ExprNode::ColumnRef { .. }) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "global min() expects a column reference expression.",
+            ));
+        }
+        let dtype = Self::infer_global_min_max_dtype(&inner)?;
+        Ok(ExprNode::GlobalAgg {
+            op: GlobalAggOp::Min,
+            inner: Box::new(inner),
+            dtype,
+        })
+    }
+
+    pub fn make_global_max(inner: ExprNode) -> PyResult<Self> {
+        if !matches!(&inner, ExprNode::ColumnRef { .. }) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "global max() expects a column reference expression.",
+            ));
+        }
+        let dtype = Self::infer_global_min_max_dtype(&inner)?;
+        Ok(ExprNode::GlobalAgg {
+            op: GlobalAggOp::Max,
+            inner: Box::new(inner),
+            dtype,
+        })
+    }
+
+    pub fn make_strptime(inner: ExprNode, format: String, to_datetime: bool) -> PyResult<Self> {
+        if format.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "strptime format must be non-empty.",
+            ));
+        }
+        if inner.dtype().as_scalar_base_field().flatten() != Some(BaseType::Str) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "strptime() requires a string column.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        let dtype = if to_datetime {
+            DTypeDesc::Scalar {
+                base: Some(BaseType::DateTime),
+                nullable,
+            }
+        } else {
+            DTypeDesc::Scalar {
+                base: Some(BaseType::Date),
+                nullable,
+            }
+        };
+        Ok(ExprNode::Strptime {
+            inner: Box::new(inner),
+            format,
+            to_datetime,
+            dtype,
+        })
+    }
+
+    pub fn make_unix_timestamp(inner: ExprNode, unit: UnixTimestampUnit) -> PyResult<Self> {
+        let b = inner.dtype().as_scalar_base_field().flatten();
+        if b != Some(BaseType::Date) && b != Some(BaseType::DateTime) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "unix_timestamp() requires a date or datetime column.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::UnixTimestamp {
+            inner: Box::new(inner),
+            unit,
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Int),
+                nullable,
+            },
+        })
+    }
+
+    pub fn make_binary_length(inner: ExprNode) -> PyResult<Self> {
+        if inner.dtype().as_scalar_base_field().flatten() != Some(BaseType::Binary) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "binary_len() requires a bytes column.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::BinaryLength {
+            inner: Box::new(inner),
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Int),
+                nullable,
+            },
+        })
+    }
+
+    pub fn make_map_len(inner: ExprNode) -> PyResult<Self> {
+        if !inner.dtype().is_map() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "map_len() requires a map column.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::MapLen {
+            inner: Box::new(inner),
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Int),
+                nullable,
+            },
+        })
+    }
+
+    fn window_shift_operand_dtype(inner: &ExprNode) -> PyResult<DTypeDesc> {
+        let d = inner.dtype();
+        if d.is_struct() || d.is_list() || d.is_map() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "lag/lead expect a scalar column expression.",
+            ));
+        }
+        let base = d.as_scalar_base_field().flatten().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "lag/lead require a column with known scalar dtype.",
+            )
+        })?;
+        Ok(DTypeDesc::Scalar {
+            base: Some(base),
+            nullable: true,
+        })
+    }
+
+    pub fn make_window_lag(
+        inner: ExprNode,
+        n: u32,
+        partition_by: Vec<String>,
+        order_by: Vec<(String, bool)>,
+    ) -> PyResult<Self> {
+        if partition_by.is_empty() && order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "window expression requires at least one partition_by or order_by column.",
+            ));
+        }
+        if order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "lag() requires order_by columns.",
+            ));
+        }
+        let dtype = Self::window_shift_operand_dtype(&inner)?;
+        Ok(ExprNode::Window {
+            op: WindowOp::Lag { n },
+            operand: Some(Box::new(inner)),
+            partition_by,
+            order_by,
+            dtype,
+        })
+    }
+
+    pub fn make_window_lead(
+        inner: ExprNode,
+        n: u32,
+        partition_by: Vec<String>,
+        order_by: Vec<(String, bool)>,
+    ) -> PyResult<Self> {
+        if partition_by.is_empty() && order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "window expression requires at least one partition_by or order_by column.",
+            ));
+        }
+        if order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "lead() requires order_by columns.",
+            ));
+        }
+        let dtype = Self::window_shift_operand_dtype(&inner)?;
+        Ok(ExprNode::Window {
+            op: WindowOp::Lead { n },
+            operand: Some(Box::new(inner)),
+            partition_by,
+            order_by,
+            dtype,
+        })
+    }
+
     pub fn global_agg_default_alias(&self) -> Option<String> {
         match self {
             ExprNode::GlobalAgg { op, inner, .. } => {
@@ -1471,6 +1704,9 @@ impl ExprNode {
                 Some(match op {
                     GlobalAggOp::Sum => format!("sum_{name}"),
                     GlobalAggOp::Mean => format!("mean_{name}"),
+                    GlobalAggOp::Count => format!("count_{name}"),
+                    GlobalAggOp::Min => format!("min_{name}"),
+                    GlobalAggOp::Max => format!("max_{name}"),
                 })
             }
             _ => None,
@@ -2439,11 +2675,16 @@ impl ExprNode {
                 let vals = inner.eval(ctx, n)?;
                 let is_date =
                     inner.dtype().as_scalar_base_field().flatten() == Some(BaseType::Date);
+                let is_time =
+                    inner.dtype().as_scalar_base_field().flatten() == Some(BaseType::Time);
+                const NS_PER_HOUR: i64 = 3_600_000_000_000;
+                const NS_PER_MIN: i64 = 60_000_000_000;
+                const NS_PER_SEC: i64 = 1_000_000_000;
                 Ok(vals
                     .into_iter()
                     .map(|v| match v {
                         None => None,
-                        Some(LiteralValue::DateTimeMicros(us)) if !is_date => {
+                        Some(LiteralValue::DateTimeMicros(us)) if !is_date && !is_time => {
                             let (y, mo, d, h, mi, s) = utc_ymdhms_from_unix_micros(us);
                             let i = match part {
                                 TemporalPart::Year => i64::from(y),
@@ -2452,13 +2693,18 @@ impl ExprNode {
                                 TemporalPart::Hour => i64::from(h),
                                 TemporalPart::Minute => i64::from(mi),
                                 TemporalPart::Second => i64::from(s),
+                                TemporalPart::Nanosecond => {
+                                    let sub_us = us.rem_euclid(1_000_000);
+                                    i64::from(sub_us) * 1000
+                                }
                             };
                             Some(LiteralValue::Int(i))
                         }
                         Some(LiteralValue::DateDays(days)) if is_date => match part {
-                            TemporalPart::Hour | TemporalPart::Minute | TemporalPart::Second => {
-                                None
-                            }
+                            TemporalPart::Hour
+                            | TemporalPart::Minute
+                            | TemporalPart::Second
+                            | TemporalPart::Nanosecond => None,
                             TemporalPart::Year | TemporalPart::Month | TemporalPart::Day => {
                                 let (y, mo, d) = utc_calendar_from_epoch_days(days);
                                 let i = match part {
@@ -2470,6 +2716,21 @@ impl ExprNode {
                                 Some(LiteralValue::Int(i))
                             }
                         },
+                        Some(LiteralValue::TimeNanos(ns)) if is_time => match part {
+                            TemporalPart::Year | TemporalPart::Month | TemporalPart::Day => None,
+                            TemporalPart::Hour => {
+                                Some(LiteralValue::Int((ns / NS_PER_HOUR).rem_euclid(24)))
+                            }
+                            TemporalPart::Minute => {
+                                Some(LiteralValue::Int((ns / NS_PER_MIN).rem_euclid(60)))
+                            }
+                            TemporalPart::Second => {
+                                Some(LiteralValue::Int((ns / NS_PER_SEC).rem_euclid(60)))
+                            }
+                            TemporalPart::Nanosecond => {
+                                Some(LiteralValue::Int(ns.rem_euclid(NS_PER_SEC)))
+                            }
+                        },
                         _ => None,
                     })
                     .collect())
@@ -2479,9 +2740,13 @@ impl ExprNode {
             | ExprNode::ListContains { .. }
             | ExprNode::ListMin { .. }
             | ExprNode::ListMax { .. }
-            | ExprNode::ListSum { .. } => {
+            | ExprNode::ListSum { .. }
+            | ExprNode::Strptime { .. }
+            | ExprNode::UnixTimestamp { .. }
+            | ExprNode::BinaryLength { .. }
+            | ExprNode::MapLen { .. } => {
                 Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-                    "List expressions are only supported with the Polars execution engine.",
+                    "This expression is only supported with the Polars execution engine.",
                 ))
             }
             ExprNode::StructField { .. } => {
