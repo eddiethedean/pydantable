@@ -252,10 +252,12 @@ def validate_columns_strict(
         field_keys = set(field_types.keys())
         missing = sorted(field_keys - cols)
         extra = sorted(cols - field_keys)
-        if missing:
-            raise ValueError(f"Missing required columns: {missing}")
-        if extra:
-            raise ValueError(f"Unknown columns for schema: {extra}")
+        if missing or extra:
+            expected = sorted(field_keys)
+            raise ValueError(
+                "Polars DataFrame columns must match schema columns exactly; "
+                f"expected={expected}, missing={missing}, extra={extra}"
+            )
         for name, annotation in field_types.items():
             _, nullable = _annotation_nullable_inner(annotation)
             if nullable:

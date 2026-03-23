@@ -14,7 +14,11 @@ from typing import Any, cast
 from pydantic import BaseModel, ValidationError, create_model
 
 from .dataframe import DataFrame
-from .schema import Schema, validate_dataframe_model_field_annotations
+from .schema import (
+    Schema,
+    _is_polars_dataframe,
+    validate_dataframe_model_field_annotations,
+)
 
 
 def _field_defs_from_annotations(
@@ -25,12 +29,15 @@ def _field_defs_from_annotations(
 
 def _normalize_input(
     *,
-    data: Mapping[str, Any] | Sequence[Mapping[str, Any] | BaseModel],
+    data: Any,
     row_model: type[BaseModel],
     ignore_errors: bool = False,
     on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-) -> dict[str, list[Any]]:
+) -> Any:
     expected_fields = list(row_model.model_fields.keys())
+
+    if _is_polars_dataframe(data):
+        return data
 
     if isinstance(data, Mapping):
         # Columnar input path; downstream DataFrame strict validation handles
@@ -146,7 +153,7 @@ class DataFrameModel:
 
     def __init__(
         self,
-        data: Mapping[str, Any] | Sequence[Mapping[str, Any] | BaseModel],
+        data: Any,
         *,
         validate_data: bool = True,
         ignore_errors: bool = False,
