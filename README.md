@@ -6,65 +6,44 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/pydantable)](https://pypi.org/project/pydantable/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core.**
+**Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core (Polars inside the native extension).**
 
 **Current release: 0.17.0** · Python **3.10+**
 
 ---
 
+## At a glance
+
+- **Schemas first:** Pydantic field annotations define column types, nullability (`T | None`), and which expressions are legal. Many mistakes are caught when you build the `Expr`, not only when you run the query.
+- **Two entry styles:** `DataFrameModel` (SQLModel-like whole-table class with a generated row model) or `DataFrame[YourSchema](data)` with any Pydantic `BaseModel` schema.
+- **Polars-shaped API:** `select`, `with_columns`, `filter`, `join`, `group_by`, windows, reshape helpers — semantics are documented in the [interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html), not guaranteed identical to Polars on every edge case.
+- **Optional extras:** `pydantable[polars]` for `to_polars()`; `pydantable[arrow]` for `read_parquet` / `read_ipc`, `to_arrow` / `ato_arrow`, and `pa.Table` / `RecordBatch` constructors.
+- **Optional façades:** `pydantable.pandas` and `pydantable.pyspark` swap naming/imports; execution stays the same in-process core (not a real Spark or pandas backend).
+- **Service-ready:** Sync and async materialization (`collect`, `to_dict`, `acollect`, `ato_dict`, …), [FastAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) patterns, and trusted ingest modes for bulk JSON or Arrow.
+
+---
+
 ## Documentation
 
-**The full manual lives on Read the Docs:**
-
-### **[https://pydantable.readthedocs.io/en/latest/](https://pydantable.readthedocs.io/en/latest/)**
-
-That site is the supported entry point for concepts, contracts, API notes, and examples. The sections below point to the same pages so you can jump straight from GitHub.
+The **canonical manual** is on Read the Docs: **[https://pydantable.readthedocs.io/en/latest/](https://pydantable.readthedocs.io/en/latest/)**
 
 | Topic | Read the Docs |
 |--------|----------------|
 | **Home / overview** | [Documentation home](https://pydantable.readthedocs.io/en/latest/index.html) |
-| **`DataFrameModel` contract** (inputs, transforms, collisions, materialization) | [DataFrameModel (SQLModel-like)](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) |
-| **Column types** (scalars, structs, `list[T]`, nullability, unsupported cases) | [Supported data types](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html) |
-| **FastAPI** (routers, bodies, `collect`, responses) | [FastAPI integration](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) |
-| **Execution model** (`collect`, `to_dict`, `to_polars`, optional Python Polars, UI modules) | [Execution (Rust engine)](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) |
-| **Semantics** (nulls, joins, ordering, reshaping, windows — Polars-style contract) | [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) |
-| **Roadmap** (shipped through **0.17.0**, planned **0.18**, path to v1.0.0) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
-| **Why not use Polars directly?** | [Why not just use Polars?](https://pydantable.readthedocs.io/en/latest/WHY_NOT_POLARS.html) |
-| **Pandas-style imports** (`pydantable.pandas`) | [Pandas UI](https://pydantable.readthedocs.io/en/latest/PANDAS_UI.html) |
-| **PySpark-style imports** (`pydantable.pyspark`) | [PySpark UI](https://pydantable.readthedocs.io/en/latest/PYSPARK_UI.html) |
-| **PySpark helpers & parity** | [PySpark interface](https://pydantable.readthedocs.io/en/latest/PYSPARK_INTERFACE.html) · [PySpark API parity](https://pydantable.readthedocs.io/en/latest/PYSPARK_PARITY.html) |
-| **Polars parity** (scorecard, workflows, transformation roadmap) | [Parity scorecard](https://pydantable.readthedocs.io/en/latest/PARITY_SCORECARD.html) · [Polars-style workflows](https://pydantable.readthedocs.io/en/latest/POLARS_WORKFLOWS.html) · [Transformation parity roadmap](https://pydantable.readthedocs.io/en/latest/POLARS_TRANSFORMATIONS_ROADMAP.html) |
-| **Contributors** (build, test, benchmarks, releases) | [Developer guide](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html) |
-| **Plan / vision** (architecture phasing) | [Plan document](https://pydantable.readthedocs.io/en/latest/pydantable_plan.html) |
-| **Python API reference** (autodoc) | [API reference](https://pydantable.readthedocs.io/en/latest/api/index.html) |
-
-For copy-paste convenience, the site base URL is:
-
-`https://pydantable.readthedocs.io/en/latest/`
-
----
-
-## What PydanTable does
-
-PydanTable keeps **Pydantic models** as the source of truth for:
-
-- column types and nullability (`Optional[T]` / `T | None`)
-- **typed expressions** — invalid combinations fail when the expression is built (Rust AST), not only at runtime
-- **schema evolution** — chained transforms produce new model types with stable rules (e.g. `with_columns` name collisions)
-
-The default API feels **Polars-like**; optional **`pydantable.pandas`** and **`pydantable.pyspark`** modules only change naming and imports — execution is always the native core. Details: [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html), [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html).
-
-**0.17.0** deepens **string-keyed** map contracts (docs + tests for **`map_get`** / **`map_contains_key`** after PyArrow **`map<utf8, …>`** ingest; **`dict[int, T]`** map keys remain deferred). It extends **`pydantable.pyspark.sql.functions`** with thin wrappers (**`str_replace`**, **`regexp_replace`**, **`strip_prefix`**, **`strip_suffix`**, **`strip_chars`**, **`strptime`**, **`binary_len`**, **`list_*`**) over core **`Expr`**. **0.16.1** fixes Rust expression typing so invalid arithmetic on **`dict[str, T]`** map columns (for example `df.m + 1`) raises **`TypeError`** instead of panicking, and fixes **`DataFrame[Schema](pa.Table)`** / **`RecordBatch`** construction (correct **`pydantable.io`** imports in **`validate_columns_strict`**). **0.16.0** adds **`read_parquet` / `read_ipc`**, **`to_arrow` / `ato_arrow`**, **`Table` / `RecordBatch`** constructor ingest ( **`pyarrow`**; **`pydantable[arrow]`** ), and **FastAPI** hardening (multipart uploads, **`Depends`** executors, background tasks, HTTP status notes). **0.15.0** added **async materialization** (`acollect`, `ato_dict`, `ato_polars`, and `DataFrameModel` `arows` / `ato_dicts`), **FastAPI `async` + `lifespan`** examples, **PyArrow `map<utf8, …>`** ingest for **`dict[str, T]`** columns, PySpark **`trim` / `abs` / `round` / `floor` / `ceil`**, and removed the legacy **`validate_data`** constructor argument — use **`trusted_mode`** only on **`DataFrame`** / **`DataFrameModel`**. **0.14.0** added window **`orderBy(..., nulls_last=...)`**, **`DtypeDriftWarning`**, **`validate_data`** deprecation (removed in **0.15.0**), **FastAPI `TestClient`** docs/tests, and PySpark **`dayofmonth` / `lower` / `upper`**. See [changelog](https://pydantable.readthedocs.io/en/latest/changelog.html) and [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html).
-
-**Expression surface (current release, Rust-typed `Expr`):**
-
-- **Globals in `select`:** `global_sum`, `global_mean`, `global_count`, `global_min`, `global_max`, and **`global_row_count()`** (row count / `COUNT(*)`). PySpark: `F.count()` with no argument for row count; `F.count(F.col(...))` for non-null column count.
-- **Windows:** `row_number`, `rank`, `dense_rank`, `window_sum`, `window_mean`, **`window_min`**, **`window_max`**, `lag`, `lead` with `Window.partitionBy(...).orderBy(..., nulls_last=...)` / `.spec()`, plus framed windows (`rowsBetween`, `rangeBetween`) for supported operations.
-- **Temporal:** `strptime`, `unix_timestamp`, **`cast` from `str` → `date` / `datetime`** (Polars parsing; use `strptime` for fixed formats), `dt_*` parts, `dt_nanosecond` on `datetime` / `time`.
-- **Maps / binary:** `map_len`, **`map_get`**, **`map_contains_key`**, `binary_len`, including nested JSON-like map value dtypes with string keys.
-- **Map utilities:** `map_keys()`, `map_values()`, `map_entries()`, and `map_from_entries()` for per-row key/value extraction and reconstruction on `dict[str, T]` columns.
-
-PySpark-named helpers live under `pydantable.pyspark.sql.functions` (including **0.17.0** string/list/bytes wrappers; see [PySpark parity](https://pydantable.readthedocs.io/en/latest/PYSPARK_PARITY.html)). Details: [Supported types](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html), [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html), [CHANGELOG](https://pydantable.readthedocs.io/en/latest/changelog.html).
+| **Changelog & versions** | [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html) |
+| **`DataFrameModel`** (inputs, transforms, collisions, materialization) | [DataFrameModel](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) |
+| **Column types** (scalars, structs, `list[T]`, maps, trusted ingest) | [Supported data types](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html) |
+| **FastAPI** (routers, bodies, async, multipart) | [FastAPI integration](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) |
+| **Execution** (`collect`, `to_dict`, `to_polars`, `to_arrow`, async) | [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) |
+| **Semantics** (nulls, joins, windows, reshape) | [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) |
+| **Roadmap** (shipped **0.17.0**, planned **0.18+**, path to v1.0.0) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
+| **Why not Polars alone?** | [Why not just use Polars?](https://pydantable.readthedocs.io/en/latest/WHY_NOT_POLARS.html) |
+| **Pandas-style API** (`pydantable.pandas`) | [Pandas UI](https://pydantable.readthedocs.io/en/latest/PANDAS_UI.html) |
+| **PySpark-style API** (`pydantable.pyspark`) | [PySpark UI](https://pydantable.readthedocs.io/en/latest/PYSPARK_UI.html) · [Parity matrix](https://pydantable.readthedocs.io/en/latest/PYSPARK_PARITY.html) |
+| **Polars parity** | [Scorecard](https://pydantable.readthedocs.io/en/latest/PARITY_SCORECARD.html) · [Workflows](https://pydantable.readthedocs.io/en/latest/POLARS_WORKFLOWS.html) · [Transformation roadmap](https://pydantable.readthedocs.io/en/latest/POLARS_TRANSFORMATIONS_ROADMAP.html) |
+| **Contributors** | [Developer guide](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html) |
+| **Architecture plan** | [Plan document](https://pydantable.readthedocs.io/en/latest/pydantable_plan.html) |
+| **Python API (autodoc)** | [API reference](https://pydantable.readthedocs.io/en/latest/api/index.html) |
 
 ---
 
@@ -74,19 +53,21 @@ PySpark-named helpers live under `pydantable.pyspark.sql.functions` (including *
 pip install pydantable
 ```
 
-Optional Python **Polars** (for `to_polars()` only):
+**Optional dependencies** (same package, feature extras):
 
 ```bash
-pip install 'pydantable[polars]'
+pip install 'pydantable[polars]'   # to_polars()
+pip install 'pydantable[arrow]'  # read_parquet/read_ipc, to_arrow, Table/RecordBatch constructors
 ```
 
-**From a git checkout**, the Rust extension must be built (e.g. with [maturin](https://www.maturin.rs/)):
+**From a git checkout** you need a Rust toolchain and a build of the extension (e.g. [Maturin](https://www.maturin.rs/)):
 
 ```bash
 pip install .
+# editable: maturin develop --manifest-path pydantable-core/Cargo.toml
 ```
 
-See [Developer guide — local setup](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html) for `maturin develop`, release builds, and CI parity.
+Full setup, `make check-full`, and release notes: [Developer guide](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html).
 
 ---
 
@@ -104,41 +85,64 @@ df2 = df.with_columns(age2=df.age * 2)
 df3 = df2.select("id", "age2")
 df4 = df3.filter(df3.age2 > 10)
 
+# Columnar dict (good for JSON APIs)
 print(df4.to_dict())
+# {'age2': [40], 'id': [1]}
+
+# List of Pydantic row models (default collect)
+for row in df4.collect():
+    print(row.id, row.age2)
 ```
 
-Example output:
+**Materialization:** [`collect()`](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) → `list` of row models; [`to_dict()`](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) / `collect(as_lists=True)` → `dict[str, list]`; `to_polars()` / `to_arrow()` when the matching extra is installed. **Async:** `acollect`, `ato_dict`, `ato_polars`, `ato_arrow` offload blocking work from the event loop ([Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html), [FastAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html)).
 
-```text
-{'age2': [40], 'id': [1]}
+**Alternate import styles** (same engine):
+
+```python
+from pydantable.pandas import DataFrameModel as PandasDataFrameModel
+from pydantable.pyspark import DataFrameModel as PySparkDataFrameModel
+from pydantable import DataFrameModel as DefaultDataFrameModel
 ```
 
-- **Materialization:** [`collect()`](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) returns a list of Pydantic row models; [`to_dict()`](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) returns columnar `dict[str, list]`; **`to_arrow` / `ato_arrow`** (optional **`pyarrow`**) return a PyArrow **`Table`**. **0.15.0** [`acollect` / `ato_dict` / `ato_polars`](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) run the same work off the asyncio loop (**`ato_arrow`** in **0.16.0**).
-- **Alternate UIs:**
+More examples: [FastAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html), [Polars-style workflows](https://pydantable.readthedocs.io/en/latest/POLARS_WORKFLOWS.html).
 
-  ```python
-  from pydantable.pandas import DataFrameModel as PandasDataFrameModel
-  from pydantable.pyspark import DataFrameModel as PySparkDataFrameModel
-  from pydantable import DataFrameModel as DefaultDataFrameModel
-  ```
+**Validation policy:** Constructors validate strictly by default. For messy row lists, `ignore_errors=True` plus `on_validation_errors=callback` receives failed rows (`row_index`, `row`, Pydantic `errors`). Trusted bulk paths use `trusted_mode` (`off` / `shape_only` / `strict`). Details: [DataFrameModel](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html), [Supported types](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html).
 
-More examples: [FastAPI integration](https://pydantable.readthedocs.io/en/latest/FASTAPI.html), [Polars-style workflows](https://pydantable.readthedocs.io/en/latest/POLARS_WORKFLOWS.html).
+---
 
-Input quality policy (optional): constructors are strict by default, and can be
-switched to best-effort ingestion with `ignore_errors=True` plus
-`on_validation_errors=...` to receive failed rows (`row_index`, `row`,
-validation `errors`). See [DataFrameModel docs](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html).
+## Expression & API surface
+
+Typed **`Expr`** builds a Rust AST. Highlights:
+
+- **Globals in `select`:** `global_sum`, `global_mean`, `global_count`, `global_min`, `global_max`, `global_row_count()` (row count). PySpark façade: `F.count()` with no argument = row count.
+- **Windows:** `row_number`, `rank`, `dense_rank`, `window_sum`, `window_mean`, `window_min`, `window_max`, `lag`, `lead` with `Window.partitionBy(...).orderBy(..., nulls_last=...)`; framed `rowsBetween` / `rangeBetween` where supported ([window semantics](https://pydantable.readthedocs.io/en/latest/WINDOW_SQL_SEMANTICS.html)).
+- **Temporal & strings:** `strptime`, `unix_timestamp`, `cast` to `date`/`datetime`, `dt_*` parts, `strip` / `lower` / `upper`, `str_replace`, `strip_prefix` / `suffix` / `chars`, list helpers (`list_len`, `list_get`, …).
+- **Maps (string keys):** `map_len`, `map_get`, `map_contains_key`, `map_keys`, `map_values`, `map_entries`, `map_from_entries`, `element_at`; `binary_len` for `bytes` columns.
+
+PySpark-named wrappers: `pydantable.pyspark.sql.functions` mirrors much of the above ([parity table](https://pydantable.readthedocs.io/en/latest/PYSPARK_PARITY.html)).
+
+---
+
+## Recent releases
+
+**0.17.0** — Tighter docs and tests for **`map_get` / `map_contains_key`** after PyArrow **`map<utf8, …>`** ingest; more **`pyspark.sql.functions`** thin wrappers (`str_replace`, `regexp_replace`, `strip_*`, `strptime`, `binary_len`, `list_*`). Non-string map keys (`dict[int, T]`, etc.) remain future work ([Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) **Later**).
+
+**0.16.x** — Arrow interchange (`read_parquet` / `read_ipc`, `to_arrow` / `ato_arrow`, Table/RecordBatch constructors), FastAPI multipart and deployment docs, map-column arithmetic `TypeError` fix, `DataFrame[Schema](pa.Table)` constructor fix.
+
+Older highlights: **0.15.0** async materialization and Arrow map ingest; **0.14.0** window null ordering and FastAPI `TestClient` coverage. Full history: [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html).
 
 ---
 
 ## Development
 
+From a clone with `.venv` and `pip install -e ".[dev]"` plus a built extension:
+
 ```bash
-make check-full   # Ruff, mypy, Rust fmt/clippy/tests (see Makefile for `rust-test` env)
-pytest -q         # or: pytest -n auto  with the [dev] extra
+make check-full              # Ruff, mypy, Rust fmt / clippy / tests
+PYTHONPATH=python pytest -q  # integration tests (see DEVELOPER.md)
 ```
 
-Rust + Python: see [Developer guide](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html) (formatting, `maturin`, `make rust-test` for `cargo test` with the venv `PYTHONPATH`, benchmarks, contribution workflow).
+Rust tests need the Makefile `PYO3_PYTHON` / `PYTHONPATH` wiring: `make rust-test`. Details: [Developer guide](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html).
 
 ---
 
