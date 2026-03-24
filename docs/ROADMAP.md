@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.16.x → 0.18.x → v1.0.0)
+# PydanTable roadmap (0.15.x → 0.18.x → v1.0.0)
 
-**Current release: `0.16.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, planned minors **0.17.0–0.18.0**, and what is still open before calling **`v1.0.0`**.
+**Current release: `0.15.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, planned minors **0.17.0–0.18.0**, and what is still open before calling **`v1.0.0`**.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
@@ -74,7 +74,7 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 - Close or explicitly defer remaining gaps in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) (and related parity docs: [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md), [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md)).
 - Keep CI green across supported Python versions and platforms; keep extension + optional **`[polars]`** matrices exercised in CI.
-- **Constructor ingest:** **`validate_data`** was removed in **0.16.0**; use **`trusted_mode`** only ([`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md)).
+- **Constructor ingest:** **`validate_data`** was removed in **0.15.0**; use **`trusted_mode`** only ([`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md)).
 - Optional: consolidated **migration guide** if semver ever jumps in a breaking way; keep [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) the semantics source of truth.
 - **Async I/O:** **0.15.0** ships **`acollect` / `ato_dict` / `ato_polars`** (and **`DataFrameModel`** **`arows` / `ato_dicts`**) using **`asyncio.to_thread`** or a custom executor; see [`EXECUTION.md`](EXECUTION.md) and [`FASTAPI.md`](FASTAPI.md). First-class **file / Parquet / IPC** helpers on the Python API are **Planned 0.17.0**; until then interchange remains **`to_dict`**, **`to_polars`**, and trusted Arrow/Polars buffers.
 - **FastAPI integration maturity:** treat [`FASTAPI.md`](FASTAPI.md) as the **canonical service guide**. **0.14.0** added **`TestClient`** / OpenAPI notes; **0.15.0** added **`async`** route examples and **`lifespan`**. **Multipart / file**, **`Depends`**, **background tasks**, and **error → HTTP status** mapping are **Planned 0.17.0** (see below).
@@ -170,33 +170,23 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 - [x] **Polars parity docs:** scorecard and [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) updated for **0.14.0** (transformation phases P1–P7 remain complete; this release is façade / contract polish).
 - [x] **PySpark façade:** **`dayofmonth`**, **`lower`**, **`upper`** in **`pydantable.pyspark.sql.functions`** (thin wrappers over core **`Expr`**).
 - [x] **Hypothesis:** additional pipeline property (`with_columns` identity) in `tests/test_hypothesis_properties.py`; documented in [`DEVELOPER.md`](DEVELOPER.md).
-- [x] **`validate_data` policy:** **`DeprecationWarning`** when **`validate_data=`** is passed without **`trusted_mode`**; documented removal after **0.16.0**.
+- [x] **`validate_data` policy:** **`DeprecationWarning`** when **`validate_data=`** is passed without **`trusted_mode`** in **0.14.x**; **`validate_data`** removed in **0.15.0**.
 - [x] **FastAPI testing & DX:** **`TestClient`** / columnar body examples in [`FASTAPI.md`](FASTAPI.md); **`tests/test_fastapi_recipes.py`**; **`fastapi`** / **`httpx`** in **`[dev]`** and CI pytest install.
 - [x] **Regression tests:** **`tests/test_v014_features.py`** (deprecation, drift, windows, PySpark, FastAPI); extra Hypothesis coverage for **`shape_only`** without drift on int columns.
 
 ---
 
-## Shipped in 0.15.0 (async I/O, Arrow maps, PySpark breadth)
+## Shipped in 0.15.0 (async I/O, Arrow maps, PySpark breadth, constructor cleanup)
 
-**Themes:** non-blocking materialization, Arrow **`map<utf8, …>`** ingest for **`dict[str, T]`**, and more PySpark-named helpers.
+**Themes:** non-blocking materialization, Arrow **`map<utf8, …>`** ingest for **`dict[str, T]`**, more PySpark-named helpers, and removal of the legacy **`validate_data`** constructor argument (**`trusted_mode`** only).
 
 - [x] **Maps and keys:** **Arrow-native `map`** columns (PyArrow **`MapType`** with **string keys**) ingest on constructors (**including `trusted_mode='off'`** after conversion); cells become Python **`dict`**. **`strict`** checks scalar map **value** types against Arrow (nested value dtypes: best-effort / documented limits). **Heterogeneous map keys** (e.g. **`dict[int, T]`**) remain **out of scope** for this release—see **Later** below.
 - [x] **Async materialization:** **`acollect`**, **`ato_dict`**, **`ato_polars`** on **`DataFrame`**; **`DataFrameModel`** adds the same plus **`arows`** and **`ato_dicts`**. Blocking Rust/Polars work runs in **`asyncio.to_thread`** or **`executor=`**. Documented limits: cancellation does not stop in-flight engine work; **`ato_polars`** still materializes a Python dict first. [`EXECUTION.md`](EXECUTION.md), [`FASTAPI.md`](FASTAPI.md).
 - [x] **FastAPI `async` routes:** **`async def`** examples, **`lifespan`** + **`ThreadPoolExecutor`**, **`StreamingResponse`** guidance (manual chunking; no built-in async row iterator). Tests: **`tests/test_fastapi_recipes.py`**, **`scripts/verify_doc_examples.py`**.
 - [x] **Spark façade depth:** **`trim`**, **`abs`**, **`round`**, **`floor`**, **`ceil`** in **`pydantable.pyspark.sql.functions`** (still **not** a distributed Spark engine).
-- [x] **Docs and migration:** [`changelog.md`](changelog.md) **0.15.0** entry; sync APIs unchanged (additive release).
-- [x] **Regression tests:** **`tests/test_async_materialization.py`**, **`tests/test_pyarrow_map_ingest.py`**, **`tests/test_v015_features.py`** (expanded **0.15.0** coverage).
-
----
-
-## Shipped in 0.16.0 (constructor cleanup)
-
-**Themes:** remove the **`validate_data`** compatibility path; **`trusted_mode`** is the **only** constructor knob for ingest depth on **`DataFrame`** / **`DataFrameModel`**.
-
-- [x] **Public API:** **`validate_data`** removed from **`DataFrame.__init__`** and **`DataFrameModel.__init__`**; passing it raises **`TypeError`**. See [`python/pydantable/dataframe.py`](../python/pydantable/dataframe.py), [`python/pydantable/dataframe_model.py`](../python/pydantable/dataframe_model.py).
-- [x] **Schema:** Removed **`_VALIDATE_DATA_KW_UNSET`**, **`_warn_validate_data_kw_deprecated`**, **`_coerce_validate_data_kw`**, and **`_skip_validate_data_deprecation`** / bridge kwargs; trimmed **`validate_columns_strict`** docstring ([`python/pydantable/schema.py`](../python/pydantable/schema.py)).
-- [x] **Docs:** [`changelog.md`](changelog.md) **0.16.0**; **`DATAFRAMEMODEL`**, **`FASTAPI`**, **`SUPPORTED_TYPES`**, **`PERFORMANCE`**, **`INTERFACE_CONTRACT`**, **`index`**, **`README`**.
-- [x] **Tests:** **`tests/test_v014_features.py`**, **`tests/test_dataframe_model.py`**, **`tests/test_dataframe_ops.py`** — **`TypeError`** for **`validate_data`** kw; trusted paths use **`trusted_mode`** only.
+- [x] **Constructor API:** **`validate_data`** removed from **`DataFrame.__init__`** and **`DataFrameModel.__init__`**; passing it raises **`TypeError`**. Removed schema helpers **`_VALIDATE_DATA_KW_UNSET`**, **`_warn_validate_data_kw_deprecated`**, **`_coerce_validate_data_kw`**, and internal **`_skip_validate_data_deprecation`** / bridge kwargs; trimmed **`validate_columns_strict`** docstring. See [`python/pydantable/dataframe.py`](../python/pydantable/dataframe.py), [`python/pydantable/dataframe_model.py`](../python/pydantable/dataframe_model.py), [`python/pydantable/schema.py`](../python/pydantable/schema.py).
+- [x] **Docs:** [`changelog.md`](changelog.md) **0.15.0**; **`DATAFRAMEMODEL`**, **`FASTAPI`**, **`SUPPORTED_TYPES`**, **`PERFORMANCE`**, **`INTERFACE_CONTRACT`**, **`index`**, **`README`**.
+- [x] **Regression tests:** **`tests/test_async_materialization.py`**, **`tests/test_pyarrow_map_ingest.py`**, **`tests/test_v015_features.py`**, **`tests/test_v015_constructor_api.py`**; **`tests/test_v014_features.py`**, **`tests/test_dataframe_model.py`**, **`tests/test_dataframe_ops.py`** (constructor **`TypeError`** coverage).
 
 ---
 
@@ -216,7 +206,7 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 - [ ] **Maps / keys v2:** spike **non-string keys** (e.g. **`dict[int, T]`**) **or** deepen **Arrow map** + **`Expr`** (**`map_get`**, typing) so behavior matches a written contract in [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md). If the spike is too large, move remainder to **Later** explicitly.
 - [ ] **PySpark façade:** add **Spark-named** helpers where **`Expr`** / Rust lowering already supports them (see deferred items in [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md)); reinforce “facade only” messaging.
-- [ ] **Parity documentation:** refresh [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md) and [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) for the post-**0.16.0** API surface; optional benchmarks in [`PERFORMANCE.md`](PERFORMANCE.md) for new interchange paths if **0.17.0** ships them.
+- [ ] **Parity documentation:** refresh [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md) and [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) for the post-**0.15.0** API surface; optional benchmarks in [`PERFORMANCE.md`](PERFORMANCE.md) for new interchange paths if **0.17.0** ships them.
 
 ---
 

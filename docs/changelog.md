@@ -2,21 +2,7 @@
 
 All notable changes to this project are documented here. The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.16.0] — 2026-03-25
-
-### Highlights
-
-- **Constructor cleanup:** **`validate_data`** removed from **`DataFrame`** and **`DataFrameModel`**. Ingest depth is controlled only by **`trusted_mode`** (`off` / `shape_only` / `strict`; omit for full per-element validation). Passing **`validate_data=...`** raises **`TypeError`**. Internal helpers **`_VALIDATE_DATA_KW_UNSET`**, **`_warn_validate_data_kw_deprecated`**, and **`_coerce_validate_data_kw`** are removed from **`schema`**. Direct callers of **`validate_columns_strict`** may still use **`validate_elements`** as a legacy bridge.
-
-### Tests
-
-- **`tests/test_v014_features.py`**, **`tests/test_dataframe_model.py`**: assert **`TypeError`** when **`validate_data`** is passed; trusted-path tests use **`trusted_mode`** only.
-
-### Details
-
-See {doc}`ROADMAP` **Shipped in 0.16.0**. Docs (**`DATAFRAMEMODEL`**, **`FASTAPI`**, **`SUPPORTED_TYPES`**, **`PERFORMANCE`**, etc.) no longer document **`validate_data`** on constructors.
-
-## [0.15.0] — 2026-03-24
+## [0.15.0] — 2026-03-25
 
 ### Highlights
 
@@ -24,17 +10,18 @@ See {doc}`ROADMAP` **Shipped in 0.16.0**. Docs (**`DATAFRAMEMODEL`**, **`FASTAPI
 - **FastAPI:** **`async def`** route examples, **`lifespan`** + **`ThreadPoolExecutor`**, and **`StreamingResponse`** guidance (manual chunking; no built-in row iterator yet). **`tests/test_fastapi_recipes.py`** and **`scripts/verify_doc_examples.py`** extended.
 - **Arrow-native maps:** PyArrow **`map<utf8, …>`** arrays (and chunked) ingest for **`dict[str, T]`** columns; convert to Python **`dict`** cells. String keys only; **`strict`** checks scalar value types (nested map values: best-effort). Tests: **`tests/test_pyarrow_map_ingest.py`**. {doc}`SUPPORTED_TYPES` updated.
 - **PySpark façade:** **`trim`**, **`abs`**, **`round`**, **`floor`**, **`ceil`** in **`pydantable.pyspark.sql.functions`** (and package **`__all__`**). {doc}`PYSPARK_PARITY` updated.
+- **Constructor cleanup:** **`validate_data`** removed from **`DataFrame`** and **`DataFrameModel`**. Ingest depth uses **`trusted_mode`** only (`off` / `shape_only` / `strict`; omit for full per-element validation). Passing **`validate_data=...`** raises **`TypeError`**. Removed internal schema helpers **`_VALIDATE_DATA_KW_UNSET`**, **`_warn_validate_data_kw_deprecated`**, and **`_coerce_validate_data_kw`**. Direct callers of **`validate_columns_strict`** may still use **`validate_elements`** as a legacy bridge. Docs (**`DATAFRAMEMODEL`**, **`FASTAPI`**, **`SUPPORTED_TYPES`**, **`PERFORMANCE`**, etc.) describe **`trusted_mode`** only on constructors.
 - **Dev:** **`pytest-asyncio`** in **`[dev]`**; **`asyncio_mode = auto`** in **`pyproject.toml`**.
 
 ### Tests
 
-- **`tests/test_async_materialization.py`**, **`tests/test_pyarrow_map_ingest.py`**, **`tests/test_v015_features.py`** (PySpark **0.15.0** helpers and core parity); extended **`tests/test_fastapi_recipes.py`**.
+- **`tests/test_async_materialization.py`**, **`tests/test_pyarrow_map_ingest.py`**, **`tests/test_v015_features.py`**, **`tests/test_v015_constructor_api.py`**; extended **`tests/test_fastapi_recipes.py`**. **`tests/test_v014_features.py`**, **`tests/test_dataframe_model.py`**, **`tests/test_dataframe_ops.py`**: **`TypeError`** when **`validate_data`** is passed; trusted paths use **`trusted_mode`** only.
 
 ### Details
 
-See {doc}`ROADMAP` **Shipped in 0.15.0**. Sync **`collect` / `to_dict` / `to_polars`** are unchanged; migration is additive unless you replace manual **`asyncio.to_thread`** wrappers with the new APIs.
+See {doc}`ROADMAP` **Shipped in 0.15.0**. Sync **`collect` / `to_dict` / `to_polars`** are unchanged aside from constructor kwargs (drop **`validate_data`**; use **`trusted_mode`**). You may replace manual **`asyncio.to_thread`** wrappers with **`acollect`** / **`ato_*`**.
 
-**`rust_version()`** in the extension now reports **`env!("CARGO_PKG_VERSION")`** so it always matches **`pyproject.toml`** / **`Cargo.toml`** (release hygiene).
+**`rust_version()`** in the extension reports **`env!("CARGO_PKG_VERSION")`** so it matches **`pyproject.toml`** / **`Cargo.toml`**.
 
 ## [0.14.0] — 2026-03-23
 
@@ -42,11 +29,11 @@ See {doc}`ROADMAP` **Shipped in 0.15.0**. Sync **`collect` / `to_dict` / `to_pol
 
 - **Window `orderBy` null placement:** **`nulls_last`** on **`Window.partitionBy(...).orderBy(...)`** (per-column list or bool); framed windows use all keys; unframed Polars **`.over`** uses the first key for **`SortOptions`**. Docs: {doc}`WINDOW_SQL_SEMANTICS`, {doc}`INTERFACE_CONTRACT`.
 - **Trusted `shape_only`:** **`pydantable.DtypeDriftWarning`** when data would fail **`strict`**; env **`PYDANTABLE_SUPPRESS_SHAPE_ONLY_DRIFT_WARNINGS=1`** to silence. See {doc}`SUPPORTED_TYPES`.
-- **`validate_data` deprecation:** explicit **`validate_data=`** without **`trusted_mode`** raises **`DeprecationWarning`** (removal after **0.16.0**). See {doc}`DATAFRAMEMODEL`, {doc}`FASTAPI`.
+- **`validate_data` deprecation:** explicit **`validate_data=`** without **`trusted_mode`** raises **`DeprecationWarning`** (removal shipped in **0.15.0**). See {doc}`DATAFRAMEMODEL`, {doc}`FASTAPI`.
 - **PySpark façade:** **`dayofmonth`**, **`lower`**, **`upper`** in **`pydantable.pyspark.sql.functions`**. {doc}`PYSPARK_PARITY` updated.
 - **FastAPI DX:** **`TestClient`** recipes and OpenAPI notes in {doc}`FASTAPI`; **`tests/test_fastapi_recipes.py`**; **`fastapi`** / **`httpx`** in **`[dev]`** and CI.
 - **Hypothesis:** extra property test for **`with_columns`** identity; {doc}`DEVELOPER` documents running property tests.
-- **Tests:** **`tests/test_v014_features.py`** covers **`DtypeDriftWarning`** (including multi-column drift), window **`lag`** / **`row_number`** with null sort order, FastAPI **422** / OpenAPI **`requestBody`**, and PySpark **`dayofmonth` / `lower` / `upper`**. (Constructor **`validate_data`** was deprecated here and removed in **0.16.0** — see changelog **\[0.16.0\]**.)
+- **Tests:** **`tests/test_v014_features.py`** covers **`DtypeDriftWarning`** (including multi-column drift), window **`lag`** / **`row_number`** with null sort order, FastAPI **422** / OpenAPI **`requestBody`**, and PySpark **`dayofmonth` / `lower` / `upper`**. (Constructor **`validate_data`** was deprecated here and removed in **0.15.0** — see changelog **\[0.15.0\]**.)
 
 ### Details
 

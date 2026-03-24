@@ -197,7 +197,7 @@ Polars and columnar Python paths; **0.13.0** adds **`strict`** dtype checks for 
 `Array` / `ChunkedArray` columns and accepts concrete Arrow array classes as trusted
 buffers). See **`schema.validate_columns_strict`** for the low-level API (**`validate_elements`** remains a bridge for direct callers).
 
-See {doc}`DATAFRAMEMODEL` (“Trusted ingest”). The legacy **`validate_data`** constructor argument was removed in **0.16.0**.
+See {doc}`DATAFRAMEMODEL` (“Trusted ingest”). The legacy **`validate_data`** constructor argument was removed in **0.15.0**.
 
 **0.14.0 — `shape_only` dtype drift:** when **`trusted_mode="shape_only"`**, pydantable
 may emit **`pydantable.DtypeDriftWarning`** if a column would be **rejected under

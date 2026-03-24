@@ -1,4 +1,4 @@
-"""0.16.0: removed ``validate_data``; ``trusted_mode``-only constructors."""
+"""0.15.0: ``validate_data`` removed; ``trusted_mode``-only constructors."""
 
 from __future__ import annotations
 
