@@ -27,7 +27,7 @@ source .venv/bin/activate
 
 ## Repository Layout
 
-- `python/pydantable/`: thin Python API layer + Pydantic integration
+- `python/pydantable/`: thin Python API layer + Pydantic integration (`dataframe/`, `schema/` packages with `_impl.py` bodies)
 - `python/pydantable/rust_engine.py`: calls into `pydantable._core` for execution (single engine)
 - `pydantable-core/src/`: Rust core (`dtype`, `expr`, `plan`, PyO3 exports)
 - `tests/`: Python integration/unit tests for behavior contracts
@@ -66,6 +66,36 @@ Current contract direction:
 - Python is the ergonomic API boundary (`DataFrameModel`, stubs, docs, Pydantic)
 - Rust is the source of truth for expression typing, logical-plan validation, and execution for supported operations
 - Python wrappers should avoid duplicating validation that Rust already enforces
+
+### SOLID-oriented layout (internals)
+
+- **Rust — `plan/execute_polars/`:** Polars execution is split into `common`, `runner` (`PolarsPlanRunner`), `materialize`, `join_exec`, `groupby_exec`, `concat_exec`, `literal_agg`, and `reshape_exec`, re-exported from `execute_polars/mod.rs`.
+- **Rust — `python_api/`:** PyO3 bindings are split into `types` (`PyExpr`, `PyPlan`), `expr_fns`, `plan_fns`, and `exec_fns`; `mod.rs` only registers symbols on `_core`.
+- **Rust — `plan/executor.rs`:** `PhysicalPlanExecutor` dispatches full-plan `execute_plan`. With `polars_engine`, inherent methods on `PolarsExecutor` (`join`, `groupby_agg`, `concat`, `melt`, `pivot`, `explode`, `unnest`, `groupby_dynamic_agg`) forward to `execute_polars::*` so call sites depend on the executor type rather than raw free functions.
+- **Python — `dataframe/` and `schema/`:** Public API stays `pydantable.dataframe` and `pydantable.schema`; implementations live in `_impl.py` inside each package for a single-responsibility split without changing imports.
+
+### Extension checklist (new surface area)
+
+When adding a feature, touch the minimal set in order:
+
+1. **Expr / dtype (Rust):** `expr/ir.rs`, `expr/typing.rs`, `expr/lower_polars.rs` (and PyO3 builders in `python_api/expr_fns.rs` if exposed to Python).
+2. **Plan step (Rust):** `plan/ir.rs` (`PlanStep`), `plan/build.rs`, `plan/serialize.rs`, `plan/execute_polars/runner.rs` (or the relevant `execute_polars/*` module), plus tests under `pydantable-core`.
+3. **Python `DataFrame` API:** `python/pydantable/dataframe/_impl.py` (and `rust_engine.py` if a new `_core` entry point is required).
+4. **Docs / changelog:** user-visible behavior belongs in the docs site and `docs/changelog.md`.
+
+### Optional: narrow `Protocol` for tests (Python)
+
+Integration tests can depend on a small structural protocol instead of mocking all of `_core`:
+
+```python
+from typing import Any, Protocol
+
+class RustCorePlan(Protocol):
+    def make_plan(self, schema_fields: dict[str, Any]) -> Any: ...
+    def execute_plan(self, plan: Any, data: Any, *, as_python_lists: bool = False) -> Any: ...
+```
+
+Use this only where it reduces brittle monkeypatching; production code keeps importing `pydantable._core` via `rust_engine._require_rust_core()`.
 
 Phase 4 boundary contract:
 

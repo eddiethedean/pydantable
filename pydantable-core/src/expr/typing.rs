@@ -283,8 +283,16 @@ impl ExprNode {
             ));
         }
         let nullable = left.nullable_flag() || right.nullable_flag();
-        let left_b = left.as_scalar_base_field().unwrap();
-        let right_b = right.as_scalar_base_field().unwrap();
+        let left_b = left.as_scalar_base_field().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Arithmetic operators do not support struct-, list-, or map-typed columns.",
+            )
+        })?;
+        let right_b = right.as_scalar_base_field().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Arithmetic operators do not support struct-, list-, or map-typed columns.",
+            )
+        })?;
 
         if let (Some(a), Some(b)) = (left_b, right_b) {
             use ArithOp::*;

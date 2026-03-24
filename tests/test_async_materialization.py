@@ -85,7 +85,7 @@ async def test_ato_polars_import_error_propagates() -> None:
     df = Tiny({"x": [1]})
     with (
         mock.patch(
-            "pydantable.dataframe.importlib.import_module",
+            "pydantable.dataframe._impl.importlib.import_module",
             side_effect=ImportError("no polars"),
         ),
         pytest.raises(ImportError, match="polars is required"),

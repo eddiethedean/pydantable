@@ -21,6 +21,8 @@ pub use execute_polars::{
     execute_pivot_polars, execute_unnest_polars, PolarsPlanRunner,
 };
 pub use executor::PhysicalPlanExecutor;
+#[cfg(feature = "polars_engine")]
+pub use executor::PolarsExecutor;
 #[allow(unused_imports)]
 pub use ir::{make_plan, PlanInner, PlanStep};
 pub use schema_py::{schema_descriptors_as_py, schema_fields_as_py};
@@ -28,9 +30,6 @@ pub use serialize::planinner_to_serializable;
 
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
-
-#[cfg(feature = "polars_engine")]
-use crate::plan::executor::PolarsExecutor;
 
 #[cfg(not(feature = "polars_engine"))]
 use crate::plan::executor::RowwiseExecutor;

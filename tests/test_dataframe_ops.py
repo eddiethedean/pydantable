@@ -76,7 +76,7 @@ def test_nested_schema_rejects_arithmetic_on_struct_column():
     df = DataFrame[_Person](
         {"id": [1], "addr": [{"street": "main"}]},
     )
-    with pytest.raises(TypeError, match="struct- or list-typed columns"):
+    with pytest.raises(TypeError, match="struct-, list-, or map-typed"):
         _ = df.addr + 1
 
 

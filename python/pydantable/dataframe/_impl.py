@@ -31,8 +31,8 @@ from typing import (
 
 from pydantic import BaseModel, TypeAdapter
 
-from .expressions import ColumnRef, Expr
-from .rust_engine import (
+from pydantable.expressions import ColumnRef, Expr
+from pydantable.rust_engine import (
     _require_rust_core,
     execute_concat,
     execute_explode,
@@ -44,7 +44,7 @@ from .rust_engine import (
     execute_plan,
     execute_unnest,
 )
-from .schema import (
+from pydantable.schema import (
     _annotation_nullable_inner,
     make_derived_schema_type,
     merge_field_types_preserving_identity,

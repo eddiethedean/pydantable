@@ -148,7 +148,7 @@ def test_explode_mismatched_list_lengths_errors() -> None:
 
 def test_arithmetic_rejects_list_column() -> None:
     df = DataFrame[_TagsInt]({"id": [1], "tags": [[1, 2]]})
-    with pytest.raises(TypeError, match="list-typed"):
+    with pytest.raises(TypeError, match="struct-, list-, or map-typed"):
         _ = df.tags + 1
 
 
