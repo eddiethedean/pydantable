@@ -1,5 +1,5 @@
 """
-Split timing for a representative pipeline: validation vs plan vs collect.
+Split timing: validation, `DataFrame` build, transform, then columnar ``to_dict()``.
 
 Run from repo root with release extension:
 
@@ -63,7 +63,7 @@ def main() -> None:
         df.with_columns(spend2=df.spend * 1.1)
         .filter(df.spend > 50.0)
         .select("user_id", "spend2")
-        .collect()
+        .to_dict()
     )
     t_pipeline = perf_counter() - t2
 
@@ -74,9 +74,9 @@ def main() -> None:
     p_pct = 100 * t_pipeline / total
     print(f"  validate_columns_strict: {t_validate:.4f}s ({v_pct:.1f}%)")
     print(f"  DataFrame construct+plan: {t_construct:.4f}s ({c_pct:.1f}%)")
-    print(f"  transform+collect:       {t_pipeline:.4f}s ({p_pct:.1f}%)")
+    print(f"  transform+to_dict:       {t_pipeline:.4f}s ({p_pct:.1f}%)")
     print(f"  total:                   {total:.4f}s")
-    print(f"  collect rows (sample):   {len(out['user_id'])}")
+    print(f"  output rows (sample):    {len(out['user_id'])}")
 
     if args.cprofile:
 
@@ -88,7 +88,7 @@ def main() -> None:
                 d.with_columns(spend2=d.spend * 1.1)
                 .filter(d.spend > 50.0)
                 .select("user_id", "spend2")
-                .collect()
+                .to_dict()
             )
 
         pr = cProfile.Profile()

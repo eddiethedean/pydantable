@@ -35,6 +35,8 @@ For execution, the PySpark UI uses the same Rust/Polars path as the default expo
 
 **0.18.0:** The parity matrix above is **unchanged**—no new `sql.functions` wrappers this release.
 
+**0.19.0:** Matrix **unchanged**—documentation and **0.x** versioning policy only; see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.19.0**.
+
 ## Phase B status (expression surface)
 
 Delivered in-tree: **`IsNull`**, **`IsNotNull`**, **`Coalesce`**, **`CaseWhen`** (`when` / `otherwise`), **`Cast`**, **`InList`**, **`Between`**, **`StringConcat`**, **`Substring`**, **`StringLength`** — Rust `ExprNode`, Polars lowering, and `pydantable.pyspark.sql.functions` / `Expr` methods.

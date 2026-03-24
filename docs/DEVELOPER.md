@@ -111,7 +111,7 @@ Phase 4 boundary contract:
 - **`pytest` on `tests/`** is the **CI-facing** check for end-to-end behavior (`collect`, joins, UIs). Prefer adding user-visible regressions here when behavior crosses the Python boundary.
 - **Async tests:** **`pytest-asyncio`** is in **`[dev]`**; `pyproject.toml` sets **`asyncio_mode = auto`** so `async def` tests run without extra markers unless you prefer explicit `@pytest.mark.asyncio`.
 
-### Release ↔ tests map (0.15.0–0.18.0)
+### Release ↔ tests map (0.15.0–0.19.0)
 
 Use this table to locate **Python tests and doc-example smoke** that back shipped minors (see `docs/changelog.md` for narrative highlights). It is not a substitute for line coverage.
 
@@ -122,8 +122,9 @@ Use this table to locate **Python tests and doc-example smoke** that back shippe
 | **0.16.1** | Map-column arithmetic `TypeError` (not panic); `validate_columns_strict` Arrow `pydantable.io` import fix | `tests/test_expr_070_surfaces.py`; `tests/test_arrow_interchange.py` (`test_dataframe_generic_accepts_pa_table`) |
 | **0.17.0** | Map `Expr` contracts after Arrow ingest; PySpark `functions` string/list/bytes wrappers | `tests/test_pyarrow_map_ingest.py` (`test_arrow_map_ingest_then_map_get_and_contains`); `tests/test_pyspark_sql.py` (new façade tests) |
 | **0.18.0** | Grouped Polars error context (`polars_err_ctx`); map-key deferral (docs); Hypothesis + integration `join` / `group_by` smoke | `tests/test_v018_features.py`; `tests/test_hypothesis_properties.py` (`test_group_by_sum_matches_manual`, `test_inner_join_unique_ids_row_count`, …); Rust: `execute_polars/common.rs` (`polars_err_format_tests`), `groupby_exec.rs` |
+| **0.19.0** | Pre-1.0 doc consolidation (`VERSIONING`, parity/README/index, `PERFORMANCE` note); CI-stable grouped test ordering | Same as **0.18.0** for execution semantics; `tests/test_v018_features.py` (`_sort_group_output` for `group_by` asserts); docs: `docs/VERSIONING.md`, `docs/ROADMAP.md` **Shipped in 0.19.0** |
 
-#### Changelog-driven audit (0.15.0–0.18.0)
+#### Changelog-driven audit (0.15.0–0.19.0)
 
 Cross-check each bullet in `docs/changelog.md` for recent minors against tests or `verify_doc_examples.py`.
 
@@ -158,6 +159,13 @@ Cross-check each bullet in `docs/changelog.md` for recent minors against tests o
 - **Grouped execution error context:** Rust `polars_err_ctx` on **`group_by().agg()`** `collect()` in `execute_polars/common.rs` / `groupby_exec.rs`; notes in `docs/EXECUTION.md` and `docs/INTERFACE_CONTRACT.md`. Unit tests: `polars_err_format_tests` in `execute_polars/common.rs`.
 - **Non-string map keys:** deferred—`docs/SUPPORTED_TYPES.md`, `docs/ROADMAP.md` **Later** (no new ingest code).
 - **Hypothesis / integration:** `tests/test_hypothesis_properties.py` (group_by sum/count, inner/left join); `tests/test_v018_features.py` (empty group_by, multi-agg, semi/anti/left join, count vs group size).
+
+**0.19.0**
+
+- **Docs-only release** for API surface; no new Rust `Expr` or PySpark façade rows.
+- **`VERSIONING.md`:** 0.x semver; links from `INTERFACE_CONTRACT.md`.
+- **`PERFORMANCE.md`:** validation subsection (re-run scripts; no new headline timings vs 0.18.x).
+- **Grouped tests:** `tests/test_v018_features.py` — `_sort_group_output` before comparing `group_by` columnar output to reference (order not API-guaranteed; `pytest -n auto` on Ubuntu CI).
 
 #### Optional follow-ups (non-blocking)
 
@@ -310,7 +318,7 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 
 ## Release Notes Checklist (for contributors)
 
-- [ ] Version matches everywhere: `pyproject.toml`, `pydantable-core/Cargo.toml`, `python/pydantable/__init__.py`, and `rust_version()` in `pydantable-core/src/python_api/mod.rs` (CI also runs `tests/test_version_alignment.py`, which asserts `__version__ == _core.rust_version()`)
+- [ ] Version matches everywhere: `pyproject.toml`, `pydantable-core/Cargo.toml`, `python/pydantable/__init__.py`, and `rust_version()` in `pydantable-core/src/python_api/expr_fns.rs` (`env!("CARGO_PKG_VERSION")`) (CI also runs `tests/test_version_alignment.py`, which asserts `__version__ == _core.rust_version()`)
 - [ ] `docs/changelog.md` has a section for the release with highlights
 - [ ] `make check-full` passes (Ruff, mypy, `cargo fmt --check`, `clippy -D warnings`, `cargo test --all-features`)
 - [ ] Python tests pass in `.venv` (`pytest`)
@@ -322,8 +330,8 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 
 ### Publishing (PyPI)
 
-Pushing a git tag matching `v*` (for example `v0.18.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then **`maturin build`** (per target) and **`twine upload --skip-existing dist/*`** to PyPI. The repository needs a **`PYPI_API_TOKEN`** secret (`TWINE_USERNAME` is **`__token__`** in the workflow). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test install** (`.github/workflows/_shared-ci.yml`, **Install maturin and test deps**) aligned with **`pyproject.toml`** **`[project.optional-dependencies]`** **`dev`** + **`pandas`** + **`polars`** (e.g. **`pytest-asyncio`**, **`polars`**, **`fastapi`**, **`httpx`**, **`python-multipart`**, **`pyarrow`**, **`hypothesis`**) so optional tests are not skipped on any OS/Python matrix leg or on tag builds.
+Pushing a git tag matching `v*` (for example `v0.19.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then **`maturin build`** (per target) and **`twine upload --skip-existing dist/*`** to PyPI. The repository needs a **`PYPI_API_TOKEN`** secret (`TWINE_USERNAME` is **`__token__`** in the workflow). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test install** (`.github/workflows/_shared-ci.yml`, **Install maturin and test deps**) aligned with **`pyproject.toml`** **`[project.optional-dependencies]`** **`dev`** + **`pandas`** + **`polars`** (e.g. **`pytest-asyncio`**, **`polars`**, **`fastapi`**, **`httpx`**, **`python-multipart`**, **`pyarrow`**, **`hypothesis`**) so optional tests are not skipped on any OS/Python matrix leg or on tag builds.
 
 **GNU manylinux wheels** are built with **`PyO3/maturin-action`** inside the default **manylinux Docker** images (`manylinux: 2_17` / `2_28`). Avoid **`container: off`** plus **`--zig`** on the host for those targets: linker failures and **OOM** are common with a Polars-sized dependency tree. **musllinux** jobs still use **`--zig`** in `release.yml` as needed.
 
-The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v0.18.0`**).
+The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v0.19.0`**).

@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented here. The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.19.0] — 2026-03-24
+
+### Highlights
+
+- **Pre-1.0 consolidation:** {doc}`VERSIONING` documents **0.x** patch vs minor expectations; {doc}`INTERFACE_CONTRACT` links there for semver scope while staying the behavioral source of truth.
+- **Roadmap to 1.0:** {doc}`ROADMAP` **Shipped in 0.19.0** replaces the planned checklist; **Planned v1.0.0** items that belong on the **1.0.0** tag (full **1.x** semver policy, SBOM, comms) remain explicitly deferred there with rationale below.
+- **Parity docs:** {doc}`POLARS_TRANSFORMATIONS_ROADMAP`, {doc}`PARITY_SCORECARD`, {doc}`PYSPARK_PARITY`, {doc}`README`, and {doc}`index` updated for **current release** and **0.19 → 1.0** clarity—no new table methods or PySpark `functions` rows.
+- **Performance:** {doc}`PERFORMANCE` adds an **0.19.0 validation** note (key scripts spot-checked; no headline number refresh vs **0.18.x** paths).
+- **CI / tests:** Grouped output comparisons in **`tests/test_v018_features.py`** sort by group key where row order is not API-guaranteed (stable **`pytest-xdist`** on Linux).
+
+### Details
+
+See {doc}`ROADMAP` **Shipped in 0.19.0**. Release hygiene: **`make check-full`**, **`cargo test --all-features`**, **`cargo check --no-default-features`**, full **pytest** before tag; GitHub Actions install deps aligned with {doc}`DEVELOPER` / **`pyproject.toml`** **`[dev]`**.
+
+**Deferred to v1.0.0 tag (not blocking 0.19.0):** formal **1.x** semver publication, PyPI packaging dry-run narrative, SBOM/supply-chain notes, support matrix as a **1.0.x** commitment, and README/index “1.0 leads” copy—see {doc}`ROADMAP` **Planned v1.0.0**.
+
 ## [0.18.0] — 2026-03-30
 
 ### Highlights

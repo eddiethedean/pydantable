@@ -51,3 +51,7 @@ Run `profile_breakdown.py --cprofile` for a cumulative profile of one pipeline.
 ## Release profile
 
 Wheels and `maturin develop --release` use Cargo’s `release` profile. Optional **thin LTO** is enabled in `pydantable-core/Cargo.toml` to trade longer compile time for slightly faster native code.
+
+## 0.19.0 validation
+
+**0.19.0** spot-checked [`benchmarks/profile_breakdown.py`](../benchmarks/profile_breakdown.py), [`benchmarks/micro_collect_only.py`](../benchmarks/micro_collect_only.py), [`benchmarks/framed_window_bench.py`](../benchmarks/framed_window_bench.py), and [`benchmarks/trusted_polars_ingest_bench.py`](../benchmarks/trusted_polars_ingest_bench.py) under a **release** extension build on the supported Polars stack; **0.18.x** did not change materialization or grouped execution hot paths in ways that require refreshed headline numbers here. Re-run these scripts locally when upgrading Polars or changing the Rust execution path.

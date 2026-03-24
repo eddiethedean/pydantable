@@ -8,7 +8,7 @@
 
 **Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core (Polars inside the native extension).**
 
-**Current release: 0.18.0** · Python **3.10+**
+**Current release: 0.19.0** · Python **3.10+**
 
 ---
 
@@ -30,13 +30,13 @@ The **canonical manual** is on Read the Docs: **[https://pydantable.readthedocs.
 | Topic | Read the Docs |
 |--------|----------------|
 | **Home / overview** | [Documentation home](https://pydantable.readthedocs.io/en/latest/index.html) |
-| **Changelog & versions** | [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html) |
+| **Changelog & versions** | [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html) · [Versioning (0.x)](https://pydantable.readthedocs.io/en/latest/VERSIONING.html) |
 | **`DataFrameModel`** (inputs, transforms, collisions, materialization) | [DataFrameModel](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) |
 | **Column types** (scalars, structs, `list[T]`, maps, trusted ingest) | [Supported data types](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html) |
 | **FastAPI** (routers, bodies, async, multipart) | [FastAPI integration](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) |
 | **Execution** (`collect`, `to_dict`, `to_polars`, `to_arrow`, async) | [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) |
 | **Semantics** (nulls, joins, windows, reshape) | [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) |
-| **Roadmap** (shipped **0.18.0**, planned **0.19+**, path to v1.0.0) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
+| **Roadmap** (shipped **0.19.0**, path to **v1.0.0**) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
 | **Why not Polars alone?** | [Why not just use Polars?](https://pydantable.readthedocs.io/en/latest/WHY_NOT_POLARS.html) |
 | **Pandas-style API** (`pydantable.pandas`) | [Pandas UI](https://pydantable.readthedocs.io/en/latest/PANDAS_UI.html) |
 | **PySpark-style API** (`pydantable.pyspark`) | [PySpark UI](https://pydantable.readthedocs.io/en/latest/PYSPARK_UI.html) · [Parity matrix](https://pydantable.readthedocs.io/en/latest/PYSPARK_PARITY.html) |
@@ -124,6 +124,8 @@ PySpark-named wrappers: `pydantable.pyspark.sql.functions` mirrors much of the a
 ---
 
 ## Recent releases
+
+**0.19.0** — Pre-1.0 **documentation consolidation**: [Versioning (0.x)](https://pydantable.readthedocs.io/en/latest/VERSIONING.html), [interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) cross-links, parity/README/index refresh for the **0.19 → 1.0** path, [PERFORMANCE](https://pydantable.readthedocs.io/en/latest/PERFORMANCE.html) benchmark spot-check note, release-hygiene alignment with CI; **group_by** tests sort output where row order is not guaranteed (stable **`pytest-xdist`**). No new **`Expr`** or PySpark façade methods.
 
 **0.18.0** — Clearer **Polars** error context for **`group_by().agg()`**; explicit deferral of non-string map keys ([Supported types](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html), [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html)); parity/roadmap doc refresh (no new façade APIs); Hypothesis smoke for **join** / **group_by**.
 

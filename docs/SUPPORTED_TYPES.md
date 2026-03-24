@@ -71,7 +71,7 @@ wins (Polars map semantics); do not rely on raising an error for duplicates.
 
 **0.17.0 — Map expressions after Arrow ingest:** After ingest, the column is a normal **`dict[str, T]`** map for planning and **`Expr`**: **`map_get(key)`** yields **null** when the key is absent (or the whole map cell is null); **`map_contains_key(key)`** is boolean. Same rules apply to maps built from Python dict cells. See **`tests/test_pyarrow_map_ingest.py`** (`test_arrow_map_ingest_then_map_get_and_contains`).
 
-**0.18.0 — Non-string map keys:** **`dict[int, T]`**, other non-string Python keys, and Arrow **`map`** types whose keys are not **`string` / `large_string`** remain **unsupported**. That work is explicitly deferred; see {doc}`ROADMAP` **Later**. This release does not change map dtypes or ingest—only clarifies the roadmap.
+**0.18.0 / 0.19.0 — Non-string map keys:** **`dict[int, T]`**, other non-string Python keys, and Arrow **`map`** types whose keys are not **`string` / `large_string`** remain **unsupported**. That work is explicitly deferred; see {doc}`ROADMAP` **Later**. **0.19.0** does not change map dtypes or ingest.
 
 ## Homogeneous list columns (`list[T]` / `List[T]`)
 

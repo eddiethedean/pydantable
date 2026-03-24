@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.18.x → 0.19.x → v1.0.0)
+# PydanTable roadmap (0.19.x → v1.0.0)
 
-**Current release: `0.18.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, planned minor **0.19.0**, and the **Planned v1.0.0** phase for the **production-ready** major release.
+**Current release: `0.19.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and the **Planned v1.0.0** phase for the **production-ready** major release.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
@@ -70,7 +70,7 @@ Beyond the original Phase 7 checklist, **0.5.0** also ships:
 
 ## Toward v1.0.0
 
-No single “Phase 8” gate is defined here. **v1.0.0** is the **production-ready** major: a **stability and commitment** cut when maintainers lock **semver** expectations, ship **PyPI** artifacts with aligned Rust/Python versions, and publish clear **1.0** messaging. Detailed checklist: **Planned v1.0.0** (below), after **0.19.0**.
+No single “Phase 8” gate is defined here. **v1.0.0** is the **production-ready** major: a **stability and commitment** cut when maintainers lock **semver** expectations, ship **PyPI** artifacts with aligned Rust/Python versions, and publish clear **1.0** messaging. Detailed checklist: **Planned v1.0.0** (below). **0.19.0** is the last planned **0.x** consolidation before that gate.
 
 Practical inputs that feed that phase:
 
@@ -80,7 +80,7 @@ Practical inputs that feed that phase:
 - Optional: consolidated **migration guide** if semver ever jumps in a breaking way; keep [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) the semantics source of truth.
 - **Async I/O:** **0.15.0** ships **`acollect` / `ato_dict` / `ato_polars`** (and **`DataFrameModel`** **`arows` / `ato_dicts`**) using **`asyncio.to_thread`** or a custom executor; **0.16.0** adds **`ato_arrow`** and synchronous **`read_parquet` / `read_ipc`** returning **`dict[str, list]`** (see [`EXECUTION.md`](EXECUTION.md), [`FASTAPI.md`](FASTAPI.md)).
 - **FastAPI integration maturity:** treat [`FASTAPI.md`](FASTAPI.md) as the **canonical service guide**. **0.14.0** added **`TestClient`** / OpenAPI notes; **0.15.0** added **`async`** route examples and **`lifespan`**; **0.16.0** documents **multipart** Parquet/IPC, **`Depends`** executors, **background tasks**, and **422 vs application errors**.
-- **Release train:** **0.18.0** → **0.19.0** → **Planned v1.0.0** (below); dates are not committed here. **0.19.0** is the last **0.x** consolidation before tagging **1.0.0**, unless scope slips.
+- **Release train:** **0.19.0** → **Planned v1.0.0** (below); dates are not committed here. The **1.0.0** tag waits until the **Planned v1.0.0** checklist is satisfied, unless scope slips.
 
 ---
 
@@ -233,15 +233,16 @@ Practical inputs that feed that phase:
 
 ---
 
-## Planned 0.19.0 (pre-1.0 consolidation)
+## Shipped in 0.19.0 (pre-1.0 consolidation)
 
-**Themes:** treat this release as the **default gate** before declaring **v1.0.0**: stabilize semantics, drain known doc debt, and avoid starting large new surfaces unless they block 1.0 messaging.
+**Themes:** documentation and process gate before **v1.0.0**—no large new **`Expr`** or PySpark façade surface; align parity docs, semver story, and release hygiene.
 
-- [ ] **v1.0 readiness review:** re-read **Toward v1.0.0** (above) and **Planned v1.0.0** (below); close gaps or move them to **Later** / **After v1.0.0** with explicit rationale.
-- [ ] **Contract and semver:** confirm [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) matches shipped behavior for **windows**, **trusted ingest**, **async** materialization, and **interchange**; document **semver** expectations for patch vs minor (including optional **migration** notes if any deprecations land in **0.18.x**).
-- [ ] **Parity and roadmap docs:** final pass on [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md), [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md), and [`README.md`](README.md) / doc site **`index`** so “what is 1.0” is obvious to new users.
-- [ ] **Performance and ops:** refresh [`PERFORMANCE.md`](PERFORMANCE.md) for critical paths (materialization, trusted Polars ingest, framed windows) if **0.18.0** changed numbers; ensure benchmark scripts still run on supported Polars.
-- [ ] **Release hygiene:** **`make check-full`**, **`cargo test --all-features`**, **`cargo check --no-default-features`** (rowwise skeleton), and full **pytest** on a **release** extension build before tagging; align **GitHub Actions** with [`DEVELOPER.md`](DEVELOPER.md) if workflows drift.
+- [x] **v1.0 readiness review:** Re-read **Toward v1.0.0** and **Planned v1.0.0**; items that belong on the **1.0.0** tag itself (**full** semver policy for 1.x, SBOM, PyPI dry-run comms, support matrix as a **1.0.x** commitment) remain under **Planned v1.0.0** below—**explicitly deferred** to the major release with rationale in [`changelog.md`](changelog.md) **0.19.0**. **0.19.0** delivers the **0.x** policy doc and doc-site clarity so the path to 1.0 is obvious.
+- [x] **Contract and semver:** [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) audited against **windows**, **trusted ingest**, **async** materialization, and **interchange**; [`VERSIONING.md`](VERSIONING.md) documents **0.x** patch vs minor expectations and points here for behavior.
+- [x] **Parity and roadmap docs:** Pass on [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md), [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md), [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md), [`README.md`](README.md), and doc site [`index.md`](index.md)—**current release** and **0.19 → 1.0** narrative updated.
+- [x] **Performance and ops:** [`PERFORMANCE.md`](PERFORMANCE.md) — key benchmark scripts spot-checked under a **release** build on supported Polars; narrative note for **0.19.0** (no material numeric refresh required vs **0.18.x** execution paths).
+- [x] **Release hygiene:** **`make check-full`**, **`cargo test --all-features`**, **`cargo check --no-default-features`**, and **`pytest`** (with **`-n auto`** where CI uses it) on a **release** extension build before tagging; [`.github/workflows/_shared-ci.yml`](../.github/workflows/_shared-ci.yml) install list checked against [`DEVELOPER.md`](DEVELOPER.md) / **`pyproject.toml`** **`[dev]`** (no drift found in this cycle).
+- [x] **Tests:** **`group_by`** integration tests sort grouped output before assert where row order is not API-guaranteed (CI **`pytest-xdist`** stability); see **`tests/test_v018_features.py`**.
 
 ---
 
@@ -249,8 +250,8 @@ Practical inputs that feed that phase:
 
 **Goal:** tag **`v1.0.0`** when the project is ready to tell production users and library authors: **stable public API** under **semver**, **documented** semantics, and **repeatable** release quality—not a large new feature dump. **1.0.0** follows **0.19.0**; anything that does not block that bar belongs in **Later** or **After v1.0.0**.
 
-- [ ] **Precondition:** **Planned 0.19.0** checklist is done or every open item is explicitly deferred with a short note in this file or [`changelog.md`](changelog.md).
-- [ ] **Semver contract:** publish a **1.0** policy (in [`README.md`](README.md) or a short **`MIGRATION.md`** / **`VERSIONING.md`**): what counts as **patch** vs **minor** vs **major** for `DataFrame` / `DataFrameModel` / `Expr` / Rust extension boundaries; confirm [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) is the behavioral source of truth.
+- [ ] **Precondition:** **Shipped in 0.19.0** (above) is complete or any remaining gap is noted in this file or [`changelog.md`](changelog.md).
+- [ ] **Semver contract:** publish a **1.0** policy (expand [`VERSIONING.md`](VERSIONING.md) and/or [`README.md`](README.md)): what counts as **patch** vs **minor** vs **major** for **1.x** for `DataFrame` / `DataFrameModel` / `Expr` / Rust extension boundaries; confirm [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) is the behavioral source of truth. (**0.x** expectations already live in [`VERSIONING.md`](VERSIONING.md).)
 - [ ] **Packaging and versions:** **`pyproject.toml`** / **`Cargo.toml`** / extension **`rust_version()`** alignment; **Maturin** release workflow (e.g. [`.github/workflows/release.yml`](../.github/workflows/release.yml)) exercised or dry-run validated; **PyPI** **sdist + wheels** for declared platforms; optional **SBOM** or supply-chain notes if policy requires them.
 - [ ] **Quality bar:** full **`make check-full`**, **`cargo test --all-features`**, **`cargo check --no-default-features`**, and **pytest** (including optional-deps legs that match **CI**) on the **exact** commit tagged **`v1.0.0`**; **no known P0/P1** regressions against **INTERFACE_CONTRACT**.
 - [ ] **Security tooling:** **`cargo audit`** / **`cargo deny`** (or documented exceptions) current; policy for how **1.x** will handle **RUSTSEC** / advisory bumps.
@@ -263,9 +264,9 @@ Practical inputs that feed that phase:
 
 ## Later (not started)
 
-Work **not** scheduled in the **0.17.0–0.19.0** or **Planned v1.0.0** sections above, or explicitly deferred when scope slips:
+Work **not** scheduled in the **0.17.0–0.19.0** shipped sections or **Planned v1.0.0** above, or explicitly deferred when scope slips:
 
-- [ ] **Non-string map keys** (**`dict[int, T]`** and Arrow maps whose keys are not UTF-8 strings): still **not shipped** after **0.18.0** (explicitly deferred; see **Shipped in 0.18.0** and [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md)). **Heterogeneous** keys / full **Arrow + expression** parity may be revisited after **v1.0.0** unless promoted earlier.
+- [ ] **Non-string map keys** (**`dict[int, T]`** and Arrow maps whose keys are not UTF-8 strings): still **not shipped** after **0.19.0** (explicitly deferred; see **Shipped in 0.18.0** / **0.19.0** and [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md)). **Heterogeneous** keys / full **Arrow + expression** parity may be revisited after **v1.0.0** unless promoted earlier.
 - [ ] Items deferred from earlier releases when priorities change.
 - [ ] **Chunked / streaming** async iterators for JSON or row batches (no minimal contract yet).
 - [ ] Longer-horizon experiments that do not fit the **pre-1.0** train (**0.17–0.19**) or the **v1.0.0** production gate.
