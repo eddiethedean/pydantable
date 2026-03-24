@@ -498,7 +498,7 @@ def test_p6_dataframe_model_rolling_and_dynamic() -> None:
     assert "v_count" in grouped.collect(as_lists=True)
 
 
-def test_dataframe_model_accepts_polars_dataframe_when_validate_data_false() -> None:
+def test_dataframe_model_accepts_polars_dataframe_trusted_shape_only() -> None:
     pl = pytest.importorskip("polars")
     pdf = pl.DataFrame({"id": [1, 2], "age": [20, None]})
     df = UserDF(pdf, trusted_mode="shape_only")
@@ -572,22 +572,20 @@ def test_validate_columns_strict_validate_elements_false_and_trusted_off_conflic
         )
 
 
-def test_dataframe_model_validate_data_false_collect_matches_trusted_shape_only() -> (
-    None
-):
+def test_dataframe_model_trusted_shape_only_collect_roundtrip() -> None:
     data = {"id": [1, 2], "age": [20, None]}
-    with pytest.warns(DeprecationWarning, match="trusted_mode"):
-        a = UserDF(data, validate_data=False).collect(as_lists=True)
-    b = UserDF(data, trusted_mode="shape_only").collect(as_lists=True)
-    assert a == b == data
+    out = UserDF(data, trusted_mode="shape_only").collect(as_lists=True)
+    assert out == data
 
 
-def test_validate_data_kw_deprecation_warning_once() -> None:
-    with pytest.warns(DeprecationWarning, match="0\\.16\\.0"):
+def test_dataframe_model_rejects_validate_data_keyword() -> None:
+    with pytest.raises(TypeError):
         UserDF({"id": [1], "age": [10]}, validate_data=True)
+    with pytest.raises(TypeError):
+        UserDF({"id": [1], "age": [10]}, validate_data=False)
 
 
-def test_default_constructors_no_validate_data_deprecation() -> None:
+def test_default_constructors_no_deprecation_warning() -> None:
     import warnings
 
     with warnings.catch_warnings():

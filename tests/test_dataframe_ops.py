@@ -447,7 +447,7 @@ def test_temporal_groupby_and_join_paths() -> None:
     assert sorted(grouped["id"]) == [1, 2]
 
 
-def test_validate_data_false_numpy_ingest_collect() -> None:
+def test_trusted_shape_only_numpy_ingest_collect() -> None:
     np = pytest.importorskip("numpy")
 
     class N(Schema):

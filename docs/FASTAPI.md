@@ -34,17 +34,17 @@ From a git checkout, build the extension (for example with [Maturin](https://www
 pip install .
 ```
 
-## Trusted ingest (`trusted_mode` and `validate_data`)
+## Trusted ingest (`trusted_mode`)
 
 For **`DataFrameModel(...)`** and **`DataFrame[Schema](...)`**, ingestion defaults to full per-cell validation (`trusted_mode="off"`). For **trusted** bulk paths (pre-validated upstream data, internal services), use:
 
 | Mode | Meaning |
 |------|---------|
 | **`trusted_mode="off"`** | Default: full Pydantic validation per cell (same as omitting the argument). |
-| **`trusted_mode="shape_only"`** | Skip element validation; still checks column names and row counts. Replaces legacy **`validate_data=False`**. May emit **`DtypeDriftWarning`** when payloads would fail **`strict`** (see {doc}`SUPPORTED_TYPES`). |
+| **`trusted_mode="shape_only"`** | Skip element validation; still checks column names and row counts. May emit **`DtypeDriftWarning`** when payloads would fail **`strict`** (see {doc}`SUPPORTED_TYPES`). |
 | **`trusted_mode="strict"`** | Trusted bulk input plus dtype / nested-shape checks against the schema (including Polars columns). |
 
-**`validate_data=True` / `False`** remains a **compatibility alias**; passing it **explicitly** without **`trusted_mode`** triggers a **`DeprecationWarning`** (removal after **0.16.0**). Prefer **`trusted_mode`** in new code. Details: [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md), [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md).
+Details: [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md), [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md).
 
 ```python
 from pydantable import DataFrameModel

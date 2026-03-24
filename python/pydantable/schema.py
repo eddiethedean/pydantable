@@ -29,34 +29,6 @@ from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError, create
 
 _NoneType = type(None)
 
-# Sentinel for ``DataFrame(..., validate_data=...)`` / ``DataFrameModel``: warn when
-# the caller passes ``validate_data`` explicitly while ``trusted_mode`` is unset.
-_VALIDATE_DATA_KW_UNSET = object()
-
-
-def _warn_validate_data_kw_deprecated(
-    *,
-    validate_data: Any,
-    trusted_mode: Literal["off", "shape_only", "strict"] | None,
-    stacklevel: int,
-) -> None:
-    if trusted_mode is not None or validate_data is _VALIDATE_DATA_KW_UNSET:
-        return
-    warnings.warn(
-        "validate_data is deprecated and will be removed after pydantable 0.16.0; "
-        "use trusted_mode instead (trusted_mode='off' for full per-element validation, "
-        "trusted_mode='shape_only' for trusted bulk ingest, trusted_mode='strict' for "
-        "dtype-checked trusted ingest).",
-        DeprecationWarning,
-        stacklevel=stacklevel,
-    )
-
-
-def _coerce_validate_data_kw(validate_data: Any) -> bool:
-    if validate_data is _VALIDATE_DATA_KW_UNSET:
-        return True
-    return bool(validate_data)
-
 
 class DtypeDriftWarning(UserWarning):
     """Emitted for ``trusted_mode='shape_only'`` when ``strict`` would reject values."""
@@ -761,12 +733,9 @@ def validate_columns_strict(
     - ``strict``: shape checks plus dtype-compatibility checks (scalars; for Polars,
       nested ``list`` / ``dict[str, T]`` / struct columns vs annotations).
 
-    ``validate_elements`` remains as a compatibility alias (deprecated for direct
-    callers; prefer ``trusted_mode``): ``True`` maps to ``trusted_mode='off'`` and
-    ``False`` maps to ``trusted_mode='shape_only'``. Passing ``validate_data=`` on
-    :class:`~pydantable.dataframe.DataFrame` or
-    :class:`~pydantable.dataframe_model.DataFrameModel` emits :exc:`DeprecationWarning`
-    when ``trusted_mode`` is not set.
+    ``validate_elements`` remains as a compatibility alias for direct callers
+    (prefer ``trusted_mode``): ``True`` maps to ``trusted_mode='off'`` and
+    ``False`` maps to ``trusted_mode='shape_only'``.
 
     With ``validate_elements=False``, a Polars ``DataFrame`` may be passed
     directly so the Rust engine can ingest it via Arrow IPC without per-cell

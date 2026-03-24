@@ -18,10 +18,8 @@ from pydantic import BaseModel, ValidationError, create_model
 
 from .dataframe import DataFrame
 from .schema import (
-    _VALIDATE_DATA_KW_UNSET,
     Schema,
     _is_polars_dataframe,
-    _warn_validate_data_kw_deprecated,
     validate_dataframe_model_field_annotations,
 )
 
@@ -160,22 +158,18 @@ class DataFrameModel:
         self,
         data: Any,
         *,
-        validate_data: Any = _VALIDATE_DATA_KW_UNSET,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ) -> None:
         """Load columnar data or rows.
 
-        Prefer ``trusted_mode`` over ``validate_data`` (deprecated when passed
-        explicitly without ``trusted_mode``; removal planned after **0.16.0**).
-        Use ``trusted_mode='shape_only'`` for trusted bulk input (layout still
-        validated). When ``ignore_errors=True``, invalid rows are skipped and
-        details can be observed via ``on_validation_errors``.
+        Use ``trusted_mode='shape_only'`` or ``'strict'`` for trusted bulk input
+        (layout still validated; ``strict`` adds dtype checks). Default is full
+        per-element validation (``trusted_mode='off'`` or omitted). When
+        ``ignore_errors=True``, invalid rows are skipped and details can be
+        observed via ``on_validation_errors``.
         """
-        _warn_validate_data_kw_deprecated(
-            validate_data=validate_data, trusted_mode=trusted_mode, stacklevel=2
-        )
         normalized = _normalize_input(
             data=data,
             row_model=self.RowModel,
@@ -185,11 +179,9 @@ class DataFrameModel:
         dataframe_cls = cast("Any", self._dataframe_cls)
         self._df = dataframe_cls[self._SchemaModel](
             normalized,
-            validate_data=validate_data,
             trusted_mode=trusted_mode,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
-            _skip_validate_data_deprecation=True,
         )
 
     @classmethod

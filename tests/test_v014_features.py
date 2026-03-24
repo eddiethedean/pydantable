@@ -24,28 +24,11 @@ class TwoCol(Schema):
     b: int
 
 
-def test_dataframe_validate_data_false_emits_deprecation() -> None:
-    with pytest.warns(DeprecationWarning, match="trusted_mode"):
+def test_dataframe_rejects_validate_data_keyword() -> None:
+    with pytest.raises(TypeError):
         DataFrame[TwoInt]({"id": [1], "age": [2]}, validate_data=False)
-
-
-def test_dataframe_validate_data_true_emits_deprecation() -> None:
-    with pytest.warns(DeprecationWarning, match="0\\.16\\.0"):
+    with pytest.raises(TypeError):
         DataFrame[TwoInt]({"id": [1], "age": [2]}, validate_data=True)
-
-
-def test_dataframe_trusted_mode_with_validate_data_false_no_deprecation() -> None:
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always", DeprecationWarning)
-        DataFrame[TwoInt](
-            {"id": [1], "age": [2]},
-            trusted_mode="strict",
-            validate_data=False,
-        )
-    assert not any(
-        issubclass(r.category, DeprecationWarning) and "validate_data" in str(r.message)
-        for r in rec
-    )
 
 
 def test_dataframe_trusted_mode_only_no_deprecation() -> None:

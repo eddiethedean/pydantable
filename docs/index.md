@@ -18,7 +18,7 @@ This **documentation site** is the detailed manual. The repository **README** on
 
 **Expressions (0.7+ through current):** typed **`Expr`** builds a Rust AST — globals (**`global_row_count`**, **`global_sum`**, …), ranked and framed windows (including multi-key **`rangeBetween`**; see {doc}`WINDOW_SQL_SEMANTICS`), maps and temporal helpers, PySpark mirrors in {doc}`PYSPARK_PARITY`. Semantics: {doc}`INTERFACE_CONTRACT` and {doc}`changelog`.
 
-**Trusted ingest:** **`trusted_mode`** (`off` / `shape_only` / `strict`) and legacy **`validate_data`** on constructors — {doc}`DATAFRAMEMODEL`, {doc}`SUPPORTED_TYPES`. **I/O:** sync **`collect` / `to_dict` / `to_polars`** plus **async** **`acollect` / `ato_dict` / `ato_polars`** ({doc}`EXECUTION`, {doc}`FASTAPI`). **Arrow `map<utf8, …>`** columns can ingest as **`dict[str, T]`** ({doc}`SUPPORTED_TYPES`).
+**Trusted ingest:** **`trusted_mode`** (`off` / `shape_only` / `strict`) on constructors — {doc}`DATAFRAMEMODEL`, {doc}`SUPPORTED_TYPES`. **I/O:** sync **`collect` / `to_dict` / `to_polars`** plus **async** **`acollect` / `ato_dict` / `ato_polars`** ({doc}`EXECUTION`, {doc}`FASTAPI`). **Arrow `map<utf8, …>`** columns can ingest as **`dict[str, T]`** ({doc}`SUPPORTED_TYPES`).
 
 ## Where to go next
 

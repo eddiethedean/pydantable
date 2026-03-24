@@ -30,7 +30,7 @@ Each column in your schema is one **scalar** Python type from this set:
 
 Use these types in **Pydantic field annotations** on `DataFrameModel` subclasses (or
 `Schema` models for `DataFrame[Schema]`). Runtime cell values must be instances
-compatible with that annotation (validated by Pydantic when `validate_data=True`).
+compatible with that annotation (validated by Pydantic under default ingest, i.e. `trusted_mode="off"` or omitted).
 
 ## Nullability
 
@@ -189,20 +189,15 @@ Python value per row per column; **struct** columns use a list of **dicts** (or
 compatible row objects). Lists may be plain `list`, `tuple`, or
 `numpy.ndarray` (see `schema.validate_columns_strict`).
 
-With **`validate_data=False`**, trusted bulk paths may pass **NumPy**, **PyArrow**,
+With **`trusted_mode="shape_only"`** or **`"strict"`**, trusted bulk paths may pass **NumPy**, **PyArrow**,
 or a **Polars `DataFrame`** as documented in {doc}`EXECUTION` and {doc}`PERFORMANCE`;
-scalar dtypes must still match the schema. Use **`trusted_mode`** on **`DataFrame` /
-`DataFrameModel`** for explicit **`shape_only`** vs **`strict`** checks (introduced in
-**0.11.0**; **0.12.0** extends **`strict`** to nested list / dict / struct shapes on
+scalar dtypes must still match the schema. **`trusted_mode`** on **`DataFrame` /
+`DataFrameModel`** selects **`shape_only`** vs **`strict`** checks (**0.11.0**; **0.12.0** extends **`strict`** to nested list / dict / struct shapes on
 Polars and columnar Python paths; **0.13.0** adds **`strict`** dtype checks for **PyArrow**
-`Array` / `ChunkedArray` columns (and accepts all concrete Arrow array classes as trusted
-buffers). See `schema.validate_columns_strict`); **`validate_data`**
-remains a compatibility alias mapped onto those modes.
+`Array` / `ChunkedArray` columns and accepts concrete Arrow array classes as trusted
+buffers). See **`schema.validate_columns_strict`** for the low-level API (**`validate_elements`** remains a bridge for direct callers).
 
-**Migration (recommended):** replace `validate_data=False` with `trusted_mode="shape_only"`
-(or `trusted_mode="strict"` when you want Polars dtype-shape checks on nested columns).
-Replace `validate_data=True` with `trusted_mode="off"` or omit the argument. See
-{doc}`DATAFRAMEMODEL` (“Trusted ingest”).
+See {doc}`DATAFRAMEMODEL` (“Trusted ingest”). The legacy **`validate_data`** constructor argument was removed in **0.16.0**.
 
 **0.14.0 — `shape_only` dtype drift:** when **`trusted_mode="shape_only"`**, pydantable
 may emit **`pydantable.DtypeDriftWarning`** if a column would be **rejected under

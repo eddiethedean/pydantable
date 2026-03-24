@@ -100,20 +100,20 @@ building the logical plan (and before storing the current schema).
 Row validation uses the generated `RowModel` so errors point to concrete row
 fields.
 
-### Trusted ingest: `validate_data` vs `trusted_mode`
+### Trusted ingest (`trusted_mode`)
 
-For **`DataFrameModel`** and **`DataFrame[Schema]`**, prefer explicit **`trusted_mode`** over the legacy **`validate_data`** flag:
+For **`DataFrameModel`** and **`DataFrame[Schema]`**, use **`trusted_mode`** to control how strictly constructor input is checked:
 
 | Goal | Use |
 |------|-----|
-| Full per-cell Pydantic validation (default) | `trusted_mode="off"` (or omit; same as `validate_data=True`) |
-| Skip element validation; keep shape / column names | `trusted_mode="shape_only"` (replaces `validate_data=False`) |
+| Full per-cell Pydantic validation (default) | `trusted_mode="off"` (or omit) |
+| Skip element validation; keep shape / column names | `trusted_mode="shape_only"` |
 | Trusted bulk input plus light dtype checks (including nested list/struct/map shapes for Polars columns) | `trusted_mode="strict"` |
 
 Under **`trusted_mode="shape_only"`**, **`DtypeDriftWarning`** may be emitted when data
 would fail **`strict`** checks; see {doc}`SUPPORTED_TYPES` (“Runtime column payloads”).
 
-`validate_data=True/False` remains supported as a **compatibility alias** mapped onto those modes. Passing **`validate_data=` explicitly** while **`trusted_mode`** is omitted emits a **`DeprecationWarning`** (removal planned after **0.16.0**); omit `validate_data` or set **`trusted_mode`** directly. See {doc}`SUPPORTED_TYPES` (“Runtime column payloads”) and `pydantable.schema.validate_columns_strict`.
+Low-level column validation also lives in **`pydantable.schema.validate_columns_strict`** (with an optional **`validate_elements`** bridge for direct callers).
 
 ### Handling bad input rows (`ignore_errors`)
 
