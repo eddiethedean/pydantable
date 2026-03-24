@@ -14,6 +14,8 @@ All notable changes to this project are documented here. The format is inspired 
 
 See {doc}`ROADMAP` **Shipped in 0.16.0**. Sync **`read_parquet` / `read_ipc`** are blocking; use **`asyncio.to_thread`** or an executor from **`async def`** routes for large files if loop latency matters.
 
+- **CI / release:** **`actions/cache@v5`** in **`ci.yml`** and **`release.yml`** (clears GitHub Actions Node 20 deprecation warnings for **`actions/cache@v4`**). **`release.yml`** uses **`maturin build`** + **`twine upload --skip-existing`** per platform instead of deprecated **`maturin publish`** (see [PyO3/maturin#2334](https://github.com/PyO3/maturin/issues/2334)); **`TWINE_USERNAME=__token__`** and **`PYPI_API_TOKEN`** unchanged.
+
 ## [0.15.0] — 2026-03-25
 
 ### Highlights
