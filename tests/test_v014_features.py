@@ -150,6 +150,33 @@ def test_pyspark_dayofmonth_lower_upper() -> None:
     assert out["su"] == ["HELLO", "PYSPARK"]
 
 
+class _NumStr(Schema):
+    x: int
+    y: float
+    s: str
+
+
+def test_pyspark_trim_abs_round_floor_ceil() -> None:
+    df = PSDataFrame[_NumStr](
+        {"x": [-1, 2], "y": [-1.4, 1.6], "s": ["  hi ", "x"]}
+    )
+    out = (
+        df.withColumn("ax", F.abs(F.col("x", dtype=int)))
+        .withColumn("ay", F.abs(F.col("y", dtype=float)))
+        .withColumn("tr", F.trim(F.col("s", dtype=str)))
+        .withColumn("rd", F.round(F.col("y", dtype=float), 0))
+        .withColumn("fl", F.floor(F.col("y", dtype=float)))
+        .withColumn("cl", F.ceil(F.col("y", dtype=float)))
+        .collect(as_lists=True)
+    )
+    assert out["ax"] == [1, 2]
+    assert out["ay"] == [1.4, 1.6]
+    assert out["tr"] == ["hi", "x"]
+    assert out["rd"] == [-1.0, 2.0]
+    assert out["fl"] == [-2.0, 1.0]
+    assert out["cl"] == [-1.0, 2.0]
+
+
 pytest.importorskip("fastapi")
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

@@ -164,6 +164,31 @@ def upper(column: Expr) -> Expr:
     return column.upper()
 
 
+def trim(column: Expr) -> Expr:
+    """Trim leading/trailing whitespace (Spark ``trim``; core ``Expr.strip``)."""
+    return column.strip()
+
+
+def abs(column: Expr) -> Expr:
+    """Absolute value for numeric columns (Spark ``abs``)."""
+    return column.abs()
+
+
+def round(column: Expr, scale: int = 0) -> Expr:
+    """Round to ``scale`` decimal places (Spark ``round``)."""
+    return column.round(scale)
+
+
+def floor(column: Expr) -> Expr:
+    """Largest integer not greater than the value (Spark ``floor``)."""
+    return column.floor()
+
+
+def ceil(column: Expr) -> Expr:
+    """Smallest integer not less than the value (Spark ``ceil``)."""
+    return column.ceil()
+
+
 def hour(column: Expr) -> Expr:
     """Hour 0-23 (Spark ``hour``); ``datetime`` or ``time`` column."""
     return column.dt_hour()

@@ -36,7 +36,7 @@ For execution, the PySpark UI uses the same Rust/Polars path as the default expo
 
 Delivered in-tree: **`IsNull`**, **`IsNotNull`**, **`Coalesce`**, **`CaseWhen`** (`when` / `otherwise`), **`Cast`**, **`InList`**, **`Between`**, **`StringConcat`**, **`Substring`**, **`StringLength`** — Rust `ExprNode`, Polars lowering, and `pydantable.pyspark.sql.functions` / `Expr` methods.
 
-**Also delivered:** Spark-named **date/datetime** helpers in `pydantable.pyspark.sql.functions` — `year`, `month`, `day`, `dayofmonth`, `hour`, `minute`, `second`, `nanosecond`, `to_date` (with optional `format=` for string columns), `unix_timestamp` — thin wrappers over core `Expr` methods (same Rust lowering as the core API). **String:** `lower`, `upper`.
+**Also delivered:** Spark-named **date/datetime** helpers in `pydantable.pyspark.sql.functions` — `year`, `month`, `day`, `dayofmonth`, `hour`, `minute`, `second`, `nanosecond`, `to_date` (with optional `format=` for string columns), `unix_timestamp` — thin wrappers over core `Expr` methods (same Rust lowering as the core API). **String:** `lower`, `upper`, `trim` (whitespace; core `Expr.strip`). **Numeric:** `abs`, `round`, `floor`, `ceil`.
 
 **Global row count:** use `pydantable.expressions.global_row_count()` or `functions.count()` with no argument (row count / `count(*)`-style). **Deferred:** other Spark-specific temporal helpers not yet modeled.
 

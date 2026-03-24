@@ -2,12 +2,17 @@
 
 Logical plans and expression typing live in Rust; Python holds schema state and
 forwards transforms. Materialization is via :meth:`DataFrame.collect`,
-:meth:`DataFrame.to_dict`, or :meth:`DataFrame.to_polars`.
+:meth:`DataFrame.to_dict`, or :meth:`DataFrame.to_polars`. Non-blocking variants
+:meth:`DataFrame.acollect`, :meth:`DataFrame.ato_dict`, and
+:meth:`DataFrame.ato_polars` run the same work in a worker thread.
 """
 
 from __future__ import annotations
 
+import asyncio
 import enum
+import functools
+import importlib
 import warnings
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -53,6 +58,7 @@ from .schema import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
+    from concurrent.futures import Executor
 
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
@@ -98,6 +104,18 @@ def _rows_from_column_dict(
         row_dict = {name: col[i] for name, col in data.items()}
         out.append(row_type.model_validate(row_dict))
     return out
+
+
+async def _materialize_in_thread(
+    fn: Callable[[], Any],
+    *,
+    executor: Executor | None,
+) -> Any:
+    """Run a no-arg callable for blocking Rust/Polars work off the event loop."""
+    loop = asyncio.get_running_loop()
+    if executor is not None:
+        return await loop.run_in_executor(executor, fn)
+    return await asyncio.to_thread(fn)
 
 
 def _is_bool_or_nullable_bool(dtype: Any) -> bool:
@@ -933,8 +951,6 @@ class DataFrame(Generic[SchemaT]):
         Python package: ``pip install 'pydantable[polars]'``).
         """
         try:
-            import importlib
-
             pl = importlib.import_module("polars")
         except ImportError as e:
             raise ImportError(
@@ -942,6 +958,58 @@ class DataFrame(Generic[SchemaT]):
                 "pip install 'pydantable[polars]'"
             ) from e
         return pl.DataFrame(self.to_dict())
+
+    async def acollect(
+        self,
+        *,
+        as_lists: bool = False,
+        as_numpy: bool = False,
+        as_polars: bool | None = None,
+        executor: Executor | None = None,
+    ) -> Any:
+        """
+        Async version of :meth:`collect`: same semantics, but blocking work runs
+        in :func:`asyncio.to_thread` or in ``executor`` when provided.
+
+        Cancelling the awaiting task does **not** cancel in-flight Rust/Polars
+        execution; the worker thread runs to completion.
+        """
+        return await _materialize_in_thread(
+            functools.partial(
+                self.collect,
+                as_lists=as_lists,
+                as_numpy=as_numpy,
+                as_polars=as_polars,
+            ),
+            executor=executor,
+        )
+
+    async def ato_dict(
+        self,
+        *,
+        executor: Executor | None = None,
+    ) -> dict[str, list[Any]]:
+        """Async version of :meth:`to_dict` (see :meth:`acollect`)."""
+        return await _materialize_in_thread(
+            functools.partial(self.to_dict),
+            executor=executor,
+        )
+
+    async def ato_polars(
+        self,
+        *,
+        executor: Executor | None = None,
+    ) -> Any:
+        """
+        Async version of :meth:`to_polars` (see :meth:`acollect`).
+
+        This still materializes a columnar Python dict first, then builds the
+        Polars frame—same copies as the synchronous path.
+        """
+        return await _materialize_in_thread(
+            functools.partial(self.to_polars),
+            executor=executor,
+        )
 
     @classmethod
     def concat(

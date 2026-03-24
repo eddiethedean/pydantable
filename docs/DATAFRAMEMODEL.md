@@ -325,6 +325,7 @@ produces:
 - `df.rows()` -> same as `collect()` (default arguments)
 - `df.to_dict()` -> columnar `dict[str, list]` (use for column-shaped API responses)
 - `df.to_dicts()` -> list of dicts (JSON-friendly), derived from row models
+- `await df.acollect()`, `await df.ato_dict()`, `await df.ato_polars()`, `await df.arows()`, `await df.ato_dicts()` -> **0.15.0+** async counterparts (thread-offloaded; see `EXECUTION` / `FASTAPI`)
 
 This is the “bridge” between columnar execution and Pydantic row semantics.
 

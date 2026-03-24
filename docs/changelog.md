@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here. The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.15.0] — 2026-03-24
+
+### Highlights
+
+- **Async materialization:** **`acollect`**, **`ato_dict`**, **`ato_polars`** on **`DataFrame`**; **`DataFrameModel`** adds the same plus **`arows`** and **`ato_dicts`**. Work runs in **`asyncio.to_thread`** or an optional **`executor=`**. See {doc}`EXECUTION`, {doc}`FASTAPI`.
+- **FastAPI:** **`async def`** route examples, **`lifespan`** + **`ThreadPoolExecutor`**, and **`StreamingResponse`** guidance (manual chunking; no built-in row iterator yet). **`tests/test_fastapi_recipes.py`** and **`scripts/verify_doc_examples.py`** extended.
+- **Arrow-native maps:** PyArrow **`map<utf8, …>`** arrays (and chunked) ingest for **`dict[str, T]`** columns; convert to Python **`dict`** cells. String keys only; **`strict`** checks scalar value types (nested map values: best-effort). Tests: **`tests/test_pyarrow_map_ingest.py`**. {doc}`SUPPORTED_TYPES` updated.
+- **PySpark façade:** **`trim`**, **`abs`**, **`round`**, **`floor`**, **`ceil`** in **`pydantable.pyspark.sql.functions`** (and package **`__all__`**). {doc}`PYSPARK_PARITY` updated.
+- **Dev:** **`pytest-asyncio`** in **`[dev]`**; **`asyncio_mode = auto`** in **`pyproject.toml`**.
+
+### Details
+
+See {doc}`ROADMAP` **Shipped in 0.15.0**. Sync **`collect` / `to_dict` / `to_polars`** are unchanged; migration is additive unless you replace manual **`asyncio.to_thread`** wrappers with the new APIs.
+
 ## [0.14.0] — 2026-03-23
 
 ### Highlights
@@ -35,7 +49,7 @@ See {doc}`ROADMAP` **Shipped in 0.14.0**.
 
 Release audit: `make check-full` and full **pytest** green with a **release** `maturin` build. No regressions to **`rangeBetween`**, trusted **`strict`**, or **`map_from_entries`** beyond documentation and **PyArrow** **`strict`** hardening above.
 
-**Roadmap (editorial):** **0.13.0** ships the documentation-first stabilization track together with the scope formerly planned as **Remaining in 0.13.x** / **0.14.0**. Former **0.15.0** / **0.16.0** rows are renumbered to **Planned 0.14.0** and **Planned 0.15.0**; async I/O targets **0.15.0**.
+**Roadmap (editorial):** **0.13.0** ships the documentation-first stabilization track together with the scope formerly planned as **Remaining in 0.13.x** / **0.14.0**. Async materialization shipped in **0.15.0** (see changelog **\[0.15.0\]**).
 
 See {doc}`FASTAPI`, {doc}`EXECUTION`, {doc}`PERFORMANCE`, {doc}`ROADMAP`, and {doc}`INTERFACE_CONTRACT`.
 

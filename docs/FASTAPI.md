@@ -12,8 +12,13 @@ For FastAPI services, `pydantable` gives you:
 - typed dataframe transformations in handlers or services
 - **`collect()`** — `list` of Pydantic models for the **current** projection (ideal for `response_model=list[YourRow]`)
 - **`to_dict()`** — `dict[str, list]` when the response is **column-shaped** JSON
+- **`acollect()`**, **`ato_dict()`**, **`ato_polars()`** — same semantics off the event loop (see below)
 
-**Materialization is synchronous:** `collect()`, `to_dict()`, `collect(as_lists=True)`, and optional `to_polars()` run **blocking** work (Rust + Polars inside the extension). For ASGI stacks, plan on **`asyncio.to_thread`** or similar until **async I/O** lands in **0.15.0** (see [`EXECUTION.md`](EXECUTION.md) and [`ROADMAP.md`](ROADMAP.md)).
+**Synchronous materialization** (`collect()`, `to_dict()`, `collect(as_lists=True)`, optional `to_polars()`) runs **blocking** Rust + Polars work on the **current thread**.
+
+**Asynchronous materialization (0.15.0+):** `await df.acollect()`, `await df.ato_dict()`, and `await df.ato_polars()` run that blocking work in **`asyncio.to_thread`** by default, or in a **`concurrent.futures.Executor`** you pass as `executor=...`. Use this from **`async def`** route handlers so the ASGI event loop stays responsive. Cancelling the waiter does **not** cancel in-flight engine work; see [`EXECUTION.md`](EXECUTION.md) for limits (GIL, copies, `to_polars`).
+
+**`DataFrameModel`** also exposes **`arows()`** and **`ato_dicts()`** as async counterparts to **`rows()`** / **`to_dicts()`**.
 
 ## Install
 
@@ -85,6 +90,55 @@ df = UserDF({"id": body.id, "age": body.age})
 ```
 
 Same schema rules apply as for columnar constructors in [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md) (equal-length columns, types per field).
+
+## Async routes, executors, and lifespan
+
+For **`async def`** handlers, **`await`** the async materialization helpers instead of calling **`collect()`** / **`to_dict()`** directly (unless you intentionally block the loop).
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+from pydantable import DataFrameModel
+
+
+class UserDF(DataFrameModel):
+    id: int
+    age: int | None
+
+
+class UserRow(BaseModel):
+    id: int
+    age: int | None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Bounded pool for dataframe materialization (optional; default is asyncio’s thread pool).
+    executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="pydantable")
+    app.state.df_executor = executor
+    yield
+    executor.shutdown(wait=True)
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+@app.post("/users-async", response_model=list[UserRow])
+async def create_users_async(rows: list[UserDF.RowModel]):
+    df = UserDF(rows)
+    ex = app.state.df_executor
+    return await df.acollect(executor=ex)
+```
+
+Without a custom executor, **`await df.acollect()`** is enough: pydantable uses **`asyncio.to_thread`**.
+
+### Chunked or streaming JSON
+
+There is **no** built-in row-by-row or column-chunk **`async` iterator** for materialization yet. For **`StreamingResponse`**, a practical pattern is to **`await df.ato_dict()`** (or **`await df.arows()`**) and then stream **serialized chunks** you build yourself (for example **NDJSON** lines or pre-sized batches), keeping in mind that the full result may already be in memory after **`ato_dict`**. For very large tables, prefer **pagination** or **external storage** at the API design level.
 
 ## Large tables, Polars, Arrow, and trust boundaries
 
@@ -283,9 +337,10 @@ For `[{"sku": "A", "qty": 2, "unit_price": 10.0}, {"sku": "B", "qty": 1, "unit_p
 
 ## Columnar vs row-shaped responses
 
-- **`to_dict()`** — `dict[str, list]`; one JSON object with parallel arrays.
-- **`collect()`** — `list` of Pydantic models for the **current** schema; return it from the handler and let **`response_model`** define OpenAPI and validate the serialized response.
-- **`to_dicts()`** — `list[dict]` from row models when you want plain dicts without a separate DTO class.
+- **`to_dict()`** / **`await ato_dict()`** — `dict[str, list]`; one JSON object with parallel arrays.
+- **`collect()`** / **`await acollect()`** — `list` of Pydantic models for the **current** schema; return it from the handler and let **`response_model`** define OpenAPI and validate the serialized response.
+- **`to_dicts()`** / **`await ato_dicts()`** — `list[dict]` from row models when you want plain dicts without a separate DTO class.
+- **`await ato_polars()`** — optional Polars **`DataFrame`** when the **`[polars]`** extra is installed (same semantics as **`to_polars()`**).
 
 ## Error timing and API safety
 

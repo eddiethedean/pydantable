@@ -277,6 +277,127 @@ def _column_buffer_for_trusted(name: str, col: Any) -> Any:
     )
 
 
+def _dict_str_value_annotation(annotation: Any) -> tuple[Any, bool] | None:
+    """For ``dict[str, V]`` (optional outer null), return ``(V, nullable_col)``."""
+    inner, nullable_col = _annotation_nullable_inner(annotation)
+    origin = get_origin(inner)
+    if origin is not dict:
+        return None
+    la = get_args(inner)
+    if len(la) != 2 or la[0] is not str:
+        return None
+    return (la[1], nullable_col)
+
+
+def _arrow_map_keys_are_string(map_type: Any) -> bool:
+    try:
+        import pyarrow as pa  # type: ignore[import-untyped]
+    except ImportError:
+        return False
+    kt = map_type.key_type
+    return pa.types.is_string(kt) or pa.types.is_large_string(kt)
+
+
+def _trusted_pyarrow_map_value_matches(val_ann: Any, map_type: Any) -> bool:
+    """Strict check: Arrow map value type vs ``dict[str, val_ann]`` value annotation."""
+    vt = map_type.item_type
+    dt_low = str(vt).lower()
+    inner_v, _ = _annotation_nullable_inner(val_ann)
+    origin = get_origin(inner_v)
+    if origin in (list, dict):
+        return True
+    if isinstance(inner_v, type) and issubclass(inner_v, BaseModel):
+        return True
+    return _trusted_pyarrow_strict_scalar(inner_v, dt_low)
+
+
+def _map_arrow_cell_to_dict(cell: Any) -> Any:
+    """Turn one PyArrow map cell (from ``to_pylist``) into a ``dict[str, Any]``."""
+    if cell is None:
+        return None
+    if isinstance(cell, Mapping):
+        out: dict[str, Any] = {}
+        for k, v in cell.items():
+            if k is None:
+                raise TypeError("Map keys must not be null")
+            if not isinstance(k, str):
+                raise TypeError(
+                    "pydantable dict[str, T] map columns require string keys "
+                    f"(got {type(k).__name__})"
+                )
+            out[k] = v
+        return out
+    out_d: dict[str, Any] = {}
+    for kv in cell:
+        if not isinstance(kv, (list, tuple)) or len(kv) != 2:
+            raise TypeError(f"Invalid map entry {kv!r}")
+        k, v = kv[0], kv[1]
+        if k is None:
+            raise TypeError("Map keys must not be null")
+        if not isinstance(k, str):
+            raise TypeError(
+                "pydantable dict[str, T] map columns require string keys "
+                f"(got {type(k).__name__})"
+            )
+        out_d[str(k)] = v
+    return out_d
+
+
+def _normalize_pyarrow_map_column(
+    name: str,
+    col: Any,
+    annotation: Any,
+    *,
+    mode: Literal["off", "shape_only", "strict"],
+) -> Any:
+    """
+    If ``col`` is a PyArrow map array (or chunked) and the field is ``dict[str, T]``,
+    convert cells to Python ``dict`` (or ``None``) for the Rust/Python engine.
+
+    Non-string map keys are rejected. In ``strict`` mode, the Arrow value type must
+    match the declared value type (scalar check; nested value types are best-effort).
+    """
+    parsed_ann = _dict_str_value_annotation(annotation)
+    if parsed_ann is None:
+        return col
+    val_ann, _ = parsed_ann
+    try:
+        import pyarrow as pa  # type: ignore[import-untyped]
+    except ImportError:
+        return col
+    if not isinstance(col, (pa.Array, pa.ChunkedArray)):
+        return col
+    ref: pa.Array | None
+    if isinstance(col, pa.Array):
+        ref = col
+    elif col.num_chunks:
+        ref = col.chunk(0)
+    else:
+        return col
+    if not pa.types.is_map(ref.type):
+        return col
+    map_type = ref.type
+    if not _arrow_map_keys_are_string(map_type):
+        raise TypeError(
+            f"Column {name!r}: Arrow map keys must be string (utf8 or large_string) "
+            "for dict[str, T] columns."
+        )
+    if mode == "strict" and not _trusted_pyarrow_map_value_matches(val_ann, map_type):
+        raise ValueError(
+            f"Column {name!r} is incompatible with schema annotation "
+            f"{annotation!r} in strict trusted mode."
+        )
+    if isinstance(col, pa.ChunkedArray):
+        if col.num_chunks == 0:
+            arr = pa.array([], type=map_type)
+        else:
+            arr = pa.concat_arrays(col.chunks)
+    else:
+        arr = col
+    raw = arr.to_pylist()
+    return [_map_arrow_cell_to_dict(c) for c in raw]
+
+
 def _trusted_mode_from_legacy(
     *,
     validate_elements: bool | None,
@@ -712,10 +833,16 @@ def validate_columns_strict(
     for name, _expected_type in field_types.items():
         col = data[name]
         if mode == "off":
+            col = _normalize_pyarrow_map_column(
+                name, col, field_types[name], mode=mode
+            )
             values = _sequence_column_to_list(name, col)
             lengths.add(len(values))
         else:
             values = _column_buffer_for_trusted(name, col)
+            values = _normalize_pyarrow_map_column(
+                name, values, field_types[name], mode=mode
+            )
             lengths.add(len(values))
 
         normalized[name] = values

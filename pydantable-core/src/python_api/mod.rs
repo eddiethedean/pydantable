@@ -85,7 +85,7 @@ impl PyPlan {
 
 #[pyfunction]
 fn rust_version() -> &'static str {
-    "0.14.0"
+    env!("CARGO_PKG_VERSION")
 }
 
 #[pyfunction]

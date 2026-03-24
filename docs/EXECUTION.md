@@ -4,7 +4,9 @@ All materialization — `collect()`, joins, group-by, reshape, etc. — runs thr
 **compiled Rust extension** (`pydantable._core`), which uses Polars for physical execution
 inside the native extension. Python does **not** require the `polars` package for core use.
 
-**Synchronous I/O only (today):** Every documented user-facing **read/write** path for materialization and interchange is **blocking** — including **`collect()`**, **`to_dict()`**, **`collect(as_lists=True)`**, optional **`to_polars()`**, and related helpers. There are no **`async def`** dataframe APIs in the library yet. **0.15.0** is planned to add **async** coverage for stable materialization and interchange; see {doc}`ROADMAP` and {doc}`FASTAPI` for service-oriented notes.
+**Synchronous materialization (default):** **`collect()`**, **`to_dict()`**, **`collect(as_lists=True)`**, **`collect(as_numpy=True)`**, and optional **`to_polars()`** run **blocking** Rust + Polars work on the **current thread**.
+
+**Async materialization (0.15.0+):** **`await acollect()`**, **`await ato_dict()`**, and **`await ato_polars()`** on **`DataFrame`** run the same logic in a **worker thread** via **`asyncio.to_thread`**, or in a **`concurrent.futures.Executor`** passed as **`executor=`**. **`DataFrameModel`** mirrors this with **`acollect`**, **`ato_dict`**, **`ato_polars`**, **`arows`**, and **`ato_dicts`**. Cancelling the awaiting task does **not** cancel in-flight native work. The **GIL** still serializes some Python callbacks; **`ato_polars()`** builds a Polars frame from a materialized columnar **`dict`** (extra allocation vs calling Polars alone). There is no async **file / IPC** API on the Python package yet. Service patterns: {doc}`FASTAPI` and {doc}`ROADMAP`.
 
 By default, `collect()` returns a **list of Pydantic models** (one per row), validated
 against the current projected schema. Use **`to_dict()`** or **`collect(as_lists=True)`**

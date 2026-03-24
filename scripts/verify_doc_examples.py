@@ -10,6 +10,8 @@ in sync with the API.
 
 from __future__ import annotations
 
+import asyncio
+
 from pydantable import DataFrameModel
 from pydantable.pandas import DataFrameModel as PandasDataFrameModel
 from pydantable.pyspark import DataFrameModel as PySparkDataFrameModel
@@ -354,5 +356,21 @@ class UsersColumnarBody(BaseModel):
 body = UsersColumnarBody(id=[1, 2], age=[20, None])
 df_col = UserFastApi({"id": body.id, "age": body.age})
 assert df_col.to_dict() == {"id": [1, 2], "age": [20, None]}
+
+# docs/FASTAPI — async materialization (acollect / ato_dict)
+
+
+async def _fastapi_async_snippet() -> None:
+    df_a = UserFastApi([RM(id=1, age=20), RM(id=2, age=None)])
+    rows = await df_a.acollect()
+    assert [m.model_dump() for m in rows] == [
+        {"id": 1, "age": 20},
+        {"id": 2, "age": None},
+    ]
+    col = await df_a.ato_dict()
+    assert col == {"id": [1, 2], "age": [20, None]}
+
+
+asyncio.run(_fastapi_async_snippet())
 
 print("verify_doc_examples: ok")

@@ -9,7 +9,10 @@ from __future__ import annotations
 import sys
 import typing
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
+
+if TYPE_CHECKING:
+    from concurrent.futures import Executor
 
 from pydantic import BaseModel, ValidationError, create_model
 
@@ -248,6 +251,55 @@ class DataFrameModel:
         respected consistently with Pydantic.
         """
         return [row.model_dump() for row in self.rows()]
+
+    async def acollect(
+        self,
+        *,
+        as_lists: bool = False,
+        as_numpy: bool = False,
+        as_polars: bool | None = None,
+        executor: Executor | None = None,
+    ) -> Any:
+        """Async :meth:`collect` (delegates to :meth:`DataFrame.acollect`)."""
+        return await self._df.acollect(
+            as_lists=as_lists,
+            as_numpy=as_numpy,
+            as_polars=as_polars,
+            executor=executor,
+        )
+
+    async def ato_dict(
+        self,
+        *,
+        executor: Executor | None = None,
+    ) -> dict[str, list[Any]]:
+        """Async :meth:`to_dict`."""
+        return await self._df.ato_dict(executor=executor)
+
+    async def ato_polars(
+        self,
+        *,
+        executor: Executor | None = None,
+    ) -> Any:
+        """Async :meth:`to_polars`."""
+        return await self._df.ato_polars(executor=executor)
+
+    async def arows(
+        self,
+        *,
+        executor: Executor | None = None,
+    ) -> list[BaseModel]:
+        """Async :meth:`rows` (same as ``await acollect()``)."""
+        return await self.acollect(executor=executor)
+
+    async def ato_dicts(
+        self,
+        *,
+        executor: Executor | None = None,
+    ) -> list[dict[str, Any]]:
+        """Async :meth:`to_dicts`."""
+        rows = await self.arows(executor=executor)
+        return [row.model_dump() for row in rows]
 
     def select(self, *cols: Any) -> DataFrameModel:
         return self._from_dataframe(self._df.select(*cols))

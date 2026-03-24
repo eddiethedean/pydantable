@@ -51,3 +51,28 @@ def test_testclient_columnar_dict_body() -> None:
     r = client.post("/bulk", json={"id": [1, 2], "age": [10, None]})
     assert r.status_code == 200
     assert r.json() == {"id": [1, 2], "age": [10, None]}
+
+
+def test_testclient_async_acollect_and_ato_dict() -> None:
+    app = FastAPI()
+
+    @app.post("/users-async", response_model=list[UserRow])
+    async def create_users_async(rows: list[UserDF.RowModel]):
+        df = UserDF(rows)
+        return await df.acollect()
+
+    @app.post("/bulk-async")
+    async def bulk_async(body: dict[str, list]):
+        df = UserDF(body, trusted_mode="shape_only")
+        return await df.ato_dict()
+
+    client = TestClient(app)
+    r = client.post(
+        "/users-async", json=[{"id": 1, "age": 20}, {"id": 2, "age": None}]
+    )
+    assert r.status_code == 200
+    assert r.json() == [{"id": 1, "age": 20}, {"id": 2, "age": None}]
+
+    r2 = client.post("/bulk-async", json={"id": [1, 2], "age": [10, None]})
+    assert r2.status_code == 200
+    assert r2.json() == {"id": [1, 2], "age": [10, None]}

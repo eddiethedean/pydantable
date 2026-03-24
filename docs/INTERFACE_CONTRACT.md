@@ -152,7 +152,7 @@ Rolling/dynamic contracts:
 
 - **Multi-key `RANGE` window frames:** {doc}`WINDOW_SQL_SEMANTICS` (sort keys vs range axis on the first `orderBy` column).
 - **Trusted ingest (`trusted_mode`, legacy `validate_data`):** {doc}`DATAFRAMEMODEL`, {doc}`SUPPORTED_TYPES`.
-- **Synchronous materialization; async roadmap:** {doc}`EXECUTION`, {doc}`ROADMAP`, {doc}`FASTAPI`.
+- **Materialization (sync + async):** {doc}`EXECUTION`, {doc}`ROADMAP`, {doc}`FASTAPI`.
 
 ## Migration Notes (Polars -> PydanTable)
 
