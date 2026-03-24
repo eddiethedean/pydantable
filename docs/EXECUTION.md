@@ -46,3 +46,29 @@ from pydantable.pyspark import DataFrameModel
 These import lines only load symbols; executing them in a REPL prints nothing.
 
 See also `docs/PANDAS_UI.md` and `docs/PYSPARK_UI.md`.
+
+## `repr` (string form)
+
+**`repr(df)`** on **`DataFrame`** (and **`print(df)`**, which uses the same hook when **`__str__`** is not overridden) shows a multi-line summary:
+
+- The parameterized class name (e.g. **`DataFrame[MySchema]`**).
+- The current schema type’s **`__qualname__`**.
+- A column table: **name** and **dtype** string derived from Pydantic field annotations (`int`, `str`, `float | None`, `Literal[...]`, generics like **`list[int]`**, etc.).
+
+If there are more than **32** columns, only the first **32** are listed, followed by **`… and N more`**.
+
+**Row counts are intentionally omitted.** The logical plan may filter, join, or aggregate; the number of rows in the result is not known without running **`collect()`**, **`to_dict()`**, **`to_polars()`**, or **`to_arrow()`**. **`DataFrameModel`** delegates to the inner **`DataFrame`**; **`GroupedDataFrame`** / **`DynamicGroupedDataFrame`** (and the model wrappers) prepend a short grouping summary before the inner frame.
+
+This is for **REPLs, logs, and tracebacks**—not a substitute for materializing data.
+
+## Jupyter / HTML (`_repr_html_`)
+
+In **Jupyter**, **IPython**, **VS Code** notebooks, and similar frontends, **`DataFrame`** and **`DataFrameModel`** implement **`_repr_html_()`** so the last line of a cell renders as an **HTML table** (pandas-style), without installing **`polars`**.
+
+- **Preview only:** the table shows up to **20** rows and **40** columns (constants in **`pydantable.dataframe._impl`**). Long string or **`repr`** cell values are truncated for display.
+- **Materialization:** the preview runs the same engine path as **`head()`** + **`to_dict()`**—it executes the current logical plan for the bounded slice. Large frames still pay that cost for the preview.
+- **Safety:** cell text is **HTML-escaped** so arbitrary string data does not inject markup.
+- **Grouped handles:** **`GroupedDataFrame`** / **`DynamicGroupedDataFrame`** (and grouped model wrappers) prepend a short label, then show the inner frame preview.
+- **Look and feel:** Preview uses a **card**-style layout (rounded corners, light shadow, slate **CSS** variables), **uppercase** column headers, **zebra** row banding, **tabular** row indices, and tinted **banner** strips for **`DataFrameModel`** / grouped contexts—similar in spirit to **pandas** HTML display without depending on it.
+
+For the full dataset, use **`to_dict()`**, **`collect()`**, **`to_polars()`**, or **`to_arrow()`** as usual.

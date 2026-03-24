@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **`DataFrame.__repr__`:** Multi-line `repr` with parameterized class, schema type, and aligned column dtypes; truncates very wide schemas (first **32** columns + `… and N more`). **`DataFrameModel`**, **`GroupedDataFrame`**, **`DynamicGroupedDataFrame`**, and grouped model wrappers include a readable `repr`. Row counts are not shown (lazy plans may change length—materialize to inspect data). See {doc}`EXECUTION`, {doc}`DATAFRAMEMODEL`, {doc}`README`.
+- **`DataFrame._repr_html_`:** Jupyter / IPython **HTML table** preview (bounded rows/columns/cell length; **HTML-escaped** cells; same materialization path as **`head()`** + **`to_dict()`** for the preview). **`DataFrameModel`** and grouped handles delegate or prepend a label. See {doc}`EXECUTION` **Jupyter / HTML**, {doc}`ROADMAP` **Notebook utilities**.
+
 ## [0.19.0] — 2026-03-24
 
 ### Highlights

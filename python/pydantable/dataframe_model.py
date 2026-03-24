@@ -6,6 +6,7 @@ Input may be column dicts or row sequences (mappings / Pydantic).
 
 from __future__ import annotations
 
+import html
 import sys
 import typing
 from collections.abc import Callable, Mapping, Sequence
@@ -197,6 +198,24 @@ class DataFrameModel:
             trusted_mode=trusted_mode,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+        )
+
+    def __repr__(self) -> str:
+        inner = "\n".join(f"  {line}" for line in repr(self._df).split("\n"))
+        return f"{type(self).__name__}\n{inner}"
+
+    def _repr_html_(self) -> str:
+        """HTML table preview for Jupyter (delegates to inner :class:`DataFrame`)."""
+        inner = self._df._repr_html_()
+        title = html.escape(type(self).__name__)
+        return (
+            '<div class="pydantable-render pydantable-render--context" '
+            'style="margin:0 0 1rem 0;">'
+            '<p style="margin:0 0 10px 0;padding:8px 12px;border-radius:8px;'
+            "font:600 12px ui-sans-serif,system-ui,sans-serif;"
+            "color:#1e3a8a;background:#eff6ff;border:1px solid #bfdbfe;"
+            'letter-spacing:0.02em;">'
+            f"<b>{title}</b> (DataFrameModel)</p>{inner}</div>"
         )
 
     @classmethod
@@ -527,6 +546,23 @@ class GroupedDataFrameModel:
         self._grouped_df = grouped_df
         self._model_type = model_type
 
+    def __repr__(self) -> str:
+        inner = "\n".join(f"  {line}" for line in repr(self._grouped_df).split("\n"))
+        return f"GroupedDataFrameModel({self._model_type.__name__})\n{inner}"
+
+    def _repr_html_(self) -> str:
+        inner = self._grouped_df._repr_html_()
+        title = html.escape(self._model_type.__name__)
+        return (
+            '<div class="pydantable-render pydantable-render--context" '
+            'style="margin:0 0 1rem 0;">'
+            '<p style="margin:0 0 10px 0;padding:8px 12px;border-radius:8px;'
+            "font:600 12px ui-sans-serif,system-ui,sans-serif;"
+            "color:#334155;background:#eef2ff;border:1px solid #c7d2fe;"
+            'letter-spacing:0.02em;">'
+            f"<b>GroupedDataFrameModel({title})</b></p>{inner}</div>"
+        )
+
     def agg(self, **aggregations: Any) -> DataFrameModel:
         """Same kwargs as :meth:`pydantable.dataframe.GroupedDataFrame.agg`."""
         return self._model_type._from_dataframe(self._grouped_df.agg(**aggregations))
@@ -538,6 +574,23 @@ class DynamicGroupedDataFrameModel:
     def __init__(self, grouped_df: Any, model_type: type[DataFrameModel]) -> None:
         self._grouped_df = grouped_df
         self._model_type = model_type
+
+    def __repr__(self) -> str:
+        inner = "\n".join(f"  {line}" for line in repr(self._grouped_df).split("\n"))
+        return f"DynamicGroupedDataFrameModel({self._model_type.__name__})\n{inner}"
+
+    def _repr_html_(self) -> str:
+        inner = self._grouped_df._repr_html_()
+        title = html.escape(self._model_type.__name__)
+        return (
+            '<div class="pydantable-render pydantable-render--context" '
+            'style="margin:0 0 1rem 0;">'
+            '<p style="margin:0 0 10px 0;padding:8px 12px;border-radius:8px;'
+            "font:600 12px ui-sans-serif,system-ui,sans-serif;"
+            "color:#334155;background:#ecfdf5;border:1px solid #a7f3d0;"
+            'letter-spacing:0.02em;">'
+            f"<b>DynamicGroupedDataFrameModel({title})</b></p>{inner}</div>"
+        )
 
     def agg(self, **aggregations: Any) -> DataFrameModel:
         """Same rules as :meth:`pydantable.dataframe.DynamicGroupedDataFrame.agg`."""

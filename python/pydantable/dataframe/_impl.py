@@ -13,7 +13,9 @@ from __future__ import annotations
 import asyncio
 import enum
 import functools
+import html
 import importlib
+import types
 import warnings
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -62,6 +64,214 @@ if TYPE_CHECKING:
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
 _NoneType = type(None)
+
+# Cap column listing in :meth:`DataFrame.__repr__` for very wide schemas.
+_REPR_MAX_COLUMNS = 32
+_REPR_DTYPE_MAX_LEN = 72
+# Jupyter / IPython :meth:`DataFrame._repr_html_` preview limits (materializes rows).
+_REPR_HTML_MAX_ROWS = 20
+_REPR_HTML_MAX_COLS = 40
+_REPR_HTML_MAX_CELL_LEN = 500
+_UNION_ORIGINS = (types.UnionType, Union)
+
+
+def _dtype_repr(annotation: Any) -> str:
+    """Stable, readable dtype string for schema annotations (repr / logging)."""
+    if annotation is None:
+        return "Any"
+    if isinstance(annotation, type):
+        if annotation is _NoneType:
+            return "None"
+        return getattr(annotation, "__qualname__", annotation.__name__)
+
+    args = get_args(annotation)
+    origin = get_origin(annotation)
+
+    if origin is Literal:
+        inner = ", ".join(repr(a) for a in args)
+        return f"Literal[{inner}]"
+
+    if origin is not None and origin in _UNION_ORIGINS:
+        if (
+            len(args) == 2
+            and _NoneType in args
+            and not all(a is _NoneType for a in args)
+        ):
+            other = args[0] if args[1] is _NoneType else args[1]
+            return f"{_dtype_repr(other)} | None"
+        return " | ".join(_dtype_repr(a) for a in args)
+
+    if origin is not None:
+        oname = getattr(
+            origin, "__qualname__", getattr(origin, "__name__", repr(origin))
+        )
+        if args:
+            inner = ", ".join(_dtype_repr(a) for a in args)
+            return f"{oname}[{inner}]"
+        return oname
+
+    s = repr(annotation)
+    if len(s) > _REPR_DTYPE_MAX_LEN:
+        return f"{s[: _REPR_DTYPE_MAX_LEN - 1]}…"
+    return s
+
+
+def _html_cell_text(value: Any) -> str:
+    """Format a single cell for HTML tables; output must be HTML-escaped."""
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "True" if value else "False"
+    if isinstance(value, (int, float)):
+        s = str(value)
+    elif isinstance(value, str):
+        s = value
+    else:
+        s = repr(value)
+    if len(s) > _REPR_HTML_MAX_CELL_LEN:
+        return f"{s[: _REPR_HTML_MAX_CELL_LEN - 1]}…"
+    return s
+
+
+def _dataframe_to_html_fragment(
+    *,
+    column_dict: dict[str, list[Any]],
+    column_order: list[str],
+    caption: str | None = None,
+    note: str | None = None,
+) -> str:
+    """Build a styled HTML table fragment (card layout, Jupyter-friendly)."""
+    rows = len(next(iter(column_dict.values()))) if column_dict else 0
+    # Modern palette: slate neutrals, soft shadow, zebra rows (no external CSS).
+    css = """
+<style scoped>
+.pydantable-render {
+  --pt-bg: #ffffff;
+  --pt-border: #e2e8f0;
+  --pt-header-fg: #0f172a;
+  --pt-muted: #64748b;
+  --pt-row-alt: #f8fafc;
+  --pt-cell-fg: #1e293b;
+  --pt-index-bg: #f1f5f9;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--pt-cell-fg);
+  max-width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+}
+.pydantable-render *, .pydantable-render *::before, .pydantable-render *::after {
+  box-sizing: border-box;
+}
+.pydantable-render .pydantable-surface {
+  border-radius: 12px;
+  border: 1px solid var(--pt-border);
+  background: var(--pt-bg);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+  overflow-x: auto;
+}
+.pydantable-render table.pydantable-df {
+  width: 100%;
+  min-width: min-content;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+.pydantable-render caption {
+  caption-side: top;
+  text-align: left;
+  padding: 12px 14px 10px;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--pt-header-fg);
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid var(--pt-border);
+}
+.pydantable-render thead th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--pt-muted);
+  background: #f8fafc;
+  border-bottom: 1px solid var(--pt-border);
+  white-space: nowrap;
+}
+.pydantable-render thead th.pt-index-head {
+  width: 3.25rem;
+  text-align: right;
+  padding-right: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.pydantable-render tbody th[scope="row"] {
+  text-align: right;
+  padding: 6px 10px 6px 12px;
+  font-weight: 500;
+  font-size: 12px;
+  font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--pt-muted);
+  background: var(--pt-index-bg);
+  border-bottom: 1px solid var(--pt-border);
+  border-right: 1px solid var(--pt-border);
+  vertical-align: top;
+}
+.pydantable-render tbody td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--pt-border);
+  vertical-align: top;
+  word-break: break-word;
+}
+.pydantable-render tbody tr:nth-child(even) td {
+  background: var(--pt-row-alt);
+}
+.pydantable-render tbody tr:nth-child(even) th[scope="row"] {
+  background: #e8edf3;
+}
+.pydantable-render tbody tr:last-child td,
+.pydantable-render tbody tr:last-child th {
+  border-bottom: none;
+}
+.pydantable-render .pydantable-note {
+  margin: 12px 4px 16px;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--pt-muted);
+}
+</style>
+"""
+    parts: list[str] = [
+        '<div class="pydantable-render">',
+        css,
+        '<div class="pydantable-surface">',
+        '<table class="pydantable-df">',
+    ]
+    if caption:
+        parts.append(f"<caption>{html.escape(caption)}</caption>")
+    parts.append("<thead><tr>")
+    parts.append('<th scope="col" class="pt-index-head"></th>')
+    for name in column_order:
+        parts.append(f'<th scope="col">{html.escape(name)}</th>')
+    parts.append("</tr></thead><tbody>")
+    for i in range(rows):
+        parts.append("<tr>")
+        parts.append(f'<th scope="row">{i}</th>')
+        for name in column_order:
+            raw = column_dict[name][i]
+            text = _html_cell_text(raw)
+            parts.append(f"<td>{html.escape(text)}</td>")
+        parts.append("</tr>")
+    parts.extend(["</tbody></table>", "</div>"])
+    if note:
+        parts.append(f'<p class="pydantable-note">{html.escape(note)}</p>')
+    parts.append("</div>")
+    return "\n".join(parts)
 
 
 def _coerce_enum_columns(
@@ -242,6 +452,103 @@ class DataFrame(Generic[SchemaT]):
         if item in self._current_field_types:
             return self.col(item)
         raise AttributeError(item)
+
+    def __repr__(self) -> str:
+        fields = self._current_field_types
+        schema = self._current_schema_type
+        schema_qn = getattr(schema, "__qualname__", schema.__name__)
+        cls_name = self.__class__.__name__
+        n = len(fields)
+        lines = [
+            f"{cls_name}",
+            f"  schema: {schema_qn}",
+            f"  columns ({n}):",
+        ]
+        if not fields:
+            lines.append("    (none)")
+            return "\n".join(lines)
+        items = list(fields.items())
+        shown = items[:_REPR_MAX_COLUMNS]
+        name_w = max(len(name) for name, _ in shown)
+        for name, ann in shown:
+            dtype_s = _dtype_repr(ann)
+            lines.append(f"    {name:<{name_w}}  {dtype_s}")
+        rest = len(items) - len(shown)
+        if rest > 0:
+            lines.append(f"    … and {rest} more")
+        return "\n".join(lines)
+
+    def _repr_html_(self) -> str:
+        """Rich HTML table for Jupyter / IPython (preview only; materializes data).
+
+        Shows up to :data:`_REPR_HTML_MAX_ROWS` rows and :data:`_REPR_HTML_MAX_COLS`
+        columns. Full result sets may be larger—use :meth:`to_dict` or
+        :meth:`to_polars` for complete data.
+        """
+        try:
+            return self._repr_html_impl()
+        except Exception as e:  # pragma: no cover - defensive for notebook UX
+            err = html.escape(str(e))
+            return (
+                '<div class="pydantable-render pydantable-render--error" '
+                'style="font-family:ui-sans-serif,system-ui,sans-serif;'
+                "font-size:13px;margin:0 0 1rem 0;padding:14px 16px;"
+                "border-radius:12px;border:1px solid #fecaca;background:#fef2f2;"
+                'color:#991b1b;box-shadow:0 1px 2px rgba(127,29,29,0.06);">'
+                '<p style="margin:0 0 8px 0;font-weight:600;">HTML preview failed</p>'
+                f'<pre style="margin:0;white-space:pre-wrap;word-break:break-word;'
+                f'font-size:12px;color:#7f1d1d;">{err}</pre></div>'
+            )
+
+    def _repr_html_impl(self) -> str:
+        cols_all = list(self._current_field_types.keys())
+        if not cols_all:
+            return (
+                '<div class="pydantable-render" style="margin:0 0 1rem 0;">'
+                '<div class="pydantable-surface" style="border-radius:12px;'
+                "border:1px dashed #cbd5e1;background:#f8fafc;"
+                "padding:1.5rem 1.25rem;text-align:center;color:#64748b;"
+                "font-family:ui-sans-serif,system-ui,sans-serif;font-size:13px;"
+                'box-shadow:0 1px 2px rgba(15,23,42,0.04);">'
+                '<p style="margin:0;"><em>No columns</em></p></div></div>'
+            )
+
+        preview = self.head(_REPR_HTML_MAX_ROWS)
+        data = preview.to_dict()
+        n_rows = len(next(iter(data.values()))) if data else 0
+
+        col_order = [c for c in cols_all if c in data]
+        for c in data:
+            if c not in col_order:
+                col_order.append(c)
+
+        n_cols_total = len(col_order)
+        col_trunc = n_cols_total > _REPR_HTML_MAX_COLS
+        shown_cols = col_order[:_REPR_HTML_MAX_COLS]
+        sub: dict[str, list[Any]] = {c: data[c] for c in shown_cols}
+
+        st = self._current_schema_type
+        schema_qn = getattr(st, "__qualname__", st.__name__)
+        caption = f"{self.__class__.__name__} · schema={schema_qn}"
+
+        note_parts: list[str] = [
+            f"Preview: {n_rows} row{'s' if n_rows != 1 else ''} x "
+            f"{len(shown_cols)} column{'s' if len(shown_cols) != 1 else ''} shown"
+        ]
+        if n_rows >= _REPR_HTML_MAX_ROWS:
+            note_parts.append(f"(up to {_REPR_HTML_MAX_ROWS} rows)")
+        if col_trunc:
+            rest = n_cols_total - len(shown_cols)
+            col_s = "column" if rest == 1 else "columns"
+            note_parts.append(f"(… and {rest} more {col_s} omitted)")
+        note = " ".join(note_parts)
+
+        return _dataframe_to_html_fragment(
+            column_dict=sub,
+            column_order=shown_cols,
+            caption=caption,
+            note=note,
+        )
 
     def with_columns(self, **new_columns: Expr | Any) -> DataFrame[Any]:
         """Add or replace columns.
@@ -1080,6 +1387,23 @@ class GroupedDataFrame:
         self._df = df
         self._keys = list(keys)
 
+    def __repr__(self) -> str:
+        inner = "\n".join(f"  {line}" for line in repr(self._df).split("\n"))
+        return f"GroupedDataFrame(by={self._keys!r})\n{inner}"
+
+    def _repr_html_(self) -> str:
+        inner = self._df._repr_html_()
+        keys_s = html.escape(repr(self._keys))
+        return (
+            '<div class="pydantable-render pydantable-render--context" '
+            'style="margin:0 0 1rem 0;">'
+            '<p style="margin:0 0 10px 0;padding:8px 12px;border-radius:8px;'
+            "font:600 12px ui-sans-serif,system-ui,sans-serif;"
+            "color:#334155;background:#eef2ff;border:1px solid #c7d2fe;"
+            'letter-spacing:0.02em;">'
+            f"<b>GroupedDataFrame</b> (by={keys_s})</p>{inner}</div>"
+        )
+
     def agg(self, **aggregations: tuple[str, str] | tuple[str, Expr]) -> DataFrame[Any]:
         """One output column per kwarg: ``name=(op, column_or_expr)``."""
         agg_specs: dict[str, tuple[str, str]] = {}
@@ -1146,6 +1470,31 @@ class DynamicGroupedDataFrame:
         self._every = every
         self._period = period or every
         self._by = list(by)
+
+    def __repr__(self) -> str:
+        inner = "\n".join(f"  {line}" for line in repr(self._df).split("\n"))
+        return (
+            f"DynamicGroupedDataFrame(index={self._index!r}, "
+            f"every={self._every!r}, period={self._period!r}, by={self._by!r})\n"
+            f"{inner}"
+        )
+
+    def _repr_html_(self) -> str:
+        inner = self._df._repr_html_()
+        hdr = (
+            f"DynamicGroupedDataFrame index={html.escape(repr(self._index))} "
+            f"every={html.escape(repr(self._every))} "
+            f"period={html.escape(repr(self._period))} by={html.escape(repr(self._by))}"
+        )
+        return (
+            '<div class="pydantable-render pydantable-render--context" '
+            'style="margin:0 0 1rem 0;">'
+            '<p style="margin:0 0 10px 0;padding:8px 12px;border-radius:8px;'
+            "font:600 11px ui-sans-serif,system-ui,sans-serif;line-height:1.45;"
+            "color:#334155;background:#ecfdf5;border:1px solid #a7f3d0;"
+            'word-break:break-word;">'
+            f"<b>{hdr}</b></p>{inner}</div>"
+        )
 
     def agg(self, **aggregations: tuple[str, str]) -> DataFrame[Any]:
         """Same as :meth:`GroupedDataFrame.agg`; column specs are strings only."""

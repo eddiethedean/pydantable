@@ -38,6 +38,12 @@ From this definition, `DataFrameModel` generates:
 - `UserDF.RowModel`: a Pydantic model for a single row
 - a schema-backed typed dataframe wrapper used for query building and execution
 
+## `repr` and notebooks
+
+**`repr(user_df)`** / **`print(user_df)`** shows the **`DataFrameModel`** subclass name on the first line, then an indented **`DataFrame[…Schema]`** block with the same schema and column dtype lines as **`DataFrame`** (see {doc}`EXECUTION` **repr**). Row counts are not shown—use **`to_dict()`**, **`collect()`**, or **`len(user_df.collect())`** when you need the number of rows.
+
+In **Jupyter** / **VS Code** notebooks, **`user_df`** (or the last expression in a cell) can render as an **HTML table** via **`_repr_html_()`**—see {doc}`EXECUTION` **Jupyter / HTML** (bounded preview; materializes like **`head()`** + **`to_dict()`**).
+
 ## Input formats (all supported)
 
 `UserDF(...)` accepts **columnar data**, **row dicts**, or **sequences of Pydantic models** (including `UserDF.RowModel` instances).
