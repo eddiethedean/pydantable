@@ -67,9 +67,7 @@ def test_testclient_async_acollect_and_ato_dict() -> None:
         return await df.ato_dict()
 
     client = TestClient(app)
-    r = client.post(
-        "/users-async", json=[{"id": 1, "age": 20}, {"id": 2, "age": None}]
-    )
+    r = client.post("/users-async", json=[{"id": 1, "age": 20}, {"id": 2, "age": None}])
     assert r.status_code == 200
     assert r.json() == [{"id": 1, "age": 20}, {"id": 2, "age": None}]
 

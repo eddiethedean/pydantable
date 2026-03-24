@@ -157,9 +157,7 @@ class _NumStr(Schema):
 
 
 def test_pyspark_trim_abs_round_floor_ceil() -> None:
-    df = PSDataFrame[_NumStr](
-        {"x": [-1, 2], "y": [-1.4, 1.6], "s": ["  hi ", "x"]}
-    )
+    df = PSDataFrame[_NumStr]({"x": [-1, 2], "y": [-1.4, 1.6], "s": ["  hi ", "x"]})
     out = (
         df.withColumn("ax", F.abs(F.col("x", dtype=int)))
         .withColumn("ay", F.abs(F.col("y", dtype=float)))

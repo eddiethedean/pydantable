@@ -83,10 +83,13 @@ async def test_dataframe_acollect_core() -> None:
 @pytest.mark.asyncio
 async def test_ato_polars_import_error_propagates() -> None:
     df = Tiny({"x": [1]})
-    with mock.patch(
-        "pydantable.dataframe.importlib.import_module",
-        side_effect=ImportError("no polars"),
-    ), pytest.raises(ImportError, match="polars is required"):
+    with (
+        mock.patch(
+            "pydantable.dataframe.importlib.import_module",
+            side_effect=ImportError("no polars"),
+        ),
+        pytest.raises(ImportError, match="polars is required"),
+    ):
         await df.ato_polars()
 
 
@@ -104,9 +107,7 @@ async def test_acollect_matches_sync_after_transforms() -> None:
     chained = df.filter(df.a >= 2).with_columns(sum_ab=df.a + df.b)
     sync_rows = chained.collect()
     async_rows = await chained.acollect()
-    assert [r.model_dump() for r in sync_rows] == [
-        r.model_dump() for r in async_rows
-    ]
+    assert [r.model_dump() for r in sync_rows] == [r.model_dump() for r in async_rows]
     sync_d = chained.to_dict()
     async_d = await chained.ato_dict()
     assert sync_d == async_d

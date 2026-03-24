@@ -833,9 +833,7 @@ def validate_columns_strict(
     for name, _expected_type in field_types.items():
         col = data[name]
         if mode == "off":
-            col = _normalize_pyarrow_map_column(
-                name, col, field_types[name], mode=mode
-            )
+            col = _normalize_pyarrow_map_column(name, col, field_types[name], mode=mode)
             values = _sequence_column_to_list(name, col)
             lengths.add(len(values))
         else:
