@@ -138,3 +138,60 @@ def test_arrow_map_ingest_then_map_get_and_contains() -> None:
     assert out["miss"] == [None]
     assert out["has_a"] == [True]
     assert out["has_z"] == [False]
+
+
+def test_arrow_map_ingest_multi_row_null_empty_map_get() -> None:
+    """Null map cells and empty maps behave like dict-based maps after ingest."""
+    mt = pa.map_(pa.string(), pa.int64())
+    arr = pa.array(
+        [
+            [("x", 10), ("y", 20)],
+            [],
+            None,
+        ],
+        type=mt,
+    )
+    df = DataFrame[MapIntNullableCell]({"m": arr}, trusted_mode="strict")
+    out = df.with_columns(
+        vx=df.m.map_get("x"),
+        miss=df.m.map_get("nope"),
+        has_x=df.m.map_contains_key("x"),
+        has_z=df.m.map_contains_key("z"),
+        n=df.m.map_len(),
+    ).collect(as_lists=True)
+    assert out["vx"] == [10, None, None]
+    assert out["miss"] == [None, None, None]
+    assert out["has_x"] == [True, False, None]
+    assert out["has_z"] == [False, False, None]
+    assert out["n"] == [2, 0, None]
+
+
+def test_arrow_map_chunked_ingest_then_map_keys_values() -> None:
+    """Chunked Arrow map arrays work with map_keys / map_values after ingest."""
+    mt = pa.map_(pa.string(), pa.int64())
+    c1 = pa.array([[("a", 1), ("b", 2)]], type=mt)
+    c2 = pa.array([[("c", 3)]], type=mt)
+    ca = pa.chunked_array([c1, c2])
+    df = DataFrame[MapInt]({"m": ca}, trusted_mode="strict")
+    out = df.with_columns(k=df.m.map_keys(), v=df.m.map_values()).collect(as_lists=True)
+    assert out["k"] == [["a", "b"], ["c"]]
+    assert out["v"] == [[1, 2], [3]]
+
+
+def test_arrow_map_ingest_filter_by_map_get() -> None:
+    """Expressions on Arrow-ingested maps participate in filter like dict columns."""
+    mt = pa.map_(pa.string(), pa.int64())
+    arr = pa.array(
+        [
+            [("score", 5)],
+            [("score", 12)],
+            [("other", 99)],
+        ],
+        type=mt,
+    )
+    df = DataFrame[MapInt]({"m": arr}, trusted_mode="shape_only")
+    score = df.m.map_get("score")
+    filtered = df.filter(score > 10)
+    assert filtered.collect(as_lists=True) == {
+        "m": [{"score": 12}],
+    }

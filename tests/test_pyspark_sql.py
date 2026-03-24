@@ -97,6 +97,82 @@ def test_sql_functions_strptime_and_binary_len() -> None:
     assert out["bl"] == [3]
 
 
+def test_sql_functions_strptime_to_datetime_true_is_datetime() -> None:
+    """``to_datetime=True`` yields ``datetime`` (value may be TZ-adjusted by Polars)."""
+
+    class S(Schema):
+        ts: str
+
+    df = DataFrame[S]({"ts": ["2024-01-15"]})
+    out = df.withColumn(
+        "dt", F.strptime(F.col("ts", dtype=str), "%Y-%m-%d", to_datetime=True)
+    ).collect(as_lists=True)
+    assert isinstance(out["dt"][0], datetime)
+
+
+def test_sql_functions_string_wrappers_reject_non_expr() -> None:
+    with pytest.raises(TypeError, match="typed column Expr"):
+        F.str_replace("s", "a", "b")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="typed column Expr"):
+        F.regexp_replace("s", "a", "b")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="typed column Expr"):
+        F.strip_prefix("s", "p")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="typed column Expr"):
+        F.strip_suffix("s", "p")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="typed column Expr"):
+        F.strip_chars("s", "ab")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="typed column Expr"):
+        F.strptime("s", "%Y")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="typed column Expr"):
+        F.binary_len(b"abc")  # type: ignore[arg-type]
+
+
+def test_sql_functions_list_wrappers_reject_non_expr() -> None:
+    with pytest.raises(TypeError, match="typed column Expr"):
+        F.list_len([1, 2])  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="typed column Expr"):
+        F.list_get([1, 2], 0)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="typed column Expr"):
+        F.list_contains([1], 1)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="typed column Expr"):
+        F.list_min([1, 2])  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="typed column Expr"):
+        F.list_max([1, 2])  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="typed column Expr"):
+        F.list_sum([1, 2])  # type: ignore[arg-type]
+
+
+def test_sql_functions_str_replace_nullable_string_column() -> None:
+    class S(Schema):
+        s: str | None
+
+    df = DataFrame[S]({"s": [None, "aab"]})
+    out = df.withColumn(
+        "t", F.str_replace(F.col("s", dtype=str | None), "a", "z")
+    ).collect(as_lists=True)
+    assert out["t"] == [None, "zzb"]
+
+
+def test_sql_functions_list_ops_on_empty_list() -> None:
+    class S(Schema):
+        items: list[int]
+
+    df = DataFrame[S]({"items": [[]]})
+    out = (
+        df.withColumn("n", F.list_len(F.col("items", dtype=list[int])))
+        .withColumn("mn", F.list_min(F.col("items", dtype=list[int])))
+        .withColumn("mx", F.list_max(F.col("items", dtype=list[int])))
+        .withColumn("s", F.list_sum(F.col("items", dtype=list[int])))
+        .withColumn("has0", F.list_contains(F.col("items", dtype=list[int]), 0))
+        .collect(as_lists=True)
+    )
+    assert out["n"] == [0]
+    assert out["mn"] == [None]
+    assert out["mx"] == [None]
+    assert out["s"] == [0]
+    assert out["has0"] == [False]
+
+
 def test_column_type_alias_is_expr() -> None:
     from pydantable.expressions import Expr
 
