@@ -1,4 +1,7 @@
-"""Async materialization APIs (acollect / ato_dict / ato_polars)."""
+"""Async materialization APIs (acollect / ato_dict / ato_polars).
+
+**ato_arrow** is covered in ``tests/test_arrow_interchange.py`` (0.16.0), not here.
+"""
 
 from __future__ import annotations
 

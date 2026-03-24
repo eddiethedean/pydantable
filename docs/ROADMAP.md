@@ -200,7 +200,7 @@ Practical inputs that feed that phase:
 - [x] **Constructors:** **`validate_columns_strict`** and **`DataFrameModel`** accept **`pa.Table`** / **`RecordBatch`** when **`pyarrow`** is installed (convert to Python lists, then existing validation).
 - [x] **Async:** **`ato_arrow`** uses the same thread-offload model as **`ato_polars`**. **`read_parquet` / `read_ipc`** remain synchronous (document **`asyncio.to_thread`** / executor for large files from async routes).
 - [x] **FastAPI:** [`FASTAPI.md`](FASTAPI.md) — **multipart** Parquet upload example, **`Depends`** executor injection, **background tasks** caveats, **422 vs `HTTPException` / uncaught constructor errors**; **`python-multipart`** in **`[dev]`** and CI. **`tests/test_fastapi_recipes.py`**: multipart + **422** on bad row types; **`scripts/verify_doc_examples.py`**: **`read_parquet`** + **`to_arrow`** smoke.
-- [x] **Tests:** **`tests/test_arrow_interchange.py`**.
+- [x] **Tests:** **`tests/test_arrow_interchange.py`** (read/write helpers, **`to_arrow` / `ato_arrow`**, **`Table` / `RecordBatch` constructors); **`tests/test_fastapi_recipes.py`** (multipart Parquet, **422** where applicable); **`scripts/verify_doc_examples.py`** (**`read_parquet`** + **`to_arrow`** smoke).
 
 ---
 

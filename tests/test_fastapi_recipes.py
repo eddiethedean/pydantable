@@ -1,4 +1,13 @@
-"""FastAPI `TestClient` smoke tests for `DataFrameModel` routes (optional deps)."""
+"""FastAPI `TestClient` smoke tests for `DataFrameModel` routes (optional deps).
+
+This file intentionally spans multiple release themes:
+
+- **0.14+:** sync routes, OpenAPI, columnar JSON bodies (still the baseline for HTTP integration smoke).
+- **0.15+:** async routes using async materialization (`acollect`, `ato_dict`).
+- **0.16+:** multipart Parquet upload + `read_parquet` in an async handler.
+
+See `docs/DEVELOPER.md` (release ↔ tests map) for a maintainer-facing index.
+"""
 
 from __future__ import annotations
 
@@ -21,6 +30,9 @@ class UserDF(DataFrameModel):
 class UserRow(BaseModel):
     id: int
     age: int | None
+
+
+# --- 0.14.0+: sync TestClient, OpenAPI, columnar bodies ---
 
 
 def test_testclient_row_list_body_and_openapi() -> None:
@@ -53,6 +65,9 @@ def test_testclient_columnar_dict_body() -> None:
     r = client.post("/bulk", json={"id": [1, 2], "age": [10, None]})
     assert r.status_code == 200
     assert r.json() == {"id": [1, 2], "age": [10, None]}
+
+
+# --- 0.15.0+: async routes (async materialization) ---
 
 
 def test_testclient_async_acollect_and_ato_dict() -> None:
@@ -89,6 +104,9 @@ def test_row_list_invalid_type_is_422() -> None:
     client = TestClient(app)
     r = client.post("/users", json=[{"id": "not-an-int", "age": 20}])
     assert r.status_code == 422
+
+
+# --- 0.16.0+: multipart Parquet + read_parquet ---
 
 
 def test_multipart_parquet_upload() -> None:

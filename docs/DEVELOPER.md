@@ -111,6 +111,40 @@ Phase 4 boundary contract:
 - **`pytest` on `tests/`** is the **CI-facing** check for end-to-end behavior (`collect`, joins, UIs). Prefer adding user-visible regressions here when behavior crosses the Python boundary.
 - **Async tests:** **`pytest-asyncio`** is in **`[dev]`**; `pyproject.toml` sets **`asyncio_mode = auto`** so `async def` tests run without extra markers unless you prefer explicit `@pytest.mark.asyncio`.
 
+### Release ↔ tests map (0.15.0 / 0.16.0)
+
+Use this table to locate **Python tests and doc-example smoke** that back shipped minors (see `docs/changelog.md` for narrative highlights). It is not a substitute for line coverage.
+
+| Release | Highlights (summary) | Primary test modules |
+| --- | --- | --- |
+| **0.15.0** | Async `acollect` / `ato_*`, Arrow `map` ingest, PySpark `trim` / `abs` / …, `validate_data` removal | `tests/test_async_materialization.py`, `tests/test_pyarrow_map_ingest.py`, `tests/test_v015_features.py`, `tests/test_v015_constructor_api.py`; `tests/test_fastapi_recipes.py` (sync `TestClient` / OpenAPI from **0.14+** plus async materialization routes) |
+| **0.16.0** | `read_parquet` / `read_ipc`, `to_arrow` / `ato_arrow`, `Table` / `RecordBatch` constructors, FastAPI multipart | `tests/test_arrow_interchange.py`; `tests/test_fastapi_recipes.py` (multipart Parquet); `scripts/verify_doc_examples.py` (read Parquet + `to_arrow` smoke; see comment block near `read_parquet`) |
+
+#### Changelog-driven audit (0.15.0 / 0.16.0)
+
+Cross-check each bullet in `docs/changelog.md` for **[0.15.0]** and **[0.16.0]** against tests or `verify_doc_examples.py`.
+
+**0.15.0**
+
+- **`executor=`** on async APIs: covered in `tests/test_async_materialization.py` (`acollect`, `ato_dict`, `ato_polars` with a custom executor).
+- **`ato_polars`**, **`arows`**, **`ato_dicts`**: same module.
+- **Arrow-native `map` ingest:** `tests/test_pyarrow_map_ingest.py`.
+- **PySpark façade breadth (`trim`, …):** `tests/test_v015_features.py` (and related parity tests as listed in the changelog).
+- **`validate_data` removal / `trusted_mode`:** `tests/test_v015_constructor_api.py` plus constructor tests named in the changelog (**`test_v014_features.py`**, **`test_dataframe_model.py`**, **`test_dataframe_ops.py`**).
+- **FastAPI async routes (`acollect` / `ato_dict`):** `tests/test_fastapi_recipes.py`. **`lifespan`**, **`ThreadPoolExecutor`**, and **`StreamingResponse`** are described in `docs/FASTAPI.md`; there is **no pytest** that instantiates `StreamingResponse`, and `scripts/verify_doc_examples.py` does not reference those symbols by name.
+
+**0.16.0**
+
+- **`read_ipc(..., as_stream=True)`:** `tests/test_arrow_interchange.py` (`test_read_ipc_stream_format_bytes`).
+- **`RecordBatch` constructor path:** same file (`test_constructor_accepts_record_batch`).
+- **`to_arrow` parity with `to_dict`:** `test_to_arrow_and_from_pydict_matches_to_dict`; **`ato_arrow`:** `test_ato_arrow`. Async **`ato_arrow`** is intentionally **not** repeated in `tests/test_async_materialization.py` (cross-link in that module’s docstring).
+- **Multipart Parquet upload:** `tests/test_fastapi_recipes.py` (`test_multipart_parquet_upload`); **422** on bad row types: `test_row_list_invalid_type_is_422`.
+
+#### Optional follow-ups (non-blocking)
+
+- Executable smoke for a **`StreamingResponse`** pattern from `FASTAPI.md`, if we want parity with doc-only guidance today.
+- Split `tests/test_fastapi_recipes.py` by concern (sync vs async vs multipart) only if maintainers want stronger file-level separation; default is section comments in the single module.
+
 ### Run Python tests
 
 ```bash
