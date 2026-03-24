@@ -2089,11 +2089,10 @@ impl ExprNode {
             }
             ExprNode::Literal { value, .. } => {
                 // Materialize literal into a vector. This avoids needing per-row context.
-                if value.is_none() {
-                    Ok(vec![None; n])
-                } else {
-                    let lit = value.as_ref().unwrap();
+                if let Some(lit) = value.as_ref() {
                     Ok((0..n).map(|_| Some(lit.clone())).collect())
+                } else {
+                    Ok(vec![None; n])
                 }
             }
             ExprNode::BinaryOp {

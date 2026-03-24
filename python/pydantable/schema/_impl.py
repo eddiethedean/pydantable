@@ -29,6 +29,26 @@ from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError, create
 
 _NoneType = type(None)
 
+# ``get_type_hints`` / nested model introspection failures → unsupported annotation.
+_TYPE_HINTS_INTROSPECTION_ERRORS: tuple[type[BaseException], ...] = (
+    TypeError,
+    NameError,
+    ValueError,
+    KeyError,
+    AttributeError,
+    SyntaxError,
+    RecursionError,
+)
+
+# Row adapter paths other than Pydantic ``ValidationError``.
+_ADAPTER_COERCE_ERRORS: tuple[type[BaseException], ...] = (
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    NotImplementedError,
+)
+
 
 class DtypeDriftWarning(UserWarning):
     """Emitted for ``trusted_mode='shape_only'`` when ``strict`` would reject values."""
@@ -149,7 +169,7 @@ def _is_supported_column_annotation_inner(
         stack.add(ann)
         try:
             hints = get_type_hints(ann, include_extras=True)
-        except Exception:
+        except _TYPE_HINTS_INTROSPECTION_ERRORS:
             return False
         for fname in ann.model_fields:
             fa = hints.get(fname)
@@ -414,7 +434,7 @@ def _trusted_column_has_nulls(col: Any) -> bool:
     if hasattr(col, "null_count"):
         try:
             return int(col.null_count) > 0
-        except Exception:
+        except (TypeError, ValueError, AttributeError):
             pass
     typ = type(col)
     if typ.__module__ == "numpy" and typ.__name__ == "ndarray":
@@ -515,7 +535,7 @@ def _polars_dtype_matches_annotation(dt: Any, annotation: Any) -> bool:
         by_name = {f.name: f.dtype for f in dt.fields}
         try:
             get_type_hints(inner, include_extras=True)
-        except Exception:
+        except _TYPE_HINTS_INTROSPECTION_ERRORS:
             return False
         if set(by_name.keys()) != set(inner.model_fields.keys()):
             return False
@@ -568,7 +588,7 @@ def _trusted_nested_value_strict(annotation: Any, value: Any) -> bool:
             return False
         try:
             hints = get_type_hints(inner, include_extras=True)
-        except Exception:
+        except _TYPE_HINTS_INTROSPECTION_ERRORS:
             return False
         keys = set(value.keys())
         if keys != set(inner.model_fields.keys()):
@@ -850,7 +870,9 @@ def validate_columns_strict(
                     typed_row[name] = adapter.validate_python(row[name])
                 except ValidationError as exc:
                     row_errors.extend(exc.errors())
-                except Exception as exc:  # pragma: no cover - defensive adapter path
+                except (
+                    _ADAPTER_COERCE_ERRORS
+                ) as exc:  # pragma: no cover - rare adapter path
                     row_errors.append(
                         {
                             "type": "validation_error",

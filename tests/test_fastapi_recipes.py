@@ -11,12 +11,14 @@ See `docs/DEVELOPER.md` (release ↔ tests map) for a maintainer-facing index.
 
 from __future__ import annotations
 
+import json
 from io import BytesIO
 
 import pytest
 
 pytest.importorskip("fastapi")
 from fastapi import FastAPI, UploadFile
+from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 from pydantable import DataFrameModel
 from pydantic import BaseModel
@@ -91,6 +93,28 @@ def test_testclient_async_acollect_and_ato_dict() -> None:
     r2 = client.post("/bulk-async", json={"id": [1, 2], "age": [10, None]})
     assert r2.status_code == 200
     assert r2.json() == {"id": [1, 2], "age": [10, None]}
+
+
+def test_streaming_response_after_ato_dict() -> None:
+    """Smoke: ``StreamingResponse`` after ``ato_dict`` (see ``docs/FASTAPI.md``)."""
+
+    app = FastAPI()
+
+    @app.get("/bulk-stream")
+    async def bulk_stream() -> StreamingResponse:
+        df = UserDF({"id": [1, 2], "age": [10, None]}, trusted_mode="shape_only")
+        col = await df.ato_dict()
+        payload = json.dumps(col).encode()
+
+        def chunks() -> list[bytes]:
+            return [payload]
+
+        return StreamingResponse(iter(chunks()), media_type="application/json")
+
+    client = TestClient(app)
+    r = client.get("/bulk-stream")
+    assert r.status_code == 200
+    assert json.loads(r.content.decode()) == {"id": [1, 2], "age": [10, None]}
 
 
 def test_row_list_invalid_type_is_422() -> None:

@@ -265,29 +265,36 @@ impl PolarsPlanRunner {
             df.column(c).map_err(polars_err)?;
         }
 
+        let height = df.height();
         for (_pk, mut idxs) in groups {
-            idxs.sort_by(|a, b| {
-                for (c, asc, nulls_last) in order_by.iter() {
-                    let s = df
-                        .column(c)
-                        .map_err(polars_err)
-                        .expect("order column validated above")
-                        .as_materialized_series();
-                    let av_a = s
-                        .get(*a)
-                        .map_err(polars_err)
-                        .expect("window sort row index");
-                    let av_b = s
-                        .get(*b)
-                        .map_err(polars_err)
-                        .expect("window sort row index");
-                    let cmp = Self::anyvalue_sort_cmp_nulls(av_a, av_b, *nulls_last);
+            let mut sort_keys: Vec<(usize, Vec<AnyValue<'static>>)> =
+                Vec::with_capacity(idxs.len());
+            for &idx in idxs.iter() {
+                if idx >= height {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "internal: window row index {idx} out of bounds (frame height {height}).",
+                    )));
+                }
+                let mut parts = Vec::with_capacity(order_by.len());
+                for (c, _, _) in order_by.iter() {
+                    let s = df.column(c).map_err(polars_err)?.as_materialized_series();
+                    let av = s.get(idx).map_err(polars_err)?;
+                    parts.push(av.into_static());
+                }
+                sort_keys.push((idx, parts));
+            }
+            sort_keys.sort_by(|(ia, ka), (ib, kb)| {
+                for (i, (_, asc, nulls_last)) in order_by.iter().enumerate() {
+                    let cmp =
+                        Self::anyvalue_sort_cmp_nulls(ka[i].clone(), kb[i].clone(), *nulls_last);
                     if cmp != Ordering::Equal {
                         return if *asc { cmp } else { cmp.reverse() };
                     }
                 }
-                a.cmp(b)
+                ia.cmp(ib)
             });
+            idxs.clear();
+            idxs.extend(sort_keys.into_iter().map(|(idx, _)| idx));
 
             if matches!(op, WindowOp::RowNumber) {
                 for (pos, idx) in idxs.iter().enumerate() {
@@ -578,6 +585,15 @@ impl PolarsPlanRunner {
                     .map(|s| s.to_string())
                     .collect::<Vec<_>>();
                 let targets = subset.clone().unwrap_or(all_cols);
+                let strategy_when_no_literal: Option<&str> = if value.is_some() {
+                    None
+                } else {
+                    Some(strategy.as_deref().ok_or_else(|| {
+                        PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                            "internal: fill_null requires a strategy when no literal value is set.",
+                        )
+                    })?)
+                };
                 let exprs = targets
                     .into_iter()
                     .map(|name| {
@@ -613,7 +629,7 @@ impl PolarsPlanRunner {
                                 }
                             }
                         } else {
-                            match strategy.as_ref().expect("validated strategy").as_str() {
+                            match strategy_when_no_literal.unwrap() {
                                 "forward" => {
                                     base.fill_null_with_strategy(FillNullStrategy::Forward(None))
                                 }

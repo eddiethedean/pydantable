@@ -159,8 +159,12 @@ pub(super) fn agg_literal(
                 let as_float = |x: i128| x as f64 / scale;
                 return match op {
                     "sum" => Ok(Some(LiteralValue::Decimal(decs.iter().copied().sum()))),
-                    "min" => Ok(Some(LiteralValue::Decimal(*decs.iter().min().unwrap()))),
-                    "max" => Ok(Some(LiteralValue::Decimal(*decs.iter().max().unwrap()))),
+                    "min" => Ok(Some(LiteralValue::Decimal(
+                        *decs.iter().min().expect("non-empty decs checked above"),
+                    ))),
+                    "max" => Ok(Some(LiteralValue::Decimal(
+                        *decs.iter().max().expect("non-empty decs checked above"),
+                    ))),
                     "mean" => Ok(Some(LiteralValue::Float(
                         decs.iter().map(|&x| as_float(x)).sum::<f64>() / decs.len() as f64,
                     ))),

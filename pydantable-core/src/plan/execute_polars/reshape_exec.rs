@@ -464,7 +464,9 @@ fn parse_duration_seconds_strict(text: &str) -> PyResult<f64> {
             "invalid duration string",
         ));
     }
-    let unit = text.chars().last().unwrap();
+    let unit = text.chars().next_back().ok_or_else(|| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>("invalid duration string")
+    })?;
     let num: f64 = text[..text.len() - 1].parse().map_err(|_| {
         PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("invalid duration {text:?}"))
     })?;

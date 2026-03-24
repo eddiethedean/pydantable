@@ -122,7 +122,7 @@ Use this table to locate **Python tests and doc-example smoke** that back shippe
 | **0.16.1** | Map-column arithmetic `TypeError` (not panic); `validate_columns_strict` Arrow `pydantable.io` import fix | `tests/test_expr_070_surfaces.py`; `tests/test_arrow_interchange.py` (`test_dataframe_generic_accepts_pa_table`) |
 | **0.17.0** | Map `Expr` contracts after Arrow ingest; PySpark `functions` string/list/bytes wrappers | `tests/test_pyarrow_map_ingest.py` (`test_arrow_map_ingest_then_map_get_and_contains`); `tests/test_pyspark_sql.py` (new façade tests) |
 | **0.18.0** | Grouped Polars error context (`polars_err_ctx`); map-key deferral (docs); Hypothesis + integration `join` / `group_by` smoke | `tests/test_v018_features.py`; `tests/test_hypothesis_properties.py` (`test_group_by_sum_matches_manual`, `test_inner_join_unique_ids_row_count`, …); Rust: `execute_polars/common.rs` (`polars_err_format_tests`), `groupby_exec.rs` |
-| **0.19.0** | Pre-1.0 doc consolidation (`VERSIONING`, parity/README/index, `PERFORMANCE` note); CI-stable grouped test ordering | Same as **0.18.0** for execution semantics; `tests/test_v018_features.py` (`_sort_group_output` for `group_by` asserts); docs: `docs/VERSIONING.md`, `docs/ROADMAP.md` **Shipped in 0.19.0** |
+| **0.19.0** | Pre-1.0 doc consolidation (`VERSIONING`, parity/README/index, `PERFORMANCE` note); CI-stable grouped test ordering; bug-hunt hardening (see below) | `tests/test_v018_features.py` (`_sort_group_output`); `tests/test_schema_type_hints_narrowing.py`; `tests/test_fastapi_recipes.py` (`StreamingResponse` smoke); join assertions via `assert_table_eq_sorted` in `tests/test_advanced_ops_phase6.py`, `tests/test_dataframe_ops.py`; `scripts/verify_doc_examples.py` (`os._exit` teardown); docs: `docs/VERSIONING.md`, `docs/ROADMAP.md` **Shipped in 0.19.0** |
 
 #### Changelog-driven audit (0.15.0–0.19.0)
 
@@ -135,7 +135,7 @@ Cross-check each bullet in `docs/changelog.md` for recent minors against tests o
 - **Arrow-native `map` ingest:** `tests/test_pyarrow_map_ingest.py`.
 - **PySpark façade breadth (`trim`, …):** `tests/test_v015_features.py` (and related parity tests as listed in the changelog).
 - **`validate_data` removal / `trusted_mode`:** `tests/test_v015_constructor_api.py` plus constructor tests named in the changelog (**`test_v014_features.py`**, **`test_dataframe_model.py`**, **`test_dataframe_ops.py`**).
-- **FastAPI async routes (`acollect` / `ato_dict`):** `tests/test_fastapi_recipes.py`. **`lifespan`**, **`ThreadPoolExecutor`**, and **`StreamingResponse`** are described in `docs/FASTAPI.md`; there is **no pytest** that instantiates `StreamingResponse`, and `scripts/verify_doc_examples.py` does not reference those symbols by name.
+- **FastAPI async routes (`acollect` / `ato_dict`):** `tests/test_fastapi_recipes.py`. **`StreamingResponse`** smoke: `test_streaming_response_after_ato_dict`. **`lifespan`** and **`ThreadPoolExecutor`** are described in `docs/FASTAPI.md`; there is **no pytest** that wires a full **`lifespan`** + executor stack, and `scripts/verify_doc_examples.py` does not reference those symbols by name.
 
 **0.16.0**
 
@@ -166,10 +166,14 @@ Cross-check each bullet in `docs/changelog.md` for recent minors against tests o
 - **`VERSIONING.md`:** 0.x semver; links from `INTERFACE_CONTRACT.md`.
 - **`PERFORMANCE.md`:** validation subsection (re-run scripts; no new headline timings vs 0.18.x).
 - **Grouped tests:** `tests/test_v018_features.py` — `_sort_group_output` before comparing `group_by` columnar output to reference (order not API-guaranteed; `pytest -n auto` on Ubuntu CI).
+- **Schema introspection:** `tests/test_schema_type_hints_narrowing.py` — narrowed `get_type_hints` exception tuples in `schema/_impl.py`.
+- **FastAPI:** `tests/test_fastapi_recipes.py` — `test_streaming_response_after_ato_dict`.
+- **Join ordering:** `assert_table_eq_sorted(..., keys=[...])` for inner-join dict equality in `tests/test_advanced_ops_phase6.py`, `tests/test_dataframe_ops.py`.
+- **Doc-example script:** `scripts/verify_doc_examples.py` ends with `os._exit(0)` when `__name__ == "__main__"` to avoid teardown SIGABRT; CI no longer masks exit **134**.
 
 #### Optional follow-ups (non-blocking)
 
-- Executable smoke for a **`StreamingResponse`** pattern from `FASTAPI.md`, if we want parity with doc-only guidance today.
+- **`lifespan`** + **`ThreadPoolExecutor`** integration pytest, if we want parity beyond `FASTAPI.md` prose.
 - Split `tests/test_fastapi_recipes.py` by concern (sync vs async vs multipart) only if maintainers want stronger file-level separation; default is section comments in the single module.
 
 ### Run Python tests

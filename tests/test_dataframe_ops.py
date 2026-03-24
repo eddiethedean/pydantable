@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta
 
 import pytest
+from conftest import assert_table_eq_sorted
 from pydantable import DataFrame, Schema
 from pydantable.expressions import ColumnRef
 from pydantic import BaseModel
@@ -434,7 +435,16 @@ def test_temporal_groupby_and_join_paths() -> None:
         }
     )
     joined = left.join(right, on=["id", "ts"], how="inner").collect(as_lists=True)
-    assert joined["id"] == [1, 2]
+    assert_table_eq_sorted(
+        joined,
+        {
+            "id": [1, 2],
+            "ts": [datetime(2024, 1, 2), datetime(2024, 1, 1)],
+            "v": [20, None],
+            "tag": ["a", "b"],
+        },
+        keys=["id", "ts"],
+    )
 
     grouped = (
         left.group_by("id")

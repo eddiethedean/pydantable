@@ -55,7 +55,11 @@ def test_phase6_join_collision_uses_suffix():
     left = DataFrame[Left]({"id": [1, 2], "score": [10, 20]})
     right = DataFrame[Right]({"id": [1, 2], "score": [100, 200]})
     out = left.join(right, on="id", suffix="_r").collect(as_lists=True)
-    assert out == {"id": [1, 2], "score": [10, 20], "score_r": [100, 200]}
+    assert_table_eq_sorted(
+        out,
+        {"id": [1, 2], "score": [10, 20], "score_r": [100, 200]},
+        keys=["id"],
+    )
 
 
 def test_phase6_groupby_agg_count_sum_mean():
@@ -90,7 +94,11 @@ def test_phase6_dataframe_model_join_and_groupby_parity():
     countries = CountryDF({"id": [1, 3], "country": ["US", "CA"]})
     joined = users.join(countries, on="id")
     out = joined.collect(as_lists=True)
-    assert out == {"id": [1, 3], "age": [20, 30], "country": ["US", "CA"]}
+    assert_table_eq_sorted(
+        out,
+        {"id": [1, 3], "age": [20, 30], "country": ["US", "CA"]},
+        keys=["id"],
+    )
 
     grouped = users.group_by("id").agg(age_count=("count", "age"))
     g = grouped.collect(as_lists=True)
