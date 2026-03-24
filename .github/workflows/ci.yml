@@ -252,7 +252,8 @@ jobs:
           PYVER: ${{ matrix.python-version }}
         run: |
           if [ "$MATRIX_OS" = "ubuntu-latest" ] && [ "$PYVER" = "3.11" ]; then
-            $PY -m pytest -q -n auto --cov=pydantable --cov-report=term-missing --cov-report=xml
+            # Serial pytest for coverage: -n auto + cov + native ext has aborted workers (exit 134) on GHA runners.
+            $PY -m pytest -q --cov=pydantable --cov-report=term-missing --cov-report=xml
           elif [ "$MATRIX_OS" = "ubuntu-latest" ]; then
             $PY -m pytest -q -n auto
           else
