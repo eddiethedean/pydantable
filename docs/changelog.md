@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format is inspired 
 ### Fixed
 
 - **Expression typing:** Binary arithmetic on **`dict[str, T]`** map columns (for example `df.m + 1` or `df.m + df.m`) now raises **`TypeError`** in Rust (`infer_arith_dtype`) instead of panicking on an internal unwrap. Regression test: **`tests/test_expr_070_surfaces.py`**.
+- **Constructors:** **`validate_columns_strict`** (and therefore **`DataFrame[Schema](pa.Table)`** / **`RecordBatch`**) imported Arrow conversion helpers from the wrong submodule (`pydantable.schema.io`, which does not exist). Imports now use **`pydantable.io`**, matching **`DataFrameModel`**. Regression: **`tests/test_arrow_interchange.py`** (`test_dataframe_generic_accepts_pa_table`).
 
 ## [0.16.0] — 2026-03-26
 

@@ -207,6 +207,7 @@ Practical inputs that feed that phase:
 ## Shipped in 0.16.1 (patch)
 
 - [x] **Expression typing:** **`infer_arith_dtype`** rejects **`dict[str, T]`** map operands for binary arithmetic ( **`TypeError`** instead of a Rust panic). Test: **`tests/test_expr_070_surfaces.py`**.
+- [x] **Constructors:** **`validate_columns_strict`** loads **`pydantable.io`** helpers for **`pa.Table`** / **`RecordBatch`** (fixes **`DataFrame[Schema](...)`** with Arrow inputs). Test: **`tests/test_arrow_interchange.py`** (`test_dataframe_generic_accepts_pa_table`).
 
 ---
 

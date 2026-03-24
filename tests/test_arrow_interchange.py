@@ -11,8 +11,9 @@ pytest.importorskip("pyarrow")
 import pyarrow as pa
 import pyarrow.ipc as ipc
 import pyarrow.parquet as pq
-from pydantable import DataFrameModel, read_ipc, read_parquet
+from pydantable import DataFrame, DataFrameModel, read_ipc, read_parquet
 from pydantable.io import record_batch_to_column_dict
+from pydantic import BaseModel
 
 
 class SmallDF(DataFrameModel):
@@ -67,6 +68,18 @@ def test_to_arrow_and_from_pydict_matches_to_dict() -> None:
 def test_constructor_accepts_pa_table() -> None:
     table = pa.Table.from_pydict({"id": [9], "name": ["z"]})
     df = SmallDF(table)
+    assert df.to_dict() == {"id": [9], "name": ["z"]}
+
+
+def test_dataframe_generic_accepts_pa_table() -> None:
+    """``DataFrame[Schema](pa.Table)`` goes through ``validate_columns_strict``."""
+
+    class Row(BaseModel):
+        id: int
+        name: str
+
+    table = pa.Table.from_pydict({"id": [9], "name": ["z"]})
+    df = DataFrame[Row](table)
     assert df.to_dict() == {"id": [9], "name": ["z"]}
 
 
