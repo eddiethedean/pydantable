@@ -1,6 +1,6 @@
 # PydanTable roadmap (0.16.x → 0.17.x → v1.0.0)
 
-**Current release: `0.16.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, planned minor **0.17.0**, and what is still open before calling **`v1.0.0`**.
+**Current release: `0.16.1`.** This document summarizes what recent releases include, how they relate to the original phase plan, planned minor **0.17.0**, and what is still open before calling **`v1.0.0`**.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
@@ -199,6 +199,12 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 - [x] **Async:** **`ato_arrow`** uses the same thread-offload model as **`ato_polars`**. **`read_parquet` / `read_ipc`** remain synchronous (document **`asyncio.to_thread`** / executor for large files from async routes).
 - [x] **FastAPI:** [`FASTAPI.md`](FASTAPI.md) — **multipart** Parquet upload example, **`Depends`** executor injection, **background tasks** caveats, **422 vs `HTTPException` / uncaught constructor errors**; **`python-multipart`** in **`[dev]`** and CI. **`tests/test_fastapi_recipes.py`**: multipart + **422** on bad row types; **`scripts/verify_doc_examples.py`**: **`read_parquet`** + **`to_arrow`** smoke.
 - [x] **Tests:** **`tests/test_arrow_interchange.py`**.
+
+---
+
+## Shipped in 0.16.1 (patch)
+
+- [x] **Expression typing:** **`infer_arith_dtype`** rejects **`dict[str, T]`** map operands for binary arithmetic ( **`TypeError`** instead of a Rust panic). Test: **`tests/test_expr_070_surfaces.py`**.
 
 ---
 

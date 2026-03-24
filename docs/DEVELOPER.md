@@ -239,8 +239,8 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 
 ### Publishing (PyPI)
 
-Pushing a git tag matching `v*` (for example `v0.16.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then **`maturin build`** (per target) and **`twine upload --skip-existing dist/*`** to PyPI. The repository needs a **`PYPI_API_TOKEN`** secret (`TWINE_USERNAME` is **`__token__`** in the workflow). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test dependencies** aligned with **`.github/workflows/ci.yml`** (e.g. **`pytest-asyncio`**, **`fastapi`**, **`httpx`**, **`python-multipart`**, **`pyarrow`**) so async and optional integration tests are not skipped on tag builds.
+Pushing a git tag matching `v*` (for example `v0.16.1`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then **`maturin build`** (per target) and **`twine upload --skip-existing dist/*`** to PyPI. The repository needs a **`PYPI_API_TOKEN`** secret (`TWINE_USERNAME` is **`__token__`** in the workflow). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test dependencies** aligned with **`.github/workflows/ci.yml`** (e.g. **`pytest-asyncio`**, **`fastapi`**, **`httpx`**, **`python-multipart`**, **`pyarrow`**) so async and optional integration tests are not skipped on tag builds.
 
 **GNU manylinux wheels** are built with **`PyO3/maturin-action`** inside the default **manylinux Docker** images (`manylinux: 2_17` / `2_28`). Avoid **`container: off`** plus **`--zig`** on the host for those targets: linker failures and **OOM** are common with a Polars-sized dependency tree. **musllinux** jobs still use **`--zig`** in `release.yml` as needed.
 
-The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v0.16.0`**).
+The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v0.16.1`**).

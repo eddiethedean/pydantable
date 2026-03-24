@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.1] — 2026-03-27
+
+### Fixed
+
+- **Expression typing:** Binary arithmetic on **`dict[str, T]`** map columns (for example `df.m + 1` or `df.m + df.m`) now raises **`TypeError`** in Rust (`infer_arith_dtype`) instead of panicking on an internal unwrap. Regression test: **`tests/test_expr_070_surfaces.py`**.
+
 ## [0.16.0] — 2026-03-26
 
 ### Highlights
