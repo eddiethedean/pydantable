@@ -121,3 +121,20 @@ def test_arrow_map_strict_rejects_string_column_for_int_values() -> None:
     arr = pa.array([[("k", "not-int")]], type=mt)
     with pytest.raises(ValueError, match="strict trusted"):
         DataFrame[MapInt]({"m": arr}, trusted_mode="strict")
+
+
+def test_arrow_map_ingest_then_map_get_and_contains() -> None:
+    """map_get / map_contains_key after Arrow map ingest (string-keyed maps)."""
+    mt = pa.map_(pa.string(), pa.int64())
+    arr = pa.array([[("a", 1), ("b", 2)]], type=mt)
+    df = DataFrame[MapInt]({"m": arr}, trusted_mode="strict")
+    out = df.with_columns(
+        av=df.m.map_get("a"),
+        miss=df.m.map_get("missing"),
+        has_a=df.m.map_contains_key("a"),
+        has_z=df.m.map_contains_key("z"),
+    ).collect(as_lists=True)
+    assert out["av"] == [1]
+    assert out["miss"] == [None]
+    assert out["has_a"] == [True]
+    assert out["has_z"] == [False]

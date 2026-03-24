@@ -14,6 +14,10 @@
    .. autosummary::
    
       ~DataFrame.__init__
+      ~DataFrame.acollect
+      ~DataFrame.ato_arrow
+      ~DataFrame.ato_dict
+      ~DataFrame.ato_polars
       ~DataFrame.col
       ~DataFrame.collect
       ~DataFrame.concat
@@ -36,6 +40,7 @@
       ~DataFrame.slice
       ~DataFrame.sort
       ~DataFrame.tail
+      ~DataFrame.to_arrow
       ~DataFrame.to_dict
       ~DataFrame.to_polars
       ~DataFrame.unique

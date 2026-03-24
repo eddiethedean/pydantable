@@ -23,7 +23,7 @@ Status definitions:
 | Globals in `select` | `sum`/`mean`/`count`/`min`/`max` over a column, **`global_row_count`** / `count(*)` | Implemented | Single-row `DataFrame.select`; see `INTERFACE_CONTRACT`. |
 | Expr helpers | `strptime`, `unix_timestamp`, `cast(str→date/datetime)`, `map_len`/`map_get`/`map_contains_key`, `binary_len`, `dt_nanosecond` | Implemented | Rust `ExprNode` + Polars lowering; contract tests. |
 | Performance | Guardrails for major transforms | Implemented | Lightweight regression checks in test suite. |
-| Ecosystem | Optional interfaces `pandas` and `pyspark` | Implemented | Alternate import/naming surfaces; execution is the same Rust core as default (not native pandas/Spark). |
+| Ecosystem | Optional interfaces `pandas` and `pyspark` | Implemented | Alternate import/naming surfaces; execution is the same Rust core as default (not native pandas/Spark). **0.17.0:** PySpark `sql.functions` adds string/list/bytes helpers (`str_replace`, `strip_*`, `strptime`, `binary_len`, `list_*`) as thin wrappers over core `Expr`. |
 
 ## Remaining parity gaps
 

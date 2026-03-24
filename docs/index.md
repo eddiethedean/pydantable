@@ -17,7 +17,7 @@ This **documentation site** is the detailed manual. The repository **README** on
 
 **Scalar dtypes** include `int`, `float`, `bool`, `str`, `datetime`, `date`, `time`, `timedelta`, `bytes`, homogeneous **`dict[str, T]`** maps, each nullable via `Optional` / `| None`. **Structs**, **lists**, **UUID**, **Decimal**, and **Enum** columns are documented in {doc}`SUPPORTED_TYPES`. Unsupported `DataFrameModel` field annotations fail at **class definition** time.
 
-**Expressions (0.7+ through current):** typed **`Expr`** builds a Rust AST — globals (**`global_row_count`**, **`global_sum`**, …), ranked and framed windows (including multi-key **`rangeBetween`**; see {doc}`WINDOW_SQL_SEMANTICS`), maps and temporal helpers, PySpark mirrors in {doc}`PYSPARK_PARITY`. Semantics: {doc}`INTERFACE_CONTRACT` and {doc}`changelog`.
+**Expressions (0.7+ through current):** typed **`Expr`** builds a Rust AST — globals (**`global_row_count`**, **`global_sum`**, …), ranked and framed windows (including multi-key **`rangeBetween`**; see {doc}`WINDOW_SQL_SEMANTICS`), maps and temporal helpers, PySpark mirrors in {doc}`PYSPARK_PARITY` (**0.17.0** adds more `sql.functions` wrappers — string replace/strip, **`strptime`**, **`binary_len`**, list helpers). Semantics: {doc}`INTERFACE_CONTRACT` and {doc}`changelog`.
 
 **Trusted ingest:** **`trusted_mode`** (`off` / `shape_only` / `strict`) on constructors — {doc}`DATAFRAMEMODEL`, {doc}`SUPPORTED_TYPES`. **I/O:** sync **`collect` / `to_dict` / `to_polars` / `to_arrow`** plus **async** **`acollect` / `ato_dict` / `ato_polars` / `ato_arrow`**; **`read_parquet` / `read_ipc`** for file/bytes ingest ({doc}`EXECUTION`, {doc}`FASTAPI`). **Arrow `map<utf8, …>`** columns can ingest as **`dict[str, T]`** ({doc}`SUPPORTED_TYPES`).
 

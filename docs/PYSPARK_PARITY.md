@@ -23,6 +23,7 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `functions.isnull`, `isnotnull`, `coalesce` | **Supported** | Via Rust `ExprNode`. |
 | `functions.when` / `otherwise` | **Supported** | `CaseWhen` in Rust; chain `.when(...).otherwise(...)`. |
 | `functions.cast`, `between`, `isin`, `concat`, `substring`, `length` | **Supported** | Base types only; `substring` is 1-based (Spark-style). |
+| `functions.str_replace`, `regexp_replace`, `strip_prefix`, `strip_suffix`, `strip_chars`, `strptime`, `binary_len`, `list_len`, `list_get`, `list_contains`, `list_min`, `list_max`, `list_sum` | **Supported** (**0.17.0**) | Thin wrappers over core :class:`~pydantable.expressions.Expr` methods (same Rust lowering). `regexp_replace` is an alias for literal substring replace, not full regex. |
 | `functions.sum`, `avg`, `count`, `min`, `max`, … as column exprs | **Supported** (global) | Global `sum`/`avg`/`mean`/`count`/`min`/`max` on a typed `Expr` in `DataFrame.select(...)` (single-row). **`count()`** with **no** argument → row count (**0.8.0**). Grouped paths use `group_by().agg`. |
 | `Column.cast`, `isin`, `between`, `substr`/`char_length` | **Supported** | On `Expr` / `Column`; includes **`str` → `date` / `datetime`** via Polars parsing (use `strptime` for fixed formats). |
 | `Window`, window functions | **Partial** | `Window.partitionBy().orderBy(..., nulls_last=...)` (**NULLS FIRST/LAST**); `row_number`, `rank`, `dense_rank`, `window_sum`, `window_avg`, `window_min`, `window_max`, `lag`, `lead` + core `Expr` lowering. Framing support includes `rowsBetween` for all named window ops and `rangeBetween` for numeric/temporal aggregates: **first** `orderBy` column must be numeric, `date`, `datetime`, or `duration`; additional `orderBy` columns are sort tie-breakers only ([`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md)). Unframed multi-key windows: only the first key’s `nulls_last` is passed to Polars `SortOptions`. |
@@ -38,7 +39,7 @@ Delivered in-tree: **`IsNull`**, **`IsNotNull`**, **`Coalesce`**, **`CaseWhen`**
 
 **Also delivered:** Spark-named **date/datetime** helpers in `pydantable.pyspark.sql.functions` — `year`, `month`, `day`, `dayofmonth`, `hour`, `minute`, `second`, `nanosecond`, `to_date` (with optional `format=` for string columns), `unix_timestamp` — thin wrappers over core `Expr` methods (same Rust lowering as the core API). **String:** `lower`, `upper`, `trim` (whitespace; core `Expr.strip`). **Numeric:** `abs`, `round`, `floor`, `ceil`.
 
-**Global row count:** use `pydantable.expressions.global_row_count()` or `functions.count()` with no argument (row count / `count(*)`-style). **Deferred:** other Spark-specific temporal helpers not yet modeled.
+**Global row count:** use `pydantable.expressions.global_row_count()` or `functions.count()` with no argument (row count / `count(*)`-style). **Deferred:** other Spark-specific temporal helpers (e.g. `quarter`, `weekofyear`, `from_unixtime`) not yet modeled on the core `Expr` surface.
 
 ## Phase D — Aggregates as `functions.sum(Column)`
 

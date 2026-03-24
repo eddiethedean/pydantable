@@ -169,6 +169,89 @@ def trim(column: Expr) -> Expr:
     return column.strip()
 
 
+def str_replace(column: Expr, pattern: str, replacement: str) -> Expr:
+    """Replace all occurrences of literal ``pattern`` with ``replacement``."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.str_replace() expects a typed column Expr.")
+    return column.str_replace(pattern, replacement)
+
+
+def regexp_replace(column: Expr, pattern: str, replacement: str) -> Expr:
+    """Spark-style name for literal substring replace (same as :func:`str_replace`)."""
+    return str_replace(column, pattern, replacement)
+
+
+def strip_prefix(column: Expr, prefix: str) -> Expr:
+    """Remove literal ``prefix`` from string start (core ``Expr.strip_prefix``)."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.strip_prefix() expects a typed column Expr.")
+    return column.strip_prefix(prefix)
+
+
+def strip_suffix(column: Expr, suffix: str) -> Expr:
+    """Remove literal ``suffix`` from string end (core ``Expr.strip_suffix``)."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.strip_suffix() expects a typed column Expr.")
+    return column.strip_suffix(suffix)
+
+
+def strip_chars(column: Expr, chars: str) -> Expr:
+    """Strip any character in ``chars`` from both ends (core ``Expr.strip_chars``)."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.strip_chars() expects a typed column Expr.")
+    return column.strip_chars(chars)
+
+
+def strptime(column: Expr, format: str, *, to_datetime: bool = True) -> Expr:
+    """Parse strings with ``strftime``-style ``format`` (core :meth:`Expr.strptime`)."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.strptime() expects a typed column Expr.")
+    return column.strptime(format, to_datetime=to_datetime)
+
+
+def binary_len(column: Expr) -> Expr:
+    """Byte length of ``bytes`` column (core :meth:`Expr.binary_len`)."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.binary_len() expects a typed column Expr.")
+    return column.binary_len()
+
+
+def list_len(column: Expr) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.list_len() expects a typed column Expr.")
+    return column.list_len()
+
+
+def list_get(column: Expr, index: Any) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.list_get() expects a typed column Expr.")
+    return column.list_get(index)
+
+
+def list_contains(column: Expr, value: Any) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.list_contains() expects a typed column Expr.")
+    return column.list_contains(value)
+
+
+def list_min(column: Expr) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.list_min() expects a typed column Expr.")
+    return column.list_min()
+
+
+def list_max(column: Expr) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.list_max() expects a typed column Expr.")
+    return column.list_max()
+
+
+def list_sum(column: Expr) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.list_sum() expects a typed column Expr.")
+    return column.list_sum()
+
+
 def abs(column: Expr) -> Expr:
     """Absolute value for numeric columns (Spark ``abs``)."""
     return column.abs()
@@ -372,6 +455,7 @@ def element_at(column: Expr, key: str) -> Expr:
 __all__ = [
     "avg",
     "between",
+    "binary_len",
     "cast",
     "coalesce",
     "col",
@@ -388,6 +472,12 @@ __all__ = [
     "lag",
     "lead",
     "length",
+    "list_contains",
+    "list_get",
+    "list_len",
+    "list_max",
+    "list_min",
+    "list_sum",
     "lit",
     "map_contains_key",
     "map_entries",
@@ -403,8 +493,14 @@ __all__ = [
     "month",
     "nanosecond",
     "rank",
+    "regexp_replace",
     "row_number",
     "second",
+    "str_replace",
+    "strip_chars",
+    "strip_prefix",
+    "strip_suffix",
+    "strptime",
     "substring",
     "sum",
     "to_date",

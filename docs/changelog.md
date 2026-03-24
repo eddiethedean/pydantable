@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here. The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.17.0] — 2026-03-28
+
+### Highlights
+
+- **Maps (string keys):** Documented and tested **Expr** behavior for **`map_get`** / **`map_contains_key`** on columns ingested from PyArrow **`map<utf8, …>`** (missing key → null). **Non-string** Python **`dict[int, T]`** map keys remain **unsupported** (deferred); see {doc}`ROADMAP` **Later**.
+- **PySpark façade:** [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md) — new thin **`pydantable.pyspark.sql.functions`** wrappers: **`str_replace`**, **`regexp_replace`** (alias, literal replace), **`strip_prefix`**, **`strip_suffix`**, **`strip_chars`**, **`strptime`**, **`binary_len`**, **`list_len`**, **`list_get`**, **`list_contains`**, **`list_min`**, **`list_max`**, **`list_sum`** (core **`Expr`** / Rust lowering unchanged). Tests: **`tests/test_pyspark_sql.py`**.
+- **Docs:** Refreshed [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md), [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md), [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md) (map + Arrow ingest note).
+
+### Details
+
+See {doc}`ROADMAP` **Shipped in 0.17.0**.
+
 ## [0.16.1] — 2026-03-27
 
 ### Fixed

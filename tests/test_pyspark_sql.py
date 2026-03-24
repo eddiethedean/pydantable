@@ -49,6 +49,54 @@ def test_sql_col_without_dtype_raises() -> None:
         F.col("x")
 
 
+def test_sql_functions_string_and_list_wrappers() -> None:
+    class S(Schema):
+        s: str
+        items: list[int]
+
+    df = DataFrame[S]({"s": ["aabba", "x"], "items": [[3, 1, 3], [0]]})
+    out = (
+        df.withColumn("t1", F.str_replace(F.col("s", dtype=str), "a", "z"))
+        .withColumn("t2", F.regexp_replace(F.col("s", dtype=str), "a", "z"))
+        .withColumn("pre", F.strip_prefix(F.col("s", dtype=str), "aa"))
+        .withColumn("chars", F.strip_chars(F.col("s", dtype=str), "ab"))
+        .withColumn("n", F.list_len(F.col("items", dtype=list[int])))
+        .withColumn("g0", F.list_get(F.col("items", dtype=list[int]), 0))
+        .withColumn("has3", F.list_contains(F.col("items", dtype=list[int]), 3))
+        .withColumn("lmin", F.list_min(F.col("items", dtype=list[int])))
+        .withColumn("lmax", F.list_max(F.col("items", dtype=list[int])))
+        .withColumn("lsum", F.list_sum(F.col("items", dtype=list[int])))
+        .collect(as_lists=True)
+    )
+    assert out["t1"] == ["zzbbz", "x"]
+    assert out["t2"] == ["zzbbz", "x"]
+    assert out["pre"] == ["bba", "x"]
+    assert out["chars"] == ["", "x"]
+    assert out["n"] == [3, 1]
+    assert out["g0"] == [3, 0]
+    assert out["has3"] == [True, False]
+    assert out["lmin"] == [1, 0]
+    assert out["lmax"] == [3, 0]
+    assert out["lsum"] == [7, 0]
+
+
+def test_sql_functions_strptime_and_binary_len() -> None:
+    class S(Schema):
+        ts: str
+        b: bytes
+
+    df = DataFrame[S]({"ts": ["2024-01-15"], "b": [b"abc"]})
+    out = (
+        df.withColumn(
+            "d", F.strptime(F.col("ts", dtype=str), "%Y-%m-%d", to_datetime=False)
+        )
+        .withColumn("bl", F.binary_len(F.col("b", dtype=bytes)))
+        .collect(as_lists=True)
+    )
+    assert out["d"] == [date(2024, 1, 15)]
+    assert out["bl"] == [3]
+
+
 def test_column_type_alias_is_expr() -> None:
     from pydantable.expressions import Expr
 

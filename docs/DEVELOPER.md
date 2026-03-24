@@ -111,7 +111,7 @@ Phase 4 boundary contract:
 - **`pytest` on `tests/`** is the **CI-facing** check for end-to-end behavior (`collect`, joins, UIs). Prefer adding user-visible regressions here when behavior crosses the Python boundary.
 - **Async tests:** **`pytest-asyncio`** is in **`[dev]`**; `pyproject.toml` sets **`asyncio_mode = auto`** so `async def` tests run without extra markers unless you prefer explicit `@pytest.mark.asyncio`.
 
-### Release ↔ tests map (0.15.0 / 0.16.0)
+### Release ↔ tests map (0.15.0–0.17.0)
 
 Use this table to locate **Python tests and doc-example smoke** that back shipped minors (see `docs/changelog.md` for narrative highlights). It is not a substitute for line coverage.
 
@@ -119,10 +119,12 @@ Use this table to locate **Python tests and doc-example smoke** that back shippe
 | --- | --- | --- |
 | **0.15.0** | Async `acollect` / `ato_*`, Arrow `map` ingest, PySpark `trim` / `abs` / …, `validate_data` removal | `tests/test_async_materialization.py`, `tests/test_pyarrow_map_ingest.py`, `tests/test_v015_features.py`, `tests/test_v015_constructor_api.py`; `tests/test_fastapi_recipes.py` (sync `TestClient` / OpenAPI from **0.14+** plus async materialization routes) |
 | **0.16.0** | `read_parquet` / `read_ipc`, `to_arrow` / `ato_arrow`, `Table` / `RecordBatch` constructors, FastAPI multipart | `tests/test_arrow_interchange.py`; `tests/test_fastapi_recipes.py` (multipart Parquet); `scripts/verify_doc_examples.py` (read Parquet + `to_arrow` smoke; see comment block near `read_parquet`) |
+| **0.16.1** | Map-column arithmetic `TypeError` (not panic); `validate_columns_strict` Arrow `pydantable.io` import fix | `tests/test_expr_070_surfaces.py`; `tests/test_arrow_interchange.py` (`test_dataframe_generic_accepts_pa_table`) |
+| **0.17.0** | Map `Expr` contracts after Arrow ingest; PySpark `functions` string/list/bytes wrappers | `tests/test_pyarrow_map_ingest.py` (`test_arrow_map_ingest_then_map_get_and_contains`); `tests/test_pyspark_sql.py` (new façade tests) |
 
-#### Changelog-driven audit (0.15.0 / 0.16.0)
+#### Changelog-driven audit (0.15.0–0.17.0)
 
-Cross-check each bullet in `docs/changelog.md` for **[0.15.0]** and **[0.16.0]** against tests or `verify_doc_examples.py`.
+Cross-check each bullet in `docs/changelog.md` for recent minors against tests or `verify_doc_examples.py`.
 
 **0.15.0**
 
@@ -139,6 +141,16 @@ Cross-check each bullet in `docs/changelog.md` for **[0.15.0]** and **[0.16.0]**
 - **`RecordBatch` constructor path:** same file (`test_constructor_accepts_record_batch`).
 - **`to_arrow` parity with `to_dict`:** `test_to_arrow_and_from_pydict_matches_to_dict`; **`ato_arrow`:** `test_ato_arrow`. Async **`ato_arrow`** is intentionally **not** repeated in `tests/test_async_materialization.py` (cross-link in that module’s docstring).
 - **Multipart Parquet upload:** `tests/test_fastapi_recipes.py` (`test_multipart_parquet_upload`); **422** on bad row types: `test_row_list_invalid_type_is_422`.
+
+**0.16.1**
+
+- **Map arithmetic typing:** `tests/test_expr_070_surfaces.py` (`test_map_column_arithmetic_raises_typeerror_not_panic`).
+- **`DataFrame[Schema](pa.Table)`:** `tests/test_arrow_interchange.py` (`test_dataframe_generic_accepts_pa_table`).
+
+**0.17.0**
+
+- **Map `map_get` / `map_contains_key` after PyArrow map ingest:** `tests/test_pyarrow_map_ingest.py` (`test_arrow_map_ingest_then_map_get_and_contains`).
+- **PySpark `sql.functions` wrappers:** `tests/test_pyspark_sql.py` (`test_sql_functions_string_and_list_wrappers`, `test_sql_functions_strptime_and_binary_len`).
 
 #### Optional follow-ups (non-blocking)
 
@@ -303,8 +315,8 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 
 ### Publishing (PyPI)
 
-Pushing a git tag matching `v*` (for example `v0.16.1`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then **`maturin build`** (per target) and **`twine upload --skip-existing dist/*`** to PyPI. The repository needs a **`PYPI_API_TOKEN`** secret (`TWINE_USERNAME` is **`__token__`** in the workflow). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test dependencies** aligned with **`.github/workflows/ci.yml`** (e.g. **`pytest-asyncio`**, **`fastapi`**, **`httpx`**, **`python-multipart`**, **`pyarrow`**) so async and optional integration tests are not skipped on tag builds.
+Pushing a git tag matching `v*` (for example `v0.17.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then **`maturin build`** (per target) and **`twine upload --skip-existing dist/*`** to PyPI. The repository needs a **`PYPI_API_TOKEN`** secret (`TWINE_USERNAME` is **`__token__`** in the workflow). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test dependencies** aligned with **`.github/workflows/ci.yml`** (e.g. **`pytest-asyncio`**, **`fastapi`**, **`httpx`**, **`python-multipart`**, **`pyarrow`**) so async and optional integration tests are not skipped on tag builds.
 
 **GNU manylinux wheels** are built with **`PyO3/maturin-action`** inside the default **manylinux Docker** images (`manylinux: 2_17` / `2_28`). Avoid **`container: off`** plus **`--zig`** on the host for those targets: linker failures and **OOM** are common with a Polars-sized dependency tree. **musllinux** jobs still use **`--zig`** in `release.yml` as needed.
 
-The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v0.16.1`**).
+The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v0.17.0`**).

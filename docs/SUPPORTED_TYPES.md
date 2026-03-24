@@ -69,6 +69,8 @@ wins (Polars map semantics); do not rely on raising an error for duplicates.
 
 **Arrow-native `map` columns (0.15.0+):** You may pass a PyArrow **`Array`** or **`ChunkedArray`** typed as **`map<string|large_string, V>`** for a **`dict[str, T]`** field. Each row is converted to a Python **`dict`** (or **`None`** if the map cell is null). **Non-string** Arrow map keys are rejected. With **`trusted_mode='strict'`**, scalar **`T`** is checked against the Arrow **value** type; nested **`T`** (list, struct, map) uses best-effort acceptance—prefer **`trusted_mode='off'`** when you need full Pydantic validation of nested cells. **Heterogeneous keys** (e.g. **`dict[int, T]`**) are not supported.
 
+**0.17.0 — Map expressions after Arrow ingest:** After ingest, the column is a normal **`dict[str, T]`** map for planning and **`Expr`**: **`map_get(key)`** yields **null** when the key is absent (or the whole map cell is null); **`map_contains_key(key)`** is boolean. Same rules apply to maps built from Python dict cells. See **`tests/test_pyarrow_map_ingest.py`** (`test_arrow_map_ingest_then_map_get_and_contains`).
+
 ## Homogeneous list columns (`list[T]` / `List[T]`)
 
 Use **`list[T]`** (or `typing.List[T]`) where **`T`** is any supported column type

@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.16.x → 0.17.x → 0.18.x → 0.19.x → v1.0.0)
+# PydanTable roadmap (0.17.x → 0.18.x → 0.19.x → v1.0.0)
 
-**Current release: `0.16.1`.** This document summarizes what recent releases include, how they relate to the original phase plan, planned minors **0.17.0** through **0.19.0**, and the **Planned v1.0.0** phase for the **production-ready** major release.
+**Current release: `0.17.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, planned minors **0.18.0** through **0.19.0**, and the **Planned v1.0.0** phase for the **production-ready** major release.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
@@ -186,7 +186,7 @@ Practical inputs that feed that phase:
 - [x] **Async materialization:** **`acollect`**, **`ato_dict`**, **`ato_polars`** on **`DataFrame`**; **`DataFrameModel`** adds the same plus **`arows`** and **`ato_dicts`**. Blocking Rust/Polars work runs in **`asyncio.to_thread`** or **`executor=`**. Documented limits: cancellation does not stop in-flight engine work; **`ato_polars`** still materializes a Python dict first. [`EXECUTION.md`](EXECUTION.md), [`FASTAPI.md`](FASTAPI.md).
 - [x] **FastAPI `async` routes:** **`async def`** examples, **`lifespan`** + **`ThreadPoolExecutor`**, **`StreamingResponse`** guidance (manual chunking; no built-in async row iterator). Tests: **`tests/test_fastapi_recipes.py`**, **`scripts/verify_doc_examples.py`**.
 - [x] **Spark façade depth:** **`trim`**, **`abs`**, **`round`**, **`floor`**, **`ceil`** in **`pydantable.pyspark.sql.functions`** (still **not** a distributed Spark engine).
-- [x] **Constructor API:** **`validate_data`** removed from **`DataFrame.__init__`** and **`DataFrameModel.__init__`**; passing it raises **`TypeError`**. Removed schema helpers **`_VALIDATE_DATA_KW_UNSET`**, **`_warn_validate_data_kw_deprecated`**, **`_coerce_validate_data_kw`**, and internal **`_skip_validate_data_deprecation`** / bridge kwargs; trimmed **`validate_columns_strict`** docstring. See [`python/pydantable/dataframe.py`](../python/pydantable/dataframe.py), [`python/pydantable/dataframe_model.py`](../python/pydantable/dataframe_model.py), [`python/pydantable/schema.py`](../python/pydantable/schema.py).
+- [x] **Constructor API:** **`validate_data`** removed from **`DataFrame.__init__`** and **`DataFrameModel.__init__`**; passing it raises **`TypeError`**. Removed schema helpers **`_VALIDATE_DATA_KW_UNSET`**, **`_warn_validate_data_kw_deprecated`**, **`_coerce_validate_data_kw`**, and internal **`_skip_validate_data_deprecation`** / bridge kwargs; trimmed **`validate_columns_strict`** docstring. Source: `python/pydantable/dataframe.py`, `python/pydantable/dataframe_model.py`, `python/pydantable/schema.py`.
 - [x] **Docs:** [`changelog.md`](changelog.md) **0.15.0**; **`DATAFRAMEMODEL`**, **`FASTAPI`**, **`SUPPORTED_TYPES`**, **`PERFORMANCE`**, **`INTERFACE_CONTRACT`**, **`index`**, **`README`**.
 - [x] **Regression tests:** **`tests/test_async_materialization.py`**, **`tests/test_pyarrow_map_ingest.py`**, **`tests/test_v015_features.py`**, **`tests/test_v015_constructor_api.py`**; **`tests/test_v014_features.py`**, **`tests/test_dataframe_model.py`**, **`tests/test_dataframe_ops.py`** (constructor **`TypeError`** coverage).
 
@@ -211,13 +211,13 @@ Practical inputs that feed that phase:
 
 ---
 
-## Planned 0.17.0 (maps v2 & parity polish)
+## Shipped in 0.17.0 (maps contract + PySpark façade + parity docs)
 
-**Themes:** push **map** / key expressiveness and refresh **parity** docs; keep scope bounded vs **After v1.0.0** engines.
+**Themes:** **String-keyed** maps only—deepen **Arrow map** ingest + **`Expr`** contracts; thin **PySpark** wrappers over existing core **`Expr`**; refresh **parity** docs.
 
-- [ ] **Maps / keys v2:** spike **non-string keys** (e.g. **`dict[int, T]`**) **or** deepen **Arrow map** + **`Expr`** (**`map_get`**, typing) so behavior matches a written contract in [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md). If the spike is too large, move remainder to **Later** explicitly.
-- [ ] **PySpark façade:** add **Spark-named** helpers where **`Expr`** / Rust lowering already supports them (see deferred items in [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md)); reinforce “facade only” messaging.
-- [ ] **Parity documentation:** refresh [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md) and [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) for the post-**0.16.0** API surface; optional benchmarks in [`PERFORMANCE.md`](PERFORMANCE.md) for **`to_arrow`** / read helpers.
+- [x] **Maps / keys (string-keyed):** Documented **`map_get`** / **`map_contains_key`** after PyArrow **`map<string, …>`** ingest (missing key → null). Regression: **`tests/test_pyarrow_map_ingest.py`**. **Non-string** Python **`dict[int, T]`** / non-string Arrow map keys **deferred** (see **Later**).
+- [x] **PySpark façade:** New **`pydantable.pyspark.sql.functions`** wrappers where core **`Expr`** already implements the op ([`PYSPARK_PARITY.md`](PYSPARK_PARITY.md)); execution remains the **Polars-backed** core (**facade only**).
+- [x] **Parity documentation:** [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md), [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md), [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md) updated for **0.17.0**; no **`PERFORMANCE.md`** number refresh in this release.
 
 ---
 
@@ -265,7 +265,7 @@ Practical inputs that feed that phase:
 
 Work **not** scheduled in the **0.17.0–0.19.0** or **Planned v1.0.0** sections above, or explicitly deferred when scope slips:
 
-- [ ] **Heterogeneous map keys** / full **Arrow + expression** parity if not delivered in **0.17.0** / **0.18.0** (dtype, **`map_get`**, Polars lowering)—or explicitly deferred past **v1.0.0**.
+- [ ] **Non-string map keys** (**`dict[int, T]`** and Arrow maps whose keys are not UTF-8 strings): not shipped in **0.17.0** (that release deepens **string-keyed** map contracts only). Same for **heterogeneous** keys / full **Arrow + expression** parity if not delivered in **0.18.0**—or explicitly deferred past **v1.0.0**.
 - [ ] Items deferred from earlier releases when priorities change.
 - [ ] **Chunked / streaming** async iterators for JSON or row batches (no minimal contract yet).
 - [ ] Longer-horizon experiments that do not fit the **pre-1.0** train (**0.17–0.19**) or the **v1.0.0** production gate.

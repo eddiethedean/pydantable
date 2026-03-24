@@ -175,6 +175,8 @@ Use Starlette **`BackgroundTasks`** for work that must run **after** the respons
 
 Recommend validating **untrusted** JSON with default **`trusted_mode`**; reserve **`shape_only`** / **`strict`** for authenticated internal pipelines or files you control.
 
+(async-routes-executors-and-lifespan)=
+
 ## Async routes, executors, and lifespan
 
 For **`async def`** handlers, **`await`** the async materialization helpers instead of calling **`collect()`** / **`to_dict()`** directly (unless you intentionally block the loop).
