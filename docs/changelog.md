@@ -18,7 +18,7 @@ See {doc}`ROADMAP` **Shipped in 0.19.0**. Release hygiene: **`make check-full`**
 
 **Deferred to v1.0.0 tag (not blocking 0.19.0):** formal **1.x** semver publication, PyPI packaging dry-run narrative, SBOM/supply-chain notes, support matrix as a **1.0.x** commitment, and README/index “1.0 leads” copy—see {doc}`ROADMAP` **Planned v1.0.0**.
 
-## [0.18.0] — 2026-03-30
+## [0.18.0] — 2026-03-22
 
 ### Highlights
 
@@ -31,7 +31,7 @@ See {doc}`ROADMAP` **Shipped in 0.19.0**. Release hygiene: **`make check-full`**
 
 See {doc}`ROADMAP` **Shipped in 0.18.0**. {doc}`INTERFACE_CONTRACT` aggregation rules are unchanged; the doc notes optional **`group_by().agg()`** error-message context.
 
-## [0.17.0] — 2026-03-28
+## [0.17.0] — 2026-03-18
 
 ### Highlights
 

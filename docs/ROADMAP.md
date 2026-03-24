@@ -250,7 +250,7 @@ Practical inputs that feed that phase:
 
 **Goal:** tag **`v1.0.0`** when the project is ready to tell production users and library authors: **stable public API** under **semver**, **documented** semantics, and **repeatable** release quality—not a large new feature dump. **1.0.0** follows **0.19.0**; anything that does not block that bar belongs in **Later** or **After v1.0.0**.
 
-- [ ] **Precondition:** **Shipped in 0.19.0** (above) is complete or any remaining gap is noted in this file or [`changelog.md`](changelog.md).
+- [x] **Precondition:** **Shipped in 0.19.0** (above) is complete or any remaining gap is noted in this file or [`changelog.md`](changelog.md).
 - [ ] **Semver contract:** publish a **1.0** policy (expand [`VERSIONING.md`](VERSIONING.md) and/or [`README.md`](README.md)): what counts as **patch** vs **minor** vs **major** for **1.x** for `DataFrame` / `DataFrameModel` / `Expr` / Rust extension boundaries; confirm [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) is the behavioral source of truth. (**0.x** expectations already live in [`VERSIONING.md`](VERSIONING.md).)
 - [ ] **Packaging and versions:** **`pyproject.toml`** / **`Cargo.toml`** / extension **`rust_version()`** alignment; **Maturin** release workflow (e.g. [`.github/workflows/release.yml`](../.github/workflows/release.yml)) exercised or dry-run validated; **PyPI** **sdist + wheels** for declared platforms; optional **SBOM** or supply-chain notes if policy requires them.
 - [ ] **Quality bar:** full **`make check-full`**, **`cargo test --all-features`**, **`cargo check --no-default-features`**, and **pytest** (including optional-deps legs that match **CI**) on the **exact** commit tagged **`v1.0.0`**; **no known P0/P1** regressions against **INTERFACE_CONTRACT**.
