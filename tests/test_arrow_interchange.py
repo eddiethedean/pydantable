@@ -57,7 +57,8 @@ def test_to_arrow_and_from_pydict_matches_to_dict() -> None:
     col = df.to_dict()
     tbl = df.to_arrow()
     assert isinstance(tbl, pa.Table)
-    # Column order follows :meth:`to_dict` (schema / engine ordering), not constructor key order.
+    # Column order follows :meth:`to_dict` (schema / engine ordering), not
+    # constructor key order.
     assert tbl.column_names == list(col.keys())
     assert tbl.column("id").to_pylist() == [1, 2]
     assert tbl.column("name").to_pylist() == ["a", "b"]
