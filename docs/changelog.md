@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.18.0] — 2026-03-24
+## [0.18.0] — 2026-03-30
 
 ### Highlights
 

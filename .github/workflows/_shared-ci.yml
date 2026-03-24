@@ -25,7 +25,7 @@ jobs:
         run: |
           python -m pip install -U pip
           python -m pip install ruff mypy
-          python -m pip install pydantic typing-extensions
+          python -m pip install "pydantic>=2.0,<3" "typing-extensions>=4.7"
 
       - name: Ruff format
         run: ruff format --check .
@@ -238,19 +238,19 @@ jobs:
             echo "PY=.venv/bin/python" >> $GITHUB_ENV
           fi
 
+      # Keep in sync with ``pyproject.toml`` ``[project.optional-dependencies]`` dev + pandas + polars.
       - name: Install maturin and test deps
         run: |
           $PY -m pip install -U pip
-          $PY -m pip install maturin pytest pytest-asyncio pytest-xdist "numpy>=1.24" "pandas>=2.0" "hypothesis>=6.0" "pyarrow>=14.0" "fastapi>=0.100" "httpx>=0.24" "python-multipart>=0.0.6"
+          $PY -m pip install maturin pytest pytest-asyncio pytest-xdist \
+            "numpy>=1.24" "pandas>=2.0" "hypothesis>=6.0" "pyarrow>=14.0" \
+            "fastapi>=0.100" "httpx>=0.24" "python-multipart>=0.0.6" \
+            "polars>=1.0.0,<2"
 
       - name: Build and install extension
         run: $PY -m maturin develop --release
         env:
           VIRTUAL_ENV: ${{ github.workspace }}/.venv
-
-      - name: Install Polars (Ubuntu Python 3.11 — Python-side to_polars() tests)
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
-        run: $PY -m pip install "polars>=1.0.0,<2"
 
       - name: Pytest
         env:

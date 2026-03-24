@@ -222,7 +222,7 @@ PYTHONPATH=python .venv/bin/python scripts/verify_doc_examples.py
 
 This executes the same patterns as the Quick Start and several doc examples (no network). Fix failures before merging user-facing doc changes.
 
-**CI** runs `scripts/verify_doc_examples.py` on **Ubuntu + Python 3.11** after tests (see `.github/workflows/ci.yml`).
+**CI** runs `scripts/verify_doc_examples.py` on **Ubuntu + Python 3.11** after tests (see `.github/workflows/_shared-ci.yml` via `ci.yml`).
 
 Optional Python **`polars`** for local `to_polars()` / benchmark comparisons: `pip install -e ".[polars]"` or `".[benchmark]"` (see benchmark sections below). CI installs Polars on the **Ubuntu 3.11** matrix leg so `import polars` / `to_polars()` tests are not skipped there.
 
@@ -322,7 +322,7 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 
 ### Publishing (PyPI)
 
-Pushing a git tag matching `v*` (for example `v0.18.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then **`maturin build`** (per target) and **`twine upload --skip-existing dist/*`** to PyPI. The repository needs a **`PYPI_API_TOKEN`** secret (`TWINE_USERNAME` is **`__token__`** in the workflow). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test dependencies** aligned with **`.github/workflows/ci.yml`** (e.g. **`pytest-asyncio`**, **`fastapi`**, **`httpx`**, **`python-multipart`**, **`pyarrow`**) so async and optional integration tests are not skipped on tag builds.
+Pushing a git tag matching `v*` (for example `v0.18.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then **`maturin build`** (per target) and **`twine upload --skip-existing dist/*`** to PyPI. The repository needs a **`PYPI_API_TOKEN`** secret (`TWINE_USERNAME` is **`__token__`** in the workflow). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test install** (`.github/workflows/_shared-ci.yml`, **Install maturin and test deps**) aligned with **`pyproject.toml`** **`[project.optional-dependencies]`** **`dev`** + **`pandas`** + **`polars`** (e.g. **`pytest-asyncio`**, **`polars`**, **`fastapi`**, **`httpx`**, **`python-multipart`**, **`pyarrow`**, **`hypothesis`**) so optional tests are not skipped on any OS/Python matrix leg or on tag builds.
 
 **GNU manylinux wheels** are built with **`PyO3/maturin-action`** inside the default **manylinux Docker** images (`manylinux: 2_17` / `2_28`). Avoid **`container: off`** plus **`--zig`** on the host for those targets: linker failures and **OOM** are common with a Polars-sized dependency tree. **musllinux** jobs still use **`--zig`** in `release.yml` as needed.
 

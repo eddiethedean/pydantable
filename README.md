@@ -36,7 +36,7 @@ The **canonical manual** is on Read the Docs: **[https://pydantable.readthedocs.
 | **FastAPI** (routers, bodies, async, multipart) | [FastAPI integration](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) |
 | **Execution** (`collect`, `to_dict`, `to_polars`, `to_arrow`, async) | [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) |
 | **Semantics** (nulls, joins, windows, reshape) | [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) |
-| **Roadmap** (shipped **0.17.0**, planned **0.18+**, path to v1.0.0) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
+| **Roadmap** (shipped **0.18.0**, planned **0.19+**, path to v1.0.0) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
 | **Why not Polars alone?** | [Why not just use Polars?](https://pydantable.readthedocs.io/en/latest/WHY_NOT_POLARS.html) |
 | **Pandas-style API** (`pydantable.pandas`) | [Pandas UI](https://pydantable.readthedocs.io/en/latest/PANDAS_UI.html) |
 | **PySpark-style API** (`pydantable.pyspark`) | [PySpark UI](https://pydantable.readthedocs.io/en/latest/PYSPARK_UI.html) · [Parity matrix](https://pydantable.readthedocs.io/en/latest/PYSPARK_PARITY.html) |
