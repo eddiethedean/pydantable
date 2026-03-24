@@ -5,6 +5,7 @@ use pyo3::types::{
 };
 
 /// Polars precision for [`BaseType::Decimal`] columns and literals.
+#[cfg_attr(not(feature = "polars_engine"), allow(dead_code))]
 pub const DECIMAL_PRECISION: usize = 38;
 /// Polars scale for [`BaseType::Decimal`] columns and literals (`10^{-scale}` units).
 pub const DECIMAL_SCALE: usize = 9;
@@ -72,6 +73,7 @@ impl DTypeDesc {
         }
     }
 
+    #[cfg_attr(not(feature = "polars_engine"), allow(dead_code))]
     pub fn scalar_nullable(base: BaseType) -> Self {
         Self::Scalar {
             base: Some(base),

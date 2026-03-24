@@ -1,7 +1,7 @@
 //! Row-wise plan execution when the Polars engine is disabled.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyList};
+use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
 
 use crate::dtype::scaled_i128_to_py_decimal;
 use crate::expr::LiteralValue;
@@ -29,6 +29,19 @@ fn micros_to_py_timedelta(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
     let dt_mod = py.import_bound("datetime")?;
     let td = dt_mod.getattr("timedelta")?;
     Ok(td.call1((0, 0, micros))?.into_py(py))
+}
+
+fn nanos_to_py_time(py: Python<'_>, ns: i64) -> PyResult<PyObject> {
+    let dt_mod = py.import_bound("datetime")?;
+    let time_cls = dt_mod.getattr("time")?;
+    let nanos = ns.rem_euclid(86_400 * 1_000_000_000);
+    let secs = nanos / 1_000_000_000;
+    let nsub = nanos % 1_000_000_000;
+    let micro = (nsub / 1000) as i32;
+    let h = (secs / 3600) as i32;
+    let m = ((secs % 3600) / 60) as i32;
+    let s = (secs % 60) as i32;
+    Ok(time_cls.call1((h, m, s, micro))?.into_py(py))
 }
 
 pub(crate) fn execute_plan_rowwise(
@@ -290,6 +303,10 @@ pub(crate) fn execute_plan_rowwise(
                 Some(LiteralValue::DateDays(v)) => values.push(days_to_py_date(py, *v)?),
                 Some(LiteralValue::DurationMicros(v)) => {
                     values.push(micros_to_py_timedelta(py, *v)?)
+                }
+                Some(LiteralValue::TimeNanos(v)) => values.push(nanos_to_py_time(py, *v)?),
+                Some(LiteralValue::Binary(b)) => {
+                    values.push(PyBytes::new_bound(py, b.as_slice()).into_py(py));
                 }
             }
         }

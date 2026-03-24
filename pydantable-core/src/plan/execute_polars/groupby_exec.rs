@@ -109,7 +109,12 @@ pub fn execute_groupby_agg_polars(
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
     let mut tmp_count_cols: HashMap<String, String> = HashMap::new();
     for key in by.iter() {
-        out_schema.insert(key.clone(), plan.schema.get(key).unwrap().clone());
+        let dt = plan.schema.get(key).cloned().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "group_by() unknown key column '{key}'.",
+            ))
+        })?;
+        out_schema.insert(key.clone(), dt);
     }
 
     for (out_name, op, in_col) in aggregations.into_iter() {

@@ -125,7 +125,12 @@ pub fn execute_melt_polars(
 
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
     for k in id_vars.iter() {
-        out_schema.insert(k.clone(), plan.schema.get(k).unwrap().clone());
+        let dt = plan.schema.get(k).cloned().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "melt() unknown id column '{k}'.",
+            ))
+        })?;
+        out_schema.insert(k.clone(), dt);
     }
     out_schema.insert(
         variable_name.clone(),
@@ -265,7 +270,12 @@ pub fn execute_pivot_polars(
 
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
     for c in index.iter() {
-        out_schema.insert(c.clone(), plan.schema.get(c).unwrap().clone());
+        let dt = plan.schema.get(c).cloned().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "pivot() unknown index column '{c}'.",
+            ))
+        })?;
+        out_schema.insert(c.clone(), dt);
     }
     let mut out_cols: HashMap<String, Vec<PyObject>> = HashMap::new();
     for c in index.iter() {
@@ -286,7 +296,11 @@ pub fn execute_pivot_polars(
                     name
                 )));
             }
-            let in_d = plan.schema.get(v).unwrap().clone();
+            let in_d = plan.schema.get(v).cloned().ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                    "pivot() unknown value column '{v}'.",
+                ))
+            })?;
             let base = in_d.as_scalar_base_field().flatten().ok_or_else(|| {
                 PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "pivot() value columns must have known-base dtypes.",
@@ -327,7 +341,14 @@ pub fn execute_pivot_polars(
             let val = ctx[c][first]
                 .as_ref()
                 .map_or(py.None(), |x| literal_to_py(py, x));
-            out_cols.get_mut(c).unwrap().push(val);
+            out_cols
+                .get_mut(c)
+                .ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                        "internal: pivot missing output column '{c}'.",
+                    ))
+                })?
+                .push(val);
         }
         for pv in pivot_values.iter() {
             let matching = row_idx
@@ -375,7 +396,11 @@ pub fn execute_pivot_polars(
                 )?;
                 out_cols
                     .get_mut(name)
-                    .unwrap()
+                    .ok_or_else(|| {
+                        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                            "internal: pivot missing generated column '{name}'.",
+                        ))
+                    })?
                     .push(lit.as_ref().map_or(py.None(), |x| literal_to_py(py, x)));
             }
         }
@@ -605,7 +630,11 @@ pub fn execute_groupby_dynamic_agg_polars(
         }
 
         for key in group_order {
-            let rows = group_rows.get(&key).unwrap();
+            let rows = group_rows.get(&key).ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                    "internal: group_by_dynamic missing group key in row map.",
+                )
+            })?;
             if rows.is_empty() {
                 continue;
             }
@@ -613,14 +642,25 @@ pub fn execute_groupby_dynamic_agg_polars(
             let idx_val = index_list.get_item(first)?;
             out_cols
                 .get_mut(&index_column)
-                .unwrap()
+                .ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                        "internal: group_by_dynamic missing index column '{index_column}'.",
+                    ))
+                })?
                 .push(idx_val.into_py(py));
 
             for c in by.iter() {
                 let v = ctx[c][first]
                     .as_ref()
                     .map_or(py.None(), |x| literal_to_py(py, x));
-                out_cols.get_mut(c).unwrap().push(v);
+                out_cols
+                    .get_mut(c)
+                    .ok_or_else(|| {
+                        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                            "internal: group_by_dynamic missing by column '{c}'.",
+                        ))
+                    })?
+                    .push(v);
             }
 
             for (out_name, op, in_col) in aggregations.iter() {
@@ -639,7 +679,11 @@ pub fn execute_groupby_dynamic_agg_polars(
                 let lit = agg_literal(op, &vals, base)?;
                 out_cols
                     .get_mut(out_name)
-                    .unwrap()
+                    .ok_or_else(|| {
+                        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                            "internal: group_by_dynamic missing agg output column '{out_name}'.",
+                        ))
+                    })?
                     .push(lit.as_ref().map_or(py.None(), |x| literal_to_py(py, x)));
             }
         }
@@ -648,15 +692,26 @@ pub fn execute_groupby_dynamic_agg_polars(
     }
 
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
-    out_schema.insert(
-        index_column.clone(),
-        plan.schema.get(&index_column).unwrap().clone(),
-    );
+    let index_dtype = plan.schema.get(&index_column).cloned().ok_or_else(|| {
+        PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+            "group_by_dynamic() unknown index column '{index_column}'.",
+        ))
+    })?;
+    out_schema.insert(index_column.clone(), index_dtype);
     for c in by.iter() {
-        out_schema.insert(c.clone(), plan.schema.get(c).unwrap().clone());
+        let dt = plan.schema.get(c).cloned().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "group_by_dynamic() unknown by column '{c}'.",
+            ))
+        })?;
+        out_schema.insert(c.clone(), dt);
     }
     for (out_name, op, in_col) in aggregations.iter() {
-        let in_dtype = plan.schema.get(in_col).unwrap().clone();
+        let in_dtype = plan.schema.get(in_col).cloned().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "group_by_dynamic() unknown input column '{in_col}'.",
+            ))
+        })?;
         let out_d = match op.as_str() {
             "count" => DTypeDesc::Scalar {
                 base: Some(crate::dtype::BaseType::Int),
@@ -667,7 +722,11 @@ pub fn execute_groupby_dynamic_agg_polars(
                 nullable: true,
             },
             "sum" | "min" | "max" => in_dtype.clone(),
-            _ => unreachable!(),
+            other => {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Unsupported dynamic aggregation '{other}'.",
+                )));
+            }
         };
         out_schema.insert(out_name.clone(), out_d);
     }

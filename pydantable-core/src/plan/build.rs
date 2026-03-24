@@ -69,7 +69,12 @@ pub fn plan_select(plan: &PlanInner, columns: Vec<String>) -> PyResult<PlanInner
 
     let mut new_schema = HashMap::new();
     for c in columns.iter() {
-        new_schema.insert(c.clone(), plan.schema.get(c).unwrap().clone());
+        let dtype = plan.schema.get(c).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "internal: plan schema missing column '{c}' after validation.",
+            ))
+        })?;
+        new_schema.insert(c.clone(), dtype.clone());
     }
 
     let mut new_steps = plan.steps.clone();
@@ -281,9 +286,13 @@ pub fn plan_rename(plan: &PlanInner, columns: HashMap<String, String>) -> PyResu
                 new
             )));
         }
-        let dtype = plan.schema.get(old).unwrap().clone();
+        let dtype = plan.schema.get(old).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "internal: plan schema missing column '{old}' after validation.",
+            ))
+        })?;
         new_schema.remove(old);
-        new_schema.insert(new.clone(), dtype);
+        new_schema.insert(new.clone(), dtype.clone());
     }
     let mut new_steps = plan.steps.clone();
     new_steps.push(PlanStep::Rename { columns });

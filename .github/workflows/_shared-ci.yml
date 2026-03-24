@@ -86,6 +86,9 @@ jobs:
       - name: Clippy
         run: cargo clippy --manifest-path pydantable-core/Cargo.toml -- -D warnings
 
+      - name: Check no-default-features (rowwise skeleton)
+        run: cargo check --manifest-path pydantable-core/Cargo.toml --no-default-features
+
   audit:
     name: Audit
     runs-on: ubuntu-latest

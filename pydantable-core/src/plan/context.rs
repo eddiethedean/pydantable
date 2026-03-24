@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDate, PyDateTime, PyDelta, PyDict, PyList};
+use pyo3::types::{PyAny, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyList, PyTime};
 
 use crate::dtype::{py_decimal_to_scaled_i128, py_enum_to_wire_string, BaseType, DTypeDesc};
 use crate::expr::LiteralValue;
@@ -73,7 +73,7 @@ pub fn root_data_to_ctx(
                     DTypeDesc::Scalar {
                         base: Some(BaseType::Enum),
                         ..
-                    } => LiteralValue::EnumStr(py_enum_to_wire_string(item)?),
+                    } => LiteralValue::EnumStr(py_enum_to_wire_string(&item)?),
                     DTypeDesc::Scalar {
                         base: Some(BaseType::Uuid),
                         ..
@@ -88,7 +88,7 @@ pub fn root_data_to_ctx(
                     DTypeDesc::Scalar {
                         base: Some(BaseType::Decimal),
                         ..
-                    } => LiteralValue::Decimal(py_decimal_to_scaled_i128(item)?),
+                    } => LiteralValue::Decimal(py_decimal_to_scaled_i128(&item)?),
                     DTypeDesc::Scalar {
                         base: Some(BaseType::DateTime),
                         ..
@@ -113,12 +113,35 @@ pub fn root_data_to_ctx(
                         let secs: f64 = td.call_method0("total_seconds")?.extract()?;
                         LiteralValue::DurationMicros((secs * 1_000_000.0).round() as i64)
                     }
+                    DTypeDesc::Scalar {
+                        base: Some(BaseType::Time),
+                        ..
+                    } => {
+                        let t = item.downcast::<PyTime>()?;
+                        let h: i64 = t.getattr("hour")?.extract()?;
+                        let m: i64 = t.getattr("minute")?.extract()?;
+                        let s: i64 = t.getattr("second")?.extract()?;
+                        let micro: i64 = t.getattr("microsecond")?.extract()?;
+                        let nanos = ((h * 3600 + m * 60 + s) * 1_000_000_000) + micro * 1000;
+                        LiteralValue::TimeNanos(nanos)
+                    }
+                    DTypeDesc::Scalar {
+                        base: Some(BaseType::Binary),
+                        ..
+                    } => {
+                        let b = item.downcast::<PyBytes>()?;
+                        LiteralValue::Binary(b.as_bytes().to_vec())
+                    }
                     DTypeDesc::Scalar { base: None, .. } => {
                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                             "Root schema cannot have unknown-base dtype.",
                         ));
                     }
-                    DTypeDesc::Struct { .. } | DTypeDesc::List { .. } => unreachable!(),
+                    DTypeDesc::Struct { .. } | DTypeDesc::List { .. } | DTypeDesc::Map { .. } => {
+                        unreachable!(
+                            "struct/list/map columns are rejected before per-cell conversion"
+                        )
+                    }
                 };
                 out.push(Some(lit));
             }

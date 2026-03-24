@@ -32,7 +32,7 @@ fn trim_matches_char_set(s: &str, pat: &str) -> String {
 }
 
 #[cfg(not(feature = "polars_engine"))]
-fn wire_str<'a>(v: &'a LiteralValue) -> Option<&'a str> {
+fn wire_str(v: &LiteralValue) -> Option<&str> {
     match v {
         LiteralValue::Str(s) | LiteralValue::EnumStr(s) => Some(s.as_str()),
         _ => None,
@@ -413,8 +413,16 @@ impl ExprNode {
                     ));
                 }
 
-                let lb = left.as_scalar_base_field().unwrap();
-                let rb = right.as_scalar_base_field().unwrap();
+                let lb = left.as_scalar_base_field().ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Equality comparisons do not support struct-, list-, or map-typed columns.",
+                    )
+                })?;
+                let rb = right.as_scalar_base_field().ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Equality comparisons do not support struct-, list-, or map-typed columns.",
+                    )
+                })?;
                 let inferred_left_base = lb.or(rb);
                 let inferred_right_base = rb.or(lb);
                 let (lb, rb) = match (inferred_left_base, inferred_right_base) {
@@ -422,9 +430,13 @@ impl ExprNode {
                     (None, None) => {
                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                             "Cannot infer equality from Literal(None) alone.",
-                        ))
+                        ));
                     }
-                    _ => unreachable!(),
+                    _ => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                            "Cannot infer equality from a typed operand and an unknown-base literal.",
+                        ));
+                    }
                 };
 
                 let allowed = (matches!(
@@ -468,8 +480,16 @@ impl ExprNode {
                     ));
                 }
 
-                let lb = left.as_scalar_base_field().unwrap();
-                let rb = right.as_scalar_base_field().unwrap();
+                let lb = left.as_scalar_base_field().ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Ordering comparisons do not support struct-, list-, or map-typed columns.",
+                    )
+                })?;
+                let rb = right.as_scalar_base_field().ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Ordering comparisons do not support struct-, list-, or map-typed columns.",
+                    )
+                })?;
                 let inferred_left_base = lb.or(rb);
                 let inferred_right_base = rb.or(lb);
                 let (lb, rb) = match (inferred_left_base, inferred_right_base) {
@@ -477,9 +497,13 @@ impl ExprNode {
                     (None, None) => {
                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                             "Cannot infer ordering from Literal(None) alone.",
-                        ))
+                        ));
                     }
-                    _ => unreachable!(),
+                    _ => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                            "Cannot infer ordering from a typed operand and an unknown-base literal.",
+                        ));
+                    }
                 };
 
                 let allowed_numeric = matches!(
@@ -2349,7 +2373,7 @@ impl ExprNode {
                                         }
                                         BaseType::Decimal => {
                                             let ai = match va {
-                                                LiteralValue::Decimal(i) => *i,
+                                                LiteralValue::Decimal(i) => i,
                                                 _ => {
                                                     return Err(PyErr::new::<
                                                         pyo3::exceptions::PyTypeError,
@@ -2360,7 +2384,7 @@ impl ExprNode {
                                                 }
                                             };
                                             let bi = match vb {
-                                                LiteralValue::Decimal(i) => *i,
+                                                LiteralValue::Decimal(i) => i,
                                                 _ => {
                                                     return Err(PyErr::new::<
                                                         pyo3::exceptions::PyTypeError,
@@ -2411,6 +2435,38 @@ impl ExprNode {
                                                     pyo3::exceptions::PyTypeError,
                                                     _,
                                                 >("Typed equality expected duration operands."));
+                                                }
+                                            }
+                                        }
+                                        BaseType::Time => {
+                                            match (va, vb) {
+                                                (
+                                                    LiteralValue::TimeNanos(a),
+                                                    LiteralValue::TimeNanos(b),
+                                                ) => a == b,
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed equality expected time operands.",
+                                                    ));
+                                                }
+                                            }
+                                        }
+                                        BaseType::Binary => {
+                                            match (va, vb) {
+                                                (
+                                                    LiteralValue::Binary(a),
+                                                    LiteralValue::Binary(b),
+                                                ) => a == b,
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed equality expected binary operands.",
+                                                    ));
                                                 }
                                             }
                                         }
@@ -2524,7 +2580,7 @@ impl ExprNode {
                                         }
                                         BaseType::Decimal => {
                                             let ai = match va {
-                                                LiteralValue::Decimal(i) => *i,
+                                                LiteralValue::Decimal(i) => i,
                                                 _ => {
                                                     return Err(PyErr::new::<
                                                         pyo3::exceptions::PyTypeError,
@@ -2535,7 +2591,7 @@ impl ExprNode {
                                                 }
                                             };
                                             let bi = match vb {
-                                                LiteralValue::Decimal(i) => *i,
+                                                LiteralValue::Decimal(i) => i,
                                                 _ => {
                                                     return Err(PyErr::new::<
                                                         pyo3::exceptions::PyTypeError,
@@ -2610,6 +2666,52 @@ impl ExprNode {
                                                         _,
                                                     >(
                                                         "Typed ordering expected duration operands.",
+                                                    ));
+                                                }
+                                            };
+                                            match op {
+                                                CmpOp::Lt => a < b,
+                                                CmpOp::Le => a <= b,
+                                                CmpOp::Gt => a > b,
+                                                CmpOp::Ge => a >= b,
+                                                _ => false,
+                                            }
+                                        }
+                                        BaseType::Time => {
+                                            let (a, b) = match (va, vb) {
+                                                (
+                                                    LiteralValue::TimeNanos(a),
+                                                    LiteralValue::TimeNanos(b),
+                                                ) => (a, b),
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed ordering expected time operands.",
+                                                    ));
+                                                }
+                                            };
+                                            match op {
+                                                CmpOp::Lt => a < b,
+                                                CmpOp::Le => a <= b,
+                                                CmpOp::Gt => a > b,
+                                                CmpOp::Ge => a >= b,
+                                                _ => false,
+                                            }
+                                        }
+                                        BaseType::Binary => {
+                                            let (a, b) = match (va, vb) {
+                                                (
+                                                    LiteralValue::Binary(a),
+                                                    LiteralValue::Binary(b),
+                                                ) => (a, b),
+                                                _ => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
+                                                    >(
+                                                        "Typed ordering expected binary operands.",
                                                     ));
                                                 }
                                             };
@@ -2864,7 +2966,7 @@ impl ExprNode {
                             Some(LiteralValue::Int(s.chars().count() as i64))
                         }
                         Some(LiteralValue::Decimal(d)) => Some(LiteralValue::Int(
-                            crate::dtype::scaled_i128_to_decimal_string(*d)
+                            crate::dtype::scaled_i128_to_decimal_string(d)
                                 .chars()
                                 .count() as i64,
                         )),
@@ -3029,7 +3131,7 @@ impl ExprNode {
                                 TemporalPart::Second => i64::from(s),
                                 TemporalPart::Nanosecond => {
                                     let sub_us = us.rem_euclid(1_000_000);
-                                    i64::from(sub_us) * 1000
+                                    sub_us * 1000
                                 }
                             };
                             Some(LiteralValue::Int(i))
@@ -3283,7 +3385,9 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             | LiteralValue::DurationMicros(_)
             | LiteralValue::Uuid(_)
             | LiteralValue::Decimal(_)
-            | LiteralValue::EnumStr(_) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            | LiteralValue::EnumStr(_)
+            | LiteralValue::TimeNanos(_)
+            | LiteralValue::Binary(_) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Cannot cast temporal literal to int.",
             )),
         },
@@ -3299,7 +3403,9 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             | LiteralValue::DurationMicros(_)
             | LiteralValue::Uuid(_)
             | LiteralValue::Decimal(_)
-            | LiteralValue::EnumStr(_) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            | LiteralValue::EnumStr(_)
+            | LiteralValue::TimeNanos(_)
+            | LiteralValue::Binary(_) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Cannot cast temporal literal to float.",
             )),
         },
@@ -3319,7 +3425,9 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             | LiteralValue::DurationMicros(_)
             | LiteralValue::Uuid(_)
             | LiteralValue::Decimal(_)
-            | LiteralValue::EnumStr(_) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            | LiteralValue::EnumStr(_)
+            | LiteralValue::TimeNanos(_)
+            | LiteralValue::Binary(_) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Cannot cast temporal literal to bool.",
             )),
         },
@@ -3336,6 +3444,11 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             LiteralValue::DateTimeMicros(us) => Ok(LiteralValue::Str(format!("{us}"))),
             LiteralValue::DateDays(d) => Ok(LiteralValue::Str(format!("{d}"))),
             LiteralValue::DurationMicros(us) => Ok(LiteralValue::Str(format!("{us}"))),
+            LiteralValue::TimeNanos(_) | LiteralValue::Binary(_) => Err(
+                PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Row-wise cast() to str does not support time or binary literals.",
+                ),
+            ),
         },
         BaseType::Enum => match v {
             LiteralValue::EnumStr(s) => Ok(LiteralValue::EnumStr(s)),
@@ -3414,6 +3527,18 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             )),
             _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "cast() to datetime supports datetime or ISO-8601 datetime str literals.",
+            )),
+        },
+        BaseType::Time => match v {
+            LiteralValue::TimeNanos(ns) => Ok(LiteralValue::TimeNanos(ns)),
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() to time supports time literal (nanoseconds) only.",
+            )),
+        },
+        BaseType::Binary => match v {
+            LiteralValue::Binary(b) => Ok(LiteralValue::Binary(b)),
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() to binary supports bytes literal only.",
             )),
         },
         BaseType::Duration => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
