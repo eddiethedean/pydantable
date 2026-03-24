@@ -54,9 +54,11 @@ def test_read_ipc_stream_format_bytes() -> None:
 
 def test_to_arrow_and_from_pydict_matches_to_dict() -> None:
     df = SmallDF({"id": [1, 2], "name": ["a", "b"]})
+    col = df.to_dict()
     tbl = df.to_arrow()
     assert isinstance(tbl, pa.Table)
-    assert tbl.column_names == ["id", "name"]
+    # Column order follows :meth:`to_dict` (schema / engine ordering), not constructor key order.
+    assert tbl.column_names == list(col.keys())
     assert tbl.column("id").to_pylist() == [1, 2]
     assert tbl.column("name").to_pylist() == ["a", "b"]
 
