@@ -238,7 +238,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m pip install --upgrade pip "twine<6"
-          python -m twine upload --skip-existing dist/*
+          python -m twine upload --skip-existing dist/*.whl dist/*.tar.gz
 
   publish-pypi-manylinux-aarch64:
     name: PyPI manylinux aarch64
@@ -262,7 +262,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m pip install --upgrade pip "twine<6"
-          python -m twine upload --skip-existing dist/*
+          python -m twine upload --skip-existing dist/*.whl dist/*.tar.gz
 
   publish-pypi-mac:
     name: PyPI macOS ${{ matrix.target }}
@@ -289,7 +289,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m pip install --upgrade pip "twine<6"
-          python -m twine upload --skip-existing dist/*
+          python -m twine upload --skip-existing dist/*.whl dist/*.tar.gz
 
   publish-pypi-musllinux-x86_64:
     name: PyPI musllinux x86_64
@@ -317,7 +317,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m pip install --upgrade pip "twine<6"
-          python -m twine upload --skip-existing dist/*
+          python -m twine upload --skip-existing dist/*.whl dist/*.tar.gz
 
   publish-pypi-musllinux-aarch64:
     name: PyPI musllinux aarch64
@@ -345,7 +345,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m pip install --upgrade pip "twine<6"
-          python -m twine upload --skip-existing dist/*
+          python -m twine upload --skip-existing dist/*.whl dist/*.tar.gz
 
   publish-pypi-windows-x86_64:
     name: PyPI Windows x86_64
@@ -368,7 +368,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m pip install --upgrade pip "twine<6"
-          python -m twine upload --skip-existing dist/*
+          python -m twine upload --skip-existing dist/*.whl dist/*.tar.gz
 
   publish-pypi-windows-arm64:
     name: PyPI Windows aarch64
@@ -391,5 +391,5 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m pip install --upgrade pip "twine<6"
-          python -m twine upload --skip-existing dist/*
+          python -m twine upload --skip-existing dist/*.whl dist/*.tar.gz
 
