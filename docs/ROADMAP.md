@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.15.x → v1.0.0)
+# PydanTable roadmap (0.15.x → 0.18.x → v1.0.0)
 
-**Current release: `0.15.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, and what is still open before calling **`v1.0.0`**.
+**Current release: `0.15.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, planned minors **0.16.0–0.18.0**, and what is still open before calling **`v1.0.0`**.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
@@ -21,7 +21,7 @@ The public API stays **SQLModel-like**:
 
 Details: [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md).
 
-**FastAPI / ASGI:** [`FASTAPI.md`](FASTAPI.md) covers `response_model`, row-list and **column-shaped** bodies, **`trusted_mode`** / **`validate_data`**, **`TestClient`** recipes, joins/aggregations, **sync** and **`async` materialization** (`acollect` / `ato_dict` / …), **`lifespan`** + executor patterns, and streaming notes. Still **planned** for later minors: multipart/file ingestion, richer **`Depends`** recipes, **background tasks**, and error → HTTP status mapping (see **Toward v1.0.0** below).
+**FastAPI / ASGI:** [`FASTAPI.md`](FASTAPI.md) covers `response_model`, row-list and **column-shaped** bodies, **`trusted_mode`** / **`validate_data`**, **`TestClient`** recipes, joins/aggregations, **sync** and **`async` materialization** (`acollect` / `ato_dict` / …), **`lifespan`** + executor patterns, and streaming notes. **Multipart / file**, richer **`Depends`**, and **error → HTTP status** mapping are targeted for **Planned 0.17.0** below (see also **Toward v1.0.0**).
 
 ---
 
@@ -74,10 +74,11 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 - Close or explicitly defer remaining gaps in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) (and related parity docs: [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md), [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md)).
 - Keep CI green across supported Python versions and platforms; keep extension + optional **`[polars]`** matrices exercised in CI.
-- **`validate_data`:** **0.14.0** emits **`DeprecationWarning`** when **`validate_data=`** is passed without **`trusted_mode`**; removal after **0.16.0** (see [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md)).
+- **`validate_data`:** **0.14.0** emits **`DeprecationWarning`** when **`validate_data=`** is passed without **`trusted_mode`**; **removal is planned in 0.16.0** (see **Planned 0.16.0** and [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md)).
 - Optional: consolidated **migration guide** if semver ever jumps in a breaking way; keep [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) the semantics source of truth.
-- **Async I/O:** **0.15.0** ships **`acollect` / `ato_dict` / `ato_polars`** (and **`DataFrameModel`** **`arows` / `ato_dicts`**) using **`asyncio.to_thread`** or a custom executor; see [`EXECUTION.md`](EXECUTION.md) and [`FASTAPI.md`](FASTAPI.md). There are still no first-class **file / Parquet / IPC** helpers on the Python API; interchange remains **`to_dict`**, **`to_polars`**, and trusted Arrow/Polars buffers.
-- **FastAPI integration maturity:** treat [`FASTAPI.md`](FASTAPI.md) as the **canonical service guide**—expand further with **multipart / file** ingestion, richer **`Depends`** patterns, **background tasks**, and **error → HTTP status** mapping for validation vs engine errors. **0.14.0** added **`TestClient`** / OpenAPI notes; **0.15.0** added **`async`** route examples and **`lifespan`**.
+- **Async I/O:** **0.15.0** ships **`acollect` / `ato_dict` / `ato_polars`** (and **`DataFrameModel`** **`arows` / `ato_dicts`**) using **`asyncio.to_thread`** or a custom executor; see [`EXECUTION.md`](EXECUTION.md) and [`FASTAPI.md`](FASTAPI.md). First-class **file / Parquet / IPC** helpers on the Python API are **Planned 0.17.0**; until then interchange remains **`to_dict`**, **`to_polars`**, and trusted Arrow/Polars buffers.
+- **FastAPI integration maturity:** treat [`FASTAPI.md`](FASTAPI.md) as the **canonical service guide**. **0.14.0** added **`TestClient`** / OpenAPI notes; **0.15.0** added **`async`** route examples and **`lifespan`**. **Multipart / file**, **`Depends`**, **background tasks**, and **error → HTTP status** mapping are **Planned 0.17.0** (see below).
+- **Release train:** concrete scope for the next three minors is in **Planned 0.16.0**, **Planned 0.17.0**, and **Planned 0.18.0**; dates are not committed here.
 
 ---
 
@@ -188,14 +189,74 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 ---
 
+## Planned 0.16.0 (API cleanup)
+
+**Themes:** drop the **`validate_data`** compatibility path (**0.14.0** warned removal after **0.16.0**); **`trusted_mode`** is the **only** constructor knob for ingest depth on **`DataFrame`** / **`DataFrameModel`**. No need to over-engineer migration messaging—the package is still pre-adoption; a short changelog note and doc sweep are enough.
+
+### Removal scope (code)
+
+- [ ] **Public APIs:** Drop **`validate_data`** from **`DataFrame.__init__`** ([`python/pydantable/dataframe.py`](../python/pydantable/dataframe.py)) and **`DataFrameModel.__init__`** ([`python/pydantable/dataframe_model.py`](../python/pydantable/dataframe_model.py)). Passing **`validate_data=...`** should raise **`TypeError`** (unexpected keyword), not a custom error—unless the project prefers an explicit message pointing to **`trusted_mode`** (document the choice in the changelog).
+- [ ] **Internal / schema:** Remove **`_VALIDATE_DATA_KW_UNSET`**, **`_warn_validate_data_kw_deprecated`**, and **`_coerce_validate_data_kw`** from [`python/pydantable/schema.py`](../python/pydantable/schema.py) once nothing routes through them. Trim the **`validate_columns_strict`** docstring so it no longer describes constructor **`validate_data`** (that function uses **`validate_elements`** / **`trusted_mode`** only). Remove **`_skip_validate_data_deprecation`** and the **`DataFrameModel` → `DataFrame`** bridge kwargs that exist only to suppress double-warnings.
+- [ ] **Docstrings:** Update module and constructor docstrings that still describe **`validate_data`** as supported.
+
+### Mapping reference (docs / changelog)
+
+| Old pattern (0.15.x) | Replace with (0.16.0+) |
+|--------------------|-------------------------|
+| `validate_data=True` (explicit) | Omit **`trusted_mode`** or set **`trusted_mode="off"`** |
+| `validate_data=False` | **`trusted_mode="shape_only"`** |
+| `validate_data=False` + dtype checks | **`trusted_mode="strict"`** |
+| `validate_data=...` together with **`trusted_mode`** | **`trusted_mode` only** |
+
+### Documentation sweep
+
+- [ ] **[`changelog.md`](changelog.md):** **\[0.16.0\]** entry: **`validate_data` removed**; optional one-line table or bullets from the mapping above.
+- [ ] **[`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md):** Remove or archive the **`validate_data` vs `trusted_mode`** compatibility subsection; single source of truth = **`trusted_mode`** only.
+- [ ] **[`FASTAPI.md`](FASTAPI.md), [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md), [`PERFORMANCE.md`](PERFORMANCE.md), [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md), [`index.md`](index.md):** Replace “legacy **`validate_data`**” phrasing with **`trusted_mode`** only; keep one short historical sentence if useful (“removed in 0.16.0”).
+- [ ] **[`README.md`](README.md):** Release highlights line should say **`validate_data` removed** rather than “deprecation”.
+- [ ] **Autodoc / API reference:** Regenerate or hand-edit any pages that list **`validate_data`** on constructors.
+
+### Tests and tooling
+
+- [ ] **Replace deprecation tests** in **`tests/test_v014_features.py`**, **`tests/test_dataframe_model.py`**, and any other **`tests/*.py`** that pass **`validate_data=`** with tests that assert **`TypeError`** (or chosen error) when the keyword is used; keep **one** focused test that documents removal if helpful.
+- [ ] **Rename or split** tests whose **function names** still say **`validate_data`** once behavior is “removed kw” (e.g. **`test_polars_ingest_requires_trusted_mode`** instead of **`...validate_data_false`**).
+- [ ] **`tests/test_dataframe_ops.py`**, **`scripts/verify_doc_examples.py`:** grep **`validate_data`** and switch examples to **`trusted_mode`**.
+- [ ] **`grep -r validate_data`** across **`python/`**, **`tests/`**, **`docs/`**, **`scripts/`** before release; only allow matches in **changelog / historical roadmap** lines if explicitly labeled as past behavior.
+
+### Release hygiene
+
+- [ ] **Version bump:** **`pyproject.toml`**, **`Cargo.toml`**, **`__version__`**, **`rust_version()`** mechanism unchanged (still **`env!(CARGO_PKG_VERSION)`**).
+
+---
+
+## Planned 0.17.0 (interchange & service hardening)
+
+**Themes:** optional **file / Arrow** interchange on the Python side; **FastAPI** patterns for real deployments.
+
+- [ ] **Interchange (narrow, stable surface):** e.g. **Apache Arrow** round-trip (**`Table` / `RecordBatch`** → columnar root or **`to_arrow`** from materialized frames), and/or **Parquet** / **IPC** read helpers that land in **`dict[str, list]`** or trusted Polars—exact API names TBD. Document **trust**, **copies**, and **async** (`ato_*` + new helpers) in [`EXECUTION.md`](EXECUTION.md) and [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md).
+- [ ] **Async (optional):** if interchange APIs are blocking, add **`async`** siblings (same model as **0.15.0**). **Chunked / streaming** iterators for JSON or row batches only if a minimal contract is agreed (otherwise defer to **Later**).
+- [ ] **FastAPI:** **multipart / file** ingestion, reusable **`Depends`** patterns, **background tasks** notes, and **validation vs engine error → HTTP status** mapping; extend [`FASTAPI.md`](FASTAPI.md) and **`tests/test_fastapi_recipes.py`** (and **`verify_doc_examples`** where applicable).
+
+---
+
+## Planned 0.18.0 (maps v2 & parity polish)
+
+**Themes:** push **map** / key expressiveness and refresh **parity** docs; keep scope bounded vs **After v1.0.0** engines.
+
+- [ ] **Maps / keys v2:** spike **non-string keys** (e.g. **`dict[int, T]`**) **or** deepen **Arrow map** + **`Expr`** (**`map_get`**, typing) so behavior matches a written contract in [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md). If the spike is too large, move remainder to **Later** explicitly.
+- [ ] **PySpark façade:** add **Spark-named** helpers where **`Expr`** / Rust lowering already supports them (see deferred items in [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md)); reinforce “facade only” messaging.
+- [ ] **Parity documentation:** refresh [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md) and [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) for the post-**0.15.0** API surface; optional benchmarks in [`PERFORMANCE.md`](PERFORMANCE.md) for new interchange paths if **0.17.0** ships them.
+
+---
+
 ## Later (not started)
 
-Directions beyond **0.15.x** and still before (or orthogonal to) calling **v1.0.0**:
+Work **not** scheduled above for **0.16.0–0.18.0**, or explicitly deferred when scope slips:
 
-- [ ] **Heterogeneous map keys** and full **Arrow / expression** parity for non-string map keys (would require dtype, **`map_get`**, and Polars lowering work).
-- [ ] Items deferred from **0.13.x–0.15.0** above when scope slips or priorities change.
-- [ ] Longer-horizon experimental work that does not fit a minor release train.
-- [ ] **FastAPI ecosystem (optional):** thin **`pydantable[fastapi]`** extra with **pinned** compatible **`fastapi` / `starlette`** ranges, reusable **middleware**, or **router** kits—**only** if demand and maintenance bandwidth are clear.
+- [ ] **Heterogeneous map keys** / full **Arrow + expression** parity if not delivered in **0.18.0** (dtype, **`map_get`**, Polars lowering).
+- [ ] Items deferred from earlier releases when priorities change.
+- [ ] Longer-horizon experiments that do not fit the **0.16–0.18** train.
+- [ ] **FastAPI ecosystem (optional):** thin **`pydantable[fastapi]`** extra with **pinned** **`fastapi` / `starlette`**, **middleware**, or **router** kits—**only** if demand and maintenance bandwidth are clear.
 
 ---
 
