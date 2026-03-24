@@ -121,7 +121,7 @@ Use this table to locate **Python tests and doc-example smoke** that back shippe
 | **0.16.0** | `read_parquet` / `read_ipc`, `to_arrow` / `ato_arrow`, `Table` / `RecordBatch` constructors, FastAPI multipart | `tests/test_arrow_interchange.py`; `tests/test_fastapi_recipes.py` (multipart Parquet); `scripts/verify_doc_examples.py` (read Parquet + `to_arrow` smoke; see comment block near `read_parquet`) |
 | **0.16.1** | Map-column arithmetic `TypeError` (not panic); `validate_columns_strict` Arrow `pydantable.io` import fix | `tests/test_expr_070_surfaces.py`; `tests/test_arrow_interchange.py` (`test_dataframe_generic_accepts_pa_table`) |
 | **0.17.0** | Map `Expr` contracts after Arrow ingest; PySpark `functions` string/list/bytes wrappers | `tests/test_pyarrow_map_ingest.py` (`test_arrow_map_ingest_then_map_get_and_contains`); `tests/test_pyspark_sql.py` (new façade tests) |
-| **0.18.0** | Grouped Polars error context (`polars_err_ctx`); map-key deferral (docs); Hypothesis `join` / `group_by` smoke | `tests/test_hypothesis_properties.py` (`test_group_by_sum_matches_manual`, `test_inner_join_unique_ids_row_count`); Rust: `pydantable-core/src/plan/execute_polars/groupby_exec.rs` |
+| **0.18.0** | Grouped Polars error context (`polars_err_ctx`); map-key deferral (docs); Hypothesis + integration `join` / `group_by` smoke | `tests/test_v018_features.py`; `tests/test_hypothesis_properties.py` (`test_group_by_sum_matches_manual`, `test_inner_join_unique_ids_row_count`, …); Rust: `execute_polars/common.rs` (`polars_err_format_tests`), `groupby_exec.rs` |
 
 #### Changelog-driven audit (0.15.0–0.18.0)
 
@@ -155,9 +155,9 @@ Cross-check each bullet in `docs/changelog.md` for recent minors against tests o
 
 **0.18.0**
 
-- **Grouped execution error context:** Rust `polars_err_ctx` on **`group_by().agg()`** `collect()` in `execute_polars/common.rs` / `groupby_exec.rs`; notes in `docs/EXECUTION.md` and `docs/INTERFACE_CONTRACT.md`.
+- **Grouped execution error context:** Rust `polars_err_ctx` on **`group_by().agg()`** `collect()` in `execute_polars/common.rs` / `groupby_exec.rs`; notes in `docs/EXECUTION.md` and `docs/INTERFACE_CONTRACT.md`. Unit tests: `polars_err_format_tests` in `execute_polars/common.rs`.
 - **Non-string map keys:** deferred—`docs/SUPPORTED_TYPES.md`, `docs/ROADMAP.md` **Later** (no new ingest code).
-- **Hypothesis:** `tests/test_hypothesis_properties.py` (`test_group_by_sum_matches_manual`, `test_inner_join_unique_ids_row_count`).
+- **Hypothesis / integration:** `tests/test_hypothesis_properties.py` (group_by sum/count, inner/left join); `tests/test_v018_features.py` (empty group_by, multi-agg, semi/anti/left join, count vs group size).
 
 #### Optional follow-ups (non-blocking)
 

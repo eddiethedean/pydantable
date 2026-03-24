@@ -228,7 +228,7 @@ Practical inputs that feed that phase:
 - [x] **Rust plan / Python boundary:** [`polars_err_ctx`](../pydantable-core/src/plan/execute_polars/common.rs) prefixes Polars **`collect()`** failures during **`group_by().agg()`** with **`(group_by().agg())`** in the **`ValueError`** message. [`DEVELOPER.md`](DEVELOPER.md) updated.
 - [x] **Polars transformations:** Phases **P1–P7** in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) remain complete; **post–P7** note—future parity is **additive** (`Expr` / transforms), not a new phase backlog. [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md) and [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md) refreshed for **0.18.0** (no new façade rows).
 - [x] **Maps:** **Non-string map keys** explicitly **not** in **0.18.0**; [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md) and **Later** (below) updated.
-- [x] **CI and quality:** Hypothesis smoke tests for **`group_by().agg()`** and **`join`** (`tests/test_hypothesis_properties.py`).
+- [x] **CI and quality:** Hypothesis + integration tests for **`group_by().agg()`** and **`join`** (`tests/test_hypothesis_properties.py`, `tests/test_v018_features.py`); Rust **`polars_err_ctx`** format tests in `execute_polars/common.rs`.
 - [x] **Docs:** [`changelog.md`](changelog.md); [`EXECUTION.md`](EXECUTION.md) and [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) note on grouped **`group_by().agg()`** Polars error wording. Aggregation **semantics** unchanged.
 
 ---

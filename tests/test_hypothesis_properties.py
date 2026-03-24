@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import warnings
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 import pytest
 from conftest import assert_table_eq_sorted
@@ -297,6 +297,35 @@ def test_group_by_sum_matches_manual(data: dict[str, list]) -> None:
     got = sorted(zip(out["k"], out["s"], strict=True), key=lambda t: (t[0], t[1]))
     exp = sorted(expected.items(), key=lambda t: (t[0], t[1]))
     assert got == exp
+
+
+@given(data=aligned_kv_columns())
+@settings(max_examples=35, deadline=None)
+def test_group_by_count_matches_group_size(data: dict[str, list]) -> None:
+    df = DataFrame[KV](data)
+    out = df.group_by("k").agg(c=("count", "v")).collect(as_lists=True)
+    sizes = Counter(data["k"])
+    got = dict(zip(out["k"], out["c"], strict=True))
+    assert got == dict(sizes)
+
+
+@given(data=join_unique_id_xy())
+@settings(max_examples=25, deadline=None)
+def test_left_join_preserves_left_row_count(data: dict[str, list]) -> None:
+    """``left`` join height equals left input height (duplicate left keys)."""
+    if not data["id"]:
+        left = DataFrame[JLeft]({"id": [], "x": []})
+        right = DataFrame[JRight]({"id": [], "y": []})
+        expect_n = 0
+    else:
+        left_ids = list(data["id"]) + list(data["id"])
+        left_xs = list(data["x"]) + [x + 1000 for x in data["x"]]
+        left = DataFrame[JLeft]({"id": left_ids, "x": left_xs})
+        right = DataFrame[JRight]({"id": data["id"], "y": data["y"]})
+        expect_n = len(left_ids)
+    j = left.join(right, on="id", how="left")
+    out = j.collect(as_lists=True)
+    assert len(out["id"]) == expect_n
 
 
 @given(data=join_unique_id_xy())

@@ -688,3 +688,38 @@ pub(super) fn root_data_to_polars_df(
         .collect::<Vec<polars::prelude::Column>>();
     DataFrame::new_infer_height(columns).map_err(polars_err)
 }
+
+#[cfg(test)]
+mod polars_err_format_tests {
+    use super::{polars_err, polars_err_ctx};
+    use polars::prelude::PolarsError;
+    use pyo3::prelude::*;
+    use pyo3::prepare_freethreaded_python;
+
+    #[test]
+    fn polars_err_ctx_includes_groupby_agg_label() {
+        prepare_freethreaded_python();
+        let e = PolarsError::ComputeError("synthetic".into());
+        let err = polars_err_ctx("group_by().agg()", e);
+        Python::with_gil(|py| {
+            let msg = err.value_bound(py).to_string();
+            assert!(
+                msg.contains("(group_by().agg())"),
+                "unexpected message: {msg}"
+            );
+            assert!(msg.contains("synthetic"), "unexpected message: {msg}");
+        });
+    }
+
+    #[test]
+    fn polars_err_without_ctx_has_plain_prefix() {
+        prepare_freethreaded_python();
+        let e = PolarsError::ComputeError("x".into());
+        let err = polars_err(e);
+        Python::with_gil(|py| {
+            let msg = err.value_bound(py).to_string();
+            assert!(msg.contains("Polars execution error:"), "unexpected: {msg}");
+            assert!(!msg.contains("(group_by().agg())"), "unexpected: {msg}");
+        });
+    }
+}

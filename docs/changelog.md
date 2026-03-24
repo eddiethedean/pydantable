@@ -9,7 +9,7 @@ All notable changes to this project are documented here. The format is inspired 
 - **Grouped execution errors:** Polars **`collect()`** failures during **`group_by().agg()`** may include **`(group_by().agg())`** in the **`ValueError`** text (via **`polars_err_ctx`**) so they are identifiable as grouped aggregation runtime errors. See {doc}`EXECUTION`.
 - **Maps:** **Non-string** map keys (**`dict[int, T]`**, non-UTF-8 Arrow map keys) remain **unsupported** and are **explicitly deferred** for this release ({doc}`SUPPORTED_TYPES`, {doc}`ROADMAP` **Later**).
 - **Documentation:** Post–**P7** note in {doc}`POLARS_TRANSFORMATIONS_ROADMAP` (phases complete; further parity is additive). {doc}`PARITY_SCORECARD`, {doc}`PYSPARK_PARITY`, {doc}`DEVELOPER`, {doc}`ROADMAP` updated. **No** new PySpark **`sql.functions`** wrappers or table API changes.
-- **Tests:** Hypothesis smoke tests for **`group_by().agg(sum)`** and **`join`** (`tests/test_hypothesis_properties.py`).
+- **Tests:** Hypothesis + integration coverage for **`group_by`** / **`join`** (`tests/test_hypothesis_properties.py`, **`tests/test_v018_features.py`**); Rust **`polars_err_ctx`** message format (`execute_polars/common.rs`, **`polars_err_format_tests`**).
 
 ### Details
 
