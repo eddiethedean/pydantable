@@ -115,7 +115,10 @@ pub(super) fn polars_err(e: PolarsError) -> PyErr {
 /// Hand off an in-memory Polars `DataFrame` to Python Polars via Arrow IPC (avoids
 /// per-cell `series_to_py_list` materialization).
 #[cfg(feature = "polars_engine")]
-pub(super) fn polars_dataframe_to_python_via_ipc(py: Python<'_>, df: &mut DataFrame) -> PyResult<PyObject> {
+pub(super) fn polars_dataframe_to_python_via_ipc(
+    py: Python<'_>,
+    df: &mut DataFrame,
+) -> PyResult<PyObject> {
     let mut buf = Cursor::new(Vec::<u8>::new());
     IpcWriter::new(&mut buf).finish(df).map_err(polars_err)?;
     let bytes = buf.into_inner();

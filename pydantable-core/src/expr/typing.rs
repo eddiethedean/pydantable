@@ -2438,38 +2438,33 @@ impl ExprNode {
                                                 }
                                             }
                                         }
-                                        BaseType::Time => {
-                                            match (va, vb) {
-                                                (
-                                                    LiteralValue::TimeNanos(a),
-                                                    LiteralValue::TimeNanos(b),
-                                                ) => a == b,
-                                                _ => {
-                                                    return Err(PyErr::new::<
-                                                        pyo3::exceptions::PyTypeError,
-                                                        _,
-                                                    >(
-                                                        "Typed equality expected time operands.",
-                                                    ));
-                                                }
+                                        BaseType::Time => match (va, vb) {
+                                            (
+                                                LiteralValue::TimeNanos(a),
+                                                LiteralValue::TimeNanos(b),
+                                            ) => a == b,
+                                            _ => {
+                                                return Err(PyErr::new::<
+                                                    pyo3::exceptions::PyTypeError,
+                                                    _,
+                                                >(
+                                                    "Typed equality expected time operands.",
+                                                ));
                                             }
-                                        }
-                                        BaseType::Binary => {
-                                            match (va, vb) {
-                                                (
-                                                    LiteralValue::Binary(a),
-                                                    LiteralValue::Binary(b),
-                                                ) => a == b,
-                                                _ => {
-                                                    return Err(PyErr::new::<
-                                                        pyo3::exceptions::PyTypeError,
-                                                        _,
-                                                    >(
-                                                        "Typed equality expected binary operands.",
-                                                    ));
-                                                }
+                                        },
+                                        BaseType::Binary => match (va, vb) {
+                                            (LiteralValue::Binary(a), LiteralValue::Binary(b)) => {
+                                                a == b
                                             }
-                                        }
+                                            _ => {
+                                                return Err(PyErr::new::<
+                                                    pyo3::exceptions::PyTypeError,
+                                                    _,
+                                                >(
+                                                    "Typed equality expected binary operands.",
+                                                ));
+                                            }
+                                        },
                                     };
                                     if *op == CmpOp::Eq {
                                         eq
@@ -3444,11 +3439,11 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             LiteralValue::DateTimeMicros(us) => Ok(LiteralValue::Str(format!("{us}"))),
             LiteralValue::DateDays(d) => Ok(LiteralValue::Str(format!("{d}"))),
             LiteralValue::DurationMicros(us) => Ok(LiteralValue::Str(format!("{us}"))),
-            LiteralValue::TimeNanos(_) | LiteralValue::Binary(_) => Err(
-                PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            LiteralValue::TimeNanos(_) | LiteralValue::Binary(_) => {
+                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                     "Row-wise cast() to str does not support time or binary literals.",
-                ),
-            ),
+                ))
+            }
         },
         BaseType::Enum => match v {
             LiteralValue::EnumStr(s) => Ok(LiteralValue::EnumStr(s)),

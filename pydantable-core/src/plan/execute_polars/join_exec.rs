@@ -36,6 +36,7 @@ use super::common::*;
 use super::materialize::{dtype_from_polars, series_to_py_list};
 use super::runner::PolarsPlanRunner;
 
+#[allow(clippy::too_many_arguments)]
 pub fn execute_join_polars(
     py: Python<'_>,
     left_plan: &PlanInner,

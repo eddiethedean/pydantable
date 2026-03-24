@@ -273,8 +273,14 @@ impl PolarsPlanRunner {
                         .map_err(polars_err)
                         .expect("order column validated above")
                         .as_materialized_series();
-                    let av_a = s.get(*a).map_err(polars_err).expect("window sort row index");
-                    let av_b = s.get(*b).map_err(polars_err).expect("window sort row index");
+                    let av_a = s
+                        .get(*a)
+                        .map_err(polars_err)
+                        .expect("window sort row index");
+                    let av_b = s
+                        .get(*b)
+                        .map_err(polars_err)
+                        .expect("window sort row index");
                     let cmp = Self::anyvalue_sort_cmp_nulls(av_a, av_b, *nulls_last);
                     if cmp != Ordering::Equal {
                         return if *asc { cmp } else { cmp.reverse() };

@@ -755,11 +755,11 @@ def validate_columns_strict(
         pa = None  # type: ignore[assignment]
     if pa is not None:
         if isinstance(data, pa.Table):
-            from .io import arrow_table_to_column_dict
+            from pydantable.io import arrow_table_to_column_dict
 
             data = arrow_table_to_column_dict(data)
         elif isinstance(data, pa.RecordBatch):
-            from .io import record_batch_to_column_dict
+            from pydantable.io import record_batch_to_column_dict
 
             data = record_batch_to_column_dict(data)
 

@@ -37,6 +37,7 @@ use super::literal_agg::{agg_literal, literal_to_py, py_dict_to_literal_ctx};
 use super::materialize::{dtype_from_polars, series_to_py_list};
 use super::runner::PolarsPlanRunner;
 
+#[allow(clippy::too_many_arguments)]
 pub fn execute_melt_polars(
     py: Python<'_>,
     plan: &PlanInner,

@@ -2,7 +2,7 @@
 
 This file intentionally spans multiple release themes:
 
-- **0.14+:** sync routes, OpenAPI, columnar JSON bodies (still the baseline for HTTP integration smoke).
+- **0.14+:** sync routes, OpenAPI, columnar JSON bodies (integration smoke).
 - **0.15+:** async routes using async materialization (`acollect`, `ato_dict`).
 - **0.16+:** multipart Parquet upload + `read_parquet` in an async handler.
 

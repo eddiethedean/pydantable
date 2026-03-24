@@ -109,6 +109,7 @@ impl PolarsExecutor {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn melt(
         py: Python<'_>,
         plan: &PlanInner,
@@ -131,6 +132,7 @@ impl PolarsExecutor {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn pivot(
         py: Python<'_>,
         plan: &PlanInner,

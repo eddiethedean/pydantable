@@ -267,7 +267,11 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
 }
 
 #[cfg(feature = "polars_engine")]
-pub(super) fn series_to_py_list(py: Python<'_>, series: &Series, dtype: &DTypeDesc) -> PyResult<PyObject> {
+pub(super) fn series_to_py_list(
+    py: Python<'_>,
+    series: &Series,
+    dtype: &DTypeDesc,
+) -> PyResult<PyObject> {
     let mut values: Vec<PyObject> = Vec::with_capacity(series.len());
     match dtype {
         DTypeDesc::Struct { .. } => {
