@@ -235,7 +235,7 @@ jobs:
       - name: Install maturin and test deps
         run: |
           $PY -m pip install -U pip
-          $PY -m pip install maturin pytest pytest-asyncio pytest-xdist pytest-cov "numpy>=1.24" "pandas>=2.0" "hypothesis>=6.0" "pyarrow>=14.0" "fastapi>=0.100" "httpx>=0.24" "python-multipart>=0.0.6"
+          $PY -m pip install maturin pytest pytest-asyncio pytest-xdist "numpy>=1.24" "pandas>=2.0" "hypothesis>=6.0" "pyarrow>=14.0" "fastapi>=0.100" "httpx>=0.24" "python-multipart>=0.0.6"
 
       - name: Build and install extension
         run: $PY -m maturin develop --release
@@ -249,12 +249,8 @@ jobs:
       - name: Pytest
         env:
           MATRIX_OS: ${{ matrix.os }}
-          PYVER: ${{ matrix.python-version }}
         run: |
-          if [ "$MATRIX_OS" = "ubuntu-latest" ] && [ "$PYVER" = "3.11" ]; then
-            # Serial pytest for coverage: -n auto + cov + native ext has aborted workers (exit 134) on GHA runners.
-            $PY -m pytest -q --cov=pydantable --cov-report=term-missing --cov-report=xml
-          elif [ "$MATRIX_OS" = "ubuntu-latest" ]; then
+          if [ "$MATRIX_OS" = "ubuntu-latest" ]; then
             $PY -m pytest -q -n auto
           else
             $PY -m pytest -q
