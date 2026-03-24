@@ -184,6 +184,7 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 - [x] **FastAPI `async` routes:** **`async def`** examples, **`lifespan`** + **`ThreadPoolExecutor`**, **`StreamingResponse`** guidance (manual chunking; no built-in async row iterator). Tests: **`tests/test_fastapi_recipes.py`**, **`scripts/verify_doc_examples.py`**.
 - [x] **Spark façade depth:** **`trim`**, **`abs`**, **`round`**, **`floor`**, **`ceil`** in **`pydantable.pyspark.sql.functions`** (still **not** a distributed Spark engine).
 - [x] **Docs and migration:** [`changelog.md`](changelog.md) **0.15.0** entry; sync APIs unchanged (additive release).
+- [x] **Regression tests:** **`tests/test_async_materialization.py`**, **`tests/test_pyarrow_map_ingest.py`**, **`tests/test_v015_features.py`** (expanded **0.15.0** coverage).
 
 ---
 

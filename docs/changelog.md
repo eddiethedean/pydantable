@@ -12,9 +12,15 @@ All notable changes to this project are documented here. The format is inspired 
 - **PySpark façade:** **`trim`**, **`abs`**, **`round`**, **`floor`**, **`ceil`** in **`pydantable.pyspark.sql.functions`** (and package **`__all__`**). {doc}`PYSPARK_PARITY` updated.
 - **Dev:** **`pytest-asyncio`** in **`[dev]`**; **`asyncio_mode = auto`** in **`pyproject.toml`**.
 
+### Tests
+
+- **`tests/test_async_materialization.py`**, **`tests/test_pyarrow_map_ingest.py`**, **`tests/test_v015_features.py`** (PySpark **0.15.0** helpers and core parity); extended **`tests/test_fastapi_recipes.py`**.
+
 ### Details
 
 See {doc}`ROADMAP` **Shipped in 0.15.0**. Sync **`collect` / `to_dict` / `to_polars`** are unchanged; migration is additive unless you replace manual **`asyncio.to_thread`** wrappers with the new APIs.
+
+**`rust_version()`** in the extension now reports **`env!("CARGO_PKG_VERSION")`** so it always matches **`pyproject.toml`** / **`Cargo.toml`** (release hygiene).
 
 ## [0.14.0] — 2026-03-23
 
@@ -36,8 +42,8 @@ See {doc}`ROADMAP` **Shipped in 0.14.0**.
 
 ### Highlights
 
-- **Stabilization + combined scope:** {doc}`FASTAPI` — **`trusted_mode`** / **`validate_data`**, column-shaped **`dict[str, list]`** bodies, **sync** materialization and **0.15.0** async pointers; trust-boundary guidance for large / pre-validated tables and **Polars** / **Arrow**; install notes for PyPI wheels vs git builds.
-- **Sync-only I/O:** {doc}`EXECUTION` and {doc}`PERFORMANCE` call out **blocking** materialization and interchange today; link to **Planned 0.15.0** async work. Tuning text prefers **`trusted_mode`** alongside **`validate_data`**.
+- **Stabilization + combined scope:** {doc}`FASTAPI` — **`trusted_mode`** / **`validate_data`**, column-shaped **`dict[str, list]`** bodies, **sync** materialization and pointers forward to async work (shipped in **0.15.0**); trust-boundary guidance for large / pre-validated tables and **Polars** / **Arrow**; install notes for PyPI wheels vs git builds.
+- **Sync-only I/O (at time of 0.13.0):** {doc}`EXECUTION` and {doc}`PERFORMANCE` described **blocking** materialization; **async** APIs arrived in **0.15.0** ({doc}`EXECUTION`, {doc}`FASTAPI`). Tuning text prefers **`trusted_mode`** alongside **`validate_data`**.
 - **Window semantics (docs):** null ordering and **`CURRENT ROW`** / peer framing in {doc}`WINDOW_SQL_SEMANTICS` and {doc}`INTERFACE_CONTRACT`; `Window` docstring in `window_spec.py`. (**User-facing `NULLS FIRST` / `LAST`** shipped in **0.14.0**.)
 - **Trusted `strict` + PyArrow:** `isinstance(..., pa.Array | pa.ChunkedArray)` in trusted buffers (concrete array types such as `Int64Array`); stricter scalars for **int**, **float**, **decimal**, **enum**, **uuid**, and temporal Arrow types. Tests in `tests/test_trusted_strict_pyarrow.py`; **`pyarrow>=14`** in **`[dev]`** and CI. (**`shape_only` drift warnings** shipped in **0.14.0**.)
 - **Performance:** `benchmarks/framed_window_bench.py`, `benchmarks/trusted_polars_ingest_bench.py`; {doc}`PERFORMANCE` table and cross-links.
