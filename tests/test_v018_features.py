@@ -22,6 +22,13 @@ class R(Schema):
     y: int
 
 
+def _sort_group_output(cols: dict[str, list], *, key_col: str = "k") -> dict[str, list]:
+    """Sort group_by rows by ``key_col`` (row order from the engine is not stable)."""
+    n = len(cols[key_col])
+    order = sorted(range(n), key=lambda i: cols[key_col][i])
+    return {c: [cols[c][i] for i in order] for c in cols}
+
+
 def test_group_by_agg_empty_frame() -> None:
     """Grouped aggregation on zero rows returns empty output columns."""
     df = DataFrame[KV]({"k": [], "v": []})
@@ -54,13 +61,7 @@ def test_group_by_multiple_aggs_match_reference() -> None:
         exp["c"].append(len(vs))
         exp["mu"].append(sum(vs) / len(vs))
         exp["n"].append(len(set(vs)))
-    got = {
-        "k": list(out["k"]),
-        "s": list(out["s"]),
-        "c": list(out["c"]),
-        "mu": list(out["mu"]),
-        "n": list(out["n"]),
-    }
+    got = _sort_group_output({c: list(out[c]) for c in out})
     assert got == exp
 
 
