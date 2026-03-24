@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.17.x → 0.18.x → 0.19.x → v1.0.0)
+# PydanTable roadmap (0.18.x → 0.19.x → v1.0.0)
 
-**Current release: `0.17.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, planned minors **0.18.0** through **0.19.0**, and the **Planned v1.0.0** phase for the **production-ready** major release.
+**Current release: `0.18.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, planned minor **0.19.0**, and the **Planned v1.0.0** phase for the **production-ready** major release.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
@@ -80,7 +80,7 @@ Practical inputs that feed that phase:
 - Optional: consolidated **migration guide** if semver ever jumps in a breaking way; keep [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) the semantics source of truth.
 - **Async I/O:** **0.15.0** ships **`acollect` / `ato_dict` / `ato_polars`** (and **`DataFrameModel`** **`arows` / `ato_dicts`**) using **`asyncio.to_thread`** or a custom executor; **0.16.0** adds **`ato_arrow`** and synchronous **`read_parquet` / `read_ipc`** returning **`dict[str, list]`** (see [`EXECUTION.md`](EXECUTION.md), [`FASTAPI.md`](FASTAPI.md)).
 - **FastAPI integration maturity:** treat [`FASTAPI.md`](FASTAPI.md) as the **canonical service guide**. **0.14.0** added **`TestClient`** / OpenAPI notes; **0.15.0** added **`async`** route examples and **`lifespan`**; **0.16.0** documents **multipart** Parquet/IPC, **`Depends`** executors, **background tasks**, and **422 vs application errors**.
-- **Release train:** **Planned 0.17.0** → **0.18.0** → **0.19.0** → **Planned v1.0.0** (below); dates are not committed here. **0.19.0** is the last **0.x** consolidation before tagging **1.0.0**, unless scope slips.
+- **Release train:** **0.18.0** → **0.19.0** → **Planned v1.0.0** (below); dates are not committed here. **0.19.0** is the last **0.x** consolidation before tagging **1.0.0**, unless scope slips.
 
 ---
 
@@ -221,15 +221,15 @@ Practical inputs that feed that phase:
 
 ---
 
-## Planned 0.18.0 (maintainability, execution seams, deeper parity)
+## Shipped in 0.18.0 (maintainability, execution seams, parity docs)
 
-**Themes:** keep user-facing API stable while improving **internals**, **testability**, and **Polars / façade parity** without opening the post-**v1.0.0** engine work below.
+**Themes:** stable user-facing API; clearer **Rust / Polars** error context for **grouped** execution; explicit **deferral** of non-string map keys; documentation and light **Hypothesis** smoke tests—no new **`Expr`** or PySpark façade methods.
 
-- [ ] **Rust plan / Python boundary:** tighten **executor** and **PyO3** boundaries where it reduces coupling (e.g. grouped execution entry points, clear errors for **rowwise** vs **Polars** paths); extend [`DEVELOPER.md`](DEVELOPER.md) checklists for new plan steps and exports.
-- [ ] **Polars transformations:** close or explicitly defer the next tranche of items in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) that are still **open** after **0.17.0**; align [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md) and [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md) with any new façade methods.
-- [ ] **Maps / structs / lists:** follow through on **0.17.0** spikes—if **non-string map keys** or **Arrow map + `Expr`** work lands partially here, document limits in [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md) and add regression tests; otherwise move remainder to **Later** with a one-line pointer.
-- [ ] **CI and quality:** keep **multi-Python** and **optional `[polars]`** matrices green; consider property-test expansion ([`DEVELOPER.md`](DEVELOPER.md), Hypothesis) for high-value pipelines (join / group_by / window smoke paths).
-- [ ] **Docs:** [`changelog.md`](changelog.md) and cross-links from [`EXECUTION.md`](EXECUTION.md) / [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) for any semantic tweaks.
+- [x] **Rust plan / Python boundary:** [`polars_err_ctx`](../pydantable-core/src/plan/execute_polars/common.rs) prefixes Polars **`collect()`** failures during **`group_by().agg()`** with **`(group_by().agg())`** in the **`ValueError`** message. [`DEVELOPER.md`](DEVELOPER.md) updated.
+- [x] **Polars transformations:** Phases **P1–P7** in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) remain complete; **post–P7** note—future parity is **additive** (`Expr` / transforms), not a new phase backlog. [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md) and [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md) refreshed for **0.18.0** (no new façade rows).
+- [x] **Maps:** **Non-string map keys** explicitly **not** in **0.18.0**; [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md) and **Later** (below) updated.
+- [x] **CI and quality:** Hypothesis smoke tests for **`group_by().agg()`** and **`join`** (`tests/test_hypothesis_properties.py`).
+- [x] **Docs:** [`changelog.md`](changelog.md); [`EXECUTION.md`](EXECUTION.md) and [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) note on grouped **`group_by().agg()`** Polars error wording. Aggregation **semantics** unchanged.
 
 ---
 
@@ -265,7 +265,7 @@ Practical inputs that feed that phase:
 
 Work **not** scheduled in the **0.17.0–0.19.0** or **Planned v1.0.0** sections above, or explicitly deferred when scope slips:
 
-- [ ] **Non-string map keys** (**`dict[int, T]`** and Arrow maps whose keys are not UTF-8 strings): not shipped in **0.17.0** (that release deepens **string-keyed** map contracts only). Same for **heterogeneous** keys / full **Arrow + expression** parity if not delivered in **0.18.0**—or explicitly deferred past **v1.0.0**.
+- [ ] **Non-string map keys** (**`dict[int, T]`** and Arrow maps whose keys are not UTF-8 strings): still **not shipped** after **0.18.0** (explicitly deferred; see **Shipped in 0.18.0** and [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md)). **Heterogeneous** keys / full **Arrow + expression** parity may be revisited after **v1.0.0** unless promoted earlier.
 - [ ] Items deferred from earlier releases when priorities change.
 - [ ] **Chunked / streaming** async iterators for JSON or row batches (no minimal contract yet).
 - [ ] Longer-horizon experiments that do not fit the **pre-1.0** train (**0.17–0.19**) or the **v1.0.0** production gate.

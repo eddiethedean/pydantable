@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import warnings
+from collections import defaultdict
 
 import pytest
 from conftest import assert_table_eq_sorted
@@ -26,6 +27,69 @@ class TwoInt(Schema):
 class IntOpt(Schema):
     id: int
     age: int | None
+
+
+class KV(Schema):
+    k: int
+    v: int
+
+
+class JLeft(Schema):
+    id: int
+    x: int
+
+
+class JRight(Schema):
+    id: int
+    y: int
+
+
+@composite
+def aligned_kv_columns(draw):
+    n = draw(st.integers(min_value=0, max_value=96))
+    ks = draw(
+        st.lists(
+            st.integers(min_value=-6, max_value=6),
+            min_size=n,
+            max_size=n,
+        )
+    )
+    vs = draw(
+        st.lists(
+            st.integers(min_value=-200, max_value=200),
+            min_size=n,
+            max_size=n,
+        )
+    )
+    return {"k": ks, "v": vs}
+
+
+@composite
+def join_unique_id_xy(draw):
+    n = draw(st.integers(min_value=0, max_value=48))
+    ids = draw(
+        st.lists(
+            st.integers(min_value=0, max_value=100),
+            min_size=n,
+            max_size=n,
+            unique=True,
+        )
+    )
+    xs = draw(
+        st.lists(
+            st.integers(min_value=-30, max_value=30),
+            min_size=n,
+            max_size=n,
+        )
+    )
+    ys = draw(
+        st.lists(
+            st.integers(min_value=-30, max_value=30),
+            min_size=n,
+            max_size=n,
+        )
+    )
+    return {"id": ids, "x": xs, "y": ys}
 
 
 @composite
@@ -220,6 +284,38 @@ def test_schema_from_descriptors_roundtrip_keys(mapping: dict[str, dict]) -> Non
     assert set(fields.keys()) == set(mapping.keys())
     for name, desc in mapping.items():
         assert fields[name] == dtype_descriptor_to_annotation(desc)
+
+
+@given(data=aligned_kv_columns())
+@settings(max_examples=40, deadline=None)
+def test_group_by_sum_matches_manual(data: dict[str, list]) -> None:
+    df = DataFrame[KV](data)
+    out = df.group_by("k").agg(s=("sum", "v")).collect(as_lists=True)
+    expected: defaultdict[int, int] = defaultdict(int)
+    for k, v in zip(data["k"], data["v"], strict=True):
+        expected[k] += v
+    got = sorted(zip(out["k"], out["s"], strict=True), key=lambda t: (t[0], t[1]))
+    exp = sorted(expected.items(), key=lambda t: (t[0], t[1]))
+    assert got == exp
+
+
+@given(data=join_unique_id_xy())
+@settings(max_examples=30, deadline=None)
+def test_inner_join_unique_ids_row_count(data: dict[str, list]) -> None:
+    left = DataFrame[JLeft]({"id": data["id"], "x": data["x"]})
+    right = DataFrame[JRight]({"id": data["id"], "y": data["y"]})
+    joined = left.join(right, on="id", how="inner")
+    out = joined.collect(as_lists=True)
+    assert len(out["id"]) == len(data["id"])
+    got = sorted(
+        zip(out["id"], out["x"], out["y"], strict=True),
+        key=lambda t: (t[0], t[1], t[2]),
+    )
+    exp = sorted(
+        zip(data["id"], data["x"], data["y"], strict=True),
+        key=lambda t: (t[0], t[1], t[2]),
+    )
+    assert got == exp
 
 
 @given(every=st.sampled_from(["0s", "0m", "0h", "0d"]))

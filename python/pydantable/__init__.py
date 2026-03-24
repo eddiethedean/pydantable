@@ -29,4 +29,4 @@ __all__ = [
     "read_ipc",
     "read_parquet",
 ]
-__version__ = "0.17.0"
+__version__ = "0.18.0"

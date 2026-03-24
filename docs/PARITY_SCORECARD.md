@@ -30,3 +30,5 @@ Status definitions:
 - Arbitrary Polars **nested/list dtypes** without a matching Pydantic `list[T]` / struct annotation are out of scope; the engine stays schema-first.
 - Window frame semantics match the documented **PostgreSQL-style** `RANGE` rules for multi-key `orderBy`, not every SQL dialect; see [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md).
 - Additional advanced analytical APIs outside the current roadmap scope.
+
+**0.18.0:** No new table methods or PySpark `functions` rows; this release focused on internals (clearer **group_by**/**Polars** error context), documentation, and deferred non-string **map** keys—see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.18.0**.

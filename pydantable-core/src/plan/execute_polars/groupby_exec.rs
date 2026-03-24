@@ -344,7 +344,7 @@ pub fn execute_groupby_agg_polars(
         .group_by(by_exprs)
         .agg(agg_exprs)
         .collect()
-        .map_err(polars_err)?;
+        .map_err(|e| super::common::polars_err_ctx("group_by().agg()", e))?;
 
     out_df = mask_groupby_sum_mean_columns(out_df, &tmp_count_cols, &out_schema)?;
 

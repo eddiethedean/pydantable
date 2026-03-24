@@ -33,6 +33,8 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 
 For execution, the PySpark UI uses the same Rust/Polars path as the default export.
 
+**0.18.0:** The parity matrix above is **unchanged**—no new `sql.functions` wrappers this release.
+
 ## Phase B status (expression surface)
 
 Delivered in-tree: **`IsNull`**, **`IsNotNull`**, **`Coalesce`**, **`CaseWhen`** (`when` / `otherwise`), **`Cast`**, **`InList`**, **`Between`**, **`StringConcat`**, **`Substring`**, **`StringLength`** — Rust `ExprNode`, Polars lowering, and `pydantable.pyspark.sql.functions` / `Expr` methods.

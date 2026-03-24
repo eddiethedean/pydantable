@@ -4,7 +4,9 @@ This document tracks the plan to reach broad transformation-method parity with
 Polars while preserving `pydantable`'s typed schema contracts.
 
 Notes that say **Implemented on branch `v0.5.0`** refer to historical work landed in the 0.5.x line.
-The current release is **0.17.0** (see `docs/changelog.md`); older bullets below still record the 0.5.x baseline plus later additions.
+The current release is **0.18.0** (see `docs/changelog.md`); older bullets below still record the 0.5.x baseline plus later additions.
+
+**Post–P7 (0.18.0+):** Phases **P1–P7** below are **complete**. Further Polars-style parity is **additive** (new `Expr` methods, transforms, or façade wrappers) and is tracked in [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md), [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md), and [`ROADMAP.md`](ROADMAP.md)—not as a new “P8” checklist unless maintainers add one explicitly.
 For execution details (Pydantic-first `collect()`, optional Python `polars`), see `docs/EXECUTION.md`.
 
 ## Current baseline (implemented)
@@ -165,6 +167,7 @@ Validation:
 - [x] Full docs pass completed with migration guidance
 
 Progress note:
+- **0.18.0:** Maintainability and docs—contextual Polars errors for **`group_by().agg()`**, explicit deferral of non-string map keys, post–P7 roadmap note — see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.18.0**.
 - **0.17.0:** String-keyed **map** contract tests + docs after PyArrow map ingest; PySpark **`functions`** wrappers for string replace/strip, **`strptime`**, **`binary_len`**, list **`Expr`** helpers — see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.17.0**.
 - **0.16.1:** Map-column arithmetic typing fix — see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.16.1**.
 - **0.16.0:** **`read_parquet` / `read_ipc`**, **`to_arrow` / `ato_arrow`**, **`Table` / `RecordBatch`** constructors, **FastAPI** multipart / **`Depends`** / HTTP-status docs — see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.16.0**.

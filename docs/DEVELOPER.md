@@ -69,7 +69,7 @@ Current contract direction:
 
 ### SOLID-oriented layout (internals)
 
-- **Rust — `plan/execute_polars/`:** Polars execution is split into `common`, `runner` (`PolarsPlanRunner`), `materialize`, `join_exec`, `groupby_exec`, `concat_exec`, `literal_agg`, and `reshape_exec`, re-exported from `execute_polars/mod.rs`.
+- **Rust — `plan/execute_polars/`:** Polars execution is split into `common`, `runner` (`PolarsPlanRunner`), `materialize`, `join_exec`, `groupby_exec`, `concat_exec`, `literal_agg`, and `reshape_exec`, re-exported from `execute_polars/mod.rs`. **`common::polars_err_ctx`** (0.18.0+) labels Polars **`collect()`** failures in **`groupby_exec`** as **`group_by().agg()`** in the Python **`ValueError`** text—see `execute_polars/common.rs` and {doc}`EXECUTION`.
 - **Rust — `python_api/`:** PyO3 bindings are split into `types` (`PyExpr`, `PyPlan`), `expr_fns`, `plan_fns`, and `exec_fns`; `mod.rs` only registers symbols on `_core`.
 - **Rust — `plan/executor.rs`:** `PhysicalPlanExecutor` dispatches full-plan `execute_plan`. With `polars_engine`, inherent methods on `PolarsExecutor` (`join`, `groupby_agg`, `concat`, `melt`, `pivot`, `explode`, `unnest`, `groupby_dynamic_agg`) forward to `execute_polars::*` so call sites depend on the executor type rather than raw free functions.
 - **Python — `dataframe/` and `schema/`:** Public API stays `pydantable.dataframe` and `pydantable.schema`; implementations live in `_impl.py` inside each package for a single-responsibility split without changing imports.
@@ -111,7 +111,7 @@ Phase 4 boundary contract:
 - **`pytest` on `tests/`** is the **CI-facing** check for end-to-end behavior (`collect`, joins, UIs). Prefer adding user-visible regressions here when behavior crosses the Python boundary.
 - **Async tests:** **`pytest-asyncio`** is in **`[dev]`**; `pyproject.toml` sets **`asyncio_mode = auto`** so `async def` tests run without extra markers unless you prefer explicit `@pytest.mark.asyncio`.
 
-### Release ↔ tests map (0.15.0–0.17.0)
+### Release ↔ tests map (0.15.0–0.18.0)
 
 Use this table to locate **Python tests and doc-example smoke** that back shipped minors (see `docs/changelog.md` for narrative highlights). It is not a substitute for line coverage.
 
@@ -121,8 +121,9 @@ Use this table to locate **Python tests and doc-example smoke** that back shippe
 | **0.16.0** | `read_parquet` / `read_ipc`, `to_arrow` / `ato_arrow`, `Table` / `RecordBatch` constructors, FastAPI multipart | `tests/test_arrow_interchange.py`; `tests/test_fastapi_recipes.py` (multipart Parquet); `scripts/verify_doc_examples.py` (read Parquet + `to_arrow` smoke; see comment block near `read_parquet`) |
 | **0.16.1** | Map-column arithmetic `TypeError` (not panic); `validate_columns_strict` Arrow `pydantable.io` import fix | `tests/test_expr_070_surfaces.py`; `tests/test_arrow_interchange.py` (`test_dataframe_generic_accepts_pa_table`) |
 | **0.17.0** | Map `Expr` contracts after Arrow ingest; PySpark `functions` string/list/bytes wrappers | `tests/test_pyarrow_map_ingest.py` (`test_arrow_map_ingest_then_map_get_and_contains`); `tests/test_pyspark_sql.py` (new façade tests) |
+| **0.18.0** | Grouped Polars error context (`polars_err_ctx`); map-key deferral (docs); Hypothesis `join` / `group_by` smoke | `tests/test_hypothesis_properties.py` (`test_group_by_sum_matches_manual`, `test_inner_join_unique_ids_row_count`); Rust: `pydantable-core/src/plan/execute_polars/groupby_exec.rs` |
 
-#### Changelog-driven audit (0.15.0–0.17.0)
+#### Changelog-driven audit (0.15.0–0.18.0)
 
 Cross-check each bullet in `docs/changelog.md` for recent minors against tests or `verify_doc_examples.py`.
 
@@ -151,6 +152,12 @@ Cross-check each bullet in `docs/changelog.md` for recent minors against tests o
 
 - **Map `map_get` / `map_contains_key` after PyArrow map ingest:** `tests/test_pyarrow_map_ingest.py` (`test_arrow_map_ingest_then_map_get_and_contains`).
 - **PySpark `sql.functions` wrappers:** `tests/test_pyspark_sql.py` (`test_sql_functions_string_and_list_wrappers`, `test_sql_functions_strptime_and_binary_len`).
+
+**0.18.0**
+
+- **Grouped execution error context:** Rust `polars_err_ctx` on **`group_by().agg()`** `collect()` in `execute_polars/common.rs` / `groupby_exec.rs`; notes in `docs/EXECUTION.md` and `docs/INTERFACE_CONTRACT.md`.
+- **Non-string map keys:** deferred—`docs/SUPPORTED_TYPES.md`, `docs/ROADMAP.md` **Later** (no new ingest code).
+- **Hypothesis:** `tests/test_hypothesis_properties.py` (`test_group_by_sum_matches_manual`, `test_inner_join_unique_ids_row_count`).
 
 #### Optional follow-ups (non-blocking)
 
@@ -315,8 +322,8 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 
 ### Publishing (PyPI)
 
-Pushing a git tag matching `v*` (for example `v0.17.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then **`maturin build`** (per target) and **`twine upload --skip-existing dist/*`** to PyPI. The repository needs a **`PYPI_API_TOKEN`** secret (`TWINE_USERNAME` is **`__token__`** in the workflow). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test dependencies** aligned with **`.github/workflows/ci.yml`** (e.g. **`pytest-asyncio`**, **`fastapi`**, **`httpx`**, **`python-multipart`**, **`pyarrow`**) so async and optional integration tests are not skipped on tag builds.
+Pushing a git tag matching `v*` (for example `v0.18.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then **`maturin build`** (per target) and **`twine upload --skip-existing dist/*`** to PyPI. The repository needs a **`PYPI_API_TOKEN`** secret (`TWINE_USERNAME` is **`__token__`** in the workflow). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test dependencies** aligned with **`.github/workflows/ci.yml`** (e.g. **`pytest-asyncio`**, **`fastapi`**, **`httpx`**, **`python-multipart`**, **`pyarrow`**) so async and optional integration tests are not skipped on tag builds.
 
 **GNU manylinux wheels** are built with **`PyO3/maturin-action`** inside the default **manylinux Docker** images (`manylinux: 2_17` / `2_28`). Avoid **`container: off`** plus **`--zig`** on the host for those targets: linker failures and **OOM** are common with a Polars-sized dependency tree. **musllinux** jobs still use **`--zig`** in `release.yml` as needed.
 
-The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v0.17.0`**).
+The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v0.18.0`**).

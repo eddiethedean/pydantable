@@ -8,7 +8,7 @@
 
 **Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core (Polars inside the native extension).**
 
-**Current release: 0.17.0** · Python **3.10+**
+**Current release: 0.18.0** · Python **3.10+**
 
 ---
 
@@ -124,6 +124,8 @@ PySpark-named wrappers: `pydantable.pyspark.sql.functions` mirrors much of the a
 ---
 
 ## Recent releases
+
+**0.18.0** — Clearer **Polars** error context for **`group_by().agg()`**; explicit deferral of non-string map keys ([Supported types](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html), [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html)); parity/roadmap doc refresh (no new façade APIs); Hypothesis smoke for **join** / **group_by**.
 
 **0.17.0** — Tighter docs and tests for **`map_get` / `map_contains_key`** after PyArrow **`map<utf8, …>`** ingest; more **`pyspark.sql.functions`** thin wrappers (`str_replace`, `regexp_replace`, `strip_*`, `strptime`, `binary_len`, `list_*`). Non-string map keys (`dict[int, T]`, etc.) remain future work ([Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) **Later**).
 

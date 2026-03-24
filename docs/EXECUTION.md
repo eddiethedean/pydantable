@@ -18,6 +18,8 @@ if you need a Polars **`DataFrame`** in Python. Install **`pydantable[arrow]`** 
 The Python module `python/pydantable/rust_engine.py` is the thin wrapper that invokes
 `execute_plan`, `execute_join`, and related functions on `_core` (no alternate engines).
 
+**0.18.0 — Grouped execution errors:** When Polars **`collect()`** fails during **`group_by().agg()`**, the raised **`ValueError`** may include the prefix **`Polars execution error (group_by().agg()):`** so the failure is identifiable as grouped aggregation rather than a generic plan step. This does not change aggregation results or schema rules ({doc}`INTERFACE_CONTRACT`).
+
 Optional **UI modules** (`pydantable.pandas`, `pydantable.pyspark`) only change **method
 names and imports** (e.g. `assign` vs `withColumn`). They do not select a different
 execution engine.

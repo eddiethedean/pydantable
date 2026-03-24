@@ -112,6 +112,15 @@ pub(super) fn polars_err(e: PolarsError) -> PyErr {
     PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Polars execution error: {e}"))
 }
 
+/// Same as [`polars_err`], with a short parenthetical label in the message (e.g.
+/// `group_by().agg()`) so grouped-aggregation `collect()` failures are identifiable.
+#[cfg(feature = "polars_engine")]
+pub(super) fn polars_err_ctx(context: &'static str, e: PolarsError) -> PyErr {
+    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+        "Polars execution error ({context}): {e}"
+    ))
+}
+
 /// Hand off an in-memory Polars `DataFrame` to Python Polars via Arrow IPC (avoids
 /// per-cell `series_to_py_list` materialization).
 #[cfg(feature = "polars_engine")]

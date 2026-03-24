@@ -89,6 +89,8 @@ The output field nullability is preserved/derived accordingly:
 - nullable aggregates above are typed as `Optional[...]`
 - `count` and `n_unique` outputs remain non-optional integers
 
+**Polars runtime errors (0.18.0+):** On **`collect()`** failure during **`group_by().agg()`**, the raised **`ValueError`** may include **`(group_by().agg())`** in the message (Rust **`polars_err_ctx`**) so the error is attributable to grouped aggregation. This does not change the aggregation rules above; see {doc}`EXECUTION`.
+
 ## Reshaping semantics
 
 Supported reshape methods:
