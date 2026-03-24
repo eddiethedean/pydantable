@@ -271,9 +271,15 @@ impl ExprNode {
     }
 
     fn infer_arith_dtype(op: ArithOp, left: DTypeDesc, right: DTypeDesc) -> PyResult<DTypeDesc> {
-        if left.is_struct() || right.is_struct() || left.is_list() || right.is_list() {
+        if left.is_struct()
+            || right.is_struct()
+            || left.is_list()
+            || right.is_list()
+            || left.is_map()
+            || right.is_map()
+        {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "Arithmetic operators do not support struct- or list-typed columns.",
+                "Arithmetic operators do not support struct-, list-, or map-typed columns.",
             ));
         }
         let nullable = left.nullable_flag() || right.nullable_flag();

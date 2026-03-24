@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 
+import pytest
+
 from pydantable import DataFrame, Schema
 
 
@@ -34,6 +36,20 @@ def test_map_get_and_contains_key() -> None:
     ).collect(as_lists=True)
     assert out["av"] == [1, None, None]
     assert out["has_b"] == [True, False, None]
+
+
+def test_map_column_arithmetic_raises_typeerror_not_panic() -> None:
+    """Map dtypes must not hit Rust unwrap() in infer_arith_dtype (regression)."""
+
+    class M(Schema):
+        id: int
+        m: dict[str, int]
+
+    df = DataFrame[M]({"id": [1], "m": [{"a": 1}]})
+    with pytest.raises(TypeError):
+        df.with_columns(bad=df.m + 1)
+    with pytest.raises(TypeError):
+        df.with_columns(bad=df.m + df.m)
 
 
 def test_binary_len_byte_count() -> None:
