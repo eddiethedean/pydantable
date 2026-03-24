@@ -228,7 +228,7 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          python -m pip install --upgrade pip twine
+          python -m pip install --upgrade pip "twine<6"
           python -m twine upload --skip-existing dist/*
 
   publish-pypi-manylinux-aarch64:
@@ -252,7 +252,7 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          python -m pip install --upgrade pip twine
+          python -m pip install --upgrade pip "twine<6"
           python -m twine upload --skip-existing dist/*
 
   publish-pypi-mac:
@@ -279,7 +279,7 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          python -m pip install --upgrade pip twine
+          python -m pip install --upgrade pip "twine<6"
           python -m twine upload --skip-existing dist/*
 
   publish-pypi-musllinux-x86_64:
@@ -307,7 +307,7 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          python -m pip install --upgrade pip twine
+          python -m pip install --upgrade pip "twine<6"
           python -m twine upload --skip-existing dist/*
 
   publish-pypi-musllinux-aarch64:
@@ -335,7 +335,7 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          python -m pip install --upgrade pip twine
+          python -m pip install --upgrade pip "twine<6"
           python -m twine upload --skip-existing dist/*
 
   publish-pypi-windows-x86_64:
@@ -358,7 +358,7 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          python -m pip install --upgrade pip twine
+          python -m pip install --upgrade pip "twine<6"
           python -m twine upload --skip-existing dist/*
 
   publish-pypi-windows-arm64:
@@ -381,6 +381,6 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          python -m pip install --upgrade pip twine
+          python -m pip install --upgrade pip "twine<6"
           python -m twine upload --skip-existing dist/*
 
