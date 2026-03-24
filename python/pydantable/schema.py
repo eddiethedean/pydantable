@@ -737,6 +737,9 @@ def validate_columns_strict(
     (prefer ``trusted_mode``): ``True`` maps to ``trusted_mode='off'`` and
     ``False`` maps to ``trusted_mode='shape_only'``.
 
+    A PyArrow ``Table`` or ``RecordBatch`` is converted to ``dict[str, list]``
+    (Python lists per column) before validation; install ``pyarrow`` for this path.
+
     With ``validate_elements=False``, a Polars ``DataFrame`` may be passed
     directly so the Rust engine can ingest it via Arrow IPC without per-cell
     Python materialization.
@@ -745,6 +748,20 @@ def validate_columns_strict(
     mode = _trusted_mode_from_legacy(
         validate_elements=validate_elements, trusted_mode=trusted_mode
     )
+
+    try:
+        import pyarrow as pa  # type: ignore[import-untyped]
+    except ImportError:
+        pa = None  # type: ignore[assignment]
+    if pa is not None:
+        if isinstance(data, pa.Table):
+            from .io import arrow_table_to_column_dict
+
+            data = arrow_table_to_column_dict(data)
+        elif isinstance(data, pa.RecordBatch):
+            from .io import record_batch_to_column_dict
+
+            data = record_batch_to_column_dict(data)
 
     if _is_polars_dataframe(data):
         if mode == "off":

@@ -42,6 +42,20 @@ def _normalize_input(
     if _is_polars_dataframe(data):
         return data
 
+    try:
+        import pyarrow as pa  # type: ignore[import-untyped]
+    except ImportError:
+        pa = None  # type: ignore[assignment]
+    if pa is not None:
+        if isinstance(data, pa.Table):
+            from .io import arrow_table_to_column_dict
+
+            return arrow_table_to_column_dict(data)
+        if isinstance(data, pa.RecordBatch):
+            from .io import record_batch_to_column_dict
+
+            return record_batch_to_column_dict(data)
+
     if isinstance(data, Mapping):
         # Columnar input path; downstream DataFrame strict validation handles
         # required/extra keys, length, and value type checks.
@@ -109,8 +123,9 @@ class DataFrameModel:
     """Columns on a subclass → generated ``RowModel`` and DataFrame-like methods.
 
     Annotate every field with a supported column type. :attr:`RowModel` validates
-    one row. Data is a column map ``{name: list}`` or a sequence of row dicts /
-    models.
+    one row. Data is a column map ``{name: list}``, a PyArrow ``Table`` or
+    ``RecordBatch`` (requires ``pyarrow``), a Polars ``DataFrame`` in trusted
+    modes, or a sequence of row dicts / models.
     """
 
     RowModel: type[BaseModel]
@@ -226,6 +241,12 @@ class DataFrameModel:
     def to_polars(self) -> Any:
         return self._df.to_polars()
 
+    def to_arrow(self) -> Any:
+        """
+        Materialize as a PyArrow ``Table`` (delegates to :meth:`DataFrame.to_arrow`).
+        """
+        return self._df.to_arrow()
+
     def rows(self) -> list[BaseModel]:
         """
         Materialize this DataFrame into a list of per-row Pydantic models.
@@ -275,6 +296,14 @@ class DataFrameModel:
     ) -> Any:
         """Async :meth:`to_polars`."""
         return await self._df.ato_polars(executor=executor)
+
+    async def ato_arrow(
+        self,
+        *,
+        executor: Executor | None = None,
+    ) -> Any:
+        """Async :meth:`to_arrow`."""
+        return await self._df.ato_arrow(executor=executor)
 
     async def arows(
         self,

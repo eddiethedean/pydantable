@@ -189,6 +189,8 @@ Python value per row per column; **struct** columns use a list of **dicts** (or
 compatible row objects). Lists may be plain `list`, `tuple`, or
 `numpy.ndarray` (see `schema.validate_columns_strict`).
 
+**0.16.0 — PyArrow `Table` / `RecordBatch`:** When **`pyarrow`** is installed, you may pass a **`pa.Table`** or **`RecordBatch`** as **`DataFrame` / `DataFrameModel`** input. It is converted to **`dict[str, list]`** via **`to_pylist()`** per column (copies), then the usual validation runs. **`pydantable.read_parquet`** and **`read_ipc`** produce the same shape for file/bytes sources. **`DataFrame.to_arrow()`** goes the other way: execute the plan as for **`to_dict()`**, then **`pyarrow.Table.from_pydict`**. Supported cell types are those that already round-trip through list materialization (scalars, **JSON-friendly** nested shapes per engine limits); exotic Arrow extension types may not map cleanly—validate with **`trusted_mode='off'`** when in doubt.
+
 With **`trusted_mode="shape_only"`** or **`"strict"`**, trusted bulk paths may pass **NumPy**, **PyArrow**,
 or a **Polars `DataFrame`** as documented in {doc}`EXECUTION` and {doc}`PERFORMANCE`;
 scalar dtypes must still match the schema. **`trusted_mode`** on **`DataFrame` /

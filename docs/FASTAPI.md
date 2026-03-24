@@ -12,11 +12,13 @@ For FastAPI services, `pydantable` gives you:
 - typed dataframe transformations in handlers or services
 - **`collect()`** — `list` of Pydantic models for the **current** projection (ideal for `response_model=list[YourRow]`)
 - **`to_dict()`** — `dict[str, list]` when the response is **column-shaped** JSON
-- **`acollect()`**, **`ato_dict()`**, **`ato_polars()`** — same semantics off the event loop (see below)
+- **`acollect()`**, **`ato_dict()`**, **`ato_polars()`**, **`ato_arrow()`** — same semantics off the event loop (see below)
+- **`read_parquet()`** / **`read_ipc()`** — load Parquet or Arrow IPC into **`dict[str, list]`** for constructors (requires **`pyarrow`**; **`pip install 'pydantable[arrow]'`**)
+- **`to_arrow()`** — materialize a PyArrow **`Table`** after the same engine path as **`to_dict()`** (not zero-copy; see [`EXECUTION.md`](EXECUTION.md))
 
 **Synchronous materialization** (`collect()`, `to_dict()`, `collect(as_lists=True)`, optional `to_polars()`) runs **blocking** Rust + Polars work on the **current thread**.
 
-**Asynchronous materialization (0.15.0+):** `await df.acollect()`, `await df.ato_dict()`, and `await df.ato_polars()` run that blocking work in **`asyncio.to_thread`** by default, or in a **`concurrent.futures.Executor`** you pass as `executor=...`. Use this from **`async def`** route handlers so the ASGI event loop stays responsive. Cancelling the waiter does **not** cancel in-flight engine work; see [`EXECUTION.md`](EXECUTION.md) for limits (GIL, copies, `to_polars`).
+**Asynchronous materialization (0.15.0+):** `await df.acollect()`, `await df.ato_dict()`, `await df.ato_polars()`, and ( **0.16.0+** ) `await df.ato_arrow()` run that blocking work in **`asyncio.to_thread`** by default, or in a **`concurrent.futures.Executor`** you pass as `executor=...`. Use this from **`async def`** route handlers so the ASGI event loop stays responsive. Cancelling the waiter does **not** cancel in-flight engine work; see [`EXECUTION.md`](EXECUTION.md) for limits (GIL, copies, `to_polars`, `to_arrow`).
 
 **`DataFrameModel`** also exposes **`arows()`** and **`ato_dicts()`** as async counterparts to **`rows()`** / **`to_dicts()`**.
 
@@ -90,6 +92,88 @@ df = UserDF({"id": body.id, "age": body.age})
 ```
 
 Same schema rules apply as for columnar constructors in [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md) (equal-length columns, types per field).
+
+## Parquet and Arrow IPC uploads (multipart)
+
+For **file** bodies, read bytes in the handler and use **`pydantable.read_parquet`** or **`read_ipc`** ( **`as_stream=True`** for streaming IPC). FastAPI file routes require the **`python-multipart`** package (`pip install python-multipart`).
+
+Use **`trusted_mode="shape_only"`** or **`strict`** for internal uploads where the file is already schema-shaped; use default validation for untrusted clients.
+
+```python
+from io import BytesIO
+
+import pyarrow as pa
+import pyarrow.parquet as pq
+from fastapi import FastAPI, UploadFile
+
+from pydantable import DataFrameModel, read_parquet
+
+
+class UserDF(DataFrameModel):
+    id: int
+    age: int | None
+
+
+app = FastAPI()
+
+
+@app.post("/upload-parquet")
+async def upload_parquet(file: UploadFile):
+    raw = await file.read()
+    cols = read_parquet(raw)
+    df = UserDF(cols, trusted_mode="shape_only")
+    return df.to_dict()
+```
+
+## Injectable executor with `Depends`
+
+Besides **`lifespan`** + **`app.state`**, you can inject a **`ThreadPoolExecutor`** (or **`None`**) via **`Depends`** so tests and routes share one pattern:
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+from typing import Annotated
+
+from fastapi import Depends, FastAPI
+
+from pydantable import DataFrameModel
+
+
+class UserDF(DataFrameModel):
+    id: int
+    age: int | None
+
+
+_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="pydantable")
+
+
+def get_df_executor() -> ThreadPoolExecutor:
+    return _executor
+
+
+app = FastAPI()
+
+
+@app.post("/users-async")
+async def create_users_async(
+    rows: list[UserDF.RowModel],
+    executor: Annotated[ThreadPoolExecutor, Depends(get_df_executor)],
+):
+    df = UserDF(rows)
+    return await df.acollect(executor=executor)
+```
+
+Pass **`executor=None`** (omit **`Depends`**) to keep **`asyncio.to_thread`** as in the [Async routes](#async-routes-executors-and-lifespan) example.
+
+## Background tasks
+
+Use Starlette **`BackgroundTasks`** for work that must run **after** the response is sent (e.g. logging metrics, cache warming). Background code **cannot** change the HTTP body; exceptions should be logged or handled inside the task— they do **not** become **`500`** responses. For dataframe work that must complete before the client receives data, keep **`await df.ato_dict()`** (or similar) in the handler instead.
+
+## Validation errors and HTTP status codes
+
+- **FastAPI / Pydantic** validate route parameters and body models first. Type mismatches on **`list[YourRowModel]`** typically produce **`422 Unprocessable Entity`** with a structured error body.
+- **Application logic** after validation: map expected domain failures to **`HTTPException(status_code=..., detail=...)`** (e.g. **`404`**, **`409`**). Uncaught **`ValueError`** / **`TypeError`** from **`DataFrameModel(...)`** (unknown columns, length mismatch, **`TypeError`** when **`trusted_mode`** is wrong for Polars) become **`500`** unless you catch them and translate.
+
+Recommend validating **untrusted** JSON with default **`trusted_mode`**; reserve **`shape_only`** / **`strict`** for authenticated internal pipelines or files you control.
 
 ## Async routes, executors, and lifespan
 

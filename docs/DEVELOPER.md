@@ -239,6 +239,6 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 
 ### Publishing (PyPI)
 
-Pushing a git tag matching `v*` (for example `v0.15.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then `maturin publish` for multiple platforms. The repository needs a **`PYPI_API_TOKEN`** secret (see workflow env `MATURIN_PYPI_TOKEN`). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test dependencies** aligned with **`.github/workflows/ci.yml`** (e.g. **`pytest-asyncio`**, **`fastapi`**, **`httpx`**, **`pyarrow`**) so async and optional integration tests are not skipped on tag builds.
+Pushing a git tag matching `v*` (for example `v0.16.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then `maturin publish` for multiple platforms. The repository needs a **`PYPI_API_TOKEN`** secret (see workflow env `MATURIN_PYPI_TOKEN`). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test dependencies** aligned with **`.github/workflows/ci.yml`** (e.g. **`pytest-asyncio`**, **`fastapi`**, **`httpx`**, **`python-multipart`**, **`pyarrow`**) so async and optional integration tests are not skipped on tag builds.
 
-The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v0.15.0`**).
+The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v0.16.0`**).

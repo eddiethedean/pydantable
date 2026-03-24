@@ -8,7 +8,7 @@
 
 **Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core.**
 
-**Current release: 0.15.0** · Python **3.10+**
+**Current release: 0.16.0** · Python **3.10+**
 
 ---
 
@@ -28,7 +28,7 @@ That site is the supported entry point for concepts, contracts, API notes, and e
 | **FastAPI** (routers, bodies, `collect`, responses) | [FastAPI integration](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) |
 | **Execution model** (`collect`, `to_dict`, `to_polars`, optional Python Polars, UI modules) | [Execution (Rust engine)](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) |
 | **Semantics** (nulls, joins, ordering, reshaping, windows — Polars-style contract) | [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) |
-| **Roadmap** (shipped through **0.15.0**, planned **0.17–0.18**, path to v1.0.0) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
+| **Roadmap** (shipped through **0.16.0**, planned **0.17**, path to v1.0.0) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
 | **Why not use Polars directly?** | [Why not just use Polars?](https://pydantable.readthedocs.io/en/latest/WHY_NOT_POLARS.html) |
 | **Pandas-style imports** (`pydantable.pandas`) | [Pandas UI](https://pydantable.readthedocs.io/en/latest/PANDAS_UI.html) |
 | **PySpark-style imports** (`pydantable.pyspark`) | [PySpark UI](https://pydantable.readthedocs.io/en/latest/PYSPARK_UI.html) |
@@ -54,7 +54,7 @@ PydanTable keeps **Pydantic models** as the source of truth for:
 
 The default API feels **Polars-like**; optional **`pydantable.pandas`** and **`pydantable.pyspark`** modules only change naming and imports — execution is always the native core. Details: [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html), [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html).
 
-**0.15.0** adds **async materialization** (`acollect`, `ato_dict`, `ato_polars`, and `DataFrameModel` `arows` / `ato_dicts`), **FastAPI `async` + `lifespan`** examples, **PyArrow `map<utf8, …>`** ingest for **`dict[str, T]`** columns, PySpark **`trim` / `abs` / `round` / `floor` / `ceil`**, and removes the legacy **`validate_data`** constructor argument — use **`trusted_mode`** only on **`DataFrame`** / **`DataFrameModel`**. **0.14.0** added window **`orderBy(..., nulls_last=...)`**, **`DtypeDriftWarning`**, **`validate_data`** deprecation (removed in **0.15.0**), **FastAPI `TestClient`** docs/tests, and PySpark **`dayofmonth` / `lower` / `upper`**. See [changelog](https://pydantable.readthedocs.io/en/latest/changelog.html) and [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html).
+**0.16.0** adds **`read_parquet` / `read_ipc`**, **`to_arrow` / `ato_arrow`**, **`Table` / `RecordBatch`** constructor ingest ( **`pyarrow`**; **`pydantable[arrow]`** ), and **FastAPI** hardening (multipart uploads, **`Depends`** executors, background tasks, HTTP status notes). **0.15.0** added **async materialization** (`acollect`, `ato_dict`, `ato_polars`, and `DataFrameModel` `arows` / `ato_dicts`), **FastAPI `async` + `lifespan`** examples, **PyArrow `map<utf8, …>`** ingest for **`dict[str, T]`** columns, PySpark **`trim` / `abs` / `round` / `floor` / `ceil`**, and removed the legacy **`validate_data`** constructor argument — use **`trusted_mode`** only on **`DataFrame`** / **`DataFrameModel`**. **0.14.0** added window **`orderBy(..., nulls_last=...)`**, **`DtypeDriftWarning`**, **`validate_data`** deprecation (removed in **0.15.0**), **FastAPI `TestClient`** docs/tests, and PySpark **`dayofmonth` / `lower` / `upper`**. See [changelog](https://pydantable.readthedocs.io/en/latest/changelog.html) and [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html).
 
 **Expression surface (current release, Rust-typed `Expr`):**
 
@@ -113,7 +113,7 @@ Example output:
 {'age2': [40], 'id': [1]}
 ```
 
-- **Materialization:** [`collect()`](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) returns a list of Pydantic row models; [`to_dict()`](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) returns columnar `dict[str, list]`. **0.15.0** [`acollect` / `ato_dict` / `ato_polars`](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) run the same work off the asyncio loop.
+- **Materialization:** [`collect()`](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) returns a list of Pydantic row models; [`to_dict()`](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) returns columnar `dict[str, list]`; **`to_arrow` / `ato_arrow`** (optional **`pyarrow`**) return a PyArrow **`Table`**. **0.15.0** [`acollect` / `ato_dict` / `ato_polars`](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) run the same work off the asyncio loop (**`ato_arrow`** in **0.16.0**).
 - **Alternate UIs:**
 
   ```python

@@ -2,9 +2,10 @@
 
 Logical plans and expression typing live in Rust; Python holds schema state and
 forwards transforms. Materialization is via :meth:`DataFrame.collect`,
-:meth:`DataFrame.to_dict`, or :meth:`DataFrame.to_polars`. Non-blocking variants
-:meth:`DataFrame.acollect`, :meth:`DataFrame.ato_dict`, and
-:meth:`DataFrame.ato_polars` run the same work in a worker thread.
+:meth:`DataFrame.to_dict`, :meth:`DataFrame.to_polars`, or :meth:`DataFrame.to_arrow`.
+Non-blocking variants :meth:`DataFrame.acollect`, :meth:`DataFrame.ato_dict`,
+:meth:`DataFrame.ato_polars`, and :meth:`DataFrame.ato_arrow` run the same work in a
+worker thread.
 """
 
 from __future__ import annotations
@@ -949,6 +950,24 @@ class DataFrame(Generic[SchemaT]):
             ) from e
         return pl.DataFrame(self.to_dict())
 
+    def to_arrow(self) -> Any:
+        """
+        Materialize as a PyArrow ``Table`` (requires the optional ``pyarrow``
+        package: ``pip install 'pydantable[arrow]'``).
+
+        This runs the same Rust execution path as :meth:`to_dict`, then builds
+        Arrow arrays from Python lists—it is not a zero-copy export of internal
+        buffers.
+        """
+        try:
+            pa = importlib.import_module("pyarrow")
+        except ImportError as e:
+            raise ImportError(
+                "pyarrow is required for to_arrow(). Install with: "
+                "pip install 'pydantable[arrow]'"
+            ) from e
+        return pa.Table.from_pydict(self.to_dict())
+
     async def acollect(
         self,
         *,
@@ -998,6 +1017,21 @@ class DataFrame(Generic[SchemaT]):
         """
         return await _materialize_in_thread(
             functools.partial(self.to_polars),
+            executor=executor,
+        )
+
+    async def ato_arrow(
+        self,
+        *,
+        executor: Executor | None = None,
+    ) -> Any:
+        """
+        Async version of :meth:`to_arrow` (see :meth:`acollect`).
+
+        Same materialization and copies as the synchronous path.
+        """
+        return await _materialize_in_thread(
+            functools.partial(self.to_arrow),
             executor=executor,
         )
 

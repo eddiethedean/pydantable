@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from io import BytesIO
+
 import pytest
 
 pytest.importorskip("fastapi")
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile
 from fastapi.testclient import TestClient
 from pydantable import DataFrameModel
 from pydantic import BaseModel
@@ -74,3 +76,44 @@ def test_testclient_async_acollect_and_ato_dict() -> None:
     r2 = client.post("/bulk-async", json={"id": [1, 2], "age": [10, None]})
     assert r2.status_code == 200
     assert r2.json() == {"id": [1, 2], "age": [10, None]}
+
+
+def test_row_list_invalid_type_is_422() -> None:
+    app = FastAPI()
+
+    @app.post("/users", response_model=list[UserRow])
+    def create_users(rows: list[UserDF.RowModel]):
+        df = UserDF(rows)
+        return df.collect()
+
+    client = TestClient(app)
+    r = client.post("/users", json=[{"id": "not-an-int", "age": 20}])
+    assert r.status_code == 422
+
+
+def test_multipart_parquet_upload() -> None:
+    pytest.importorskip("python_multipart")
+    pytest.importorskip("pyarrow")
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    from pydantable import read_parquet
+
+    app = FastAPI()
+
+    @app.post("/upload")
+    async def upload_parquet(file: UploadFile):
+        raw = await file.read()
+        cols = read_parquet(raw)
+        df = UserDF(cols, trusted_mode="shape_only")
+        return df.to_dict()
+
+    buf = BytesIO()
+    pq.write_table(pa.Table.from_pydict({"id": [1, 2], "age": [30, None]}), buf)
+    client = TestClient(app)
+    r = client.post(
+        "/upload",
+        files={"file": ("data.parquet", buf.getvalue(), "application/octet-stream")},
+    )
+    assert r.status_code == 200
+    assert r.json() == {"id": [1, 2], "age": [30, None]}

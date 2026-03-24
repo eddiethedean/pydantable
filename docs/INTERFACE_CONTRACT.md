@@ -148,6 +148,12 @@ Rolling/dynamic contracts:
 - Dynamic windows support `every` / `period` with `s/m/h/d` suffixes and explicit aggregation contracts.
 - Nulls are ignored for numeric aggregations; all-null windows yield `None` for nullable aggregates and `0` for `count`.
 
+## Arrow interchange (0.16.0)
+
+- **`pydantable.read_parquet`** / **`read_ipc`:** synchronous PyArrow readers; return **`dict[str, list]`** for **`DataFrame[Schema](...)`** / **`DataFrameModel(...)`**. **`read_ipc(..., as_stream=True)`** selects the **streaming** IPC format; default is **file** IPC.
+- **`DataFrame.to_arrow`** / **`DataFrame.ato_arrow`:** same logical materialization as **`to_dict`**, then build a PyArrow **`Table`** in Python (**not** a zero-copy view of internal Polars buffers). **`DataFrameModel`** exposes the same methods by delegation.
+- **Constructors:** **`pyarrow.Table`** and **`RecordBatch`** are accepted when **`pyarrow`** is installed (converted to Python lists before validation); see {doc}`SUPPORTED_TYPES`.
+
 ## Related documentation
 
 - **Multi-key `RANGE` window frames:** {doc}`WINDOW_SQL_SEMANTICS` (sort keys vs range axis on the first `orderBy` column).

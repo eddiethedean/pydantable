@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.15.x → 0.18.x → v1.0.0)
+# PydanTable roadmap (0.16.x → 0.17.x → v1.0.0)
 
-**Current release: `0.15.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, planned minors **0.17.0–0.18.0**, and what is still open before calling **`v1.0.0`**.
+**Current release: `0.16.0`.** This document summarizes what recent releases include, how they relate to the original phase plan, planned minor **0.17.0**, and what is still open before calling **`v1.0.0`**.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
@@ -21,7 +21,7 @@ The public API stays **SQLModel-like**:
 
 Details: [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md).
 
-**FastAPI / ASGI:** [`FASTAPI.md`](FASTAPI.md) covers `response_model`, row-list and **column-shaped** bodies, **`trusted_mode`**, **`TestClient`** recipes, joins/aggregations, **sync** and **`async` materialization** (`acollect` / `ato_dict` / …), **`lifespan`** + executor patterns, and streaming notes. **Multipart / file**, richer **`Depends`**, and **error → HTTP status** mapping are targeted for **Planned 0.17.0** below (see also **Toward v1.0.0**).
+**FastAPI / ASGI:** [`FASTAPI.md`](FASTAPI.md) covers `response_model`, row-list and **column-shaped** bodies, **`trusted_mode`**, **`TestClient`** recipes, joins/aggregations, **sync** and **`async` materialization** (`acollect` / `ato_dict` / `ato_arrow` / …), **`lifespan`** + executor patterns, **multipart Parquet** uploads, **`Depends`**-injected pools, **background tasks**, **HTTP status** guidance, and streaming notes (**0.16.0** for file/interchange docs—see **Shipped in 0.16.0**).
 
 ---
 
@@ -76,9 +76,9 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 - Keep CI green across supported Python versions and platforms; keep extension + optional **`[polars]`** matrices exercised in CI.
 - **Constructor ingest:** **`validate_data`** was removed in **0.15.0**; use **`trusted_mode`** only ([`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md)).
 - Optional: consolidated **migration guide** if semver ever jumps in a breaking way; keep [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) the semantics source of truth.
-- **Async I/O:** **0.15.0** ships **`acollect` / `ato_dict` / `ato_polars`** (and **`DataFrameModel`** **`arows` / `ato_dicts`**) using **`asyncio.to_thread`** or a custom executor; see [`EXECUTION.md`](EXECUTION.md) and [`FASTAPI.md`](FASTAPI.md). First-class **file / Parquet / IPC** helpers on the Python API are **Planned 0.17.0**; until then interchange remains **`to_dict`**, **`to_polars`**, and trusted Arrow/Polars buffers.
-- **FastAPI integration maturity:** treat [`FASTAPI.md`](FASTAPI.md) as the **canonical service guide**. **0.14.0** added **`TestClient`** / OpenAPI notes; **0.15.0** added **`async`** route examples and **`lifespan`**. **Multipart / file**, **`Depends`**, **background tasks**, and **error → HTTP status** mapping are **Planned 0.17.0** (see below).
-- **Release train:** concrete scope for the next minors is in **Planned 0.17.0** and **Planned 0.18.0**; dates are not committed here.
+- **Async I/O:** **0.15.0** ships **`acollect` / `ato_dict` / `ato_polars`** (and **`DataFrameModel`** **`arows` / `ato_dicts`**) using **`asyncio.to_thread`** or a custom executor; **0.16.0** adds **`ato_arrow`** and synchronous **`read_parquet` / `read_ipc`** returning **`dict[str, list]`** (see [`EXECUTION.md`](EXECUTION.md), [`FASTAPI.md`](FASTAPI.md)).
+- **FastAPI integration maturity:** treat [`FASTAPI.md`](FASTAPI.md) as the **canonical service guide**. **0.14.0** added **`TestClient`** / OpenAPI notes; **0.15.0** added **`async`** route examples and **`lifespan`**; **0.16.0** documents **multipart** Parquet/IPC, **`Depends`** executors, **background tasks**, and **422 vs application errors**.
+- **Release train:** concrete scope for the next minor is **Planned 0.17.0**; dates are not committed here.
 
 ---
 
@@ -190,33 +190,36 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 ---
 
-## Planned 0.17.0 (interchange & service hardening)
+## Shipped in 0.16.0 (interchange & service hardening)
 
-**Themes:** optional **file / Arrow** interchange on the Python side; **FastAPI** patterns for real deployments.
+**Themes:** PyArrow **Parquet / IPC** read helpers, **`to_arrow` / `ato_arrow`**, **`Table` / `RecordBatch`** constructor ingest, and **FastAPI** deployment patterns.
 
-- [ ] **Interchange (narrow, stable surface):** e.g. **Apache Arrow** round-trip (**`Table` / `RecordBatch`** → columnar root or **`to_arrow`** from materialized frames), and/or **Parquet** / **IPC** read helpers that land in **`dict[str, list]`** or trusted Polars—exact API names TBD. Document **trust**, **copies**, and **async** (`ato_*` + new helpers) in [`EXECUTION.md`](EXECUTION.md) and [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md).
-- [ ] **Async (optional):** if interchange APIs are blocking, add **`async`** siblings (same model as **0.15.0**). **Chunked / streaming** iterators for JSON or row batches only if a minimal contract is agreed (otherwise defer to **Later**).
-- [ ] **FastAPI:** **multipart / file** ingestion, reusable **`Depends`** patterns, **background tasks** notes, and **validation vs engine error → HTTP status** mapping; extend [`FASTAPI.md`](FASTAPI.md) and **`tests/test_fastapi_recipes.py`** (and **`verify_doc_examples`** where applicable).
+- [x] **Interchange:** **`pydantable.read_parquet`** and **`read_ipc`** ( **`as_stream`** for streaming IPC) return **`dict[str, list]`**; **`DataFrame.to_arrow`** / **`ato_arrow`** and **`DataFrameModel`** mirrors materialize a PyArrow **`Table`** after the same path as **`to_dict`** (documented copies; not zero-copy). **`pyproject`** **`[arrow]`** extra (**`pyarrow>=14`**). [`EXECUTION.md`](EXECUTION.md), [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md), [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md).
+- [x] **Constructors:** **`validate_columns_strict`** and **`DataFrameModel`** accept **`pa.Table`** / **`RecordBatch`** when **`pyarrow`** is installed (convert to Python lists, then existing validation).
+- [x] **Async:** **`ato_arrow`** uses the same thread-offload model as **`ato_polars`**. **`read_parquet` / `read_ipc`** remain synchronous (document **`asyncio.to_thread`** / executor for large files from async routes).
+- [x] **FastAPI:** [`FASTAPI.md`](FASTAPI.md) — **multipart** Parquet upload example, **`Depends`** executor injection, **background tasks** caveats, **422 vs `HTTPException` / uncaught constructor errors**; **`python-multipart`** in **`[dev]`** and CI. **`tests/test_fastapi_recipes.py`**: multipart + **422** on bad row types; **`scripts/verify_doc_examples.py`**: **`read_parquet`** + **`to_arrow`** smoke.
+- [x] **Tests:** **`tests/test_arrow_interchange.py`**.
 
 ---
 
-## Planned 0.18.0 (maps v2 & parity polish)
+## Planned 0.17.0 (maps v2 & parity polish)
 
 **Themes:** push **map** / key expressiveness and refresh **parity** docs; keep scope bounded vs **After v1.0.0** engines.
 
 - [ ] **Maps / keys v2:** spike **non-string keys** (e.g. **`dict[int, T]`**) **or** deepen **Arrow map** + **`Expr`** (**`map_get`**, typing) so behavior matches a written contract in [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md). If the spike is too large, move remainder to **Later** explicitly.
 - [ ] **PySpark façade:** add **Spark-named** helpers where **`Expr`** / Rust lowering already supports them (see deferred items in [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md)); reinforce “facade only” messaging.
-- [ ] **Parity documentation:** refresh [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md) and [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) for the post-**0.15.0** API surface; optional benchmarks in [`PERFORMANCE.md`](PERFORMANCE.md) for new interchange paths if **0.17.0** ships them.
+- [ ] **Parity documentation:** refresh [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md) and [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) for the post-**0.16.0** API surface; optional benchmarks in [`PERFORMANCE.md`](PERFORMANCE.md) for **`to_arrow`** / read helpers.
 
 ---
 
 ## Later (not started)
 
-Work **not** scheduled above for **0.17.0–0.18.0**, or explicitly deferred when scope slips:
+Work **not** scheduled above for **0.16.0–0.17.0**, or explicitly deferred when scope slips:
 
-- [ ] **Heterogeneous map keys** / full **Arrow + expression** parity if not delivered in **0.18.0** (dtype, **`map_get`**, Polars lowering).
+- [ ] **Heterogeneous map keys** / full **Arrow + expression** parity if not delivered in **0.17.0** (dtype, **`map_get`**, Polars lowering).
 - [ ] Items deferred from earlier releases when priorities change.
-- [ ] Longer-horizon experiments that do not fit the **0.17–0.18** train.
+- [ ] **Chunked / streaming** async iterators for JSON or row batches (no minimal contract yet).
+- [ ] Longer-horizon experiments that do not fit the **0.16–0.17** train.
 - [ ] **FastAPI ecosystem (optional):** thin **`pydantable[fastapi]`** extra with **pinned** **`fastapi` / `starlette`**, **middleware**, or **router** kits—**only** if demand and maintenance bandwidth are clear.
 
 ---

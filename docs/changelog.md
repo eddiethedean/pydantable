@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here. The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.0] — 2026-03-26
+
+### Highlights
+
+- **Arrow interchange:** **`read_parquet`** and **`read_ipc`** (optional **`as_stream`** for streaming IPC) return **`dict[str, list]`** for **`DataFrame` / `DataFrameModel`**. **`to_arrow`** / **`ato_arrow`** materialize a PyArrow **`Table`** after the same engine path as **`to_dict`** (not zero-copy). Optional extra **`pydantable[arrow]`** (**`pyarrow>=14`**). Constructors accept **`pa.Table`** / **`RecordBatch`** when **`pyarrow`** is installed.
+- **FastAPI:** [`FASTAPI.md`](FASTAPI.md) — multipart Parquet upload, **`Depends`** executor pattern, background-task notes, **422** vs application error guidance. **`python-multipart`** in **`[dev]`** and CI workflows. Tests: **`tests/test_fastapi_recipes.py`** (multipart + invalid body **422**), **`tests/test_arrow_interchange.py`**; **`scripts/verify_doc_examples.py`** extended.
+- **Docs:** [`EXECUTION.md`](EXECUTION.md), [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md), [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md), [`ROADMAP.md`](ROADMAP.md), [`README.md`](README.md), [`index.md`](index.md).
+
+### Details
+
+See {doc}`ROADMAP` **Shipped in 0.16.0**. Sync **`read_parquet` / `read_ipc`** are blocking; use **`asyncio.to_thread`** or an executor from **`async def`** routes for large files if loop latency matters.
+
 ## [0.15.0] — 2026-03-25
 
 ### Highlights

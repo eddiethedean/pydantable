@@ -15,6 +15,7 @@ from . import pyspark as pyspark
 from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
 from .expressions import Expr
+from .io import read_ipc, read_parquet
 from .schema import DtypeDriftWarning, Schema
 
 __all__ = [
@@ -25,5 +26,7 @@ __all__ = [
     "Schema",
     "pandas",
     "pyspark",
+    "read_ipc",
+    "read_parquet",
 ]
-__version__ = "0.15.0"
+__version__ = "0.16.0"
