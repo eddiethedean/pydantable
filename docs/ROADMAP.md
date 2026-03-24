@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.16.x → 0.17.x → v1.0.0)
+# PydanTable roadmap (0.16.x → 0.17.x → 0.18.x → 0.19.x → v1.0.0)
 
-**Current release: `0.16.1`.** This document summarizes what recent releases include, how they relate to the original phase plan, planned minor **0.17.0**, and what is still open before calling **`v1.0.0`**.
+**Current release: `0.16.1`.** This document summarizes what recent releases include, how they relate to the original phase plan, planned minors **0.17.0** through **0.19.0**, and the **Planned v1.0.0** phase for the **production-ready** major release.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
@@ -70,7 +70,9 @@ Beyond the original Phase 7 checklist, **0.5.0** also ships:
 
 ## Toward v1.0.0
 
-No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability and commitment** milestone when maintainers are comfortable locking semver semantics and publishing “1.0” messaging. Practical inputs:
+No single “Phase 8” gate is defined here. **v1.0.0** is the **production-ready** major: a **stability and commitment** cut when maintainers lock **semver** expectations, ship **PyPI** artifacts with aligned Rust/Python versions, and publish clear **1.0** messaging. Detailed checklist: **Planned v1.0.0** (below), after **0.19.0**.
+
+Practical inputs that feed that phase:
 
 - Close or explicitly defer remaining gaps in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) (and related parity docs: [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md), [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md)).
 - Keep CI green across supported Python versions and platforms; keep extension + optional **`[polars]`** matrices exercised in CI.
@@ -78,7 +80,7 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 - Optional: consolidated **migration guide** if semver ever jumps in a breaking way; keep [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) the semantics source of truth.
 - **Async I/O:** **0.15.0** ships **`acollect` / `ato_dict` / `ato_polars`** (and **`DataFrameModel`** **`arows` / `ato_dicts`**) using **`asyncio.to_thread`** or a custom executor; **0.16.0** adds **`ato_arrow`** and synchronous **`read_parquet` / `read_ipc`** returning **`dict[str, list]`** (see [`EXECUTION.md`](EXECUTION.md), [`FASTAPI.md`](FASTAPI.md)).
 - **FastAPI integration maturity:** treat [`FASTAPI.md`](FASTAPI.md) as the **canonical service guide**. **0.14.0** added **`TestClient`** / OpenAPI notes; **0.15.0** added **`async`** route examples and **`lifespan`**; **0.16.0** documents **multipart** Parquet/IPC, **`Depends`** executors, **background tasks**, and **422 vs application errors**.
-- **Release train:** concrete scope for the next minor is **Planned 0.17.0**; dates are not committed here.
+- **Release train:** **Planned 0.17.0** → **0.18.0** → **0.19.0** → **Planned v1.0.0** (below); dates are not committed here. **0.19.0** is the last **0.x** consolidation before tagging **1.0.0**, unless scope slips.
 
 ---
 
@@ -218,14 +220,54 @@ No single “Phase 8” gate is defined here. **v1.0.0** is mainly a **stability
 
 ---
 
+## Planned 0.18.0 (maintainability, execution seams, deeper parity)
+
+**Themes:** keep user-facing API stable while improving **internals**, **testability**, and **Polars / façade parity** without opening the post-**v1.0.0** engine work below.
+
+- [ ] **Rust plan / Python boundary:** tighten **executor** and **PyO3** boundaries where it reduces coupling (e.g. grouped execution entry points, clear errors for **rowwise** vs **Polars** paths); extend [`DEVELOPER.md`](DEVELOPER.md) checklists for new plan steps and exports.
+- [ ] **Polars transformations:** close or explicitly defer the next tranche of items in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md) that are still **open** after **0.17.0**; align [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md) and [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md) with any new façade methods.
+- [ ] **Maps / structs / lists:** follow through on **0.17.0** spikes—if **non-string map keys** or **Arrow map + `Expr`** work lands partially here, document limits in [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md) and add regression tests; otherwise move remainder to **Later** with a one-line pointer.
+- [ ] **CI and quality:** keep **multi-Python** and **optional `[polars]`** matrices green; consider property-test expansion ([`DEVELOPER.md`](DEVELOPER.md), Hypothesis) for high-value pipelines (join / group_by / window smoke paths).
+- [ ] **Docs:** [`changelog.md`](changelog.md) and cross-links from [`EXECUTION.md`](EXECUTION.md) / [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) for any semantic tweaks.
+
+---
+
+## Planned 0.19.0 (pre-1.0 consolidation)
+
+**Themes:** treat this release as the **default gate** before declaring **v1.0.0**: stabilize semantics, drain known doc debt, and avoid starting large new surfaces unless they block 1.0 messaging.
+
+- [ ] **v1.0 readiness review:** re-read **Toward v1.0.0** (above) and **Planned v1.0.0** (below); close gaps or move them to **Later** / **After v1.0.0** with explicit rationale.
+- [ ] **Contract and semver:** confirm [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) matches shipped behavior for **windows**, **trusted ingest**, **async** materialization, and **interchange**; document **semver** expectations for patch vs minor (including optional **migration** notes if any deprecations land in **0.18.x**).
+- [ ] **Parity and roadmap docs:** final pass on [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md), [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md), and [`README.md`](README.md) / doc site **`index`** so “what is 1.0” is obvious to new users.
+- [ ] **Performance and ops:** refresh [`PERFORMANCE.md`](PERFORMANCE.md) for critical paths (materialization, trusted Polars ingest, framed windows) if **0.18.0** changed numbers; ensure benchmark scripts still run on supported Polars.
+- [ ] **Release hygiene:** **`make check-full`**, **`cargo test --all-features`**, **`cargo check --no-default-features`** (rowwise skeleton), and full **pytest** on a **release** extension build before tagging; align **GitHub Actions** with [`DEVELOPER.md`](DEVELOPER.md) if workflows drift.
+
+---
+
+## Planned v1.0.0 (production-ready major release)
+
+**Goal:** tag **`v1.0.0`** when the project is ready to tell production users and library authors: **stable public API** under **semver**, **documented** semantics, and **repeatable** release quality—not a large new feature dump. **1.0.0** follows **0.19.0**; anything that does not block that bar belongs in **Later** or **After v1.0.0**.
+
+- [ ] **Precondition:** **Planned 0.19.0** checklist is done or every open item is explicitly deferred with a short note in this file or [`changelog.md`](changelog.md).
+- [ ] **Semver contract:** publish a **1.0** policy (in [`README.md`](README.md) or a short **`MIGRATION.md`** / **`VERSIONING.md`**): what counts as **patch** vs **minor** vs **major** for `DataFrame` / `DataFrameModel` / `Expr` / Rust extension boundaries; confirm [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) is the behavioral source of truth.
+- [ ] **Packaging and versions:** **`pyproject.toml`** / **`Cargo.toml`** / extension **`rust_version()`** alignment; **Maturin** release workflow (e.g. [`.github/workflows/release.yml`](../.github/workflows/release.yml)) exercised or dry-run validated; **PyPI** **sdist + wheels** for declared platforms; optional **SBOM** or supply-chain notes if policy requires them.
+- [ ] **Quality bar:** full **`make check-full`**, **`cargo test --all-features`**, **`cargo check --no-default-features`**, and **pytest** (including optional-deps legs that match **CI**) on the **exact** commit tagged **`v1.0.0`**; **no known P0/P1** regressions against **INTERFACE_CONTRACT**.
+- [ ] **Security tooling:** **`cargo audit`** / **`cargo deny`** (or documented exceptions) current; policy for how **1.x** will handle **RUSTSEC** / advisory bumps.
+- [ ] **Documentation and comms:** **README** + doc site **`index`** lead with **1.0** positioning; **changelog** **`1.0.0`** section highlights stability scope; **upgrade path** from **0.19.x** in one place (even if “no breaking changes from last 0.19”).
+- [ ] **Support matrix:** state supported **Python** versions and **Polars** optional-extra expectations for **1.0.x**; link [`DEVELOPER.md`](DEVELOPER.md) for contributors.
+
+**Out of scope for the 1.0.0 tag itself:** new execution engines (**Spark**, SQL backend, etc.)—those stay under **After v1.0.0** unless a maintainer explicitly promotes an exception.
+
+---
+
 ## Later (not started)
 
-Work **not** scheduled above for **0.16.0–0.17.0**, or explicitly deferred when scope slips:
+Work **not** scheduled in the **0.17.0–0.19.0** or **Planned v1.0.0** sections above, or explicitly deferred when scope slips:
 
-- [ ] **Heterogeneous map keys** / full **Arrow + expression** parity if not delivered in **0.17.0** (dtype, **`map_get`**, Polars lowering).
+- [ ] **Heterogeneous map keys** / full **Arrow + expression** parity if not delivered in **0.17.0** / **0.18.0** (dtype, **`map_get`**, Polars lowering)—or explicitly deferred past **v1.0.0**.
 - [ ] Items deferred from earlier releases when priorities change.
 - [ ] **Chunked / streaming** async iterators for JSON or row batches (no minimal contract yet).
-- [ ] Longer-horizon experiments that do not fit the **0.16–0.17** train.
+- [ ] Longer-horizon experiments that do not fit the **pre-1.0** train (**0.17–0.19**) or the **v1.0.0** production gate.
 - [ ] **FastAPI ecosystem (optional):** thin **`pydantable[fastapi]`** extra with **pinned** **`fastapi` / `starlette`**, **middleware**, or **router** kits—**only** if demand and maintenance bandwidth are clear.
 
 ---
