@@ -288,17 +288,17 @@ Practical inputs that feed that phase:
 
 ---
 
-## Planned 0.21.0 (Streamlit: `st.write`, `st.dataframe`, `st.data_editor`)
+## Shipped in 0.21.0 (Streamlit: `st.write`, `st.dataframe`, `st.data_editor`)
 
 **Today:** [Streamlit](https://streamlit.io/) **`st.dataframe`** and **`st.data_editor`** accept **pandas**, **PyArrow**, **Polars**, and objects that expose the **Python DataFrame Interchange Protocol** (`__dataframe__` / [SPEC 21](https://data-apis.org/dataframe-protocol/latest/purpose.html)). A **pydantable** **`DataFrame`** is none of these unless you convert (e.g. **`to_polars()`**, **`to_arrow()`**, or columnar **`to_dict()`** wrapped for display). **`st.write`** may render **`_repr_html_`** / plain **`repr`**, not a native interactive table.
 
-**Goal for 0.21.0 — first-class Streamlit ergonomics**
+**Goal (shipped): first-class Streamlit ergonomics**
 
-- [ ] **Interchange protocol (preferred path):** implement **`__dataframe__`** on **`DataFrame`** (and **`DataFrameModel`** via delegation) so **`st.dataframe(df)`** and **`st.data_editor(df)`** work without manual conversion where Streamlit’s stack supports the exported Arrow-backed interchange (document dtype / nullability limits).
-- [ ] **Fallback documentation:** until interchange is complete or for unsupported types, document **`st.dataframe(df.to_polars())`**, **`st.dataframe(df.to_arrow())`**, and **`st.write`** behavior in a short **`STREAMLIT.md`** (or an [`EXECUTION.md`](EXECUTION.md) subsection) with install extras (**`polars`** / **`pyarrow`**).
-- [ ] **Tests:** optional CI or local smoke tests with **`streamlit`** / **`pytest`** (or a minimal script) covering **`st.write`**, **`st.dataframe`**, **`st.data_editor`** on a small typed frame; pin a supported **Streamlit** version range.
-- [ ] **Packaging:** optional extra **`pydantable[streamlit]`** (or document **`pip install streamlit`** alongside **`pydantable[polars]`** / **`[arrow]`**) so app authors know the matrix.
-- [ ] **Changelog + README:** call out Streamlit in **Recent integrations** once shipped.
+- [x] **Interchange protocol (preferred path):** implemented **`__dataframe__`** on **`DataFrame`** (and **`DataFrameModel`** via delegation) so **`st.dataframe(df)`** works without manual conversion where Streamlit’s stack supports the exported Arrow-backed interchange (documented dtype / nullability limits and materialization costs).
+- [x] **Fallback documentation:** documented **`st.dataframe(df.to_polars())`**, **`st.dataframe(df.to_arrow())`**, and **`st.write`** behavior in **`STREAMLIT.md`** and an {doc}`EXECUTION` interchange subsection.
+- [x] **Tests:** CI smoke coverage using Streamlit’s built-in app testing harness (`streamlit.testing.v1.AppTest`) for **`st.write`** / **`st.dataframe`** and the supported **`st.data_editor(df.to_arrow())`** fallback.
+- [x] **Packaging:** documented **`pip install streamlit`** alongside **`pydantable[arrow]`** / **`pydantable[polars]`**; CI pins a supported Streamlit range.
+- [x] **Changelog + README:** Streamlit integration called out in **changelog** and **README**.
 
 **Non-goals for 0.21.0:** custom Streamlit **components** beyond what **`st.dataframe`** / **`st.data_editor`** provide; **hosted** Streamlit Cloud–specific packaging.
 
