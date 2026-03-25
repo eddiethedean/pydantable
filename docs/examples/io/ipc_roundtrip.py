@@ -1,4 +1,4 @@
-"""Arrow IPC file: export, lazy read/write, materialize.
+"""Arrow IPC file: write, lazy read/write, materialize.
 
 Needs ``pydantable._core``. Run::
 
@@ -10,12 +10,10 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from pydantable import DataFrame
-from pydantable.io import export_ipc, materialize_ipc
-from pydantic import BaseModel
+from pydantable import DataFrameModel
 
 
-class Row(BaseModel):
+class Row(DataFrameModel):
     z: int
 
 
@@ -23,13 +21,13 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as td:
         src = Path(td) / "in.arrow"
         dst = Path(td) / "out.arrow"
-        export_ipc(src, {"z": [10, 20]})
+        Row({"z": [10, 20]}).write_ipc(str(src))
 
-        df = DataFrame[Row].read_ipc(str(src))
+        df = Row.read_ipc(str(src))
         df.write_ipc(str(dst))
 
-        got = materialize_ipc(dst)
-        assert [int(x) for x in got["z"]] == [10, 20]
+        got = Row.materialize_ipc(dst)
+        assert [int(x) for x in got.to_dict()["z"]] == [10, 20]
 
     print("ipc_roundtrip: ok")
 

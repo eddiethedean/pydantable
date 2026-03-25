@@ -1,4 +1,6 @@
-"""Local HTTP server: ``fetch_*`` and ``read_parquet_url`` (stdlib + pydantable).
+"""Local HTTP server: Parquet bytes, lazy URL read, CSV/NDJSON temp paths.
+
+Uses **methods** on ``DataFrameModel``; stdlib ``urllib`` for raw byte checks.
 
 Run::
 
@@ -10,23 +12,24 @@ from __future__ import annotations
 import os
 import tempfile
 import threading
+import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
-from pydantable import DataFrame
-from pydantable.io import (
-    export_parquet,
-    fetch_bytes,
-    fetch_csv_url,
-    fetch_ndjson_url,
-    fetch_parquet_url,
-    read_parquet_url,
-)
-from pydantic import BaseModel
+from pydantable import DataFrameModel
 
 
-class ParqRow(BaseModel):
+class ParqRow(DataFrameModel):
     c: int
+
+
+class CsvRow(DataFrameModel):
+    a: int
+    b: int
+
+
+class NdRow(DataFrameModel):
+    p: int
 
 
 def _serve_blob(blob: bytes) -> tuple[HTTPServer, str]:
@@ -50,21 +53,21 @@ def _serve_blob(blob: bytes) -> tuple[HTTPServer, str]:
 def main() -> None:
     with tempfile.TemporaryDirectory() as td:
         pq = Path(td) / "served.parquet"
-        export_parquet(pq, {"c": [1, 2, 3]})
+        ParqRow({"c": [1, 2, 3]}).write_parquet(str(pq))
         parquet_blob = pq.read_bytes()
 
     server, parquet_url = _serve_blob(parquet_blob)
     try:
-        assert fetch_bytes(parquet_url, experimental=True) == parquet_blob
-        eager = fetch_parquet_url(parquet_url, experimental=True)
-        assert eager["c"] == [1, 2, 3]
+        assert urllib.request.urlopen(parquet_url).read() == parquet_blob
 
-        root = read_parquet_url(parquet_url, experimental=True)
+        eager = ParqRow.materialize_parquet(parquet_blob)
+        assert eager.to_dict()["c"] == [1, 2, 3]
+
+        df = ParqRow.read_parquet_url(parquet_url, experimental=True)
         try:
-            df = DataFrame[ParqRow]._from_scan_root(root)
             assert [r.c for r in df.collect()] == [1, 2, 3]
         finally:
-            os.unlink(root.path)
+            os.unlink(df._df._root_data.path)
     finally:
         server.shutdown()
         server.server_close()
@@ -72,9 +75,17 @@ def main() -> None:
     csv_blob = b"a,b\n3,4\n"
     server2, csv_url = _serve_blob(csv_blob)
     try:
-        csv_data = fetch_csv_url(csv_url, experimental=True)
-        assert [int(x) for x in csv_data["a"]] == [3]
-        assert [int(x) for x in csv_data["b"]] == [4]
+        data = urllib.request.urlopen(csv_url).read()
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+            f.write(data)
+            csv_path = f.name
+        try:
+            tbl = CsvRow.materialize_csv(csv_path)
+            d = tbl.to_dict()
+            assert [int(x) for x in d["a"]] == [3]
+            assert [int(x) for x in d["b"]] == [4]
+        finally:
+            os.unlink(csv_path)
     finally:
         server2.shutdown()
         server2.server_close()
@@ -82,8 +93,15 @@ def main() -> None:
     ndjson_blob = b'{"p":1}\n{"p":2}\n'
     server3, nd_url = _serve_blob(ndjson_blob)
     try:
-        nd = fetch_ndjson_url(nd_url, experimental=True)
-        assert [int(x) for x in nd["p"]] == [1, 2]
+        data = urllib.request.urlopen(nd_url).read()
+        with tempfile.NamedTemporaryFile(suffix=".ndjson", delete=False) as f:
+            f.write(data)
+            nd_path = f.name
+        try:
+            tbl = NdRow.materialize_ndjson(nd_path)
+            assert [int(x) for x in tbl.to_dict()["p"]] == [1, 2]
+        finally:
+            os.unlink(nd_path)
     finally:
         server3.shutdown()
         server3.server_close()

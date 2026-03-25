@@ -1,4 +1,4 @@
-"""Lazy Parquet overview: export → read → filter → collect (needs ``pydantable._core``).
+"""Lazy Parquet overview: write → read → filter → collect (needs ``pydantable._core``).
 
 Run from the repository root::
 
@@ -14,27 +14,25 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from pydantable import DataFrame
-from pydantable.io import export_parquet, materialize_parquet
-from pydantic import BaseModel
+from pydantable import DataFrameModel
 
 
-class Row(BaseModel):
+class Row(DataFrameModel):
     x: int
 
 
 def main() -> None:
     with tempfile.TemporaryDirectory() as td:
         path = Path(td) / "data.parquet"
-        export_parquet(path, {"x": [1, 2, 3]})
+        Row({"x": [1, 2, 3]}).write_parquet(str(path))
 
-        df = DataFrame[Row].read_parquet(str(path))
+        df = Row.read_parquet(str(path))
         filtered = df.filter(df.x > 1)
         rows = filtered.collect()
         assert [r.x for r in rows] == [2, 3]
 
-        eager = materialize_parquet(path)
-        assert eager["x"] == [1, 2, 3]
+        eager = Row.materialize_parquet(path)
+        assert eager.to_dict()["x"] == [1, 2, 3]
 
     print("overview_roundtrip: ok")
 

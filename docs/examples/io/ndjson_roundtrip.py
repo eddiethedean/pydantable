@@ -10,12 +10,10 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from pydantable import DataFrame
-from pydantable.io import export_ndjson, materialize_ndjson
-from pydantic import BaseModel
+from pydantable import DataFrameModel
 
 
-class Row(BaseModel):
+class Row(DataFrameModel):
     a: int
     b: str
 
@@ -28,16 +26,16 @@ def main() -> None:
             encoding="utf-8",
         )
 
-        df = DataFrame[Row].read_ndjson(str(path))
+        df = Row.read_ndjson(str(path))
         rows = df.collect()
         assert [r.a for r in rows] == [1, 2]
         assert [r.b for r in rows] == ["x", "y"]
 
         path2 = Path(td) / "round.ndjson"
-        export_ndjson(path2, {"a": [3], "b": ["z"]})
-        got = materialize_ndjson(path2)
-        assert got["a"] == [3]
-        assert got["b"] == ["z"]
+        Row({"a": [3], "b": ["z"]}).write_ndjson(str(path2))
+        got = Row.materialize_ndjson(path2)
+        assert got.to_dict()["a"] == [3]
+        assert got.to_dict()["b"] == ["z"]
 
     print("ndjson_roundtrip: ok")
 
