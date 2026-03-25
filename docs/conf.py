@@ -21,6 +21,27 @@ except Exception:
     # Autodoc will still render docstrings/signatures from pure-Python code.
     version = release = "unknown"
 
+
+def setup(app) -> None:
+    """Expose optional SQLAlchemy types on modules for autodoc / ``get_type_hints``.
+
+    ``Engine`` / ``Connection`` are imported only under ``TYPE_CHECKING`` in the
+    library, so Sphinx would otherwise warn that forward references cannot be
+    resolved. Read the Docs installs ``sqlalchemy`` (see ``.readthedocs.yaml``)
+    without compiling the Rust extension.
+    """
+    try:
+        from sqlalchemy.engine import Connection, Engine
+    except ImportError:
+        return
+    import pydantable.dataframe_model as dataframe_model
+    import pydantable.io.sql as io_sql
+
+    dataframe_model.Engine = Engine  # type: ignore[attr-defined]
+    dataframe_model.Connection = Connection  # type: ignore[attr-defined]
+    io_sql.Engine = Engine  # type: ignore[attr-defined]
+    io_sql.Connection = Connection  # type: ignore[attr-defined]
+
 extensions = [
     "myst_parser",
     "sphinx.ext.autodoc",

@@ -19,6 +19,7 @@ build:
         sphinx-rtd-theme
         "pydantic>=2,<3"
         "typing-extensions>=4.7"
+        "sqlalchemy>=2,<3"
 
 sphinx:
   builder: html
