@@ -5,7 +5,7 @@ It is intended to be independent of Python import style (default vs `pandas` / `
 at the *type/semantics* level, while allowing implementation-specific physical ordering
 (e.g. row order from `to_dict()` / `collect(as_lists=True)`).
 
-## Semver and stability (0.x → 1.x)
+## Semver and stability (0.x)
 
 Versioning expectations (0.x and 1.x policy, extension alignment) are summarized in {doc}`VERSIONING`. **This document** records what the library **does** for joins, nulls, windows, grouped aggregation, trusted ingest, async materialization, and Arrow interchange—not which release added each surface.
 

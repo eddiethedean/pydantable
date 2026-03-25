@@ -8,7 +8,7 @@
 
 **Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core (Polars inside the native extension).**
 
-**Current release: 1.0.0** · Python **3.10–3.13**
+**Current release: 0.22.0** · Python **3.10–3.13**
 
 ---
 
@@ -24,9 +24,9 @@
 
 ---
 
-## Upgrading to 1.0
+## Upgrading
 
-- From **0.21.x → 1.0.0**: there are **no intended breaking changes**; this is a semver/stability milestone. See [Versioning](https://pydantable.readthedocs.io/en/latest/VERSIONING.html) for 1.x policy.
+- From **0.21.x → 0.22.0**: no intended breaking changes.
 
 ## Documentation
 
