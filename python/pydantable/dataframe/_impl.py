@@ -1504,6 +1504,36 @@ class DataFrame(Generic[SchemaT]):
         # PyArrow implements the interchange protocol on Table; delegate to it.
         return table.__dataframe__(nan_as_null=nan_as_null, allow_copy=allow_copy)
 
+    def __dataframe_consortium_standard__(self, api_version: str | None = None) -> Any:
+        """
+        Entry point to the Dataframe API Consortium Standard (optional).
+
+        This is distinct from the interchange protocol (`__dataframe__`). When the
+        optional `dataframe-api-compat` package is installed, this returns a
+        standards-compliant wrapper object that exposes the Consortium's draft
+        DataFrame API.
+        """
+        try:
+            import dataframe_api_compat  # type: ignore[import-untyped]
+        except ImportError as e:
+            raise ImportError(
+                "dataframe-api-compat is required for __dataframe_consortium_standard__(). "
+                "Install with: pip install 'dataframe-api-compat'"
+            ) from e
+        try:
+            import pandas as pd  # type: ignore[import-untyped]
+        except ImportError as e:
+            raise ImportError(
+                "pandas is required for pydantable's __dataframe_consortium_standard__() "
+                "implementation. Install with: pip install 'pydantable[pandas]'"
+            ) from e
+
+        pdf = pd.DataFrame(self.to_dict())
+        return dataframe_api_compat.pandas_standard.convert_to_standard_compliant_dataframe(
+            pdf,
+            api_version=api_version,
+        )
+
     async def acollect(
         self,
         *,

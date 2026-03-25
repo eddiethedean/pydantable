@@ -245,7 +245,7 @@ jobs:
           $PY -m pip install maturin pytest pytest-asyncio pytest-xdist \
             "numpy>=1.24" "pandas>=2.0" "hypothesis>=6.0" "pyarrow>=14.0" \
             "fastapi>=0.100" "httpx>=0.24" "python-multipart>=0.0.6" \
-            "polars>=1.0.0,<2" "streamlit>=1.30,<2"
+            "polars>=1.0.0,<2" "streamlit>=1.30,<2" "dataframe-api-compat>=0.2.7"
 
       - name: Build and install extension
         run: $PY -m maturin develop --release

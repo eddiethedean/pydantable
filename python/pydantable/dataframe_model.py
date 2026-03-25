@@ -314,6 +314,10 @@ class DataFrameModel:
         """Delegate the dataframe interchange protocol to the inner :class:`DataFrame`."""
         return self._df.__dataframe__(nan_as_null=nan_as_null, allow_copy=allow_copy)
 
+    def __dataframe_consortium_standard__(self, api_version: str | None = None) -> Any:
+        """Delegate the Consortium Standard entrypoint to the inner :class:`DataFrame`."""
+        return self._df.__dataframe_consortium_standard__(api_version=api_version)
+
     def rows(self) -> list[BaseModel]:
         """
         Materialize this DataFrame into a list of per-row Pydantic models.
