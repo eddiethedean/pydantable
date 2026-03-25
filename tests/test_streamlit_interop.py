@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import warnings
 
 import pytest
@@ -13,6 +12,8 @@ def test_streamlit_dataframe_interchange_smoke() -> None:
     from streamlit.testing.v1 import AppTest
 
     def app() -> None:
+        from contextlib import suppress
+
         import streamlit as st
         from pydantable import DataFrameModel
         from streamlit.errors import StreamlitAPIException
@@ -29,7 +30,7 @@ def test_streamlit_dataframe_interchange_smoke() -> None:
         # As of current Streamlit, `st.data_editor` does not accept interchange-protocol
         # objects directly; it does accept Arrow/Pandas/Polars. Keep this test aligned
         # with Streamlit behavior while still covering the editor path.
-        with contextlib.suppress(StreamlitAPIException):
+        with suppress(StreamlitAPIException):
             st.data_editor(df)
         st.data_editor(df.to_arrow())
 
