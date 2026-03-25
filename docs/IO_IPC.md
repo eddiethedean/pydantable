@@ -1,37 +1,38 @@
 # Arrow IPC / Feather file I/O
 
-**Module:** `pydantable.io` · **Typed frames:** `DataFrame[Schema].read_ipc`, `write_ipc` (and `DataFrameModel` equivalents).
+**Primary:** **`DataFrame[Schema].read_ipc`**, **`write_ipc`**, and **`DataFrameModel`** methods. **Secondary:** **`pydantable.io`**.
 
 This covers **Arrow IPC file** (`.arrow` / `.feather`-style single file), not arbitrary **streaming IPC** on a socket unless you materialize through PyArrow yourself.
 
 ## Read (sources)
 
-### Lazy local file → `ScanFileRoot`
+### `DataFrame[Schema]` and `DataFrameModel`
 
-- **`read_ipc(path, *, columns=None, **scan_kwargs)`**
-- **`aread_ipc(...)`**
+- **`DataFrame[Schema].read_ipc(path, *, columns=None, **scan_kwargs)`**
+- **`MyModel.read_ipc(...)`**, **`await MyModel.aread_ipc(..., executor=None)`**
+- **`MyModel.materialize_ipc`**, **`await MyModel.amaterialize_ipc`** — **`as_stream`**, **`engine`**
 
-**`scan_kwargs`:** **`record_batch_statistics`** is supported. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
+### `pydantable.io`
 
-### Eager `dict[str, list]`
+- **`read_ipc`**, **`aread_ipc`**
+- **`materialize_ipc`**, **`amaterialize_ipc`**
 
-- **`materialize_ipc(source, *, as_stream=False, engine=None)`**
-- **`amaterialize_ipc(...)`**
+**`scan_kwargs`:** **`record_batch_statistics`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
 
 **`as_stream=False`** (default): local file paths can use Rust; otherwise PyArrow. **`as_stream=True`** uses PyArrow stream decoding. Install **`pydantable[arrow]`** when the path goes through PyArrow.
 
 ## Write (targets)
 
-### Lazy plan → file
+### `DataFrame[Schema]` and `DataFrameModel`
 
-- **`DataFrame[Schema].write_ipc(path, *, compression=None)`**
+- **`df.write_ipc(path, *, compression=..., write_kwargs=..., streaming=...)`**
+- **`model.write_ipc(...)`**
 
-IPC sink options are intentionally narrow: use top-level **`compression=`**. **Non-empty `write_kwargs`** is rejected (so scan-style keys do not silently apply to the wrong API).
+IPC sink options are intentionally narrow: use top-level **`compression=`**. **Non-empty `write_kwargs`** is rejected.
 
-### Eager column dict → file
+### `pydantable.io`
 
-- **`export_ipc(path, data, *, engine=None)`**
-- **`aexport_ipc(...)`**
+- **`export_ipc`**, **`aexport_ipc`**
 
 ## Runnable example
 

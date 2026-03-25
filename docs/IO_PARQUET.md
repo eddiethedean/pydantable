@@ -1,50 +1,57 @@
 # Parquet I/O
 
-**Module:** `pydantable.io` · **Typed frames:** `DataFrame[Schema].read_parquet`, `read_parquet_url`, `write_parquet` (and `DataFrameModel` equivalents).
+**Primary:** **`DataFrame[Schema].read_parquet`**, **`read_parquet_url`**, **`write_parquet`**, and **`DataFrameModel`** classmethods / instance methods below. **Secondary:** **`pydantable.io`** — same behavior without a typed frame (returns **`ScanFileRoot`** or **`dict[str, list]`** / writes from raw dicts).
 
 ## Read (sources)
 
-### Lazy local file → `ScanFileRoot`
+### `DataFrame[Schema]` and `DataFrameModel`
 
-- **`read_parquet(path, *, columns=None, **scan_kwargs)`**
-- **`aread_parquet(...)`** — same, via `asyncio.to_thread` (optional **`executor=`**).
+**Lazy — local file**
 
-Use when you want a **Polars lazy scan** inside the Rust plan without loading the file into Python lists. Optional **`columns`** limits projected fields.
+- **`DataFrame[Schema].read_parquet(path, *, columns=None, **scan_kwargs)`**
+- **`MyModel.read_parquet(...)`** — classmethod; optional **`trusted_mode`** / validation kwargs (see {doc}`DATAFRAMEMODEL`).
+- **`await MyModel.aread_parquet(..., executor=None)`**
 
-**`scan_kwargs`** (Polars scan): for example **`n_rows`**, **`low_memory`**, **`rechunk`**, **`use_statistics`**, **`cache`**, **`glob`**, **`allow_missing_columns`**, **`parallel`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
+**Lazy — HTTP(S) Parquet**
 
-### HTTP(S) → temp file → lazy root
+- **`DataFrame[Schema].read_parquet_url(url, *, experimental=True, columns=None, **kwargs)`** — **`kwargs`** go to **`fetch_bytes`**, not the Parquet scanner.
+- **`MyModel.read_parquet_url(...)`** — same.
+- **`DataFrameModel`** does **not** define **`aread_parquet_url`**; use **`pydantable.io.aread_parquet_url`** and **`DataFrame[Schema]`** if you need async HTTP.
 
-- **`read_parquet_url(url, *, experimental=True, columns=None, **kwargs)`**
-- **`aread_parquet_url(...)`**
+**Eager — column dict in memory**
 
-**`kwargs`** are passed to **`fetch_bytes`** (e.g. **`headers`**, **`timeout`**), **not** to the Parquet scanner. There is **no** `scan_kwargs` on this path today; the file is scanned with defaults after download.
+- **`MyModel.materialize_parquet(source, *, columns=..., engine=...)`**, **`await MyModel.amaterialize_parquet`**
+- **`DataFrame[Schema](cols)`** from any **`dict[str, list]`** (including **`materialize_parquet`** from **`pydantable.io`**).
 
-The temp **`.parquet`** file is **not** deleted automatically. Delete it after **`write_*`**, **`collect()`**, etc. Details: {doc}`DATA_IO_SOURCES` (**`read_parquet_url` temp-file lifecycle**).
+The temp file for **`read_parquet_url`** is **not** deleted automatically; see {doc}`DATA_IO_SOURCES` (**`read_parquet_url` temp-file lifecycle**).
 
-### Eager `dict[str, list]`
+### `pydantable.io` (module functions)
 
-- **`materialize_parquet(source, *, columns=None, engine=None)`**
-- **`amaterialize_parquet(...)`**
+**Lazy**
 
-**`engine`:** **`"auto"`** (default) uses Rust for **local file paths** when **`columns is None`**; otherwise PyArrow. **`"rust"`** / **`"pyarrow"`** force one implementation. Override default with env **`PYDANTABLE_IO_ENGINE`**.
+- **`read_parquet(path, *, columns=None, **scan_kwargs)`** → **`ScanFileRoot`**
+- **`aread_parquet(...)`** — **`asyncio.to_thread`** (optional **`executor=`**)
+- **`read_parquet_url`**, **`aread_parquet_url`**
 
-- **`fetch_parquet_url(url, *, experimental=True, columns=None, **kwargs)`** — download and decode in one step (PyArrow on bytes).
+**Eager**
+
+- **`materialize_parquet(source, *, columns=None, engine=None)`**, **`amaterialize_parquet`**
+- **`fetch_parquet_url`** — download and decode in one step (PyArrow on bytes)
+
+**`scan_kwargs`:** for example **`n_rows`**, **`low_memory`**, **`rechunk`**, **`use_statistics`**, **`cache`**, **`glob`**, **`allow_missing_columns`**, **`parallel`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
 
 ## Write (targets)
 
-### Lazy plan → file (Rust / Polars)
+### `DataFrame[Schema]` and `DataFrameModel`
 
-- **`DataFrame[Schema].write_parquet(path, *, compression=None, write_kwargs=None)`**
+- **`df.write_parquet(path, *, compression=None, write_kwargs=None, streaming=...)`**
+- **`model.write_parquet(...)`** — same.
 
-**`write_kwargs`** may include **`compression`**, **`row_group_size`**, **`data_page_size`**, **`statistics`**, **`parallel`** (see {doc}`DATA_IO_SOURCES`). Unknown keys raise **`ValueError`**.
+**`write_kwargs`** may include **`compression`**, **`row_group_size`**, **`data_page_size`**, **`statistics`**, **`parallel`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
 
-### Eager column dict → file
+### `pydantable.io`
 
-- **`export_parquet(path, data, *, engine=None)`**
-- **`aexport_parquet(...)`**
-
-Uses Rust when available, else **`pyarrow.parquet`** (install **`pydantable[arrow]`** for the fallback path).
+- **`export_parquet(path, data, *, engine=None)`**, **`aexport_parquet`** — eager **`dict[str, list]`** → file (Rust when available, else PyArrow with **`pydantable[arrow]`**).
 
 ## Runnable examples
 

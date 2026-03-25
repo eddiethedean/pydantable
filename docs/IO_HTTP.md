@@ -1,20 +1,36 @@
 # HTTP(S) and object-store reads
 
-**Modules:** `pydantable.io.http`, re-exported from `pydantable.io`. Most URL helpers are **experimental** unless you opt in globally.
+**Primary:** use **`DataFrame[Schema].read_parquet_url`** for lazy Parquet over HTTP, or pass column dicts from downloads into **`DataFrame` / `DataFrameModel`**. **Secondary:** **`pydantable.io`** — **`fetch_bytes`**, **`fetch_*_url`**, **`read_from_object_store`** (re-exported from **`pydantable.io.http`**).
 
 ## Experimental gate
 
 By default, URL and cloud-style helpers require **`experimental=True`** on each call **or** environment variable **`PYDANTABLE_IO_EXPERIMENTAL=1`**. This matches **`fetch_bytes`** and **`read_from_object_store`**.
 
-## Raw bytes
+## `DataFrame` / `DataFrameModel`
+
+**Lazy Parquet URL**
+
+- **`DataFrame[Schema].read_parquet_url(url, *, experimental=True, columns=None, **kwargs)`**
+- **`MyModel.read_parquet_url(...)`** — **`kwargs`** for **`fetch_bytes`** only (not **`scan_kwargs`**).
+- **`DataFrameModel`** has **no** **`aread_parquet_url`**; use **`pydantable.io.aread_parquet_url`** and construct **`DataFrame[Schema]`** if you need async.
+
+The temp **`.parquet`** is **not** auto-deleted; see {doc}`IO_PARQUET` and {doc}`DATA_IO_SOURCES`.
+
+**Eager URL helpers (column dict)**
+
+Pass **`fetch_parquet_url`**, **`fetch_csv_url`**, or **`fetch_ndjson_url`** results to **`MyModel(cols)`** or **`DataFrame[Schema](cols)`** — there are **no** **`DataFrameModel.fetch_*_url`** classmethods.
+
+**Object stores**
+
+Pass **`read_from_object_store(...)`** output to **`MyModel(cols)`** or **`DataFrame[Schema](cols)`** — there is no **`DataFrameModel.read_from_object_store`**.
+
+## `pydantable.io`
+
+### Raw bytes
 
 - **`fetch_bytes(url, *, experimental=True, headers=None, timeout=60.0)`** — **HTTP/HTTPS** only (stdlib **`urllib`**).
 
-Use this when you already know how to parse the body, or as the low-level primitive for other helpers.
-
-## Eager format helpers (return `dict[str, list]`)
-
-These download the full response, then decode (temp file for CSV/NDJSON):
+### Eager format helpers (`dict[str, list]`)
 
 | Function | Notes |
 |----------|--------|
@@ -24,11 +40,11 @@ These download the full response, then decode (temp file for CSV/NDJSON):
 
 **`kwargs`** beyond each function’s explicit parameters are passed through to **`fetch_bytes`** (e.g. **`headers`**, **`timeout`**).
 
-## Lazy Parquet over HTTP
+### Lazy Parquet URL
 
-**`read_parquet_url`** / **`aread_parquet_url`** download to a **named temp** **`.parquet`** and return **`ScanFileRoot`** for lazy plans. That temp file is **not** auto-deleted; see {doc}`IO_PARQUET` and {doc}`DATA_IO_SOURCES`.
+- **`read_parquet_url`**, **`aread_parquet_url`** — return **`ScanFileRoot`**; same temp-file lifecycle as above.
 
-## Object-store URIs (`s3://`, `gs://`, `az://`, …)
+### Object-store URIs (`s3://`, `gs://`, `az://`, …)
 
 - **`read_from_object_store(uri, *, experimental=True, format="parquet", **kwargs)`**
 

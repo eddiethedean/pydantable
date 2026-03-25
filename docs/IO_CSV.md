@@ -1,39 +1,37 @@
 # CSV I/O
 
-**Module:** `pydantable.io` · **Typed frames:** `DataFrame[Schema].read_csv`, `write_csv` (and `DataFrameModel` equivalents).
+**Primary:** **`DataFrame[Schema].read_csv`**, **`write_csv`**, and **`DataFrameModel`** classmethods / instance methods. **Secondary:** **`pydantable.io`** — **`ScanFileRoot`**, **`materialize_csv`**, **`export_csv`**, **`fetch_csv_url`**.
 
 ## Read (sources)
 
-### Lazy local file → `ScanFileRoot`
+### `DataFrame[Schema]` and `DataFrameModel`
 
-- **`read_csv(path, *, columns=None, **scan_kwargs)`**
-- **`aread_csv(...)`**
+- **`DataFrame[Schema].read_csv(path, *, columns=None, **scan_kwargs)`**
+- **`MyModel.read_csv(...)`**, **`await MyModel.aread_csv(..., executor=None)`**
+- **`MyModel.materialize_csv`**, **`await MyModel.amaterialize_csv`**
 
-**`scan_kwargs`** map to Polars CSV scan options, for example **`separator`**, **`has_header`**, **`skip_rows`**, **`skip_lines`**, **`n_rows`**, **`infer_schema_length`**, **`ignore_errors`**, **`low_memory`**, **`rechunk`**, **`glob`**, **`cache`**, **`quote_char`**, **`eol_char`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
+### `pydantable.io`
 
-### Eager `dict[str, list]`
+- **`read_csv`**, **`aread_csv`** — lazy **`ScanFileRoot`**
+- **`materialize_csv`**, **`amaterialize_csv`** — eager **`dict[str, list]`** (**`engine`**, **`use_rap`** on sync path)
+- **`fetch_csv_url`** — HTTP(S) → temp file → read; temp removed after read
 
-- **`materialize_csv(path, *, engine=None, use_rap=False)`**
-- **`amaterialize_csv(...)`**
+**`scan_kwargs`:** for example **`separator`**, **`has_header`**, **`skip_rows`**, **`skip_lines`**, **`n_rows`**, **`infer_schema_length`**, **`ignore_errors`**, **`low_memory`**, **`rechunk`**, **`glob`**, **`cache`**, **`quote_char`**, **`eol_char`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
 
-**`engine="auto"`** tries Rust, then falls back to the stdlib **`csv`** module. **`use_rap=True`** uses **`aread_csv_rap`** only when **no** asyncio event loop is running; inside async code, **`await aread_csv_rap(path)`** from **`pydantable.io.rap_support`** instead.
-
-### HTTP(S)
-
-- **`fetch_csv_url(url, *, experimental=True, **kwargs)`** — downloads to a temp file, prefers Rust CSV read, then stdlib fallback. Temp file is removed after read.
+**`use_rap=True`** ( **`materialize_csv`** only): uses **`aread_csv_rap`** when **no** event loop; in async code **`await aread_csv_rap(path)`** from **`pydantable.io.rap_support`**.
 
 ## Write (targets)
 
-### Lazy plan → file
+### `DataFrame[Schema]` and `DataFrameModel`
 
-- **`DataFrame[Schema].write_csv(path, *, separator=None, compression=None, write_kwargs=None)`**
+- **`df.write_csv(path, *, separator=..., compression=..., write_kwargs=..., streaming=...)`**
+- **`model.write_csv(...)`** — same.
 
-**`write_kwargs`** may include **`include_header`**, **`include_bom`**. Top-level **`separator`** / **`compression`** are forwarded where the Rust sink supports them. See {doc}`DATA_IO_SOURCES`.
+**`write_kwargs`:** **`include_header`**, **`include_bom`**. See {doc}`DATA_IO_SOURCES`.
 
-### Eager column dict → file
+### `pydantable.io`
 
-- **`export_csv(path, data, *, engine=None)`**
-- **`aexport_csv(...)`**
+- **`export_csv`**, **`aexport_csv`** — eager column dict → file.
 
 ## Runnable example
 
