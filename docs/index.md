@@ -30,7 +30,7 @@ This **documentation site** is the detailed manual. The repository **README** on
 | **Library users** | {doc}`DATAFRAMEMODEL` — contract, inputs, transforms, materialization |
 | **FastAPI apps** | {doc}`FASTAPI` — routers, request bodies, responses |
 | **Semantics** (nulls, joins, ordering) | {doc}`INTERFACE_CONTRACT` · {doc}`VERSIONING` (0.x semver) |
-| **Data sources & I/O (planning)** | {doc}`DATA_IO_SOURCES` — common reads/writes, SQL async stacks |
+| **Data sources & I/O** | {doc}`IO_OVERVIEW` — one page per format/transport · {doc}`DATA_IO_SOURCES` — planning & async stacks |
 | **Contributors** | {doc}`DEVELOPER` — build, test, Sphinx, release |
 | **Polars parity and gaps** | {doc}`PARITY_SCORECARD` and {doc}`POLARS_TRANSFORMATIONS_ROADMAP` |
 | **Roadmap (0.20 shipped, 1.0 next)** | {doc}`ROADMAP` — **Shipped in 0.20.0**, **Planned v1.0.0** |
@@ -48,6 +48,21 @@ FASTAPI
 EXECUTION
 DATA_IO_SOURCES
 STREAMLIT
+```
+
+```{toctree}
+:titlesonly:
+:hidden:
+:caption: Data I/O (by format)
+
+IO_OVERVIEW
+IO_PARQUET
+IO_CSV
+IO_NDJSON
+IO_IPC
+IO_HTTP
+IO_SQL
+IO_EXTRAS
 ```
 
 ```{toctree}

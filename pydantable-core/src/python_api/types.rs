@@ -1,7 +1,7 @@
 //! `PyExpr` and `PyPlan` PyO3 classes.
 
 use pyo3::prelude::*;
-use pyo3::types::PyAny;
+use pyo3::types::{PyAny, PyDict};
 
 use crate::dtype::dtype_to_python_type;
 use crate::expr::{exprnode_to_serializable, ExprNode};
@@ -34,7 +34,6 @@ impl PyExpr {
 
 /// Lazy on-disk table root (Parquet, CSV, NDJSON, IPC); avoids materializing to Python lists.
 #[pyclass(module = "pydantable._core", name = "ScanFileRoot")]
-#[derive(Clone)]
 pub struct ScanFileRoot {
     #[pyo3(get)]
     pub path: String,
@@ -43,18 +42,45 @@ pub struct ScanFileRoot {
     pub format: String,
     #[pyo3(get)]
     pub columns: Option<Vec<String>>,
+    /// Optional per-format scan options (see Python ``read_*`` docs).
+    pub scan_kwargs: Option<Py<PyDict>>,
 }
 
 #[pymethods]
 impl ScanFileRoot {
     #[new]
-    #[pyo3(signature = (path, format, columns=None))]
-    fn new(path: String, format: String, columns: Option<Vec<String>>) -> Self {
-        Self {
+    #[pyo3(signature = (path, format, columns=None, scan_kwargs=None))]
+    fn new(
+        path: String,
+        format: String,
+        columns: Option<Vec<String>>,
+        scan_kwargs: Option<Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        let sk = match scan_kwargs {
+            None => None,
+            Some(b) => {
+                if b.is_none() {
+                    None
+                } else if let Ok(d) = b.downcast::<PyDict>() {
+                    Some(d.clone().unbind())
+                } else {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "scan_kwargs must be a dict or None",
+                    ));
+                }
+            }
+        };
+        Ok(Self {
             path,
             format,
             columns,
-        }
+            scan_kwargs: sk,
+        })
+    }
+
+    #[getter]
+    fn scan_kwargs<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyDict>> {
+        self.scan_kwargs.as_ref().map(|d| d.bind(py).clone())
     }
 }
 

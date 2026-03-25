@@ -20,6 +20,7 @@
       ~DataFrame.ato_polars
       ~DataFrame.col
       ~DataFrame.collect
+      ~DataFrame.collect_batches
       ~DataFrame.concat
       ~DataFrame.describe
       ~DataFrame.distinct
@@ -35,6 +36,11 @@
       ~DataFrame.join
       ~DataFrame.melt
       ~DataFrame.pivot
+      ~DataFrame.read_csv
+      ~DataFrame.read_ipc
+      ~DataFrame.read_ndjson
+      ~DataFrame.read_parquet
+      ~DataFrame.read_parquet_url
       ~DataFrame.rename
       ~DataFrame.rolling_agg
       ~DataFrame.schema_fields
@@ -50,6 +56,10 @@
       ~DataFrame.unpivot
       ~DataFrame.value_counts
       ~DataFrame.with_columns
+      ~DataFrame.write_csv
+      ~DataFrame.write_ipc
+      ~DataFrame.write_ndjson
+      ~DataFrame.write_parquet
    
    
 

@@ -96,6 +96,7 @@ impl PolarsExecutor {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn concat(
         py: Python<'_>,
         left_plan: &PlanInner,

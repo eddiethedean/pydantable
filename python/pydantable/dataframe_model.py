@@ -249,7 +249,7 @@ class DataFrameModel:
     def _wrap_inner_df(cls, inner: DataFrame[Any]) -> Self:
         obj = cls.__new__(cls)
         obj._df = inner
-        return cast(Self, obj)
+        return cast("Self", obj)
 
     @classmethod
     def read_parquet(
@@ -260,12 +260,15 @@ class DataFrameModel:
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **scan_kwargs: Any,
     ) -> Self:
         """Lazy Parquet read (local path). See :func:`pydantable.io.read_parquet`."""
         del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel].read_parquet(path, columns=columns)
+        inner = dataframe_cls[cls._SchemaModel].read_parquet(
+            path, columns=columns, **scan_kwargs
+        )
         return cls._wrap_inner_df(inner)
 
     @classmethod
@@ -280,7 +283,10 @@ class DataFrameModel:
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **kwargs: Any,
     ) -> Self:
-        """Lazy Parquet via HTTP(S) download to a temp file. See :func:`pydantable.io.read_parquet_url`."""
+        """Lazy Parquet via HTTP(S) download to a temp file.
+
+        See :func:`pydantable.io.read_parquet_url`.
+        """
         del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         dataframe_cls = cast("Any", cls._dataframe_cls)
@@ -298,12 +304,15 @@ class DataFrameModel:
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **scan_kwargs: Any,
     ) -> Self:
         """Lazy Arrow IPC file read (local path)."""
         del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel].read_ipc(path, columns=columns)
+        inner = dataframe_cls[cls._SchemaModel].read_ipc(
+            path, columns=columns, **scan_kwargs
+        )
         return cls._wrap_inner_df(inner)
 
     @classmethod
@@ -315,12 +324,15 @@ class DataFrameModel:
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **scan_kwargs: Any,
     ) -> Self:
         """Lazy CSV read (local path)."""
         del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel].read_csv(path, columns=columns)
+        inner = dataframe_cls[cls._SchemaModel].read_csv(
+            path, columns=columns, **scan_kwargs
+        )
         return cls._wrap_inner_df(inner)
 
     @classmethod
@@ -332,12 +344,15 @@ class DataFrameModel:
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **scan_kwargs: Any,
     ) -> Self:
         """Lazy NDJSON read (local path)."""
         del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel].read_ndjson(path, columns=columns)
+        inner = dataframe_cls[cls._SchemaModel].read_ndjson(
+            path, columns=columns, **scan_kwargs
+        )
         return cls._wrap_inner_df(inner)
 
     @classmethod
@@ -351,7 +366,7 @@ class DataFrameModel:
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ) -> Self:
-        """Eager Parquet → ``dict[str, list]`` via :func:`pydantable.io.materialize_parquet`."""
+        """Eager Parquet via :func:`pydantable.io.materialize_parquet` (column dict)."""
         cls._dfm_require_subclass_with_schema()
         from .io import materialize_parquet as _mp
 
@@ -442,7 +457,7 @@ class DataFrameModel:
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ) -> Self:
-        """SQL → columns via :func:`pydantable.io.fetch_sql` (needs ``pydantable[sql]``)."""
+        """SQL query → columns via :func:`pydantable.io.fetch_sql` (``[sql]`` extra)."""
         cls._dfm_require_subclass_with_schema()
         from .io import fetch_sql as _fetch_sql
 
@@ -464,12 +479,13 @@ class DataFrameModel:
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **scan_kwargs: Any,
     ) -> Self:
         del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         from .io import aread_parquet as _aread
 
-        root = await _aread(path, columns=columns, executor=executor)
+        root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel]._from_scan_root(root)
         return cls._wrap_inner_df(inner)
@@ -484,12 +500,13 @@ class DataFrameModel:
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **scan_kwargs: Any,
     ) -> Self:
         del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         from .io import aread_ipc as _aread
 
-        root = await _aread(path, columns=columns, executor=executor)
+        root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel]._from_scan_root(root)
         return cls._wrap_inner_df(inner)
@@ -504,12 +521,13 @@ class DataFrameModel:
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **scan_kwargs: Any,
     ) -> Self:
         del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         from .io import aread_csv as _aread
 
-        root = await _aread(path, columns=columns, executor=executor)
+        root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel]._from_scan_root(root)
         return cls._wrap_inner_df(inner)
@@ -524,12 +542,13 @@ class DataFrameModel:
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **scan_kwargs: Any,
     ) -> Self:
         del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         from .io import aread_ndjson as _aread
 
-        root = await _aread(path, columns=columns, executor=executor)
+        root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel]._from_scan_root(root)
         return cls._wrap_inner_df(inner)
@@ -572,9 +591,7 @@ class DataFrameModel:
         cls._dfm_require_subclass_with_schema()
         from .io import amaterialize_ipc as _ami
 
-        cols = await _ami(
-            source, as_stream=as_stream, engine=engine, executor=executor
-        )
+        cols = await _ami(source, as_stream=as_stream, engine=engine, executor=executor)
         return cls(
             cols,
             trusted_mode=trusted_mode,
@@ -597,9 +614,7 @@ class DataFrameModel:
         cls._dfm_require_subclass_with_schema()
         from .io import amaterialize_csv as _amc
 
-        cols = await _amc(
-            path, engine=engine, use_rap=use_rap, executor=executor
-        )
+        cols = await _amc(path, engine=engine, use_rap=use_rap, executor=executor)
         return cls(
             cols,
             trusted_mode=trusted_mode,
@@ -653,10 +668,14 @@ class DataFrameModel:
         )
 
     def write_parquet(
-        self, path: str | Any, *, streaming: bool | None = None
+        self,
+        path: str | Any,
+        *,
+        streaming: bool | None = None,
+        write_kwargs: dict[str, Any] | None = None,
     ) -> None:
-        """Write the current lazy plan to Parquet without materializing to Python dicts."""
-        self._df.write_parquet(path, streaming=streaming)
+        """Write the lazy plan to Parquet (no Python column dict materialization)."""
+        self._df.write_parquet(path, streaming=streaming, write_kwargs=write_kwargs)
 
     def write_csv(
         self,
@@ -664,8 +683,11 @@ class DataFrameModel:
         *,
         streaming: bool | None = None,
         separator: str = ",",
+        write_kwargs: dict[str, Any] | None = None,
     ) -> None:
-        self._df.write_csv(path, streaming=streaming, separator=separator)
+        self._df.write_csv(
+            path, streaming=streaming, separator=separator, write_kwargs=write_kwargs
+        )
 
     def write_ipc(
         self,
@@ -673,13 +695,23 @@ class DataFrameModel:
         *,
         streaming: bool | None = None,
         compression: str | None = None,
+        write_kwargs: dict[str, Any] | None = None,
     ) -> None:
-        self._df.write_ipc(path, streaming=streaming, compression=compression)
+        self._df.write_ipc(
+            path,
+            streaming=streaming,
+            compression=compression,
+            write_kwargs=write_kwargs,
+        )
 
     def write_ndjson(
-        self, path: str | Any, *, streaming: bool | None = None
+        self,
+        path: str | Any,
+        *,
+        streaming: bool | None = None,
+        write_kwargs: dict[str, Any] | None = None,
     ) -> None:
-        self._df.write_ndjson(path, streaming=streaming)
+        self._df.write_ndjson(path, streaming=streaming, write_kwargs=write_kwargs)
 
     def collect_batches(
         self,

@@ -12,16 +12,20 @@ from pathlib import Path
 import pytest
 from pydantable import DataFrame
 from pydantable.io import (
+    aexport_ipc,
+    aexport_ndjson,
+    aexport_parquet,
     afetch_sql,
     amaterialize_csv,
     amaterialize_ipc,
     amaterialize_ndjson,
     amaterialize_parquet,
     arrow_table_to_column_dict,
-    aexport_ipc,
-    aexport_ndjson,
-    aexport_parquet,
     awrite_sql,
+    export_csv,
+    export_ipc,
+    export_ndjson,
+    export_parquet,
     fetch_bytes,
     fetch_csv_url,
     fetch_ndjson_url,
@@ -33,10 +37,6 @@ from pydantable.io import (
     materialize_parquet,
     read_parquet_url,
     record_batch_to_column_dict,
-    export_csv,
-    export_ipc,
-    export_ndjson,
-    export_parquet,
     write_sql,
 )
 from pydantic import BaseModel
@@ -596,7 +596,7 @@ async def test_aread_sql_with_executor(tmp_dir: Path) -> None:
 
 
 def test_read_parquet_filter_write_roundtrip(tmp_dir: Path) -> None:
-    """Lazy scan root → filter → sink without a full Python dict for the scanned table."""
+    """Lazy scan → filter → sink (no full Python dict for the scanned table)."""
 
     class Row(BaseModel):
         x: int
@@ -609,6 +609,22 @@ def test_read_parquet_filter_write_roundtrip(tmp_dir: Path) -> None:
     df2.write_parquet(str(path_out))
     got = materialize_parquet(path_out)
     assert got["x"] == [2, 3]
+
+
+def test_read_csv_scan_kwargs_and_write_parquet_write_kwargs(tmp_dir: Path) -> None:
+    """``**scan_kwargs`` on lazy CSV read; ``write_kwargs`` on lazy Parquet write."""
+
+    class Row(BaseModel):
+        a: int
+        b: int
+
+    path_csv = tmp_dir / "semi.csv"
+    path_out = tmp_dir / "out_kw.pq"
+    path_csv.write_text("a;b\n1;2\n", encoding="utf-8")
+    df = DataFrame[Row].read_csv(str(path_csv), separator=";")
+    df.write_parquet(str(path_out), write_kwargs={"compression": "snappy"})
+    got = materialize_parquet(path_out)
+    assert got == {"a": [1], "b": [2]}
 
 
 def test_read_parquet_join_inner_collect_lists(tmp_dir: Path) -> None:

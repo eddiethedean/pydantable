@@ -2,19 +2,18 @@
 
 use std::fs::File;
 
-use polars::lazy::dsl::col;
 use polars::prelude::{Engine, *};
 use polars_io::ipc::IpcCompression;
-use polars_io::ipc::IpcScanOptions;
-use polars_io::prelude::{CsvWriter, IpcWriter, JsonFormat, JsonWriter, ParquetWriter};
+use polars_io::prelude::IpcWriter;
 use polars_io::SerWriter;
 use pyo3::prelude::*;
-use pyo3::types::PyAny;
+use pyo3::types::{PyAny, PyDict};
 
 use crate::plan::ir::PlanInner;
 
 use super::common::{polars_dataframe_to_python_via_ipc, polars_err, root_data_to_polars_df};
 use super::runner::PolarsPlanRunner;
+use super::scan_kw::{dispatch_file_scan, write_csv_file, write_ndjson_file, write_parquet_file};
 
 pub(crate) const SCAN_FILE_ROOT_NAME: &str = "ScanFileRoot";
 
@@ -29,6 +28,18 @@ pub(crate) fn is_scan_file_root(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
     Ok(module == "pydantable._core")
 }
 
+fn scan_kw_from_root(root_data: &Bound<'_, PyAny>) -> PyResult<Option<Py<PyDict>>> {
+    if !root_data.hasattr("scan_kwargs")? {
+        return Ok(None);
+    }
+    let b = root_data.getattr("scan_kwargs")?;
+    if b.is_none() {
+        return Ok(None);
+    }
+    let d = b.downcast::<PyDict>()?;
+    Ok(Some(d.clone().unbind()))
+}
+
 /// Where physical rows for a plan root come from (in-memory columns vs on-disk scan).
 enum RootSource {
     InMemory,
@@ -36,10 +47,11 @@ enum RootSource {
         path: String,
         format_lower: String,
         columns: Option<Vec<String>>,
+        scan_kw: Option<Py<PyDict>>,
     },
 }
 
-fn root_source_from_py(root_data: &Bound<'_, PyAny>) -> PyResult<RootSource> {
+fn root_source_from_py(_py: Python<'_>, root_data: &Bound<'_, PyAny>) -> PyResult<RootSource> {
     if is_scan_file_root(root_data)? {
         let path: String = root_data.getattr("path")?.extract()?;
         let format: String = root_data.getattr("format")?.extract()?;
@@ -48,55 +60,16 @@ fn root_source_from_py(root_data: &Bound<'_, PyAny>) -> PyResult<RootSource> {
             .getattr("columns")
             .ok()
             .and_then(|c| c.extract().ok());
+        let scan_kw = scan_kw_from_root(root_data)?;
         Ok(RootSource::Scan {
             path,
             format_lower,
             columns,
+            scan_kw,
         })
     } else {
         Ok(RootSource::InMemory)
     }
-}
-
-fn apply_column_projection(mut lf: LazyFrame, columns: Option<Vec<String>>) -> LazyFrame {
-    if let Some(cols) = columns {
-        let exprs: Vec<Expr> = cols.iter().map(|c| col(c.as_str())).collect();
-        lf = lf.select(exprs);
-    }
-    lf
-}
-
-fn dispatch_scan(
-    py: Python<'_>,
-    path: String,
-    format: &str,
-    columns: Option<Vec<String>>,
-) -> PyResult<LazyFrame> {
-    let lf = match format {
-        "parquet" => py.allow_threads(move || {
-            LazyFrame::scan_parquet(PlRefPath::new(path.as_str()), ScanArgsParquet::default())
-        }),
-        "csv" => py.allow_threads(move || {
-            LazyCsvReader::new(PlRefPath::new(path.as_str())).finish()
-        }),
-        "ndjson" => py.allow_threads(move || {
-            LazyJsonLineReader::new(PlRefPath::new(path.as_str())).finish()
-        }),
-        "ipc" => py.allow_threads(move || {
-            LazyFrame::scan_ipc(
-                PlRefPath::new(path.as_str()),
-                IpcScanOptions::default(),
-                polars::prelude::UnifiedScanArgs::default(),
-            )
-        }),
-        _ => {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Unknown scan format {format:?}; expected 'parquet', 'csv', 'ndjson', or 'ipc'."
-            )));
-        }
-    }
-    .map_err(polars_err)?;
-    Ok(apply_column_projection(lf, columns))
 }
 
 /// Build the base `LazyFrame` for `plan` (no plan steps applied yet).
@@ -105,12 +78,16 @@ pub(crate) fn base_lazy_frame(
     plan: &PlanInner,
     root_data: &Bound<'_, PyAny>,
 ) -> PyResult<LazyFrame> {
-    match root_source_from_py(root_data)? {
+    match root_source_from_py(py, root_data)? {
         RootSource::Scan {
             path,
             format_lower,
             columns,
-        } => dispatch_scan(py, path, format_lower.as_str(), columns),
+            scan_kw,
+        } => {
+            let kw_bound: Option<Bound<'_, PyDict>> = scan_kw.as_ref().map(|p| p.bind(py).clone());
+            dispatch_file_scan(py, path, format_lower.as_str(), columns, kw_bound.as_ref())
+        }
         RootSource::InMemory => {
             let df = root_data_to_polars_df(py, &plan.root_schema, root_data)?;
             Ok(df.lazy())
@@ -142,7 +119,7 @@ pub(crate) fn collect_lazyframe(
     py.allow_threads(move || lf.collect_with_engine(engine).map_err(polars_err))
 }
 
-fn ipc_compression_from_str(s: Option<&str>) -> PyResult<Option<IpcCompression>> {
+pub(crate) fn ipc_compression_from_str(s: Option<&str>) -> PyResult<Option<IpcCompression>> {
     let s = s.map(str::trim).filter(|x| !x.is_empty());
     match s {
         None | Some("none") | Some("uncompressed") => Ok(None),
@@ -154,6 +131,21 @@ fn ipc_compression_from_str(s: Option<&str>) -> PyResult<Option<IpcCompression>>
     }
 }
 
+fn write_kw_as_dict<'py>(
+    write_kw: Option<&'py Bound<'py, PyAny>>,
+) -> PyResult<Option<&'py Bound<'py, PyDict>>> {
+    match write_kw {
+        None => Ok(None),
+        Some(b) => {
+            if b.is_none() {
+                Ok(None)
+            } else {
+                Ok(Some(b.downcast::<PyDict>()?))
+            }
+        }
+    }
+}
+
 /// Execute plan and write Parquet without materializing to Python `dict[str, list]`.
 pub(crate) fn sink_parquet_polars(
     py: Python<'_>,
@@ -161,16 +153,12 @@ pub(crate) fn sink_parquet_polars(
     root_data: &Bound<'_, PyAny>,
     path: String,
     streaming: bool,
+    write_kw: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<()> {
     let lf = plan_to_lazyframe(py, plan, root_data)?;
     let mut df = collect_lazyframe(py, lf, streaming)?;
-    let mut file = File::create(path.as_str()).map_err(|e| {
-        PyErr::new::<pyo3::exceptions::PyOSError, _>(format!("sink_parquet: {e}"))
-    })?;
-    ParquetWriter::new(&mut file)
-        .finish(&mut df)
-        .map_err(polars_err)?;
-    Ok(())
+    let d = write_kw_as_dict(write_kw)?;
+    write_parquet_file(py, path.as_str(), &mut df, d)
 }
 
 pub(crate) fn sink_csv_polars(
@@ -180,17 +168,12 @@ pub(crate) fn sink_csv_polars(
     path: String,
     streaming: bool,
     separator: u8,
+    write_kw: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<()> {
     let lf = plan_to_lazyframe(py, plan, root_data)?;
     let mut df = collect_lazyframe(py, lf, streaming)?;
-    let mut file = File::create(path.as_str()).map_err(|e| {
-        PyErr::new::<pyo3::exceptions::PyOSError, _>(format!("sink_csv: {e}"))
-    })?;
-    CsvWriter::new(&mut file)
-        .with_separator(separator)
-        .finish(&mut df)
-        .map_err(polars_err)?;
-    Ok(())
+    let d = write_kw_as_dict(write_kw)?;
+    write_csv_file(py, path.as_str(), &mut df, separator, d)
 }
 
 pub(crate) fn sink_ipc_polars(
@@ -200,13 +183,25 @@ pub(crate) fn sink_ipc_polars(
     path: String,
     streaming: bool,
     compression: Option<String>,
+    write_kw: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<()> {
+    if let Some(w) = write_kw {
+        if !w.is_none() {
+            let d = write_kw_as_dict(Some(w))?;
+            if let Some(dict) = d {
+                if dict.len() > 0 {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "sink_ipc does not accept write_kwargs yet; use compression= only",
+                    ));
+                }
+            }
+        }
+    }
     let lf = plan_to_lazyframe(py, plan, root_data)?;
     let mut df = collect_lazyframe(py, lf, streaming)?;
     let comp = ipc_compression_from_str(compression.as_deref())?;
-    let mut file = File::create(path.as_str()).map_err(|e| {
-        PyErr::new::<pyo3::exceptions::PyOSError, _>(format!("sink_ipc: {e}"))
-    })?;
+    let mut file = File::create(path.as_str())
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyOSError, _>(format!("sink_ipc: {e}")))?;
     let mut writer = IpcWriter::new(&mut file).with_compression(comp);
     writer.finish(&mut df).map_err(polars_err)?;
     Ok(())
@@ -218,17 +213,12 @@ pub(crate) fn sink_ndjson_polars(
     root_data: &Bound<'_, PyAny>,
     path: String,
     streaming: bool,
+    write_kw: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<()> {
     let lf = plan_to_lazyframe(py, plan, root_data)?;
     let mut df = collect_lazyframe(py, lf, streaming)?;
-    let mut file = File::create(path.as_str()).map_err(|e| {
-        PyErr::new::<pyo3::exceptions::PyOSError, _>(format!("sink_ndjson: {e}"))
-    })?;
-    JsonWriter::new(&mut file)
-        .with_json_format(JsonFormat::JsonLines)
-        .finish(&mut df)
-        .map_err(polars_err)?;
-    Ok(())
+    let d = write_kw_as_dict(write_kw)?;
+    write_ndjson_file(py, path.as_str(), &mut df, d)
 }
 
 /// Materialize the plan, then split rows into Polars `DataFrame` chunks (via IPC to Python).

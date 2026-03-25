@@ -340,16 +340,12 @@ pub fn execute_groupby_agg_polars(
         }
     }
 
-    let mut out_df = collect_lazyframe(
-        py,
-        lf.group_by(by_exprs).agg(agg_exprs),
-        streaming,
-    )
-    .map_err(|e| {
-        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-            "Polars execution error (group_by().agg()): {e}"
-        ))
-    })?;
+    let mut out_df = collect_lazyframe(py, lf.group_by(by_exprs).agg(agg_exprs), streaming)
+        .map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Polars execution error (group_by().agg()): {e}"
+            ))
+        })?;
 
     out_df = mask_groupby_sum_mean_columns(out_df, &tmp_count_cols, &out_schema)?;
 

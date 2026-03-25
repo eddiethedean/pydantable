@@ -374,8 +374,8 @@ async def _fastapi_async_snippet() -> None:
 
 asyncio.run(_fastapi_async_snippet())
 
-# docs/FASTAPI / interchange — materialize_parquet + to_arrow (pyarrow optional at runtime;
-# CI installs pyarrow for pytest and this script).
+# docs/FASTAPI / interchange: materialize_parquet + to_arrow. PyArrow optional at
+# runtime; CI installs it for pytest and this script.
 try:
     import pyarrow as pa
     import pyarrow.parquet as pq

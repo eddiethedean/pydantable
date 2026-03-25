@@ -14,6 +14,11 @@ mod serialize;
 
 pub use build::*;
 #[cfg(feature = "polars_engine")]
+pub(crate) use execute_polars::{
+    collect_plan_batches_polars, sink_csv_polars, sink_ipc_polars, sink_ndjson_polars,
+    sink_parquet_polars,
+};
+#[cfg(feature = "polars_engine")]
 pub(crate) use execute_polars::{dtype_from_polars, series_to_py_list};
 #[cfg(feature = "polars_engine")]
 #[allow(unused_imports)]
@@ -21,11 +26,6 @@ pub use execute_polars::{
     execute_concat_polars, execute_explode_polars, execute_groupby_agg_polars,
     execute_groupby_dynamic_agg_polars, execute_join_polars, execute_melt_polars,
     execute_pivot_polars, execute_unnest_polars, PolarsPlanRunner,
-};
-#[cfg(feature = "polars_engine")]
-pub(crate) use execute_polars::{
-    collect_plan_batches_polars, sink_csv_polars, sink_ipc_polars, sink_ndjson_polars,
-    sink_parquet_polars,
 };
 pub use executor::PhysicalPlanExecutor;
 #[cfg(feature = "polars_engine")]

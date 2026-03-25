@@ -1,5 +1,7 @@
 # Data sources for read/write (planning reference)
 
+**Per-format API reference:** {doc}`IO_OVERVIEW` (Parquet, CSV, NDJSON, IPC, HTTP, SQL, extras).
+
 This document lists **common and useful** places applications read and write tabular data. It is intended to guide **0.22.x+** I/O work in pydantable: which formats and transports to support first, and which **async** stacks pair well with **FastAPI** and typed frames.
 
 **Today (0.23.0+)**, pydantable ships **`pydantable.io`** with three layers:
@@ -8,7 +10,20 @@ This document lists **common and useful** places applications read and write tab
 2. **`materialize_*` / `amaterialize_*`** — eager **`dict[str, list]`** reads (**Rust** on local paths where possible; **PyArrow** for bytes, HTTP bodies, column subsets, streaming IPC).
 3. **`DataFrame.write_parquet`**, **`write_csv`**, **`write_ipc`**, **`write_ndjson`** (and **`DataFrameModel`** mirrors) — write the lazy pipeline from Rust without a giant Python dict.
 
-### `read_parquet_url` / `aread_parquet_url` temp-file lifecycle
+## Lazy read **`**scan_kwargs`** and write **`write_kwargs`**
+
+**Reads** (**`read_parquet`**, **`read_csv`**, **`read_ndjson`**, **`read_ipc`**, and async **`aread_*`**) accept Polars scan options as keyword arguments; they are forwarded to the Rust layer as **`scan_kwargs`**. **Writes** accept an optional **`write_kwargs=dict`** (same idea for the Polars sink). Unknown keys raise **`ValueError`** with an **allowed:** list.
+
+| Format | Read kwargs (examples) | Write kwargs |
+|--------|------------------------|--------------|
+| **Parquet** | **`n_rows`**, **`low_memory`**, **`rechunk`**, **`use_statistics`**, **`cache`**, **`glob`**, **`allow_missing_columns`**, **`parallel`** | **`compression`**, **`row_group_size`**, **`data_page_size`**, **`statistics`**, **`parallel`** |
+| **CSV** | **`has_header`**, **`separator`**, **`skip_rows`**, **`skip_lines`**, **`n_rows`**, **`infer_schema_length`**, **`ignore_errors`**, **`low_memory`**, **`rechunk`**, **`glob`**, **`cache`**, **`quote_char`**, **`eol_char`** | **`include_header`**, **`include_bom`** (plus top-level **`separator`**, **`compression`** where applicable) |
+| **NDJSON** | **`low_memory`**, **`rechunk`**, **`ignore_errors`**, **`n_rows`**, **`infer_schema_length`** | **`json_format`** (**`"lines"`** / **`"json"`**) |
+| **IPC** | **`record_batch_statistics`** | Use top-level **`compression=`** only; extra **`write_kwargs`** are rejected. |
+
+**`read_parquet_url`**: URL fetch still uses **`**kwargs`** for the HTTP path; avoid mixing fetch and scan options in one dict unless you split them in application code.
+
+## `read_parquet_url` / `aread_parquet_url` temp-file lifecycle
 
 These helpers **`fetch_bytes`** from HTTP(S), write a **named temp** **`.parquet`** file, and return **`ScanFileRoot(path, "parquet", columns)`**. The file is **not** deleted when the **`ScanFileRoot`** or **`DataFrame`** is garbage-collected.
 

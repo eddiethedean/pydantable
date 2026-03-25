@@ -24,7 +24,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 - **Rust:** **`ScanFileRoot`**, **`plan_to_lazyframe`**, internal **`sink_*`** exports for lazy writes; join/groupby/reshape entrypoints work with lazy file roots where implemented (see **`EXECUTION`** matrix).
 - **Python:** **`read_csv_stdin`** uses **`materialize_csv`** internally.
-- **Docs:** [`EXECUTION.md`](EXECUTION.md) memory model and streaming/collect compatibility matrix ( **`PYDANTABLE_ENGINE_STREAMING`** reserved); [`DATA_IO_SOURCES.md`](DATA_IO_SOURCES.md), [`FASTAPI.md`](FASTAPI.md), [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md), [`ROADMAP.md`](ROADMAP.md), [`README.md`](../README.md).
+- **Docs:** {doc}`EXECUTION` memory model and streaming/collect compatibility matrix ( **`PYDANTABLE_ENGINE_STREAMING`** reserved); {doc}`DATA_IO_SOURCES`, {doc}`FASTAPI`, {doc}`INTERFACE_CONTRACT`, {doc}`ROADMAP`, {doc}`README`.
 
 ### Migration (from 0.22.x)
 

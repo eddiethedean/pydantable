@@ -6,12 +6,12 @@ use pyo3::types::PyAny;
 use crate::plan::execute_plan as execute_plan_inner;
 
 #[cfg(feature = "polars_engine")]
+use crate::plan::PolarsExecutor;
+#[cfg(feature = "polars_engine")]
 use crate::plan::{
     collect_plan_batches_polars, sink_csv_polars, sink_ipc_polars, sink_ndjson_polars,
     sink_parquet_polars,
 };
-#[cfg(feature = "polars_engine")]
-use crate::plan::PolarsExecutor;
 
 use super::types::PyPlan;
 
@@ -29,26 +29,35 @@ fn execute_plan(
 
 #[cfg(feature = "polars_engine")]
 #[pyfunction]
-#[pyo3(signature = (plan, root_data, path, streaming=false))]
+#[pyo3(signature = (plan, root_data, path, streaming=false, write_kwargs=None))]
 fn sink_parquet(
     py: Python<'_>,
     plan: &PyPlan,
     root_data: &Bound<'_, PyAny>,
     path: String,
     streaming: bool,
+    write_kwargs: Option<Bound<'_, PyAny>>,
 ) -> PyResult<()> {
-    sink_parquet_polars(py, &plan.inner, root_data, path, streaming)
+    sink_parquet_polars(
+        py,
+        &plan.inner,
+        root_data,
+        path,
+        streaming,
+        write_kwargs.as_ref(),
+    )
 }
 
 #[cfg(not(feature = "polars_engine"))]
 #[pyfunction]
-#[pyo3(signature = (plan, root_data, path, streaming=false))]
+#[pyo3(signature = (plan, root_data, path, streaming=false, write_kwargs=None))]
 fn sink_parquet(
     _py: Python<'_>,
-    _plan: &PyPlan,
-    _root_data: &Bound<'_, PyAny>,
-    _path: String,
-    _streaming: bool,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    path: String,
+    streaming: bool,
+    write_kwargs: Option<Bound<'_, PyAny>>,
 ) -> PyResult<()> {
     Err(pyo3::exceptions::PyRuntimeError::new_err(
         "sink_parquet requires pydantable-core built with the `polars_engine` feature.",
@@ -57,7 +66,7 @@ fn sink_parquet(
 
 #[cfg(feature = "polars_engine")]
 #[pyfunction]
-#[pyo3(signature = (plan, root_data, path, streaming=false, separator=44))]
+#[pyo3(signature = (plan, root_data, path, streaming=false, separator=44, write_kwargs=None))]
 fn sink_csv(
     py: Python<'_>,
     plan: &PyPlan,
@@ -65,20 +74,30 @@ fn sink_csv(
     path: String,
     streaming: bool,
     separator: u8,
+    write_kwargs: Option<Bound<'_, PyAny>>,
 ) -> PyResult<()> {
-    sink_csv_polars(py, &plan.inner, root_data, path, streaming, separator)
+    sink_csv_polars(
+        py,
+        &plan.inner,
+        root_data,
+        path,
+        streaming,
+        separator,
+        write_kwargs.as_ref(),
+    )
 }
 
 #[cfg(not(feature = "polars_engine"))]
 #[pyfunction]
-#[pyo3(signature = (plan, root_data, path, streaming=false, separator=44))]
+#[pyo3(signature = (plan, root_data, path, streaming=false, separator=44, write_kwargs=None))]
 fn sink_csv(
     _py: Python<'_>,
-    _plan: &PyPlan,
-    _root_data: &Bound<'_, PyAny>,
-    _path: String,
-    _streaming: bool,
-    _separator: u8,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    path: String,
+    streaming: bool,
+    separator: u8,
+    write_kwargs: Option<Bound<'_, PyAny>>,
 ) -> PyResult<()> {
     Err(pyo3::exceptions::PyRuntimeError::new_err(
         "sink_csv requires pydantable-core built with the `polars_engine` feature.",
@@ -87,7 +106,7 @@ fn sink_csv(
 
 #[cfg(feature = "polars_engine")]
 #[pyfunction]
-#[pyo3(signature = (plan, root_data, path, streaming=false, compression=None))]
+#[pyo3(signature = (plan, root_data, path, streaming=false, compression=None, write_kwargs=None))]
 fn sink_ipc(
     py: Python<'_>,
     plan: &PyPlan,
@@ -95,6 +114,7 @@ fn sink_ipc(
     path: String,
     streaming: bool,
     compression: Option<String>,
+    write_kwargs: Option<Bound<'_, PyAny>>,
 ) -> PyResult<()> {
     sink_ipc_polars(
         py,
@@ -103,19 +123,21 @@ fn sink_ipc(
         path,
         streaming,
         compression,
+        write_kwargs.as_ref(),
     )
 }
 
 #[cfg(not(feature = "polars_engine"))]
 #[pyfunction]
-#[pyo3(signature = (plan, root_data, path, streaming=false, compression=None))]
+#[pyo3(signature = (plan, root_data, path, streaming=false, compression=None, write_kwargs=None))]
 fn sink_ipc(
     _py: Python<'_>,
-    _plan: &PyPlan,
-    _root_data: &Bound<'_, PyAny>,
-    _path: String,
-    _streaming: bool,
-    _compression: Option<String>,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    path: String,
+    streaming: bool,
+    compression: Option<String>,
+    write_kwargs: Option<Bound<'_, PyAny>>,
 ) -> PyResult<()> {
     Err(pyo3::exceptions::PyRuntimeError::new_err(
         "sink_ipc requires pydantable-core built with the `polars_engine` feature.",
@@ -124,26 +146,35 @@ fn sink_ipc(
 
 #[cfg(feature = "polars_engine")]
 #[pyfunction]
-#[pyo3(signature = (plan, root_data, path, streaming=false))]
+#[pyo3(signature = (plan, root_data, path, streaming=false, write_kwargs=None))]
 fn sink_ndjson(
     py: Python<'_>,
     plan: &PyPlan,
     root_data: &Bound<'_, PyAny>,
     path: String,
     streaming: bool,
+    write_kwargs: Option<Bound<'_, PyAny>>,
 ) -> PyResult<()> {
-    sink_ndjson_polars(py, &plan.inner, root_data, path, streaming)
+    sink_ndjson_polars(
+        py,
+        &plan.inner,
+        root_data,
+        path,
+        streaming,
+        write_kwargs.as_ref(),
+    )
 }
 
 #[cfg(not(feature = "polars_engine"))]
 #[pyfunction]
-#[pyo3(signature = (plan, root_data, path, streaming=false))]
+#[pyo3(signature = (plan, root_data, path, streaming=false, write_kwargs=None))]
 fn sink_ndjson(
     _py: Python<'_>,
-    _plan: &PyPlan,
-    _root_data: &Bound<'_, PyAny>,
-    _path: String,
-    _streaming: bool,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    path: String,
+    streaming: bool,
+    write_kwargs: Option<Bound<'_, PyAny>>,
 ) -> PyResult<()> {
     Err(pyo3::exceptions::PyRuntimeError::new_err(
         "sink_ndjson requires pydantable-core built with the `polars_engine` feature.",
@@ -168,10 +199,10 @@ fn collect_plan_batches(
 #[pyo3(signature = (plan, root_data, batch_size=65536, streaming=false))]
 fn collect_plan_batches(
     _py: Python<'_>,
-    _plan: &PyPlan,
-    _root_data: &Bound<'_, PyAny>,
-    _batch_size: usize,
-    _streaming: bool,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    batch_size: usize,
+    streaming: bool,
 ) -> PyResult<Vec<PyObject>> {
     Err(pyo3::exceptions::PyRuntimeError::new_err(
         "collect_plan_batches requires pydantable-core built with the `polars_engine` feature.",
@@ -263,6 +294,7 @@ fn execute_groupby_agg(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 #[pyfunction]
 #[pyo3(signature = (left_plan, left_root_data, right_plan, right_root_data, how, as_python_lists=false, streaming=false))]
 fn execute_concat(

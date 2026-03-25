@@ -148,17 +148,26 @@ class PandasGroupedDataFrame(CoreGroupedDataFrame):
     def sum(self, *columns: str) -> CoreDataFrame:
         if not columns:
             raise TypeError("sum() requires at least one column name.")
-        return self.agg(**{f"{c}_sum": ("sum", c) for c in columns})
+        return self.agg(
+            streaming=None,
+            **{f"{c}_sum": ("sum", c) for c in columns},
+        )
 
     def mean(self, *columns: str) -> CoreDataFrame:
         if not columns:
             raise TypeError("mean() requires at least one column name.")
-        return self.agg(**{f"{c}_mean": ("mean", c) for c in columns})
+        return self.agg(
+            streaming=None,
+            **{f"{c}_mean": ("mean", c) for c in columns},
+        )
 
     def count(self, *columns: str) -> CoreDataFrame:
         if not columns:
             raise TypeError("count() requires at least one column name.")
-        return self.agg(**{f"{c}_count": ("count", c) for c in columns})
+        return self.agg(
+            streaming=None,
+            **{f"{c}_count": ("count", c) for c in columns},
+        )
 
 
 class PandasDataFrameModel(CoreDataFrameModel):

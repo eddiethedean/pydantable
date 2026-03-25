@@ -8,7 +8,7 @@ inside the native extension. Python does **not** require the `polars` package fo
 
 **Async materialization (0.15.0+):** **`await acollect()`**, **`await ato_dict()`**, **`await ato_polars()`**, and **`await ato_arrow()`** on **`DataFrame`** run the same logic in a **worker thread** via **`asyncio.to_thread`**, or in a **`concurrent.futures.Executor`** passed as **`executor=`**. **`DataFrameModel`** mirrors this with **`acollect`**, **`ato_dict`**, **`ato_polars`**, **`ato_arrow`**, **`arows`**, and **`ato_dicts`**. Cancelling the awaiting task does **not** cancel in-flight native work. The **GIL** still serializes some Python callbacks; **`ato_polars()`** and **`ato_arrow()`** both build their respective outputs from a materialized columnar **`dict`** (extra allocation vs calling Polars or PyArrow alone on raw buffers).
 
-**File / I/O helpers (0.22.0+):** **`pydantable.io`** separates **lazy file roots** from **eager materialization**.
+**File / I/O helpers (0.22.0+):** **`pydantable.io`** separates **lazy file roots** from **eager materialization**. Per-format read/write reference: {doc}`IO_OVERVIEW`.
 
 - **`read_*` / `aread_*`:** return a native **`ScanFileRoot`** handle (local path + format). Use **`DataFrame[Schema].read_parquet(...)`** (or **`DataFrameModel.read_parquet`**) so transforms run on a Polars **`LazyFrame`** without loading the whole file into **`dict[str, list]`** first. **`DataFrame.write_parquet`**, **`write_csv`**, **`write_ipc`**, and **`write_ndjson`** write the lazy result from Rust (no giant Python column dict on those paths). **`read_parquet_url`** / **`aread_parquet_url`** download HTTP(S) Parquet to a **caller-owned temp file**—see {doc}`DATA_IO_SOURCES`.
 - **`materialize_*` / `amaterialize_*`:** read files or buffers into **`dict[str, list]`** for constructors, tests, and small data (**Rust** on local paths where possible; **PyArrow** for bytes, HTTP payloads, column subsets, and streaming IPC). Same threading story as before: **`await amaterialize_parquet(...)`** or **`executor=`**.
@@ -17,7 +17,7 @@ inside the native extension. Python does **not** require the `polars` package fo
 
 Service patterns: {doc}`FASTAPI` and {doc}`ROADMAP`. Transport table: {doc}`DATA_IO_SOURCES`.
 
-### Streaming / engine `collect` (Polars)
+## Streaming / engine `collect` (Polars)
 
 **Default:** the Rust engine runs Polars **`LazyFrame.collect_with_engine(Engine::InMemory)`** (in-process).
 

@@ -9,18 +9,19 @@ mod materialize;
 mod reshape_exec;
 mod root_lazy;
 mod runner;
+mod scan_kw;
 
 pub use concat_exec::execute_concat_polars;
 pub use groupby_exec::execute_groupby_agg_polars;
 pub use join_exec::execute_join_polars;
 pub(crate) use materialize::execute_plan_polars;
 pub(crate) use materialize::{dtype_from_polars, series_to_py_list};
-pub(crate) use root_lazy::{
-    collect_plan_batches_polars, sink_csv_polars, sink_ipc_polars, sink_ndjson_polars,
-    sink_parquet_polars,
-};
 pub use reshape_exec::{
     execute_explode_polars, execute_groupby_dynamic_agg_polars, execute_melt_polars,
     execute_pivot_polars, execute_unnest_polars,
+};
+pub(crate) use root_lazy::{
+    collect_plan_batches_polars, sink_csv_polars, sink_ipc_polars, sink_ndjson_polars,
+    sink_parquet_polars,
 };
 pub use runner::PolarsPlanRunner;

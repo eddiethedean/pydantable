@@ -39,7 +39,6 @@ from pydantable.display import get_repr_html_limits
 from pydantable.expressions import ColumnRef, Expr
 from pydantable.rust_engine import (
     _require_rust_core,
-    collect_batches as rust_collect_batches,
     execute_concat,
     execute_explode,
     execute_groupby_agg,
@@ -49,9 +48,20 @@ from pydantable.rust_engine import (
     execute_pivot,
     execute_plan,
     execute_unnest,
+)
+from pydantable.rust_engine import (
+    collect_batches as rust_collect_batches,
+)
+from pydantable.rust_engine import (
     write_csv as rust_write_csv,
+)
+from pydantable.rust_engine import (
     write_ipc as rust_write_ipc,
+)
+from pydantable.rust_engine import (
     write_ndjson as rust_write_ndjson,
+)
+from pydantable.rust_engine import (
     write_parquet as rust_write_parquet,
 )
 from pydantable.schema import (
@@ -77,7 +87,10 @@ _NoneType = type(None)
 
 def _is_scan_file_root(obj: Any) -> bool:
     t = type(obj)
-    return t.__name__ == "ScanFileRoot" and getattr(t, "__module__", "") == "pydantable._core"
+    return (
+        t.__name__ == "ScanFileRoot"
+        and getattr(t, "__module__", "") == "pydantable._core"
+    )
 
 
 # Cap column listing in :meth:`DataFrame.__repr__` for very wide schemas.
@@ -394,7 +407,10 @@ _ENGINE_STREAMING_ENV = "PYDANTABLE_ENGINE_STREAMING"
 
 
 def _resolve_engine_streaming(explicit: bool | None) -> bool:
-    """Polars collect engine: ``streaming=True`` or env ``PYDANTABLE_ENGINE_STREAMING=1``."""
+    """Polars collect engine: ``streaming=True`` or env ``PYDANTABLE_ENGINE_STREAMING``.
+
+    Truthy env values: ``1``, ``true``, ``yes``.
+    """
     if explicit is not None:
         return explicit
     v = os.environ.get(_ENGINE_STREAMING_ENV, "").strip().lower()
@@ -451,7 +467,10 @@ class DataFrame(Generic[SchemaT]):
 
     @classmethod
     def _from_scan_root(cls, root: Any) -> DataFrame[Any]:
-        """Build a lazy frame from :class:`pydantable._core.ScanFileRoot` (no column validation yet)."""
+        """Build a lazy frame from :class:`pydantable._core.ScanFileRoot`.
+
+        Column validation is not applied yet.
+        """
         if cls._schema_type is None:
             raise TypeError(
                 "Use DataFrame[SchemaType].read_* to construct from a lazy file read."
@@ -471,11 +490,12 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        **scan_kwargs: Any,
     ) -> DataFrame[Any]:
         """Lazy Parquet read (local file path)."""
         from pydantable.io import read_parquet as _read_parquet
 
-        return cls._from_scan_root(_read_parquet(path, columns=columns))
+        return cls._from_scan_root(_read_parquet(path, columns=columns, **scan_kwargs))
 
     @classmethod
     def read_parquet_url(
@@ -486,7 +506,10 @@ class DataFrame(Generic[SchemaT]):
         columns: list[str] | None = None,
         **kwargs: Any,
     ) -> DataFrame[Any]:
-        """Lazy Parquet read after HTTP(S) download to a temp file (see {doc}`DATA_IO_SOURCES`)."""
+        """Lazy Parquet read after HTTP(S) download to a temp file.
+
+        See {doc}`DATA_IO_SOURCES`.
+        """
         from pydantable.io import read_parquet_url as _read_parquet_url
 
         return cls._from_scan_root(
@@ -499,10 +522,11 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        **scan_kwargs: Any,
     ) -> DataFrame[Any]:
         from pydantable.io import read_csv as _read_csv
 
-        return cls._from_scan_root(_read_csv(path, columns=columns))
+        return cls._from_scan_root(_read_csv(path, columns=columns, **scan_kwargs))
 
     @classmethod
     def read_ndjson(
@@ -510,10 +534,11 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        **scan_kwargs: Any,
     ) -> DataFrame[Any]:
         from pydantable.io import read_ndjson as _read_ndjson
 
-        return cls._from_scan_root(_read_ndjson(path, columns=columns))
+        return cls._from_scan_root(_read_ndjson(path, columns=columns, **scan_kwargs))
 
     @classmethod
     def read_ipc(
@@ -521,10 +546,11 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        **scan_kwargs: Any,
     ) -> DataFrame[Any]:
         from pydantable.io import read_ipc as _read_ipc
 
-        return cls._from_scan_root(_read_ipc(path, columns=columns))
+        return cls._from_scan_root(_read_ipc(path, columns=columns, **scan_kwargs))
 
     @classmethod
     def _from_plan(
@@ -691,7 +717,10 @@ class DataFrame(Generic[SchemaT]):
         if column not in self._current_field_types:
             raise KeyError(f"Unknown column {column!r} for current schema.")
         out_name = "__pydantable_vc_n"
-        g = self.group_by(column).agg(**{out_name: ("count", column)})
+        g = self.group_by(column).agg(
+            streaming=None,
+            **{out_name: ("count", column)},
+        )
         d = g.to_dict()
         keys = d[column]
         counts = d[out_name]
@@ -1585,16 +1614,27 @@ class DataFrame(Generic[SchemaT]):
         return _coerce_enum_columns(raw, self._current_field_types)
 
     def write_parquet(
-        self, path: str | Any, *, streaming: bool | None = None
+        self,
+        path: str | Any,
+        *,
+        streaming: bool | None = None,
+        write_kwargs: dict[str, Any] | None = None,
     ) -> None:
-        """Write this lazy plan to Parquet without building a Python ``dict[str, list]``.
+        """Write this lazy plan to Parquet without a Python ``dict[str, list]``.
 
         Optional ``streaming=`` (or ``PYDANTABLE_ENGINE_STREAMING``) uses Polars
         streaming collect before writing, when supported.
+
+        ``write_kwargs`` may include Polars writer options such as ``compression``,
+        ``row_group_size``, ``data_page_size``, ``statistics``, ``parallel``.
         """
         use_streaming = _resolve_engine_streaming(streaming)
         rust_write_parquet(
-            self._rust_plan, self._root_data, str(path), streaming=use_streaming
+            self._rust_plan,
+            self._root_data,
+            str(path),
+            streaming=use_streaming,
+            write_kwargs=write_kwargs,
         )
 
     def write_csv(
@@ -1603,6 +1643,7 @@ class DataFrame(Generic[SchemaT]):
         *,
         streaming: bool | None = None,
         separator: str = ",",
+        write_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Write this lazy plan to CSV from Rust (no Python column dict)."""
         if len(separator) != 1:
@@ -1614,6 +1655,7 @@ class DataFrame(Generic[SchemaT]):
             str(path),
             streaming=use_streaming,
             separator=ord(separator),
+            write_kwargs=write_kwargs,
         )
 
     def write_ipc(
@@ -1622,8 +1664,12 @@ class DataFrame(Generic[SchemaT]):
         *,
         streaming: bool | None = None,
         compression: str | None = None,
+        write_kwargs: dict[str, Any] | None = None,
     ) -> None:
-        """Write Arrow IPC file from Rust. ``compression`` is ``None``, ``'lz4'``, or ``'zstd'``."""
+        """Write Arrow IPC file from Rust.
+
+        ``compression`` is ``None``, ``'lz4'``, or ``'zstd'``.
+        """
         use_streaming = _resolve_engine_streaming(streaming)
         rust_write_ipc(
             self._rust_plan,
@@ -1631,15 +1677,27 @@ class DataFrame(Generic[SchemaT]):
             str(path),
             streaming=use_streaming,
             compression=compression,
+            write_kwargs=write_kwargs,
         )
 
     def write_ndjson(
-        self, path: str | Any, *, streaming: bool | None = None
+        self,
+        path: str | Any,
+        *,
+        streaming: bool | None = None,
+        write_kwargs: dict[str, Any] | None = None,
     ) -> None:
-        """Write newline-delimited JSON from Rust."""
+        """Write newline-delimited JSON from Rust.
+
+        ``write_kwargs`` may include ``json_format``.
+        """
         use_streaming = _resolve_engine_streaming(streaming)
         rust_write_ndjson(
-            self._rust_plan, self._root_data, str(path), streaming=use_streaming
+            self._rust_plan,
+            self._root_data,
+            str(path),
+            streaming=use_streaming,
+            write_kwargs=write_kwargs,
         )
 
     def collect_batches(
@@ -1648,7 +1706,10 @@ class DataFrame(Generic[SchemaT]):
         batch_size: int = 65_536,
         streaming: bool | None = None,
     ) -> list[Any]:
-        """Return Polars ``DataFrame`` chunks after one engine collect (see {doc}`EXECUTION`)."""
+        """Return Polars ``DataFrame`` chunks after one engine collect.
+
+        See {doc}`EXECUTION`.
+        """
         use_streaming = _resolve_engine_streaming(streaming)
         return rust_collect_batches(
             self._rust_plan,

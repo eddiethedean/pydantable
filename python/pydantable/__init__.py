@@ -18,7 +18,6 @@ from .display import get_repr_html_limits, reset_display_options, set_display_op
 from .expressions import Expr
 from .io import (
     afetch_sql,
-    amaterialize_ipc,
     amaterialize_parquet,
     aread_parquet,
     aread_parquet_url,
@@ -50,9 +49,9 @@ __all__ = [
     "materialize_parquet",
     "pandas",
     "pyspark",
-    "reset_display_options",
     "read_parquet",
     "read_parquet_url",
+    "reset_display_options",
     "set_display_options",
 ]
 __version__ = "0.23.0"

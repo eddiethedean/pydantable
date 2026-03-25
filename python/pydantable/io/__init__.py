@@ -81,6 +81,7 @@ def _scan_file_root(
     fmt: str,
     *,
     columns: list[str] | None = None,
+    scan_kwargs: dict[str, Any] | None = None,
 ) -> Any:
     try:
         from pydantable import _core as rust
@@ -90,29 +91,56 @@ def _scan_file_root(
         ) from e
     if not hasattr(rust, "ScanFileRoot"):
         raise NotImplementedError("pydantable._core.ScanFileRoot is not available.")
-    return rust.ScanFileRoot(str(path), fmt, columns)
+    sk = scan_kwargs if scan_kwargs else None
+    return rust.ScanFileRoot(str(path), fmt, columns, sk)
 
 
 def read_parquet(
-    path: str | Path, *, columns: list[str] | None = None
+    path: str | Path,
+    *,
+    columns: list[str] | None = None,
+    **scan_kwargs: Any,
 ) -> Any:
-    """Lazy Parquet read (local path); returns ``ScanFileRoot``. Use ``DataFrame[Schema].read_parquet``."""
-    return _scan_file_root(path, "parquet", columns=columns)
+    """Lazy Parquet read (local path); returns ``ScanFileRoot``. Use ``DataFrame[Schema].read_parquet``.
+
+    Extra keyword arguments are forwarded as Polars scan options (e.g. ``low_memory``, ``n_rows``,
+    ``parallel``, ``glob``). Unknown keys raise ``ValueError`` from the Rust layer.
+    """
+    sk = scan_kwargs if scan_kwargs else None
+    return _scan_file_root(path, "parquet", columns=columns, scan_kwargs=sk)
 
 
-def read_csv(path: str | Path, *, columns: list[str] | None = None) -> Any:
-    """Lazy CSV read (local path); returns ``ScanFileRoot``."""
-    return _scan_file_root(path, "csv", columns=columns)
+def read_csv(
+    path: str | Path,
+    *,
+    columns: list[str] | None = None,
+    **scan_kwargs: Any,
+) -> Any:
+    """Lazy CSV read (local path); returns ``ScanFileRoot``. See ``read_parquet`` for ``**scan_kwargs``."""
+    sk = scan_kwargs if scan_kwargs else None
+    return _scan_file_root(path, "csv", columns=columns, scan_kwargs=sk)
 
 
-def read_ndjson(path: str | Path, *, columns: list[str] | None = None) -> Any:
+def read_ndjson(
+    path: str | Path,
+    *,
+    columns: list[str] | None = None,
+    **scan_kwargs: Any,
+) -> Any:
     """Lazy newline-delimited JSON read (local path); returns ``ScanFileRoot``."""
-    return _scan_file_root(path, "ndjson", columns=columns)
+    sk = scan_kwargs if scan_kwargs else None
+    return _scan_file_root(path, "ndjson", columns=columns, scan_kwargs=sk)
 
 
-def read_ipc(path: str | Path, *, columns: list[str] | None = None) -> Any:
+def read_ipc(
+    path: str | Path,
+    *,
+    columns: list[str] | None = None,
+    **scan_kwargs: Any,
+) -> Any:
     """Lazy Arrow IPC **file** read (local path); returns ``ScanFileRoot``."""
-    return _scan_file_root(path, "ipc", columns=columns)
+    sk = scan_kwargs if scan_kwargs else None
+    return _scan_file_root(path, "ipc", columns=columns, scan_kwargs=sk)
 
 
 def read_parquet_url(
@@ -135,7 +163,7 @@ def read_parquet_url(
     except Exception:
         os.unlink(name)
         raise
-    return _scan_file_root(name, "parquet", columns=columns)
+    return _scan_file_root(name, "parquet", columns=columns, scan_kwargs=None)
 
 
 def materialize_parquet(
@@ -361,8 +389,11 @@ async def aread_parquet(
     *,
     columns: list[str] | None = None,
     executor: Executor | None = None,
+    **scan_kwargs: Any,
 ) -> Any:
-    return await _run_io(read_parquet, (path,), {"columns": columns}, executor=executor)
+    return await _run_io(
+        read_parquet, (path,), {"columns": columns, **scan_kwargs}, executor=executor
+    )
 
 
 async def aread_parquet_url(
@@ -386,8 +417,11 @@ async def aread_csv(
     *,
     columns: list[str] | None = None,
     executor: Executor | None = None,
+    **scan_kwargs: Any,
 ) -> Any:
-    return await _run_io(read_csv, (path,), {"columns": columns}, executor=executor)
+    return await _run_io(
+        read_csv, (path,), {"columns": columns, **scan_kwargs}, executor=executor
+    )
 
 
 async def aread_ndjson(
@@ -395,8 +429,11 @@ async def aread_ndjson(
     *,
     columns: list[str] | None = None,
     executor: Executor | None = None,
+    **scan_kwargs: Any,
 ) -> Any:
-    return await _run_io(read_ndjson, (path,), {"columns": columns}, executor=executor)
+    return await _run_io(
+        read_ndjson, (path,), {"columns": columns, **scan_kwargs}, executor=executor
+    )
 
 
 async def aread_ipc(
@@ -404,8 +441,11 @@ async def aread_ipc(
     *,
     columns: list[str] | None = None,
     executor: Executor | None = None,
+    **scan_kwargs: Any,
 ) -> Any:
-    return await _run_io(read_ipc, (path,), {"columns": columns}, executor=executor)
+    return await _run_io(
+        read_ipc, (path,), {"columns": columns, **scan_kwargs}, executor=executor
+    )
 
 
 async def amaterialize_parquet(
@@ -556,11 +596,11 @@ __all__ = [
     "aread_parquet_url",
     "arrow_table_to_column_dict",
     "awrite_sql",
-    "extras",
     "export_csv",
     "export_ipc",
     "export_ndjson",
     "export_parquet",
+    "extras",
     "fetch_bytes",
     "fetch_csv_url",
     "fetch_ndjson_url",

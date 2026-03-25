@@ -73,13 +73,18 @@ def execute_plan(
 
 
 def write_parquet(
-    plan: Any, root_data: Any, path: str, *, streaming: bool = False
+    plan: Any,
+    root_data: Any,
+    path: str,
+    *,
+    streaming: bool = False,
+    write_kwargs: dict[str, Any] | None = None,
 ) -> None:
     """Write lazy plan + root to Parquet via Rust (no Python ``dict[str, list]``)."""
     rust = _require_rust_core()
     if not hasattr(rust, "sink_parquet"):
         raise NotImplementedError("Rust extension does not implement `sink_parquet`.")
-    rust.sink_parquet(plan, root_data, path, streaming)
+    rust.sink_parquet(plan, root_data, path, streaming, write_kwargs)
 
 
 def write_csv(
@@ -89,12 +94,13 @@ def write_csv(
     *,
     streaming: bool = False,
     separator: int = ord(","),
+    write_kwargs: dict[str, Any] | None = None,
 ) -> None:
     """Write lazy plan + root to CSV via Rust."""
     rust = _require_rust_core()
     if not hasattr(rust, "sink_csv"):
         raise NotImplementedError("Rust extension does not implement `sink_csv`.")
-    rust.sink_csv(plan, root_data, path, streaming, separator & 0xFF)
+    rust.sink_csv(plan, root_data, path, streaming, separator & 0xFF, write_kwargs)
 
 
 def write_ipc(
@@ -104,22 +110,28 @@ def write_ipc(
     *,
     streaming: bool = False,
     compression: str | None = None,
+    write_kwargs: dict[str, Any] | None = None,
 ) -> None:
     """Write lazy plan + root to Arrow IPC file via Rust."""
     rust = _require_rust_core()
     if not hasattr(rust, "sink_ipc"):
         raise NotImplementedError("Rust extension does not implement `sink_ipc`.")
-    rust.sink_ipc(plan, root_data, path, streaming, compression)
+    rust.sink_ipc(plan, root_data, path, streaming, compression, write_kwargs)
 
 
 def write_ndjson(
-    plan: Any, root_data: Any, path: str, *, streaming: bool = False
+    plan: Any,
+    root_data: Any,
+    path: str,
+    *,
+    streaming: bool = False,
+    write_kwargs: dict[str, Any] | None = None,
 ) -> None:
     """Write lazy plan + root as newline-delimited JSON via Rust."""
     rust = _require_rust_core()
     if not hasattr(rust, "sink_ndjson"):
         raise NotImplementedError("Rust extension does not implement `sink_ndjson`.")
-    rust.sink_ndjson(plan, root_data, path, streaming)
+    rust.sink_ndjson(plan, root_data, path, streaming, write_kwargs)
 
 
 def collect_batches(
@@ -139,9 +151,7 @@ def collect_batches(
         raise NotImplementedError(
             "Rust extension does not implement `collect_plan_batches`."
         )
-    return list(
-        rust.collect_plan_batches(plan, root_data, batch_size, streaming)
-    )
+    return list(rust.collect_plan_batches(plan, root_data, batch_size, streaming))
 
 
 def execute_join(

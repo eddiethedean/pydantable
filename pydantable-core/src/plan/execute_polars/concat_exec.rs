@@ -36,6 +36,7 @@ use super::common::*;
 use super::materialize::{dtype_from_polars, series_to_py_list};
 use super::root_lazy::{collect_lazyframe, plan_to_lazyframe};
 
+#[allow(clippy::too_many_arguments)]
 pub fn execute_concat_polars(
     py: Python<'_>,
     left_plan: &PlanInner,
