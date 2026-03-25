@@ -585,14 +585,28 @@ impl PolarsPlanRunner {
                     .map(|s| s.to_string())
                     .collect::<Vec<_>>();
                 let targets = subset.clone().unwrap_or(all_cols);
-                let strategy_when_no_literal: Option<&str> = if value.is_some() {
+                let strategy_when_no_literal: Option<FillNullStrategy> = if value.is_some() {
                     None
                 } else {
-                    Some(strategy.as_deref().ok_or_else(|| {
+                    let s = strategy.as_deref().ok_or_else(|| {
                         PyErr::new::<pyo3::exceptions::PyValueError, _>(
                             "internal: fill_null requires a strategy when no literal value is set.",
                         )
-                    })?)
+                    })?;
+                    Some(match s {
+                        "forward" => FillNullStrategy::Forward(None),
+                        "backward" => FillNullStrategy::Backward(None),
+                        "min" => FillNullStrategy::Min,
+                        "max" => FillNullStrategy::Max,
+                        "mean" => FillNullStrategy::Mean,
+                        "zero" => FillNullStrategy::Zero,
+                        "one" => FillNullStrategy::One,
+                        _ => {
+                            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "internal: unknown fill_null strategy.",
+                            ));
+                        }
+                    })
                 };
                 let exprs = targets
                     .into_iter()
@@ -628,21 +642,10 @@ impl PolarsPlanRunner {
                                     base.fill_null(lit(b.as_slice()).cast(DataType::Binary))
                                 }
                             }
+                        } else if let Some(strategy) = strategy_when_no_literal {
+                            base.fill_null_with_strategy(strategy)
                         } else {
-                            match strategy_when_no_literal.unwrap() {
-                                "forward" => {
-                                    base.fill_null_with_strategy(FillNullStrategy::Forward(None))
-                                }
-                                "backward" => {
-                                    base.fill_null_with_strategy(FillNullStrategy::Backward(None))
-                                }
-                                "min" => base.fill_null_with_strategy(FillNullStrategy::Min),
-                                "max" => base.fill_null_with_strategy(FillNullStrategy::Max),
-                                "mean" => base.fill_null_with_strategy(FillNullStrategy::Mean),
-                                "zero" => base.fill_null_with_strategy(FillNullStrategy::Zero),
-                                "one" => base.fill_null_with_strategy(FillNullStrategy::One),
-                                _ => base,
-                            }
+                            base
                         };
                         filled.alias(&name)
                     })

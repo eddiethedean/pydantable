@@ -138,9 +138,9 @@ pub fn root_data_to_ctx(
                         ));
                     }
                     DTypeDesc::Struct { .. } | DTypeDesc::List { .. } | DTypeDesc::Map { .. } => {
-                        unreachable!(
-                            "struct/list/map columns are rejected before per-cell conversion"
-                        )
+                        return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                            "Struct/list/map columns require the Polars execution engine (polars_engine feature).",
+                        ));
                     }
                 };
                 out.push(Some(lit));

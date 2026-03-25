@@ -54,11 +54,11 @@ Each path that builds Polars or Arrow **first** runs the same Rust materializati
 
 ### DataFrame interchange protocol (`__dataframe__`) and Streamlit
 
-Some tools (including Streamlit’s `st.dataframe` / `st.data_editor`) can render interactive tables from objects that implement the **Python DataFrame Interchange Protocol** (`__dataframe__`).
+Some tools (including Streamlit’s `st.dataframe`) can render interactive tables from objects that implement the **Python DataFrame Interchange Protocol** (`__dataframe__`).
 
 As of **0.21.0**, `pydantable` implements `__dataframe__` on `DataFrame` (and `DataFrameModel` via delegation). This path **materializes** to a PyArrow `Table` first (same cost class as `to_arrow()`), then delegates to PyArrow’s interchange export.
 
-See {doc}`STREAMLIT` for install notes, fallbacks, and limitations.
+See {doc}`STREAMLIT` for install notes, fallbacks (including `st.data_editor(df.to_arrow())`), and limitations.
 
 The Python module `python/pydantable/rust_engine.py` is the thin wrapper that invokes
 `execute_plan`, `execute_join`, and related functions on `_core` (no alternate engines).

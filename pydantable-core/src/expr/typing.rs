@@ -1265,8 +1265,16 @@ impl ExprNode {
                 fields,
                 nullable: true,
             },
-            DTypeDesc::Map { .. } => unreachable!(),
-            DTypeDesc::List { .. } => unreachable!(),
+            DTypeDesc::Map { .. } => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "internal: list_get() does not support map element dtypes.",
+                ));
+            }
+            DTypeDesc::List { .. } => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "internal: list_get() does not support nested list element dtypes.",
+                ));
+            }
         };
         Ok(ExprNode::ListGet {
             inner: Box::new(inner),

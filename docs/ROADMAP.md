@@ -295,7 +295,7 @@ Practical inputs that feed that phase:
 **Goal (shipped): first-class Streamlit ergonomics**
 
 - [x] **Interchange protocol (preferred path):** implemented **`__dataframe__`** on **`DataFrame`** (and **`DataFrameModel`** via delegation) so **`st.dataframe(df)`** works without manual conversion where Streamlit’s stack supports the exported Arrow-backed interchange (documented dtype / nullability limits and materialization costs).
-- [x] **Fallback documentation:** documented **`st.dataframe(df.to_polars())`**, **`st.dataframe(df.to_arrow())`**, and **`st.write`** behavior in **`STREAMLIT.md`** and an {doc}`EXECUTION` interchange subsection.
+- [x] **Fallback documentation:** documented **`st.dataframe(df.to_polars())`**, **`st.dataframe(df.to_arrow())`**, **`st.data_editor(df.to_arrow())`** (editing fallback), and **`st.write`** behavior in **`STREAMLIT.md`** and an {doc}`EXECUTION` interchange subsection.
 - [x] **Tests:** CI smoke coverage using Streamlit’s built-in app testing harness (`streamlit.testing.v1.AppTest`) for **`st.write`** / **`st.dataframe`** and the supported **`st.data_editor(df.to_arrow())`** fallback.
 - [x] **Packaging:** documented **`pip install streamlit`** alongside **`pydantable[arrow]`** / **`pydantable[polars]`**; CI pins a supported Streamlit range.
 - [x] **Changelog + README:** Streamlit integration called out in **changelog** and **README**.
