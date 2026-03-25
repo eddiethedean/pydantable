@@ -78,7 +78,7 @@ df  # last expression → HTML table in Jupyter / VS Code
 
 - **`display(df)`** or the last expression in a cell uses **`_repr_html_()`** on **`DataFrame`** / **`DataFrameModel`** (bounded rows/columns; see {doc}`EXECUTION` **Jupyter / HTML**).
 - **`repr(df)`** is the plain-text path (no **`collect()`** for row counts—see {doc}`EXECUTION` **repr**).
-- **`df.shape`**, **`df.info()`**, **`df.describe()`** follow {doc}`INTERFACE_CONTRACT` **Introspection** ( **`describe`** includes bool/str in **0.21.0+**).
+- **`df.shape`**, **`df.info()`**, **`df.describe()`** follow {doc}`INTERFACE_CONTRACT` **Introspection** ( **`describe`** includes bool/str in **0.20.0+**).
 
 No extra **ipywidgets** dependency is required for the default HTML table.
 

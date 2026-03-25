@@ -105,7 +105,7 @@ This is for **REPLs, logs, and tracebacks**—not a substitute for materializing
 ## `info()` and `describe()` (**0.20.0+**)
 
 - **`info()`** returns a **multi-line string** listing logical column names, **dtype** annotations, and a **row count** aligned with **`shape[0]`** (root-buffer semantics—see {doc}`INTERFACE_CONTRACT` **Introspection**). It does **not** force a full **`collect()`** beyond what **`shape`** already implies for buffer-backed frames.
-- **`describe()`** (**0.21.0+**): one **`to_dict()`** materialization, then Python-side stats for **int**, **float**, **bool**, and **str** columns (nullable forms included). Numeric: mean/min/max/std where applicable. Bool: true/false/null counts. String: row count, **`n_unique`** (full scan of non-null strings), min/max **length**, null count. Other dtypes are omitted.
+- **`describe()`** (**0.20.0+**): one **`to_dict()`** materialization, then Python-side stats for **int**, **float**, **bool**, and **str** columns (nullable forms included). Numeric: mean/min/max/std where applicable. Bool: true/false/null counts. String: row count, **`n_unique`** (full scan of non-null strings), min/max **length**, null count. Other dtypes are omitted.
 
 ## Jupyter / HTML (`_repr_html_`) and display options
 
@@ -113,7 +113,7 @@ In **Jupyter**, **IPython**, **VS Code** notebooks, and similar frontends, **`Da
 
 **Defaults:** up to **20** rows, **40** columns, **500** characters per cell (see **`pydantable.dataframe._impl`**).
 
-**Tuning (**0.21.0+**):** set environment variables **`PYDANTABLE_REPR_HTML_MAX_ROWS`**, **`PYDANTABLE_REPR_HTML_MAX_COLS`**, **`PYDANTABLE_REPR_HTML_MAX_CELL_LEN`**, or call **`pydantable.set_display_options(...)`** / **`get_repr_html_limits()`** / **`reset_display_options()`** from {mod}`pydantable.display`.
+**Tuning (**0.20.0+**):** set environment variables **`PYDANTABLE_REPR_HTML_MAX_ROWS`**, **`PYDANTABLE_REPR_HTML_MAX_COLS`**, **`PYDANTABLE_REPR_HTML_MAX_CELL_LEN`**, or call **`pydantable.set_display_options(...)`** / **`get_repr_html_limits()`** / **`reset_display_options()`** from {mod}`pydantable.display`.
 
 - **Preview only:** bounded rows/columns/cell length.
 - **Materialization:** the preview runs the same engine path as **`head(N)`** + **`to_dict()`** for the bounded slice.

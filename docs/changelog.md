@@ -8,33 +8,25 @@ All notable changes to this project are documented here. The format is inspired 
 
 (none yet)
 
-## [0.21.0] — 2026-03-25
+## [0.20.0] — 2026-03-25
+
+**PyPI:** this version is **not** published yet; **`pip install pydantable`** currently installs **0.19.0** until maintainers release **0.20.0**.
 
 ### Highlights
 
+- **UX / discovery:** Core **`DataFrame`** and **`DataFrameModel`** expose **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, and **`describe()`** for **int**, **float**, **bool**, and **str** columns (one **`to_dict()`** materialization). **`shape[0]`** follows **root-buffer** semantics—see {doc}`INTERFACE_CONTRACT` **Introspection**, {doc}`EXECUTION`.
 - **Docs:** {doc}`QUICKSTART` (five-minute tour), repository **`notebooks/five_minute_tour.ipynb`**, {doc}`EXECUTION` sections on **materialization costs**, **import styles**, **copy-as / interchange**; **naming map** in {doc}`PANDAS_UI` / {doc}`PYSPARK_UI`.
 - **Display:** **`pydantable.display`** — **`get_repr_html_limits`**, **`set_display_options`**, **`reset_display_options`**; env **`PYDANTABLE_REPR_HTML_*`** for Jupyter HTML preview bounds.
-- **`describe()`:** bool and str summary lines ( **`n_unique`** for strings; one **`to_dict()`**).
-- **`DataFrame.value_counts`** / **`DataFrameModel.value_counts`** (group-by path).
-- **`_repr_mimebundle_`** on **`DataFrame`** and **`DataFrameModel`** (`text/plain` + `text/html`).
+- **`DataFrame.value_counts`** / **`DataFrameModel.value_counts`** (group-by path); **`_repr_mimebundle_`** on **`DataFrame`** and **`DataFrameModel`** (`text/plain` + `text/html`).
 - **Debugging:** **`PYDANTABLE_VERBOSE_ERRORS=1`** appends schema context to **`ValueError`** from **`execute_plan`**.
+- **Expressions:** **`Expr`**, **`ColumnRef`**, **`WhenChain`**, and pending window helpers implement readable **`__repr__`**. Tests: **`tests/test_expr_repr.py`**.
+- **PySpark façade:** **`DataFrame.show()`** and **`summary()`** (alias of **`describe()`**). See {doc}`PYSPARK_UI`, {doc}`PYSPARK_PARITY`.
+- **Documentation:** {doc}`README`, {doc}`index`, {doc}`ROADMAP`, {doc}`PARITY_SCORECARD`, {doc}`PANDAS_UI`, {doc}`DEVELOPER`.
 
 ### Details
 
-Tests: **`tests/test_display_options.py`**, **`tests/test_dataframe_discovery.py`**. See {doc}`EXECUTION`, {doc}`INTERFACE_CONTRACT`.
-
-## [0.20.0] — 2026-03-24
-
-### Highlights
-
-- **UX / discovery:** Core **`DataFrame`** and **`DataFrameModel`** expose **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, and **`describe()`** (numeric **`int` / `float`** columns only for **`describe`**; one **`to_dict()`** materialization). **`shape[0]`** follows **root-buffer** semantics and may diverge from materialized row count after lazy transforms—see {doc}`INTERFACE_CONTRACT` **Introspection**, {doc}`EXECUTION`.
-- **Expressions:** **`Expr`**, **`ColumnRef`**, **`WhenChain`**, and pending window helpers implement readable **`__repr__`** (JSON-friendly AST snippet + dtype / columns where useful). Tests: **`tests/test_expr_repr.py`**.
-- **PySpark façade:** **`DataFrame.show()`** (bounded text table; **`head`**-like) and **`summary()`** (alias of **`describe()`** string output). **`DataFrameModel`** delegates. See {doc}`PYSPARK_UI`, {doc}`PYSPARK_PARITY`.
-- **Documentation:** {doc}`README`, {doc}`index`, {doc}`ROADMAP` **Shipped in 0.20.0**, {doc}`PARITY_SCORECARD`, {doc}`PANDAS_UI` (core parity with pandas UI introspection), {doc}`DEVELOPER` (release map + notebooks).
-
-### Details
-
-- **Repr / HTML (from pre-release Unreleased):** Multi-line **`DataFrame.__repr__`** and **`_repr_html_`** (card-style HTML; grouped/model banners). See {doc}`EXECUTION`, **`tests/test_dataframe_repr.py`**.
+- **Repr / HTML:** Multi-line **`DataFrame.__repr__`** and **`_repr_html_`** (card-style HTML; grouped/model banners). See {doc}`EXECUTION`, **`tests/test_dataframe_repr.py`**.
+- **Tests:** **`tests/test_display_options.py`**, **`tests/test_dataframe_discovery.py`**, **`tests/test_rust_engine_verbose_errors.py`**. See {doc}`EXECUTION`, {doc}`INTERFACE_CONTRACT`.
 - **Release hygiene:** **`make check-full`**, full **pytest**, **`cargo test --all-features`** per {doc}`DEVELOPER`.
 
 ## [0.19.0] — 2026-03-24

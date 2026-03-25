@@ -8,7 +8,7 @@
 
 **Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core (Polars inside the native extension).**
 
-**Current release: 0.21.0** · Python **3.10+**
+**Latest on PyPI: 0.19.0** · **This repository (`main`): 0.20.0** (not yet published) · Python **3.10+**
 
 ---
 
@@ -127,9 +127,11 @@ PySpark-named wrappers: `pydantable.pyspark.sql.functions` mirrors much of the a
 
 ## Recent releases
 
-**0.21.0** — **Documentation & display:** [Quickstart](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html), [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) materialization cost table and import-style guide, **`set_display_options`** / env for HTML preview bounds, richer **`describe()`** (bool/str), **`value_counts`**, **`_repr_mimebundle_`**, optional **`PYDANTABLE_VERBOSE_ERRORS`**. See [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html).
+`pip install pydantable` currently resolves to **0.19.0** on PyPI. The bullets below include **0.20.0** work on **`main`** (see [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html)) that is **not** on PyPI until the next release.
 
-**0.20.0** — **UX / discovery:** core **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, numeric **`describe()`**; **`Expr`** / **`WhenChain`** **`repr`**; PySpark façade **`show()`** / **`summary()`**. [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html), [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) **Introspection**, [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html). Multi-line **`DataFrame`** **`repr`** and **`_repr_html_`** (see **0.20.0** changelog Highlights).
+**0.20.0** (main / unreleased) — **Documentation & display:** [Quickstart](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html), [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) materialization cost table and import-style guide, **`set_display_options`** / env for HTML preview bounds, richer **`describe()`** (bool/str), **`value_counts`**, **`_repr_mimebundle_`**, optional **`PYDANTABLE_VERBOSE_ERRORS`**. See [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html).
+
+**0.20.0** (main / unreleased) — **UX / discovery:** core **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, numeric **`describe()`**; **`Expr`** / **`WhenChain`** **`repr`**; PySpark façade **`show()`** / **`summary()`**. [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html), [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) **Introspection**, [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html). Multi-line **`DataFrame`** **`repr`** and **`_repr_html_`** (see **0.20.0** changelog Highlights).
 
 **0.19.0** — Pre-1.0 **documentation consolidation**: [Versioning (0.x)](https://pydantable.readthedocs.io/en/latest/VERSIONING.html), [interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) cross-links, parity/README/index refresh for the **0.19 → 1.0** path, [PERFORMANCE](https://pydantable.readthedocs.io/en/latest/PERFORMANCE.html) benchmark spot-check note, release-hygiene alignment with CI; **group_by** tests sort output where row order is not guaranteed (stable **`pytest-xdist`**). No new **`Expr`** or PySpark façade methods.
 

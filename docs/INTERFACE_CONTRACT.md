@@ -26,8 +26,8 @@ row position. The project test-suite uses sorted comparisons to enforce this.
 - **`columns`** and **`dtypes`** reflect the **current logical schema** (projected column names and Pydantic field annotations).
 - **`shape`** and **`empty`** are derived from the **root** ingested column buffers when present (same idea as the pandas UI table in {doc}`PANDAS_UI`). When the logical plan applies filters or other transforms **without** replacing that root buffer, **`shape[0]`** may **not** equal the number of rows returned by **`to_dict()`**, **`collect()`**, or **`head()`** after execution. Use materialized output for an accurate row count.
 - **`info()`** returns a multi-line **string** summarizing column names, dtypes, and row count consistent with the **`shape`** policy above (not a full **`collect()`** unless documented elsewhere).
-- **`describe()`** (**0.21.0+**) returns a multi-line **string** after one **`to_dict()`** pass: **int** / **float** (mean, min, max, std where applicable), **bool** (true/false/null counts), **str** (counts, **`n_unique`**, min/max string length, nulls). Other dtypes are omitted.
-- **`value_counts(column)`** (**0.21.0+**) returns per-value counts via group-by aggregation (engine path); optional **`normalize=True`** returns fractions.
+- **`describe()`** (**0.20.0+**) returns a multi-line **string** after one **`to_dict()`** pass: **int** / **float** (mean, min, max, std where applicable), **bool** (true/false/null counts), **str** (counts, **`n_unique`**, min/max string length, nulls). Other dtypes are omitted.
+- **`value_counts(column)`** (**0.20.0+**) returns per-value counts via group-by aggregation (engine path); optional **`normalize=True`** returns fractions.
 
 ## Join semantics (collision + keys)
 
