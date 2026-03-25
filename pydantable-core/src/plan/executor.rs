@@ -13,6 +13,7 @@ pub trait PhysicalPlanExecutor {
         plan: &PlanInner,
         root_data: &Bound<'_, PyAny>,
         as_python_lists: bool,
+        streaming: bool,
     ) -> PyResult<PyObject>;
 }
 
@@ -27,8 +28,9 @@ impl PhysicalPlanExecutor for PolarsExecutor {
         plan: &PlanInner,
         root_data: &Bound<'_, PyAny>,
         as_python_lists: bool,
+        streaming: bool,
     ) -> PyResult<PyObject> {
-        PolarsExecutor::execute_plan(py, plan, root_data, as_python_lists)
+        PolarsExecutor::execute_plan(py, plan, root_data, as_python_lists, streaming)
     }
 }
 
@@ -40,8 +42,9 @@ impl PolarsExecutor {
         plan: &PlanInner,
         root_data: &Bound<'_, PyAny>,
         as_python_lists: bool,
+        streaming: bool,
     ) -> PyResult<PyObject> {
-        super::execute_polars::execute_plan_polars(py, plan, root_data, as_python_lists)
+        super::execute_polars::execute_plan_polars(py, plan, root_data, as_python_lists, streaming)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -56,6 +59,7 @@ impl PolarsExecutor {
         how: String,
         suffix: String,
         as_python_lists: bool,
+        streaming: bool,
     ) -> PyResult<(PyObject, PyObject)> {
         super::execute_polars::execute_join_polars(
             py,
@@ -68,6 +72,7 @@ impl PolarsExecutor {
             how,
             suffix,
             as_python_lists,
+            streaming,
         )
     }
 
@@ -78,6 +83,7 @@ impl PolarsExecutor {
         by: Vec<String>,
         aggregations: Vec<(String, String, String)>,
         as_python_lists: bool,
+        streaming: bool,
     ) -> PyResult<(PyObject, PyObject)> {
         super::execute_polars::execute_groupby_agg_polars(
             py,
@@ -86,6 +92,7 @@ impl PolarsExecutor {
             by,
             aggregations,
             as_python_lists,
+            streaming,
         )
     }
 
@@ -97,6 +104,7 @@ impl PolarsExecutor {
         right_root_data: &Bound<'_, PyAny>,
         how: String,
         as_python_lists: bool,
+        streaming: bool,
     ) -> PyResult<(PyObject, PyObject)> {
         super::execute_polars::execute_concat_polars(
             py,
@@ -106,6 +114,7 @@ impl PolarsExecutor {
             right_root_data,
             how,
             as_python_lists,
+            streaming,
         )
     }
 
@@ -119,6 +128,7 @@ impl PolarsExecutor {
         variable_name: String,
         value_name: String,
         as_python_lists: bool,
+        streaming: bool,
     ) -> PyResult<(PyObject, PyObject)> {
         super::execute_polars::execute_melt_polars(
             py,
@@ -129,6 +139,7 @@ impl PolarsExecutor {
             variable_name,
             value_name,
             as_python_lists,
+            streaming,
         )
     }
 
@@ -142,6 +153,7 @@ impl PolarsExecutor {
         values: Vec<String>,
         aggregate_function: String,
         as_python_lists: bool,
+        streaming: bool,
     ) -> PyResult<(PyObject, PyObject)> {
         super::execute_polars::execute_pivot_polars(
             py,
@@ -152,6 +164,7 @@ impl PolarsExecutor {
             values,
             aggregate_function,
             as_python_lists,
+            streaming,
         )
     }
 
@@ -160,8 +173,9 @@ impl PolarsExecutor {
         plan: &PlanInner,
         root_data: &Bound<'_, PyAny>,
         columns: Vec<String>,
+        streaming: bool,
     ) -> PyResult<(PyObject, PyObject)> {
-        super::execute_polars::execute_explode_polars(py, plan, root_data, columns)
+        super::execute_polars::execute_explode_polars(py, plan, root_data, columns, streaming)
     }
 
     pub fn unnest(
@@ -169,8 +183,9 @@ impl PolarsExecutor {
         plan: &PlanInner,
         root_data: &Bound<'_, PyAny>,
         columns: Vec<String>,
+        streaming: bool,
     ) -> PyResult<(PyObject, PyObject)> {
-        super::execute_polars::execute_unnest_polars(py, plan, root_data, columns)
+        super::execute_polars::execute_unnest_polars(py, plan, root_data, columns, streaming)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -184,6 +199,7 @@ impl PolarsExecutor {
         by: Option<Vec<String>>,
         aggregations: Vec<(String, String, String)>,
         as_python_lists: bool,
+        streaming: bool,
     ) -> PyResult<(PyObject, PyObject)> {
         super::execute_polars::execute_groupby_dynamic_agg_polars(
             py,
@@ -195,6 +211,7 @@ impl PolarsExecutor {
             by,
             aggregations,
             as_python_lists,
+            streaming,
         )
     }
 }
@@ -210,6 +227,7 @@ impl PhysicalPlanExecutor for RowwiseExecutor {
         plan: &PlanInner,
         root_data: &Bound<'_, PyAny>,
         _as_python_lists: bool,
+        _streaming: bool,
     ) -> PyResult<PyObject> {
         super::execute_rowwise::execute_plan_rowwise(py, plan, root_data, _as_python_lists)
     }

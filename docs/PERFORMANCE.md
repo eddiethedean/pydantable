@@ -19,7 +19,7 @@ End-to-end work splits roughly into:
 3. **Polars execution** — lazy plan `collect()` inside Rust (always synchronous inside the extension).
 4. **Rust → Python** — results are materialized as Python column lists (`dict[str, list]`) for the default Python API; `collect()` wraps rows as Pydantic models, and `to_dict()` exposes the columnar dict directly. Optional `to_polars()` builds a Polars `DataFrame` when the `polars` extra is installed.
 
-**Async handlers (0.15.0+):** `acollect` / `ato_dict` / `ato_polars` offload steps (3)+(4) to a thread pool so the asyncio loop stays free; **0.16.0** adds the same for **`ato_arrow`**. **Synchronous** **`read_parquet` / `read_ipc`** block the current thread. See {doc}`EXECUTION` and {doc}`FASTAPI`.
+**Async handlers (0.15.0+):** `acollect` / `ato_dict` / `ato_polars` offload steps (3)+(4) to a thread pool so the asyncio loop stays free; **0.16.0** adds the same for **`ato_arrow`**. **Synchronous** **`materialize_parquet` / `materialize_ipc`** block the current thread. See {doc}`EXECUTION` and {doc}`FASTAPI`.
 
 Ratios vs raw Polars/pandas in `benchmarks/pydantable_vs_*.py` reflect this stack, not only step (3).
 

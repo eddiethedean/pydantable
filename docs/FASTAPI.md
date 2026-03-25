@@ -13,8 +13,9 @@ For FastAPI services, `pydantable` gives you:
 - **`collect()`** — `list` of Pydantic models for the **current** projection (ideal for `response_model=list[YourRow]`)
 - **`to_dict()`** — `dict[str, list]` when the response is **column-shaped** JSON
 - **`acollect()`**, **`ato_dict()`**, **`ato_polars()`**, **`ato_arrow()`** — same semantics off the event loop (see below)
-- **`read_parquet()`** / **`read_ipc()`** / **`write_parquet()`** — load or persist **local files** via **`pydantable.io`** (Rust-first paths in the extension; **buffers** / **streaming IPC** / **column lists** need **`pyarrow`**, **`pip install 'pydantable[arrow]'`**; **dict writes** need **`polars`**, **`pip install 'pydantable[polars]'`**)
-- **`aread_parquet()`** / **`aread_ipc()`** / … — same as above off the event loop (**`asyncio.to_thread`**; optional **`executor=`**)
+- **`pydantable.io`** — **`read_*` / `materialize_*` / `export_*`** for **Parquet**, **Arrow IPC**, **CSV**, **NDJSON** (Rust-first on local paths where the wheel supports it; **PyArrow** for buffers, column subsets, streaming IPC). For **out-of-core** pipelines use **`read_*`** + transforms + **`DataFrame.write_parquet`**. Extras: **`[sql]`** (SQLAlchemy **`fetch_sql`**), **`[cloud]`** (**`fsspec`** URLs), **`[rap]`** (true-async CSV via **`aread_csv_rap`**). See **`pip install 'pydantable[io]'`** for **PyArrow + Polars** together.
+- **`amaterialize_parquet`**, **`amaterialize_ipc`**, **`amaterialize_csv`**, **`amaterialize_ndjson`** and **`aexport_parquet`**, **`aexport_ipc`**, **`aexport_csv`**, **`aexport_ndjson`** — eager file I/O **off the event loop** (**`asyncio.to_thread`** by default, or your **`executor=`**). Use inside **`async def`** when you need a full **`dict[str, list]`** (e.g. to pass into **`DataFrameModel`**), or to **export** columns to a path.
+- **`afetch_sql`** / **`awrite_sql`** — SQLAlchemy-backed table I/O without blocking the loop (same threading model).
 - **`to_arrow()`** — materialize a PyArrow **`Table`** after the same engine path as **`to_dict()`** (not zero-copy; see [`EXECUTION.md`](EXECUTION.md))
 
 **Synchronous materialization** (`collect()`, `to_dict()`, `collect(as_lists=True)`, optional `to_polars()`) runs **blocking** Rust + Polars work on the **current thread**.
@@ -96,18 +97,15 @@ Same schema rules apply as for columnar constructors in [`DATAFRAMEMODEL.md`](DA
 
 ## Parquet and Arrow IPC uploads (multipart)
 
-For **file** bodies, read bytes in the handler and use **`pydantable.read_parquet`** or **`read_ipc`** ( **`as_stream=True`** for streaming IPC); **`read_parquet`** / **`read_ipc`** on **bytes** require **`pyarrow`** (**`pip install 'pydantable[arrow]'`**). For **disk paths** inside workers, prefer **`await aread_parquet(path)`** so the event loop stays free. FastAPI file routes require **`python-multipart`** (`pip install python-multipart`).
+For **file** bodies, read bytes in the handler and use **`materialize_parquet`** / **`materialize_ipc`** from **`pydantable.io`** ( **`as_stream=True`** for streaming IPC); reads from **bytes** require **`pyarrow`** (**`pip install 'pydantable[arrow]'`** or **`[io]`**). That **`materialize_*`** call is still **blocking** while PyArrow decodes—either keep uploads small or offload with **`asyncio.to_thread(materialize_parquet, raw, …)`** / **`run_in_executor`**. For **paths on disk** (shared volume, temp file after **`await file.read()`**), prefer **`await amaterialize_parquet(path)`** so the pattern is consistent with other async routes. FastAPI file routes require **`python-multipart`** (`pip install python-multipart`).
 
 Use **`trusted_mode="shape_only"`** or **`strict`** for internal uploads where the file is already schema-shaped; use default validation for untrusted clients.
 
 ```python
-from io import BytesIO
-
-import pyarrow as pa
-import pyarrow.parquet as pq
 from fastapi import FastAPI, UploadFile
 
-from pydantable import DataFrameModel, read_parquet
+from pydantable import DataFrameModel
+from pydantable.io import materialize_parquet
 
 
 class UserDF(DataFrameModel):
@@ -121,30 +119,133 @@ app = FastAPI()
 @app.post("/upload-parquet")
 async def upload_parquet(file: UploadFile):
     raw = await file.read()
-    cols = read_parquet(raw)
+    cols = materialize_parquet(raw)
     df = UserDF(cols, trusted_mode="shape_only")
     return df.to_dict()
 ```
 
-## Async SQL (`aread_sql`) and experimental URLs
+## `pydantable.io` async I/O in `async def` routes
 
-**SQLAlchemy 2.x** ( **`pip install 'pydantable[sql]'`** plus your **DBAPI** driver): **`read_sql`** / **`write_sql`** work with **any** SQLAlchemy-supported URL (**PostgreSQL**, **MySQL**, **SQLite**, **SQL Server**, …). Async routes use **`aread_sql`** / **`awrite_sql`** (**`asyncio.to_thread`** under the hood). Keep **`SELECT`** statements parameterized; never build SQL from untrusted request fields without binds.
+For **FastAPI**, the **`amaterialize_*`**, **`aread_*`**, **`afetch_sql`**, **`aexport_*`**, and **`awrite_sql`** helpers in **`pydantable.io`** mirror the sync API but run work in **`asyncio.to_thread`** (or in a **`ThreadPoolExecutor`** you pass as **`executor=`**). That keeps the ASGI event loop responsive while **Rust**, **PyArrow**, **stdlib CSV**, or **SQLAlchemy** does blocking I/O.
+
+**Install** what you need:
+
+```bash
+pip install 'pydantable[io]'      # PyArrow + Polars for columnar paths / fallbacks
+pip install 'pydantable[sql]'     # SQLAlchemy only; add your DB driver (psycopg, pymysql, …)
+pip install 'pydantable[cloud]'   # fsspec for s3://, gs://, file://, … (experimental)
+pip install 'pydantable[rap]'     # optional: aread_csv_rap (rapcsv + rapfiles)
+```
+
+| Sync | Async | Typical use in a route |
+|------|-------|-------------------------|
+| **`read_parquet`** (lazy root) | **`aread_parquet`** | Large local Parquet without full Python dict |
+| **`materialize_parquet`** | **`amaterialize_parquet`** | Eager columns from path or bytes |
+| **`materialize_ipc`** | **`amaterialize_ipc`** | Arrow IPC / Feather file |
+| **`materialize_csv`** | **`amaterialize_csv`** | CSV path |
+| **`materialize_ndjson`** | **`amaterialize_ndjson`** | NDJSON / JSON-lines file |
+| **`export_parquet`** | **`aexport_parquet`** | Persist column dict to Parquet |
+| **`export_ipc`** / **`export_csv`** / **`export_ndjson`** | **`aexport_*`** | Same for other formats |
+| **`fetch_sql`** | **`afetch_sql`** | Parameterized **`SELECT`** → **`dict[str, list]`** |
+| **`write_sql`** | **`awrite_sql`** | Append or replace table from column dict |
+
+**`DataFrame.write_parquet`** (and siblings) are synchronous (Rust); call them from a thread pool inside **`async def`** if the write can be large. All **`amaterialize_*`** / **`aread_*`** / **`afetch_*`** / **`aexport_*`** / **`awrite_sql`** accept **`executor=`** (same semantics as **`df.acollect(executor=…)`**). Reuse one bounded **`ThreadPoolExecutor`** from **`app.state`** or **`Depends`** for dataframe materialization **and** file/SQL I/O so load is predictable under concurrency.
+
+### Example: read a Parquet path without blocking the loop
 
 ```python
-from pydantable.io import aread_sql
+from fastapi import FastAPI
+
+from pydantable import DataFrameModel
+from pydantable.io import amaterialize_parquet
+
+
+class RowDF(DataFrameModel):
+    id: int
+    name: str
+
+
+app = FastAPI()
+
+
+@app.get("/from-parquet-path")
+async def from_parquet_path(path: str):
+    cols = await amaterialize_parquet(path)
+    df = RowDF(cols, trusted_mode="shape_only")
+    return await df.ato_dict()
+```
+
+### Example: upload → temp file → async read
+
+For large uploads, avoid holding **`bytes`** longer than necessary: write to a temp path, **`amaterialize_*`**, then delete.
+
+```python
+import tempfile
+from pathlib import Path
+
+from fastapi import FastAPI, UploadFile
+
+from pydantable.io import amaterialize_parquet
+
+
+app = FastAPI()
+
+
+@app.post("/upload-parquet-async")
+async def upload_parquet_async(file: UploadFile):
+    suffix = Path(file.filename or "upload").suffix or ".parquet"
+    data = await file.read()
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(data)
+        path = tmp.name
+    try:
+        return await amaterialize_parquet(path)
+    finally:
+        Path(path).unlink(missing_ok=True)
+```
+
+### Async SQL (`afetch_sql` / `awrite_sql`)
+
+**SQLAlchemy 2.x** (**`pip install 'pydantable[sql]'`** plus your **DBAPI** driver): **`fetch_sql`** / **`write_sql`** support any SQLAlchemy URL (**PostgreSQL**, **MySQL**, **SQLite**, **SQL Server**, …). In **`async def`** handlers, use **`afetch_sql`** / **`awrite_sql`**. Keep **`SELECT`** parameterized; never build SQL from untrusted request fields without binds.
+
+```python
+from typing import Annotated, Any
+
+from fastapi import Body
+
+from pydantable.io import afetch_sql, awrite_sql
 
 
 @app.get("/rows")
 async def rows(database_url: str):
-    cols = await aread_sql(
+    cols = await afetch_sql(
         "SELECT id, name FROM t WHERE active = :a",
         database_url,
         parameters={"a": True},
     )
     return cols
+
+
+@app.post("/bulk-insert")
+async def bulk_insert(
+    database_url: str,
+    cols: Annotated[dict[str, list[Any]], Body(...)],
+):
+    await awrite_sql(cols, "staging_events", database_url, if_exists="append")
+    return {"ok": True}
 ```
 
-**HTTP(S) Parquet** (experimental): set **`PYDANTABLE_IO_EXPERIMENTAL=1`** or pass **`experimental=True`** to **`read_parquet_url`** (downloads via stdlib **`urllib`**, then PyArrow).
+### Experimental HTTP(S) and object-store URLs
+
+**HTTP(S)** helpers download with stdlib **`urllib`**, then parse (**experimental**): set **`PYDANTABLE_IO_EXPERIMENTAL=1`** or pass **`experimental=True`** to **`fetch_parquet_url`**, **`fetch_csv_url`**, **`fetch_ndjson_url`**, or **`fetch_bytes`**. Do not fetch untrusted URLs without size limits and timeouts at your gateway.
+
+**Object-style URIs** (**`s3://`**, **`gs://`**, **`file://`**, …) use **`read_from_object_store`** with **`fsspec`** (**`pip install 'pydantable[cloud]'`** + backend drivers as needed). Same experimental flag / parameter as other URL helpers.
+
+### Optional: true-async CSV with **`aread_csv_rap`**
+
+**`amaterialize_csv`** uses **`asyncio.to_thread`** around sync/Rust paths. **`aread_csv_rap`** (**`pip install 'pydantable[rap]'`**) uses **rapcsv** + **rapfiles** for async file reads without that thread offload—useful if you standardize on the **`[rap]`** stack. From sync code only, **`materialize_csv(..., use_rap=True)`** delegates to **`asyncio.run(aread_csv_rap(...))`** when no event loop is running (see **`pydantable.io`** docstrings).
+
+Tier-2/3 readers (**Excel**, **BigQuery**, **Snowflake**, **Kafka**, …) live under **`pydantable.io.extras`**; they are mostly **sync** SDK calls—wrap them in **`asyncio.to_thread`** (or your shared **`executor=`**) from **`async def`** routes the same way. Planning reference: [`DATA_IO_SOURCES.md`](DATA_IO_SOURCES.md).
 
 ## Injectable executor with `Depends`
 
@@ -184,6 +285,8 @@ async def create_users_async(
 ```
 
 Pass **`executor=None`** (omit **`Depends`**) to keep **`asyncio.to_thread`** as in the [Async routes](#async-routes-executors-and-lifespan) example.
+
+Use the **same** injected executor for **`await amaterialize_parquet(..., executor=ex)`** / **`await afetch_sql(..., executor=ex)`** when you want file and SQL I/O to share the pool with **`await df.acollect(executor=ex)`**.
 
 ## Background tasks
 

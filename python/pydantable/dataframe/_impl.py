@@ -15,6 +15,7 @@ import enum
 import functools
 import html
 import importlib
+import os
 import statistics
 import types
 import warnings
@@ -38,6 +39,7 @@ from pydantable.display import get_repr_html_limits
 from pydantable.expressions import ColumnRef, Expr
 from pydantable.rust_engine import (
     _require_rust_core,
+    collect_batches as rust_collect_batches,
     execute_concat,
     execute_explode,
     execute_groupby_agg,
@@ -47,6 +49,10 @@ from pydantable.rust_engine import (
     execute_pivot,
     execute_plan,
     execute_unnest,
+    write_csv as rust_write_csv,
+    write_ipc as rust_write_ipc,
+    write_ndjson as rust_write_ndjson,
+    write_parquet as rust_write_parquet,
 )
 from pydantable.schema import (
     _annotation_nullable_inner,
@@ -67,6 +73,12 @@ if TYPE_CHECKING:
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
 _NoneType = type(None)
+
+
+def _is_scan_file_root(obj: Any) -> bool:
+    t = type(obj)
+    return t.__name__ == "ScanFileRoot" and getattr(t, "__module__", "") == "pydantable._core"
+
 
 # Cap column listing in :meth:`DataFrame.__repr__` for very wide schemas.
 _REPR_MAX_COLUMNS = 32
@@ -378,6 +390,17 @@ class WithColumnsStep:
     columns: dict[str, Expr]
 
 
+_ENGINE_STREAMING_ENV = "PYDANTABLE_ENGINE_STREAMING"
+
+
+def _resolve_engine_streaming(explicit: bool | None) -> bool:
+    """Polars collect engine: ``streaming=True`` or env ``PYDANTABLE_ENGINE_STREAMING=1``."""
+    if explicit is not None:
+        return explicit
+    v = os.environ.get(_ENGINE_STREAMING_ENV, "").strip().lower()
+    return v in ("1", "true", "yes")
+
+
 class DataFrame(Generic[SchemaT]):
     """Strongly typed lazy table: schema at construction, transforms, then ``collect``.
 
@@ -427,6 +450,83 @@ class DataFrame(Generic[SchemaT]):
         self._rust_plan = _require_rust_core().make_plan(self.schema_fields())
 
     @classmethod
+    def _from_scan_root(cls, root: Any) -> DataFrame[Any]:
+        """Build a lazy frame from :class:`pydantable._core.ScanFileRoot` (no column validation yet)."""
+        if cls._schema_type is None:
+            raise TypeError(
+                "Use DataFrame[SchemaType].read_* to construct from a lazy file read."
+            )
+        rust = _require_rust_core()
+        plan = rust.make_plan(schema_field_types(cls._schema_type))
+        return cls._from_plan(
+            root_data=root,
+            root_schema_type=cls._schema_type,
+            current_schema_type=cls._schema_type,
+            rust_plan=plan,
+        )
+
+    @classmethod
+    def read_parquet(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+    ) -> DataFrame[Any]:
+        """Lazy Parquet read (local file path)."""
+        from pydantable.io import read_parquet as _read_parquet
+
+        return cls._from_scan_root(_read_parquet(path, columns=columns))
+
+    @classmethod
+    def read_parquet_url(
+        cls,
+        url: str,
+        *,
+        experimental: bool = True,
+        columns: list[str] | None = None,
+        **kwargs: Any,
+    ) -> DataFrame[Any]:
+        """Lazy Parquet read after HTTP(S) download to a temp file (see {doc}`DATA_IO_SOURCES`)."""
+        from pydantable.io import read_parquet_url as _read_parquet_url
+
+        return cls._from_scan_root(
+            _read_parquet_url(url, experimental=experimental, columns=columns, **kwargs)
+        )
+
+    @classmethod
+    def read_csv(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+    ) -> DataFrame[Any]:
+        from pydantable.io import read_csv as _read_csv
+
+        return cls._from_scan_root(_read_csv(path, columns=columns))
+
+    @classmethod
+    def read_ndjson(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+    ) -> DataFrame[Any]:
+        from pydantable.io import read_ndjson as _read_ndjson
+
+        return cls._from_scan_root(_read_ndjson(path, columns=columns))
+
+    @classmethod
+    def read_ipc(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+    ) -> DataFrame[Any]:
+        from pydantable.io import read_ipc as _read_ipc
+
+        return cls._from_scan_root(_read_ipc(path, columns=columns))
+
+    @classmethod
     def _from_plan(
         cls,
         *,
@@ -467,6 +567,8 @@ class DataFrame(Generic[SchemaT]):
         if not self._root_data:
             return (0, len(self._current_field_types))
         rd = self._root_data
+        if _is_scan_file_root(rd):
+            return (0, len(self._current_field_types))
         if _is_polars_dataframe(rd):
             return (len(rd), len(self._current_field_types))
         first = next(iter(rd.values()))
@@ -1033,7 +1135,9 @@ class DataFrame(Generic[SchemaT]):
         value_vars: Sequence[str] | None = None,
         variable_name: str = "variable",
         value_name: str = "value",
+        streaming: bool | None = None,
     ) -> DataFrame[Any]:
+        use_streaming = _resolve_engine_streaming(streaming)
         out_data, schema_descriptors = execute_melt(
             self._rust_plan,
             self._root_data,
@@ -1042,6 +1146,7 @@ class DataFrame(Generic[SchemaT]):
             variable_name,
             value_name,
             as_python_lists=True,
+            streaming=use_streaming,
         )
         derived_fields = self._field_types_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
@@ -1077,6 +1182,7 @@ class DataFrame(Generic[SchemaT]):
         columns: str | ColumnRef,
         values: str | Sequence[str],
         aggregate_function: str = "first",
+        streaming: bool | None = None,
     ) -> DataFrame[Any]:
         index_cols = [index] if isinstance(index, str) else list(index)
         if isinstance(columns, str):
@@ -1094,6 +1200,7 @@ class DataFrame(Generic[SchemaT]):
                 "pivot(columns=...) expects a column name or single-column ColumnRef."
             )
         value_cols = [values] if isinstance(values, str) else list(values)
+        use_streaming = _resolve_engine_streaming(streaming)
         out_data, schema_descriptors = execute_pivot(
             self._rust_plan,
             self._root_data,
@@ -1102,6 +1209,7 @@ class DataFrame(Generic[SchemaT]):
             value_cols,
             aggregate_function,
             as_python_lists=True,
+            streaming=use_streaming,
         )
         derived_fields = self._field_types_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
@@ -1115,10 +1223,13 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
-    def explode(self, columns: str | Sequence[str]) -> DataFrame[Any]:
+    def explode(
+        self, columns: str | Sequence[str], *, streaming: bool | None = None
+    ) -> DataFrame[Any]:
         cols = [columns] if isinstance(columns, str) else list(columns)
+        use_streaming = _resolve_engine_streaming(streaming)
         out_data, schema_descriptors = execute_explode(
-            self._rust_plan, self._root_data, cols
+            self._rust_plan, self._root_data, cols, streaming=use_streaming
         )
         derived_fields = self._field_types_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
@@ -1132,10 +1243,13 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
-    def unnest(self, columns: str | Sequence[str]) -> DataFrame[Any]:
+    def unnest(
+        self, columns: str | Sequence[str], *, streaming: bool | None = None
+    ) -> DataFrame[Any]:
         cols = [columns] if isinstance(columns, str) else list(columns)
+        use_streaming = _resolve_engine_streaming(streaming)
         out_data, schema_descriptors = execute_unnest(
-            self._rust_plan, self._root_data, cols
+            self._rust_plan, self._root_data, cols, streaming=use_streaming
         )
         derived_fields = self._field_types_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
@@ -1158,6 +1272,7 @@ class DataFrame(Generic[SchemaT]):
         right_on: str | Expr | Sequence[str | Expr] | None = None,
         how: str = "inner",
         suffix: str = "_right",
+        streaming: bool | None = None,
     ) -> DataFrame[Any]:
         """Join two frames on key column(s); ``how`` is e.g. ``inner``, ``left``."""
         if not isinstance(other, DataFrame):
@@ -1211,6 +1326,7 @@ class DataFrame(Generic[SchemaT]):
                     "join() left_on and right_on must have the same length."
                 )
 
+        use_streaming = _resolve_engine_streaming(streaming)
         joined_data, schema_descriptors = execute_join(
             self._rust_plan,
             self._root_data,
@@ -1221,6 +1337,7 @@ class DataFrame(Generic[SchemaT]):
             how,
             suffix,
             as_python_lists=True,
+            streaming=use_streaming,
         )
         join_prev = previous_field_types_for_join(
             self._current_field_types,
@@ -1395,6 +1512,7 @@ class DataFrame(Generic[SchemaT]):
         as_lists: bool = False,
         as_numpy: bool = False,
         as_polars: bool | None = None,
+        streaming: bool | None = None,
     ) -> Any:
         """
         Materialize this typed logical DataFrame.
@@ -1411,6 +1529,11 @@ class DataFrame(Generic[SchemaT]):
         With ``as_numpy=True``, returns ``dict[str, numpy.ndarray]`` (requires
         ``numpy``).
 
+        With ``streaming=True``, or when the environment variable
+        ``PYDANTABLE_ENGINE_STREAMING`` is set to a truthy value (and
+        ``streaming`` is omitted), Polars uses its streaming engine for
+        ``collect`` where supported (best-effort; some plans fall back or error).
+
         The ``as_polars`` argument is deprecated: use :meth:`to_polars` for a
         Polars ``DataFrame`` when the optional ``polars`` package is installed.
         """
@@ -1422,16 +1545,18 @@ class DataFrame(Generic[SchemaT]):
                 stacklevel=2,
             )
             if as_polars:
-                return self.to_polars()
-            return self.to_dict()
+                return self.to_polars(streaming=streaming)
+            return self.to_dict(streaming=streaming)
         if as_numpy and as_lists:
             raise ValueError(
                 "collect() cannot specify both as_numpy=True and as_lists=True."
             )
+        use_streaming = _resolve_engine_streaming(streaming)
         column_dict = execute_plan(
             self._rust_plan,
             self._root_data,
             as_python_lists=True,
+            streaming=use_streaming,
             error_context=self._materialize_error_context(),
         )
         column_dict = _coerce_enum_columns(column_dict, self._current_field_types)
@@ -1443,26 +1568,102 @@ class DataFrame(Generic[SchemaT]):
             return {k: np.asarray(v) for k, v in column_dict.items()}
         return _rows_from_column_dict(column_dict, self._current_schema_type)
 
-    def to_dict(self) -> dict[str, list[Any]]:
+    def to_dict(self, *, streaming: bool | None = None) -> dict[str, list[Any]]:
         """Columnar materialization (alias for ``collect(as_lists=True)`` shape).
 
         **Cost:** full Rust execution for the current plan. See {doc}`EXECUTION`.
+        Pass ``streaming=`` or set ``PYDANTABLE_ENGINE_STREAMING`` like :meth:`collect`.
         """
+        use_streaming = _resolve_engine_streaming(streaming)
         raw = execute_plan(
             self._rust_plan,
             self._root_data,
             as_python_lists=True,
+            streaming=use_streaming,
             error_context=self._materialize_error_context(),
         )
         return _coerce_enum_columns(raw, self._current_field_types)
 
-    def to_polars(self) -> Any:
+    def write_parquet(
+        self, path: str | Any, *, streaming: bool | None = None
+    ) -> None:
+        """Write this lazy plan to Parquet without building a Python ``dict[str, list]``.
+
+        Optional ``streaming=`` (or ``PYDANTABLE_ENGINE_STREAMING``) uses Polars
+        streaming collect before writing, when supported.
+        """
+        use_streaming = _resolve_engine_streaming(streaming)
+        rust_write_parquet(
+            self._rust_plan, self._root_data, str(path), streaming=use_streaming
+        )
+
+    def write_csv(
+        self,
+        path: str | Any,
+        *,
+        streaming: bool | None = None,
+        separator: str = ",",
+    ) -> None:
+        """Write this lazy plan to CSV from Rust (no Python column dict)."""
+        if len(separator) != 1:
+            raise ValueError("write_csv separator must be a single character.")
+        use_streaming = _resolve_engine_streaming(streaming)
+        rust_write_csv(
+            self._rust_plan,
+            self._root_data,
+            str(path),
+            streaming=use_streaming,
+            separator=ord(separator),
+        )
+
+    def write_ipc(
+        self,
+        path: str | Any,
+        *,
+        streaming: bool | None = None,
+        compression: str | None = None,
+    ) -> None:
+        """Write Arrow IPC file from Rust. ``compression`` is ``None``, ``'lz4'``, or ``'zstd'``."""
+        use_streaming = _resolve_engine_streaming(streaming)
+        rust_write_ipc(
+            self._rust_plan,
+            self._root_data,
+            str(path),
+            streaming=use_streaming,
+            compression=compression,
+        )
+
+    def write_ndjson(
+        self, path: str | Any, *, streaming: bool | None = None
+    ) -> None:
+        """Write newline-delimited JSON from Rust."""
+        use_streaming = _resolve_engine_streaming(streaming)
+        rust_write_ndjson(
+            self._rust_plan, self._root_data, str(path), streaming=use_streaming
+        )
+
+    def collect_batches(
+        self,
+        *,
+        batch_size: int = 65_536,
+        streaming: bool | None = None,
+    ) -> list[Any]:
+        """Return Polars ``DataFrame`` chunks after one engine collect (see {doc}`EXECUTION`)."""
+        use_streaming = _resolve_engine_streaming(streaming)
+        return rust_collect_batches(
+            self._rust_plan,
+            self._root_data,
+            batch_size=batch_size,
+            streaming=use_streaming,
+        )
+
+    def to_polars(self, *, streaming: bool | None = None) -> Any:
         """
         Materialize as a Polars ``DataFrame`` (requires the optional ``polars``
         Python package: ``pip install 'pydantable[polars]'``).
 
         **Cost:** builds a columnar dict via the Rust engine, then a Polars frame.
-        See {doc}`EXECUTION`.
+        See {doc}`EXECUTION`. Optional ``streaming=`` matches :meth:`collect`.
         """
         try:
             pl = importlib.import_module("polars")
@@ -1471,9 +1672,9 @@ class DataFrame(Generic[SchemaT]):
                 "polars is required for to_polars(). Install with: "
                 "pip install 'pydantable[polars]'"
             ) from e
-        return pl.DataFrame(self.to_dict())
+        return pl.DataFrame(self.to_dict(streaming=streaming))
 
-    def to_arrow(self) -> Any:
+    def to_arrow(self, *, streaming: bool | None = None) -> Any:
         """
         Materialize as a PyArrow ``Table`` (requires the optional ``pyarrow``
         package: ``pip install 'pydantable[arrow]'``).
@@ -1481,6 +1682,7 @@ class DataFrame(Generic[SchemaT]):
         This runs the same Rust execution path as :meth:`to_dict`, then builds
         Arrow arrays from Python lists—it is not a zero-copy export of internal
         buffers. **Cost:** same materialization class as :meth:`to_dict`.
+        Optional ``streaming=`` matches :meth:`collect`.
         """
         try:
             pa = importlib.import_module("pyarrow")
@@ -1489,7 +1691,7 @@ class DataFrame(Generic[SchemaT]):
                 "pyarrow is required for to_arrow(). Install with: "
                 "pip install 'pydantable[arrow]'"
             ) from e
-        return pa.Table.from_pydict(self.to_dict())
+        return pa.Table.from_pydict(self.to_dict(streaming=streaming))
 
     def __dataframe__(
         self, *, nan_as_null: bool = False, allow_copy: bool = True
@@ -1545,6 +1747,7 @@ class DataFrame(Generic[SchemaT]):
         as_lists: bool = False,
         as_numpy: bool = False,
         as_polars: bool | None = None,
+        streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> Any:
         """
@@ -1560,6 +1763,7 @@ class DataFrame(Generic[SchemaT]):
                 as_lists=as_lists,
                 as_numpy=as_numpy,
                 as_polars=as_polars,
+                streaming=streaming,
             ),
             executor=executor,
         )
@@ -1567,17 +1771,19 @@ class DataFrame(Generic[SchemaT]):
     async def ato_dict(
         self,
         *,
+        streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> dict[str, list[Any]]:
         """Async version of :meth:`to_dict` (see :meth:`acollect`)."""
         return await _materialize_in_thread(
-            functools.partial(self.to_dict),
+            functools.partial(self.to_dict, streaming=streaming),
             executor=executor,
         )
 
     async def ato_polars(
         self,
         *,
+        streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> Any:
         """
@@ -1587,13 +1793,14 @@ class DataFrame(Generic[SchemaT]):
         Polars frame—same copies as the synchronous path.
         """
         return await _materialize_in_thread(
-            functools.partial(self.to_polars),
+            functools.partial(self.to_polars, streaming=streaming),
             executor=executor,
         )
 
     async def ato_arrow(
         self,
         *,
+        streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> Any:
         """
@@ -1602,7 +1809,7 @@ class DataFrame(Generic[SchemaT]):
         Same materialization and copies as the synchronous path.
         """
         return await _materialize_in_thread(
-            functools.partial(self.to_arrow),
+            functools.partial(self.to_arrow, streaming=streaming),
             executor=executor,
         )
 
@@ -1612,6 +1819,7 @@ class DataFrame(Generic[SchemaT]):
         dfs: Sequence[DataFrame[Any]],
         *,
         how: str = "vertical",
+        streaming: bool | None = None,
     ) -> DataFrame[Any]:
         """Stack or otherwise combine two or more frames (see Rust ``how`` values)."""
         if len(dfs) < 2:
@@ -1621,6 +1829,7 @@ class DataFrame(Generic[SchemaT]):
         out_schema_type = base._current_schema_type
         merged_ft = dict(base._current_field_types)
         out_plan = base._rust_plan
+        use_streaming = _resolve_engine_streaming(streaming)
         for df in dfs[1:]:
             out_data, schema_descriptors = execute_concat(
                 out_plan,
@@ -1629,6 +1838,7 @@ class DataFrame(Generic[SchemaT]):
                 df._root_data,
                 how,
                 as_python_lists=True,
+                streaming=use_streaming,
             )
             derived_fields = schema_from_descriptors(schema_descriptors)
             merged_ft = merge_field_types_preserving_identity(
@@ -1668,7 +1878,12 @@ class GroupedDataFrame:
             f"<b>GroupedDataFrame</b> (by={keys_s})</p>{inner}</div>"
         )
 
-    def agg(self, **aggregations: tuple[str, str] | tuple[str, Expr]) -> DataFrame[Any]:
+    def agg(
+        self,
+        *,
+        streaming: bool | None = None,
+        **aggregations: tuple[str, str] | tuple[str, Expr],
+    ) -> DataFrame[Any]:
         """One output column per kwarg: ``name=(op, column_or_expr)``."""
         agg_specs: dict[str, tuple[str, str]] = {}
         for out_name, spec in aggregations.items():
@@ -1697,12 +1912,14 @@ class GroupedDataFrame:
                 )
             agg_specs[out_name] = (op, in_col)
 
+        use_streaming = _resolve_engine_streaming(streaming)
         grouped_data, schema_descriptors = execute_groupby_agg(
             self._df._rust_plan,
             self._df._root_data,
             self._keys,
             agg_specs,
             as_python_lists=True,
+            streaming=use_streaming,
         )
         derived_fields = self._df._field_types_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
@@ -1760,7 +1977,12 @@ class DynamicGroupedDataFrame:
             f"<b>{hdr}</b></p>{inner}</div>"
         )
 
-    def agg(self, **aggregations: tuple[str, str]) -> DataFrame[Any]:
+    def agg(
+        self,
+        *,
+        streaming: bool | None = None,
+        **aggregations: tuple[str, str],
+    ) -> DataFrame[Any]:
         """Same as :meth:`GroupedDataFrame.agg`; column specs are strings only."""
         agg_specs: dict[str, tuple[str, str]] = {}
         for out_name, spec in aggregations.items():
@@ -1774,6 +1996,7 @@ class DynamicGroupedDataFrame:
                 raise TypeError("agg() op and column must be strings.")
             agg_specs[out_name] = (op, in_col)
 
+        use_streaming = _resolve_engine_streaming(streaming)
         out_data, schema_descriptors = execute_groupby_dynamic_agg(
             self._df._rust_plan,
             self._df._root_data,
@@ -1783,6 +2006,7 @@ class DynamicGroupedDataFrame:
             self._by if self._by else None,
             agg_specs,
             as_python_lists=True,
+            streaming=use_streaming,
         )
         derived_fields = self._df._field_types_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(

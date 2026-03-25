@@ -50,9 +50,12 @@ def execute_plan(
     data: Any,
     *,
     as_python_lists: bool = False,
+    streaming: bool = False,
     error_context: str | None = None,
 ) -> Any:
     """Run a full plan to materialized columns (lists or native, per flag).
+
+    ``streaming=True`` requests Polars' streaming collect engine where supported.
 
     If ``PYDANTABLE_VERBOSE_ERRORS`` is set to a truthy value and
     ``error_context`` is provided, :exc:`ValueError` from the engine is
@@ -62,11 +65,83 @@ def execute_plan(
     if not hasattr(rust, "execute_plan"):
         raise NotImplementedError("Rust extension does not implement `execute_plan`.")
     try:
-        return rust.execute_plan(plan, data, as_python_lists)
+        return rust.execute_plan(plan, data, as_python_lists, streaming)
     except ValueError as e:
         if _verbose_plan_errors_enabled() and error_context:
             raise ValueError(f"{e}\n[context: {error_context}]") from e
         raise
+
+
+def write_parquet(
+    plan: Any, root_data: Any, path: str, *, streaming: bool = False
+) -> None:
+    """Write lazy plan + root to Parquet via Rust (no Python ``dict[str, list]``)."""
+    rust = _require_rust_core()
+    if not hasattr(rust, "sink_parquet"):
+        raise NotImplementedError("Rust extension does not implement `sink_parquet`.")
+    rust.sink_parquet(plan, root_data, path, streaming)
+
+
+def write_csv(
+    plan: Any,
+    root_data: Any,
+    path: str,
+    *,
+    streaming: bool = False,
+    separator: int = ord(","),
+) -> None:
+    """Write lazy plan + root to CSV via Rust."""
+    rust = _require_rust_core()
+    if not hasattr(rust, "sink_csv"):
+        raise NotImplementedError("Rust extension does not implement `sink_csv`.")
+    rust.sink_csv(plan, root_data, path, streaming, separator & 0xFF)
+
+
+def write_ipc(
+    plan: Any,
+    root_data: Any,
+    path: str,
+    *,
+    streaming: bool = False,
+    compression: str | None = None,
+) -> None:
+    """Write lazy plan + root to Arrow IPC file via Rust."""
+    rust = _require_rust_core()
+    if not hasattr(rust, "sink_ipc"):
+        raise NotImplementedError("Rust extension does not implement `sink_ipc`.")
+    rust.sink_ipc(plan, root_data, path, streaming, compression)
+
+
+def write_ndjson(
+    plan: Any, root_data: Any, path: str, *, streaming: bool = False
+) -> None:
+    """Write lazy plan + root as newline-delimited JSON via Rust."""
+    rust = _require_rust_core()
+    if not hasattr(rust, "sink_ndjson"):
+        raise NotImplementedError("Rust extension does not implement `sink_ndjson`.")
+    rust.sink_ndjson(plan, root_data, path, streaming)
+
+
+def collect_batches(
+    plan: Any,
+    root_data: Any,
+    *,
+    batch_size: int = 65_536,
+    streaming: bool = False,
+) -> list[Any]:
+    """Materialize the plan and return a list of Polars ``DataFrame`` chunks (via IPC).
+
+    The engine performs a full collect first, then slices rows—this is not Polars'
+    native lazy batch iterator.
+    """
+    rust = _require_rust_core()
+    if not hasattr(rust, "collect_plan_batches"):
+        raise NotImplementedError(
+            "Rust extension does not implement `collect_plan_batches`."
+        )
+    return list(
+        rust.collect_plan_batches(plan, root_data, batch_size, streaming)
+    )
 
 
 def execute_join(
@@ -80,6 +155,7 @@ def execute_join(
     suffix: str,
     *,
     as_python_lists: bool = False,
+    streaming: bool = False,
 ) -> tuple[Any, Any]:
     """Join two plan/data roots; returns ``(new_data, schema_descriptors)``."""
     rust = _require_rust_core()
@@ -95,6 +171,7 @@ def execute_join(
         how,
         suffix,
         as_python_lists,
+        streaming,
     )
 
 
@@ -105,6 +182,7 @@ def execute_groupby_agg(
     aggregations: Any,
     *,
     as_python_lists: bool = False,
+    streaming: bool = False,
 ) -> tuple[Any, Any]:
     """Group and aggregate; returns materialized data and output schema descriptors."""
     rust = _require_rust_core()
@@ -113,7 +191,7 @@ def execute_groupby_agg(
             "Rust extension does not implement `execute_groupby_agg`."
         )
     return rust.execute_groupby_agg(
-        plan, root_data, list(by), aggregations, as_python_lists
+        plan, root_data, list(by), aggregations, as_python_lists, streaming
     )
 
 
@@ -125,6 +203,7 @@ def execute_concat(
     how: str,
     *,
     as_python_lists: bool = False,
+    streaming: bool = False,
 ) -> tuple[Any, Any]:
     """Concatenate two frames (e.g. vertical stack)."""
     rust = _require_rust_core()
@@ -135,6 +214,7 @@ def execute_concat(
         right_root_data,
         how,
         as_python_lists,
+        streaming,
     )
 
 
@@ -147,6 +227,7 @@ def execute_melt(
     value_name: str,
     *,
     as_python_lists: bool = False,
+    streaming: bool = False,
 ) -> tuple[Any, Any]:
     """Unpivot to long format (melt)."""
     rust = _require_rust_core()
@@ -158,6 +239,7 @@ def execute_melt(
         variable_name,
         value_name,
         as_python_lists,
+        streaming,
     )
 
 
@@ -170,6 +252,7 @@ def execute_pivot(
     aggregate_function: str,
     *,
     as_python_lists: bool = False,
+    streaming: bool = False,
 ) -> tuple[Any, Any]:
     """Pivot with aggregation."""
     rust = _require_rust_core()
@@ -181,6 +264,7 @@ def execute_pivot(
         list(values),
         aggregate_function,
         as_python_lists,
+        streaming,
     )
 
 
@@ -188,20 +272,24 @@ def execute_explode(
     plan: Any,
     root_data: Any,
     columns: Sequence[str],
+    *,
+    streaming: bool = False,
 ) -> tuple[Any, Any]:
     """Explode list columns to one row per element."""
     rust = _require_rust_core()
-    return rust.execute_explode(plan, root_data, list(columns))
+    return rust.execute_explode(plan, root_data, list(columns), streaming)
 
 
 def execute_unnest(
     plan: Any,
     root_data: Any,
     columns: Sequence[str],
+    *,
+    streaming: bool = False,
 ) -> tuple[Any, Any]:
     """Unnest struct columns into top-level fields."""
     rust = _require_rust_core()
-    return rust.execute_unnest(plan, root_data, list(columns))
+    return rust.execute_unnest(plan, root_data, list(columns), streaming)
 
 
 def execute_rolling_agg(
@@ -232,9 +320,18 @@ def execute_groupby_dynamic_agg(
     aggregations: Any,
     *,
     as_python_lists: bool = False,
+    streaming: bool = False,
 ) -> tuple[Any, Any]:
     """Time-bucket group-by with aggregations."""
     rust = _require_rust_core()
     return rust.execute_groupby_dynamic_agg(
-        plan, root_data, index_column, every, period, by, aggregations, as_python_lists
+        plan,
+        root_data,
+        index_column,
+        every,
+        period,
+        by,
+        aggregations,
+        as_python_lists,
+        streaming,
     )

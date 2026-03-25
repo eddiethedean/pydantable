@@ -20,7 +20,7 @@ use crate::plan::schema_py::schema_descriptors_as_py;
 use polars::chunked_array::builder::get_list_builder;
 use polars::lazy::dsl::{col, cols, lit, when, Expr as PolarsExpr};
 use polars::prelude::{
-    AnyValue, BooleanChunked, CrossJoin, DataFrame, DataType, ExplodeOptions, Field,
+    AnyValue, BooleanChunked, CrossJoin, DataFrame, DataType, Engine, ExplodeOptions, Field,
     FillNullStrategy, Float64Chunked, Int128Chunked, Int32Chunked, Int64Chunked, IntoColumn,
     IntoLazy, IntoSeries, JoinArgs, JoinType, LazyFrame, Literal, MaintainOrderJoin, NamedFrom,
     NewChunkedArray, PlSmallStr, PolarsError, Scalar, Series, SortMultipleOptions, StringChunked,
@@ -33,6 +33,7 @@ use polars_io::prelude::{SerReader, SerWriter};
 use numpy::PyReadonlyArray1;
 
 use super::common::*;
+use super::root_lazy::plan_to_lazyframe;
 use super::runner::PolarsPlanRunner;
 
 fn map_list_series_to_py_dict(
@@ -479,10 +480,17 @@ pub(crate) fn execute_plan_polars(
     plan: &PlanInner,
     root_data: &Bound<'_, PyAny>,
     as_python_lists: bool,
+    streaming: bool,
 ) -> PyResult<PyObject> {
-    let df = root_data_to_polars_df(py, &plan.root_schema, root_data)?;
-    let lf = PolarsPlanRunner::apply_steps(df.lazy(), &plan.steps)?;
-    let mut out_df = lf.collect().map_err(polars_err)?;
+    let lf = plan_to_lazyframe(py, plan, root_data)?;
+    let engine = if streaming {
+        Engine::Streaming
+    } else {
+        Engine::InMemory
+    };
+    let mut out_df = py
+        .allow_threads(move || lf.collect_with_engine(engine))
+        .map_err(polars_err)?;
 
     if !as_python_lists {
         return polars_dataframe_to_python_via_ipc(py, &mut out_df);

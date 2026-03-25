@@ -188,7 +188,7 @@ mod polars_engine_tests {
             ages.append(py.None()).unwrap();
             root.set_item("age", ages).unwrap();
 
-            let out = execute_plan(py, &plan, root.as_any(), true).unwrap();
+            let out = execute_plan(py, &plan, root.as_any(), true, false).unwrap();
             let dict = out.bind(py).downcast::<PyDict>().expect("dict of lists");
             let ids: Vec<i64> = dict.get_item("id").unwrap().unwrap().extract().unwrap();
             let age0 = dict
@@ -230,7 +230,7 @@ mod polars_engine_tests {
             ages.append(py.None()).unwrap();
             root.set_item("age", ages).unwrap();
 
-            let out = execute_plan(py, &plan, root.as_any(), false).unwrap();
+            let out = execute_plan(py, &plan, root.as_any(), false, false).unwrap();
             let polars = py.import_bound("polars").unwrap();
             let df_class = polars.getattr("DataFrame").unwrap();
             let builtins = py.import_bound("builtins").unwrap();
@@ -277,6 +277,7 @@ mod polars_engine_tests {
                 vec!["k".to_string()],
                 vec![("s".to_string(), "sum".to_string(), "v".to_string())],
                 true,
+                false,
             )
             .unwrap();
 
@@ -312,6 +313,7 @@ mod polars_engine_tests {
                 vec!["k".to_string()],
                 vec![("s".to_string(), "sum".to_string(), "v".to_string())],
                 true,
+                false,
             )
             .unwrap();
 
@@ -331,6 +333,7 @@ mod polars_engine_tests {
                 root2.as_any(),
                 vec!["k".to_string()],
                 vec![("s".to_string(), "sum".to_string(), "v".to_string())],
+                false,
                 false,
             )
             .unwrap();

@@ -9,7 +9,9 @@ import pytest
 class _FakeRustCore:
     """Minimal stand-in: only ``execute_plan`` used by :func:`execute_plan`."""
 
-    def execute_plan(self, plan: object, data: object, as_python_lists: bool) -> None:
+    def execute_plan(
+        self, plan: object, data: object, as_python_lists: bool, streaming: bool = False
+    ) -> None:
         raise ValueError("simulated engine failure")
 
 

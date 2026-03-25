@@ -12,8 +12,12 @@ import typing
 from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Literal, cast
 
+from typing_extensions import Self
+
 if TYPE_CHECKING:
     from concurrent.futures import Executor
+
+    from sqlalchemy.engine import Connection, Engine
 
 from pydantic import BaseModel, ValidationError, create_model
 
@@ -31,17 +35,27 @@ def _field_defs_from_annotations(
     return {name: (dtype, ...) for name, dtype in annotations.items()}
 
 
+# ``str``, ``bytes``, ``memoryview``, etc. are ``Sequence`` but must not be treated
+# as a list of row dicts (classic foot-gun).
+_ROW_SEQUENCE_EXCLUDES: tuple[type[Any], ...] = (str, bytes, bytearray, memoryview)
+
+
 def _normalize_input(
     *,
     data: Any,
     row_model: type[BaseModel],
     ignore_errors: bool = False,
     on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-) -> Any:
+) -> tuple[Any, bool]:
+    """Return ``(normalized_data, from_row_sequence)``.
+
+    ``from_row_sequence`` is True when input was a sequence of row mappings/models
+    so the caller can avoid re-running full per-cell validation downstream.
+    """
     expected_fields = list(row_model.model_fields.keys())
 
     if _is_polars_dataframe(data):
-        return data
+        return data, False
 
     try:
         import pyarrow as pa  # type: ignore[import-untyped]
@@ -51,23 +65,23 @@ def _normalize_input(
         if isinstance(data, pa.Table):
             from .io import arrow_table_to_column_dict
 
-            return arrow_table_to_column_dict(data)
+            return arrow_table_to_column_dict(data), False
         if isinstance(data, pa.RecordBatch):
             from .io import record_batch_to_column_dict
 
-            return record_batch_to_column_dict(data)
+            return record_batch_to_column_dict(data), False
 
     if isinstance(data, Mapping):
         # Columnar input path; downstream DataFrame strict validation handles
         # required/extra keys, length, and value type checks.
         return {
             k: list(v) if isinstance(v, (list, tuple)) else v for k, v in data.items()
-        }  # type: ignore[return-value]
+        }, False  # type: ignore[return-value]
 
-    if isinstance(data, Sequence):
+    if isinstance(data, Sequence) and not isinstance(data, _ROW_SEQUENCE_EXCLUDES):
         rows = list(data)
         if not rows:
-            return {name: [] for name in expected_fields}
+            return {name: [] for name in expected_fields}, True
 
         valid_rows: list[dict[str, Any]] = []
         failures: list[dict[str, Any]] = []
@@ -112,10 +126,17 @@ def _normalize_input(
             on_validation_errors(failures)
 
         columns: dict[str, list[Any]] = {name: [] for name in expected_fields}
-        for row_dict in valid_rows:
+        for dumped in valid_rows:
             for name in expected_fields:
-                columns[name].append(row_dict[name])
-        return columns
+                columns[name].append(dumped[name])
+        return columns, True
+
+    if isinstance(data, Sequence) and isinstance(data, _ROW_SEQUENCE_EXCLUDES):
+        raise TypeError(
+            "DataFrameModel row input must be a sequence of row dicts or models, "
+            f"not {type(data).__name__}. For columnar data use a mapping "
+            "`{column: list}`."
+        )
 
     raise TypeError("DataFrameModel input must be a column mapping or row sequence.")
 
@@ -127,6 +148,10 @@ class DataFrameModel:
     one row. Data is a column map ``{name: list}``, a PyArrow ``Table`` or
     ``RecordBatch`` (requires ``pyarrow``), a Polars ``DataFrame`` in trusted
     modes, or a sequence of row dicts / models.
+
+    **I/O classmethods:** ``read_*`` / ``aread_*`` use lazy file roots (no full Python
+    column lists). ``materialize_*`` / ``fetch_sql`` load ``dict[str, list]`` then
+    wrap the same lazy :class:`~pydantable.dataframe.DataFrame` plan as the constructor.
     """
 
     RowModel: type[BaseModel]
@@ -185,20 +210,484 @@ class DataFrameModel:
         per-element validation (``trusted_mode='off'`` or omitted). When
         ``ignore_errors=True``, invalid rows are skipped and details can be
         observed via ``on_validation_errors``.
+
+        Row sequences are validated **per row** with :meth:`RowModel.model_validate`
+        (including when you set ``trusted_mode='shape_only'`` on the dataframe—
+        that flag currently applies to the inner column pass, not this row step).
+        For default ``trusted_mode`` (``off`` / omitted), the inner
+        :class:`~pydantable.dataframe.DataFrame` is opened in
+        ``trusted_mode='shape_only'`` so cell values are not validated twice.
+        Columnar mappings use the ``trusted_mode`` you pass unchanged.
         """
-        normalized = _normalize_input(
+        normalized, from_rows = _normalize_input(
             data=data,
             row_model=self.RowModel,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
         dataframe_cls = cast("Any", self._dataframe_cls)
+        inner_trusted = trusted_mode
+        if from_rows and (trusted_mode is None or trusted_mode == "off"):
+            inner_trusted = "shape_only"
         self._df = dataframe_cls[self._SchemaModel](
             normalized,
+            trusted_mode=inner_trusted,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    def _dfm_require_subclass_with_schema(cls) -> None:
+        if not getattr(cls, "RowModel", None):
+            raise TypeError(
+                "I/O classmethods must be called on a concrete DataFrameModel "
+                "subclass with annotated columns, not on the bridge "
+                f"{cls.__qualname__} base."
+            )
+
+    @classmethod
+    def _wrap_inner_df(cls, inner: DataFrame[Any]) -> Self:
+        obj = cls.__new__(cls)
+        obj._df = inner
+        return cast(Self, obj)
+
+    @classmethod
+    def read_parquet(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        """Lazy Parquet read (local path). See :func:`pydantable.io.read_parquet`."""
+        del trusted_mode, ignore_errors, on_validation_errors
+        cls._dfm_require_subclass_with_schema()
+        dataframe_cls = cast("Any", cls._dataframe_cls)
+        inner = dataframe_cls[cls._SchemaModel].read_parquet(path, columns=columns)
+        return cls._wrap_inner_df(inner)
+
+    @classmethod
+    def read_parquet_url(
+        cls,
+        url: str,
+        *,
+        experimental: bool = True,
+        columns: list[str] | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **kwargs: Any,
+    ) -> Self:
+        """Lazy Parquet via HTTP(S) download to a temp file. See :func:`pydantable.io.read_parquet_url`."""
+        del trusted_mode, ignore_errors, on_validation_errors
+        cls._dfm_require_subclass_with_schema()
+        dataframe_cls = cast("Any", cls._dataframe_cls)
+        inner = dataframe_cls[cls._SchemaModel].read_parquet_url(
+            url, experimental=experimental, columns=columns, **kwargs
+        )
+        return cls._wrap_inner_df(inner)
+
+    @classmethod
+    def read_ipc(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        """Lazy Arrow IPC file read (local path)."""
+        del trusted_mode, ignore_errors, on_validation_errors
+        cls._dfm_require_subclass_with_schema()
+        dataframe_cls = cast("Any", cls._dataframe_cls)
+        inner = dataframe_cls[cls._SchemaModel].read_ipc(path, columns=columns)
+        return cls._wrap_inner_df(inner)
+
+    @classmethod
+    def read_csv(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        """Lazy CSV read (local path)."""
+        del trusted_mode, ignore_errors, on_validation_errors
+        cls._dfm_require_subclass_with_schema()
+        dataframe_cls = cast("Any", cls._dataframe_cls)
+        inner = dataframe_cls[cls._SchemaModel].read_csv(path, columns=columns)
+        return cls._wrap_inner_df(inner)
+
+    @classmethod
+    def read_ndjson(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        """Lazy NDJSON read (local path)."""
+        del trusted_mode, ignore_errors, on_validation_errors
+        cls._dfm_require_subclass_with_schema()
+        dataframe_cls = cast("Any", cls._dataframe_cls)
+        inner = dataframe_cls[cls._SchemaModel].read_ndjson(path, columns=columns)
+        return cls._wrap_inner_df(inner)
+
+    @classmethod
+    def materialize_parquet(
+        cls,
+        source: str | bytes | Any,
+        *,
+        columns: list[str] | None = None,
+        engine: str | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        """Eager Parquet → ``dict[str, list]`` via :func:`pydantable.io.materialize_parquet`."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import materialize_parquet as _mp
+
+        cols = _mp(source, columns=columns, engine=engine)
+        return cls(
+            cols,
             trusted_mode=trusted_mode,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
+
+    @classmethod
+    def materialize_ipc(
+        cls,
+        source: str | bytes | Any,
+        *,
+        as_stream: bool = False,
+        engine: str | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        """Eager IPC via :func:`pydantable.io.materialize_ipc`."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import materialize_ipc as _mi
+
+        cols = _mi(source, as_stream=as_stream, engine=engine)
+        return cls(
+            cols,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    def materialize_csv(
+        cls,
+        path: str | Any,
+        *,
+        engine: str | None = None,
+        use_rap: bool = False,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        """Eager CSV via :func:`pydantable.io.materialize_csv`."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import materialize_csv as _mc
+
+        cols = _mc(path, engine=engine, use_rap=use_rap)
+        return cls(
+            cols,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    def materialize_ndjson(
+        cls,
+        path: str | Any,
+        *,
+        engine: str | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        """Eager NDJSON via :func:`pydantable.io.materialize_ndjson`."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import materialize_ndjson as _mn
+
+        cols = _mn(path, engine=engine)
+        return cls(
+            cols,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    def fetch_sql(
+        cls,
+        sql: str,
+        bind: str | Engine | Connection,
+        *,
+        parameters: Mapping[str, Any] | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        """SQL → columns via :func:`pydantable.io.fetch_sql` (needs ``pydantable[sql]``)."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import fetch_sql as _fetch_sql
+
+        cols = _fetch_sql(sql, bind, parameters=parameters)
+        return cls(
+            cols,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    async def aread_parquet(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        del trusted_mode, ignore_errors, on_validation_errors
+        cls._dfm_require_subclass_with_schema()
+        from .io import aread_parquet as _aread
+
+        root = await _aread(path, columns=columns, executor=executor)
+        dataframe_cls = cast("Any", cls._dataframe_cls)
+        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(root)
+        return cls._wrap_inner_df(inner)
+
+    @classmethod
+    async def aread_ipc(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        del trusted_mode, ignore_errors, on_validation_errors
+        cls._dfm_require_subclass_with_schema()
+        from .io import aread_ipc as _aread
+
+        root = await _aread(path, columns=columns, executor=executor)
+        dataframe_cls = cast("Any", cls._dataframe_cls)
+        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(root)
+        return cls._wrap_inner_df(inner)
+
+    @classmethod
+    async def aread_csv(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        del trusted_mode, ignore_errors, on_validation_errors
+        cls._dfm_require_subclass_with_schema()
+        from .io import aread_csv as _aread
+
+        root = await _aread(path, columns=columns, executor=executor)
+        dataframe_cls = cast("Any", cls._dataframe_cls)
+        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(root)
+        return cls._wrap_inner_df(inner)
+
+    @classmethod
+    async def aread_ndjson(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        del trusted_mode, ignore_errors, on_validation_errors
+        cls._dfm_require_subclass_with_schema()
+        from .io import aread_ndjson as _aread
+
+        root = await _aread(path, columns=columns, executor=executor)
+        dataframe_cls = cast("Any", cls._dataframe_cls)
+        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(root)
+        return cls._wrap_inner_df(inner)
+
+    @classmethod
+    async def amaterialize_parquet(
+        cls,
+        source: str | bytes | Any,
+        *,
+        columns: list[str] | None = None,
+        engine: str | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        cls._dfm_require_subclass_with_schema()
+        from .io import amaterialize_parquet as _amp
+
+        cols = await _amp(source, columns=columns, engine=engine, executor=executor)
+        return cls(
+            cols,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    async def amaterialize_ipc(
+        cls,
+        source: str | bytes | Any,
+        *,
+        as_stream: bool = False,
+        engine: str | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        cls._dfm_require_subclass_with_schema()
+        from .io import amaterialize_ipc as _ami
+
+        cols = await _ami(
+            source, as_stream=as_stream, engine=engine, executor=executor
+        )
+        return cls(
+            cols,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    async def amaterialize_csv(
+        cls,
+        path: str | Any,
+        *,
+        engine: str | None = None,
+        use_rap: bool = False,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        cls._dfm_require_subclass_with_schema()
+        from .io import amaterialize_csv as _amc
+
+        cols = await _amc(
+            path, engine=engine, use_rap=use_rap, executor=executor
+        )
+        return cls(
+            cols,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    async def amaterialize_ndjson(
+        cls,
+        path: str | Any,
+        *,
+        engine: str | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        cls._dfm_require_subclass_with_schema()
+        from .io import amaterialize_ndjson as _amn
+
+        cols = await _amn(path, engine=engine, executor=executor)
+        return cls(
+            cols,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    async def afetch_sql(
+        cls,
+        sql: str,
+        bind: str | Engine | Connection,
+        *,
+        parameters: Mapping[str, Any] | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        cls._dfm_require_subclass_with_schema()
+        from .io import afetch_sql as _afs
+
+        cols = await _afs(sql, bind, parameters=parameters, executor=executor)
+        return cls(
+            cols,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    def write_parquet(
+        self, path: str | Any, *, streaming: bool | None = None
+    ) -> None:
+        """Write the current lazy plan to Parquet without materializing to Python dicts."""
+        self._df.write_parquet(path, streaming=streaming)
+
+    def write_csv(
+        self,
+        path: str | Any,
+        *,
+        streaming: bool | None = None,
+        separator: str = ",",
+    ) -> None:
+        self._df.write_csv(path, streaming=streaming, separator=separator)
+
+    def write_ipc(
+        self,
+        path: str | Any,
+        *,
+        streaming: bool | None = None,
+        compression: str | None = None,
+    ) -> None:
+        self._df.write_ipc(path, streaming=streaming, compression=compression)
+
+    def write_ndjson(
+        self, path: str | Any, *, streaming: bool | None = None
+    ) -> None:
+        self._df.write_ndjson(path, streaming=streaming)
+
+    def collect_batches(
+        self,
+        *,
+        batch_size: int = 65_536,
+        streaming: bool | None = None,
+    ) -> list[Any]:
+        return self._df.collect_batches(batch_size=batch_size, streaming=streaming)
 
     def __repr__(self) -> str:
         inner = "\n".join(f"  {line}" for line in repr(self._df).split("\n"))
@@ -293,22 +782,26 @@ class DataFrameModel:
         as_lists: bool = False,
         as_numpy: bool = False,
         as_polars: bool | None = None,
+        streaming: bool | None = None,
     ) -> Any:
         return self._df.collect(
-            as_lists=as_lists, as_numpy=as_numpy, as_polars=as_polars
+            as_lists=as_lists,
+            as_numpy=as_numpy,
+            as_polars=as_polars,
+            streaming=streaming,
         )
 
-    def to_dict(self) -> dict[str, list[Any]]:
-        return self._df.to_dict()
+    def to_dict(self, *, streaming: bool | None = None) -> dict[str, list[Any]]:
+        return self._df.to_dict(streaming=streaming)
 
-    def to_polars(self) -> Any:
-        return self._df.to_polars()
+    def to_polars(self, *, streaming: bool | None = None) -> Any:
+        return self._df.to_polars(streaming=streaming)
 
-    def to_arrow(self) -> Any:
+    def to_arrow(self, *, streaming: bool | None = None) -> Any:
         """
         Materialize as a PyArrow ``Table`` (delegates to :meth:`DataFrame.to_arrow`).
         """
-        return self._df.to_arrow()
+        return self._df.to_arrow(streaming=streaming)
 
     def __dataframe__(
         self, *, nan_as_null: bool = False, allow_copy: bool = True
@@ -344,6 +837,7 @@ class DataFrameModel:
         as_lists: bool = False,
         as_numpy: bool = False,
         as_polars: bool | None = None,
+        streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> Any:
         """Async :meth:`collect` (delegates to :meth:`DataFrame.acollect`)."""
@@ -351,32 +845,36 @@ class DataFrameModel:
             as_lists=as_lists,
             as_numpy=as_numpy,
             as_polars=as_polars,
+            streaming=streaming,
             executor=executor,
         )
 
     async def ato_dict(
         self,
         *,
+        streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> dict[str, list[Any]]:
         """Async :meth:`to_dict`."""
-        return await self._df.ato_dict(executor=executor)
+        return await self._df.ato_dict(streaming=streaming, executor=executor)
 
     async def ato_polars(
         self,
         *,
+        streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> Any:
         """Async :meth:`to_polars`."""
-        return await self._df.ato_polars(executor=executor)
+        return await self._df.ato_polars(streaming=streaming, executor=executor)
 
     async def ato_arrow(
         self,
         *,
+        streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> Any:
         """Async :meth:`to_arrow`."""
-        return await self._df.ato_arrow(executor=executor)
+        return await self._df.ato_arrow(streaming=streaming, executor=executor)
 
     async def arows(
         self,

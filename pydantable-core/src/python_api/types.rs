@@ -32,6 +32,32 @@ impl PyExpr {
     }
 }
 
+/// Lazy on-disk table root (Parquet, CSV, NDJSON, IPC); avoids materializing to Python lists.
+#[pyclass(module = "pydantable._core", name = "ScanFileRoot")]
+#[derive(Clone)]
+pub struct ScanFileRoot {
+    #[pyo3(get)]
+    pub path: String,
+    /// ``parquet``, ``csv``, ``ndjson``, or ``ipc``.
+    #[pyo3(get)]
+    pub format: String,
+    #[pyo3(get)]
+    pub columns: Option<Vec<String>>,
+}
+
+#[pymethods]
+impl ScanFileRoot {
+    #[new]
+    #[pyo3(signature = (path, format, columns=None))]
+    fn new(path: String, format: String, columns: Option<Vec<String>>) -> Self {
+        Self {
+            path,
+            format,
+            columns,
+        }
+    }
+}
+
 #[pyclass]
 #[derive(Clone)]
 pub struct PyPlan {
@@ -52,19 +78,21 @@ impl PyPlan {
         planinner_to_serializable(py, &self.inner)
     }
 
-    #[pyo3(signature = (root_data, as_python_lists=false))]
+    #[pyo3(signature = (root_data, as_python_lists=false, streaming=false))]
     fn execute(
         &self,
         py: Python<'_>,
         root_data: &Bound<'_, PyAny>,
         as_python_lists: bool,
+        streaming: bool,
     ) -> PyResult<PyObject> {
-        execute_plan_inner(py, &self.inner, root_data, as_python_lists)
+        execute_plan_inner(py, &self.inner, root_data, as_python_lists, streaming)
     }
 }
 
 pub(super) fn register_classes(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExpr>()?;
+    m.add_class::<ScanFileRoot>()?;
     m.add_class::<PyPlan>()?;
     Ok(())
 }

@@ -6,24 +6,181 @@ use pyo3::types::PyAny;
 use crate::plan::execute_plan as execute_plan_inner;
 
 #[cfg(feature = "polars_engine")]
+use crate::plan::{
+    collect_plan_batches_polars, sink_csv_polars, sink_ipc_polars, sink_ndjson_polars,
+    sink_parquet_polars,
+};
+#[cfg(feature = "polars_engine")]
 use crate::plan::PolarsExecutor;
 
 use super::types::PyPlan;
 
 #[pyfunction]
-#[pyo3(signature = (plan, root_data, as_python_lists=false))]
+#[pyo3(signature = (plan, root_data, as_python_lists=false, streaming=false))]
 fn execute_plan(
     py: Python<'_>,
     plan: &PyPlan,
     root_data: &Bound<'_, PyAny>,
     as_python_lists: bool,
+    streaming: bool,
 ) -> PyResult<PyObject> {
-    execute_plan_inner(py, &plan.inner, root_data, as_python_lists)
+    execute_plan_inner(py, &plan.inner, root_data, as_python_lists, streaming)
+}
+
+#[cfg(feature = "polars_engine")]
+#[pyfunction]
+#[pyo3(signature = (plan, root_data, path, streaming=false))]
+fn sink_parquet(
+    py: Python<'_>,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    path: String,
+    streaming: bool,
+) -> PyResult<()> {
+    sink_parquet_polars(py, &plan.inner, root_data, path, streaming)
+}
+
+#[cfg(not(feature = "polars_engine"))]
+#[pyfunction]
+#[pyo3(signature = (plan, root_data, path, streaming=false))]
+fn sink_parquet(
+    _py: Python<'_>,
+    _plan: &PyPlan,
+    _root_data: &Bound<'_, PyAny>,
+    _path: String,
+    _streaming: bool,
+) -> PyResult<()> {
+    Err(pyo3::exceptions::PyRuntimeError::new_err(
+        "sink_parquet requires pydantable-core built with the `polars_engine` feature.",
+    ))
+}
+
+#[cfg(feature = "polars_engine")]
+#[pyfunction]
+#[pyo3(signature = (plan, root_data, path, streaming=false, separator=44))]
+fn sink_csv(
+    py: Python<'_>,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    path: String,
+    streaming: bool,
+    separator: u8,
+) -> PyResult<()> {
+    sink_csv_polars(py, &plan.inner, root_data, path, streaming, separator)
+}
+
+#[cfg(not(feature = "polars_engine"))]
+#[pyfunction]
+#[pyo3(signature = (plan, root_data, path, streaming=false, separator=44))]
+fn sink_csv(
+    _py: Python<'_>,
+    _plan: &PyPlan,
+    _root_data: &Bound<'_, PyAny>,
+    _path: String,
+    _streaming: bool,
+    _separator: u8,
+) -> PyResult<()> {
+    Err(pyo3::exceptions::PyRuntimeError::new_err(
+        "sink_csv requires pydantable-core built with the `polars_engine` feature.",
+    ))
+}
+
+#[cfg(feature = "polars_engine")]
+#[pyfunction]
+#[pyo3(signature = (plan, root_data, path, streaming=false, compression=None))]
+fn sink_ipc(
+    py: Python<'_>,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    path: String,
+    streaming: bool,
+    compression: Option<String>,
+) -> PyResult<()> {
+    sink_ipc_polars(
+        py,
+        &plan.inner,
+        root_data,
+        path,
+        streaming,
+        compression,
+    )
+}
+
+#[cfg(not(feature = "polars_engine"))]
+#[pyfunction]
+#[pyo3(signature = (plan, root_data, path, streaming=false, compression=None))]
+fn sink_ipc(
+    _py: Python<'_>,
+    _plan: &PyPlan,
+    _root_data: &Bound<'_, PyAny>,
+    _path: String,
+    _streaming: bool,
+    _compression: Option<String>,
+) -> PyResult<()> {
+    Err(pyo3::exceptions::PyRuntimeError::new_err(
+        "sink_ipc requires pydantable-core built with the `polars_engine` feature.",
+    ))
+}
+
+#[cfg(feature = "polars_engine")]
+#[pyfunction]
+#[pyo3(signature = (plan, root_data, path, streaming=false))]
+fn sink_ndjson(
+    py: Python<'_>,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    path: String,
+    streaming: bool,
+) -> PyResult<()> {
+    sink_ndjson_polars(py, &plan.inner, root_data, path, streaming)
+}
+
+#[cfg(not(feature = "polars_engine"))]
+#[pyfunction]
+#[pyo3(signature = (plan, root_data, path, streaming=false))]
+fn sink_ndjson(
+    _py: Python<'_>,
+    _plan: &PyPlan,
+    _root_data: &Bound<'_, PyAny>,
+    _path: String,
+    _streaming: bool,
+) -> PyResult<()> {
+    Err(pyo3::exceptions::PyRuntimeError::new_err(
+        "sink_ndjson requires pydantable-core built with the `polars_engine` feature.",
+    ))
+}
+
+#[cfg(feature = "polars_engine")]
+#[pyfunction]
+#[pyo3(signature = (plan, root_data, batch_size=65536, streaming=false))]
+fn collect_plan_batches(
+    py: Python<'_>,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    batch_size: usize,
+    streaming: bool,
+) -> PyResult<Vec<PyObject>> {
+    collect_plan_batches_polars(py, &plan.inner, root_data, batch_size, streaming)
+}
+
+#[cfg(not(feature = "polars_engine"))]
+#[pyfunction]
+#[pyo3(signature = (plan, root_data, batch_size=65536, streaming=false))]
+fn collect_plan_batches(
+    _py: Python<'_>,
+    _plan: &PyPlan,
+    _root_data: &Bound<'_, PyAny>,
+    _batch_size: usize,
+    _streaming: bool,
+) -> PyResult<Vec<PyObject>> {
+    Err(pyo3::exceptions::PyRuntimeError::new_err(
+        "collect_plan_batches requires pydantable-core built with the `polars_engine` feature.",
+    ))
 }
 
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (left_plan, left_root_data, right_plan, right_root_data, left_on, right_on, how, suffix, as_python_lists=false))]
+#[pyo3(signature = (left_plan, left_root_data, right_plan, right_root_data, left_on, right_on, how, suffix, as_python_lists=false, streaming=false))]
 fn execute_join(
     py: Python<'_>,
     left_plan: &PyPlan,
@@ -35,6 +192,7 @@ fn execute_join(
     how: String,
     suffix: String,
     as_python_lists: bool,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     #[cfg(feature = "polars_engine")]
     {
@@ -49,6 +207,7 @@ fn execute_join(
             how,
             suffix,
             as_python_lists,
+            streaming,
         )
     }
     #[cfg(not(feature = "polars_engine"))]
@@ -60,7 +219,7 @@ fn execute_join(
 }
 
 #[pyfunction]
-#[pyo3(signature = (plan, root_data, by, aggregations, as_python_lists=false))]
+#[pyo3(signature = (plan, root_data, by, aggregations, as_python_lists=false, streaming=false))]
 fn execute_groupby_agg(
     py: Python<'_>,
     plan: &PyPlan,
@@ -68,6 +227,7 @@ fn execute_groupby_agg(
     by: Vec<String>,
     aggregations: &Bound<'_, PyAny>,
     as_python_lists: bool,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     let dict: &Bound<'_, pyo3::types::PyDict> = aggregations.downcast()?;
     let mut aggs: Vec<(String, String, String)> = Vec::new();
@@ -85,7 +245,15 @@ fn execute_groupby_agg(
     }
     #[cfg(feature = "polars_engine")]
     {
-        PolarsExecutor::groupby_agg(py, &plan.inner, root_data, by, aggs, as_python_lists)
+        PolarsExecutor::groupby_agg(
+            py,
+            &plan.inner,
+            root_data,
+            by,
+            aggs,
+            as_python_lists,
+            streaming,
+        )
     }
     #[cfg(not(feature = "polars_engine"))]
     {
@@ -96,7 +264,7 @@ fn execute_groupby_agg(
 }
 
 #[pyfunction]
-#[pyo3(signature = (left_plan, left_root_data, right_plan, right_root_data, how, as_python_lists=false))]
+#[pyo3(signature = (left_plan, left_root_data, right_plan, right_root_data, how, as_python_lists=false, streaming=false))]
 fn execute_concat(
     py: Python<'_>,
     left_plan: &PyPlan,
@@ -105,6 +273,7 @@ fn execute_concat(
     right_root_data: &Bound<'_, PyAny>,
     how: String,
     as_python_lists: bool,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     #[cfg(feature = "polars_engine")]
     {
@@ -116,6 +285,7 @@ fn execute_concat(
             right_root_data,
             how,
             as_python_lists,
+            streaming,
         )
     }
     #[cfg(not(feature = "polars_engine"))]
@@ -127,7 +297,7 @@ fn execute_concat(
 }
 
 #[pyfunction]
-#[pyo3(signature = (plan, root_data, id_vars, value_vars, variable_name, value_name, as_python_lists=false))]
+#[pyo3(signature = (plan, root_data, id_vars, value_vars, variable_name, value_name, as_python_lists=false, streaming=false))]
 #[allow(clippy::too_many_arguments)]
 fn execute_melt(
     py: Python<'_>,
@@ -138,6 +308,7 @@ fn execute_melt(
     variable_name: String,
     value_name: String,
     as_python_lists: bool,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     #[cfg(feature = "polars_engine")]
     {
@@ -150,6 +321,7 @@ fn execute_melt(
             variable_name,
             value_name,
             as_python_lists,
+            streaming,
         )
     }
     #[cfg(not(feature = "polars_engine"))]
@@ -162,7 +334,7 @@ fn execute_melt(
 
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (plan, root_data, index, columns, values, aggregate_function, as_python_lists=false))]
+#[pyo3(signature = (plan, root_data, index, columns, values, aggregate_function, as_python_lists=false, streaming=false))]
 fn execute_pivot(
     py: Python<'_>,
     plan: &PyPlan,
@@ -172,6 +344,7 @@ fn execute_pivot(
     values: Vec<String>,
     aggregate_function: String,
     as_python_lists: bool,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     #[cfg(feature = "polars_engine")]
     {
@@ -184,6 +357,7 @@ fn execute_pivot(
             values,
             aggregate_function,
             as_python_lists,
+            streaming,
         )
     }
     #[cfg(not(feature = "polars_engine"))]
@@ -195,15 +369,17 @@ fn execute_pivot(
 }
 
 #[pyfunction]
+#[pyo3(signature = (plan, root_data, columns, streaming=false))]
 fn execute_explode(
     py: Python<'_>,
     plan: &PyPlan,
     root_data: &Bound<'_, PyAny>,
     columns: Vec<String>,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     #[cfg(feature = "polars_engine")]
     {
-        PolarsExecutor::explode(py, &plan.inner, root_data, columns)
+        PolarsExecutor::explode(py, &plan.inner, root_data, columns, streaming)
     }
     #[cfg(not(feature = "polars_engine"))]
     {
@@ -214,15 +390,17 @@ fn execute_explode(
 }
 
 #[pyfunction]
+#[pyo3(signature = (plan, root_data, columns, streaming=false))]
 fn execute_unnest(
     py: Python<'_>,
     plan: &PyPlan,
     root_data: &Bound<'_, PyAny>,
     columns: Vec<String>,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     #[cfg(feature = "polars_engine")]
     {
-        PolarsExecutor::unnest(py, &plan.inner, root_data, columns)
+        PolarsExecutor::unnest(py, &plan.inner, root_data, columns, streaming)
     }
     #[cfg(not(feature = "polars_engine"))]
     {
@@ -253,7 +431,7 @@ fn execute_rolling_agg(
 
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (plan, root_data, index_column, every, period, by, aggregations, as_python_lists=false))]
+#[pyo3(signature = (plan, root_data, index_column, every, period, by, aggregations, as_python_lists=false, streaming=false))]
 fn execute_groupby_dynamic_agg(
     py: Python<'_>,
     plan: &PyPlan,
@@ -264,6 +442,7 @@ fn execute_groupby_dynamic_agg(
     by: Option<Vec<String>>,
     aggregations: &Bound<'_, PyAny>,
     as_python_lists: bool,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     let dict: &Bound<'_, pyo3::types::PyDict> = aggregations.downcast()?;
     let mut aggs: Vec<(String, String, String)> = Vec::new();
@@ -291,6 +470,7 @@ fn execute_groupby_dynamic_agg(
             by,
             aggs,
             as_python_lists,
+            streaming,
         )
     }
     #[cfg(not(feature = "polars_engine"))]
@@ -303,6 +483,11 @@ fn execute_groupby_dynamic_agg(
 
 pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(execute_plan, m)?)?;
+    m.add_function(wrap_pyfunction!(sink_parquet, m)?)?;
+    m.add_function(wrap_pyfunction!(sink_csv, m)?)?;
+    m.add_function(wrap_pyfunction!(sink_ipc, m)?)?;
+    m.add_function(wrap_pyfunction!(sink_ndjson, m)?)?;
+    m.add_function(wrap_pyfunction!(collect_plan_batches, m)?)?;
     m.add_function(wrap_pyfunction!(execute_join, m)?)?;
     m.add_function(wrap_pyfunction!(execute_groupby_agg, m)?)?;
     m.add_function(wrap_pyfunction!(execute_concat, m)?)?;

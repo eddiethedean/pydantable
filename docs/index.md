@@ -3,7 +3,7 @@
 **Strongly-typed DataFrame layer for FastAPI and Pydantic services**, with a Rust-powered execution core (Polars-backed inside the native extension).
 
 ```{note}
-This **documentation site** is the detailed manual. The repository **README** on your Git host is the short entrypoint; both should stay aligned for install commands and version. **Current release:** **0.22.0** (see {doc}`changelog`).
+This **documentation site** is the detailed manual. The repository **README** on your Git host is the short entrypoint; both should stay aligned for install commands and version. **Current release:** **0.23.0** (see {doc}`changelog`).
 ```
 
 ## At a glance
@@ -11,7 +11,7 @@ This **documentation site** is the detailed manual. The repository **README** on
 - **Schemas first:** Pydantic annotations drive column types, nullability, and early expression errors (Rust AST).
 - **SQLModel-like `DataFrameModel`:** whole-table type, generated row models, column or row inputs.
 - **Optional Python Polars:** install `pydantable[polars]` for `to_polars()`; core usage does not require `import polars`.
-- **Optional PyArrow interchange:** install `pydantable[arrow]` for **`read_parquet` / `read_ipc`**, **`to_arrow` / `ato_arrow`**, and **`Table` / `RecordBatch`** constructor ingest.
+- **Optional PyArrow interchange:** install `pydantable[arrow]` for **`materialize_parquet` / `materialize_ipc`**, **`to_arrow` / `ato_arrow`**, and **`Table` / `RecordBatch`** constructor ingest. **Lazy file reads:** **`read_*`** + **`DataFrame.write_parquet`** ({doc}`EXECUTION`).
 
 **Materialization (0.5+):** `collect()` returns a **list of Pydantic row models** for the current schema. Use **`to_dict()`** (or **`collect(as_lists=True)`**) for columnar **`dict[str, list]`** responses. **`to_polars()`** is available when the optional Python **`polars`** package is installed; **`to_arrow()`** when **`pyarrow`** is installed (**0.16.0**). **0.15.0** adds **`acollect`**, **`ato_dict`**, and **`ato_polars`** for **async** thread-offloaded materialization; **0.16.0** adds **`ato_arrow`**. Details: {doc}`EXECUTION` and {doc}`DATAFRAMEMODEL`.
 
@@ -19,7 +19,7 @@ This **documentation site** is the detailed manual. The repository **README** on
 
 **Expressions (0.7+ through 0.20.0):** typed **`Expr`** builds a Rust AST — globals (**`global_row_count`**, **`global_sum`**, …), ranked and framed windows (including multi-key **`rangeBetween`**; see {doc}`WINDOW_SQL_SEMANTICS`), maps and temporal helpers, PySpark mirrors in {doc}`PYSPARK_PARITY` (**0.17.0** added more `sql.functions` wrappers; **0.18.0** / **0.19.0** did not expand the façade matrix; **0.20.0** adds **`show`** / **`summary`** on the PySpark UI **`DataFrame`**). **`Expr`** / **`WhenChain`** expose **`__repr__`** for debugging. Semantics: {doc}`INTERFACE_CONTRACT` and {doc}`changelog`. **Next:** {doc}`ROADMAP` **Planned v1.0.0** for the **1.0** stability cut (optional polish in **Later**).
 
-**Trusted ingest:** **`trusted_mode`** (`off` / `shape_only` / `strict`) on constructors — {doc}`DATAFRAMEMODEL`, {doc}`SUPPORTED_TYPES`. **I/O:** sync **`collect` / `to_dict` / `to_polars` / `to_arrow`** plus **async** **`acollect` / `ato_dict` / `ato_polars` / `ato_arrow`**; **`read_parquet` / `read_ipc`** for file/bytes ingest ({doc}`EXECUTION`, {doc}`FASTAPI`). **Arrow `map<utf8, …>`** columns can ingest as **`dict[str, T]`** ({doc}`SUPPORTED_TYPES`).
+**Trusted ingest:** **`trusted_mode`** (`off` / `shape_only` / `strict`) on constructors — {doc}`DATAFRAMEMODEL`, {doc}`SUPPORTED_TYPES`. **I/O:** sync **`collect` / `to_dict` / `to_polars` / `to_arrow`** plus **async** **`acollect` / `ato_dict` / `ato_polars` / `ato_arrow`**; **`materialize_*`** / **`read_*`** / **`fetch_sql`** for ingest ({doc}`EXECUTION`, {doc}`FASTAPI`). **Arrow `map<utf8, …>`** columns can ingest as **`dict[str, T]`** ({doc}`SUPPORTED_TYPES`).
 
 **String representation:** **`repr(df)`** on **`DataFrame`** and **`DataFrameModel`** prints the parameterized schema (class name, column names, and dtype annotations). Very wide schemas list the first **32** columns and **`… and N more`**. Row counts are **not** included—filters and joins can change the result size without materializing; use **`collect()`**, **`to_dict()`**, or **`len(...)`** on materialized results when you need shape ({doc}`EXECUTION`, {doc}`DATAFRAMEMODEL`). **Discovery (0.20.0+):** **`columns`**, **`shape`**, **`dtypes`**, **`info()`**, **`describe()`** on the core API—see {doc}`INTERFACE_CONTRACT` **Introspection** for **`shape`** vs executed row count. **Jupyter / IPython:** **`_repr_html_()`** draws a bounded **HTML table** (pandas-style) without **`polars`** ({doc}`EXECUTION` **Jupyter / HTML**).
 

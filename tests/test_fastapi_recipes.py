@@ -4,7 +4,7 @@ This file intentionally spans multiple release themes:
 
 - **0.14+:** sync routes, OpenAPI, columnar JSON bodies (integration smoke).
 - **0.15+:** async routes using async materialization (`acollect`, `ato_dict`).
-- **0.16+:** multipart Parquet upload + `read_parquet` in an async handler.
+- **0.16+:** multipart Parquet upload + `materialize_parquet` in an async handler.
 
 See `docs/DEVELOPER.md` (release ↔ tests map) for a maintainer-facing index.
 """
@@ -130,7 +130,7 @@ def test_row_list_invalid_type_is_422() -> None:
     assert r.status_code == 422
 
 
-# --- 0.16.0+: multipart Parquet + read_parquet ---
+# --- 0.16.0+: multipart Parquet + materialize_parquet ---
 
 
 def test_multipart_parquet_upload() -> None:
@@ -139,14 +139,14 @@ def test_multipart_parquet_upload() -> None:
 
     import pyarrow as pa
     import pyarrow.parquet as pq
-    from pydantable import read_parquet
+    from pydantable import materialize_parquet
 
     app = FastAPI()
 
     @app.post("/upload")
     async def upload_parquet(file: UploadFile):
         raw = await file.read()
-        cols = read_parquet(raw)
+        cols = materialize_parquet(raw)
         df = UserDF(cols, trusted_mode="shape_only")
         return df.to_dict()
 

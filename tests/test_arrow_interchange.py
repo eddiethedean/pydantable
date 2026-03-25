@@ -11,7 +11,7 @@ pytest.importorskip("pyarrow")
 import pyarrow as pa
 import pyarrow.ipc as ipc
 import pyarrow.parquet as pq
-from pydantable import DataFrame, DataFrameModel, read_ipc, read_parquet
+from pydantable import DataFrame, DataFrameModel, materialize_ipc, materialize_parquet
 from pydantable.io import record_batch_to_column_dict
 from pydantic import BaseModel
 
@@ -26,7 +26,7 @@ def test_read_parquet_roundtrip(tmp_path) -> None:
     table = pa.Table.from_pydict(col)
     path = tmp_path / "t.parquet"
     pq.write_table(table, path)
-    out = read_parquet(path)
+    out = materialize_parquet(path)
     assert out == col
     df = SmallDF(out)
     assert df.to_dict() == col
@@ -38,7 +38,7 @@ def test_read_ipc_file_format_roundtrip(tmp_path) -> None:
     path = tmp_path / "t.arrow"
     with ipc.new_file(path, table.schema) as writer:
         writer.write_table(table)
-    out = read_ipc(path, as_stream=False)
+    out = materialize_ipc(path, as_stream=False)
     assert out == col
 
 
@@ -49,7 +49,7 @@ def test_read_ipc_stream_format_bytes() -> None:
     with ipc.new_stream(buf, table.schema) as writer:
         writer.write_table(table)
     raw = buf.getvalue()
-    out = read_ipc(raw, as_stream=True)
+    out = materialize_ipc(raw, as_stream=True)
     assert out == col
 
 

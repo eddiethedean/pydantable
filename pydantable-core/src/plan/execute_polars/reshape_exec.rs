@@ -35,7 +35,7 @@ use numpy::PyReadonlyArray1;
 use super::common::*;
 use super::literal_agg::{agg_literal, literal_to_py, py_dict_to_literal_ctx};
 use super::materialize::{dtype_from_polars, series_to_py_list};
-use super::runner::PolarsPlanRunner;
+use super::root_lazy::{collect_lazyframe, plan_to_lazyframe};
 
 #[allow(clippy::too_many_arguments)]
 pub fn execute_melt_polars(
@@ -47,6 +47,7 @@ pub fn execute_melt_polars(
     variable_name: String,
     value_name: String,
     as_python_lists: bool,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     if variable_name == value_name {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -114,15 +115,14 @@ pub fn execute_melt_polars(
         )
     })?;
 
-    let df = root_data_to_polars_df(py, &plan.root_schema, root_data)?;
-    let lf = PolarsPlanRunner::apply_steps(df.lazy(), &plan.steps)?;
+    let lf = plan_to_lazyframe(py, plan, root_data)?;
     let args = UnpivotArgsDSL {
         on: Some(cols(values.iter().map(|s| s.as_str()))),
         index: cols(id_vars.iter().map(|s| s.as_str())),
         variable_name: Some(variable_name.clone().into()),
         value_name: Some(value_name.clone().into()),
     };
-    let mut out_df = lf.unpivot(args).collect().map_err(polars_err)?;
+    let mut out_df = collect_lazyframe(py, lf.unpivot(args), streaming)?;
 
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
     for k in id_vars.iter() {
@@ -183,6 +183,7 @@ pub fn execute_pivot_polars(
     values: Vec<String>,
     aggregate_function: String,
     as_python_lists: bool,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     if index.is_empty() {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -226,7 +227,7 @@ pub fn execute_pivot_polars(
         )));
     }
 
-    let data_obj = crate::plan::execute_plan(py, plan, root_data, true)?;
+    let data_obj = crate::plan::execute_plan(py, plan, root_data, true, streaming)?;
     let data_bound = data_obj.bind(py);
     let ctx = py_dict_to_literal_ctx(&plan.schema, data_bound)?;
 
@@ -529,6 +530,7 @@ pub fn execute_groupby_dynamic_agg_polars(
     by: Option<Vec<String>>,
     aggregations: Vec<(String, String, String)>,
     as_python_lists: bool,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     let by = by.unwrap_or_default();
     if !plan.schema.contains_key(&index_column) {
@@ -556,7 +558,7 @@ pub fn execute_groupby_dynamic_agg_polars(
         }
     }
 
-    let data_obj = crate::plan::execute_plan(py, plan, root_data, true)?;
+    let data_obj = crate::plan::execute_plan(py, plan, root_data, true, streaming)?;
     let data_bound = data_obj.bind(py);
     let ctx = py_dict_to_literal_ctx(&plan.schema, data_bound)?;
 
@@ -778,6 +780,7 @@ pub fn execute_explode_polars(
     plan: &PlanInner,
     root_data: &Bound<'_, PyAny>,
     columns: Vec<String>,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     for c in columns.iter() {
         let dt = plan.schema.get(c).ok_or_else(|| {
@@ -794,8 +797,7 @@ pub fn execute_explode_polars(
         }
     }
 
-    let df = root_data_to_polars_df(py, &plan.root_schema, root_data)?;
-    let mut lf = PolarsPlanRunner::apply_steps(df.lazy(), &plan.steps)?;
+    let mut lf = plan_to_lazyframe(py, plan, root_data)?;
     lf = lf.explode(
         cols(columns.iter().map(|c| c.as_str())),
         ExplodeOptions {
@@ -803,7 +805,7 @@ pub fn execute_explode_polars(
             keep_nulls: true,
         },
     );
-    let out_df = lf.collect().map_err(polars_err)?;
+    let out_df = collect_lazyframe(py, lf, streaming)?;
 
     let mut out_schema: HashMap<String, DTypeDesc> = plan.schema.clone();
     for c in &columns {
@@ -860,6 +862,7 @@ pub fn execute_unnest_polars(
     plan: &PlanInner,
     root_data: &Bound<'_, PyAny>,
     columns: Vec<String>,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     for c in columns.iter() {
         let dt = plan.schema.get(c).ok_or_else(|| {
@@ -876,11 +879,10 @@ pub fn execute_unnest_polars(
         }
     }
 
-    let df = root_data_to_polars_df(py, &plan.root_schema, root_data)?;
-    let mut lf = PolarsPlanRunner::apply_steps(df.lazy(), &plan.steps)?;
+    let mut lf = plan_to_lazyframe(py, plan, root_data)?;
     let sep: PlSmallStr = "_".into();
     lf = lf.unnest(cols(columns.iter().map(|s| s.as_str())), Some(sep));
-    let out_df = lf.collect().map_err(polars_err)?;
+    let out_df = collect_lazyframe(py, lf, streaming)?;
 
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
     for col_name in out_df.get_column_names() {

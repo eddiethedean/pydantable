@@ -164,9 +164,15 @@ Rolling/dynamic contracts:
 
 ## Arrow interchange (0.16.0)
 
-- **`pydantable.read_parquet`** / **`read_ipc`:** synchronous PyArrow readers; return **`dict[str, list]`** for **`DataFrame[Schema](...)`** / **`DataFrameModel(...)`**. **`read_ipc(..., as_stream=True)`** selects the **streaming** IPC format; default is **file** IPC.
+- **`pydantable.materialize_parquet`** / **`materialize_ipc`** (and **`pydantable.io`**) return **`dict[str, list]`** for **`DataFrame[Schema](...)`** / **`DataFrameModel(...)`**. **`materialize_ipc(..., as_stream=True)`** selects the **streaming** IPC format; default is **file** IPC. For lazy local files use **`read_*`** + **`DataFrame.write_parquet`** ({doc}`EXECUTION`).
 - **`DataFrame.to_arrow`** / **`DataFrame.ato_arrow`:** same logical materialization as **`to_dict`**, then build a PyArrow **`Table`** in Python (**not** a zero-copy view of internal Polars buffers). **`DataFrameModel`** exposes the same methods by delegation.
 - **Constructors:** **`pyarrow.Table`** and **`RecordBatch`** are accepted when **`pyarrow`** is installed (converted to Python lists before validation); see {doc}`SUPPORTED_TYPES`.
+
+## Polars `LazyFrame` escape hatch (deferred)
+
+The compiled extension executes with a Rust Polars **`LazyFrame`**, which is **not** interchangeable with **`polars.LazyFrame`** in Python. A **`to_polars_lazy()`**-style API would need **`pyo3-polars`** (or similar) or a portable serialized plan—not shipped in core today.
+
+**Interoperability patterns:** keep pipelines in pydantable with **`read_*`** / **`read_parquet_url`** + transforms + **`write_parquet`**, **`write_csv`**, **`write_ipc`**, **`write_ndjson`**, or **`collect()`** / **`to_dict()`** / **`to_polars()`**; use **`materialize_*`** when you want a Python column dict first; use **`polars.scan_parquet`** (etc.) when the entire workload should stay in native Polars.
 
 ## Related documentation
 

@@ -133,7 +133,7 @@ def test_read_from_object_store_jsonl_alias(tmp_path: Path) -> None:
 
 def test_read_from_object_store_rejects_http() -> None:
     pytest.importorskip("fsspec")
-    with pytest.raises(ValueError, match="read_parquet_url"):
+    with pytest.raises(ValueError, match="fetch_parquet_url"):
         read_from_object_store("https://example.com/x.parquet", experimental=True)
 
 
@@ -156,7 +156,9 @@ def test_read_from_object_store_experimental_env(
     monkeypatch.setenv("PYDANTABLE_IO_EXPERIMENTAL", "1")
     path = tmp_path / "env.parquet"
     pq.write_table(pa.table({"e": [1]}), path)
-    got = read_from_object_store(path.resolve().as_uri(), experimental=False, format="parquet")
+    got = read_from_object_store(
+        path.resolve().as_uri(), experimental=False, format="parquet"
+    )
     assert got == {"e": [1]}
 
 
@@ -243,7 +245,9 @@ def test_read_snowflake_empty_cursor_description() -> None:
             return None
 
     with patch("snowflake.connector.connect", return_value=_Conn()):
-        assert read_snowflake("SELECT 1", experimental=True, account="a", user="u") == {}
+        assert (
+            read_snowflake("SELECT 1", experimental=True, account="a", user="u") == {}
+        )
 
 
 def test_read_kafka_json_batch_mocked() -> None:

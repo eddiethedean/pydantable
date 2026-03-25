@@ -34,6 +34,7 @@ use numpy::PyReadonlyArray1;
 
 use super::common::*;
 use super::materialize::{dtype_from_polars, series_to_py_list};
+use super::root_lazy::{collect_lazyframe, plan_to_lazyframe};
 use super::runner::PolarsPlanRunner;
 
 #[allow(clippy::too_many_arguments)]
@@ -48,6 +49,7 @@ pub fn execute_join_polars(
     how: String,
     suffix: String,
     as_python_lists: bool,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     let is_cross = how == "cross";
     let is_semi = how == "semi";
@@ -99,10 +101,8 @@ pub fn execute_join_polars(
         }
     };
 
-    let left_df = root_data_to_polars_df(py, &left_plan.root_schema, left_root_data)?;
-    let right_df = root_data_to_polars_df(py, &right_plan.root_schema, right_root_data)?;
-    let left_lf = PolarsPlanRunner::apply_steps(left_df.lazy(), &left_plan.steps)?;
-    let mut right_lf = PolarsPlanRunner::apply_steps(right_df.lazy(), &right_plan.steps)?;
+    let left_lf = plan_to_lazyframe(py, left_plan, left_root_data)?;
+    let mut right_lf = plan_to_lazyframe(py, right_plan, right_root_data)?;
 
     // Deterministic collision handling:
     // - keep left names unchanged
@@ -140,8 +140,8 @@ pub fn execute_join_polars(
     }
 
     let out_df = if is_cross {
-        let left_df = left_lf.collect().map_err(polars_err)?;
-        let right_df = right_lf.collect().map_err(polars_err)?;
+        let left_df = collect_lazyframe(py, left_lf, streaming)?;
+        let right_df = collect_lazyframe(py, right_lf, streaming)?;
         left_df
             .cross_join(
                 &right_df,
@@ -168,7 +168,7 @@ pub fn execute_join_polars(
                 .filter(col("__pydantable_join_marker").is_null())
                 .select(left_plan.schema.keys().map(col).collect::<Vec<_>>());
         }
-        joined.collect().map_err(polars_err)?
+        collect_lazyframe(py, joined, streaming)?
     };
 
     // Build schema descriptors from actual output dtypes.

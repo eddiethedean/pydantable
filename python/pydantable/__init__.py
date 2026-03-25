@@ -16,7 +16,20 @@ from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
 from .display import get_repr_html_limits, reset_display_options, set_display_options
 from .expressions import Expr
-from .io import aread_parquet, read_ipc, read_parquet, write_parquet
+from .io import (
+    afetch_sql,
+    amaterialize_ipc,
+    amaterialize_parquet,
+    aread_parquet,
+    aread_parquet_url,
+    export_parquet,
+    fetch_sql,
+    materialize_ipc,
+    materialize_ndjson,
+    materialize_parquet,
+    read_parquet,
+    read_parquet_url,
+)
 from .schema import DtypeDriftWarning, Schema
 
 __all__ = [
@@ -25,14 +38,21 @@ __all__ = [
     "DtypeDriftWarning",
     "Expr",
     "Schema",
+    "afetch_sql",
+    "amaterialize_parquet",
     "aread_parquet",
+    "aread_parquet_url",
+    "export_parquet",
+    "fetch_sql",
     "get_repr_html_limits",
+    "materialize_ipc",
+    "materialize_ndjson",
+    "materialize_parquet",
     "pandas",
     "pyspark",
-    "read_ipc",
-    "read_parquet",
     "reset_display_options",
+    "read_parquet",
+    "read_parquet_url",
     "set_display_options",
-    "write_parquet",
 ]
-__version__ = "0.22.0"
+__version__ = "0.23.0"

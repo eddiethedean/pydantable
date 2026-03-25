@@ -1,6 +1,6 @@
 [package]
 name = "pydantable-core"
-version = "0.22.0"
+version = "0.23.0"
 edition = "2021"
 publish = false
 license = "MIT"
@@ -20,7 +20,7 @@ pyo3 = { version = "0.24.1" }
 # `range` enables `int_range` for SQL-style `row_number` over windows; with `dtype-datetime`,
 # Polars 0.53 also needs `timezones` (polars-plan `replace_tz` cfgs) and `dtype-array` so
 # `polars-expr` matches `polars-plan` list/array IR variants.
-polars = { version = "0.53.0", optional = true, features = ["lazy", "is_in", "strings", "concat_str", "is_between", "pivot", "abs", "round_series", "dtype-array", "dtype-struct", "dtype-decimal", "dtype-time", "regex", "rank", "range", "timezones", "csv", "parquet", "json"] }
+polars = { version = "0.53.0", optional = true, features = ["lazy", "is_in", "strings", "concat_str", "is_between", "pivot", "abs", "round_series", "dtype-array", "dtype-struct", "dtype-decimal", "dtype-time", "regex", "rank", "range", "timezones", "csv", "parquet", "json", "ipc"] }
 polars-io = { version = "0.53.0", optional = true, features = ["ipc", "csv", "parquet", "json"] }
 numpy = { version = "0.24", optional = true }
 

@@ -374,7 +374,7 @@ async def _fastapi_async_snippet() -> None:
 
 asyncio.run(_fastapi_async_snippet())
 
-# docs/FASTAPI / interchange — read_parquet + to_arrow (pyarrow optional at runtime;
+# docs/FASTAPI / interchange — materialize_parquet + to_arrow (pyarrow optional at runtime;
 # CI installs pyarrow for pytest and this script).
 try:
     import pyarrow as pa
@@ -384,11 +384,11 @@ except ImportError:
 else:
     from io import BytesIO
 
-    from pydantable import read_parquet
+    from pydantable import materialize_parquet
 
     _buf = BytesIO()
     pq.write_table(pa.Table.from_pydict({"id": [1], "age": [20]}), _buf)
-    _cols = read_parquet(_buf.getvalue())
+    _cols = materialize_parquet(_buf.getvalue())
     _df_pq = UserFastApi(_cols, trusted_mode="shape_only")
     assert _df_pq.to_dict() == {"id": [1], "age": [20]}
     _at = _df_pq.to_arrow()

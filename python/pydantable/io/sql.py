@@ -1,4 +1,4 @@
-"""SQLAlchemy-backed ``read_sql`` / ``write_sql`` (optional ``[sql]`` extra).
+"""SQLAlchemy-backed ``fetch_sql`` / ``write_sql`` (optional ``[sql]`` extra).
 
 Works with **any database URL and dialect** SQLAlchemy supports (PostgreSQL, MySQL,
 SQLite, SQL Server, Oracle, etc.). Install the matching **DBAPI driver** for your URL
@@ -24,14 +24,14 @@ def _to_engine(bind: str | Engine) -> Engine:
     return create_engine(bind)
 
 
-def read_sql(
+def fetch_sql(
     sql: str,
     bind: str | Engine | Connection,
     *,
     parameters: Mapping[str, Any] | None = None,
 ) -> dict[str, list[Any]]:
     """
-    Execute ``sql`` and return rows as ``dict[column_name, list]``.
+    Execute ``sql`` and return rows as ``dict[column_name, list]`` (materialized).
 
     ``bind`` may be any SQLAlchemy **URL** your environment has drivers for, or a
     :class:`~sqlalchemy.engine.Engine` / :class:`~sqlalchemy.engine.Connection`.
@@ -94,7 +94,7 @@ def write_sql(
     * ``replace``: drops the table if it exists, recreates it with inferred column types, then inserts.
       ``table_name`` / ``schema`` must be **trusted** identifiers (not user-controlled).
 
-    ``bind`` is any SQLAlchemy-supported **URL** or **Engine** (same driver rules as ``read_sql``).
+    ``bind`` is any SQLAlchemy-supported **URL** or **Engine** (same driver rules as ``fetch_sql``).
     ``if_exists="replace"`` uses generic DDL; exotic dialects may need app-specific migrations instead.
     """
     from sqlalchemy import MetaData, Table, insert, inspect
@@ -132,7 +132,9 @@ def write_sql(
             return
 
         if not exists:
-            raise ValueError(f"table {table_name!r} does not exist (if_exists='append')")
+            raise ValueError(
+                f"table {table_name!r} does not exist (if_exists='append')"
+            )
         md = MetaData()
         tbl = Table(table_name, md, schema=schema, autoload_with=conn)
         conn.execute(insert(tbl), rows)

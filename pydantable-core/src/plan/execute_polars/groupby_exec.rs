@@ -34,7 +34,7 @@ use numpy::PyReadonlyArray1;
 
 use super::common::*;
 use super::materialize::series_to_py_list;
-use super::runner::PolarsPlanRunner;
+use super::root_lazy::{collect_lazyframe, plan_to_lazyframe};
 
 fn mask_groupby_sum_mean_columns(
     mut df: DataFrame,
@@ -82,6 +82,7 @@ pub fn execute_groupby_agg_polars(
     by: Vec<String>,
     aggregations: Vec<(String, String, String)>,
     as_python_lists: bool,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     if by.is_empty() {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -102,8 +103,7 @@ pub fn execute_groupby_agg_polars(
         ));
     }
 
-    let df = root_data_to_polars_df(py, &plan.root_schema, root_data)?;
-    let lf = PolarsPlanRunner::apply_steps(df.lazy(), &plan.steps)?;
+    let lf = plan_to_lazyframe(py, plan, root_data)?;
     let by_exprs = by.iter().map(col).collect::<Vec<_>>();
     let mut agg_exprs = Vec::new();
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
@@ -340,11 +340,16 @@ pub fn execute_groupby_agg_polars(
         }
     }
 
-    let mut out_df = lf
-        .group_by(by_exprs)
-        .agg(agg_exprs)
-        .collect()
-        .map_err(|e| super::common::polars_err_ctx("group_by().agg()", e))?;
+    let mut out_df = collect_lazyframe(
+        py,
+        lf.group_by(by_exprs).agg(agg_exprs),
+        streaming,
+    )
+    .map_err(|e| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "Polars execution error (group_by().agg()): {e}"
+        ))
+    })?;
 
     out_df = mask_groupby_sum_mean_columns(out_df, &tmp_count_cols, &out_schema)?;
 

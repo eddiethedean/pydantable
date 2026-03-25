@@ -4,9 +4,36 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking — lazy I/O naming:** **`scan_*` / `ascan_*`** → **`read_*` / `aread_*`**; **`DataFrame.sink_*` / `DataFrameModel.sink_*`** → **`write_*`**. Eager **`dict[str, list]` → file** in **`pydantable.io`** is **`export_*` / `aexport_*`** (not **`write_*`**, which now means lazy plan output on **`DataFrame`**). Top-level **`pydantable`** re-exports **`read_parquet`**, **`read_parquet_url`**, **`aread_parquet`**, **`aread_parquet_url`**, **`export_parquet`** (replacing **`scan_*`** / **`write_parquet`**).
+
 ### Added
 
 (none yet)
+
+## [0.23.0] — 2026-03-25
+
+### Highlights
+
+- **Out-of-core file workflows:** **`read_parquet`**, **`read_csv`**, **`read_ndjson`**, **`read_ipc`** (and **`aread_*`**) return a **`ScanFileRoot`** so **`DataFrame` / `DataFrameModel`** can run transforms on a Polars **`LazyFrame`** without loading the full file into Python lists first.
+- **`DataFrame.write_parquet`** (and **`write_csv`**, **`write_ipc`**, **`write_ndjson`**): write the lazy pipeline from the Rust engine without building a giant **`dict[str, list]`** for the result.
+- **Breaking — public I/O renames:** sync/async eager file reads into columns are **`materialize_*` / `amaterialize_*`**. Lazy local files use **`read_*` / `aread_*`**. Eager **`dict[str, list]` → file** uses **`export_*` / `aexport_*`**. SQL **`read_sql` / `aread_sql`** → **`fetch_sql` / `afetch_sql`**. HTTP URL readers **`read_parquet_url`**, **`read_csv_url`**, **`read_ndjson_url`** (0.22 names) → **`fetch_parquet_url`**, **`fetch_csv_url`**, **`fetch_ndjson_url`**. Lazy HTTP Parquet temp-file entry: **`read_parquet_url` / `aread_parquet_url`**. Top-level **`pydantable`** exports and **`DataFrameModel`** classmethods follow the same vocabulary.
+
+### Details
+
+- **Rust:** **`ScanFileRoot`**, **`plan_to_lazyframe`**, internal **`sink_*`** exports for lazy writes; join/groupby/reshape entrypoints work with lazy file roots where implemented (see **`EXECUTION`** matrix).
+- **Python:** **`read_csv_stdin`** uses **`materialize_csv`** internally.
+- **Docs:** [`EXECUTION.md`](EXECUTION.md) memory model and streaming/collect compatibility matrix ( **`PYDANTABLE_ENGINE_STREAMING`** reserved); [`DATA_IO_SOURCES.md`](DATA_IO_SOURCES.md), [`FASTAPI.md`](FASTAPI.md), [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md), [`ROADMAP.md`](ROADMAP.md), [`README.md`](../README.md).
+
+### Migration (from 0.22.x)
+
+| Removed | Use instead |
+|---------|-------------|
+| **`read_parquet`**, **`aread_parquet`**, … | **`materialize_parquet`**, **`amaterialize_parquet`**, … |
+| **`read_sql`**, **`aread_sql`** | **`fetch_sql`**, **`afetch_sql`** |
+| **`read_parquet_url`**, … | **`fetch_parquet_url`**, … |
+| Large local file, filter → Parquet out | **`read_parquet`** + transforms + **`DataFrame.write_parquet`** |
 
 ## [0.22.0] — 2026-03-25
 

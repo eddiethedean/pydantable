@@ -34,7 +34,7 @@ use numpy::PyReadonlyArray1;
 
 use super::common::*;
 use super::materialize::{dtype_from_polars, series_to_py_list};
-use super::runner::PolarsPlanRunner;
+use super::root_lazy::{collect_lazyframe, plan_to_lazyframe};
 
 pub fn execute_concat_polars(
     py: Python<'_>,
@@ -44,15 +44,18 @@ pub fn execute_concat_polars(
     right_root_data: &Bound<'_, PyAny>,
     how: String,
     as_python_lists: bool,
+    streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
-    let left_df = root_data_to_polars_df(py, &left_plan.root_schema, left_root_data)?;
-    let right_df = root_data_to_polars_df(py, &right_plan.root_schema, right_root_data)?;
-    let left_out = PolarsPlanRunner::apply_steps(left_df.lazy(), &left_plan.steps)?
-        .collect()
-        .map_err(polars_err)?;
-    let right_out = PolarsPlanRunner::apply_steps(right_df.lazy(), &right_plan.steps)?
-        .collect()
-        .map_err(polars_err)?;
+    let left_out = collect_lazyframe(
+        py,
+        plan_to_lazyframe(py, left_plan, left_root_data)?,
+        streaming,
+    )?;
+    let right_out = collect_lazyframe(
+        py,
+        plan_to_lazyframe(py, right_plan, right_root_data)?,
+        streaming,
+    )?;
 
     let out_df = match how.as_str() {
         "vertical" => {

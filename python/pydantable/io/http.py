@@ -35,7 +35,9 @@ def fetch_bytes(
     _require_experimental(experimental)
     scheme = urlparse(url).scheme.lower()
     if scheme not in ("http", "https"):
-        raise ValueError(f"fetch_bytes only supports http(s) URLs, got scheme={scheme!r}")
+        raise ValueError(
+            f"fetch_bytes only supports http(s) URLs, got scheme={scheme!r}"
+        )
     req = urllib.request.Request(url, headers=dict(headers or {}))
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -52,14 +54,14 @@ def _write_temp_suffix(suffix: str) -> tuple[Path, BinaryIO]:
     return Path(name), f
 
 
-def read_parquet_url(
+def fetch_parquet_url(
     url: str,
     *,
     experimental: bool = True,
     columns: list[str] | None = None,
     **kwargs: Any,
 ) -> dict[str, list[Any]]:
-    """Download a Parquet file from ``url`` (HTTP(S) only) and load as ``dict[str, list]``."""
+    """Download a Parquet file from ``url`` (HTTP(S) only) and materialize as ``dict[str, list]``."""
     from .arrow import read_parquet_pyarrow
 
     _require_experimental(experimental)
@@ -67,7 +69,7 @@ def read_parquet_url(
     return read_parquet_pyarrow(data, columns=columns)
 
 
-def read_csv_url(
+def fetch_csv_url(
     url: str,
     *,
     experimental: bool = True,
@@ -99,7 +101,7 @@ def read_csv_url(
         path.unlink(missing_ok=True)
 
 
-def read_ndjson_url(
+def fetch_ndjson_url(
     url: str,
     *,
     experimental: bool = True,
@@ -139,7 +141,7 @@ def read_from_object_store(
         ) from e
     scheme = urlparse(uri).scheme.lower()
     if scheme in ("http", "https"):
-        raise ValueError("use read_parquet_url / read_csv_url for http(s) URLs")
+        raise ValueError("use fetch_parquet_url / fetch_csv_url for http(s) URLs")
     fmt = format.lower()
     with fsspec.open(uri, "rb") as f:  # type: ignore[call-arg]
         raw = f.read()

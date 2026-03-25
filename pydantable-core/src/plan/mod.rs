@@ -22,6 +22,11 @@ pub use execute_polars::{
     execute_groupby_dynamic_agg_polars, execute_join_polars, execute_melt_polars,
     execute_pivot_polars, execute_unnest_polars, PolarsPlanRunner,
 };
+#[cfg(feature = "polars_engine")]
+pub(crate) use execute_polars::{
+    collect_plan_batches_polars, sink_csv_polars, sink_ipc_polars, sink_ndjson_polars,
+    sink_parquet_polars,
+};
 pub use executor::PhysicalPlanExecutor;
 #[cfg(feature = "polars_engine")]
 pub use executor::PolarsExecutor;
@@ -42,14 +47,15 @@ pub fn execute_plan(
     plan: &PlanInner,
     root_data: &Bound<'_, PyAny>,
     as_python_lists: bool,
+    streaming: bool,
 ) -> PyResult<PyObject> {
     #[cfg(feature = "polars_engine")]
     {
-        PolarsExecutor.execute_plan(py, plan, root_data, as_python_lists)
+        PolarsExecutor.execute_plan(py, plan, root_data, as_python_lists, streaming)
     }
     #[cfg(not(feature = "polars_engine"))]
     {
-        RowwiseExecutor.execute_plan(py, plan, root_data, as_python_lists)
+        RowwiseExecutor.execute_plan(py, plan, root_data, as_python_lists, streaming)
     }
 }
 

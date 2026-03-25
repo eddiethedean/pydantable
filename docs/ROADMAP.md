@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.20.x → 0.22.x → v1.0.0)
+# PydanTable roadmap (0.20.x → 0.23.x → v1.0.0)
 
-**Latest release: `0.22.0`.** **Shipped in 0.22.0** adds the **`pydantable.io`** package (**Rust-first** file readers/writers, async mirrors, SQLAlchemy bridge, experimental HTTP/object-store helpers, optional enterprise extras)—see **Shipped in 0.22.0** below. Earlier **0.20.0** / **0.21.0** items (**UX** docs, **Streamlit** interchange, …) remain in their sections. **ipywidgets** / interactive explorers remain **Later** unless promoted. This document also summarizes shipped history, **Planned v1.0.0** for the **production-ready** major release, and **Later** / **After v1.0.0** backlogs.
+**Latest release: `0.23.0`.** **Shipped in 0.23.0** adds **lazy `read_*` / `aread_*` file roots**, **`DataFrame.write_*`** lazy pipeline output, **`export_*`** for eager dict→file, and **breaking renames** (**`materialize_*`**, **`fetch_sql`**, **`fetch_*_url`**)—see **Shipped in 0.23.0** below. **0.22.0** introduced the **`pydantable.io`** package with eager **`read_*` / `write_*`** names for column dict I/O (vocabulary evolved again in **0.23.0**; see changelog). Earlier **0.20.0** / **0.21.0** items (**UX** docs, **Streamlit** interchange, …) remain in their sections. **ipywidgets** / interactive explorers remain **Later** unless promoted. This document also summarizes shipped history, **Planned v1.0.0** for the **production-ready** major release, and **Later** / **After v1.0.0** backlogs.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
@@ -78,7 +78,7 @@ Practical inputs that feed that phase:
 - Keep CI green across supported Python versions and platforms; keep extension + optional **`[polars]`** matrices exercised in CI.
 - **Constructor ingest:** **`validate_data`** was removed in **0.15.0**; use **`trusted_mode`** only ([`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md)).
 - Optional: consolidated **migration guide** if semver ever jumps in a breaking way; keep [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) the semantics source of truth.
-- **Async I/O:** **0.15.0** ships **`acollect` / `ato_dict` / `ato_polars`** (and **`DataFrameModel`** **`arows` / `ato_dicts`**) using **`asyncio.to_thread`** or a custom executor; **0.16.0** adds **`ato_arrow`** and synchronous **`read_parquet` / `read_ipc`** returning **`dict[str, list]`** (see [`EXECUTION.md`](EXECUTION.md), [`FASTAPI.md`](FASTAPI.md)).
+- **Async I/O:** **0.15.0** ships **`acollect` / `ato_dict` / `ato_polars`** (and **`DataFrameModel`** **`arows` / `ato_dicts`**) using **`asyncio.to_thread`** or a custom executor; **0.16.0** adds **`ato_arrow`** and synchronous Parquet/IPC readers into **`dict[str, list]`** ( **`materialize_*`** since **0.23.0**); **0.23.0** adds **`read_*`** + **`DataFrame.write_*`** for out-of-core paths (see [`EXECUTION.md`](EXECUTION.md), [`FASTAPI.md`](FASTAPI.md)).
 - **FastAPI integration maturity:** treat [`FASTAPI.md`](FASTAPI.md) as the **canonical service guide**. **0.14.0** added **`TestClient`** / OpenAPI notes; **0.15.0** added **`async`** route examples and **`lifespan`**; **0.16.0** documents **multipart** Parquet/IPC, **`Depends`** executors, **background tasks**, and **422 vs application errors**.
 - **Release train:** **0.20.0** → **Planned v1.0.0** (below); dates are not committed here. The **1.0.0** tag waits until the **Planned v1.0.0** checklist is satisfied, unless scope slips.
 
@@ -196,11 +196,11 @@ Practical inputs that feed that phase:
 
 **Themes:** PyArrow **Parquet / IPC** read helpers, **`to_arrow` / `ato_arrow`**, **`Table` / `RecordBatch`** constructor ingest, and **FastAPI** deployment patterns.
 
-- [x] **Interchange:** **`pydantable.read_parquet`** and **`read_ipc`** ( **`as_stream`** for streaming IPC) return **`dict[str, list]`**; **`DataFrame.to_arrow`** / **`ato_arrow`** and **`DataFrameModel`** mirrors materialize a PyArrow **`Table`** after the same path as **`to_dict`** (documented copies; not zero-copy). **`pyproject`** **`[arrow]`** extra (**`pyarrow>=14`**). [`EXECUTION.md`](EXECUTION.md), [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md), [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md).
+- [x] **Interchange:** **`pydantable.read_parquet`** and **`read_ipc`** ( **`as_stream`** for streaming IPC) return **`dict[str, list]`** (**renamed** **`materialize_*`** in **0.23.0**); **`DataFrame.to_arrow`** / **`ato_arrow`** and **`DataFrameModel`** mirrors materialize a PyArrow **`Table`** after the same path as **`to_dict`** (documented copies; not zero-copy). **`pyproject`** **`[arrow]`** extra (**`pyarrow>=14`**). [`EXECUTION.md`](EXECUTION.md), [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md), [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md).
 - [x] **Constructors:** **`validate_columns_strict`** and **`DataFrameModel`** accept **`pa.Table`** / **`RecordBatch`** when **`pyarrow`** is installed (convert to Python lists, then existing validation).
-- [x] **Async:** **`ato_arrow`** uses the same thread-offload model as **`ato_polars`**. **`read_parquet` / `read_ipc`** remain synchronous (document **`asyncio.to_thread`** / executor for large files from async routes).
-- [x] **FastAPI:** [`FASTAPI.md`](FASTAPI.md) — **multipart** Parquet upload example, **`Depends`** executor injection, **background tasks** caveats, **422 vs `HTTPException` / uncaught constructor errors**; **`python-multipart`** in **`[dev]`** and CI. **`tests/test_fastapi_recipes.py`**: multipart + **422** on bad row types; **`scripts/verify_doc_examples.py`**: **`read_parquet`** + **`to_arrow`** smoke.
-- [x] **Tests:** **`tests/test_arrow_interchange.py`** (read/write helpers, **`to_arrow` / `ato_arrow`**, **`Table` / `RecordBatch` constructors); **`tests/test_fastapi_recipes.py`** (multipart Parquet, **422** where applicable); **`scripts/verify_doc_examples.py`** (**`read_parquet`** + **`to_arrow`** smoke).
+- [x] **Async:** **`ato_arrow`** uses the same thread-offload model as **`ato_polars`**. Parquet/IPC readers remain synchronous (document **`asyncio.to_thread`** / executor for large files from async routes).
+- [x] **FastAPI:** [`FASTAPI.md`](FASTAPI.md) — **multipart** Parquet upload example, **`Depends`** executor injection, **background tasks** caveats, **422 vs `HTTPException` / uncaught constructor errors**; **`python-multipart`** in **`[dev]`** and CI. **`tests/test_fastapi_recipes.py`**: multipart + **422** on bad row types; **`scripts/verify_doc_examples.py`**: Parquet + **`to_arrow`** smoke ( **`materialize_parquet`** after **0.23.0**).
+- [x] **Tests:** **`tests/test_arrow_interchange.py`** (read/write helpers, **`to_arrow` / `ato_arrow`**, **`Table` / `RecordBatch` constructors); **`tests/test_fastapi_recipes.py`** (multipart Parquet, **422** where applicable); **`scripts/verify_doc_examples.py`** (Parquet + **`to_arrow`** smoke).
 
 ---
 
@@ -308,12 +308,24 @@ Practical inputs that feed that phase:
 
 - [x] **Rust readers/writers:** **`pydantable._core`** **`io_read_*_path`** / **`io_write_*_path`** for **Parquet**, **IPC**, **CSV**, **NDJSON** ( **`Python::allow_threads`** on reads).
 - [x] **Python façade:** **`pydantable.io`** sync/async API, **`PYDANTABLE_IO_ENGINE`**, PyArrow fallbacks, **`[io]`** / **`[sql]`** / **`[cloud]`** / **`[excel]`** / **`[kafka]`** / **`[bq]`** / **`[snowflake]`** / **`[rap]`** extras in **`pyproject.toml`**.
-- [x] **SQLAlchemy:** **`read_sql`** / **`write_sql`** (any SQLAlchemy URL/dialect; parameterized SQL; drivers installed separately).
+- [x] **SQLAlchemy:** **`read_sql`** / **`write_sql`** (any SQLAlchemy URL/dialect; parameterized SQL; drivers installed separately). **Renamed** to **`fetch_sql`** in **0.23.0**.
 - [x] **Experimental transports:** **`fetch_bytes`**, URL readers, **`fsspec`** object-store helper behind **`PYDANTABLE_IO_EXPERIMENTAL`**.
 - [x] **Docs:** **`DATA_IO_SOURCES.md`**, **`EXECUTION.md`**, **`FASTAPI.md`**, **`changelog.md`**, this section.
 - [x] **Tests:** **`tests/test_io_comprehensive.py`**.
 
 **Deferred / not in-tree:** Rust **`sqlx`** drivers (documented SQLAlchemy-first); **`pyo3-asyncio`** + Tokio for I/O (thread offload remains default).
+
+---
+
+## Shipped in 0.23.0 (out-of-core scan roots + I/O renames)
+
+- [x] **Lazy file entry:** **`read_parquet`**, **`read_csv`**, **`read_ndjson`**, **`read_ipc`** (+ **`aread_*`**) return **`ScanFileRoot`**; engine builds Polars **`LazyFrame`** from the path without a full Python **`dict[str, list]`** for the scanned table.
+- [x] **Lazy write:** **`DataFrame.write_parquet`** / **`DataFrameModel.write_parquet`** (and **`write_csv`**, **`write_ipc`**, **`write_ndjson`**) — Rust pipeline output (internal **`sink_*`** symbols).
+- [x] **Breaking renames:** file **`read_*` / `aread_*`** → **`materialize_*` / `amaterialize_*`**; **`read_sql` / `aread_sql`** → **`fetch_sql` / `afetch_sql`**; HTTP **`read_*_url`** → **`fetch_*_url`**. **`DataFrameModel`** classmethods follow the same names.
+- [x] **Limitations:** **join**, **concat**, **group_by**, **melt**, **pivot**, **explode**, **unnest**, **dynamic group** on lazy file roots: see [`EXECUTION.md`](EXECUTION.md) matrix (evolves with Polars).
+- [x] **Docs + tests:** [`EXECUTION.md`](EXECUTION.md), [`DATA_IO_SOURCES.md`](DATA_IO_SOURCES.md), [`FASTAPI.md`](FASTAPI.md), [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md); **`tests/test_io_comprehensive.py`** (**`test_read_parquet_filter_write_roundtrip`**).
+
+**Later:** Polars **`streaming`** / **`PYDANTABLE_ENGINE_STREAMING`** knob; **`collect_batches`**; scan-backed joins.
 
 ---
 

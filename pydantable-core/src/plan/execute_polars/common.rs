@@ -115,6 +115,7 @@ pub(super) fn polars_err(e: PolarsError) -> PyErr {
 /// Same as [`polars_err`], with a short parenthetical label in the message (e.g.
 /// `group_by().agg()`) so grouped-aggregation `collect()` failures are identifiable.
 #[cfg(feature = "polars_engine")]
+#[allow(dead_code)] // Used by unit tests; production paths may wrap `PyErr` instead.
 pub(super) fn polars_err_ctx(context: &'static str, e: PolarsError) -> PyErr {
     PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
         "Polars execution error ({context}): {e}"

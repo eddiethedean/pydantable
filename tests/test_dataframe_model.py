@@ -4,6 +4,7 @@ import warnings
 
 import pytest
 from pydantable import DataFrame, DataFrameModel, Schema
+from pydantable.io import export_ndjson, export_parquet
 from pydantable.schema import DtypeDriftWarning, is_supported_scalar_column_annotation
 from pydantic import ValidationError
 
@@ -32,6 +33,56 @@ def test_dataframe_model_column_input_happy_path():
 def test_dataframe_model_row_input_happy_path():
     df = UserDF([{"id": 1, "age": 20}, {"id": 2, "age": None}])
     assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
+
+
+def test_dataframe_model_rejects_str_as_row_sequence() -> None:
+    with pytest.raises(TypeError, match="columnar"):
+        UserDF("not-a-row-sequence")  # type: ignore[arg-type]
+
+
+def test_dataframe_model_rejects_bytes_as_row_sequence() -> None:
+    with pytest.raises(TypeError, match="columnar"):
+        UserDF(b"not-rows")  # type: ignore[arg-type]
+
+
+def test_dataframe_model_materialize_parquet_classmethod(tmp_path) -> None:
+    path = tmp_path / "m.pq"
+    export_parquet(path, {"id": [1, 2], "age": [10, None]})
+    df = UserDF.materialize_parquet(path, trusted_mode="shape_only")
+    assert df.collect(as_lists=True) == {"id": [1, 2], "age": [10, None]}
+
+
+def test_dataframe_model_materialize_ndjson_classmethod(tmp_path) -> None:
+    path = tmp_path / "m.ndjson"
+    export_ndjson(path, {"id": [3], "age": [None]})
+    df = UserDF.materialize_ndjson(path, trusted_mode="shape_only")
+    assert df.collect(as_lists=True) == {"id": [3], "age": [None]}
+
+
+def test_dataframe_model_fetch_sql_classmethod(tmp_path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_path / "io.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (id INTEGER, age INTEGER)"))
+        conn.execute(text("INSERT INTO t VALUES (7, 8)"))
+    df = UserDF.fetch_sql("SELECT id, age FROM t", eng, trusted_mode="shape_only")
+    assert df.collect(as_lists=True) == {"id": [7], "age": [8]}
+
+
+@pytest.mark.asyncio
+async def test_dataframe_model_amaterialize_parquet_classmethod(tmp_path) -> None:
+    path = tmp_path / "a.pq"
+    export_parquet(path, {"id": [9], "age": [11]})
+    df = await UserDF.amaterialize_parquet(path, trusted_mode="shape_only")
+    assert df.collect(as_lists=True) == {"id": [9], "age": [11]}
+
+
+def test_dataframe_model_io_classmethod_rejects_bridge_base() -> None:
+    with pytest.raises(TypeError, match="concrete"):
+        DataFrameModel.materialize_parquet("x.parquet")  # type: ignore[attr-defined]
 
 
 def test_dataframe_model_row_input_strict_mode_still_raises() -> None:

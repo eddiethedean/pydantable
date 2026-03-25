@@ -8,7 +8,39 @@ inside the native extension. Python does **not** require the `polars` package fo
 
 **Async materialization (0.15.0+):** **`await acollect()`**, **`await ato_dict()`**, **`await ato_polars()`**, and **`await ato_arrow()`** on **`DataFrame`** run the same logic in a **worker thread** via **`asyncio.to_thread`**, or in a **`concurrent.futures.Executor`** passed as **`executor=`**. **`DataFrameModel`** mirrors this with **`acollect`**, **`ato_dict`**, **`ato_polars`**, **`ato_arrow`**, **`arows`**, and **`ato_dicts`**. Cancelling the awaiting task does **not** cancel in-flight native work. The **GIL** still serializes some Python callbacks; **`ato_polars()`** and **`ato_arrow()`** both build their respective outputs from a materialized columnar **`dict`** (extra allocation vs calling Polars or PyArrow alone on raw buffers).
 
-**File / I/O helpers (0.22.0+):** **`pydantable.io`** (and package exports **`read_parquet`**, **`read_ipc`**, **`write_parquet`**, **`aread_parquet`**, …) returns **`dict[str, list]`** for constructors. **Local files** default to **Rust** (Polars) when possible; **buffers**, **HTTP**, and **column-projected** Parquet use **PyArrow** where required. **Async** routes should use **`await pydantable.io.aread_parquet(...)`** ( **`asyncio.to_thread`** under the hood) or pass a thread **`executor=`**. **Writes** from column dicts use a short **Python Polars** IPC hop—install **`pydantable[polars]`** for that path. Service patterns: {doc}`FASTAPI` and {doc}`ROADMAP`.
+**File / I/O helpers (0.22.0+):** **`pydantable.io`** separates **lazy file roots** from **eager materialization**.
+
+- **`read_*` / `aread_*`:** return a native **`ScanFileRoot`** handle (local path + format). Use **`DataFrame[Schema].read_parquet(...)`** (or **`DataFrameModel.read_parquet`**) so transforms run on a Polars **`LazyFrame`** without loading the whole file into **`dict[str, list]`** first. **`DataFrame.write_parquet`**, **`write_csv`**, **`write_ipc`**, and **`write_ndjson`** write the lazy result from Rust (no giant Python column dict on those paths). **`read_parquet_url`** / **`aread_parquet_url`** download HTTP(S) Parquet to a **caller-owned temp file**—see {doc}`DATA_IO_SOURCES`.
+- **`materialize_*` / `amaterialize_*`:** read files or buffers into **`dict[str, list]`** for constructors, tests, and small data (**Rust** on local paths where possible; **PyArrow** for bytes, HTTP payloads, column subsets, and streaming IPC). Same threading story as before: **`await amaterialize_parquet(...)`** or **`executor=`**.
+- **`fetch_sql` / `afetch_sql`:** SQLAlchemy **`SELECT`** → column dict (replaces the old **`read_sql` / `aread_sql`** names).
+- **`export_*` / `aexport_*`:** take column dicts and write files eagerly; install **`pydantable[polars]`** for the Rust-backed export path where documented.
+
+Service patterns: {doc}`FASTAPI` and {doc}`ROADMAP`. Transport table: {doc}`DATA_IO_SOURCES`.
+
+### Streaming / engine `collect` (Polars)
+
+**Default:** the Rust engine runs Polars **`LazyFrame.collect_with_engine(Engine::InMemory)`** (in-process).
+
+**Streaming:** pass **`streaming=True`** to **`collect()`**, **`to_dict()`**, **`to_polars()`**, **`to_arrow()`**, **`write_parquet()`**, **`write_csv()`**, **`write_ipc()`**, **`write_ndjson()`**, **`join()`**, **`concat()`**, **`melt()`**, **`pivot()`**, **`explode()`**, **`unnest()`**, **`GroupedDataFrame.agg()`**, **`DynamicGroupedDataFrame.agg()`**, or the async mirrors; or set **`PYDANTABLE_ENGINE_STREAMING=1`** (truthy: **`1`**, **`true`**, **`yes`**) so the default is Polars’ **`Engine::Streaming`** **`collect`** where supported. Explicit **`streaming=False`** overrides the env var. This is **best-effort**: unsupported plans may error or behave like in-memory collect depending on Polars.
+
+**Streaming vs in-memory (executor family, high level):**
+
+| Executor family | Honors **`streaming=`** / env on terminal collect |
+|-----------------|--------------------------------------------------|
+| **`execute_plan`** (filter, select, window, …) | Yes |
+| **`write_*` (parquet, csv, ipc, ndjson)** | Yes |
+| **`join`**, **`concat`**, **`group_by` / `agg`**, **`melt`**, **`pivot`**, **`explode`**, **`unnest`**, **`group_by_dynamic` / `agg`** | Yes (terminal **`collect_with_engine`**); **cross join** still materializes both sides before **`cross_join`**—can be memory-heavy with two lazy file roots. |
+
+**Lazy file roots — what is safe to chain (high level):**
+
+| Plan shape | On **`read_*` root** |
+|------------|----------------------|
+| **Filter, select, with_columns, simple projections** | Supported; stays lazy until **`collect`** or **`write_*`**. |
+| **Join, concat, melt, pivot, explode, unnest, group_by, dynamic group** | **Supported** (Polars limits apply; some lazy combinations may fail at runtime). |
+
+**`collect_batches()`** runs one full engine collect, then splits rows into Polars **`DataFrame`** chunks (IPC round-trip to Python). It is **not** Polars’ native lazy batch iterator; use it for bounded batch-wise work after materialization.
+
+For **HTTP** materialization, **`fetch_*_url`** / **`read_from_object_store`** still return **`dict[str, list]`**. For **lazy** HTTP Parquet, use **`read_parquet_url`** (temp file lifecycle in {doc}`DATA_IO_SOURCES`).
 
 By default, `collect()` returns a **list of Pydantic models** (one per row), validated
 against the current projected schema. Use **`to_dict()`** or **`collect(as_lists=True)`**
@@ -48,7 +80,7 @@ See {doc}`PANDAS_UI`, {doc}`PYSPARK_UI`, and **Naming map (core ↔ pandas ↔ P
 | Validated rows | **`collect()`** (default) | none |
 | Polars **`DataFrame`** | **`to_polars()`** | **`pip install 'pydantable[polars]'`** |
 | PyArrow **`Table`** | **`to_arrow()`** | **`pip install 'pydantable[arrow]'`** |
-| File round-trip | **`read_parquet`** / **`read_ipc`** / **`write_*`** → constructors | **`[arrow]`** (buffers); **`[polars]`** (Rust write path); core wheel includes Rust readers |
+| File round-trip | **`materialize_parquet`** / **`materialize_ipc`** / **`export_*`** → constructors; or **`read_*`** + transforms + **`write_parquet`** | **`[arrow]`** (buffers); **`[polars]`** (Rust export + lazy **`write_*`** path); core wheel includes Rust readers |
 
 Each path that builds Polars or Arrow **first** runs the same Rust materialization as **`to_dict()`** unless documented otherwise.
 

@@ -78,7 +78,9 @@ def read_avro(
     try:
         import pyarrow as pa  # type: ignore[import-not-found]
     except ImportError as e:
-        raise ImportError("read_avro requires pyarrow (pip install 'pydantable[arrow]').") from e
+        raise ImportError(
+            "read_avro requires pyarrow (pip install 'pydantable[arrow]')."
+        ) from e
     from .arrow import arrow_table_to_column_dict
 
     try:
@@ -97,7 +99,9 @@ def read_orc(
     try:
         import pyarrow.orc as orc  # type: ignore[import-not-found]
     except ImportError as e:
-        raise ImportError("read_orc requires pyarrow.orc (pip install 'pydantable[arrow]').") from e
+        raise ImportError(
+            "read_orc requires pyarrow.orc (pip install 'pydantable[arrow]')."
+        ) from e
     from .arrow import arrow_table_to_column_dict
 
     with open(path, "rb") as f:
@@ -218,10 +222,10 @@ def read_csv_stdin(
     *,
     engine: str = "auto",
 ) -> dict[str, list[Any]]:
-    """Read CSV from ``stdin`` (or ``stream``) via a temporary file + :func:`read_csv`."""
+    """Read CSV from ``stdin`` (or ``stream``) via a temporary file + :func:`materialize_csv`."""
     import tempfile
 
-    from . import read_csv
+    from . import materialize_csv
 
     fh = stream or sys.stdin
     data = fh.read()
@@ -229,7 +233,7 @@ def read_csv_stdin(
     path = Path(tempfile.mkstemp(suffix=".csv")[1])
     try:
         path.write_bytes(raw)
-        return read_csv(str(path), engine=engine)
+        return materialize_csv(str(path), engine=engine)
     finally:
         path.unlink(missing_ok=True)
 
@@ -240,14 +244,14 @@ def write_csv_stdout(
     *,
     engine: str = "auto",
 ) -> None:
-    """Write ``data`` as CSV to ``stdout`` (or ``stream``) using :func:`write_csv` to a temp file."""
+    """Write ``data`` as CSV to ``stdout`` (or ``stream``) using :func:`export_csv` to a temp file."""
     import tempfile
 
-    from . import write_csv
+    from . import export_csv
 
     path = Path(tempfile.mkstemp(suffix=".csv")[1])
     try:
-        write_csv(str(path), data, engine=engine)
+        export_csv(str(path), data, engine=engine)
         out = path.read_bytes()
         if stream is None:
             sys.stdout.buffer.write(out)

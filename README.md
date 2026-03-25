@@ -8,7 +8,7 @@
 
 **Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core (Polars inside the native extension).**
 
-**Current release: 0.22.0** · Python **3.10–3.13**
+**Current release: 0.23.0** · Python **3.10–3.13**
 
 ---
 
@@ -17,7 +17,7 @@
 - **Schemas first:** Pydantic field annotations define column types, nullability (`T | None`), and which expressions are legal. Many mistakes are caught when you build the `Expr`, not only when you run the query.
 - **Two entry styles:** `DataFrameModel` (SQLModel-like whole-table class with a generated row model) or `DataFrame[YourSchema](data)` with any Pydantic `BaseModel` schema.
 - **Polars-shaped API:** `select`, `with_columns`, `filter`, `join`, `group_by`, windows, reshape helpers — semantics are documented in the [interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html), not guaranteed identical to Polars on every edge case.
-- **Optional extras:** `pydantable[polars]` for `to_polars()` and **Rust-backed file writes** (`write_parquet`, …); `pydantable[arrow]` for **buffer/streaming** Parquet/IPC, `to_arrow` / `ato_arrow`, and `pa.Table` / `RecordBatch` constructors; `pydantable[io]` bundles **arrow + polars** for full **I/O**; **`[sql]`** for `read_sql` / `write_sql` (**SQLAlchemy**; add **psycopg**, **pymysql**, etc. for your database URLs); **`[cloud]`**, **`[excel]`**, **`[kafka]`**, **`[bq]`**, **`[snowflake]`**, **`[rap]`** for other bridges in **`docs/DATA_IO_SOURCES.md`**.
+- **Optional extras:** `pydantable[polars]` for `to_polars()` and **Rust-backed I/O** (**`export_*`** for **`dict[str, list]` → file**, **`DataFrame.write_*`** for lazy plan output); `pydantable[arrow]` for **buffer/streaming** Parquet/IPC, `to_arrow` / `ato_arrow`, and `pa.Table` / `RecordBatch` constructors; `pydantable[io]` bundles **arrow + polars** for full **I/O**; **`[sql]`** for `fetch_sql` / `write_sql` (**SQLAlchemy**; add **psycopg**, **pymysql**, etc. for your database URLs); **`[cloud]`**, **`[excel]`**, **`[kafka]`**, **`[bq]`**, **`[snowflake]`**, **`[rap]`** for other bridges in **`docs/DATA_IO_SOURCES.md`**. **Lazy file entry:** **`read_parquet`** / **`read_*`** + **`DataFrame.write_parquet`** (and siblings) for out-of-core pipelines ([Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html)).
 - **Optional façades:** `pydantable.pandas` and `pydantable.pyspark` swap naming/imports; execution stays the same in-process core (not a real Spark or pandas backend).
 - **Service-ready:** Sync and async materialization (`collect`, `to_dict`, `acollect`, `ato_dict`, …), [FastAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) patterns, and trusted ingest modes for bulk JSON or Arrow.
 - **REPL / discovery:** `repr(df)` on **`DataFrame`** and **`DataFrameModel`** shows the parameterized class, schema type, and column dtypes (wide tables truncate with `… and N more`). **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, and **`describe()`** (numeric, bool, str) are on the core API (see [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) for **`shape`** vs materialized rows). **`Expr`** and **`WhenChain`** have readable **`repr`** for debugging pipelines. Row counts in **`repr`** are omitted—use **`collect()`** / **`to_dict()`** when you need data. **Jupyter / VS Code notebooks:** **`_repr_html_()`** renders a bounded **HTML table** preview (no **`polars`** required); tune via **`pydantable.display`** or **`PYDANTABLE_REPR_HTML_*`**. Details: [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html).
@@ -26,7 +26,8 @@
 
 ## Upgrading
 
-- From **0.21.x → 0.22.0**: no intended breaking changes.
+- From **0.22.x → 0.23.0**: **breaking I/O renames** — eager file reads into **`dict[str, list]`** are **`materialize_*` / `amaterialize_*`** (not the old **`read_*` / `aread_*`** names); **lazy** local files use **`read_*` / `aread_*`** ( **`ScanFileRoot`** ); lazy plan output uses **`DataFrame.write_*`**; eager **`dict[str, list]` → file** uses **`export_*` / `aexport_*`**; **`read_sql` / `aread_sql`** → **`fetch_sql` / `afetch_sql`**; HTTP column readers **`read_*_url`** → **`fetch_*_url`**; lazy HTTP Parquet temp-file entry is **`read_parquet_url` / `aread_parquet_url`**. See [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html) and [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html).
+- From **0.21.x → 0.22.0**: no intended breaking changes (see changelog for **0.22.0** I/O additions).
 
 ## Documentation
 
@@ -63,9 +64,9 @@ pip install pydantable
 
 ```bash
 pip install 'pydantable[polars]'   # to_polars(); write_parquet/write_* from dict (IPC hop)
-pip install 'pydantable[arrow]'    # read_parquet/read_ipc from bytes, to_arrow, Table/RecordBatch
+pip install 'pydantable[arrow]'    # materialize_parquet/ipc from bytes, to_arrow, Table/RecordBatch
 pip install 'pydantable[io]'       # arrow + polars (recommended for mixed file I/O)
-pip install 'pydantable[sql]'      # read_sql / write_sql (SQLAlchemy + your DB driver)
+pip install 'pydantable[sql]'      # fetch_sql / write_sql (SQLAlchemy + your DB driver)
 ```
 
 **From a git checkout** you need a Rust toolchain and a build of the extension (e.g. [Maturin](https://www.maturin.rs/)):
@@ -143,7 +144,9 @@ PySpark-named wrappers: `pydantable.pyspark.sql.functions` mirrors much of the a
 
 **0.17.0** — Tighter docs and tests for **`map_get` / `map_contains_key`** after PyArrow **`map<utf8, …>`** ingest; more **`pyspark.sql.functions`** thin wrappers (`str_replace`, `regexp_replace`, `strip_*`, `strptime`, `binary_len`, `list_*`). Non-string map keys (`dict[int, T]`, etc.) remain future work ([Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) **Later**).
 
-**0.16.x** — Arrow interchange (`read_parquet` / `read_ipc`, `to_arrow` / `ato_arrow`, Table/RecordBatch constructors), FastAPI multipart and deployment docs, map-column arithmetic `TypeError` fix, `DataFrame[Schema](pa.Table)` constructor fix.
+**0.16.x** — Arrow interchange (eager Parquet/IPC readers, `to_arrow` / `ato_arrow`, Table/RecordBatch constructors), FastAPI multipart and deployment docs, map-column arithmetic `TypeError` fix, `DataFrame[Schema](pa.Table)` constructor fix.
+
+**0.23.0** — Out-of-core **`read_*` / `aread_*`** lazy roots, **`DataFrame.write_*`** pipeline output, **`export_*`** for eager dict→file, **`materialize_*` / `fetch_sql`** naming; see [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html).
 
 Older highlights: **0.15.0** async materialization and Arrow map ingest; **0.14.0** window null ordering and FastAPI `TestClient` coverage. Full history: [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html).
 

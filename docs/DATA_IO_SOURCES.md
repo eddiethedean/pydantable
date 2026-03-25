@@ -2,7 +2,22 @@
 
 This document lists **common and useful** places applications read and write tabular data. It is intended to guide **0.22.x+** I/O work in pydantable: which formats and transports to support first, and which **async** stacks pair well with **FastAPI** and typed frames.
 
-**Today (0.22.0+)**, pydantable ships **`pydantable.io`**: **Rust-first** **`read_*` / `write_*`** for **Parquet**, **Arrow IPC**, **CSV**, and **NDJSON** into **`dict[str, list]`** (plus **PyArrow** for buffers, **column projection**, and **streaming IPC**); **async** **`aread_*` / `awrite_*`**; **SQL** via **SQLAlchemy** **`read_sql` / `write_sql`** (**`[sql]`** extra) for **any URL/dialect** SQLAlchemy supports—install the matching **DBAPI driver** in your environment ( **`psycopg`**, **`pymysql`**, **`pyodbc`**, …); **experimental** HTTP / **`fsspec`** object-store helpers; and optional **Excel**, **Delta/Avro/ORC**, **BigQuery**, **Snowflake**, **Kafka**, **stdin/stdout** entrypoints documented below. **Export** remains **`to_arrow()`** / **`to_polars()`** and constructors that accept columnar Python data and (with **`[arrow]`**) **PyArrow** **`Table`** / **`RecordBatch`**.
+**Today (0.23.0+)**, pydantable ships **`pydantable.io`** with three layers:
+
+1. **`read_*` / `aread_*`** — lazy **local file** roots (**`ScanFileRoot`**) so **`DataFrame` / `DataFrameModel`** can plan on Polars **`LazyFrame`** without loading full columns into Python (**Parquet**, **CSV**, **NDJSON**, **IPC file**).
+2. **`materialize_*` / `amaterialize_*`** — eager **`dict[str, list]`** reads (**Rust** on local paths where possible; **PyArrow** for bytes, HTTP bodies, column subsets, streaming IPC).
+3. **`DataFrame.write_parquet`**, **`write_csv`**, **`write_ipc`**, **`write_ndjson`** (and **`DataFrameModel`** mirrors) — write the lazy pipeline from Rust without a giant Python dict.
+
+### `read_parquet_url` / `aread_parquet_url` temp-file lifecycle
+
+These helpers **`fetch_bytes`** from HTTP(S), write a **named temp** **`.parquet`** file, and return **`ScanFileRoot(path, "parquet", columns)`**. The file is **not** deleted when the **`ScanFileRoot`** or **`DataFrame`** is garbage-collected.
+
+- **Delete after use:** when your pipeline finishes (after **`write_*`**, **`collect()`**, etc.), remove the path (e.g. **`os.unlink(root.path)`** if you keep a reference to the native root, or track the temp path you created).
+- **Async:** **`aread_parquet_url`** runs the same work in a thread pool like other **`aread_*`** helpers.
+
+There is **no** true streaming HTTP Parquet scan without a local file or deeper Polars/object-store integration.
+
+**`export_*` / `aexport_*`** persist column dicts to files. **SQL:** **`fetch_sql` / `afetch_sql`** and **`write_sql` / `awrite_sql`** (**SQLAlchemy**; **`[sql]`** extra + your DB driver). **HTTP(S)** uses **`fetch_parquet_url`**, **`fetch_csv_url`**, **`fetch_ndjson_url`**, **`fetch_bytes`** (experimental flag). **Object store:** **`read_from_object_store`**. Optional **Excel**, **Delta**, **Kafka**, **stdin/stdout**: **`pydantable.io.extras`**. **Interchange:** **`to_arrow()`** / **`to_polars()`** and constructors (with **`[arrow]`**, **PyArrow** **`Table`** / **`RecordBatch`**).
 
 ---
 
@@ -35,8 +50,8 @@ Pydantable already executes typed plans in **Rust** (Polars-backed). Putting **f
 
 ### Where Python (SQLAlchemy / SQLModel) still wins
 
-- **Broad driver coverage:** **`pydantable.io.read_sql` / `write_sql`** use **SQLAlchemy 2.x** sync **Engine** / **Connection** (or URL strings). Any dialect SQLAlchemy documents works as long as the **driver** is installed; pydantable does not bundle DB drivers.
-- **ORM-heavy** apps can pair **SQLModel** / **`Session`** with the same engines for CRUD, and use **`read_sql`** for bulk **`SELECT …` → `dict[str, list]`** for **`DataFrameModel`**.
+- **Broad driver coverage:** **`pydantable.io.fetch_sql` / `write_sql`** use **SQLAlchemy 2.x** sync **Engine** / **Connection** (or URL strings). Any dialect SQLAlchemy documents works as long as the **driver** is installed; pydantable does not bundle DB drivers.
+- **ORM-heavy** apps can pair **SQLModel** / **`Session`** with the same engines for CRUD, and use **`fetch_sql`** for bulk **`SELECT …` → `dict[str, list]`** for **`DataFrameModel`**.
 
 ### Async Rust ↔ FastAPI
 
@@ -61,23 +76,23 @@ Pydantable already executes typed plans in **Rust** (Polars-backed). Putting **f
 
 | Source / sink | Read | Write | Notes |
 |---------------|------|-------|--------|
-| **Parquet** | Yes (PyArrow today) | Add **`write_parquet`** (PyArrow or Polars) | Columnar, typed, compression; de facto analytics interchange. |
-| **Arrow IPC / Feather** | Yes (IPC today) | Add **IPC / Feather** writers | Zero-copy friendly within Arrow ecosystem. |
-| **CSV** | Add **`read_csv`** | Add **`write_csv`** | Universal but weak typing; needs explicit dtypes / nullable handling. |
+| **Parquet** | Yes (PyArrow today) | **`export_parquet`** / lazy **`DataFrame.write_parquet`** | Columnar, typed, compression; de facto analytics interchange. |
+| **Arrow IPC / Feather** | Yes (IPC today) | **`export_ipc`** / lazy **`write_ipc`** | Zero-copy friendly within Arrow ecosystem. |
+| **CSV** | **`materialize_csv`** / **`read_csv`** | **`export_csv`** / lazy **`write_csv`** | Universal but weak typing; needs explicit dtypes / nullable handling. |
 | **JSON** | Add **`read_json`** (array of objects **and** line-delimited) | Add **`write_json`** | APIs and logs; align with Pydantic-friendly row shapes. |
-| **SQL (relational)** | **`read_sql`** | **`write_sql`** (append/replace) | **SQLAlchemy 2.x** + your DB’s driver (**`pydantable[sql]`** ships SQLAlchemy only). |
+| **SQL (relational)** | **`fetch_sql`** | **`write_sql`** (append/replace) | **SQLAlchemy 2.x** + your DB’s driver (**`pydantable[sql]`** ships SQLAlchemy only). |
 
 ### SQL: pydantable helpers vs async engines
 
-**In pydantable (`read_sql` / `write_sql`, `aread_sql` / `awrite_sql`)**
+**In pydantable (`fetch_sql` / `write_sql`, `afetch_sql` / `awrite_sql`)**
 
 - **Any SQLAlchemy URL or engine:** e.g. **`postgresql+psycopg://…`**, **`mysql+pymysql://…`**, **`sqlite:///…`**, **`mssql+pyodbc://…`**, etc.
-- **Sync execution** inside SQLAlchemy; from **`async def`** routes use **`aread_sql`** / **`awrite_sql`** (**`asyncio.to_thread`** or **`executor=`**) so the event loop is not blocked.
+- **Sync execution** inside SQLAlchemy; from **`async def`** routes use **`afetch_sql`** / **`awrite_sql`** (**`asyncio.to_thread`** or **`executor=`**) so the event loop is not blocked.
 - **`write_sql` … `if_exists="replace"`** uses generic **DDL** (**`DropTable` / `CreateTable`**); exotic dialects or production schemas may still prefer migrations instead.
 
 **Native async SQLAlchemy (asyncpg, …)**
 
-- Pydantable’s **`aread_sql`** is still **thread-offloaded sync** SQLAlchemy. If you already use **`AsyncSession`** / **`AsyncConnection`**, you can **`await conn.stream(text(sql))`** yourself, build **`dict[str, list]`**, and pass that to constructors—or call **`read_sql`** from a thread pool for simplicity.
+- Pydantable’s **`afetch_sql`** is still **thread-offloaded sync** SQLAlchemy. If you already use **`AsyncSession`** / **`AsyncConnection`**, you can **`await conn.stream(text(sql))`** yourself, build **`dict[str, list]`**, and pass that to constructors—or call **`fetch_sql`** from a thread pool for simplicity.
 
 ---
 
@@ -132,7 +147,7 @@ Contrast with common stacks:
 ### SQL
 
 - **Preferred long-term:** **SQLAlchemy 2.0 async** engine + **`AsyncConnection`** streaming cursors to build column buffers without loading ORM rows.
-- **Interim:** sync **`read_sql`** in **`asyncio.to_thread`** (simple, portable, good enough for many FastAPI apps with a small pool).
+- **Interim:** sync **`fetch_sql`** in **`asyncio.to_thread`** (simple, portable, good enough for many FastAPI apps with a small pool).
 - **SQLite-only async:** **`rapsqlite`** (above) as an alternative to **`aiosqlite`** when the project standard is **streaming / non-threaded async** semantics; validate against your SQLite usage (WAL, concurrent readers, etc.).
 
 ### HTTP
@@ -141,17 +156,18 @@ Contrast with common stacks:
 
 ### Object storage
 
-- Many SDKs are sync: **`to_thread`** around **`fsspec`** file open + PyArrow **`read_parquet`** is a common pattern.
+- Many SDKs are sync: **`to_thread`** around **`fsspec`** file open + PyArrow / **`materialize_parquet`** is a common pattern.
 
 ---
 
-## Suggested pydantable API shape (0.22+ direction)
+## Implemented API shape (0.23.0+)
 
-Keep **one clear Python module** (e.g. `pydantable.io`) that mostly **delegates to `pydantable._core`** for format/transport work, with **SQLAlchemy** helpers as an optional Python-only extra:
+**`pydantable.io`** delegates read/materialize/write paths to **`pydantable._core`** where documented, with **SQLAlchemy** as an optional Python extra:
 
-- **Sync (Rust-backed where possible):** `read_csv`, `read_json`, `read_parquet`, `read_ipc`, `read_sql`, … returning **`dict[str, list]`** (or optional **lazy** in-memory frame later).
-- **Async:** `aread_*` with **`executor=`** mirroring **`acollect`** (thread pool around sync Rust that releases the GIL), or native async later if justified.
-- **Write:** `write_csv`, `write_json`, `write_parquet`, `write_ipc`, `write_sql`, … fed from **`to_dict()`** or zero-copy-ish paths from the engine when available.
+- **Lazy file roots:** **`read_parquet`**, **`read_csv`**, **`read_ndjson`**, **`read_ipc`** (+ async **`aread_*`**).
+- **Eager columns:** **`materialize_*` / `amaterialize_*`** → **`dict[str, list]`** for constructors and tests.
+- **Pipeline write:** **`DataFrame.write_parquet`** / **`DataFrameModel.write_parquet`** (and **`write_csv`**, **`write_ipc`**, **`write_ndjson`**) — Rust; no Python dict round-trip on the hot path.
+- **Export from dicts:** **`export_*` / `aexport_*`**, **`write_sql` / `awrite_sql`** fed from **`to_dict()`** or ad hoc buffers.
 
 **Dependencies:** mirror **Cargo features** and Python extras (`sql` = Rust `sqlx` subset **or** Python SQLAlchemy, document which); **`pydantable[excel]`** may stay Python-only for a long time.
 
