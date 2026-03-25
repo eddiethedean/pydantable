@@ -1491,14 +1491,17 @@ class DataFrame(Generic[SchemaT]):
             ) from e
         return pa.Table.from_pydict(self.to_dict())
 
-    def __dataframe__(self, *, nan_as_null: bool = False, allow_copy: bool = True) -> Any:
+    def __dataframe__(
+        self, *, nan_as_null: bool = False, allow_copy: bool = True
+    ) -> Any:
         """
         Python DataFrame Interchange Protocol export (for Streamlit and friends).
 
         This materializes the current plan to a PyArrow ``Table`` (same cost class as
         :meth:`to_arrow`) and then delegates to Arrow's protocol implementation.
 
-        Requires the optional ``pyarrow`` dependency: ``pip install 'pydantable[arrow]'``.
+        Requires the optional ``pyarrow`` dependency:
+        ``pip install 'pydantable[arrow]'``.
         """
         table = self.to_arrow()
         # PyArrow implements the interchange protocol on Table; delegate to it.
@@ -1517,22 +1520,24 @@ class DataFrame(Generic[SchemaT]):
             import dataframe_api_compat  # type: ignore[import-untyped]
         except ImportError as e:
             raise ImportError(
-                "dataframe-api-compat is required for __dataframe_consortium_standard__(). "
+                "dataframe-api-compat is required for "
+                "__dataframe_consortium_standard__(). "
                 "Install with: pip install 'dataframe-api-compat'"
             ) from e
         try:
             import pandas as pd  # type: ignore[import-untyped]
         except ImportError as e:
             raise ImportError(
-                "pandas is required for pydantable's __dataframe_consortium_standard__() "
-                "implementation. Install with: pip install 'pydantable[pandas]'"
+                "pandas is required for pydantable's "
+                "__dataframe_consortium_standard__() implementation. "
+                "Install with: pip install 'pydantable[pandas]'"
             ) from e
 
         pdf = pd.DataFrame(self.to_dict())
-        return dataframe_api_compat.pandas_standard.convert_to_standard_compliant_dataframe(
-            pdf,
-            api_version=api_version,
+        converter = (
+            dataframe_api_compat.pandas_standard.convert_to_standard_compliant_dataframe
         )
+        return converter(pdf, api_version=api_version)
 
     async def acollect(
         self,

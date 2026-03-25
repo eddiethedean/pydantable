@@ -35,8 +35,8 @@ def test_interchange_protocol_nan_as_null_passthrough() -> None:
 
     pd = pytest.importorskip("pandas")
 
-    from pydantable import DataFrameModel
     import pyarrow as pa
+    from pydantable import DataFrameModel
 
     class Floats(DataFrameModel):
         x: float | None

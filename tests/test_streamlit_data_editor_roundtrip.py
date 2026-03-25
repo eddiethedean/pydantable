@@ -9,7 +9,7 @@ pytest.importorskip("streamlit")
 
 
 def test_streamlit_data_editor_roundtrip_default_value() -> None:
-    """`st.data_editor` accepts the supported fallback and returns data we can round-trip.
+    """`st.data_editor` accepts the supported fallback and returns round-trippable data.
 
     Note: Streamlit's AppTest does not currently support simulating cell edits for
     `st.data_editor`, so this test validates the integration/return-type path for the
@@ -20,7 +20,6 @@ def test_streamlit_data_editor_roundtrip_default_value() -> None:
 
     def app() -> None:
         import streamlit as st
-
         from pydantable import DataFrameModel
 
         class SmallDF(DataFrameModel):

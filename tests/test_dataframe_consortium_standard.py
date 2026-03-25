@@ -4,7 +4,7 @@ import pytest
 
 
 def test_dataframe_consortium_standard_entrypoint() -> None:
-    dataframe_api_compat = pytest.importorskip("dataframe_api_compat")
+    pytest.importorskip("dataframe_api_compat")
     pd = pytest.importorskip("pandas")
 
     from pydantable import DataFrameModel
