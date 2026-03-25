@@ -8,7 +8,7 @@
 
 **Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core (Polars inside the native extension).**
 
-**Current release: 0.20.0** · Python **3.10+**
+**Current release: 0.21.0** · Python **3.10+**
 
 ---
 
@@ -126,6 +126,8 @@ PySpark-named wrappers: `pydantable.pyspark.sql.functions` mirrors much of the a
 ---
 
 ## Recent releases
+
+**0.21.0** — **Streamlit ergonomics:** `DataFrame` / `DataFrameModel` implement the **dataframe interchange protocol** (`__dataframe__`) via PyArrow so **`st.dataframe(df)`** and **`st.data_editor(df)`** can render typed frames directly when `pyarrow` is installed (`pip install 'pydantable[arrow]'`). See [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) (**interchange**) and [Streamlit integration](https://pydantable.readthedocs.io/en/latest/STREAMLIT.html) for fallbacks (`to_polars()` / `to_arrow()`), costs, and limitations.
 
 **0.20.0** — **UX, discovery, docs, and display:** [Quickstart](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html), [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) (materialization costs, import styles, copy-as / interchange); core **`columns`**, **`shape`**, **`info()`**, **`describe()`** (int/float/bool/str), **`value_counts`**, **`set_display_options`** / **`PYDANTABLE_REPR_HTML_*`**, **`_repr_mimebundle_`**, optional **`PYDANTABLE_VERBOSE_ERRORS`**; **`Expr`** / **`WhenChain`** **`repr`**; PySpark **`show()`** / **`summary()`**; multi-line **`DataFrame`** **`repr`** and **`_repr_html_`**. [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html), [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) **Introspection**.
 

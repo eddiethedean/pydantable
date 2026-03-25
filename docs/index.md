@@ -3,7 +3,7 @@
 **Strongly-typed DataFrame layer for FastAPI and Pydantic services**, with a Rust-powered execution core (Polars-backed inside the native extension).
 
 ```{note}
-This **documentation site** is the detailed manual. The repository **README** on your Git host is the short entrypoint; both should stay aligned for install commands and version. **Current minor:** **0.20.0** (see {doc}`changelog`).
+This **documentation site** is the detailed manual. The repository **README** on your Git host is the short entrypoint; both should stay aligned for install commands and version. **Current minor:** **0.21.0** (see {doc}`changelog`).
 ```
 
 ## At a glance
@@ -45,6 +45,7 @@ DATAFRAMEMODEL
 SUPPORTED_TYPES
 FASTAPI
 EXECUTION
+STREAMLIT
 ```
 
 ```{toctree}

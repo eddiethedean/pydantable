@@ -310,6 +310,10 @@ class DataFrameModel:
         """
         return self._df.to_arrow()
 
+    def __dataframe__(self, *, nan_as_null: bool = False, allow_copy: bool = True) -> Any:
+        """Delegate the dataframe interchange protocol to the inner :class:`DataFrame`."""
+        return self._df.__dataframe__(nan_as_null=nan_as_null, allow_copy=allow_copy)
+
     def rows(self) -> list[BaseModel]:
         """
         Materialize this DataFrame into a list of per-row Pydantic models.

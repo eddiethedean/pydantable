@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format is inspired 
 
 (none yet)
 
+## [0.21.0] — 2026-03-25
+
+### Highlights
+
+- **Streamlit:** `DataFrame` and `DataFrameModel` implement the **Python DataFrame Interchange Protocol** (`__dataframe__`) via PyArrow so `st.dataframe(df)` and `st.data_editor(df)` can render a typed `pydantable` frame directly when `pyarrow` is installed (`pip install 'pydantable[arrow]'`). See {doc}`STREAMLIT` and {doc}`EXECUTION` (**interchange**).
+
 ## [0.20.0] — 2026-03-25
 
 **Supersedes:** 0.19.0.
