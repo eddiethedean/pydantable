@@ -4,7 +4,7 @@ This guide is for contributors working on `pydantable` internals.
 
 ## Prerequisites
 
-- Python `3.10+` (project metadata targets `>=3.10`; current local dev flow uses `3.10`)
+- Python `3.10+` (project metadata targets `>=3.10`; CI exercises 3.10–3.13)
 - Rust toolchain (`rustup`, `cargo`)
 - `maturin` for building the PyO3 extension
 
@@ -24,6 +24,12 @@ Activate when working interactively:
 ```bash
 source .venv/bin/activate
 ```
+
+## SBOMs (CycloneDX)
+
+For the `v1.0.0` release train, the release workflow generates **CycloneDX** SBOMs for:
+
+- The **Python environment** used to build/install the distribution.\n+- The **Rust crate** (`pydantable-core`).\n+\n+These SBOMs are attached to the GitHub Release and uploaded as workflow artifacts.
 
 ## Repository Layout
 

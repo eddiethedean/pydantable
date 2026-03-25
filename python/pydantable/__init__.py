@@ -33,4 +33,4 @@ __all__ = [
     "reset_display_options",
     "set_display_options",
 ]
-__version__ = "0.21.0"
+__version__ = "1.0.0"

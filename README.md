@@ -8,7 +8,7 @@
 
 **Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core (Polars inside the native extension).**
 
-**Current release: 0.21.0** · Python **3.10+**
+**Current release: 1.0.0** · Python **3.10–3.13**
 
 ---
 
@@ -23,6 +23,10 @@
 - **REPL / discovery:** `repr(df)` on **`DataFrame`** and **`DataFrameModel`** shows the parameterized class, schema type, and column dtypes (wide tables truncate with `… and N more`). **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, and **`describe()`** (numeric, bool, str) are on the core API (see [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) for **`shape`** vs materialized rows). **`Expr`** and **`WhenChain`** have readable **`repr`** for debugging pipelines. Row counts in **`repr`** are omitted—use **`collect()`** / **`to_dict()`** when you need data. **Jupyter / VS Code notebooks:** **`_repr_html_()`** renders a bounded **HTML table** preview (no **`polars`** required); tune via **`pydantable.display`** or **`PYDANTABLE_REPR_HTML_*`**. Details: [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html).
 
 ---
+
+## Upgrading to 1.0
+
+- From **0.21.x → 1.0.0**: there are **no intended breaking changes**; this is a semver/stability milestone. See [Versioning](https://pydantable.readthedocs.io/en/latest/VERSIONING.html) for 1.x policy.
 
 ## Documentation
 

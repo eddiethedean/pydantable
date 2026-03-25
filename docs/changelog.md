@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format is inspired 
 
 (none yet)
 
+## [1.0.0] — 2026-03-25
+
+### Highlights
+
+- **Semver:** `pydantable` is now **1.0** — the public API follows **semver** for 1.x. See {doc}`VERSIONING` and the behavioral contract in {doc}`INTERFACE_CONTRACT`.
+- **Release quality bar:** the `v1.0.0` tag is cut from a commit that passes `make check-full`, full `pytest`, and Rust checks including `--no-default-features`.
+- **Supply chain:** the release workflow publishes **CycloneDX SBOMs** (Python + Rust) alongside wheels/sdist.
+- **Support matrix:** Python **3.10–3.13**.
+
 ## [0.21.0] — 2026-03-25
 
 ### Highlights

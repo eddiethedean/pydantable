@@ -4,7 +4,7 @@ MYPY ?= $(PYTHON) -m mypy
 
 CARGO_MANIFEST ?= pydantable-core/Cargo.toml
 
-.PHONY: check-full check-python check-rust ruff-format-check ruff-check mypy-check rust-fmt-check rust-clippy rust-test
+.PHONY: check-full check-python check-rust ruff-format-check ruff-check mypy-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 
 check-full: check-python check-rust
 
@@ -19,13 +19,16 @@ ruff-check:
 mypy-check:
 	$(MYPY) python/pydantable
 
-check-rust: rust-fmt-check rust-clippy rust-test
+check-rust: rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 
 rust-fmt-check:
 	cargo fmt --manifest-path $(CARGO_MANIFEST) -- --check
 
 rust-clippy:
 	cargo clippy --manifest-path $(CARGO_MANIFEST) -- -D warnings
+
+rust-check-no-default-features:
+	cargo check --manifest-path $(CARGO_MANIFEST) --no-default-features
 
 # PyO3's embedded interpreter does not always load site-packages; point PYTHONPATH at the venv
 # so optional deps like `polars` resolve for plan tests that import Python.
