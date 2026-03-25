@@ -21,6 +21,7 @@
       ~DataFrame.col
       ~DataFrame.collect
       ~DataFrame.concat
+      ~DataFrame.describe
       ~DataFrame.distinct
       ~DataFrame.drop
       ~DataFrame.drop_nulls
@@ -30,6 +31,7 @@
       ~DataFrame.group_by
       ~DataFrame.group_by_dynamic
       ~DataFrame.head
+      ~DataFrame.info
       ~DataFrame.join
       ~DataFrame.melt
       ~DataFrame.pivot
@@ -46,6 +48,7 @@
       ~DataFrame.unique
       ~DataFrame.unnest
       ~DataFrame.unpivot
+      ~DataFrame.value_counts
       ~DataFrame.with_columns
    
    
@@ -56,6 +59,10 @@
 
    .. autosummary::
    
+      ~DataFrame.columns
+      ~DataFrame.dtypes
+      ~DataFrame.empty
       ~DataFrame.schema_type
+      ~DataFrame.shape
    
    

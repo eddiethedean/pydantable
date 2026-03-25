@@ -1,6 +1,6 @@
 # PydanTable roadmap (0.20.x → 0.21.x → v1.0.0)
 
-**PyPI (latest published): `0.19.0`.** **This repository / next minor: `0.20.0`** (not yet on PyPI). **Shipped in 0.20.0** (below) includes **UX documentation** (quickstart, import map, interchange), **tunable HTML display** (`**set_display_options**` / env), richer **`describe()`** (bool/str), **`value_counts`**, **`_repr_mimebundle_`**, optional **`PYDANTABLE_VERBOSE_ERRORS`**, **REPL discovery** (**`columns`**, **`shape`**, **`info`**, …), **`Expr` `repr`**, and **PySpark** **`show`** / **`summary`**. **ipywidgets** / interactive explorers remain **Later** unless promoted. This document also summarizes shipped history, **Planned v1.0.0** for the **production-ready** major release, and **Later** / **After v1.0.0** backlogs.
+**Latest release: `0.20.0`.** **Shipped in 0.20.0** (below) includes **UX documentation** (quickstart, import map, interchange), **tunable HTML display** (`**set_display_options**` / env), richer **`describe()`** (bool/str), **`value_counts`**, **`_repr_mimebundle_`**, optional **`PYDANTABLE_VERBOSE_ERRORS`**, **REPL discovery** (**`columns`**, **`shape`**, **`info`**, …), **`Expr` `repr`**, and **PySpark** **`show`** / **`summary`**. **ipywidgets** / interactive explorers remain **Later** unless promoted. This document also summarizes shipped history, **Planned v1.0.0** for the **production-ready** major release, and **Later** / **After v1.0.0** backlogs.
 
 Release history (high level): [`changelog.md`](changelog.md).
 

@@ -35,4 +35,4 @@ Status definitions:
 
 **0.19.0:** Scorecard matrix **unchanged**—pre-1.0 doc consolidation, [`VERSIONING.md`](VERSIONING.md), and CI-stable grouped tests; see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.19.0**.
 
-**0.20.0:** One ecosystem row update (see table)—UX / discovery on core + PySpark **`show`** / **`summary`**; see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.20.0**.
+**0.20.0:** One ecosystem row update (see table)—UX / discovery on core + PySpark **`show`** / **`summary`**, plus **`value_counts`**, **`pydantable.display`**, **`_repr_mimebundle_`**, optional verbose plan errors; see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.20.0**.

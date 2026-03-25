@@ -148,7 +148,7 @@ Use this table to locate **Python tests and doc-example smoke** that back shippe
 | **0.17.0** | Map `Expr` contracts after Arrow ingest; PySpark `functions` string/list/bytes wrappers | `tests/test_pyarrow_map_ingest.py` (`test_arrow_map_ingest_then_map_get_and_contains`); `tests/test_pyspark_sql.py` (new façade tests) |
 | **0.18.0** | Grouped Polars error context (`polars_err_ctx`); map-key deferral (docs); Hypothesis + integration `join` / `group_by` smoke | `tests/test_v018_features.py`; `tests/test_hypothesis_properties.py` (`test_group_by_sum_matches_manual`, `test_inner_join_unique_ids_row_count`, …); Rust: `execute_polars/common.rs` (`polars_err_format_tests`), `groupby_exec.rs` |
 | **0.19.0** | Pre-1.0 doc consolidation (`VERSIONING`, parity/README/index, `PERFORMANCE` note); CI-stable grouped test ordering; bug-hunt hardening (see below) | `tests/test_v018_features.py` (`_sort_group_output`); `tests/test_schema_type_hints_narrowing.py`; `tests/test_fastapi_recipes.py` (`StreamingResponse` smoke); join assertions via `assert_table_eq_sorted` in `tests/test_advanced_ops_phase6.py`, `tests/test_dataframe_ops.py`; `scripts/verify_doc_examples.py` (`os._exit` teardown); docs: `docs/VERSIONING.md`, `docs/ROADMAP.md` **Shipped in 0.19.0** |
-| **0.20.0** | Core discovery (`columns`, `shape`, `info`, `describe`); `Expr` / `WhenChain` `repr`; PySpark `show` / `summary`; `DataFrame` `repr` / `_repr_html_` | `tests/test_dataframe_discovery.py`, `tests/test_expr_repr.py`, `tests/test_dataframe_repr.py`; docs: `docs/ROADMAP.md` **Shipped in 0.20.0** |
+| **0.20.0** | Discovery (`columns`, `shape`, `info`, `describe` bool/str, `value_counts`); `pydantable.display` / `PYDANTABLE_VERBOSE_ERRORS` / `_repr_mimebundle_`; `Expr` `repr`; PySpark `show` / `summary`; `DataFrame` `repr` / `_repr_html_` | `tests/test_dataframe_discovery.py`, `tests/test_display_options.py`, `tests/test_rust_engine_verbose_errors.py`, `tests/test_expr_repr.py`, `tests/test_dataframe_repr.py`; docs: `docs/ROADMAP.md` **Shipped in 0.20.0** |
 
 #### Changelog-driven audit (0.15.0–0.20.0)
 
@@ -199,7 +199,8 @@ Cross-check each bullet in `docs/changelog.md` for recent minors against tests o
 
 **0.20.0**
 
-- **Discovery / `describe` / PySpark `show`:** `tests/test_dataframe_discovery.py`.
+- **Discovery / `describe` / `value_counts` / PySpark `show`:** `tests/test_dataframe_discovery.py`, `tests/test_display_options.py`.
+- **Display / mimebundle / verbose errors:** `tests/test_display_options.py`, `tests/test_rust_engine_verbose_errors.py`.
 - **`Expr` `repr`:** `tests/test_expr_repr.py`.
 - **`DataFrame` `repr` / HTML:** `tests/test_dataframe_repr.py`.
 

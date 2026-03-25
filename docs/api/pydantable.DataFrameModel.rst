@@ -22,6 +22,7 @@
       ~DataFrameModel.ato_polars
       ~DataFrameModel.collect
       ~DataFrameModel.concat
+      ~DataFrameModel.describe
       ~DataFrameModel.distinct
       ~DataFrameModel.drop
       ~DataFrameModel.drop_nulls
@@ -31,6 +32,7 @@
       ~DataFrameModel.group_by
       ~DataFrameModel.group_by_dynamic
       ~DataFrameModel.head
+      ~DataFrameModel.info
       ~DataFrameModel.join
       ~DataFrameModel.melt
       ~DataFrameModel.pivot
@@ -51,6 +53,7 @@
       ~DataFrameModel.unique
       ~DataFrameModel.unnest
       ~DataFrameModel.unpivot
+      ~DataFrameModel.value_counts
       ~DataFrameModel.with_columns
    
    
@@ -61,6 +64,10 @@
 
    .. autosummary::
    
+      ~DataFrameModel.columns
+      ~DataFrameModel.dtypes
+      ~DataFrameModel.empty
+      ~DataFrameModel.shape
       ~DataFrameModel.RowModel
    
    

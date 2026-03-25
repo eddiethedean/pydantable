@@ -10,7 +10,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [0.20.0] — 2026-03-25
 
-**PyPI:** this version is **not** published yet; **`pip install pydantable`** currently installs **0.19.0** until maintainers release **0.20.0**.
+**Supersedes:** 0.19.0.
 
 ### Highlights
 

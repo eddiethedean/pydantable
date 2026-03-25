@@ -15,7 +15,7 @@ PydanTable is **0.x** until **`v1.0.0`**. This page states how maintainers inten
 
 ## Path to 1.0
 
-The **production-ready** **`v1.0.0`** bar—full semver policy for **patch / minor / major**, packaging checklist, support matrix, and comms—is described under **Planned v1.0.0** in {doc}`ROADMAP`. **0.19.0** was the pre-1.0 **documentation consolidation**; **0.20.0** adds **UX / discovery** on the same **0.x** train before that gate.
+The **production-ready** **`v1.0.0`** bar—full semver policy for **patch / minor / major**, packaging checklist, support matrix, and comms—is described under **Planned v1.0.0** in {doc}`ROADMAP`. **0.19.0** was the pre-1.0 **documentation consolidation**; **0.20.0** shipped **UX / discovery** (repr, introspection, display options, richer **`describe`**, **`value_counts`**, etc.) on the same **0.x** train before that gate.
 
 ## Related documentation
 
