@@ -97,6 +97,22 @@ def test_describe_bool_and_str_columns() -> None:
     assert "n_unique=" in d and "min_len=" in d
 
 
+def test_describe_str_empty_strings_have_min_len_zero() -> None:
+    df = DataFrame[_StrOnly]({"name": ["", "x"], "flag": [True, False]})
+    d = df.describe()
+    assert "min_len=0" in d
+
+
+def test_describe_bool_all_null_optional() -> None:
+    class _OptBool(BaseModel):
+        f: bool | None
+
+    df = DataFrame[_OptBool]({"f": [None, None]})
+    d = df.describe()
+    assert "f:" in d
+    assert "true=0" in d and "false=0" in d and "null=2" in d
+
+
 def test_describe_numeric_exact_values() -> None:
     df = DataFrame[_T]({"x": [10, 20], "y": [0.0, 0.0]})
     d = df.describe()
