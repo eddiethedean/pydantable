@@ -33,12 +33,14 @@ This **documentation site** is the detailed manual. The repository **README** on
 | **Contributors** | {doc}`DEVELOPER` — build, test, Sphinx, release |
 | **Polars parity and gaps** | {doc}`PARITY_SCORECARD` and {doc}`POLARS_TRANSFORMATIONS_ROADMAP` |
 | **Roadmap (0.20 shipped, 1.0 next)** | {doc}`ROADMAP` — **Shipped in 0.20.0**, **Planned v1.0.0** |
+| **Five-minute tour** | {doc}`QUICKSTART` |
 
 ```{toctree}
 :titlesonly:
 :hidden:
 :caption: Getting started
 
+QUICKSTART
 DATAFRAMEMODEL
 SUPPORTED_TYPES
 FASTAPI

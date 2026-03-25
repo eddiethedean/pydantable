@@ -8,6 +8,21 @@ All notable changes to this project are documented here. The format is inspired 
 
 (none yet)
 
+## [0.21.0] — 2026-03-25
+
+### Highlights
+
+- **Docs:** {doc}`QUICKSTART` (five-minute tour), repository **`notebooks/five_minute_tour.ipynb`**, {doc}`EXECUTION` sections on **materialization costs**, **import styles**, **copy-as / interchange**; **naming map** in {doc}`PANDAS_UI` / {doc}`PYSPARK_UI`.
+- **Display:** **`pydantable.display`** — **`get_repr_html_limits`**, **`set_display_options`**, **`reset_display_options`**; env **`PYDANTABLE_REPR_HTML_*`** for Jupyter HTML preview bounds.
+- **`describe()`:** bool and str summary lines ( **`n_unique`** for strings; one **`to_dict()`**).
+- **`DataFrame.value_counts`** / **`DataFrameModel.value_counts`** (group-by path).
+- **`_repr_mimebundle_`** on **`DataFrame`** and **`DataFrameModel`** (`text/plain` + `text/html`).
+- **Debugging:** **`PYDANTABLE_VERBOSE_ERRORS=1`** appends schema context to **`ValueError`** from **`execute_plan`**.
+
+### Details
+
+Tests: **`tests/test_display_options.py`**, **`tests/test_dataframe_discovery.py`**. See {doc}`EXECUTION`, {doc}`INTERFACE_CONTRACT`.
+
 ## [0.20.0] — 2026-03-24
 
 ### Highlights

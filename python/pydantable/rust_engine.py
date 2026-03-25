@@ -6,6 +6,7 @@ extension may be absent in a source checkout until the module is built with Matu
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -39,12 +40,33 @@ def _require_rust_core() -> Any:
     return _RUST_CORE
 
 
-def execute_plan(plan: Any, data: Any, *, as_python_lists: bool = False) -> Any:
-    """Run a full plan to materialized columns (lists or native, per flag)."""
+def _verbose_plan_errors_enabled() -> bool:
+    v = os.environ.get("PYDANTABLE_VERBOSE_ERRORS", "").strip().lower()
+    return v in ("1", "true", "yes")
+
+
+def execute_plan(
+    plan: Any,
+    data: Any,
+    *,
+    as_python_lists: bool = False,
+    error_context: str | None = None,
+) -> Any:
+    """Run a full plan to materialized columns (lists or native, per flag).
+
+    If ``PYDANTABLE_VERBOSE_ERRORS`` is set to a truthy value and
+    ``error_context`` is provided, :exc:`ValueError` from the engine is
+    re-raised with the context string appended (helps debugging in notebooks).
+    """
     rust = _require_rust_core()
     if not hasattr(rust, "execute_plan"):
         raise NotImplementedError("Rust extension does not implement `execute_plan`.")
-    return rust.execute_plan(plan, data, as_python_lists)
+    try:
+        return rust.execute_plan(plan, data, as_python_lists)
+    except ValueError as e:
+        if _verbose_plan_errors_enabled() and error_context:
+            raise ValueError(f"{e}\n[context: {error_context}]") from e
+        raise
 
 
 def execute_join(

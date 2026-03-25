@@ -14,6 +14,7 @@ from . import pandas as pandas
 from . import pyspark as pyspark
 from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
+from .display import get_repr_html_limits, reset_display_options, set_display_options
 from .expressions import Expr
 from .io import read_ipc, read_parquet
 from .schema import DtypeDriftWarning, Schema
@@ -24,9 +25,12 @@ __all__ = [
     "DtypeDriftWarning",
     "Expr",
     "Schema",
+    "get_repr_html_limits",
     "pandas",
     "pyspark",
     "read_ipc",
     "read_parquet",
+    "reset_display_options",
+    "set_display_options",
 ]
-__version__ = "0.20.0"
+__version__ = "0.21.0"

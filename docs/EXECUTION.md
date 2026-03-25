@@ -15,6 +15,43 @@ against the current projected schema. Use **`to_dict()`** or **`collect(as_lists
 for a columnar **`dict[str, list]`**. Install **`pydantable[polars]`** and use **`to_polars()`**
 if you need a Polars **`DataFrame`** in Python. Install **`pydantable[arrow]`** and use **`to_arrow()`** for a PyArrow **`Table`** (same materialization path as **`to_dict`**, then **`Table.from_pydict`**—not a zero-copy export of engine buffers).
 
+## Materialization costs (summary)
+
+| API | Typical cost |
+|-----|----------------|
+| **`collect()`**, **`to_dict()`**, **`to_polars()`**, **`to_arrow()`** | Full plan execution in Rust (then Python wrappers build Polars/Arrow objects where applicable). |
+| **`head()`** / **`tail()`** / **`slice()`** | Adds a lazy slice to the plan; cost hits when you materialize the result. |
+| **`_repr_html_()`** / Jupyter HTML | Materializes **`head(N)`** + **`to_dict()`** for the preview bounds (see **Display options**). |
+| **`describe()`** | One **`to_dict()`** on the current plan; string columns compute **`n_unique`** with a full scan of non-null values. |
+| **`info()`**, **`repr()`** | Schema / root-buffer **`shape`** only; no row data materialization. |
+| **Async** **`acollect`** / **`ato_dict`** / … | Same work as sync; runs in a thread pool ({doc}`FASTAPI`). |
+
+Set **`PYDANTABLE_VERBOSE_ERRORS=1`** to append a short **`schema=…`** context line when Rust raises **`ValueError`** during **`execute_plan`** (debugging only).
+
+## Choosing an import style (core vs pandas vs PySpark)
+
+All three use the **same** Rust engine; only **names** and **import paths** differ.
+
+| Style | Import | Method flavor | When it helps |
+|-------|--------|---------------|---------------|
+| **Default (Polars-shaped)** | **`from pydantable import DataFrame`** | **`with_columns`**, **`filter`**, **`select`** | New code and docs; matches {doc}`INTERFACE_CONTRACT` vocabulary. |
+| **Pandas-shaped** | **`from pydantable.pandas import DataFrame`** | **`assign`**, **`merge`**, pandas-like **`head`** | Porting pandas tutorials or muscle memory. |
+| **PySpark-shaped** | **`from pydantable.pyspark import DataFrame`** | **`withColumn`**, **`where`**, **`show`** | Spark mental model; still in-process (not a Spark cluster). |
+
+See {doc}`PANDAS_UI`, {doc}`PYSPARK_UI`, and **Naming map (core ↔ pandas ↔ PySpark)** there.
+
+## Copy as / interchange
+
+| Goal | API | Extra |
+|------|-----|--------|
+| Columnar Python **`dict[str, list]`** | **`to_dict()`** / **`collect(as_lists=True)`** | none |
+| Validated rows | **`collect()`** (default) | none |
+| Polars **`DataFrame`** | **`to_polars()`** | **`pip install 'pydantable[polars]'`** |
+| PyArrow **`Table`** | **`to_arrow()`** | **`pip install 'pydantable[arrow]'`** |
+| File round-trip | **`read_parquet`** / **`read_ipc`** → constructors | **`[arrow]`** |
+
+Each path that builds Polars or Arrow **first** runs the same Rust materialization as **`to_dict()`** unless documented otherwise.
+
 The Python module `python/pydantable/rust_engine.py` is the thin wrapper that invokes
 `execute_plan`, `execute_join`, and related functions on `_core` (no alternate engines).
 
@@ -68,16 +105,19 @@ This is for **REPLs, logs, and tracebacks**—not a substitute for materializing
 ## `info()` and `describe()` (**0.20.0+**)
 
 - **`info()`** returns a **multi-line string** listing logical column names, **dtype** annotations, and a **row count** aligned with **`shape[0]`** (root-buffer semantics—see {doc}`INTERFACE_CONTRACT` **Introspection**). It does **not** force a full **`collect()`** beyond what **`shape`** already implies for buffer-backed frames.
-- **`describe()`** computes **min / max / mean / std / count** (as available) for columns whose schema types are **numeric** **`int`** or **`float`** (including **`Optional`** / **`| None`**). It calls **`to_dict()`** once, then aggregates in Python—same broad cost class as other summaries. Non-numeric columns are **omitted** in this MVP.
+- **`describe()`** (**0.21.0+**): one **`to_dict()`** materialization, then Python-side stats for **int**, **float**, **bool**, and **str** columns (nullable forms included). Numeric: mean/min/max/std where applicable. Bool: true/false/null counts. String: row count, **`n_unique`** (full scan of non-null strings), min/max **length**, null count. Other dtypes are omitted.
 
-## Jupyter / HTML (`_repr_html_`)
+## Jupyter / HTML (`_repr_html_`) and display options
 
-In **Jupyter**, **IPython**, **VS Code** notebooks, and similar frontends, **`DataFrame`** and **`DataFrameModel`** implement **`_repr_html_()`** so the last line of a cell renders as an **HTML table** (pandas-style), without installing **`polars`**.
+In **Jupyter**, **IPython**, **VS Code** notebooks, and similar frontends, **`DataFrame`** and **`DataFrameModel`** implement **`_repr_html_()`** and **`_repr_mimebundle_()`** so the last line of a cell can render as an **HTML table** (pandas-style), without installing **`polars`**.
 
-- **Preview only:** the table shows up to **20** rows and **40** columns (constants in **`pydantable.dataframe._impl`**). Long string or **`repr`** cell values are truncated for display.
-- **Materialization:** the preview runs the same engine path as **`head()`** + **`to_dict()`**—it executes the current logical plan for the bounded slice. Large frames still pay that cost for the preview.
+**Defaults:** up to **20** rows, **40** columns, **500** characters per cell (see **`pydantable.dataframe._impl`**).
+
+**Tuning (**0.21.0+**):** set environment variables **`PYDANTABLE_REPR_HTML_MAX_ROWS`**, **`PYDANTABLE_REPR_HTML_MAX_COLS`**, **`PYDANTABLE_REPR_HTML_MAX_CELL_LEN`**, or call **`pydantable.set_display_options(...)`** / **`get_repr_html_limits()`** / **`reset_display_options()`** from {mod}`pydantable.display`.
+
+- **Preview only:** bounded rows/columns/cell length.
+- **Materialization:** the preview runs the same engine path as **`head(N)`** + **`to_dict()`** for the bounded slice.
 - **Safety:** cell text is **HTML-escaped** so arbitrary string data does not inject markup.
 - **Grouped handles:** **`GroupedDataFrame`** / **`DynamicGroupedDataFrame`** (and grouped model wrappers) prepend a short label, then show the inner frame preview.
-- **Look and feel:** Preview uses a **card**-style layout (rounded corners, light shadow, slate **CSS** variables), **uppercase** column headers, **zebra** row banding, **tabular** row indices, and tinted **banner** strips for **`DataFrameModel`** / grouped contexts—similar in spirit to **pandas** HTML display without depending on it.
 
 For the full dataset, use **`to_dict()`**, **`collect()`**, **`to_polars()`**, or **`to_arrow()`** as usual.

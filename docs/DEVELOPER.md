@@ -61,7 +61,9 @@ User-facing doc changes should keep the repository `README.md` and `docs/` align
 
 ## Notebooks (Jupyter / VS Code)
 
-Open the repo’s notebook (if present) or a scratch **`.ipynb`** with the venv that has **`pip install -e ".[dev]"`** and a built **`pydantable._core`**. In a cell:
+Canonical walkthrough: {doc}`QUICKSTART` and **`notebooks/five_minute_tour.ipynb`** at the repo root.
+
+Open the repo’s notebook or a scratch **`.ipynb`** with the venv that has **`pip install -e ".[dev]"`** and a built **`pydantable._core`**. In a cell:
 
 ```python
 from pydantable import DataFrame
@@ -76,9 +78,11 @@ df  # last expression → HTML table in Jupyter / VS Code
 
 - **`display(df)`** or the last expression in a cell uses **`_repr_html_()`** on **`DataFrame`** / **`DataFrameModel`** (bounded rows/columns; see {doc}`EXECUTION` **Jupyter / HTML**).
 - **`repr(df)`** is the plain-text path (no **`collect()`** for row counts—see {doc}`EXECUTION` **repr**).
-- **`df.shape`**, **`df.info()`**, **`df.describe()`** follow {doc}`INTERFACE_CONTRACT` **Introspection** ( **`describe`** is numeric MVP in **0.20.0+**).
+- **`df.shape`**, **`df.info()`**, **`df.describe()`** follow {doc}`INTERFACE_CONTRACT` **Introspection** ( **`describe`** includes bool/str in **0.21.0+**).
 
 No extra **ipywidgets** dependency is required for the default HTML table.
+
+**Interactive widgets (optional / later):** richer **sliders** or **page-size** controls for HTML previews would require **`ipywidgets`** (or similar) and a maintenance commitment—they are **not** bundled. Use **`set_display_options`** / env vars for bounded previews, or wrap **`display(HTML(df._repr_html_()))`** in your own widget code.
 
 ## Architecture (Rust-first)
 

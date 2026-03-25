@@ -218,6 +218,16 @@ class DataFrameModel:
             f"<b>{title}</b> (DataFrameModel)</p>{inner}</div>"
         )
 
+    def _repr_mimebundle_(
+        self,
+        include: Any = None,
+        exclude: Any = None,
+    ) -> dict[str, Any]:
+        return {
+            "text/plain": repr(self),
+            "text/html": self._repr_html_(),
+        }
+
     @classmethod
     def _derived_model_type(
         cls, field_types: Mapping[str, Any]
@@ -266,6 +276,16 @@ class DataFrameModel:
     def describe(self) -> str:
         """Delegate to :meth:`DataFrame.describe`."""
         return self._df.describe()
+
+    def value_counts(
+        self,
+        column: str,
+        *,
+        normalize: bool = False,
+        dropna: bool = True,
+    ) -> dict[Any, int | float]:
+        """Delegate to :meth:`DataFrame.value_counts`."""
+        return self._df.value_counts(column, normalize=normalize, dropna=dropna)
 
     def collect(
         self,

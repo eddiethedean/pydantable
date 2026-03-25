@@ -185,9 +185,9 @@ class DataFrame(CoreDataFrame):
         truncate: bool = True,
         vertical: bool = False,
     ) -> None:
-        """Print up to ``n`` rows (materializes via :meth:`head`).
+        """Print up to ``n`` rows (via :meth:`head` + :meth:`to_dict`).
 
-        Not a distributed Spark runtime.
+        **Cost:** bounded materialization. Not a distributed Spark runtime.
         """
         h = self.head(int(n))
         data = h.to_dict()

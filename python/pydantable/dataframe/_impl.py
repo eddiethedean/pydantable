@@ -34,6 +34,7 @@ from typing import (
 
 from pydantic import BaseModel, TypeAdapter
 
+from pydantable.display import get_repr_html_limits
 from pydantable.expressions import ColumnRef, Expr
 from pydantable.rust_engine import (
     _require_rust_core,
@@ -70,7 +71,7 @@ _NoneType = type(None)
 # Cap column listing in :meth:`DataFrame.__repr__` for very wide schemas.
 _REPR_MAX_COLUMNS = 32
 _REPR_DTYPE_MAX_LEN = 72
-# Jupyter / IPython :meth:`DataFrame._repr_html_` preview limits (materializes rows).
+# Default Jupyter / IPython preview limits; overridden by :mod:`pydantable.display`.
 _REPR_HTML_MAX_ROWS = 20
 _REPR_HTML_MAX_COLS = 40
 _REPR_HTML_MAX_CELL_LEN = 500
@@ -80,6 +81,16 @@ _UNION_ORIGINS = (types.UnionType, Union)
 def _is_describe_numeric(annotation: Any) -> bool:
     inner, _ = _annotation_nullable_inner(annotation)
     return inner is int or inner is float
+
+
+def _is_describe_bool(annotation: Any) -> bool:
+    inner, _ = _annotation_nullable_inner(annotation)
+    return inner is bool
+
+
+def _is_describe_str(annotation: Any) -> bool:
+    inner, _ = _annotation_nullable_inner(annotation)
+    return inner is str
 
 
 def _dtype_repr(annotation: Any) -> str:
@@ -123,7 +134,7 @@ def _dtype_repr(annotation: Any) -> str:
     return s
 
 
-def _html_cell_text(value: Any) -> str:
+def _html_cell_text(value: Any, *, max_cell_len: int) -> str:
     """Format a single cell for HTML tables; output must be HTML-escaped."""
     if value is None:
         return ""
@@ -135,8 +146,8 @@ def _html_cell_text(value: Any) -> str:
         s = value
     else:
         s = repr(value)
-    if len(s) > _REPR_HTML_MAX_CELL_LEN:
-        return f"{s[: _REPR_HTML_MAX_CELL_LEN - 1]}…"
+    if len(s) > max_cell_len:
+        return f"{s[: max_cell_len - 1]}…"
     return s
 
 
@@ -146,6 +157,7 @@ def _dataframe_to_html_fragment(
     column_order: list[str],
     caption: str | None = None,
     note: str | None = None,
+    max_cell_len: int = _REPR_HTML_MAX_CELL_LEN,
 ) -> str:
     """Build a styled HTML table fragment (card layout, Jupyter-friendly)."""
     rows = len(next(iter(column_dict.values()))) if column_dict else 0
@@ -271,7 +283,7 @@ def _dataframe_to_html_fragment(
         parts.append(f'<th scope="row">{i}</th>')
         for name in column_order:
             raw = column_dict[name][i]
-            text = _html_cell_text(raw)
+            text = _html_cell_text(raw, max_cell_len=max_cell_len)
             parts.append(f"<td>{html.escape(text)}</td>")
         parts.append("</tr>")
     parts.extend(["</tbody></table>", "</div>"])
@@ -471,7 +483,11 @@ class DataFrame(Generic[SchemaT]):
         return dict(self._current_field_types)
 
     def info(self) -> str:
-        """Multi-line summary string (schema, dtypes, :attr:`shape` caveat)."""
+        """Multi-line summary string (schema, dtypes, :attr:`shape` caveat).
+
+        **Cost:** does not materialize row data; uses schema and root-buffer
+        :attr:`shape` only. See {doc}`EXECUTION` **Materialization costs**.
+        """
         schema_qn = getattr(
             self._current_schema_type,
             "__qualname__",
@@ -492,18 +508,25 @@ class DataFrame(Generic[SchemaT]):
         return "\n".join(lines)
 
     def describe(self) -> str:
-        """Summary statistics for **int** and **float** columns (one materialization).
+        """Summary statistics for int, float, bool, and str columns.
 
-        Other dtypes are omitted. Requires a full :meth:`to_dict()` pass.
+        **Cost:** one full :meth:`to_dict()` materialization. String columns
+        ``n_unique`` scans all non-null strings. See {doc}`EXECUTION`.
         """
         numeric = [
             n for n, a in self._current_field_types.items() if _is_describe_numeric(a)
         ]
-        if not numeric:
-            return "describe(): no int/float columns in schema."
+        bool_cols = [
+            n for n, a in self._current_field_types.items() if _is_describe_bool(a)
+        ]
+        str_cols = [
+            n for n, a in self._current_field_types.items() if _is_describe_str(a)
+        ]
+        if not numeric and not bool_cols and not str_cols:
+            return "describe(): no int/float/bool/str columns in schema."
         data = self.to_dict()
         lines = [
-            "describe() — numeric int/float columns only; uses to_dict().",
+            "describe() — one to_dict(); int/float/bool/str columns.",
             "",
         ]
         for name in numeric:
@@ -523,7 +546,69 @@ class DataFrame(Generic[SchemaT]):
                 )
             else:
                 lines.append(f"{name}: count={c} mean={mean_v:.6g} min={mn} max={mx}")
+        for name in bool_cols:
+            col = data[name]
+            non_null = [x for x in col if x is not None]
+            n_null = len(col) - len(non_null)
+            nt = sum(1 for x in non_null if x is True)
+            nf = sum(1 for x in non_null if x is False)
+            lines.append(
+                f"{name}: count={len(non_null)} true={nt} false={nf} null={n_null}"
+            )
+        for name in str_cols:
+            col = data[name]
+            raw = [x for x in col if x is not None]
+            str_vals = [x for x in raw if isinstance(x, str)]
+            n_null = len(col) - len(raw)
+            if not str_vals:
+                lines.append(f"{name}: count=0 (all null)")
+                continue
+            n_unique = len(set(str_vals))
+            lens = [len(s) for s in str_vals]
+            lines.append(
+                f"{name}: count={len(str_vals)} n_unique={n_unique} "
+                f"min_len={min(lens)} max_len={max(lens)} null={n_null}"
+            )
         return "\n".join(lines)
+
+    def value_counts(
+        self,
+        column: str,
+        *,
+        normalize: bool = False,
+        dropna: bool = True,
+    ) -> dict[Any, int | float]:
+        """Count rows per distinct value in ``column`` (group-by aggregation).
+
+        **Cost:** engine aggregation (same path as :meth:`group_by` / :meth:`agg`).
+        See {doc}`EXECUTION`.
+
+        Returns a dict sorted by count descending, then ``repr(key)``. When
+        ``normalize=True``, values are fractions in ``[0, 1]`` (``float``).
+        """
+        if column not in self._current_field_types:
+            raise KeyError(f"Unknown column {column!r} for current schema.")
+        out_name = "__pydantable_vc_n"
+        g = self.group_by(column).agg(**{out_name: ("count", column)})
+        d = g.to_dict()
+        keys = d[column]
+        counts = d[out_name]
+        result: dict[Any, int] = {}
+        for k, c in zip(keys, counts, strict=True):
+            if dropna and k is None:
+                continue
+            result[k] = int(c) if c is not None else 0
+        total = sum(result.values())
+        if normalize:
+            if total == 0:
+                return {k: 0.0 for k in result}
+            return {k: v / total for k, v in result.items()}
+        return dict(sorted(result.items(), key=lambda kv: (-kv[1], repr(kv[0]))))
+
+    def _materialize_error_context(self) -> str:
+        st = self._current_schema_type
+        qn = getattr(st, "__qualname__", st.__name__)
+        return f"schema={qn}"
 
     def _field_types_from_descriptors(
         self,
@@ -574,9 +659,10 @@ class DataFrame(Generic[SchemaT]):
     def _repr_html_(self) -> str:
         """Rich HTML table for Jupyter / IPython (preview only; materializes data).
 
-        Shows up to :data:`_REPR_HTML_MAX_ROWS` rows and :data:`_REPR_HTML_MAX_COLS`
-        columns. Full result sets may be larger—use :meth:`to_dict` or
-        :meth:`to_polars` for complete data.
+        Row/column/cell limits default to module constants but can be set via
+        :mod:`pydantable.display` or ``PYDANTABLE_REPR_HTML_*`` env vars.
+        **Cost:** same as :meth:`head` for the bounded slice plus :meth:`to_dict`
+        on that slice. See {doc}`EXECUTION` **Jupyter / HTML**.
         """
         try:
             return self._repr_html_impl()
@@ -593,6 +679,17 @@ class DataFrame(Generic[SchemaT]):
                 f'font-size:12px;color:#7f1d1d;">{err}</pre></div>'
             )
 
+    def _repr_mimebundle_(
+        self,
+        include: Any = None,
+        exclude: Any = None,
+    ) -> dict[str, Any]:
+        """Jupyter / IPython: prefer HTML table plus plain text fallback."""
+        return {
+            "text/plain": repr(self),
+            "text/html": self._repr_html_(),
+        }
+
     def _repr_html_impl(self) -> str:
         cols_all = list(self._current_field_types.keys())
         if not cols_all:
@@ -606,7 +703,8 @@ class DataFrame(Generic[SchemaT]):
                 '<p style="margin:0;"><em>No columns</em></p></div></div>'
             )
 
-        preview = self.head(_REPR_HTML_MAX_ROWS)
+        lim = get_repr_html_limits()
+        preview = self.head(lim.max_rows)
         data = preview.to_dict()
         n_rows = len(next(iter(data.values()))) if data else 0
 
@@ -616,8 +714,8 @@ class DataFrame(Generic[SchemaT]):
                 col_order.append(c)
 
         n_cols_total = len(col_order)
-        col_trunc = n_cols_total > _REPR_HTML_MAX_COLS
-        shown_cols = col_order[:_REPR_HTML_MAX_COLS]
+        col_trunc = n_cols_total > lim.max_cols
+        shown_cols = col_order[: lim.max_cols]
         sub: dict[str, list[Any]] = {c: data[c] for c in shown_cols}
 
         st = self._current_schema_type
@@ -628,8 +726,8 @@ class DataFrame(Generic[SchemaT]):
             f"Preview: {n_rows} row{'s' if n_rows != 1 else ''} x "
             f"{len(shown_cols)} column{'s' if len(shown_cols) != 1 else ''} shown"
         ]
-        if n_rows >= _REPR_HTML_MAX_ROWS:
-            note_parts.append(f"(up to {_REPR_HTML_MAX_ROWS} rows)")
+        if n_rows >= lim.max_rows:
+            note_parts.append(f"(up to {lim.max_rows} rows)")
         if col_trunc:
             rest = n_cols_total - len(shown_cols)
             col_s = "column" if rest == 1 else "columns"
@@ -641,6 +739,7 @@ class DataFrame(Generic[SchemaT]):
             column_order=shown_cols,
             caption=caption,
             note=note,
+            max_cell_len=lim.max_cell_len,
         )
 
     def with_columns(self, **new_columns: Expr | Any) -> DataFrame[Any]:
@@ -873,9 +972,16 @@ class DataFrame(Generic[SchemaT]):
         )
 
     def head(self, n: int = 5) -> DataFrame[Any]:
+        """First ``n`` rows (lazy slice).
+
+        Materialize the result with :meth:`to_dict` or :meth:`collect`.
+        **Cost:** extends the logical plan only until you materialize. See
+        {doc}`EXECUTION` **Materialization costs**.
+        """
         return self.slice(0, n)
 
     def tail(self, n: int = 5) -> DataFrame[Any]:
+        """Last ``n`` rows (lazy slice). **Cost:** same idea as :meth:`head`."""
         return self.slice(-n, n)
 
     def fill_null(
@@ -1293,6 +1399,9 @@ class DataFrame(Generic[SchemaT]):
         """
         Materialize this typed logical DataFrame.
 
+        **Cost:** full engine execution on the current thread (same as :meth:`to_dict`
+        when returning rows or lists). See {doc}`EXECUTION` **Materialization costs**.
+
         By default returns a list of Pydantic models, one per row, validated
         against :attr:`schema_type` (the current projected schema).
 
@@ -1320,7 +1429,10 @@ class DataFrame(Generic[SchemaT]):
                 "collect() cannot specify both as_numpy=True and as_lists=True."
             )
         column_dict = execute_plan(
-            self._rust_plan, self._root_data, as_python_lists=True
+            self._rust_plan,
+            self._root_data,
+            as_python_lists=True,
+            error_context=self._materialize_error_context(),
         )
         column_dict = _coerce_enum_columns(column_dict, self._current_field_types)
         if as_lists:
@@ -1332,14 +1444,25 @@ class DataFrame(Generic[SchemaT]):
         return _rows_from_column_dict(column_dict, self._current_schema_type)
 
     def to_dict(self) -> dict[str, list[Any]]:
-        """Columnar materialization (alias for ``collect(as_lists=True)`` shape)."""
-        raw = execute_plan(self._rust_plan, self._root_data, as_python_lists=True)
+        """Columnar materialization (alias for ``collect(as_lists=True)`` shape).
+
+        **Cost:** full Rust execution for the current plan. See {doc}`EXECUTION`.
+        """
+        raw = execute_plan(
+            self._rust_plan,
+            self._root_data,
+            as_python_lists=True,
+            error_context=self._materialize_error_context(),
+        )
         return _coerce_enum_columns(raw, self._current_field_types)
 
     def to_polars(self) -> Any:
         """
         Materialize as a Polars ``DataFrame`` (requires the optional ``polars``
         Python package: ``pip install 'pydantable[polars]'``).
+
+        **Cost:** builds a columnar dict via the Rust engine, then a Polars frame.
+        See {doc}`EXECUTION`.
         """
         try:
             pl = importlib.import_module("polars")
@@ -1357,7 +1480,7 @@ class DataFrame(Generic[SchemaT]):
 
         This runs the same Rust execution path as :meth:`to_dict`, then builds
         Arrow arrays from Python lists—it is not a zero-copy export of internal
-        buffers.
+        buffers. **Cost:** same materialization class as :meth:`to_dict`.
         """
         try:
             pa = importlib.import_module("pyarrow")

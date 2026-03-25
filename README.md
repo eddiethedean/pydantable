@@ -8,7 +8,7 @@
 
 **Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core (Polars inside the native extension).**
 
-**Current release: 0.20.0** · Python **3.10+**
+**Current release: 0.21.0** · Python **3.10+**
 
 ---
 
@@ -31,6 +31,7 @@ The **canonical manual** is on Read the Docs: **[https://pydantable.readthedocs.
 | Topic | Read the Docs |
 |--------|----------------|
 | **Home / overview** | [Documentation home](https://pydantable.readthedocs.io/en/latest/index.html) |
+| **Five-minute tour** | [Quickstart](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html) |
 | **Changelog & versions** | [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html) · [Versioning (0.x)](https://pydantable.readthedocs.io/en/latest/VERSIONING.html) |
 | **`DataFrameModel`** (inputs, transforms, collisions, materialization) | [DataFrameModel](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) |
 | **Column types** (scalars, structs, `list[T]`, maps, trusted ingest) | [Supported data types](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html) |
@@ -125,6 +126,8 @@ PySpark-named wrappers: `pydantable.pyspark.sql.functions` mirrors much of the a
 ---
 
 ## Recent releases
+
+**0.21.0** — **Documentation & display:** [Quickstart](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html), [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) materialization cost table and import-style guide, **`set_display_options`** / env for HTML preview bounds, richer **`describe()`** (bool/str), **`value_counts`**, **`_repr_mimebundle_`**, optional **`PYDANTABLE_VERBOSE_ERRORS`**. See [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html).
 
 **0.20.0** — **UX / discovery:** core **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, numeric **`describe()`**; **`Expr`** / **`WhenChain`** **`repr`**; PySpark façade **`show()`** / **`summary()`**. [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html), [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) **Introspection**, [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html). Multi-line **`DataFrame`** **`repr`** and **`_repr_html_`** (see **0.20.0** changelog Highlights).
 

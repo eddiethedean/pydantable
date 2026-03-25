@@ -109,6 +109,18 @@ Properties **`columns`**, **`shape`**, **`empty`**, **`dtypes`** read from the i
 
 **`PandasGroupedDataFrameModel`** mirrors **`sum` / `mean` / `count`** on grouped models.
 
+## Naming map (core ↔ pandas ↔ PySpark)
+
+Same engine; different method names. PySpark column is in {doc}`PYSPARK_UI`.
+
+| Operation | Core / default | Pandas UI | PySpark UI |
+|-----------|----------------|-----------|------------|
+| Add column | `with_columns` | `assign` | `withColumn` |
+| Filter | `filter` | `filter` | `where` / `filter` |
+| Join | `join` | `merge` | `join` |
+| Sort | `sort` / `order_by` | `sort` | `orderBy` |
+| Rename | `rename` | `rename` | `withColumnRenamed` |
+
 ## Relationship to the default export
 
 - **`from pydantable.pandas import DataFrameModel`** uses pandas-style method names on the same Rust execution path as **`from pydantable import DataFrameModel`**.

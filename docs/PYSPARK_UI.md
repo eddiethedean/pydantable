@@ -58,6 +58,10 @@ Core operations (`collect`, `join`, `group_by`, typed `filter`, …) behave like
 | `show(n=20, truncate=True, vertical=False)` | **0.20.0+** — prints a bounded text table (`head`-like sample). |
 | `summary()` | **0.20.0+** — returns the same **string** as core **`describe()`** (numeric columns MVP), not Apache Spark’s full **`summary`** statistics set. |
 
+### Naming map (core ↔ pandas ↔ PySpark)
+
+See {doc}`PANDAS_UI` **Naming map** for **`with_columns` / `assign` / `withColumn`**, **`filter`**, joins, and sorts—same Rust engine for all three import styles.
+
 ### Schema and columns
 
 - **`columns`** — list of logical column names (same idea as Spark’s `df.columns`).
