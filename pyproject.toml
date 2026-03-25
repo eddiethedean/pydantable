@@ -89,6 +89,18 @@ ignore_missing_imports = true
 module = "polars"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "pandas"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "dataframe_api_compat"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "dataframe_api_compat.*"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 pythonpath = ["python"]
 testpaths = ["tests"]
