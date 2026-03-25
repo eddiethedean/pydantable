@@ -12,9 +12,21 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Highlights
 
-- **Release quality bar:** the `v0.22.0` tag is cut from a commit that passes `make check-full`, full `pytest`, and Rust checks including `--no-default-features`.
+- **Comprehensive I/O:** the **`pydantable.io`** package adds Rust-backed (Polars) **`read_*` / `write_*`** for **Parquet**, **Arrow IPC**, **CSV**, and **NDJSON** into **`dict[str, list]`**, with **`Python::allow_threads`** on read hot paths; **PyArrow** remains the default for **buffers**, **column projection**, and **streaming IPC**. Async mirrors **`aread_*` / `awrite_*`** use **`asyncio.to_thread`** (optional **`executor=`**), matching **`acollect`** / **`ato_arrow`**.
+- **SQLAlchemy bridge:** **`read_sql`** / **`write_sql`** ( **`pip install 'pydantable[sql]'`** + your DB driver) for URL/engine **`SELECT`** → column dict and append/replace inserts across **SQLAlchemy-supported** databases.
+- **Transports (experimental):** HTTP(S) **`fetch_bytes`**, **`read_parquet_url`**, **`read_csv_url`**, **`read_ndjson_url`**, and **`fsspec`**-based **`read_from_object_store`** — opt in with **`experimental=True`** or **`PYDANTABLE_IO_EXPERIMENTAL=1`**.
+- **Tier-2/3 extras (best-effort):** **`[excel]`**, **`[kafka]`**, **`[bq]`**, **`[snowflake]`**, **`[cloud]`**; helpers such as **`read_excel`**, **`read_delta`**, **`read_kafka_json_batch`**, **`read_csv_stdin` / `write_csv_stdout`** (see **`docs/DATA_IO_SOURCES.md`**).
+- **Optional `[rap]`:** true-async CSV via **`aread_csv_rap`** when **`rapcsv`** + **`rapfiles`** are installed.
+- **Engine override:** set **`PYDANTABLE_IO_ENGINE=rust`** or **`pyarrow`** to force file readers/writers.
+- **Release quality bar:** the **`v0.22.0`** tag is cut from a commit that passes **`make check-full`**, full **`pytest`**, and Rust checks including **`--no-default-features`**.
 - **Supply chain:** the release workflow publishes **CycloneDX SBOMs** (Python + Rust) alongside wheels/sdist.
 - **Support matrix:** Python **3.10–3.13**.
+
+### Details
+
+- **Rust:** new **`pydantable._core`** exports **`io_read_*_path`** / **`io_write_*_path`**; column-dict writes round-trip through Python **`polars.DataFrame`** → IPC → Rust writers (install **`pydantable[polars]`** for writes).
+- **Tests:** **`tests/test_io_comprehensive.py`** (round-trips, SQLite SQL, local HTTP server for URL Parquet).
+- **CI:** Python test job installs **`sqlalchemy`** with other dev deps.
 
 ## [0.21.0] — 2026-03-25
 

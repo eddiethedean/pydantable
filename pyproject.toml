@@ -24,9 +24,19 @@ dependencies = [
 [project.optional-dependencies]
 arrow = ["pyarrow>=14.0"]
 polars = ["polars>=1.0.0,<2"]
+io = ["pyarrow>=14.0", "polars>=1.0.0,<2"]
+# read_sql / write_sql — SQLAlchemy 2.x; install DBAPI drivers for your URLs separately.
+sql = ["sqlalchemy>=2.0,<3"]
+cloud = ["fsspec>=2023.0"]
+excel = ["openpyxl>=3.1"]
+kafka = ["kafka-python>=2.0"]
+bq = ["google-cloud-bigquery>=3.0"]
+snowflake = ["snowflake-connector-python>=3.0"]
+rap = ["rapcsv>=0.2", "rapfiles>=0.1", "rapsqlite>=0.1"]
 dev = [
     "fastapi>=0.100",
     "httpx>=0.24",
+    "sqlalchemy>=2.0,<3",
     "python-multipart>=0.0.6",
     "hypothesis>=6.0",
     "numpy>=1.24",
@@ -39,6 +49,15 @@ dev = [
     "polars>=1.0.0,<2",
     "streamlit>=1.30,<2",
     "dataframe-api-compat>=0.2.7",
+    "fsspec>=2023.0",
+    "google-cloud-bigquery>=3.0",
+    "kafka-python>=2.0",
+    "openpyxl>=3.1",
+    "pandas>=2.0",
+    "rapcsv>=0.2",
+    "rapfiles>=0.1",
+    "rapsqlite>=0.1",
+    "snowflake-connector-python>=3.0",
 ]
 benchmark = [
     "maturin>=1.4,<2.0",
@@ -68,6 +87,11 @@ exclude = ["notebooks"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"python/pydantable/io/**/*.py" = ["E501"]
+"tests/test_io_comprehensive.py" = ["TC003"]
+"tests/test_io_extras_and_transports.py" = ["TC003", "E501", "RUF012"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -99,6 +123,58 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "dataframe_api_compat.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "sqlalchemy"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "sqlalchemy.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "openpyxl"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "fsspec"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "kafka"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "google.cloud.bigquery"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "snowflake.connector"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "rapcsv"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "rapfiles"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pyarrow.dataset"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pyarrow.orc"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "google.cloud"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "google.cloud.bigquery"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

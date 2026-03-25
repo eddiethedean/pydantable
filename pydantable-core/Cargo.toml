@@ -10,8 +10,8 @@ name = "pydantable_core"
 crate-type = ["cdylib"]
 
 [features]
-# Keep the skeleton lightweight: Polars is only pulled in when explicitly
-# enabled later (e.g. when we implement the Rust logical plan execution).
+# `polars_engine`: plan execution + `io_*` file helpers (Parquet/IPC/CSV/NDJSON).
+# Optional Python extras (`[polars]`, `[arrow]`, …) mirror this for dict-round-trip writes.
 default = ["polars_engine"]
 polars_engine = ["dep:polars", "dep:polars-io", "dep:numpy"]
 
@@ -20,8 +20,8 @@ pyo3 = { version = "0.24.1" }
 # `range` enables `int_range` for SQL-style `row_number` over windows; with `dtype-datetime`,
 # Polars 0.53 also needs `timezones` (polars-plan `replace_tz` cfgs) and `dtype-array` so
 # `polars-expr` matches `polars-plan` list/array IR variants.
-polars = { version = "0.53.0", optional = true, features = ["lazy", "is_in", "strings", "concat_str", "is_between", "pivot", "abs", "round_series", "dtype-array", "dtype-struct", "dtype-decimal", "dtype-time", "regex", "rank", "range", "timezones"] }
-polars-io = { version = "0.53.0", optional = true, features = ["ipc"] }
+polars = { version = "0.53.0", optional = true, features = ["lazy", "is_in", "strings", "concat_str", "is_between", "pivot", "abs", "round_series", "dtype-array", "dtype-struct", "dtype-decimal", "dtype-time", "regex", "rank", "range", "timezones", "csv", "parquet", "json"] }
+polars-io = { version = "0.53.0", optional = true, features = ["ipc", "csv", "parquet", "json"] }
 numpy = { version = "0.24", optional = true }
 
 [profile.release]

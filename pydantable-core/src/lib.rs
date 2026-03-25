@@ -2,6 +2,8 @@
 
 mod dtype;
 mod expr;
+#[cfg(feature = "polars_engine")]
+mod io_polars;
 mod plan;
 mod python_api;
 

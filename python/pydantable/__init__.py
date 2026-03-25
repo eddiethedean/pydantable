@@ -16,7 +16,7 @@ from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
 from .display import get_repr_html_limits, reset_display_options, set_display_options
 from .expressions import Expr
-from .io import read_ipc, read_parquet
+from .io import aread_parquet, read_ipc, read_parquet, write_parquet
 from .schema import DtypeDriftWarning, Schema
 
 __all__ = [
@@ -25,6 +25,7 @@ __all__ = [
     "DtypeDriftWarning",
     "Expr",
     "Schema",
+    "aread_parquet",
     "get_repr_html_limits",
     "pandas",
     "pyspark",
@@ -32,5 +33,6 @@ __all__ = [
     "read_parquet",
     "reset_display_options",
     "set_display_options",
+    "write_parquet",
 ]
 __version__ = "0.22.0"

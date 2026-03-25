@@ -8,7 +8,7 @@ inside the native extension. Python does **not** require the `polars` package fo
 
 **Async materialization (0.15.0+):** **`await acollect()`**, **`await ato_dict()`**, **`await ato_polars()`**, and **`await ato_arrow()`** on **`DataFrame`** run the same logic in a **worker thread** via **`asyncio.to_thread`**, or in a **`concurrent.futures.Executor`** passed as **`executor=`**. **`DataFrameModel`** mirrors this with **`acollect`**, **`ato_dict`**, **`ato_polars`**, **`ato_arrow`**, **`arows`**, and **`ato_dicts`**. Cancelling the awaiting task does **not** cancel in-flight native work. The **GIL** still serializes some Python callbacks; **`ato_polars()`** and **`ato_arrow()`** both build their respective outputs from a materialized columnar **`dict`** (extra allocation vs calling Polars or PyArrow alone on raw buffers).
 
-**File / IPC helpers (0.16.0+):** **`pydantable.read_parquet`** and **`read_ipc`** are **synchronous** PyArrow readers that return **`dict[str, list]`** for constructors. They are **not** async; from **`async def`** routes, either call them directly for small files (briefly blocks the loop) or wrap with **`asyncio.to_thread`** / run on your **`executor=`** pool. Service patterns: {doc}`FASTAPI` and {doc}`ROADMAP`.
+**File / I/O helpers (0.22.0+):** **`pydantable.io`** (and package exports **`read_parquet`**, **`read_ipc`**, **`write_parquet`**, **`aread_parquet`**, …) returns **`dict[str, list]`** for constructors. **Local files** default to **Rust** (Polars) when possible; **buffers**, **HTTP**, and **column-projected** Parquet use **PyArrow** where required. **Async** routes should use **`await pydantable.io.aread_parquet(...)`** ( **`asyncio.to_thread`** under the hood) or pass a thread **`executor=`**. **Writes** from column dicts use a short **Python Polars** IPC hop—install **`pydantable[polars]`** for that path. Service patterns: {doc}`FASTAPI` and {doc}`ROADMAP`.
 
 By default, `collect()` returns a **list of Pydantic models** (one per row), validated
 against the current projected schema. Use **`to_dict()`** or **`collect(as_lists=True)`**
@@ -48,7 +48,7 @@ See {doc}`PANDAS_UI`, {doc}`PYSPARK_UI`, and **Naming map (core ↔ pandas ↔ P
 | Validated rows | **`collect()`** (default) | none |
 | Polars **`DataFrame`** | **`to_polars()`** | **`pip install 'pydantable[polars]'`** |
 | PyArrow **`Table`** | **`to_arrow()`** | **`pip install 'pydantable[arrow]'`** |
-| File round-trip | **`read_parquet`** / **`read_ipc`** → constructors | **`[arrow]`** |
+| File round-trip | **`read_parquet`** / **`read_ipc`** / **`write_*`** → constructors | **`[arrow]`** (buffers); **`[polars]`** (Rust write path); core wheel includes Rust readers |
 
 Each path that builds Polars or Arrow **first** runs the same Rust materialization as **`to_dict()`** unless documented otherwise.
 

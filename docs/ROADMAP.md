@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.20.x → 0.21.x → v1.0.0)
+# PydanTable roadmap (0.20.x → 0.22.x → v1.0.0)
 
-**Latest release: `0.20.0`.** **Shipped in 0.20.0** (below) includes **UX documentation** (quickstart, import map, interchange), **tunable HTML display** (`**set_display_options**` / env), richer **`describe()`** (bool/str), **`value_counts`**, **`_repr_mimebundle_`**, optional **`PYDANTABLE_VERBOSE_ERRORS`**, **REPL discovery** (**`columns`**, **`shape`**, **`info`**, …), **`Expr` `repr`**, and **PySpark** **`show`** / **`summary`**. **ipywidgets** / interactive explorers remain **Later** unless promoted. This document also summarizes shipped history, **Planned v1.0.0** for the **production-ready** major release, and **Later** / **After v1.0.0** backlogs.
+**Latest release: `0.22.0`.** **Shipped in 0.22.0** adds the **`pydantable.io`** package (**Rust-first** file readers/writers, async mirrors, SQLAlchemy bridge, experimental HTTP/object-store helpers, optional enterprise extras)—see **Shipped in 0.22.0** below. Earlier **0.20.0** / **0.21.0** items (**UX** docs, **Streamlit** interchange, …) remain in their sections. **ipywidgets** / interactive explorers remain **Later** unless promoted. This document also summarizes shipped history, **Planned v1.0.0** for the **production-ready** major release, and **Later** / **After v1.0.0** backlogs.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
@@ -301,6 +301,19 @@ Practical inputs that feed that phase:
 - [x] **Changelog + README:** Streamlit integration called out in **changelog** and **README**.
 
 **Non-goals for 0.21.0:** custom Streamlit **components** beyond what **`st.dataframe`** / **`st.data_editor`** provide; **hosted** Streamlit Cloud–specific packaging.
+
+---
+
+## Shipped in 0.22.0 (comprehensive `pydantable.io`)
+
+- [x] **Rust readers/writers:** **`pydantable._core`** **`io_read_*_path`** / **`io_write_*_path`** for **Parquet**, **IPC**, **CSV**, **NDJSON** ( **`Python::allow_threads`** on reads).
+- [x] **Python façade:** **`pydantable.io`** sync/async API, **`PYDANTABLE_IO_ENGINE`**, PyArrow fallbacks, **`[io]`** / **`[sql]`** / **`[cloud]`** / **`[excel]`** / **`[kafka]`** / **`[bq]`** / **`[snowflake]`** / **`[rap]`** extras in **`pyproject.toml`**.
+- [x] **SQLAlchemy:** **`read_sql`** / **`write_sql`** (any SQLAlchemy URL/dialect; parameterized SQL; drivers installed separately).
+- [x] **Experimental transports:** **`fetch_bytes`**, URL readers, **`fsspec`** object-store helper behind **`PYDANTABLE_IO_EXPERIMENTAL`**.
+- [x] **Docs:** **`DATA_IO_SOURCES.md`**, **`EXECUTION.md`**, **`FASTAPI.md`**, **`changelog.md`**, this section.
+- [x] **Tests:** **`tests/test_io_comprehensive.py`**.
+
+**Deferred / not in-tree:** Rust **`sqlx`** drivers (documented SQLAlchemy-first); **`pyo3-asyncio`** + Tokio for I/O (thread offload remains default).
 
 ---
 

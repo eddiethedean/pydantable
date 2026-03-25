@@ -17,7 +17,7 @@
 - **Schemas first:** Pydantic field annotations define column types, nullability (`T | None`), and which expressions are legal. Many mistakes are caught when you build the `Expr`, not only when you run the query.
 - **Two entry styles:** `DataFrameModel` (SQLModel-like whole-table class with a generated row model) or `DataFrame[YourSchema](data)` with any Pydantic `BaseModel` schema.
 - **Polars-shaped API:** `select`, `with_columns`, `filter`, `join`, `group_by`, windows, reshape helpers — semantics are documented in the [interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html), not guaranteed identical to Polars on every edge case.
-- **Optional extras:** `pydantable[polars]` for `to_polars()`; `pydantable[arrow]` for `read_parquet` / `read_ipc`, `to_arrow` / `ato_arrow`, and `pa.Table` / `RecordBatch` constructors.
+- **Optional extras:** `pydantable[polars]` for `to_polars()` and **Rust-backed file writes** (`write_parquet`, …); `pydantable[arrow]` for **buffer/streaming** Parquet/IPC, `to_arrow` / `ato_arrow`, and `pa.Table` / `RecordBatch` constructors; `pydantable[io]` bundles **arrow + polars** for full **I/O**; **`[sql]`** for `read_sql` / `write_sql` (**SQLAlchemy**; add **psycopg**, **pymysql**, etc. for your database URLs); **`[cloud]`**, **`[excel]`**, **`[kafka]`**, **`[bq]`**, **`[snowflake]`**, **`[rap]`** for other bridges in **`docs/DATA_IO_SOURCES.md`**.
 - **Optional façades:** `pydantable.pandas` and `pydantable.pyspark` swap naming/imports; execution stays the same in-process core (not a real Spark or pandas backend).
 - **Service-ready:** Sync and async materialization (`collect`, `to_dict`, `acollect`, `ato_dict`, …), [FastAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) patterns, and trusted ingest modes for bulk JSON or Arrow.
 - **REPL / discovery:** `repr(df)` on **`DataFrame`** and **`DataFrameModel`** shows the parameterized class, schema type, and column dtypes (wide tables truncate with `… and N more`). **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, and **`describe()`** (numeric, bool, str) are on the core API (see [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) for **`shape`** vs materialized rows). **`Expr`** and **`WhenChain`** have readable **`repr`** for debugging pipelines. Row counts in **`repr`** are omitted—use **`collect()`** / **`to_dict()`** when you need data. **Jupyter / VS Code notebooks:** **`_repr_html_()`** renders a bounded **HTML table** preview (no **`polars`** required); tune via **`pydantable.display`** or **`PYDANTABLE_REPR_HTML_*`**. Details: [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html).
@@ -62,8 +62,10 @@ pip install pydantable
 **Optional dependencies** (same package, feature extras):
 
 ```bash
-pip install 'pydantable[polars]'   # to_polars()
-pip install 'pydantable[arrow]'  # read_parquet/read_ipc, to_arrow, Table/RecordBatch constructors
+pip install 'pydantable[polars]'   # to_polars(); write_parquet/write_* from dict (IPC hop)
+pip install 'pydantable[arrow]'    # read_parquet/read_ipc from bytes, to_arrow, Table/RecordBatch
+pip install 'pydantable[io]'       # arrow + polars (recommended for mixed file I/O)
+pip install 'pydantable[sql]'      # read_sql / write_sql (SQLAlchemy + your DB driver)
 ```
 
 **From a git checkout** you need a Rust toolchain and a build of the extension (e.g. [Maturin](https://www.maturin.rs/)):

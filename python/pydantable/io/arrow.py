@@ -1,10 +1,4 @@
-"""File and Arrow IPC helpers that return columnar ``dict[str, list]`` for constructors.
-
-Requires the optional ``pyarrow`` package (``pip install 'pydantable[arrow]'`` or
-``pip install pyarrow``). Results are plain Python lists per column, suitable for
-:class:`~pydantable.DataFrame` / :class:`~pydantable.DataFrameModel` and normal
-validation rules.
-"""
+"""PyArrow-based readers and table helpers (optional ``pyarrow`` extra)."""
 
 from __future__ import annotations
 
@@ -20,7 +14,7 @@ def _require_pyarrow():
         import pyarrow as pa  # type: ignore[import-not-found]
     except ImportError as e:
         raise ImportError(
-            "pyarrow is required for pydantable.io helpers. Install with: "
+            "pyarrow is required for this pydantable.io helper. Install with: "
             "pip install 'pydantable[arrow]'"
         ) from e
     return pa
@@ -51,17 +45,12 @@ def record_batch_to_column_dict(batch: Any) -> dict[str, list[Any]]:
     }
 
 
-def read_parquet(
+def read_parquet_pyarrow(
     source: _Source,
     *,
     columns: list[str] | None = None,
 ) -> dict[str, list[Any]]:
-    """
-    Read a Parquet file or buffer into ``dict[str, list]``.
-
-    ``source`` may be a path, ``pathlib.Path``, ``bytes``, or binary file-like object.
-    This uses PyArrow only (no Polars dependency on the read path).
-    """
+    """Read Parquet via PyArrow into ``dict[str, list]``."""
     _require_pyarrow()
     import pyarrow.parquet as pq  # type: ignore[import-not-found,import-untyped]
 
@@ -71,20 +60,12 @@ def read_parquet(
     return arrow_table_to_column_dict(table)
 
 
-def read_ipc(
+def read_ipc_pyarrow(
     source: _Source,
     *,
     as_stream: bool = False,
 ) -> dict[str, list[Any]]:
-    """
-    Read Arrow IPC into ``dict[str, list]``.
-
-    Use ``as_stream=False`` (default) for the *file* format (``.arrow`` / feather-style
-    container). Use ``as_stream=True`` for the *streaming* IPC format (sequence of
-    record batches).
-
-    ``source`` may be a path, ``pathlib.Path``, ``bytes``, or binary file-like object.
-    """
+    """Read Arrow IPC via PyArrow into ``dict[str, list]``."""
     _require_pyarrow()
     import pyarrow.ipc as ipc  # type: ignore[import-not-found,import-untyped]
 

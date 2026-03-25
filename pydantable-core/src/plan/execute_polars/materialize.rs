@@ -267,7 +267,7 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
 }
 
 #[cfg(feature = "polars_engine")]
-pub(super) fn series_to_py_list(
+pub(crate) fn series_to_py_list(
     py: Python<'_>,
     series: &Series,
     dtype: &DTypeDesc,
@@ -502,13 +502,21 @@ pub(crate) fn execute_plan_polars(
 }
 
 #[cfg(feature = "polars_engine")]
-pub(super) fn dtype_from_polars(dt: &DataType) -> PyResult<DTypeDesc> {
+pub(crate) fn dtype_from_polars(dt: &DataType) -> PyResult<DTypeDesc> {
     match dt {
-        DataType::Int64 => Ok(DTypeDesc::Scalar {
-            base: Some(BaseType::Int),
-            nullable: true,
-        }),
-        DataType::Float64 => Ok(DTypeDesc::Scalar {
+        DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64 => {
+            Ok(DTypeDesc::Scalar {
+                base: Some(BaseType::Int),
+                nullable: true,
+            })
+        }
+        DataType::UInt8 | DataType::UInt16 | DataType::UInt32 | DataType::UInt64 => {
+            Ok(DTypeDesc::Scalar {
+                base: Some(BaseType::Int),
+                nullable: true,
+            })
+        }
+        DataType::Float32 | DataType::Float64 => Ok(DTypeDesc::Scalar {
             base: Some(BaseType::Float),
             nullable: true,
         }),

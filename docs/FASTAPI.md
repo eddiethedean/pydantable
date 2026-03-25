@@ -13,7 +13,8 @@ For FastAPI services, `pydantable` gives you:
 - **`collect()`** — `list` of Pydantic models for the **current** projection (ideal for `response_model=list[YourRow]`)
 - **`to_dict()`** — `dict[str, list]` when the response is **column-shaped** JSON
 - **`acollect()`**, **`ato_dict()`**, **`ato_polars()`**, **`ato_arrow()`** — same semantics off the event loop (see below)
-- **`read_parquet()`** / **`read_ipc()`** — load Parquet or Arrow IPC into **`dict[str, list]`** for constructors (requires **`pyarrow`**; **`pip install 'pydantable[arrow]'`**)
+- **`read_parquet()`** / **`read_ipc()`** / **`write_parquet()`** — load or persist **local files** via **`pydantable.io`** (Rust-first paths in the extension; **buffers** / **streaming IPC** / **column lists** need **`pyarrow`**, **`pip install 'pydantable[arrow]'`**; **dict writes** need **`polars`**, **`pip install 'pydantable[polars]'`**)
+- **`aread_parquet()`** / **`aread_ipc()`** / … — same as above off the event loop (**`asyncio.to_thread`**; optional **`executor=`**)
 - **`to_arrow()`** — materialize a PyArrow **`Table`** after the same engine path as **`to_dict()`** (not zero-copy; see [`EXECUTION.md`](EXECUTION.md))
 
 **Synchronous materialization** (`collect()`, `to_dict()`, `collect(as_lists=True)`, optional `to_polars()`) runs **blocking** Rust + Polars work on the **current thread**.
@@ -95,7 +96,7 @@ Same schema rules apply as for columnar constructors in [`DATAFRAMEMODEL.md`](DA
 
 ## Parquet and Arrow IPC uploads (multipart)
 
-For **file** bodies, read bytes in the handler and use **`pydantable.read_parquet`** or **`read_ipc`** ( **`as_stream=True`** for streaming IPC). FastAPI file routes require the **`python-multipart`** package (`pip install python-multipart`).
+For **file** bodies, read bytes in the handler and use **`pydantable.read_parquet`** or **`read_ipc`** ( **`as_stream=True`** for streaming IPC); **`read_parquet`** / **`read_ipc`** on **bytes** require **`pyarrow`** (**`pip install 'pydantable[arrow]'`**). For **disk paths** inside workers, prefer **`await aread_parquet(path)`** so the event loop stays free. FastAPI file routes require **`python-multipart`** (`pip install python-multipart`).
 
 Use **`trusted_mode="shape_only"`** or **`strict`** for internal uploads where the file is already schema-shaped; use default validation for untrusted clients.
 
@@ -124,6 +125,26 @@ async def upload_parquet(file: UploadFile):
     df = UserDF(cols, trusted_mode="shape_only")
     return df.to_dict()
 ```
+
+## Async SQL (`aread_sql`) and experimental URLs
+
+**SQLAlchemy 2.x** ( **`pip install 'pydantable[sql]'`** plus your **DBAPI** driver): **`read_sql`** / **`write_sql`** work with **any** SQLAlchemy-supported URL (**PostgreSQL**, **MySQL**, **SQLite**, **SQL Server**, …). Async routes use **`aread_sql`** / **`awrite_sql`** (**`asyncio.to_thread`** under the hood). Keep **`SELECT`** statements parameterized; never build SQL from untrusted request fields without binds.
+
+```python
+from pydantable.io import aread_sql
+
+
+@app.get("/rows")
+async def rows(database_url: str):
+    cols = await aread_sql(
+        "SELECT id, name FROM t WHERE active = :a",
+        database_url,
+        parameters={"a": True},
+    )
+    return cols
+```
+
+**HTTP(S) Parquet** (experimental): set **`PYDANTABLE_IO_EXPERIMENTAL=1`** or pass **`experimental=True`** to **`read_parquet_url`** (downloads via stdlib **`urllib`**, then PyArrow).
 
 ## Injectable executor with `Depends`
 
