@@ -28,9 +28,7 @@ def test_verbose_errors_append_context_when_enabled(
 
 
 @pytest.mark.parametrize("flag", ("1", "true", "yes", "TRUE"))
-def test_verbose_errors_truthy_env(
-    monkeypatch: pytest.MonkeyPatch, flag: str
-) -> None:
+def test_verbose_errors_truthy_env(monkeypatch: pytest.MonkeyPatch, flag: str) -> None:
     monkeypatch.setenv("PYDANTABLE_VERBOSE_ERRORS", flag)
     monkeypatch.setattr(rust_engine, "_RUST_CORE", _FakeRustCore())
     with pytest.raises(ValueError) as exc:

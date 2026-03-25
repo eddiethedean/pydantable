@@ -187,9 +187,10 @@ def test_repr_mimebundle_dataframe_model_wraps_plain_and_html() -> None:
     m = M({"x": [1, 2]})
     b = m._repr_mimebundle_()
     assert "DataFrame[" in b["text/plain"] or "DataFrameModel" in b["text/plain"]
-    assert "DataFrameModel" in b["text/html"] or "pydantable-render--context" in b[
-        "text/html"
-    ]
+    assert (
+        "DataFrameModel" in b["text/html"]
+        or "pydantable-render--context" in b["text/html"]
+    )
     assert "<table" in b["text/html"].lower() or "pydantable-render" in b["text/html"]
 
 
