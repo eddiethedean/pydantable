@@ -61,6 +61,15 @@ If there are more than **32** columns, only the first **32** are listed, followe
 
 This is for **REPLs, logs, and tracebacks**—not a substitute for materializing data.
 
+### `Expr` **`repr`**
+
+**`0.20.0+`:** **`Expr`**, **`ColumnRef`**, **`WhenChain`**, and pending window builder objects implement **`__repr__`** with a compact AST-style snippet (from the Rust serializable form) plus **dtype** and **referenced column** hints where available—handy in notebooks and logs without printing raw internal handles.
+
+## `info()` and `describe()` (**0.20.0+**)
+
+- **`info()`** returns a **multi-line string** listing logical column names, **dtype** annotations, and a **row count** aligned with **`shape[0]`** (root-buffer semantics—see {doc}`INTERFACE_CONTRACT` **Introspection**). It does **not** force a full **`collect()`** beyond what **`shape`** already implies for buffer-backed frames.
+- **`describe()`** computes **min / max / mean / std / count** (as available) for columns whose schema types are **numeric** **`int`** or **`float`** (including **`Optional`** / **`| None`**). It calls **`to_dict()`** once, then aggregates in Python—same broad cost class as other summaries. Non-numeric columns are **omitted** in this MVP.
+
 ## Jupyter / HTML (`_repr_html_`)
 
 In **Jupyter**, **IPython**, **VS Code** notebooks, and similar frontends, **`DataFrame`** and **`DataFrameModel`** implement **`_repr_html_()`** so the last line of a cell renders as an **HTML table** (pandas-style), without installing **`polars`**.

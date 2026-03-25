@@ -23,7 +23,7 @@ Status definitions:
 | Globals in `select` | `sum`/`mean`/`count`/`min`/`max` over a column, **`global_row_count`** / `count(*)` | Implemented | Single-row `DataFrame.select`; see `INTERFACE_CONTRACT`. |
 | Expr helpers | `strptime`, `unix_timestamp`, `cast(str→date/datetime)`, `map_len`/`map_get`/`map_contains_key`, `binary_len`, `dt_nanosecond` | Implemented | Rust `ExprNode` + Polars lowering; contract tests. |
 | Performance | Guardrails for major transforms | Implemented | Lightweight regression checks in test suite. |
-| Ecosystem | Optional interfaces `pandas` and `pyspark` | Implemented | Alternate import/naming surfaces; execution is the same Rust core as default (not native pandas/Spark). **0.17.0:** PySpark `sql.functions` adds string/list/bytes helpers (`str_replace`, `strip_*`, `strptime`, `binary_len`, `list_*`) as thin wrappers over core `Expr`. |
+| Ecosystem | Optional interfaces `pandas` and `pyspark` | Implemented | Alternate import/naming surfaces; execution is the same Rust core as default (not native pandas/Spark). **0.17.0:** PySpark `sql.functions` adds string/list/bytes helpers (`str_replace`, `strip_*`, `strptime`, `binary_len`, `list_*`) as thin wrappers over core `Expr`. **0.20.0:** PySpark UI `DataFrame.show()` / `summary()`; core + façades share `columns` / `shape` / `info` / `describe` (see `INTERFACE_CONTRACT` **Introspection**). |
 
 ## Remaining parity gaps
 
@@ -34,3 +34,5 @@ Status definitions:
 **0.18.0:** No new table methods or PySpark `functions` rows; this release focused on internals (clearer **group_by**/**Polars** error context), documentation, and deferred non-string **map** keys—see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.18.0**.
 
 **0.19.0:** Scorecard matrix **unchanged**—pre-1.0 doc consolidation, [`VERSIONING.md`](VERSIONING.md), and CI-stable grouped tests; see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.19.0**.
+
+**0.20.0:** One ecosystem row update (see table)—UX / discovery on core + PySpark **`show`** / **`summary`**; see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.20.0**.

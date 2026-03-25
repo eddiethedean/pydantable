@@ -55,6 +55,8 @@ Core operations (`collect`, `join`, `group_by`, typed `filter`, …) behave like
 | `withColumnRenamed(existing, new)` | `with_column_renamed` |
 | `dropDuplicates(subset=None)` | Core `distinct(subset=...)` when `subset` is set; else all-column `distinct()` |
 | `union` / `unionAll` | Core vertical `concat` (same schema required) |
+| `show(n=20, truncate=True, vertical=False)` | **0.20.0+** — prints a bounded text table (`head`-like sample). |
+| `summary()` | **0.20.0+** — returns the same **string** as core **`describe()`** (numeric columns MVP), not Apache Spark’s full **`summary`** statistics set. |
 
 ### Schema and columns
 

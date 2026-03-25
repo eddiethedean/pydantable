@@ -6,8 +6,21 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Added
 
-- **`DataFrame.__repr__`:** Multi-line `repr` with parameterized class, schema type, and aligned column dtypes; truncates very wide schemas (first **32** columns + `… and N more`). **`DataFrameModel`**, **`GroupedDataFrame`**, **`DynamicGroupedDataFrame`**, and grouped model wrappers include a readable `repr`. Row counts are not shown (lazy plans may change length—materialize to inspect data). See {doc}`EXECUTION`, {doc}`DATAFRAMEMODEL`, {doc}`README`.
-- **`DataFrame._repr_html_`:** Jupyter / IPython **HTML table** preview (bounded rows/columns/cell length; **HTML-escaped** cells; same materialization path as **`head()`** + **`to_dict()`** for the preview). **`DataFrameModel`** and grouped handles delegate or prepend a label. See {doc}`EXECUTION` **Jupyter / HTML**, {doc}`ROADMAP` **Notebook utilities**.
+(none yet)
+
+## [0.20.0] — 2026-03-24
+
+### Highlights
+
+- **UX / discovery:** Core **`DataFrame`** and **`DataFrameModel`** expose **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, and **`describe()`** (numeric **`int` / `float`** columns only for **`describe`**; one **`to_dict()`** materialization). **`shape[0]`** follows **root-buffer** semantics and may diverge from materialized row count after lazy transforms—see {doc}`INTERFACE_CONTRACT` **Introspection**, {doc}`EXECUTION`.
+- **Expressions:** **`Expr`**, **`ColumnRef`**, **`WhenChain`**, and pending window helpers implement readable **`__repr__`** (JSON-friendly AST snippet + dtype / columns where useful). Tests: **`tests/test_expr_repr.py`**.
+- **PySpark façade:** **`DataFrame.show()`** (bounded text table; **`head`**-like) and **`summary()`** (alias of **`describe()`** string output). **`DataFrameModel`** delegates. See {doc}`PYSPARK_UI`, {doc}`PYSPARK_PARITY`.
+- **Documentation:** {doc}`README`, {doc}`index`, {doc}`ROADMAP` **Shipped in 0.20.0**, {doc}`PARITY_SCORECARD`, {doc}`PANDAS_UI` (core parity with pandas UI introspection), {doc}`DEVELOPER` (release map + notebooks).
+
+### Details
+
+- **Repr / HTML (from pre-release Unreleased):** Multi-line **`DataFrame.__repr__`** and **`_repr_html_`** (card-style HTML; grouped/model banners). See {doc}`EXECUTION`, **`tests/test_dataframe_repr.py`**.
+- **Release hygiene:** **`make check-full`**, full **pytest**, **`cargo test --all-features`** per {doc}`DEVELOPER`.
 
 ## [0.19.0] — 2026-03-24
 

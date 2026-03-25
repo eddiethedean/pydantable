@@ -15,6 +15,32 @@ from .sql.types import StructField, StructType, annotation_to_data_type
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
+_MAX_SHOW_CELL = 48
+
+
+def _text_show_table(
+    data: dict[str, list[Any]],
+    *,
+    truncate: bool,
+) -> str:
+    cols = list(data.keys())
+    if not cols:
+        return "(empty)"
+    nrows = len(next(iter(data.values())))
+    lines: list[str] = [
+        " | ".join(cols),
+        "-+-".join("-" * min(len(c), 14) for c in cols),
+    ]
+    for i in range(nrows):
+        row_cells: list[str] = []
+        for c in cols:
+            cell = repr(data[c][i])
+            if truncate and len(cell) > _MAX_SHOW_CELL:
+                cell = f"{cell[: _MAX_SHOW_CELL - 1]}…"
+            row_cells.append(cell)
+        lines.append(" | ".join(row_cells))
+    return "\n".join(lines)
+
 
 class DataFrame(CoreDataFrame):
     """Typed table with PySpark method names; runs in-process via the Rust core."""
@@ -153,9 +179,34 @@ class DataFrame(CoreDataFrame):
         """Alias of :meth:`union` (Spark naming)."""
         return self.union(other)
 
-    @property
-    def columns(self) -> list[str]:
-        return list(self._current_field_types.keys())
+    def show(
+        self,
+        n: int = 20,
+        truncate: bool = True,
+        vertical: bool = False,
+    ) -> None:
+        """Print up to ``n`` rows (materializes via :meth:`head`).
+
+        Not a distributed Spark runtime.
+        """
+        h = self.head(int(n))
+        data = h.to_dict()
+        if vertical:
+            cols = list(data.keys())
+            if not cols:
+                print("(empty)")
+                return
+            nrows = len(next(iter(data.values())))
+            for i in range(nrows):
+                print(f"- record {i}")
+                for c in cols:
+                    print(f"  {c}: {data[c][i]!r}")
+            return
+        print(_text_show_table(data, truncate=truncate))
+
+    def summary(self) -> str:
+        """Spark-style name for :meth:`describe` (numeric columns; materializes)."""
+        return self.describe()
 
     @property
     def schema(self) -> StructType:
@@ -275,9 +326,17 @@ class DataFrameModel(CoreDataFrameModel):
     def unionAll(self, other: DataFrameModel | DataFrame) -> DataFrameModel:
         return self.union(other)
 
-    @property
-    def columns(self) -> list[str]:
-        return list(self._df.columns)
+    def show(
+        self,
+        n: int = 20,
+        truncate: bool = True,
+        vertical: bool = False,
+    ) -> None:
+        """Print rows (delegates to :class:`DataFrame`)."""
+        self._df.show(n=n, truncate=truncate, vertical=vertical)
+
+    def summary(self) -> str:
+        return self._df.summary()
 
     @property
     def schema(self) -> StructType:

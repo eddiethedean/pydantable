@@ -15,7 +15,7 @@ from .dataframe_model import DataFrameModel as CoreDataFrameModel
 from .dataframe_model import GroupedDataFrameModel as CoreGroupedDataFrameModel
 from .expressions import Expr
 from .rust_engine import _require_rust_core
-from .schema import Schema, _is_polars_dataframe
+from .schema import Schema
 
 
 def _is_pandas_series(value: object) -> bool:
@@ -80,28 +80,6 @@ class PandasDataFrame(CoreDataFrame):
             "String query() is not supported; use filter(Expr) with typed column "
             "expressions (see pydantable.expressions)."
         )
-
-    @property
-    def columns(self) -> list[str]:
-        return list(self._current_field_types.keys())
-
-    @property
-    def shape(self) -> tuple[int, int]:
-        if not self._root_data:
-            return (0, len(self._current_field_types))
-        rd = self._root_data
-        if _is_polars_dataframe(rd):
-            return (len(rd), len(self._current_field_types))
-        first = next(iter(rd.values()))
-        return (len(first), len(self._current_field_types))
-
-    @property
-    def empty(self) -> bool:
-        return self.shape[0] == 0
-
-    @property
-    def dtypes(self) -> dict[str, Any]:
-        return dict(self._current_field_types)
 
     def head(self, n: int = 5) -> CoreDataFrame:
         """
@@ -199,22 +177,6 @@ class PandasDataFrameModel(CoreDataFrameModel):
             "String query() is not supported; use filter(Expr) with typed column "
             "expressions (see pydantable.expressions)."
         )
-
-    @property
-    def columns(self) -> list[str]:
-        return list(self._df.columns)
-
-    @property
-    def shape(self) -> tuple[int, int]:
-        return self._df.shape
-
-    @property
-    def empty(self) -> bool:
-        return self._df.empty
-
-    @property
-    def dtypes(self) -> dict[str, Any]:
-        return self._df.dtypes
 
     def head(self, n: int = 5) -> CoreDataFrameModel:
         return type(self)._from_dataframe(self._df.head(n))

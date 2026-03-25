@@ -7,9 +7,25 @@ pending objects finished with ``.over(WindowSpec(...))``. Globals such as
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any
 
 from .rust_engine import _require_rust_core
+
+# Bound serialized AST size in :meth:`Expr.__repr__` for readable REPL output.
+_MAX_EXPR_REPR_AST = 200
+
+
+def _rust_expr_ast_snippet(rust_expr: Any) -> str:
+    try:
+        data = rust_expr.to_serializable()
+        s = json.dumps(data, default=str, separators=(",", ":"))
+        if len(s) > _MAX_EXPR_REPR_AST:
+            return f"{s[: _MAX_EXPR_REPR_AST - 1]}…"
+        return s
+    except Exception:
+        return "?"
+
 
 if TYPE_CHECKING:
     from .window_spec import WindowSpec
@@ -27,6 +43,13 @@ class Expr:  # type: ignore[override]
 
     def referenced_columns(self) -> set[str]:
         return set(self._rust_expr.referenced_columns())
+
+    def __repr__(self) -> str:
+        cls = type(self).__name__
+        refs = sorted(self.referenced_columns())
+        ref_s = f" refs={refs!r}" if refs else ""
+        ast_s = _rust_expr_ast_snippet(self._rust_expr)
+        return f"{cls}(dtype={self.dtype!r}{ref_s} ast={ast_s})"
 
     def _coerce_other(self, other: Any) -> Expr:
         if isinstance(other, Expr):
@@ -372,6 +395,10 @@ class Expr:  # type: ignore[override]
 class WhenChain:
     """Chained ``when`` / ``otherwise`` (Spark-style)."""
 
+    def __repr__(self) -> str:
+        n = len(self._branches)
+        return f"WhenChain({n} branch{'es' if n != 1 else ''})"
+
     def __init__(self, condition: Expr, value: Expr):
         if not isinstance(condition, Expr) or not isinstance(value, Expr):
             raise TypeError("when() expects Expr arguments.")
@@ -401,10 +428,14 @@ class ColumnRef(Expr):  # type: ignore[override]
     """Named column with an explicit Python annotation used for Rust typing."""
 
     def __init__(self, *, name: str, dtype: Any):
+        self._column_name = name
         rust_expr = _require_rust_core().make_column_ref(
             name=name, dtype_annotation=dtype
         )
         super().__init__(rust_expr=rust_expr)
+
+    def __repr__(self) -> str:
+        return f"ColumnRef({self._column_name!r}, dtype={self.dtype!r})"
 
 
 class Literal(Expr):  # type: ignore[override]
@@ -459,6 +490,9 @@ class _WindowFnPending:
     def __init__(self, kind: str):
         self._kind = kind
 
+    def __repr__(self) -> str:
+        return f"_WindowFnPending({self._kind!r})"
+
     def over(self, window: WindowSpec) -> Expr:
         rust = _require_rust_core()
         part = list(window.partition_by)
@@ -493,6 +527,9 @@ class _WindowAggPending:
     def __init__(self, inner: Expr, kind: str):
         self._inner = inner
         self._kind = kind
+
+    def __repr__(self) -> str:
+        return f"_WindowAggPending({self._kind!r}, {self._inner!r})"
 
     def over(self, window: WindowSpec) -> Expr:
         rust = _require_rust_core()
@@ -555,6 +592,9 @@ class _WindowShiftPending:
         self._inner = inner
         self._kind = kind
         self._n = int(n)
+
+    def __repr__(self) -> str:
+        return f"_WindowShiftPending({self._kind!r}, n={self._n}, {self._inner!r})"
 
     def over(self, window: WindowSpec) -> Expr:
         rust = _require_rust_core()

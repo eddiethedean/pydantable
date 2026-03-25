@@ -8,7 +8,7 @@
 
 **Typed dataframe transformations for FastAPI and Pydantic services, backed by a Rust execution core (Polars inside the native extension).**
 
-**Current release: 0.19.0** · Python **3.10+**
+**Current release: 0.20.0** · Python **3.10+**
 
 ---
 
@@ -20,7 +20,7 @@
 - **Optional extras:** `pydantable[polars]` for `to_polars()`; `pydantable[arrow]` for `read_parquet` / `read_ipc`, `to_arrow` / `ato_arrow`, and `pa.Table` / `RecordBatch` constructors.
 - **Optional façades:** `pydantable.pandas` and `pydantable.pyspark` swap naming/imports; execution stays the same in-process core (not a real Spark or pandas backend).
 - **Service-ready:** Sync and async materialization (`collect`, `to_dict`, `acollect`, `ato_dict`, …), [FastAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) patterns, and trusted ingest modes for bulk JSON or Arrow.
-- **REPL / logging:** `repr(df)` on **`DataFrame`** and **`DataFrameModel`** shows the parameterized class, schema type, and column dtypes (wide tables truncate with `… and N more`). Row counts are omitted—logical plans can change length without materializing; use **`collect()`** / **`to_dict()`** when you need data. **Jupyter / VS Code notebooks:** **`_repr_html_()`** renders a bounded **HTML table** preview (no **`polars`** required). Details: [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html).
+- **REPL / discovery:** `repr(df)` on **`DataFrame`** and **`DataFrameModel`** shows the parameterized class, schema type, and column dtypes (wide tables truncate with `… and N more`). **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, and numeric **`describe()`** are on the core API (see [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) for **`shape`** vs materialized rows). **`Expr`** and **`WhenChain`** have readable **`repr`** for debugging pipelines. Row counts in **`repr`** are omitted—use **`collect()`** / **`to_dict()`** when you need data. **Jupyter / VS Code notebooks:** **`_repr_html_()`** renders a bounded **HTML table** preview (no **`polars`** required). Details: [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html).
 
 ---
 
@@ -37,7 +37,7 @@ The **canonical manual** is on Read the Docs: **[https://pydantable.readthedocs.
 | **FastAPI** (routers, bodies, async, multipart) | [FastAPI integration](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) |
 | **Execution** (`collect`, `to_dict`, `to_polars`, `to_arrow`, async, `repr`) | [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) |
 | **Semantics** (nulls, joins, windows, reshape) | [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) |
-| **Roadmap** (shipped **0.19.0**, **Planned 0.20.0** UX + notebooks, path to **v1.0.0**) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
+| **Roadmap** (shipped **0.20.0** UX / discovery, path to **v1.0.0**) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
 | **Why not Polars alone?** | [Why not just use Polars?](https://pydantable.readthedocs.io/en/latest/WHY_NOT_POLARS.html) |
 | **Pandas-style API** (`pydantable.pandas`) | [Pandas UI](https://pydantable.readthedocs.io/en/latest/PANDAS_UI.html) |
 | **PySpark-style API** (`pydantable.pyspark`) | [PySpark UI](https://pydantable.readthedocs.io/en/latest/PYSPARK_UI.html) · [Parity matrix](https://pydantable.readthedocs.io/en/latest/PYSPARK_PARITY.html) |
@@ -125,6 +125,8 @@ PySpark-named wrappers: `pydantable.pyspark.sql.functions` mirrors much of the a
 ---
 
 ## Recent releases
+
+**0.20.0** — **UX / discovery:** core **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, numeric **`describe()`**; **`Expr`** / **`WhenChain`** **`repr`**; PySpark façade **`show()`** / **`summary()`**. [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html), [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) **Introspection**, [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html). Multi-line **`DataFrame`** **`repr`** and **`_repr_html_`** (see **0.20.0** changelog Highlights).
 
 **0.19.0** — Pre-1.0 **documentation consolidation**: [Versioning (0.x)](https://pydantable.readthedocs.io/en/latest/VERSIONING.html), [interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) cross-links, parity/README/index refresh for the **0.19 → 1.0** path, [PERFORMANCE](https://pydantable.readthedocs.io/en/latest/PERFORMANCE.html) benchmark spot-check note, release-hygiene alignment with CI; **group_by** tests sort output where row order is not guaranteed (stable **`pytest-xdist`**). No new **`Expr`** or PySpark façade methods.
 

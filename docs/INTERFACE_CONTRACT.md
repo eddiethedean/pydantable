@@ -21,6 +21,13 @@ When tests or user assertions need deterministic comparisons, compare on the
 subset of columns that define identity (for example, join keys) rather than
 row position. The project test-suite uses sorted comparisons to enforce this.
 
+## Introspection (`shape`, `columns`, `dtypes`, `info`, `describe`)
+
+- **`columns`** and **`dtypes`** reflect the **current logical schema** (projected column names and Pydantic field annotations).
+- **`shape`** and **`empty`** are derived from the **root** ingested column buffers when present (same idea as the pandas UI table in {doc}`PANDAS_UI`). When the logical plan applies filters or other transforms **without** replacing that root buffer, **`shape[0]`** may **not** equal the number of rows returned by **`to_dict()`**, **`collect()`**, or **`head()`** after execution. Use materialized output for an accurate row count.
+- **`info()`** returns a multi-line **string** summarizing column names, dtypes, and row count consistent with the **`shape`** policy above (not a full **`collect()`** unless documented elsewhere).
+- **`describe()`** (**0.20.0+**) returns a multi-line **string** of summary statistics for **numeric** **`int`** and **`float`** columns (including nullable forms) only; it materializes the frame once via **`to_dict()`**. Other dtypes are skipped for this MVP—see {doc}`EXECUTION`.
+
 ## Join semantics (collision + keys)
 
 ### Join keys

@@ -59,6 +59,27 @@ sphinx-build -b linkcheck docs docs/_build/linkcheck
 
 User-facing doc changes should keep the repository `README.md` and `docs/` aligned; run `scripts/verify_doc_examples.py` before merging (see below).
 
+## Notebooks (Jupyter / VS Code)
+
+Open the repo’s notebook (if present) or a scratch **`.ipynb`** with the venv that has **`pip install -e ".[dev]"`** and a built **`pydantable._core`**. In a cell:
+
+```python
+from pydantable import DataFrame
+from pydantable import Schema
+
+class Row(Schema):
+    x: int
+
+df = DataFrame[Row]({"x": [1, 2, 3]})
+df  # last expression → HTML table in Jupyter / VS Code
+```
+
+- **`display(df)`** or the last expression in a cell uses **`_repr_html_()`** on **`DataFrame`** / **`DataFrameModel`** (bounded rows/columns; see {doc}`EXECUTION` **Jupyter / HTML**).
+- **`repr(df)`** is the plain-text path (no **`collect()`** for row counts—see {doc}`EXECUTION` **repr**).
+- **`df.shape`**, **`df.info()`**, **`df.describe()`** follow {doc}`INTERFACE_CONTRACT` **Introspection** ( **`describe`** is numeric MVP in **0.20.0+**).
+
+No extra **ipywidgets** dependency is required for the default HTML table.
+
 ## Architecture (Rust-first)
 
 Current contract direction:
@@ -111,7 +132,7 @@ Phase 4 boundary contract:
 - **`pytest` on `tests/`** is the **CI-facing** check for end-to-end behavior (`collect`, joins, UIs). Prefer adding user-visible regressions here when behavior crosses the Python boundary.
 - **Async tests:** **`pytest-asyncio`** is in **`[dev]`**; `pyproject.toml` sets **`asyncio_mode = auto`** so `async def` tests run without extra markers unless you prefer explicit `@pytest.mark.asyncio`.
 
-### Release ↔ tests map (0.15.0–0.19.0)
+### Release ↔ tests map (0.15.0–0.20.0)
 
 Use this table to locate **Python tests and doc-example smoke** that back shipped minors (see `docs/changelog.md` for narrative highlights). It is not a substitute for line coverage.
 
@@ -123,8 +144,9 @@ Use this table to locate **Python tests and doc-example smoke** that back shippe
 | **0.17.0** | Map `Expr` contracts after Arrow ingest; PySpark `functions` string/list/bytes wrappers | `tests/test_pyarrow_map_ingest.py` (`test_arrow_map_ingest_then_map_get_and_contains`); `tests/test_pyspark_sql.py` (new façade tests) |
 | **0.18.0** | Grouped Polars error context (`polars_err_ctx`); map-key deferral (docs); Hypothesis + integration `join` / `group_by` smoke | `tests/test_v018_features.py`; `tests/test_hypothesis_properties.py` (`test_group_by_sum_matches_manual`, `test_inner_join_unique_ids_row_count`, …); Rust: `execute_polars/common.rs` (`polars_err_format_tests`), `groupby_exec.rs` |
 | **0.19.0** | Pre-1.0 doc consolidation (`VERSIONING`, parity/README/index, `PERFORMANCE` note); CI-stable grouped test ordering; bug-hunt hardening (see below) | `tests/test_v018_features.py` (`_sort_group_output`); `tests/test_schema_type_hints_narrowing.py`; `tests/test_fastapi_recipes.py` (`StreamingResponse` smoke); join assertions via `assert_table_eq_sorted` in `tests/test_advanced_ops_phase6.py`, `tests/test_dataframe_ops.py`; `scripts/verify_doc_examples.py` (`os._exit` teardown); docs: `docs/VERSIONING.md`, `docs/ROADMAP.md` **Shipped in 0.19.0** |
+| **0.20.0** | Core discovery (`columns`, `shape`, `info`, `describe`); `Expr` / `WhenChain` `repr`; PySpark `show` / `summary`; `DataFrame` `repr` / `_repr_html_` | `tests/test_dataframe_discovery.py`, `tests/test_expr_repr.py`, `tests/test_dataframe_repr.py`; docs: `docs/ROADMAP.md` **Shipped in 0.20.0** |
 
-#### Changelog-driven audit (0.15.0–0.19.0)
+#### Changelog-driven audit (0.15.0–0.20.0)
 
 Cross-check each bullet in `docs/changelog.md` for recent minors against tests or `verify_doc_examples.py`.
 
@@ -171,7 +193,13 @@ Cross-check each bullet in `docs/changelog.md` for recent minors against tests o
 - **Join ordering:** `assert_table_eq_sorted(..., keys=[...])` for inner-join dict equality in `tests/test_advanced_ops_phase6.py`, `tests/test_dataframe_ops.py`.
 - **Doc-example script:** `scripts/verify_doc_examples.py` ends with `os._exit(0)` when `__name__ == "__main__"` to avoid teardown SIGABRT; CI no longer masks exit **134**.
 
-#### Optional follow-ups (non-blocking)
+**0.20.0**
+
+- **Discovery / `describe` / PySpark `show`:** `tests/test_dataframe_discovery.py`.
+- **`Expr` `repr`:** `tests/test_expr_repr.py`.
+- **`DataFrame` `repr` / HTML:** `tests/test_dataframe_repr.py`.
+
+### Optional follow-ups (non-blocking)
 
 - **`lifespan`** + **`ThreadPoolExecutor`** integration pytest, if we want parity beyond `FASTAPI.md` prose.
 - Split `tests/test_fastapi_recipes.py` by concern (sync vs async vs multipart) only if maintainers want stronger file-level separation; default is section comments in the single module.
@@ -334,8 +362,8 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 
 ### Publishing (PyPI)
 
-Pushing a git tag matching `v*` (for example `v0.19.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then **`maturin build`** (per target) and **`twine upload --skip-existing dist/*`** to PyPI. The repository needs a **`PYPI_API_TOKEN`** secret (`TWINE_USERNAME` is **`__token__`** in the workflow). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test install** (`.github/workflows/_shared-ci.yml`, **Install maturin and test deps**) aligned with **`pyproject.toml`** **`[project.optional-dependencies]`** **`dev`** + **`pandas`** + **`polars`** (e.g. **`pytest-asyncio`**, **`polars`**, **`fastapi`**, **`httpx`**, **`python-multipart`**, **`pyarrow`**, **`hypothesis`**) so optional tests are not skipped on any OS/Python matrix leg or on tag builds.
+Pushing a git tag matching `v*` (for example `v0.20.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then **`maturin build`** (per target) and **`twine upload --skip-existing dist/*`** to PyPI. The repository needs a **`PYPI_API_TOKEN`** secret (`TWINE_USERNAME` is **`__token__`** in the workflow). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test install** (`.github/workflows/_shared-ci.yml`, **Install maturin and test deps**) aligned with **`pyproject.toml`** **`[project.optional-dependencies]`** **`dev`** + **`pandas`** + **`polars`** (e.g. **`pytest-asyncio`**, **`polars`**, **`fastapi`**, **`httpx`**, **`python-multipart`**, **`pyarrow`**, **`hypothesis`**) so optional tests are not skipped on any OS/Python matrix leg or on tag builds.
 
 **GNU manylinux wheels** are built with **`PyO3/maturin-action`** inside the default **manylinux Docker** images (`manylinux: 2_17` / `2_28`). Avoid **`container: off`** plus **`--zig`** on the host for those targets: linker failures and **OOM** are common with a Polars-sized dependency tree. **musllinux** jobs still use **`--zig`** in `release.yml` as needed.
 
-The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v0.19.0`**).
+The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v0.20.0`**).

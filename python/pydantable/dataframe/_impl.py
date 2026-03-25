@@ -15,6 +15,7 @@ import enum
 import functools
 import html
 import importlib
+import statistics
 import types
 import warnings
 from dataclasses import dataclass
@@ -48,6 +49,7 @@ from pydantable.rust_engine import (
 )
 from pydantable.schema import (
     _annotation_nullable_inner,
+    _is_polars_dataframe,
     make_derived_schema_type,
     merge_field_types_preserving_identity,
     previous_field_types_for_join,
@@ -73,6 +75,11 @@ _REPR_HTML_MAX_ROWS = 20
 _REPR_HTML_MAX_COLS = 40
 _REPR_HTML_MAX_CELL_LEN = 500
 _UNION_ORIGINS = (types.UnionType, Union)
+
+
+def _is_describe_numeric(annotation: Any) -> bool:
+    inner, _ = _annotation_nullable_inner(annotation)
+    return inner is int or inner is float
 
 
 def _dtype_repr(annotation: Any) -> str:
@@ -431,6 +438,92 @@ class DataFrame(Generic[SchemaT]):
 
     def schema_fields(self) -> dict[str, Any]:
         return dict(self._current_field_types)
+
+    @property
+    def columns(self) -> list[str]:
+        """Current logical column names (schema order)."""
+        return list(self._current_field_types.keys())
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        """``(n_rows, n_cols)`` from the **root** column buffers when present.
+
+        After lazy transforms (e.g. :meth:`filter`) that do not replace
+        ``_root_data``, the row count may **not** match materialized output; use
+        :meth:`to_dict` or :meth:`collect` for the true row count.
+        """
+        if not self._root_data:
+            return (0, len(self._current_field_types))
+        rd = self._root_data
+        if _is_polars_dataframe(rd):
+            return (len(rd), len(self._current_field_types))
+        first = next(iter(rd.values()))
+        return (len(first), len(self._current_field_types))
+
+    @property
+    def empty(self) -> bool:
+        """True when the root buffer has zero rows (see :attr:`shape`)."""
+        return self.shape[0] == 0
+
+    @property
+    def dtypes(self) -> dict[str, Any]:
+        """Map column name → Pydantic field annotation (not pandas dtype objects)."""
+        return dict(self._current_field_types)
+
+    def info(self) -> str:
+        """Multi-line summary string (schema, dtypes, :attr:`shape` caveat)."""
+        schema_qn = getattr(
+            self._current_schema_type,
+            "__qualname__",
+            self._current_schema_type.__name__,
+        )
+        lines = [
+            f"{self.__class__.__name__}",
+            f"  schema: {schema_qn}",
+            f"  columns: {len(self._current_field_types)}",
+            f"  shape (root buffer): {self.shape[0]} x {self.shape[1]}",
+            "  Note: after lazy transforms (e.g. filter), root row count may not "
+            "match materialized rows; use to_dict() or collect() for true count.",
+            "",
+            "dtypes:",
+        ]
+        for name, ann in self._current_field_types.items():
+            lines.append(f"  {name}: {_dtype_repr(ann)}")
+        return "\n".join(lines)
+
+    def describe(self) -> str:
+        """Summary statistics for **int** and **float** columns (one materialization).
+
+        Other dtypes are omitted. Requires a full :meth:`to_dict()` pass.
+        """
+        numeric = [
+            n for n, a in self._current_field_types.items() if _is_describe_numeric(a)
+        ]
+        if not numeric:
+            return "describe(): no int/float columns in schema."
+        data = self.to_dict()
+        lines = [
+            "describe() — numeric int/float columns only; uses to_dict().",
+            "",
+        ]
+        for name in numeric:
+            col = data[name]
+            vals = [x for x in col if x is not None]
+            c = len(vals)
+            if c == 0:
+                lines.append(f"{name}: count=0 (all null)")
+                continue
+            mean_v = statistics.mean(vals)
+            mn, mx = min(vals), max(vals)
+            if c >= 2:
+                std_v = statistics.stdev(vals)
+                lines.append(
+                    f"{name}: count={c} mean={mean_v:.6g} std={std_v:.6g} "
+                    f"min={mn} max={mx}"
+                )
+            else:
+                lines.append(f"{name}: count={c} mean={mean_v:.6g} min={mn} max={mx}")
+        return "\n".join(lines)
 
     def _field_types_from_descriptors(
         self,

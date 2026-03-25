@@ -67,9 +67,7 @@ def test_grouped_dataframe_repr() -> None:
 
 
 def test_dataframe_repr_html_table_and_escape() -> None:
-    df = DataFrame[_User](
-        {"id": [1, 2], "name": ["<script>x</script>", "ok"]}
-    )
+    df = DataFrame[_User]({"id": [1, 2], "name": ["<script>x</script>", "ok"]})
     h = df._repr_html_()
     assert "<table" in h
     assert "</table>" in h

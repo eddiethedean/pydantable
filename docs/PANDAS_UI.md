@@ -64,6 +64,8 @@ Unknown keyword arguments raise **`TypeError`**.
 
 ### Introspection
 
+The **default** **`pydantable.DataFrame`** (and **`DataFrameModel`**) now exposes the same **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, and **`describe()`** helpers (**0.20.0+**). The pandas façade inherits them unchanged; use either import path—see {doc}`INTERFACE_CONTRACT` **Introspection** for **`shape`** vs materialized row count.
+
 | Member | Behavior |
 |--------|----------|
 | `columns` | List of current logical column names. |

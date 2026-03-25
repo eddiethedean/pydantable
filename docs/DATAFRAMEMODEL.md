@@ -44,6 +44,8 @@ From this definition, `DataFrameModel` generates:
 
 In **Jupyter** / **VS Code** notebooks, **`user_df`** (or the last expression in a cell) can render as an **HTML table** via **`_repr_html_()`**—see {doc}`EXECUTION` **Jupyter / HTML** (bounded preview; materializes like **`head()`** + **`to_dict()`**).
 
+**Discovery (`0.20.0+`):** **`DataFrameModel`** delegates **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, and **`describe()`** to the inner **`DataFrame`**—same semantics as the core API ({doc}`INTERFACE_CONTRACT` **Introspection**, {doc}`EXECUTION` **`info()` / `describe()`**).
+
 ## Input formats (all supported)
 
 `UserDF(...)` accepts **columnar data**, **row dicts**, or **sequences of Pydantic models** (including `UserDF.RowModel` instances).

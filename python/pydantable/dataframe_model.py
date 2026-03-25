@@ -243,6 +243,30 @@ class DataFrameModel:
     def schema_fields(self) -> dict[str, Any]:
         return self._df.schema_fields()
 
+    @property
+    def columns(self) -> list[str]:
+        return self._df.columns
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        return self._df.shape
+
+    @property
+    def empty(self) -> bool:
+        return self._df.empty
+
+    @property
+    def dtypes(self) -> dict[str, Any]:
+        return self._df.dtypes
+
+    def info(self) -> str:
+        """Delegate to :meth:`DataFrame.info`."""
+        return self._df.info()
+
+    def describe(self) -> str:
+        """Delegate to :meth:`DataFrame.describe`."""
+        return self._df.describe()
+
     def collect(
         self,
         *,

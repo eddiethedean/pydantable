@@ -1,6 +1,6 @@
-# PydanTable roadmap (0.19.x → v1.0.0)
+# PydanTable roadmap (0.20.x → v1.0.0)
 
-**Current release: `0.19.0`.** The next planned **0.x** milestone for **user-facing ergonomics** is **Planned 0.20.0** (below): **repr**, discovery helpers, optional **pandas**-like summaries, and **Jupyter** / **notebook** rich display. This document also summarizes shipped history, **Planned v1.0.0** for the **production-ready** major release, and **Later** / **After v1.0.0** backlogs.
+**Current release: `0.20.0`.** **Shipped in 0.20.0** (below) delivered **repr** / **HTML** previews, **Expr** **`repr`**, core **discovery** (**`columns`**, **`shape`**, **`dtypes`**, **`info`**, **`describe`**), and **PySpark** **`show`** / **`summary`**. The next **0.x** polish items (optional **ipywidgets**, user-tunable display options) sit in **Later** unless promoted to a future minor. This document also summarizes shipped history, **Planned v1.0.0** for the **production-ready** major release, and **Later** / **After v1.0.0** backlogs.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
@@ -70,7 +70,7 @@ Beyond the original Phase 7 checklist, **0.5.0** also ships:
 
 ## Toward v1.0.0
 
-No single “Phase 8” gate is defined here. **v1.0.0** is the **production-ready** major: a **stability and commitment** cut when maintainers lock **semver** expectations, ship **PyPI** artifacts with aligned Rust/Python versions, and publish clear **1.0** messaging. Detailed checklist: **Planned v1.0.0** (below). **0.19.0** is the last planned **0.x** *documentation consolidation* before that gate; **Planned 0.20.0** is an optional **0.x** UX release (repr, discovery, summaries) that can ship before **v1.0.0** without blocking it.
+No single “Phase 8” gate is defined here. **v1.0.0** is the **production-ready** major: a **stability and commitment** cut when maintainers lock **semver** expectations, ship **PyPI** artifacts with aligned Rust/Python versions, and publish clear **1.0** messaging. Detailed checklist: **Planned v1.0.0** (below). **0.19.0** was the pre-1.0 **documentation consolidation**; **0.20.0** shipped **UX / discovery** (repr, **`info`** / **`describe`**, PySpark **`show`**) on the same Rust core.
 
 Practical inputs that feed that phase:
 
@@ -80,7 +80,7 @@ Practical inputs that feed that phase:
 - Optional: consolidated **migration guide** if semver ever jumps in a breaking way; keep [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) the semantics source of truth.
 - **Async I/O:** **0.15.0** ships **`acollect` / `ato_dict` / `ato_polars`** (and **`DataFrameModel`** **`arows` / `ato_dicts`**) using **`asyncio.to_thread`** or a custom executor; **0.16.0** adds **`ato_arrow`** and synchronous **`read_parquet` / `read_ipc`** returning **`dict[str, list]`** (see [`EXECUTION.md`](EXECUTION.md), [`FASTAPI.md`](FASTAPI.md)).
 - **FastAPI integration maturity:** treat [`FASTAPI.md`](FASTAPI.md) as the **canonical service guide**. **0.14.0** added **`TestClient`** / OpenAPI notes; **0.15.0** added **`async`** route examples and **`lifespan`**; **0.16.0** documents **multipart** Parquet/IPC, **`Depends`** executors, **background tasks**, and **422 vs application errors**.
-- **Release train:** **0.19.0** → **Planned v1.0.0** (below); dates are not committed here. The **1.0.0** tag waits until the **Planned v1.0.0** checklist is satisfied, unless scope slips.
+- **Release train:** **0.20.0** → **Planned v1.0.0** (below); dates are not committed here. The **1.0.0** tag waits until the **Planned v1.0.0** checklist is satisfied, unless scope slips.
 
 ---
 
@@ -246,57 +246,49 @@ Practical inputs that feed that phase:
 
 ---
 
-## Planned 0.20.0 (user interface and discovery)
+## Shipped in 0.20.0 (UX, discovery, PySpark previews)
 
-**Themes:** improve **REPL / notebook / logging** ergonomics and **lightweight discovery** without a second execution engine. Work stays on the existing **Rust + Polars** path; **materialize** when a summary requires row data (document cost in [`EXECUTION.md`](EXECUTION.md), [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md)).
-
-**Scope:** **not** a mandate to match **pandas** or **Polars** string-for-string—pick behaviors that fit **typed Pydantic schemas** and **lazy plans** (row counts and stats may require **`collect()`** / **`to_dict()`** / **`to_polars()`**).
+**Themes:** **REPL / notebook** ergonomics, **lightweight discovery** on the default **`DataFrame`**, readable **`Expr`** **`repr`**, and **PySpark**-named **`show`** / **`summary`**—all on the existing **Rust + Polars** path.
 
 ### String representation (`repr`)
 
-- [ ] **`DataFrame` / `DataFrameModel` / grouped handles:** ship and document the multi-line **`repr`** (schema, column dtypes, wide-schema truncation; no row count in **`repr`**—see [`EXECUTION.md`](EXECUTION.md)). **`CHANGELOG`**, [`README.md`](README.md), [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md).
-- [ ] **`Expr` and related:** readable **`repr`** for **`Expr`**, **`ColumnRef`**, **`Literal`**, **`WhenChain`**, and (optionally) window **pending** / **builder** objects—enough to debug pipelines without **`print(expr._rust_expr)`** or opaque **`object at 0x…`** lines.
-- [ ] **Docs / tests:** short examples in **EXECUTION** or **INTERFACE_CONTRACT**; **pytest** smoke for stable substrings where useful.
+- [x] **`DataFrame` / `DataFrameModel` / grouped handles:** multi-line **`repr`** and **`_repr_html_`** (schema, column dtypes, wide-schema truncation; no row count in **`repr`**). See [`EXECUTION.md`](EXECUTION.md), [`changelog.md`](changelog.md) **0.20.0**, **`tests/test_dataframe_repr.py`**.
+- [x] **`Expr` and related:** **`__repr__`** for **`Expr`**, **`ColumnRef`**, literals, **`WhenChain`**, and pending window builders (AST snippet + dtype / referenced columns). **`tests/test_expr_repr.py`**.
+- [x] **Docs / tests:** [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) **Introspection**; discovery tests in **`tests/test_dataframe_discovery.py`**.
 
-### Discovery and convenience (core vs façade)
+### Discovery and convenience (core + façades)
 
-**Today:** **`DataFrame.head` / `tail`** (materialized slice) exist on the core **`DataFrame`**; **`pydantable.pandas.PandasDataFrame`** adds **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`head`**, **`tail`** (see [`PANDAS_UI.md`](PANDAS_UI.md)).
-
-- [ ] **Core API parity (optional):** expose **`columns`**, **`shape`**, **`empty`**, and/or **`dtypes`** on **default** **`DataFrame` / `DataFrameModel`** (or document a single recommended import) so notebooks do not need the pandas façade for basics.
-- [ ] **`info`** (or **summary**): text summary of **schema**, **column count**, and **row count** when inferrable (note: **lazy** plans may require **materialization** for accurate **nrows**—align with **`repr`** policy or print **`?`** / `source rows` only when cheap).
-- [ ] **`describe` / stats:** numeric (and optionally string) **summary statistics** over selected columns—typed **nullable** columns must define **null** handling; may depend on **`polars`** extra for **efficient** stats or **always** materialize via **Rust** path.
-- [ ] **PySpark façade:** mirror names where natural (**`show`**? **summary**?) without promising Spark execution.
+- [x] **Core API:** **`columns`**, **`shape`**, **`empty`**, **`dtypes`** on **`DataFrame`** / **`DataFrameModel`** (root-buffer semantics for **`shape[0]`**—see **Introspection** in [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md)).
+- [x] **`info()`** — multi-line **str** with schema and column list (row count when consistent with **`shape`** policy).
+- [x] **`describe()`** — **numeric** **`int` / `float`** (and nullable variants) only; materializes via **`to_dict()`** once; documented MVP in [`EXECUTION.md`](EXECUTION.md).
+- [x] **PySpark façade:** **`DataFrame.show()`** (text table; **`head`**-like), **`summary()`** → same string contract as **`describe()`**. See [`PYSPARK_UI.md`](PYSPARK_UI.md), [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md).
 
 ### Notebook utilities (Jupyter, VS Code, Colab)
 
-**Goal:** first-class **rich display** in **Jupyter** / **IPython** frontends without requiring **`import polars`** or **`pandas`** for a simple preview. **HTML** uses the **stdlib** only (**`html.escape`**).
-
-- [x] **`_repr_html_`** on **`DataFrame`**, **`DataFrameModel`**, **`GroupedDataFrame`**, **`DynamicGroupedDataFrame`**, and grouped model wrappers: **HTML table** preview (caption with schema, row index column, **head**-like sample). Limits: **`_REPR_HTML_MAX_ROWS`** (**20**), **`_REPR_HTML_MAX_COLS`** (**40**), **`_REPR_HTML_MAX_CELL_LEN`** (**500**) in **`python/pydantable/dataframe/_impl.py`**. **Materialization:** same cost as **`head()`** + **`to_dict()`** for the bounded slice ([`EXECUTION.md`](EXECUTION.md) — **Jupyter / HTML**).
-- [x] **Display limits:** module-level constants (above); future work: user-tunable **`display`** options object or **IPython** integration.
-- [x] **Plain text fallback:** **`repr`** remains the non-HTML path for terminals and **nbconvert** text output.
-- [ ] **Docs:** optional **notebook** recipe in [`DEVELOPER.md`](DEVELOPER.md); optional **CI** smoke (**IPython** display hook) if maintainable.
-- [x] **Tests:** **`tests/test_dataframe_repr.py`** — **HTML** structure and escaped **`<script>`** in cell text.
+- [x] **`_repr_html_`** — bounded **HTML** preview (**stdlib** escape only).
+- [x] **Notebook note** — short subsection in [`DEVELOPER.md`](DEVELOPER.md) (**Notebooks**).
+- [ ] **Later:** user-tunable global **display** options; **ipywidgets** explorers; optional **CI** smoke for **IPython** display hooks.
 
 ### Quality and release
 
-- [ ] **Tests:** integration tests for new methods; **Hypothesis** or property tests only where high value.
-- [ ] **Docs:** [`README.md`](README.md), doc site [`index.md`](index.md), [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md) / [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md) if new façade surfaces ship.
-- [ ] **Release hygiene:** **`make check-full`**, **`pytest`**, **changelog** section **0.20.0**; bump **version** in **`pyproject.toml`** / **`python/pydantable/__init__.py`** per [`DEVELOPER.md`](DEVELOPER.md).
+- [x] **Tests:** **`tests/test_dataframe_discovery.py`**, **`tests/test_expr_repr.py`**, **`tests/test_dataframe_repr.py`**.
+- [x] **Docs:** [`README.md`](README.md), [`index.md`](index.md), [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md), [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md), [`PANDAS_UI.md`](PANDAS_UI.md).
+- [x] **Release hygiene:** **`make check-full`**, **`pytest`**, **changelog** **0.20.0**, version bump **`pyproject.toml`** / **`__init__.py`** / **`pydantable-core/Cargo.toml`**.
 
-**Explicitly out of scope for 0.20.0:** new **Expr** transforms for analytics-only gaps (unless **required** for **`describe`**); **non-string map keys**; **distributed** Spark; **ipywidgets**-heavy interactive explorers (unless promoted later—keep **HTML** + **repr** the baseline).
+**Explicitly not in 0.20.0:** new **Expr** analytics transforms beyond **`describe`** MVP; **non-string map keys**; **distributed** Spark; **ipywidgets**-heavy UIs.
 
 ---
 
 ## Planned v1.0.0 (production-ready major release)
 
-**Goal:** tag **`v1.0.0`** when the project is ready to tell production users and library authors: **stable public API** under **semver**, **documented** semantics, and **repeatable** release quality—not a large new feature dump. **1.0.0** follows **0.19.x** (and may follow **0.20.x** if **Planned 0.20.0** ships); anything that does not block that bar belongs in **Later** or **After v1.0.0**.
+**Goal:** tag **`v1.0.0`** when the project is ready to tell production users and library authors: **stable public API** under **semver**, **documented** semantics, and **repeatable** release quality—not a large new feature dump. **1.0.0** follows **0.20.x**; anything that does not block that bar belongs in **Later** or **After v1.0.0**.
 
-- [x] **Precondition:** **Shipped in 0.19.0** (above) is complete or any remaining gap is noted in this file or [`changelog.md`](changelog.md).
+- [x] **Precondition:** **Shipped in 0.19.0** and **Shipped in 0.20.0** (above) are complete or any remaining gap is noted in this file or [`changelog.md`](changelog.md).
 - [ ] **Semver contract:** publish a **1.0** policy (expand [`VERSIONING.md`](VERSIONING.md) and/or [`README.md`](README.md)): what counts as **patch** vs **minor** vs **major** for **1.x** for `DataFrame` / `DataFrameModel` / `Expr` / Rust extension boundaries; confirm [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) is the behavioral source of truth. (**0.x** expectations already live in [`VERSIONING.md`](VERSIONING.md).)
 - [ ] **Packaging and versions:** **`pyproject.toml`** / **`Cargo.toml`** / extension **`rust_version()`** alignment; **Maturin** release workflow (e.g. [`.github/workflows/release.yml`](../.github/workflows/release.yml)) exercised or dry-run validated; **PyPI** **sdist + wheels** for declared platforms; optional **SBOM** or supply-chain notes if policy requires them.
 - [ ] **Quality bar:** full **`make check-full`**, **`cargo test --all-features`**, **`cargo check --no-default-features`**, and **pytest** (including optional-deps legs that match **CI**) on the **exact** commit tagged **`v1.0.0`**; **no known P0/P1** regressions against **INTERFACE_CONTRACT**.
 - [ ] **Security tooling:** **`cargo audit`** / **`cargo deny`** (or documented exceptions) current; policy for how **1.x** will handle **RUSTSEC** / advisory bumps.
-- [ ] **Documentation and comms:** **README** + doc site **`index`** lead with **1.0** positioning; **changelog** **`1.0.0`** section highlights stability scope; **upgrade path** from **0.19.x** in one place (even if “no breaking changes from last 0.19”).
+- [ ] **Documentation and comms:** **README** + doc site **`index`** lead with **1.0** positioning; **changelog** **`1.0.0`** section highlights stability scope; **upgrade path** from **0.20.x** in one place (even if “no breaking changes from last 0.20”).
 - [ ] **Support matrix:** state supported **Python** versions and **Polars** optional-extra expectations for **1.0.x**; link [`DEVELOPER.md`](DEVELOPER.md) for contributors.
 
 **Out of scope for the 1.0.0 tag itself:** new execution engines (**Spark**, SQL backend, etc.)—those stay under **After v1.0.0** unless a maintainer explicitly promotes an exception.
@@ -305,9 +297,9 @@ Practical inputs that feed that phase:
 
 ## Later (not started)
 
-Work **not** scheduled in the **0.17.0–0.19.0** shipped sections, **Planned 0.20.0**, or **Planned v1.0.0** above, or explicitly deferred when scope slips:
+Work **not** scheduled in the **0.17.0–0.20.0** shipped sections or **Planned v1.0.0** above, or explicitly deferred when scope slips:
 
-- [ ] **Non-string map keys** (**`dict[int, T]`** and Arrow maps whose keys are not UTF-8 strings): still **not shipped** after **0.19.0** (explicitly deferred; see **Shipped in 0.18.0** / **0.19.0** and [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md)). **Heterogeneous** keys / full **Arrow + expression** parity may be revisited after **v1.0.0** unless promoted earlier.
+- [ ] **Non-string map keys** (**`dict[int, T]`** and Arrow maps whose keys are not UTF-8 strings): still **not shipped** after **0.20.0** (explicitly deferred; see **Shipped in 0.18.0** / **0.19.0** and [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md)). **Heterogeneous** keys / full **Arrow + expression** parity may be revisited after **v1.0.0** unless promoted earlier.
 - [ ] Items deferred from earlier releases when priorities change.
 - [ ] **Chunked / streaming** async iterators for JSON or row batches (no minimal contract yet).
 - [ ] Longer-horizon experiments that do not fit the **pre-1.0** train (**0.17–0.19**) or the **v1.0.0** production gate.

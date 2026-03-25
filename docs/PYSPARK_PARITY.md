@@ -15,6 +15,8 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `DataFrame.groupBy.agg` | **Supported** | Tuple specs, not Spark `agg(expr)` only. |
 | `DataFrame.orderBy` / `sort` | **Supported** | Column names + ascending flags; see core `DataFrame`. |
 | `DataFrame.limit` | **Supported** | |
+| `DataFrame.show` | **Supported** (**0.20.0**) | Prints a bounded text preview (`head`-like); not distributed Spark. |
+| `DataFrame.summary` | **Partial** (**0.20.0**) | Returns the same string as core **`describe()`** (numeric MVP)—not Spark’s full **`summary`** column set. |
 | `DataFrame.drop` | **Supported** | Drop by column name(s). |
 | `DataFrame.distinct` | **Supported** | All-column distinct rows; optional `subset=` matches core `distinct`. |
 | `DataFrame.withColumnRenamed` | **Supported** | Single rename per call (or use `rename` with dict). |
@@ -36,6 +38,8 @@ For execution, the PySpark UI uses the same Rust/Polars path as the default expo
 **0.18.0:** The parity matrix above is **unchanged**—no new `sql.functions` wrappers this release.
 
 **0.19.0:** Matrix **unchanged**—documentation and **0.x** versioning policy only; see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.19.0**.
+
+**0.20.0:** **`DataFrame.show()`** / **`summary()`** rows above; core discovery helpers are shared with the default **`DataFrame`**. See [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.20.0**.
 
 ## Phase B status (expression surface)
 
