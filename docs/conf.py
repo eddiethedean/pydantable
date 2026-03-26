@@ -42,6 +42,7 @@ def setup(app) -> None:
     io_sql.Engine = Engine  # type: ignore[attr-defined]
     io_sql.Connection = Connection  # type: ignore[attr-defined]
 
+
 extensions = [
     "myst_parser",
     "sphinx.ext.autodoc",

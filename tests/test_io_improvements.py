@@ -80,7 +80,9 @@ def test_read_from_object_store_max_bytes(tmp_path: Path) -> None:
     csv_path = tmp_path / "t.csv"
     csv_path.write_text("a\n1\n", encoding="utf-8")
     uri_csv = csv_path.resolve().as_uri()
-    out = read_from_object_store(uri_csv, experimental=True, format="csv", max_bytes=100)
+    out = read_from_object_store(
+        uri_csv, experimental=True, format="csv", max_bytes=100
+    )
     assert "a" in out
     with pytest.raises(ValueError, match="max_bytes=3"):
         read_from_object_store(uri_csv, experimental=True, format="csv", max_bytes=3)

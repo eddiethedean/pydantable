@@ -1,4 +1,6 @@
-"""Lazy Parquet: write order lines → read back → filter → collect (needs ``pydantable._core``).
+"""Lazy Parquet: write order lines → read back → filter → collect.
+
+Requires ``pydantable._core``.
 
 Mirrors a common pipeline: land Parquet in a staging folder, scan lazily, filter, then
 either iterate rows or materialize the full slice for tests/QA.

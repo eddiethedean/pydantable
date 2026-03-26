@@ -24,7 +24,10 @@ def main() -> None:
     from pydantable.io.extras import read_excel
 
     class RegionalHeadcount(DataFrameModel):
-        """HR export: one row per region (integers avoid Excel float quirks in asserts)."""
+        """HR export: one row per region.
+
+        Integers avoid Excel float quirks in asserts.
+        """
 
         region_code: int
         headcount: int

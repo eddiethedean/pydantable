@@ -29,9 +29,7 @@ def main() -> None:
         eng = create_engine(f"sqlite:///{db}")
         with eng.begin() as conn:
             conn.execute(
-                text(
-                    "CREATE TABLE order_lines (line_total_cents INTEGER NOT NULL)"
-                )
+                text("CREATE TABLE order_lines (line_total_cents INTEGER NOT NULL)")
             )
             conn.execute(text("INSERT INTO order_lines VALUES (4999)"))
 

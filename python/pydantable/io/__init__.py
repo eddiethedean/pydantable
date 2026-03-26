@@ -201,7 +201,9 @@ def read_parquet_url_ctx(
     root = read_parquet_url(url, experimental=experimental, columns=columns, **kwargs)
     path = str(getattr(root, "path", "") or "")
     if not path:
-        raise RuntimeError("ScanFileRoot.path is empty; cannot manage temp file lifecycle")
+        raise RuntimeError(
+            "ScanFileRoot.path is empty; cannot manage temp file lifecycle"
+        )
     try:
         yield dataframe_cls._from_scan_root(root)
     finally:
@@ -229,7 +231,9 @@ async def aread_parquet_url_ctx(
     )
     path = str(getattr(root, "path", "") or "")
     if not path:
-        raise RuntimeError("ScanFileRoot.path is empty; cannot manage temp file lifecycle")
+        raise RuntimeError(
+            "ScanFileRoot.path is empty; cannot manage temp file lifecycle"
+        )
     try:
         yield dataframe_cls._from_scan_root(root)
     finally:
@@ -396,7 +400,9 @@ def materialize_json(
             if not data:
                 return {}
             if not all(isinstance(x, dict) for x in data):
-                raise ValueError("materialize_json: array elements must be JSON objects")
+                raise ValueError(
+                    "materialize_json: array elements must be JSON objects"
+                )
             return _json_rows_to_columns(data)
         f.seek(0)
     return materialize_ndjson(p, engine=eng)

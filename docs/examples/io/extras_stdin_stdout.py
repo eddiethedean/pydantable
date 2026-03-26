@@ -47,9 +47,7 @@ def main() -> None:
     with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as out:
         out_path = out.name
     try:
-        ShipmentStr({"order_id": ["44021"], "carton_id": ["90001"]}).write_csv(
-            out_path
-        )
+        ShipmentStr({"order_id": ["44021"], "carton_id": ["90001"]}).write_csv(out_path)
         body = Path(out_path).read_text(encoding="utf-8")
         assert "order_id" in body and "44021" in body
     finally:
