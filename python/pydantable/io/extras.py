@@ -230,7 +230,9 @@ def read_csv_stdin(
     fh = stream or sys.stdin
     data = fh.read()
     raw = data.encode("utf-8") if isinstance(data, str) else data
-    path = Path(tempfile.mkstemp(suffix=".csv")[1])
+    fd, name = tempfile.mkstemp(suffix=".csv")
+    os.close(fd)
+    path = Path(name)
     try:
         path.write_bytes(raw)
         return materialize_csv(str(path), engine=engine)
@@ -249,7 +251,9 @@ def write_csv_stdout(
 
     from . import export_csv
 
-    path = Path(tempfile.mkstemp(suffix=".csv")[1])
+    fd, name = tempfile.mkstemp(suffix=".csv")
+    os.close(fd)
+    path = Path(name)
     try:
         export_csv(str(path), data, engine=engine)
         out = path.read_bytes()
