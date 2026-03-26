@@ -31,7 +31,8 @@ jobs:
       - name: Create Python SBOM (installed distribution)
         run: |
           python -m pip install .
-          cyclonedx-py environment --format json --output-file sbom-python.cdx.json
+          # cyclonedx-bom v7+: `environment` uses `--output-format/--of` (not `--format`)
+          cyclonedx-py environment --of JSON --output-file sbom-python.cdx.json
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
