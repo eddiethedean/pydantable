@@ -81,6 +81,14 @@ WHY_NOT_POLARS
 ```{toctree}
 :titlesonly:
 :hidden:
+:caption: Introspection and extensions
+
+PLAN_AND_PLUGINS
+```
+
+```{toctree}
+:titlesonly:
+:hidden:
 :caption: Alternate import surfaces
 
 PANDAS_UI

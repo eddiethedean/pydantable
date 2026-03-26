@@ -10,6 +10,7 @@ import os
 from typing import TYPE_CHECKING, Any
 
 from ._extension import MissingRustExtensionError
+from .observe import span
 
 _MISSING_SYMBOL_PREFIX = (
     "The pydantable native extension is present but does not implement "
@@ -70,12 +71,18 @@ def execute_plan(
             f"{_MISSING_SYMBOL_PREFIX}`execute_plan`. "
             "Reinstall or rebuild pydantable. See docs/DEVELOPER.md."
         )
-    try:
-        return rust.execute_plan(plan, data, as_python_lists, streaming)
-    except ValueError as e:
-        if _verbose_plan_errors_enabled() and error_context:
-            raise ValueError(f"{e}\n[context: {error_context}]") from e
-        raise
+    with span(
+        "execute_plan",
+        as_python_lists=bool(as_python_lists),
+        streaming=bool(streaming),
+        error_context=error_context,
+    ):
+        try:
+            return rust.execute_plan(plan, data, as_python_lists, streaming)
+        except ValueError as e:
+            if _verbose_plan_errors_enabled() and error_context:
+                raise ValueError(f"{e}\n[context: {error_context}]") from e
+            raise
 
 
 def write_parquet(
@@ -92,7 +99,8 @@ def write_parquet(
         raise MissingRustExtensionError(
             f"{_MISSING_SYMBOL_PREFIX}`sink_parquet`. See docs/DEVELOPER.md."
         )
-    rust.sink_parquet(plan, root_data, path, streaming, write_kwargs)
+    with span("sink_parquet", streaming=bool(streaming), path=str(path)):
+        rust.sink_parquet(plan, root_data, path, streaming, write_kwargs)
 
 
 def write_csv(
@@ -110,7 +118,8 @@ def write_csv(
         raise MissingRustExtensionError(
             f"{_MISSING_SYMBOL_PREFIX}`sink_csv`. See docs/DEVELOPER.md."
         )
-    rust.sink_csv(plan, root_data, path, streaming, separator & 0xFF, write_kwargs)
+    with span("sink_csv", streaming=bool(streaming), path=str(path)):
+        rust.sink_csv(plan, root_data, path, streaming, separator & 0xFF, write_kwargs)
 
 
 def write_ipc(
@@ -128,7 +137,8 @@ def write_ipc(
         raise MissingRustExtensionError(
             f"{_MISSING_SYMBOL_PREFIX}`sink_ipc`. See docs/DEVELOPER.md."
         )
-    rust.sink_ipc(plan, root_data, path, streaming, compression, write_kwargs)
+    with span("sink_ipc", streaming=bool(streaming), path=str(path), compression=compression):
+        rust.sink_ipc(plan, root_data, path, streaming, compression, write_kwargs)
 
 
 def write_ndjson(
@@ -145,7 +155,8 @@ def write_ndjson(
         raise MissingRustExtensionError(
             f"{_MISSING_SYMBOL_PREFIX}`sink_ndjson`. See docs/DEVELOPER.md."
         )
-    rust.sink_ndjson(plan, root_data, path, streaming, write_kwargs)
+    with span("sink_ndjson", streaming=bool(streaming), path=str(path)):
+        rust.sink_ndjson(plan, root_data, path, streaming, write_kwargs)
 
 
 def collect_batches(
@@ -165,7 +176,8 @@ def collect_batches(
         raise MissingRustExtensionError(
             f"{_MISSING_SYMBOL_PREFIX}`collect_plan_batches`. See docs/DEVELOPER.md."
         )
-    return list(rust.collect_plan_batches(plan, root_data, batch_size, streaming))
+    with span("collect_plan_batches", batch_size=int(batch_size), streaming=bool(streaming)):
+        return list(rust.collect_plan_batches(plan, root_data, batch_size, streaming))
 
 
 def execute_join(
@@ -187,18 +199,25 @@ def execute_join(
         raise MissingRustExtensionError(
             f"{_MISSING_SYMBOL_PREFIX}`execute_join`. See docs/DEVELOPER.md."
         )
-    return rust.execute_join(
-        left_plan,
-        left_root_data,
-        right_plan,
-        right_root_data,
-        list(left_on),
-        list(right_on),
-        how,
-        suffix,
-        as_python_lists,
-        streaming,
-    )
+    with span(
+        "execute_join",
+        how=how,
+        suffix=suffix,
+        as_python_lists=bool(as_python_lists),
+        streaming=bool(streaming),
+    ):
+        return rust.execute_join(
+            left_plan,
+            left_root_data,
+            right_plan,
+            right_root_data,
+            list(left_on),
+            list(right_on),
+            how,
+            suffix,
+            as_python_lists,
+            streaming,
+        )
 
 
 def execute_groupby_agg(
@@ -216,9 +235,15 @@ def execute_groupby_agg(
         raise MissingRustExtensionError(
             f"{_MISSING_SYMBOL_PREFIX}`execute_groupby_agg`. See docs/DEVELOPER.md."
         )
-    return rust.execute_groupby_agg(
-        plan, root_data, list(by), aggregations, as_python_lists, streaming
-    )
+    with span(
+        "execute_groupby_agg",
+        by=list(by),
+        as_python_lists=bool(as_python_lists),
+        streaming=bool(streaming),
+    ):
+        return rust.execute_groupby_agg(
+            plan, root_data, list(by), aggregations, as_python_lists, streaming
+        )
 
 
 def execute_concat(
@@ -233,15 +258,21 @@ def execute_concat(
 ) -> tuple[Any, Any]:
     """Concatenate two frames (e.g. vertical stack)."""
     rust = _require_rust_core()
-    return rust.execute_concat(
-        left_plan,
-        left_root_data,
-        right_plan,
-        right_root_data,
-        how,
-        as_python_lists,
-        streaming,
-    )
+    with span(
+        "execute_concat",
+        how=how,
+        as_python_lists=bool(as_python_lists),
+        streaming=bool(streaming),
+    ):
+        return rust.execute_concat(
+            left_plan,
+            left_root_data,
+            right_plan,
+            right_root_data,
+            how,
+            as_python_lists,
+            streaming,
+        )
 
 
 def execute_melt(
@@ -257,16 +288,17 @@ def execute_melt(
 ) -> tuple[Any, Any]:
     """Unpivot to long format (melt)."""
     rust = _require_rust_core()
-    return rust.execute_melt(
-        plan,
-        root_data,
-        list(id_vars),
-        None if value_vars is None else list(value_vars),
-        variable_name,
-        value_name,
-        as_python_lists,
-        streaming,
-    )
+    with span("execute_melt", as_python_lists=bool(as_python_lists), streaming=bool(streaming)):
+        return rust.execute_melt(
+            plan,
+            root_data,
+            list(id_vars),
+            None if value_vars is None else list(value_vars),
+            variable_name,
+            value_name,
+            as_python_lists,
+            streaming,
+        )
 
 
 def execute_pivot(
@@ -282,16 +314,22 @@ def execute_pivot(
 ) -> tuple[Any, Any]:
     """Pivot with aggregation."""
     rust = _require_rust_core()
-    return rust.execute_pivot(
-        plan,
-        root_data,
-        list(index),
-        columns,
-        list(values),
-        aggregate_function,
-        as_python_lists,
-        streaming,
-    )
+    with span(
+        "execute_pivot",
+        aggregate_function=aggregate_function,
+        as_python_lists=bool(as_python_lists),
+        streaming=bool(streaming),
+    ):
+        return rust.execute_pivot(
+            plan,
+            root_data,
+            list(index),
+            columns,
+            list(values),
+            aggregate_function,
+            as_python_lists,
+            streaming,
+        )
 
 
 def execute_explode(
@@ -303,7 +341,8 @@ def execute_explode(
 ) -> tuple[Any, Any]:
     """Explode list columns to one row per element."""
     rust = _require_rust_core()
-    return rust.execute_explode(plan, root_data, list(columns), streaming)
+    with span("execute_explode", columns=list(columns), streaming=bool(streaming)):
+        return rust.execute_explode(plan, root_data, list(columns), streaming)
 
 
 def execute_unnest(
@@ -315,7 +354,8 @@ def execute_unnest(
 ) -> tuple[Any, Any]:
     """Unnest struct columns into top-level fields."""
     rust = _require_rust_core()
-    return rust.execute_unnest(plan, root_data, list(columns), streaming)
+    with span("execute_unnest", columns=list(columns), streaming=bool(streaming)):
+        return rust.execute_unnest(plan, root_data, list(columns), streaming)
 
 
 def execute_rolling_agg(
@@ -331,9 +371,18 @@ def execute_rolling_agg(
 ) -> tuple[Any, Any]:
     """Rolling window aggregation along a time or index column."""
     rust = _require_rust_core()
-    return rust.execute_rolling_agg(
-        plan, root_data, on, column, window_size, op, out_name, by, min_periods
-    )
+    with span(
+        "execute_rolling_agg",
+        on=on,
+        column=column,
+        window_size=window_size,
+        op=op,
+        out_name=out_name,
+        min_periods=int(min_periods),
+    ):
+        return rust.execute_rolling_agg(
+            plan, root_data, on, column, window_size, op, out_name, by, min_periods
+        )
 
 
 def execute_groupby_dynamic_agg(
@@ -350,14 +399,22 @@ def execute_groupby_dynamic_agg(
 ) -> tuple[Any, Any]:
     """Time-bucket group-by with aggregations."""
     rust = _require_rust_core()
-    return rust.execute_groupby_dynamic_agg(
-        plan,
-        root_data,
-        index_column,
-        every,
-        period,
-        by,
-        aggregations,
-        as_python_lists,
-        streaming,
-    )
+    with span(
+        "execute_groupby_dynamic_agg",
+        index_column=index_column,
+        every=every,
+        period=period,
+        as_python_lists=bool(as_python_lists),
+        streaming=bool(streaming),
+    ):
+        return rust.execute_groupby_dynamic_agg(
+            plan,
+            root_data,
+            index_column,
+            every,
+            period,
+            by,
+            aggregations,
+            as_python_lists,
+            streaming,
+        )

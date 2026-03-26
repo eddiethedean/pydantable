@@ -2237,6 +2237,31 @@ class DataFrame(Generic[SchemaT]):
             executor=executor,
         )
 
+    def explain(
+        self,
+        *,
+        format: Literal["text", "json"] = "text",
+        streaming: bool | None = None,
+    ) -> str | dict[str, Any]:
+        """
+        Introspect the current logical plan.
+
+        - `format="text"` returns a compact, stable string summary.
+        - `format="json"` returns a JSON-serializable `dict`.
+
+        This is a *plan* view, not an execution trace; it does not materialize data.
+        """
+        from pydantable.plan import explain as _explain
+
+        use_streaming = _resolve_engine_streaming(streaming)
+        root_kind = "scan_file_root" if _is_scan_file_root(self._root_data) else "in_memory"
+        return _explain(
+            self._rust_plan,
+            format=format,
+            engine_streaming=use_streaming,
+            root_data_kind=root_kind,
+        )
+
     @classmethod
     def concat(
         cls,

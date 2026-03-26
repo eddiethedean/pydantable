@@ -1205,6 +1205,15 @@ class DataFrameModel:
         """Delegate to :meth:`DataFrame.describe`."""
         return self._df.describe()
 
+    def explain(
+        self,
+        *,
+        format: Literal["text", "json"] = "text",
+        streaming: bool | None = None,
+    ) -> str | dict[str, Any]:
+        """Delegate to :meth:`DataFrame.explain`."""
+        return self._df.explain(format=format, streaming=streaming)
+
     def value_counts(
         self,
         column: str,

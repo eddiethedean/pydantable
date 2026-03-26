@@ -36,6 +36,109 @@ jobs:
       - name: Mypy
         run: mypy python/pydantable
 
+  python-package-contents:
+    name: Packaging (sdist excludes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: |
+          python -m pip install -U pip
+          python -m pip install "maturin>=1.4,<2.0"
+
+      - name: Build sdist (maturin)
+        run: maturin build --sdist -o dist
+
+      - name: Verify sdist excludes generated docs
+        run: |
+          python - <<'PY'
+          import glob
+          import tarfile
+
+          sdists = glob.glob("dist/*.tar.gz")
+          if not sdists:
+            raise SystemExit("No sdist produced in dist/*.tar.gz")
+          path = sdists[0]
+
+          bad_prefixes = ("docs/_build/", "site/")
+          bad = []
+          with tarfile.open(path, "r:gz") as tf:
+            for m in tf.getmembers():
+              # sdist paths are usually like: pydantable-1.0.0/docs/_build/...
+              name = m.name.split("/", 1)[1] if "/" in m.name else m.name
+              if any(name.startswith(p) for p in bad_prefixes):
+                bad.append(m.name)
+
+          if bad:
+            raise SystemExit("sdist contains excluded paths:\\n" + "\\n".join(bad[:50]))
+          print("OK: sdist excludes docs/_build and site/")
+          PY
+
+  docs:
+    name: Docs (sphinx -W)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install docs dependencies
+        run: |
+          python -m pip install -U pip
+          python -m pip install -e ".[docs]"
+
+      - name: Build docs (warnings as errors)
+        run: sphinx-build -W -b html docs docs/_build/html
+
+  wheel-smoke:
+    name: Wheel smoke (install + import)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build wheel (maturin)
+        run: |
+          python -m pip install -U pip
+          python -m pip install "maturin>=1.4,<2.0"
+          maturin build --release -o dist
+
+      - name: Install wheel into fresh venv
+        run: |
+          python -m venv /tmp/pt_smoke_venv
+          /tmp/pt_smoke_venv/bin/python -m pip install -U pip
+          /tmp/pt_smoke_venv/bin/python -m pip install dist/*.whl
+
+      - name: Smoke test (import + minimal execution)
+        run: |
+          /tmp/pt_smoke_venv/bin/python - <<'PY'
+          from pydantable import DataFrame, Schema
+
+          class Row(Schema):
+            x: int
+
+          df = DataFrame[Row]({"x": [1, 2, 3]})
+          out = df.select("x").to_dict()
+          assert out == {"x": [1, 2, 3]}
+          print("OK")
+          PY
+
   format:
     name: Format
     runs-on: ubuntu-latest

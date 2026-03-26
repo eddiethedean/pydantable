@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO
 
 from pydantable._extension import MissingRustExtensionError
+from pydantable.observe import span
 
 from . import extras as extras
 from . import http as http
@@ -51,6 +52,8 @@ from .sql import fetch_sql, write_sql
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from concurrent.futures import Executor
+
+from pydantable.plugins import register_reader, register_writer
 
 _Source = str | Path | BinaryIO | bytes
 
@@ -257,20 +260,21 @@ def materialize_parquet(
     For out-of-core pipelines prefer :func:`read_parquet` + :meth:`~pydantable.dataframe.DataFrame.write_parquet`.
     """
     eng = (engine or _default_engine()).lower()
-    use_rust = eng in ("auto", "rust") and columns is None and _is_local_path(source)
-    if use_rust and eng != "pyarrow":
-        from ._core_io import rust_read_parquet_path
+    with span("io.materialize_parquet", engine=eng, columns=columns is not None):
+        use_rust = eng in ("auto", "rust") and columns is None and _is_local_path(source)
+        if use_rust and eng != "pyarrow":
+            from ._core_io import rust_read_parquet_path
 
-        path = str(source)
-        if os.path.isfile(path):
-            try:
-                return rust_read_parquet_path(path)
-            except Exception:
-                if eng == "rust":
-                    raise
-    if eng == "rust" and not use_rust:
-        raise ValueError("Rust Parquet read needs a local file path and columns=None")
-    return read_parquet_pyarrow(source, columns=columns)
+            path = str(source)
+            if os.path.isfile(path):
+                try:
+                    return rust_read_parquet_path(path)
+                except Exception:
+                    if eng == "rust":
+                        raise
+        if eng == "rust" and not use_rust:
+            raise ValueError("Rust Parquet read needs a local file path and columns=None")
+        return read_parquet_pyarrow(source, columns=columns)
 
 
 def materialize_ipc(
@@ -281,24 +285,25 @@ def materialize_ipc(
 ) -> dict[str, list[Any]]:
     """Read Arrow IPC (file or stream) into ``dict[str, list]``."""
     eng = (engine or _default_engine()).lower()
-    if (
-        eng in ("auto", "rust")
-        and not as_stream
-        and _is_local_path(source)
-        and os.path.isfile(str(source))
-    ):
-        from ._core_io import rust_read_ipc_path
+    with span("io.materialize_ipc", engine=eng, as_stream=bool(as_stream)):
+        if (
+            eng in ("auto", "rust")
+            and not as_stream
+            and _is_local_path(source)
+            and os.path.isfile(str(source))
+        ):
+            from ._core_io import rust_read_ipc_path
 
-        try:
-            return rust_read_ipc_path(str(source))
-        except Exception:
-            if eng == "rust":
-                raise
-    if eng == "rust" and (as_stream or not _is_local_path(source)):
-        raise ValueError(
-            "Rust IPC read supports on-disk file format only (as_stream=False)"
-        )
-    return read_ipc_pyarrow(source, as_stream=as_stream)
+            try:
+                return rust_read_ipc_path(str(source))
+            except Exception:
+                if eng == "rust":
+                    raise
+        if eng == "rust" and (as_stream or not _is_local_path(source)):
+            raise ValueError(
+                "Rust IPC read supports on-disk file format only (as_stream=False)"
+            )
+        return read_ipc_pyarrow(source, as_stream=as_stream)
 
 
 def materialize_csv(
@@ -313,57 +318,59 @@ def materialize_csv(
     * ``engine="auto"``: try Rust, then fall back to stdlib ``csv`` on failure.
     * ``use_rap=True``: load via :func:`aread_csv_rap` (only when no running event loop).
     """
-    if use_rap:
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            return asyncio.run(aread_csv_rap(str(path)))
-        raise RuntimeError(
-            "in an async context, await aread_csv_rap(path) instead of use_rap=True"
-        )
+    with span("io.materialize_csv", engine=(engine or _default_engine()).lower(), use_rap=bool(use_rap)):
+        if use_rap:
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                return asyncio.run(aread_csv_rap(str(path)))
+            raise RuntimeError(
+                "in an async context, await aread_csv_rap(path) instead of use_rap=True"
+            )
 
-    eng = (engine or _default_engine()).lower()
-    if eng in ("auto", "rust"):
-        from ._core_io import rust_read_csv_path
+        eng = (engine or _default_engine()).lower()
+        if eng in ("auto", "rust"):
+            from ._core_io import rust_read_csv_path
 
-        try:
-            return rust_read_csv_path(str(path))
-        except Exception:
-            if eng == "rust":
-                raise
-    with open(path, newline="", encoding="utf-8") as fh:
-        reader = csv.reader(fh)
-        header = next(reader)
-        cols: dict[str, list[Any]] = {h: [] for h in header}
-        for row in reader:
-            for i, h in enumerate(header):
-                cols[h].append(row[i] if i < len(row) else None)
-        return cols
+            try:
+                return rust_read_csv_path(str(path))
+            except Exception:
+                if eng == "rust":
+                    raise
+        with open(path, newline="", encoding="utf-8") as fh:
+            reader = csv.reader(fh)
+            header = next(reader)
+            cols: dict[str, list[Any]] = {h: [] for h in header}
+            for row in reader:
+                for i, h in enumerate(header):
+                    cols[h].append(row[i] if i < len(row) else None)
+            return cols
 
 
 def materialize_ndjson(
     path: str | Path, *, engine: str | None = None
 ) -> dict[str, list[Any]]:
     eng = (engine or _default_engine()).lower()
-    if eng in ("auto", "rust"):
-        from ._core_io import rust_read_ndjson_path
+    with span("io.materialize_ndjson", engine=eng):
+        if eng in ("auto", "rust"):
+            from ._core_io import rust_read_ndjson_path
 
-        try:
-            return rust_read_ndjson_path(str(path))
-        except Exception:
-            if eng == "rust":
-                raise
-    rows: list[dict[str, Any]] = []
-    with open(path, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if not line:
-                continue
-            rows.append(json.loads(line))
-    if not rows:
-        return {}
-    keys = sorted({k for r in rows for k in r})
-    return {k: [r.get(k) for r in rows] for k in keys}
+            try:
+                return rust_read_ndjson_path(str(path))
+            except Exception:
+                if eng == "rust":
+                    raise
+        rows: list[dict[str, Any]] = []
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                rows.append(json.loads(line))
+        if not rows:
+            return {}
+        keys = sorted({k for r in rows for k in r})
+        return {k: [r.get(k) for r in rows] for k in keys}
 
 
 def _json_rows_to_columns(rows: list[dict[str, Any]]) -> dict[str, list[Any]]:
@@ -383,29 +390,30 @@ def materialize_json(
     """
     p = Path(path)
     eng = (engine or _default_engine()).lower()
-    with p.open(encoding="utf-8") as f:
-        while True:
-            ch = f.read(1)
-            if not ch:
-                return {}
-            if not ch.isspace():
-                break
-        if ch == "[":
+    with span("io.materialize_json", engine=eng):
+        with p.open(encoding="utf-8") as f:
+            while True:
+                ch = f.read(1)
+                if not ch:
+                    return {}
+                if not ch.isspace():
+                    break
+            if ch == "[":
+                f.seek(0)
+                data = json.load(f)
+                if not isinstance(data, list):
+                    raise ValueError(
+                        "materialize_json: expected a JSON array of objects when file starts with '['"
+                    )
+                if not data:
+                    return {}
+                if not all(isinstance(x, dict) for x in data):
+                    raise ValueError(
+                        "materialize_json: array elements must be JSON objects"
+                    )
+                return _json_rows_to_columns(data)
             f.seek(0)
-            data = json.load(f)
-            if not isinstance(data, list):
-                raise ValueError(
-                    "materialize_json: expected a JSON array of objects when file starts with '['"
-                )
-            if not data:
-                return {}
-            if not all(isinstance(x, dict) for x in data):
-                raise ValueError(
-                    "materialize_json: array elements must be JSON objects"
-                )
-            return _json_rows_to_columns(data)
-        f.seek(0)
-    return materialize_ndjson(p, engine=eng)
+        return materialize_ndjson(p, engine=eng)
 
 
 def export_json(
@@ -427,23 +435,24 @@ def export_parquet(
 ) -> None:
     """Write ``dict[str, list]`` to Parquet (eager). For lazy plan output use :meth:`DataFrame.write_parquet`."""
     eng = (engine or _default_engine()).lower()
-    if eng in ("auto", "rust"):
-        from ._core_io import rust_write_parquet_path
+    with span("io.export_parquet", engine=eng, path=str(path)):
+        if eng in ("auto", "rust"):
+            from ._core_io import rust_write_parquet_path
 
+            try:
+                rust_write_parquet_path(str(path), data)
+                return
+            except ImportError:
+                if eng == "rust":
+                    raise
         try:
-            rust_write_parquet_path(str(path), data)
-            return
-        except ImportError:
-            if eng == "rust":
-                raise
-    try:
-        import pyarrow as pa  # type: ignore[import-not-found, import-untyped]
-        import pyarrow.parquet as pq  # type: ignore[import-not-found, import-untyped]
-    except ImportError as e:
-        raise ImportError(
-            "export_parquet fallback requires pyarrow (pip install 'pydantable[arrow]')."
-        ) from e
-    pq.write_table(pa.Table.from_pydict(data), str(path))
+            import pyarrow as pa  # type: ignore[import-not-found, import-untyped]
+            import pyarrow.parquet as pq  # type: ignore[import-not-found, import-untyped]
+        except ImportError as e:
+            raise ImportError(
+                "export_parquet fallback requires pyarrow (pip install 'pydantable[arrow]')."
+            ) from e
+        pq.write_table(pa.Table.from_pydict(data), str(path))
 
 
 def export_csv(
@@ -451,22 +460,23 @@ def export_csv(
 ) -> None:
     """Write ``dict[str, list]`` to CSV (eager)."""
     eng = (engine or _default_engine()).lower()
-    if eng in ("auto", "rust"):
-        from ._core_io import rust_write_csv_path
+    with span("io.export_csv", engine=eng, path=str(path)):
+        if eng in ("auto", "rust"):
+            from ._core_io import rust_write_csv_path
 
-        try:
-            rust_write_csv_path(str(path), data)
-            return
-        except ImportError:
-            if eng == "rust":
-                raise
-    headers = list(data.keys())
-    n = len(data[headers[0]]) if headers else 0
-    with open(path, "w", newline="", encoding="utf-8") as fh:
-        w = csv.writer(fh)
-        w.writerow(headers)
-        for i in range(n):
-            w.writerow([data[h][i] for h in headers])
+            try:
+                rust_write_csv_path(str(path), data)
+                return
+            except ImportError:
+                if eng == "rust":
+                    raise
+        headers = list(data.keys())
+        n = len(data[headers[0]]) if headers else 0
+        with open(path, "w", newline="", encoding="utf-8") as fh:
+            w = csv.writer(fh)
+            w.writerow(headers)
+            for i in range(n):
+                w.writerow([data[h][i] for h in headers])
 
 
 def export_ndjson(
@@ -474,20 +484,23 @@ def export_ndjson(
 ) -> None:
     """Write ``dict[str, list]`` as newline-delimited JSON (eager)."""
     eng = (engine or _default_engine()).lower()
-    if eng in ("auto", "rust"):
-        from ._core_io import rust_write_ndjson_path
+    with span("io.export_ndjson", engine=eng, path=str(path)):
+        if eng in ("auto", "rust"):
+            from ._core_io import rust_write_ndjson_path
 
-        try:
-            rust_write_ndjson_path(str(path), data)
-            return
-        except ImportError:
-            if eng == "rust":
-                raise
-    headers = list(data.keys())
-    n = len(data[headers[0]]) if headers else 0
-    with open(path, "w", encoding="utf-8") as fh:
-        for i in range(n):
-            fh.write(json.dumps({h: data[h][i] for h in headers}, default=str) + "\n")
+            try:
+                rust_write_ndjson_path(str(path), data)
+                return
+            except ImportError:
+                if eng == "rust":
+                    raise
+        headers = list(data.keys())
+        n = len(data[headers[0]]) if headers else 0
+        with open(path, "w", encoding="utf-8") as fh:
+            for i in range(n):
+                fh.write(
+                    json.dumps({h: data[h][i] for h in headers}, default=str) + "\n"
+                )
 
 
 def export_ipc(
@@ -495,24 +508,25 @@ def export_ipc(
 ) -> None:
     """Write ``dict[str, list]`` to Arrow IPC file (eager)."""
     eng = (engine or _default_engine()).lower()
-    if eng in ("auto", "rust"):
-        from ._core_io import rust_write_ipc_path
+    with span("io.export_ipc", engine=eng, path=str(path)):
+        if eng in ("auto", "rust"):
+            from ._core_io import rust_write_ipc_path
 
+            try:
+                rust_write_ipc_path(str(path), data)
+                return
+            except ImportError:
+                if eng == "rust":
+                    raise
         try:
-            rust_write_ipc_path(str(path), data)
-            return
-        except ImportError:
-            if eng == "rust":
-                raise
-    try:
-        import pyarrow as pa  # type: ignore[import-not-found, import-untyped]
-    except ImportError as e:
-        raise ImportError(
-            "export_ipc fallback requires pyarrow (pip install 'pydantable[arrow]')."
-        ) from e
-    table = pa.Table.from_pydict(data)
-    with open(path, "wb") as sink, pa.ipc.new_file(sink, table.schema) as writer:
-        writer.write_table(table)
+            import pyarrow as pa  # type: ignore[import-not-found, import-untyped]
+        except ImportError as e:
+            raise ImportError(
+                "export_ipc fallback requires pyarrow (pip install 'pydantable[arrow]')."
+            ) from e
+        table = pa.Table.from_pydict(data)
+        with open(path, "wb") as sink, pa.ipc.new_file(sink, table.schema) as writer:
+            writer.write_table(table)
 
 
 async def aread_parquet(
@@ -803,3 +817,23 @@ __all__ = [
     "write_csv_stdout",
     "write_sql",
 ]
+
+# Built-in plugin registrations (additive)
+register_reader("read_parquet", read_parquet, stable=True)
+register_reader("read_csv", read_csv, stable=True)
+register_reader("read_ndjson", read_ndjson, stable=True)
+register_reader("read_ipc", read_ipc, stable=True)
+register_reader("read_json", read_json, stable=True)
+register_reader("materialize_parquet", materialize_parquet, stable=True)
+register_reader("materialize_csv", materialize_csv, stable=True)
+register_reader("materialize_ndjson", materialize_ndjson, stable=True)
+register_reader("materialize_ipc", materialize_ipc, stable=True)
+register_reader("materialize_json", materialize_json, stable=True)
+register_reader("fetch_sql", fetch_sql, requires_extra="sql", stable=True)
+
+register_writer("export_parquet", export_parquet, stable=True)
+register_writer("export_csv", export_csv, stable=True)
+register_writer("export_ndjson", export_ndjson, stable=True)
+register_writer("export_ipc", export_ipc, stable=True)
+register_writer("export_json", export_json, stable=True)
+register_writer("write_sql", write_sql, requires_extra="sql", stable=True)

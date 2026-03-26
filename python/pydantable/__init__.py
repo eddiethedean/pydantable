@@ -17,6 +17,8 @@ from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
 from .display import get_repr_html_limits, reset_display_options, set_display_options
 from .expressions import Expr
+from .observe import get_observer, set_observer
+from . import plugins as plugins
 from .io import (
     afetch_sql,
     amaterialize_parquet,
@@ -46,13 +48,16 @@ __all__ = [
     "export_parquet",
     "fetch_sql",
     "get_repr_html_limits",
+    "get_observer",
     "materialize_ipc",
     "materialize_ndjson",
     "materialize_parquet",
+    "plugins",
     "pandas",
     "pyspark",
     "read_parquet",
     "read_parquet_url",
+    "set_observer",
     "reset_display_options",
     "set_display_options",
 ]
