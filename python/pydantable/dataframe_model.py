@@ -267,11 +267,15 @@ class DataFrameModel:
         **scan_kwargs: Any,
     ) -> Self:
         """Lazy Parquet read (local path). See :func:`pydantable.io.read_parquet`."""
-        del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel].read_parquet(
-            path, columns=columns, **scan_kwargs
+            path,
+            columns=columns,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
         return cls._wrap_inner_df(inner)
 
@@ -291,11 +295,16 @@ class DataFrameModel:
 
         See :func:`pydantable.io.read_parquet_url`.
         """
-        del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel].read_parquet_url(
-            url, experimental=experimental, columns=columns, **kwargs
+            url,
+            experimental=experimental,
+            columns=columns,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+            **kwargs,
         )
         return cls._wrap_inner_df(inner)
 
@@ -311,11 +320,15 @@ class DataFrameModel:
         **scan_kwargs: Any,
     ) -> Self:
         """Lazy Arrow IPC file read (local path)."""
-        del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel].read_ipc(
-            path, columns=columns, **scan_kwargs
+            path,
+            columns=columns,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
         return cls._wrap_inner_df(inner)
 
@@ -331,11 +344,15 @@ class DataFrameModel:
         **scan_kwargs: Any,
     ) -> Self:
         """Lazy CSV read (local path)."""
-        del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel].read_csv(
-            path, columns=columns, **scan_kwargs
+            path,
+            columns=columns,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
         return cls._wrap_inner_df(inner)
 
@@ -351,11 +368,15 @@ class DataFrameModel:
         **scan_kwargs: Any,
     ) -> Self:
         """Lazy NDJSON read (local path)."""
-        del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel].read_ndjson(
-            path, columns=columns, **scan_kwargs
+            path,
+            columns=columns,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
         return cls._wrap_inner_df(inner)
 
@@ -371,11 +392,15 @@ class DataFrameModel:
         **scan_kwargs: Any,
     ) -> Self:
         """Lazy JSON Lines read (local path); same as :meth:`read_ndjson`."""
-        del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel].read_json(
-            path, columns=columns, **scan_kwargs
+            path,
+            columns=columns,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
         return cls._wrap_inner_df(inner)
 
@@ -708,13 +733,17 @@ class DataFrameModel:
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> Self:
-        del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         from .io import aread_parquet as _aread
 
         root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
         dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(root)
+        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
+            root,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
         return cls._wrap_inner_df(inner)
 
     @classmethod
@@ -729,13 +758,17 @@ class DataFrameModel:
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> Self:
-        del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         from .io import aread_ipc as _aread
 
         root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
         dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(root)
+        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
+            root,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
         return cls._wrap_inner_df(inner)
 
     @classmethod
@@ -750,13 +783,17 @@ class DataFrameModel:
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> Self:
-        del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         from .io import aread_csv as _aread
 
         root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
         dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(root)
+        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
+            root,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
         return cls._wrap_inner_df(inner)
 
     @classmethod
@@ -771,13 +808,17 @@ class DataFrameModel:
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> Self:
-        del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         from .io import aread_ndjson as _aread
 
         root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
         dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(root)
+        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
+            root,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
         return cls._wrap_inner_df(inner)
 
     @classmethod
@@ -792,13 +833,17 @@ class DataFrameModel:
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> Self:
-        del trusted_mode, ignore_errors, on_validation_errors
         cls._dfm_require_subclass_with_schema()
         from .io import aread_json as _aread
 
         root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
         dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(root)
+        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
+            root,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
         return cls._wrap_inner_df(inner)
 
     @classmethod

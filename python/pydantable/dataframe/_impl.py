@@ -464,9 +464,25 @@ class DataFrame(Generic[SchemaT]):
         self._current_field_types = schema_field_types(self._current_schema_type)
         # Rust owns expression typing, logical planning, and execution.
         self._rust_plan = _require_rust_core().make_plan(self.schema_fields())
+        # Optional validation options attached to lazy scan roots. These are applied
+        # at materialization time (after the engine produces columns), because
+        # scan roots are lazy and cannot validate rows up front.
+        self._io_validation_enabled: bool = False
+        self._io_validation_trusted_mode: Literal["off", "shape_only", "strict"] | None = None
+        self._io_validation_ignore_errors: bool = False
+        self._io_validation_on_validation_errors: (
+            Callable[[list[dict[str, Any]]], None] | None
+        ) = None
 
     @classmethod
-    def _from_scan_root(cls, root: Any) -> DataFrame[Any]:
+    def _from_scan_root(
+        cls,
+        root: Any,
+        *,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> DataFrame[Any]:
         """Build a lazy frame from :class:`pydantable._core.ScanFileRoot`.
 
         Column validation is not applied yet.
@@ -477,12 +493,17 @@ class DataFrame(Generic[SchemaT]):
             )
         rust = _require_rust_core()
         plan = rust.make_plan(schema_field_types(cls._schema_type))
-        return cls._from_plan(
+        df = cls._from_plan(
             root_data=root,
             root_schema_type=cls._schema_type,
             current_schema_type=cls._schema_type,
             rust_plan=plan,
         )
+        df._io_validation_enabled = True
+        df._io_validation_trusted_mode = trusted_mode
+        df._io_validation_ignore_errors = bool(ignore_errors)
+        df._io_validation_on_validation_errors = on_validation_errors
+        return df
 
     @classmethod
     def read_parquet(
@@ -490,12 +511,44 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> DataFrame[Any]:
         """Lazy Parquet read (local file path)."""
         from pydantable.io import read_parquet as _read_parquet
 
-        return cls._from_scan_root(_read_parquet(path, columns=columns, **scan_kwargs))
+        return cls._from_scan_root(
+            _read_parquet(path, columns=columns, **scan_kwargs),
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    async def aread_parquet(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **scan_kwargs: Any,
+    ) -> DataFrame[Any]:
+        from pydantable.io import aread_parquet as _aread_parquet
+
+        root = await _aread_parquet(
+            path, columns=columns, executor=executor, **scan_kwargs
+        )
+        return cls._from_scan_root(
+            root,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
 
     @classmethod
     def read_parquet_url(
@@ -504,6 +557,9 @@ class DataFrame(Generic[SchemaT]):
         *,
         experimental: bool = True,
         columns: list[str] | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **kwargs: Any,
     ) -> DataFrame[Any]:
         """Lazy Parquet read after HTTP(S) download to a temp file.
@@ -513,7 +569,39 @@ class DataFrame(Generic[SchemaT]):
         from pydantable.io import read_parquet_url as _read_parquet_url
 
         return cls._from_scan_root(
-            _read_parquet_url(url, experimental=experimental, columns=columns, **kwargs)
+            _read_parquet_url(url, experimental=experimental, columns=columns, **kwargs),
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    async def aread_parquet_url(
+        cls,
+        url: str,
+        *,
+        experimental: bool = True,
+        columns: list[str] | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **kwargs: Any,
+    ) -> DataFrame[Any]:
+        from pydantable.io import aread_parquet_url as _aread_parquet_url
+
+        root = await _aread_parquet_url(
+            url,
+            experimental=experimental,
+            columns=columns,
+            executor=executor,
+            **kwargs,
+        )
+        return cls._from_scan_root(
+            root,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
         )
 
     @classmethod
@@ -522,11 +610,41 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> DataFrame[Any]:
         from pydantable.io import read_csv as _read_csv
 
-        return cls._from_scan_root(_read_csv(path, columns=columns, **scan_kwargs))
+        return cls._from_scan_root(
+            _read_csv(path, columns=columns, **scan_kwargs),
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    async def aread_csv(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **scan_kwargs: Any,
+    ) -> DataFrame[Any]:
+        from pydantable.io import aread_csv as _aread_csv
+
+        root = await _aread_csv(path, columns=columns, executor=executor, **scan_kwargs)
+        return cls._from_scan_root(
+            root,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
 
     @classmethod
     def read_ndjson(
@@ -534,11 +652,43 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> DataFrame[Any]:
         from pydantable.io import read_ndjson as _read_ndjson
 
-        return cls._from_scan_root(_read_ndjson(path, columns=columns, **scan_kwargs))
+        return cls._from_scan_root(
+            _read_ndjson(path, columns=columns, **scan_kwargs),
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    async def aread_ndjson(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **scan_kwargs: Any,
+    ) -> DataFrame[Any]:
+        from pydantable.io import aread_ndjson as _aread_ndjson
+
+        root = await _aread_ndjson(
+            path, columns=columns, executor=executor, **scan_kwargs
+        )
+        return cls._from_scan_root(
+            root,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
 
     @classmethod
     def read_json(
@@ -546,12 +696,42 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> DataFrame[Any]:
         """Lazy JSON Lines (same as :meth:`read_ndjson`)."""
         from pydantable.io import read_json as _read_json
 
-        return cls._from_scan_root(_read_json(path, columns=columns, **scan_kwargs))
+        return cls._from_scan_root(
+            _read_json(path, columns=columns, **scan_kwargs),
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    async def aread_json(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **scan_kwargs: Any,
+    ) -> DataFrame[Any]:
+        from pydantable.io import aread_json as _aread_json
+
+        root = await _aread_json(path, columns=columns, executor=executor, **scan_kwargs)
+        return cls._from_scan_root(
+            root,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
 
     @classmethod
     def read_ipc(
@@ -559,11 +739,41 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> DataFrame[Any]:
         from pydantable.io import read_ipc as _read_ipc
 
-        return cls._from_scan_root(_read_ipc(path, columns=columns, **scan_kwargs))
+        return cls._from_scan_root(
+            _read_ipc(path, columns=columns, **scan_kwargs),
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    async def aread_ipc(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **scan_kwargs: Any,
+    ) -> DataFrame[Any]:
+        from pydantable.io import aread_ipc as _aread_ipc
+
+        root = await _aread_ipc(path, columns=columns, executor=executor, **scan_kwargs)
+        return cls._from_scan_root(
+            root,
+            trusted_mode=trusted_mode,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
 
     @classmethod
     def _from_plan(
@@ -581,7 +791,32 @@ class DataFrame(Generic[SchemaT]):
         obj._current_field_types = schema_field_types(current_schema_type)
         obj._rust_plan = rust_plan
         obj._schema_type = None
+        obj._io_validation_enabled = False
+        obj._io_validation_trusted_mode = None
+        obj._io_validation_ignore_errors = False
+        obj._io_validation_on_validation_errors = None
         return cast("DataFrame[Any]", obj)
+
+    def _apply_io_validation_if_configured(
+        self, column_dict: dict[str, list[Any]]
+    ) -> dict[str, list[Any]]:
+        """
+        Apply optional validation/row-skipping configured on lazy scan reads.
+
+        This is intentionally post-execution: scan roots are lazy, so we can only
+        validate once we have materialized Python columns.
+        """
+        if not self._io_validation_enabled:
+            return column_dict
+        mode = self._io_validation_trusted_mode or "off"
+        return validate_columns_strict(
+            column_dict,
+            self._current_schema_type,
+            validate_elements=None,
+            trusted_mode=mode,
+            ignore_errors=self._io_validation_ignore_errors,
+            on_validation_errors=self._io_validation_on_validation_errors,
+        )
 
     @property
     def schema_type(self) -> type[BaseModel]:
@@ -1602,6 +1837,7 @@ class DataFrame(Generic[SchemaT]):
             error_context=self._materialize_error_context(),
         )
         column_dict = _coerce_enum_columns(column_dict, self._current_field_types)
+        column_dict = self._apply_io_validation_if_configured(column_dict)
         if as_lists:
             return column_dict
         if as_numpy:
@@ -1624,7 +1860,8 @@ class DataFrame(Generic[SchemaT]):
             streaming=use_streaming,
             error_context=self._materialize_error_context(),
         )
-        return _coerce_enum_columns(raw, self._current_field_types)
+        raw = _coerce_enum_columns(raw, self._current_field_types)
+        return self._apply_io_validation_if_configured(raw)
 
     def write_parquet(
         self,
