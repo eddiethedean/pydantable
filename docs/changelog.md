@@ -9,10 +9,30 @@ All notable changes to this project are documented here. The format is inspired 
 - Ingest/docs consistency for missing optional behavior:
   - `fill_missing_optional` documented consistently across constructor and typed lazy-read materialization paths.
   - Explicit schema defaults on optional fields (for example `note: str | None = "n/a"` or `= None`) now take precedence when `fill_missing_optional=False` instead of raising.
+- `v1.0.0` readiness docs:
+  - explicit 1.x semver policy in `VERSIONING.md`,
+  - 1.0 release gate checklist/security-advisory handling in `DEVELOPER.md`,
+  - roadmap/README/index updates for 1.0 communication and support matrix policy.
 
 ### Changed
 
 - Documentation now includes migration guidance from earlier `missing_optional` string-style wording (`"fill_none"` / `"error"`) to boolean `fill_missing_optional=True/False`.
+
+## [1.0.0] — planned
+
+### Scope
+
+- Production-ready major release focused on API stability and semver contract clarity.
+- No large new execution-engine features are required for the tag.
+
+### Stability commitments
+
+- 1.x patch/minor/major policy is defined in {doc}`VERSIONING`.
+- Behavioral semantics continue to be defined in {doc}`INTERFACE_CONTRACT`.
+
+### Upgrade guidance
+
+- Canonical upgrade path from 0.20.x/0.23.x is documented in `README.md` and linked from docs index.
 
 ## [0.23.0] — 2026-03-25
 

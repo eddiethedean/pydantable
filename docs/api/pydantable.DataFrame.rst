@@ -15,6 +15,12 @@
    
       ~DataFrame.__init__
       ~DataFrame.acollect
+      ~DataFrame.aread_csv
+      ~DataFrame.aread_ipc
+      ~DataFrame.aread_json
+      ~DataFrame.aread_ndjson
+      ~DataFrame.aread_parquet
+      ~DataFrame.aread_parquet_url
       ~DataFrame.ato_arrow
       ~DataFrame.ato_dict
       ~DataFrame.ato_polars

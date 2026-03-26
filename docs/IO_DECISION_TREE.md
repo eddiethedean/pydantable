@@ -15,7 +15,7 @@ Use this page to pick the right entry point. Execution semantics (lazy collect v
 | **Object-store URIs (`s3://`, …)** | **`read_from_object_store`** (**`[cloud]`**) | Column dict |
 | **Tier-2 readers (Excel, Delta, …)** | **`pydantable.io.extras`** | Column dict or helpers |
 
-**Full surface:** import from **`pydantable.io`** — the top-level **`pydantable`** package re-exports only a [small subset](IO_OVERVIEW.md#full-api-in-pydantableio) for common Parquet paths.
+**Full surface:** import from **`pydantable.io`** — the top-level **`pydantable`** package re-exports only a small subset for common Parquet paths; see {doc}`IO_OVERVIEW`.
 
 ## Engine selection (`materialize_parquet` and friends)
 

@@ -392,6 +392,29 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 - [ ] `sphinx-build -W -b html docs docs/_build/html` succeeds (matches Read the Docs `fail_on_warning`)
 - [ ] Roadmap status updated when a phase milestone changes
 
+## `v1.0.0` release gate checklist
+
+Use this checklist on the exact commit intended for tag `v1.0.0`:
+
+- [ ] `make check-full` passes.
+- [ ] `cargo test --manifest-path pydantable-core/Cargo.toml --all-features` passes.
+- [ ] `cargo check --manifest-path pydantable-core/Cargo.toml --no-default-features` passes.
+- [ ] full Python test suite passes in the CI-equivalent environment (`pytest -n auto` and required optional-deps legs).
+- [ ] `tests/test_version_alignment.py` passes (`__version__ == _core.rust_version()`).
+- [ ] release workflow dry-run evidence is captured (wheel/sdist + SBOM artifact expectations met).
+
+### Security advisory policy (1.x)
+
+For 1.x maintenance:
+
+- `cargo audit` and `cargo deny` are expected to be current in CI.
+- Any ignored advisory must be documented with:
+  - advisory ID,
+  - reason for temporary acceptance,
+  - owner,
+  - review/expiry target.
+- Exceptions must be tracked in docs/changelog or workflow comments so they are visible during release review.
+
 ### Publishing (PyPI)
 
 Pushing a git tag matching `v*` (for example `v0.23.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then **`maturin build`** (per target) and **`twine upload --skip-existing dist/*`** to PyPI. The repository needs a **`PYPI_API_TOKEN`** secret (`TWINE_USERNAME` is **`__token__`** in the workflow). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test install** (`.github/workflows/_shared-ci.yml`, **Install maturin and test deps**) aligned with **`pyproject.toml`** **`[project.optional-dependencies]`** **`dev`** + **`pandas`** + **`polars`** + **`pytest-cov`** + **`rapcsv`/`rapfiles`/`rapsqlite`** (plus the other CI-only pins: **`fastapi`**, **`httpx`**, **`sqlalchemy`**, **`streamlit`**, **`dataframe-api-compat`**, **`fsspec`**, **`openpyxl`**, **`kafka-python`**, **`google-cloud-bigquery`**, **`snowflake-connector-python`**, …) so optional tests are not skipped on matrix legs or on tag builds.

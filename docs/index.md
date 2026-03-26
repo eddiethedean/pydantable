@@ -3,7 +3,7 @@
 **Strongly-typed DataFrame layer for FastAPI and Pydantic services**, with a Rust-powered execution core (Polars-backed inside the native extension).
 
 ```{note}
-This **documentation site** is the detailed manual. The repository **README** on your Git host is the short entrypoint; both should stay aligned for install commands and version. **Current release:** **0.23.0** (see {doc}`changelog`).
+This **documentation site** is the detailed manual. The repository **README** on your Git host is the short entrypoint; both should stay aligned for install commands and version. **Current release:** **0.23.0** (see {doc}`changelog`). The project is tracking **Planned v1.0.0** as a stability/semver milestone in {doc}`ROADMAP`.
 ```
 
 ## At a glance
@@ -29,7 +29,7 @@ This **documentation site** is the detailed manual. The repository **README** on
 |----------|------------|
 | **Library users** | {doc}`DATAFRAMEMODEL` — contract, inputs, transforms, materialization |
 | **FastAPI apps** | {doc}`FASTAPI` — routers, request bodies, responses |
-| **Semantics** (nulls, joins, ordering) | {doc}`INTERFACE_CONTRACT` · {doc}`VERSIONING` (0.x semver) |
+| **Semantics** (nulls, joins, ordering) | {doc}`INTERFACE_CONTRACT` · {doc}`VERSIONING` (0.x + 1.x semver policy) |
 | **Data sources & I/O** | {doc}`IO_DECISION_TREE` — pick an API · {doc}`IO_OVERVIEW` — one page per format/transport · {doc}`DATA_IO_SOURCES` — planning & async stacks |
 | **Contributors** | {doc}`DEVELOPER` — build, test, Sphinx, release |
 | **Polars parity and gaps** | {doc}`PARITY_SCORECARD` and {doc}`POLARS_TRANSFORMATIONS_ROADMAP` |

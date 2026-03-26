@@ -30,6 +30,13 @@
 - From **0.22.x → 0.23.0**: **breaking I/O renames** — eager file reads into **`dict[str, list]`** are **`materialize_*` / `amaterialize_*`** (not the old **`read_*` / `aread_*`** names); **lazy** local files use **`read_*` / `aread_*`** ( **`ScanFileRoot`** ); lazy plan output uses **`DataFrame.write_*`**; eager **`dict[str, list]` → file** uses **`export_*` / `aexport_*`**; **`read_sql` / `aread_sql`** → **`fetch_sql` / `afetch_sql`**; HTTP column readers **`read_*_url`** → **`fetch_*_url`**; lazy HTTP Parquet temp-file entry is **`read_parquet_url` / `aread_parquet_url`**. See [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html) and [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html).
 - From **0.21.x → 0.22.0**: no intended breaking changes (see changelog for **0.22.0** I/O additions).
 
+### Planned `v1.0.0` upgrade path
+
+- **Primary promise:** `v1.0.0` is a stability/contract release, not a large feature dump.
+- **Behavior source of truth:** [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html).
+- **Versioning source of truth:** [Versioning](https://pydantable.readthedocs.io/en/latest/VERSIONING.html) (includes 1.x patch/minor/major policy).
+- **Migration expectation:** if no additional breaking change is introduced after `0.23.x`, upgrade is expected to be low-friction and focused on validating your pipelines against the same documented semantics.
+
 ## Documentation
 
 The **canonical manual** is on Read the Docs: **[https://pydantable.readthedocs.io/en/latest/](https://pydantable.readthedocs.io/en/latest/)**
@@ -60,6 +67,12 @@ The **canonical manual** is on Read the Docs: **[https://pydantable.readthedocs.
 | **Python API (autodoc)** | [API reference](https://pydantable.readthedocs.io/en/latest/api/index.html) |
 
 ---
+
+## Support matrix policy
+
+- **Current validated range:** Python **3.10–3.13**.
+- **For 1.0.x:** this range (or any change) is treated as an explicit support policy and will be reflected in docs/changelog/release notes.
+- **Optional Polars extra:** `pydantable[polars]` is supported for `to_polars()` and lazy/eager Polars-backed paths documented in the I/O/Execution guides.
 
 ## Install
 
