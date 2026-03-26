@@ -23,23 +23,26 @@ def main() -> None:
     from pydantable import DataFrameModel
     from pydantable.io.extras import read_excel
 
-    class Row(DataFrameModel):
-        u: int
-        v: int
+    class RegionalHeadcount(DataFrameModel):
+        """HR export: one row per region (integers avoid Excel float quirks in asserts)."""
+
+        region_code: int
+        headcount: int
 
     with tempfile.TemporaryDirectory() as td:
-        xlsx = Path(td) / "book.xlsx"
+        xlsx = Path(td) / "FY25_Q1_headcount_by_region.xlsx"
         wb = Workbook()
         ws = wb.active
         assert ws is not None
-        ws.append(["u", "v"])
-        ws.append([1, 2])
+        ws.append(["region_code", "headcount"])
+        ws.append([10, 42])
         wb.save(xlsx)
         wb.close()
 
-        got = Row(read_excel(xlsx, experimental=True))
-        assert [int(x) for x in got.to_dict()["u"]] == [1]
-        assert got.to_dict()["v"] == [2]
+        got = RegionalHeadcount(read_excel(xlsx, experimental=True))
+        d = got.to_dict()
+        assert [int(x) for x in d["region_code"]] == [10]
+        assert [int(x) for x in d["headcount"]] == [42]
 
     print("extras_read_excel: ok")
 

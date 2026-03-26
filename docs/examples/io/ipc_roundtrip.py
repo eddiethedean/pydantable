@@ -1,4 +1,4 @@
-"""Arrow IPC file: write, lazy read/write, materialize.
+"""Arrow IPC: hand off a columnar batch between processes (Feather/IPC on disk).
 
 Needs ``pydantable._core``. Run::
 
@@ -13,21 +13,27 @@ from pathlib import Path
 from pydantable import DataFrameModel
 
 
-class Row(DataFrameModel):
-    z: int
+class SensorReading(DataFrameModel):
+    """Two samples from a batch job writing IPC for a downstream consumer."""
+
+    sensor_id: int
+    celsius: int
 
 
 def main() -> None:
-    with tempfile.TemporaryDirectory() as td:
-        src = Path(td) / "in.arrow"
-        dst = Path(td) / "out.arrow"
-        Row({"z": [10, 20]}).write_ipc(str(src))
+    with tempfile.TemporaryDirectory() as scratch:
+        from_worker = Path(scratch) / "batch_17.arrow"
+        to_consumer = Path(scratch) / "batch_17_copy.arrow"
+        SensorReading({"sensor_id": [1, 2], "celsius": [21, 22]}).write_ipc(
+            str(from_worker)
+        )
 
-        df = Row.read_ipc(str(src))
-        df.write_ipc(str(dst))
+        df = SensorReading.read_ipc(str(from_worker))
+        df.write_ipc(str(to_consumer))
 
-        got = Row.materialize_ipc(dst)
-        assert [int(x) for x in got.to_dict()["z"]] == [10, 20]
+        got = SensorReading.materialize_ipc(to_consumer)
+        assert [int(x) for x in got.to_dict()["sensor_id"]] == [1, 2]
+        assert [int(x) for x in got.to_dict()["celsius"]] == [21, 22]
 
     print("ipc_roundtrip: ok")
 

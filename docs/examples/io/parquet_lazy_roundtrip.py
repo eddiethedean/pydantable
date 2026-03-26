@@ -1,6 +1,9 @@
-"""Lazy Parquet read/write with ``write_kwargs`` (needs ``pydantable._core``).
+"""Lazy Parquet: snapshot in → rewrite with ``write_kwargs`` (Snappy) → materialize.
 
-Run::
+Typical for archiving daily aggregates: read yesterday's file, optionally re-write with
+explicit compression for downstream consumers.
+
+Needs ``pydantable._core``. Run::
 
     python docs/examples/io/parquet_lazy_roundtrip.py
 """
@@ -13,21 +16,24 @@ from pathlib import Path
 from pydantable import DataFrameModel
 
 
-class Row(DataFrameModel):
-    x: int
+class DailyRevenue(DataFrameModel):
+    """Single row per region/day in a finance mart."""
+
+    revenue_cents: int
 
 
 def main() -> None:
-    with tempfile.TemporaryDirectory() as td:
-        src = Path(td) / "in.parquet"
-        dst = Path(td) / "out.parquet"
-        Row({"x": [7]}).write_parquet(str(src))
+    with tempfile.TemporaryDirectory() as archive:
+        incoming = Path(archive) / "revenue_2025-03-24.parquet"
+        outgoing = Path(archive) / "revenue_2025-03-24_snappy.parquet"
+        # $1.25M for the day, stored as integer cents (finance systems often do this).
+        DailyRevenue({"revenue_cents": [125_000_000]}).write_parquet(str(incoming))
 
-        df = Row.read_parquet(str(src))
-        df.write_parquet(str(dst), write_kwargs={"compression": "snappy"})
+        df = DailyRevenue.read_parquet(str(incoming))
+        df.write_parquet(str(outgoing), write_kwargs={"compression": "snappy"})
 
-        got = Row.materialize_parquet(dst)
-        assert got.to_dict()["x"] == [7]
+        got = DailyRevenue.materialize_parquet(outgoing)
+        assert got.to_dict()["revenue_cents"] == [125_000_000]
 
     print("parquet_lazy_roundtrip: ok")
 

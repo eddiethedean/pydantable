@@ -16,36 +16,42 @@ from pathlib import Path
 from pydantable import DataFrameModel
 
 
-class Row(DataFrameModel):
-    c: int
-    d: int
+class Shipment(DataFrameModel):
+    """Inbound CSV from a carrier (numeric codes in text-heavy exports)."""
+
+    order_id: int
+    carton_id: int
 
 
-class RowStr(DataFrameModel):
-    c: str
-    d: str
+class ShipmentStr(DataFrameModel):
+    """Same layout written back out as strings (labels / IDs)."""
+
+    order_id: str
+    carton_id: str
 
 
 def main() -> None:
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".csv", delete=False, encoding="utf-8"
     ) as f:
-        f.write("c,d\n9,10\n")
+        f.write("order_id,carton_id\n44021,90001\n")
         path = f.name
     try:
-        tbl = Row.materialize_csv(path)
+        tbl = Shipment.materialize_csv(path)
         d = tbl.to_dict()
-        assert [int(x) for x in d["c"]] == [9]
-        assert [int(x) for x in d["d"]] == [10]
+        assert [int(x) for x in d["order_id"]] == [44021]
+        assert [int(x) for x in d["carton_id"]] == [90001]
     finally:
         os.unlink(path)
 
     with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as out:
         out_path = out.name
     try:
-        RowStr({"c": ["x"], "d": ["y"]}).write_csv(out_path)
+        ShipmentStr({"order_id": ["44021"], "carton_id": ["90001"]}).write_csv(
+            out_path
+        )
         body = Path(out_path).read_text(encoding="utf-8")
-        assert "c" in body and "x" in body
+        assert "order_id" in body and "44021" in body
     finally:
         os.unlink(out_path)
 

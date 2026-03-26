@@ -1,4 +1,4 @@
-"""Lazy CSV: ``separator`` scan kwarg and lazy ``write_csv``.
+"""Lazy CSV: European-style ``;`` separator (common ERP exports) and lazy ``write_csv``.
 
 Needs ``pydantable._core``. Run::
 
@@ -13,24 +13,27 @@ from pathlib import Path
 from pydantable import DataFrameModel
 
 
-class Row(DataFrameModel):
-    a: int
-    b: int
+class InventorySnapshot(DataFrameModel):
+    """SKU-level stock row from a vendor CSV (semicolon-delimited)."""
+
+    sku: int
+    qty_on_hand: int
 
 
 def main() -> None:
-    with tempfile.TemporaryDirectory() as td:
-        src = Path(td) / "semi.csv"
-        dst = Path(td) / "out.csv"
-        src.write_text("a;b\n1;2\n", encoding="utf-8")
+    with tempfile.TemporaryDirectory() as data_dir:
+        # Many EU exports use ';' because ',' is the decimal separator in locale.
+        erp_export = Path(data_dir) / "stock_export.csv"
+        normalized = Path(data_dir) / "stock_utf8_comma.csv"
+        erp_export.write_text("sku;qty_on_hand\n1001;42\n", encoding="utf-8")
 
-        df = Row.read_csv(str(src), separator=";")
-        df.write_csv(str(dst))
+        df = InventorySnapshot.read_csv(str(erp_export), separator=";")
+        df.write_csv(str(normalized))
 
-        got = Row.materialize_csv(dst)
+        got = InventorySnapshot.materialize_csv(normalized)
         d = got.to_dict()
-        assert [int(x) for x in d["a"]] == [1]
-        assert [int(x) for x in d["b"]] == [2]
+        assert [int(x) for x in d["sku"]] == [1001]
+        assert [int(x) for x in d["qty_on_hand"]] == [42]
 
     print("csv_lazy_roundtrip: ok")
 
