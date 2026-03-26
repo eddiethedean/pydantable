@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from pydantable import DataFrame
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class _TwoCols(BaseModel):
@@ -24,7 +27,7 @@ def test_lazy_read_missing_required_column_raises_csv(tmp_path: Path) -> None:
     path.write_text("age\n10\n", encoding="utf-8")
 
     df = DataFrame[_TwoCols].read_csv(str(path))
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         _ = df.to_dict()
 
 
@@ -34,7 +37,7 @@ def test_lazy_read_missing_required_column_raises_ndjson(tmp_path: Path) -> None
     path.write_text(json.dumps({"age": 10}) + "\n", encoding="utf-8")
 
     df = DataFrame[_TwoCols].read_ndjson(str(path))
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         _ = df.to_dict()
 
 

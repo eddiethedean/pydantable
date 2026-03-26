@@ -54,6 +54,7 @@ def test_dataframe_model_missing_optional_field_is_filled_rows() -> None:
     df = _OptionalFieldDF([{"id": 1}, {"id": 2, "note": "x"}])
     assert df.collect(as_lists=True) == {"id": [1, 2], "note": [None, "x"]}
 
+
 def test_dataframe_model_row_model_optional_defaults_to_none() -> None:
     assert _OptionalFieldDF.RowModel.model_fields["note"].default is None
     assert _OptionalFieldDF.RowModel.model_fields["note"].is_required() is False
@@ -69,12 +70,16 @@ def test_dataframe_model_missing_optional_field_can_error_columnar() -> None:
         _OptionalFieldDF({"id": [1]}, fill_missing_optional=False)
 
 
-def test_dataframe_model_per_field_default_allows_missing_even_when_fill_false_rows() -> None:
+def test_dataframe_model_per_field_default_allows_missing_even_when_fill_false_rows() -> (  # noqa: E501
+    None
+):
     df = _OptionalFieldWithDefaultDF([{"id": 1}], fill_missing_optional=False)
     assert df.collect(as_lists=True) == {"id": [1], "note": [None]}
 
 
-def test_dataframe_model_per_field_default_allows_missing_even_when_fill_false_columnar() -> None:
+def test_dataframe_model_per_field_default_allows_missing_even_when_fill_false_columnar() -> (  # noqa: E501
+    None
+):
     df = _OptionalFieldWithDefaultDF({"id": [1]}, fill_missing_optional=False)
     assert df.collect(as_lists=True) == {"id": [1], "note": [None]}
 

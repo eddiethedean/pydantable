@@ -471,7 +471,9 @@ class DataFrame(Generic[SchemaT]):
         # at materialization time (after the engine produces columns), because
         # scan roots are lazy and cannot validate rows up front.
         self._io_validation_enabled: bool = False
-        self._io_validation_trusted_mode: Literal["off", "shape_only", "strict"] | None = None
+        self._io_validation_trusted_mode: (
+            Literal["off", "shape_only", "strict"] | None
+        ) = None
         self._io_validation_fill_missing_optional: bool = True
         self._io_validation_ignore_errors: bool = False
         self._io_validation_on_validation_errors: (
@@ -586,7 +588,9 @@ class DataFrame(Generic[SchemaT]):
         from pydantable.io import read_parquet_url as _read_parquet_url
 
         return cls._from_scan_root(
-            _read_parquet_url(url, experimental=experimental, columns=columns, **kwargs),
+            _read_parquet_url(
+                url, experimental=experimental, columns=columns, **kwargs
+            ),
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -609,8 +613,9 @@ class DataFrame(Generic[SchemaT]):
     ) -> DataFrame[Any]:
         """Async lazy Parquet over HTTP(S) (downloads to a temp file).
 
-        Prefer `DataFrameModel.aread_parquet_url_ctx` / `pydantable.io.aread_parquet_url_ctx`
-        for automatic temp-file cleanup. Validation options apply on materialization.
+        Prefer `DataFrameModel.aread_parquet_url_ctx` /
+        `pydantable.io.aread_parquet_url_ctx` for automatic temp-file cleanup.
+        Validation options apply on materialization.
         """
         from pydantable.io import aread_parquet_url as _aread_parquet_url
 
@@ -773,7 +778,9 @@ class DataFrame(Generic[SchemaT]):
         """
         from pydantable.io import aread_json as _aread_json
 
-        root = await _aread_json(path, columns=columns, executor=executor, **scan_kwargs)
+        root = await _aread_json(
+            path, columns=columns, executor=executor, **scan_kwargs
+        )
         return cls._from_scan_root(
             root,
             trusted_mode=trusted_mode,
@@ -917,7 +924,8 @@ class DataFrame(Generic[SchemaT]):
                     raise
                 if not self._io_validation_fill_missing_optional:
                     raise ValueError(
-                        f"Missing optional columns (configured as error): {[missing_col]}"
+                        "Missing optional columns (configured as error): "
+                        f"{[missing_col]}"
                     ) from e
                 # Drop the missing optional column from the temporary plan and retry.
                 field_types.pop(missing_col, None)

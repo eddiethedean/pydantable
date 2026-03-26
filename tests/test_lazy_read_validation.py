@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from http.server import BaseHTTPRequestHandler
+from typing import TYPE_CHECKING
 
 import pytest
+from conftest import http_server_thread
 from pydantable import DataFrame, DataFrameModel
 from pydantable.io import export_ipc, export_parquet
 from pydantic import BaseModel
-from conftest import http_server_thread
-from http.server import BaseHTTPRequestHandler
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class _Row(BaseModel):
@@ -25,13 +28,18 @@ def _write_bad_csv(path: Path) -> None:
 
 def _write_bad_ndjson(path: Path) -> None:
     path.write_text(
-        json.dumps({"id": "1"}) + "\n" + json.dumps({"id": "bad"}) + "\n" + json.dumps({"id": "2"}) + "\n",
+        json.dumps({"id": "1"})
+        + "\n"
+        + json.dumps({"id": "bad"})
+        + "\n"
+        + json.dumps({"id": "2"})
+        + "\n",
         encoding="utf-8",
     )
 
 
 def _write_bad_parquet(path: Path) -> None:
-    # Persist as Utf8 so the scan yields strings; then schema expects int and one row fails.
+    # Persist as Utf8 so the scan yields strings; schema expects int and one row fails.
     export_parquet(path, {"id": ["1", "bad", "2"]})
 
 
@@ -97,14 +105,16 @@ def test_lazy_read_ignore_errors_applies_on_materialize_dataframe_and_model(
         ("ipc", _write_bad_ipc, "read_ipc"),
     ],
 )
-def test_lazy_read_strict_raises_on_bad_row(tmp_path: Path, fmt: str, writer: object, df_read: str) -> None:
+def test_lazy_read_strict_raises_on_bad_row(
+    tmp_path: Path, fmt: str, writer: object, df_read: str
+) -> None:
     pytest.importorskip("pydantable._core")
 
     path = tmp_path / f"strict.{fmt}"
     writer(path)  # type: ignore[misc]
 
     df = getattr(DataFrame[_Row], df_read)(str(path))
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         _ = df.to_dict()
 
 
@@ -200,7 +210,7 @@ async def test_dataframe_aread_strict_raises_on_bad_row(
     writer(path)  # type: ignore[misc]
 
     df = await getattr(DataFrame[_Row], df_aread)(str(path))
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         _ = df.to_dict()
 
 
@@ -215,7 +225,7 @@ def test_trusted_mode_shape_only_warns_and_does_not_filter(tmp_path: Path) -> No
     _write_bad_parquet(path)
 
     df = DataFrame[_Row].read_parquet(str(path), trusted_mode="shape_only")
-    with pytest.raises(ValueError, match="non-nullable.*null"):
+    with pytest.raises(ValueError, match=r"non-nullable.*null"):
         _ = df.to_dict()
 
 
@@ -226,7 +236,7 @@ def test_trusted_mode_strict_raises(tmp_path: Path) -> None:
     _write_bad_parquet(path)
     df = DataFrame[_Row].read_parquet(str(path), trusted_mode="strict")
     # With schema typing applied during execution, bad parses may become nulls.
-    with pytest.raises(ValueError, match="non-nullable.*null"):
+    with pytest.raises(ValueError, match=r"non-nullable.*null"):
         _ = df.to_dict()
 
 
@@ -252,7 +262,7 @@ def test_ignore_errors_is_only_effective_in_off_mode(tmp_path: Path) -> None:
         ignore_errors=True,
         on_validation_errors=on_fail,
     )
-    with pytest.raises(ValueError, match="non-nullable.*null"):
+    with pytest.raises(ValueError, match=r"non-nullable.*null"):
         _ = df.to_dict()
     assert called is False
 
@@ -286,7 +296,9 @@ def test_lazy_read_collect_honors_ignore_errors(tmp_path: Path) -> None:
     assert {"type", "loc", "msg", "input"} <= set(first_err.keys())
 
 
-def test_lazy_read_to_polars_and_to_arrow_reflect_filtered_output(tmp_path: Path) -> None:
+def test_lazy_read_to_polars_and_to_arrow_reflect_filtered_output(
+    tmp_path: Path,
+) -> None:
     pytest.importorskip("pydantable._core")
 
     path = tmp_path / "interop.csv"
@@ -294,11 +306,11 @@ def test_lazy_read_to_polars_and_to_arrow_reflect_filtered_output(tmp_path: Path
 
     df = DataFrame[_Row].read_csv(str(path), ignore_errors=True)
 
-    pl = pytest.importorskip("polars")
+    pytest.importorskip("polars")
     pdf = df.to_polars()
     assert pdf.to_dict(as_series=False) == {"id": [1, 2]}
 
-    pa = pytest.importorskip("pyarrow")
+    pytest.importorskip("pyarrow")
     tbl = df.to_arrow()
     assert tbl.to_pydict() == {"id": [1, 2]}
 
@@ -338,4 +350,3 @@ def test_read_parquet_url_ignore_errors_applies_on_materialize(tmp_path: Path) -
     finally:
         server.shutdown()
         server.server_close()
-

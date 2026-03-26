@@ -878,7 +878,11 @@ def validate_columns_strict(
     if missing_optional_cols:
         if not fill_missing_optional:
             missing_without_default = sorted(
-                [c for c in missing_optional_cols if c not in missing_optional_with_defaults]
+                [
+                    c
+                    for c in missing_optional_cols
+                    if c not in missing_optional_with_defaults
+                ]
             )
             if missing_without_default:
                 raise ValueError(
@@ -887,7 +891,7 @@ def validate_columns_strict(
                 )
         n_rows = next(iter(lengths), 0)
         for name in missing_optional_cols:
-            fill_value = missing_optional_with_defaults.get(name, None)
+            fill_value = missing_optional_with_defaults.get(name)
             normalized[name] = [fill_value] * n_rows
     else:
         n_rows = next(iter(lengths), 0)
