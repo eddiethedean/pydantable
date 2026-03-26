@@ -135,6 +135,14 @@ For **`DataFrameModel`** and **`DataFrame[Schema]`**, use **`trusted_mode`** to 
 Under **`trusted_mode="shape_only"`**, **`DtypeDriftWarning`** may be emitted when data
 would fail **`strict`** checks; see {doc}`SUPPORTED_TYPES` (“Runtime column payloads”).
 
+**Row list vs column dict:** If you pass a **sequence of row mappings or models** (not a
+column dictionary), each row is still validated with **`RowModel.model_validate`** first.
+When **`trusted_mode`** is omitted or **`"off"`**, the inner **`DataFrame`** is opened
+with **`trusted_mode="shape_only"`** for the resulting column pass so values are not
+validated twice. Values you pass as **`trusted_mode="shape_only"`** or **`"strict"`**
+apply to that **inner columnar** ingest step; they do **not** replace per-row validation
+for row-sequence inputs.
+
 Low-level column validation also lives in **`pydantable.schema.validate_columns_strict`** (with an optional **`validate_elements`** bridge for direct callers).
 
 ### Handling bad input rows (`ignore_errors`)

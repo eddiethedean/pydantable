@@ -180,10 +180,6 @@ ignore_missing_imports = true
 module = "google.cloud"
 ignore_missing_imports = true
 
-[[tool.mypy.overrides]]
-module = "google.cloud.bigquery"
-ignore_missing_imports = true
-
 [tool.pytest.ini_options]
 pythonpath = ["python"]
 testpaths = ["tests"]

@@ -47,11 +47,23 @@ def register_writer(
 
 
 def get_reader(name: str) -> Callable[..., Any]:
-    return _READERS[name].fn
+    try:
+        return _READERS[name].fn
+    except KeyError:
+        known = ", ".join(sorted(_READERS)) or "(none)"
+        raise ValueError(
+            f"unknown reader {name!r}; registered readers: {known}"
+        ) from None
 
 
 def get_writer(name: str) -> Callable[..., Any]:
-    return _WRITERS[name].fn
+    try:
+        return _WRITERS[name].fn
+    except KeyError:
+        known = ", ".join(sorted(_WRITERS)) or "(none)"
+        raise ValueError(
+            f"unknown writer {name!r}; registered writers: {known}"
+        ) from None
 
 
 def list_readers() -> list[PluginFn]:

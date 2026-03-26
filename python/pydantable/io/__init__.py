@@ -182,9 +182,15 @@ def read_parquet_url(
         with os.fdopen(fd, "wb") as f:
             f.write(data)
     except Exception:
-        os.unlink(name)
+        with suppress(OSError):
+            os.unlink(name)
         raise
-    return _scan_file_root(name, "parquet", columns=columns, scan_kwargs=None)
+    try:
+        return _scan_file_root(name, "parquet", columns=columns, scan_kwargs=None)
+    except Exception:
+        with suppress(OSError):
+            os.unlink(name)
+        raise
 
 
 @contextmanager

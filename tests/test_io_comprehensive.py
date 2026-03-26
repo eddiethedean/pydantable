@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import tempfile as _stdlib_tempfile
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from conftest import http_server_thread
@@ -757,3 +759,27 @@ def test_read_parquet_url_tmp_then_cleanup(tmp_dir: Path) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_read_parquet_url_unlinks_temp_when_scan_root_fails() -> None:
+    paths: list[str] = []
+    real_mkstemp = _stdlib_tempfile.mkstemp
+
+    def track_mkstemp(*args: object, **kwargs: object) -> tuple[int, str]:
+        fd, name = real_mkstemp(*args, **kwargs)
+        paths.append(name)
+        return fd, name
+
+    with (
+        patch("pydantable.io.tempfile.mkstemp", side_effect=track_mkstemp),
+        patch("pydantable.io.fetch_bytes", return_value=b"x"),
+        patch(
+            "pydantable.io._scan_file_root",
+            side_effect=ValueError("scan root failed"),
+        ),
+        pytest.raises(ValueError, match="scan root failed"),
+    ):
+        read_parquet_url("http://example.com/fake.parquet", experimental=True)
+
+    assert len(paths) == 1
+    assert not Path(paths[0]).exists()
