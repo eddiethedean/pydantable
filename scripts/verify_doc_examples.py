@@ -12,12 +12,25 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
+from pathlib import Path
 
 from pydantable import DataFrameModel
 from pydantable.pandas import DataFrameModel as PandasDataFrameModel
 from pydantable.pyspark import DataFrameModel as PySparkDataFrameModel
 from pydantable.pyspark.sql import functions as F
 from pydantic import BaseModel
+
+PROJECT_ROOT = str(Path(__file__).resolve().parents[1])
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from scripts.doc_examples.cookbook import (
+    run_fastapi_async_materialization,
+    run_fastapi_columnar_bodies,
+    run_transforms_join_groupby,
+    run_windows_framing_primer,
+)
 
 
 def _sort_rows_by_country(out: dict[str, list]) -> dict[str, list]:
@@ -394,7 +407,14 @@ else:
     _at = _df_pq.to_arrow()
     assert _at.column("id").to_pylist() == [1]
 
+# Cookbook (new docs section)
+run_fastapi_columnar_bodies()
+run_fastapi_async_materialization()
+run_transforms_join_groupby()
+run_windows_framing_primer()
+
 print("verify_doc_examples: ok", flush=True)
+
 # Intermittent SIGABRT (exit 134) during interpreter teardown after successful
 # runs (PyO3 / Polars native drops). Skip normal shutdown when run as ``__main__``
 # so CI does not need to treat 134 as success.
