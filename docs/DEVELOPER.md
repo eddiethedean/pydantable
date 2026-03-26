@@ -13,11 +13,15 @@ This guide is for contributors working on `pydantable` internals.
 From repo root:
 
 ```bash
-PYENV_VERSION=3.10.18 python -m venv .venv
+python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip setuptools wheel
-.venv/bin/python -m pip install maturin pytest pytest-asyncio ruff basedpyright
-.venv/bin/python -m pip install -e .
+# Editable install + test/lint/docs extras (matches CI-ish dev env):
+.venv/bin/python -m pip install -e ".[dev,docs]"
+# Build the extension (required for lazy I/O tests and accurate doc version):
+maturin develop --manifest-path pydantable-core/Cargo.toml
 ```
+
+Minimal alternative (narrower deps): **`pip install maturin pytest pytest-asyncio ruff`** then **`pip install -e .`** — you still need **`maturin develop`** (or **`pip install .`**) for **`pydantable._core`**.
 
 Activate when working interactively:
 

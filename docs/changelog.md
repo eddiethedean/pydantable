@@ -11,7 +11,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Added
 
-- **Docs:** {doc}`IO_DECISION_TREE` — how to choose lazy vs eager I/O and **`pydantable.io`** vs top-level exports; engine matrix in {doc}`IO_OVERVIEW`; FASTAPI guidance on default **`asyncio.to_thread`** vs injected **`ThreadPoolExecutor`**.
+- **Docs:** {doc}`IO_DECISION_TREE` — how to choose lazy vs eager I/O and **`pydantable.io`** vs top-level exports; engine matrix in {doc}`IO_OVERVIEW`; FASTAPI guidance on default **`asyncio.to_thread`** vs injected **`ThreadPoolExecutor`**. README and **index** / **EXECUTION** / **DATAFRAMEMODEL** / **QUICKSTART** / **DEVELOPER** refreshed for **0.23.x** I/O (JSON, URL context managers, **`MissingRustExtensionError`**, **`max_bytes`**).
 - **`MissingRustExtensionError`:** subclass of **`NotImplementedError`** with a stable message when the compiled **`pydantable._core`** extension is missing or incomplete (lazy scans, sinks, **`execute_plan`**).
 - **`read_parquet_url_ctx` / `aread_parquet_url_ctx`:** context managers that delete the temporary Parquet file when the block exits (see {doc}`IO_HTTP`).
 - **`DataFrameModel`:** classmethods **`export_*`**, **`write_sql`** / **`awrite_sql`**, **`from_sql`** / **`afrom_sql`** delegating to **`pydantable.io`**.

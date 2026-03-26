@@ -4,6 +4,7 @@
 
 For **execution semantics** (lazy vs collect, Rust engine), see {doc}`EXECUTION`. For **roadmap-style** “what to support next,” see {doc}`DATA_IO_SOURCES`. **Which API should I call?** See {doc}`IO_DECISION_TREE`.
 
+(full-api-in-pydantableio)=
 ## Full API in `pydantable.io`
 
 The **`pydantable`** package re-exports a small subset of I/O (Parquet-focused lazy reads and common helpers). **Every** public I/O function lives under **`pydantable.io`** — use **`from pydantable.io import …`** for CSV/NDJSON/IPC **`materialize_*`**, **`export_*`**, **`fetch_*_url`**, **`write_sql`**, **`extras`**, and async mirrors.
@@ -12,9 +13,10 @@ The **`pydantable`** package re-exports a small subset of I/O (Parquet-focused l
 
 | What | `DataFrame[Schema]` | `DataFrameModel` subclass |
 |------|------------------------|----------------------------|
-| **Lazy local file** | **`read_parquet`**, **`read_csv`**, **`read_ndjson`**, **`read_ipc`** | **`MyModel.read_*`** — classmethods; same **`**scan_kwargs`** |
+| **Lazy local file** | **`read_parquet`**, **`read_csv`**, **`read_ndjson`**, **`read_ipc`**, **`read_json`** | **`MyModel.read_*`** — classmethods; same **`**scan_kwargs`** |
 | **Lazy Parquet URL** | **`read_parquet_url`** | **`MyModel.read_parquet_url`** — **`**kwargs`** for **`fetch_bytes`** only |
-| **Async lazy reads** | Use **`pydantable.io.aread_*`** and wrap, or **`DataFrame`** from root — **DataFrameModel** has **`aread_parquet`**, **`aread_csv`**, **`aread_ndjson`**, **`aread_ipc`** (optional **`executor=`**). **No** **`aread_parquet_url`** on the model — use **`io.aread_parquet_url`** + **`DataFrame`** if needed. |
+| **Temp Parquet URL cleanup** | Build frame inside **`read_parquet_url_ctx`** ( **`io`** ) or use **`DataFrameModel.read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** | Same — context managers unlink the download when the block exits ({doc}`IO_HTTP`) |
+| **Async lazy reads** | **`DataFrame[Schema]`** exposes sync **`read_*`** only — use **`DataFrameModel.aread_*`**, or **`await pydantable.io.aread_*`** and build the typed frame the same way sync **`read_parquet`** does from a **`ScanFileRoot`**. | **`aread_parquet`**, **`aread_csv`**, **`aread_ndjson`**, **`aread_ipc`**, **`aread_json`**, optional **`executor=`**; URL temp file without ctx: **`io.aread_parquet_url`**. |
 | **Eager reads** | Constructor **`DataFrame[Schema](cols)`** from **`dict[str, list]`** | **`materialize_*`**, **`fetch_sql`**, **`amaterialize_*`**, **`afetch_sql`** classmethods |
 | **Lazy writes** | **`write_parquet`**, **`write_csv`**, **`write_ipc`**, **`write_ndjson`** | Same **instance** methods on **`model`** — **`streaming`**, **`write_kwargs`**, etc. |
 
@@ -42,7 +44,7 @@ Use these when you want **`ScanFileRoot`**, raw column dicts, or file I/O withou
 | Layer | Role |
 |-------|------|
 | **`read_*` / `aread_*`** | Lazy **local file** scan → **`ScanFileRoot`** → Polars **`LazyFrame`** in the Rust plan (no full column lists in Python). |
-| **`read_parquet_url` / `aread_parquet_url`** | HTTP(S) download to a **temp Parquet file**, then same lazy root (you must delete the temp path when done). |
+| **`read_parquet_url` / `aread_parquet_url`** | HTTP(S) download to a **temp Parquet file**, then same lazy root — prefer **`read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** for automatic cleanup ({doc}`IO_HTTP`). |
 | **`materialize_*` / `amaterialize_*`** | Eager **`dict[str, list]`** (Rust and/or PyArrow / stdlib, depending on path). |
 | **`fetch_*_url`**, **`fetch_sql`**, **`read_from_object_store`**, **`pydantable.io.extras`** | Other sources that return **`dict[str, list]`** (or build column dicts) for **`DataFrameModel`** / constructors. |
 | **`export_*` / `aexport_*`**, **`write_sql` / `awrite_sql`** | Eager writes from an in-memory column dict or your own pipeline. |
@@ -54,6 +56,7 @@ Use these when you want **`ScanFileRoot`**, raw column dicts, or file I/O withou
 | **Parquet** (files, URLs, lazy write) | {doc}`IO_PARQUET` |
 | **CSV** | {doc}`IO_CSV` |
 | **NDJSON** (newline-delimited JSON) | {doc}`IO_NDJSON` |
+| **JSON** (array of objects; lazy + materialize) | {doc}`IO_JSON` |
 | **Arrow IPC / Feather file** | {doc}`IO_IPC` |
 | **HTTP(S), object stores** | {doc}`IO_HTTP` |
 | **SQL** (SQLAlchemy) | {doc}`IO_SQL` |

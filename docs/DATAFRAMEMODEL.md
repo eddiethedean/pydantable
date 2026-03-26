@@ -46,6 +46,10 @@ In **Jupyter** / **VS Code** notebooks, **`user_df`** (or the last expression in
 
 **Discovery (`0.20.0+`):** **`DataFrameModel`** delegates **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, and **`describe()`** to the inner **`DataFrame`**—same semantics as the core API ({doc}`INTERFACE_CONTRACT` **Introspection**, {doc}`EXECUTION` **`info()` / `describe()`**).
 
+## Classmethod I/O (`0.23.0+`)
+
+**`DataFrameModel`** mirrors **`pydantable.io`** for the common paths: lazy **`read_*` / `aread_*`**, eager **`materialize_*` / `fetch_sql` / `from_sql`**, lazy **`read_parquet_url`** and context **`read_parquet_url_ctx` / `aread_parquet_url_ctx`**, eager **`export_*`**, and **`write_sql` / `awrite_sql`**. Same arguments and semantics as the module functions; see {doc}`IO_OVERVIEW` and per-format guides under **Data I/O** in the toctree.
+
 ## Input formats (all supported)
 
 `UserDF(...)` accepts **columnar data**, **row dicts**, or **sequences of Pydantic models** (including `UserDF.RowModel` instances).

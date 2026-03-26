@@ -17,7 +17,7 @@
 - **Schemas first:** Pydantic field annotations define column types, nullability (`T | None`), and which expressions are legal. Many mistakes are caught when you build the `Expr`, not only when you run the query.
 - **Two entry styles:** `DataFrameModel` (SQLModel-like whole-table class with a generated row model) or `DataFrame[YourSchema](data)` with any Pydantic `BaseModel` schema.
 - **Polars-shaped API:** `select`, `with_columns`, `filter`, `join`, `group_by`, windows, reshape helpers — semantics are documented in the [interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html), not guaranteed identical to Polars on every edge case.
-- **I/O:** **Primary** — **`DataFrame` / `DataFrameModel`** — lazy **`read_*` / `write_*`**, eager **`materialize_*` / `fetch_sql`**, Polars options via **`scan_kwargs`** / **`write_kwargs`**. **Secondary** — **`pydantable.io`** — lazy **`ScanFileRoot`**, raw column dicts, **`export_*`**, **`write_sql`**, URL/object-store helpers when you do not construct a typed frame first. The top-level package re-exports only a small subset; **use `from pydantable.io import …` for the full API** (CSV/NDJSON/IPC materialize/export, HTTP helpers, extras). [I/O decision tree](https://pydantable.readthedocs.io/en/latest/IO_DECISION_TREE.html), [I/O overview](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html), [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html).
+- **I/O:** **Primary** — **`DataFrame` / `DataFrameModel`** — lazy **`read_*` / `write_*`** (Parquet, CSV, NDJSON, IPC, **JSON array-of-objects** via **`read_json`**), eager **`materialize_*` / `fetch_sql`**, **`export_*` / `write_sql`**, SQL **`from_sql`**, Polars options via **`scan_kwargs`** / **`write_kwargs`**. **HTTP Parquet:** **`read_parquet_url`** leaves a temp file on disk; use **`read_parquet_url_ctx` / `aread_parquet_url_ctx`** ( **`pydantable.io`** or **`DataFrameModel`**) to unlink it when the block exits. **Secondary** — **`pydantable.io`** — full mirror: lazy roots, column dicts, **`fetch_*_url`**, object store (**`max_bytes`** guards), extras. Top-level **`pydantable`** re-exports a small subset; **`from pydantable.io import …`** is the complete module API. If the native extension is missing, lazy scan/sink paths can raise **`MissingRustExtensionError`** (subclass of **`NotImplementedError`**). [I/O decision tree](https://pydantable.readthedocs.io/en/latest/IO_DECISION_TREE.html), [I/O overview](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html), [HTTP & object stores](https://pydantable.readthedocs.io/en/latest/IO_HTTP.html), [JSON files](https://pydantable.readthedocs.io/en/latest/IO_JSON.html), [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html).
 - **Optional extras:** `pydantable[polars]` for `to_polars()` and **`export_*`** (**`dict[str, list]` → file**); `pydantable[arrow]` for **buffer/streaming** Parquet/IPC, `to_arrow` / `ato_arrow`, and `pa.Table` / `RecordBatch` constructors; `pydantable[io]` bundles **arrow + polars** for full **I/O**; **`[sql]`** for `fetch_sql` / `write_sql` (**SQLAlchemy**; add **psycopg**, **pymysql**, etc. for your database URLs); **`[cloud]`**, **`[excel]`**, **`[kafka]`**, **`[bq]`**, **`[snowflake]`**, **`[rap]`** for other bridges in **`docs/DATA_IO_SOURCES.md`**.
 - **Optional façades:** `pydantable.pandas` and `pydantable.pyspark` swap naming/imports; execution stays the same in-process core (not a real Spark or pandas backend).
 - **Service-ready:** Sync and async materialization (`collect`, `to_dict`, `acollect`, `ato_dict`, …), [FastAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) patterns, and trusted ingest modes for bulk JSON or Arrow.
@@ -44,8 +44,13 @@ The **canonical manual** is on Read the Docs: **[https://pydantable.readthedocs.
 | **FastAPI** (routers, bodies, async, multipart) | [FastAPI integration](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) |
 | **Execution** (`collect`, `to_dict`, `to_polars`, `to_arrow`, async, `repr`) | [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) |
 | **Data I/O** (primary: `DataFrame` / `DataFrameModel`; secondary: `pydantable.io`) | [I/O overview](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html) |
+| **Choosing an I/O API** (lazy vs eager, `io` vs typed frame) | [I/O decision tree](https://pydantable.readthedocs.io/en/latest/IO_DECISION_TREE.html) |
+| **HTTP(S) & object stores** (URLs, fsspec, temp Parquet lifecycle) | [I/O HTTP](https://pydantable.readthedocs.io/en/latest/IO_HTTP.html) |
+| **JSON** (array of objects: lazy `read_json`, materialize/export) | [I/O JSON](https://pydantable.readthedocs.io/en/latest/IO_JSON.html) |
+| **Data sources & transports** (planning, FastAPI async stacks) | [Data I/O sources](https://pydantable.readthedocs.io/en/latest/DATA_IO_SOURCES.html) |
+| **Streamlit** (`st.dataframe`, interchange, editors) | [Streamlit](https://pydantable.readthedocs.io/en/latest/STREAMLIT.html) |
 | **Semantics** (nulls, joins, windows, reshape) | [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) |
-| **Roadmap** (shipped **0.20.0** UX / discovery, path to **v1.0.0**) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
+| **Roadmap** (shipped **0.23.x** I/O, **0.20.x** UX, path to **v1.0.0**) | [Roadmap](https://pydantable.readthedocs.io/en/latest/ROADMAP.html) |
 | **Why not Polars alone?** | [Why not just use Polars?](https://pydantable.readthedocs.io/en/latest/WHY_NOT_POLARS.html) |
 | **Pandas-style API** (`pydantable.pandas`) | [Pandas UI](https://pydantable.readthedocs.io/en/latest/PANDAS_UI.html) |
 | **PySpark-style API** (`pydantable.pyspark`) | [PySpark UI](https://pydantable.readthedocs.io/en/latest/PYSPARK_UI.html) · [Parity matrix](https://pydantable.readthedocs.io/en/latest/PYSPARK_PARITY.html) |
@@ -136,6 +141,8 @@ PySpark-named wrappers: `pydantable.pyspark.sql.functions` mirrors much of the a
 
 ## Recent releases
 
+**0.23.0** — **Lazy file roots and I/O vocabulary:** out-of-core **`read_*` / `aread_*`** (**`ScanFileRoot`**) for Parquet, CSV, NDJSON, IPC, and **JSON**; **`DataFrame` / `DataFrameModel`** **`write_*`** for lazy pipeline sinks; eager reads named **`materialize_*`**; eager dict→file **`export_*`**; SQL **`fetch_sql` / `write_sql`** and **`from_sql`** on **`DataFrameModel`**; HTTP column readers **`fetch_*_url`**; lazy HTTP Parquet **`read_parquet_url`** with optional **`read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** for temp-file cleanup; **`fetch_bytes` / `read_from_object_store`** support **`max_bytes`**. **`MissingRustExtensionError`** when the compiled extension is absent on scan/sink paths. Docs: [I/O decision tree](https://pydantable.readthedocs.io/en/latest/IO_DECISION_TREE.html), [I/O overview](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html), [I/O HTTP](https://pydantable.readthedocs.io/en/latest/IO_HTTP.html), [I/O JSON](https://pydantable.readthedocs.io/en/latest/IO_JSON.html), [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html).
+
 **0.21.0** — **Streamlit ergonomics:** `DataFrame` / `DataFrameModel` implement the **dataframe interchange protocol** (`__dataframe__`) via PyArrow so **`st.dataframe(df)`** can render typed frames directly when `pyarrow` is installed (`pip install 'pydantable[arrow]'`). See [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) (**interchange**) and [Streamlit integration](https://pydantable.readthedocs.io/en/latest/STREAMLIT.html) for editing fallbacks (`st.data_editor(df.to_arrow())` / `to_polars()`), costs, and limitations.
 
 **0.20.0** — **UX, discovery, docs, and display:** [Quickstart](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html), [Execution](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) (materialization costs, import styles, copy-as / interchange); core **`columns`**, **`shape`**, **`info()`**, **`describe()`** (int/float/bool/str), **`value_counts`**, **`set_display_options`** / **`PYDANTABLE_REPR_HTML_*`**, **`_repr_mimebundle_`**, optional **`PYDANTABLE_VERBOSE_ERRORS`**; **`Expr`** / **`WhenChain`** **`repr`**; PySpark **`show()`** / **`summary()`**; multi-line **`DataFrame`** **`repr`** and **`_repr_html_`**. [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html), [Interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) **Introspection**.
@@ -148,8 +155,6 @@ PySpark-named wrappers: `pydantable.pyspark.sql.functions` mirrors much of the a
 
 **0.16.x** — Arrow interchange (eager Parquet/IPC readers, `to_arrow` / `ato_arrow`, Table/RecordBatch constructors), FastAPI multipart and deployment docs, map-column arithmetic `TypeError` fix, `DataFrame[Schema](pa.Table)` constructor fix.
 
-**0.23.0** — Out-of-core lazy file roots (**`read_*` / `aread_*`**), **`DataFrame` / `DataFrameModel`** **`write_*`** pipeline output, **`export_*`** for eager dict→file, **`materialize_*` / `fetch_sql`** naming; **`pydantable.io`** remains the module-level mirror; see [I/O overview](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html), [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html).
-
 Older highlights: **0.15.0** async materialization and Arrow map ingest; **0.14.0** window null ordering and FastAPI `TestClient` coverage. Full history: [Changelog](https://pydantable.readthedocs.io/en/latest/changelog.html).
 
 ---
@@ -159,8 +164,8 @@ Older highlights: **0.15.0** async materialization and Arrow map ingest; **0.14.
 From a clone with `.venv` and `pip install -e ".[dev]"` plus a built extension:
 
 ```bash
-make check-full              # Ruff, mypy, Rust fmt / clippy / tests
-PYTHONPATH=python pytest -q  # integration tests (see DEVELOPER.md)
+make check-full                    # Ruff, mypy, Rust fmt / clippy / tests
+PYTHONPATH=python pytest -q -n auto  # full suite; omit -n auto for single-process
 ```
 
 Rust tests need the Makefile `PYO3_PYTHON` / `PYTHONPATH` wiring: `make rust-test`. Details: [Developer guide](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html).

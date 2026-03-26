@@ -61,3 +61,5 @@ Use `to_polars()` / `to_arrow()` when the optional extras are installed ({doc}`E
 - {doc}`DATAFRAMEMODEL` — `DataFrameModel`, validation, transforms
 - {doc}`EXECUTION` — materialization cost, async, display limits
 - {doc}`INTERFACE_CONTRACT` — semantics (joins, nulls, `shape` vs executed rows)
+- {doc}`IO_DECISION_TREE` — pick lazy vs eager I/O and `pydantable.io` vs typed constructors
+- {doc}`IO_OVERVIEW` — per-format tables (Parquet, CSV, NDJSON, JSON, IPC, HTTP, SQL)
