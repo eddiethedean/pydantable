@@ -288,6 +288,8 @@ Pass **`executor=None`** (omit **`Depends`**) to keep **`asyncio.to_thread`** as
 
 Use the **same** injected executor for **`await amaterialize_parquet(..., executor=ex)`** / **`await afetch_sql(..., executor=ex)`** when you want file and SQL I/O to share the pool with **`await df.acollect(executor=ex)`**.
 
+**When to use the default thread pool vs a shared `ThreadPoolExecutor`:** The default (**`executor=None`**) uses **`asyncio.to_thread`**, which schedules work on the interpreter’s default executor—fine for light or sporadic I/O. Prefer a **dedicated bounded** **`ThreadPoolExecutor`** (injected via **`Depends`** or **`app.state`**) when you need predictable concurrency limits, shared naming for observability, coordinated shutdown in **`lifespan`**, or to avoid competing with other libraries for the default pool under load. Neither choice makes Rust execution “more async”; both offload blocking work from the event loop.
+
 ## Background tasks
 
 Use Starlette **`BackgroundTasks`** for work that must run **after** the response is sent (e.g. logging metrics, cache warming). Background code **cannot** change the HTTP body; exceptions should be logged or handled inside the task— they do **not** become **`500`** responses. For dataframe work that must complete before the client receives data, keep **`await df.ato_dict()`** (or similar) in the handler instead.

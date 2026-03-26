@@ -7,10 +7,16 @@ All notable changes to this project are documented here. The format is inspired 
 ### Changed
 
 - **Breaking — lazy I/O naming:** **`scan_*` / `ascan_*`** → **`read_*` / `aread_*`**; **`DataFrame.sink_*` / `DataFrameModel.sink_*`** → **`write_*`**. Eager **`dict[str, list]` → file** in **`pydantable.io`** is **`export_*` / `aexport_*`** (not **`write_*`**, which now means lazy plan output on **`DataFrame`**). Top-level **`pydantable`** re-exports **`read_parquet`**, **`read_parquet_url`**, **`aread_parquet`**, **`aread_parquet_url`**, **`export_parquet`** (replacing **`scan_*`** / **`write_parquet`**).
+- **Errors:** Missing-extension failures from **`_scan_file_root`**, **`rust_engine`** sinks, and **`execute_plan`** now raise **`MissingRustExtensionError`** where applicable (still catchable as **`NotImplementedError`**).
 
 ### Added
 
-(none yet)
+- **Docs:** {doc}`IO_DECISION_TREE` — how to choose lazy vs eager I/O and **`pydantable.io`** vs top-level exports; engine matrix in {doc}`IO_OVERVIEW`; FASTAPI guidance on default **`asyncio.to_thread`** vs injected **`ThreadPoolExecutor`**.
+- **`MissingRustExtensionError`:** subclass of **`NotImplementedError`** with a stable message when the compiled **`pydantable._core`** extension is missing or incomplete (lazy scans, sinks, **`execute_plan`**).
+- **`read_parquet_url_ctx` / `aread_parquet_url_ctx`:** context managers that delete the temporary Parquet file when the block exits (see {doc}`IO_HTTP`).
+- **`DataFrameModel`:** classmethods **`export_*`**, **`write_sql`** / **`awrite_sql`**, **`from_sql`** / **`afrom_sql`** delegating to **`pydantable.io`**.
+- **HTTP / object store safety:** **`max_bytes`** on **`fetch_bytes`** and **`read_from_object_store`**; chunked reads with **`ValueError`** when exceeded.
+- **JSON (array of objects):** **`read_json`**, **`materialize_json`**, **`export_json`**, **`aread_json`**, **`amaterialize_json`**, **`aexport_json`** — local lazy scan and eager column dicts (see {doc}`IO_JSON`).
 
 ## [0.23.0] — 2026-03-25
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from . import pandas as pandas
 from . import pyspark as pyspark
+from ._extension import MissingRustExtensionError
 from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
 from .display import get_repr_html_limits, reset_display_options, set_display_options
@@ -36,6 +37,7 @@ __all__ = [
     "DataFrameModel",
     "DtypeDriftWarning",
     "Expr",
+    "MissingRustExtensionError",
     "Schema",
     "afetch_sql",
     "amaterialize_parquet",

@@ -92,6 +92,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 "python/pydantable/io/**/*.py" = ["E501"]
 "tests/test_io_comprehensive.py" = ["TC003"]
 "tests/test_io_extras_and_transports.py" = ["TC003", "E501", "RUF012"]
+"tests/test_io_improvements.py" = ["TC003", "E501"]
 
 [tool.mypy]
 python_version = "3.10"

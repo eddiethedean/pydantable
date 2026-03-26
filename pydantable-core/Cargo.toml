@@ -12,6 +12,7 @@ crate-type = ["cdylib"]
 [features]
 # `polars_engine`: plan execution + `io_*` file helpers (Parquet/IPC/CSV/NDJSON).
 # Optional Python extras (`[polars]`, `[arrow]`, …) mirror this for dict-round-trip writes.
+# Future packaging could add sub-features to trim Polars codec deps (wheel size); see docs/DEVELOPER.md.
 default = ["polars_engine"]
 polars_engine = ["dep:polars", "dep:polars-io", "dep:numpy"]
 

@@ -2,7 +2,11 @@
 
 **Primary API:** **`DataFrame[Schema]`** and **`DataFrameModel`** — instance and classmethods for lazy reads, eager materialization, and lazy writes (Rust-backed where documented). **Secondary:** **`pydantable.io`** module functions — same operations without a typed frame (return **`ScanFileRoot`**, **`dict[str, list]`**, or write from raw column dicts).
 
-For **execution semantics** (lazy vs collect, Rust engine), see {doc}`EXECUTION`. For **roadmap-style** “what to support next,” see {doc}`DATA_IO_SOURCES`.
+For **execution semantics** (lazy vs collect, Rust engine), see {doc}`EXECUTION`. For **roadmap-style** “what to support next,” see {doc}`DATA_IO_SOURCES`. **Which API should I call?** See {doc}`IO_DECISION_TREE`.
+
+## Full API in `pydantable.io`
+
+The **`pydantable`** package re-exports a small subset of I/O (Parquet-focused lazy reads and common helpers). **Every** public I/O function lives under **`pydantable.io`** — use **`from pydantable.io import …`** for CSV/NDJSON/IPC **`materialize_*`**, **`export_*`**, **`fetch_*_url`**, **`write_sql`**, **`extras`**, and async mirrors.
 
 ## Primary API: `DataFrame` and `DataFrameModel`
 
@@ -16,7 +20,20 @@ For **execution semantics** (lazy vs collect, Rust engine), see {doc}`EXECUTION`
 
 Optional validation on eager paths: **`trusted_mode`**, **`ignore_errors`**, **`on_validation_errors`** (see {doc}`DATAFRAMEMODEL`).
 
-**Not on the model:** **`export_*`**, **`write_sql`**, **`awrite_sql`**, and **`pydantable.io.extras`** — call those module functions with a **`dict[str, list]`**, or build **`DataFrame` / `DataFrameModel`** from the result.
+**Glue I/O on `DataFrameModel`:** classmethods **`export_*`**, **`write_sql`** / **`awrite_sql`**, **`from_sql`** / **`afrom_sql`** delegate to **`pydantable.io`** (same signatures as the module functions). **`pydantable.io.extras`** remains module-only.
+
+## Engine matrix (`materialize_*`)
+
+**`PYDANTABLE_IO_ENGINE`:** **`auto`** (default), **`rust`**, or **`pyarrow`** where supported.
+
+| Function | Rust path (typical) | PyArrow / fallback |
+|----------|---------------------|------------------------|
+| **`materialize_parquet`** | Local file path, **`columns is None`** | **`columns`** set, or **`bytes`** / **`BinaryIO`** source, or `auto` fallback |
+| **`materialize_csv`** | Local path | stdlib **`csv`** if Rust fails under **`auto`** |
+| **`materialize_ndjson`** | Local path | Python JSON lines if Rust fails under **`auto`** |
+| **`materialize_ipc`** | Local IPC file, **`as_stream=False`** | Streams, **`as_stream=True`**, buffers |
+
+Details: {doc}`IO_DECISION_TREE` (**Engine selection**).
 
 ## Module functions (`pydantable.io`)
 

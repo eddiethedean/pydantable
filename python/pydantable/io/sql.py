@@ -15,12 +15,15 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Connection, Engine
 
 
-def _to_engine(bind: str | Engine) -> Engine:
+def _to_engine(bind: str | Engine | Connection) -> Engine:
     from sqlalchemy import create_engine
+    from sqlalchemy.engine import Connection as SAConnection
     from sqlalchemy.engine import Engine as SAEngine
 
     if isinstance(bind, SAEngine):
         return bind
+    if isinstance(bind, SAConnection):
+        return bind.engine
     return create_engine(bind)
 
 
@@ -82,7 +85,7 @@ def _infer_columns(data: dict[str, list[Any]]):
 def write_sql(
     data: dict[str, list[Any]],
     table_name: str,
-    bind: str | Engine,
+    bind: str | Engine | Connection,
     *,
     schema: str | None = None,
     if_exists: str = "append",

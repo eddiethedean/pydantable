@@ -28,6 +28,7 @@ This document lists **common and useful** places applications read and write tab
 These helpers **`fetch_bytes`** from HTTP(S), write a **named temp** **`.parquet`** file, and return **`ScanFileRoot(path, "parquet", columns)`**. The file is **not** deleted when the **`ScanFileRoot`** or **`DataFrame`** is garbage-collected.
 
 - **Delete after use:** when your pipeline finishes (after **`write_*`**, **`collect()`**, etc.), remove the path (e.g. **`os.unlink(root.path)`** if you keep a reference to the native root, or track the temp path you created).
+- **Context managers:** **`pydantable.io.read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** and **`DataFrameModel.read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** unlink the temp file when the block exits ({doc}`IO_HTTP`).
 - **Async:** **`aread_parquet_url`** runs the same work in a thread pool like other **`aread_*`** helpers.
 
 There is **no** true streaming HTTP Parquet scan without a local file or deeper Polars/object-store integration.

@@ -24,14 +24,37 @@ def _require_experimental(experimental: bool) -> None:
     )
 
 
+def _read_limited(resp: Any, max_bytes: int | None) -> bytes:
+    if max_bytes is None:
+        return resp.read()
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = resp.read(65536)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise ValueError(
+                f"download exceeds max_bytes={max_bytes}; refuse to buffer further"
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 def fetch_bytes(
     url: str,
     *,
     experimental: bool = True,
     headers: dict[str, str] | None = None,
     timeout: float = 60.0,
+    max_bytes: int | None = None,
 ) -> bytes:
-    """Download ``url`` and return raw bytes (stdlib ``urllib``)."""
+    """Download ``url`` and return raw bytes (stdlib ``urllib``).
+
+    If ``max_bytes`` is set, read in chunks and raise ``ValueError`` if the body
+    would exceed that size (partial data is not returned).
+    """
     _require_experimental(experimental)
     scheme = urlparse(url).scheme.lower()
     if scheme not in ("http", "https"):
@@ -41,7 +64,7 @@ def fetch_bytes(
     req = urllib.request.Request(url, headers=dict(headers or {}))
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read()
+            return _read_limited(resp, max_bytes)
     except urllib.error.URLError as e:
         raise OSError(f"failed to fetch {url!r}: {e}") from e
 
@@ -61,7 +84,10 @@ def fetch_parquet_url(
     columns: list[str] | None = None,
     **kwargs: Any,
 ) -> dict[str, list[Any]]:
-    """Download a Parquet file from ``url`` (HTTP(S) only) and materialize as ``dict[str, list]``."""
+    """Download a Parquet file from ``url`` (HTTP(S) only) and materialize as ``dict[str, list]``.
+
+    Extra ``kwargs`` are forwarded to :func:`fetch_bytes` (e.g. ``max_bytes``, ``timeout``).
+    """
     from .arrow import read_parquet_pyarrow
 
     _require_experimental(experimental)
@@ -125,26 +151,36 @@ def read_from_object_store(
     *,
     experimental: bool = True,
     format: str = "parquet",
+    max_bytes: int | None = None,
     **kwargs: Any,
 ) -> dict[str, list[Any]]:
     """
     Read ``s3://``, ``gs://``, or ``az://`` style URIs via ``fsspec`` (optional dependency).
 
     *Experimental*: requires ``pip install 'pydantable[cloud]'`` (or ``fsspec`` + backend).
+
+    ``max_bytes`` caps how much of the object is read into memory (streaming reads the
+    remote file in chunks until the limit). Full streaming without a cap is not implemented.
     """
     _require_experimental(experimental)
     try:
         import fsspec  # type: ignore[import-not-found]
     except ImportError as e:
         raise ImportError(
-            "object-store URIs require fsspec (pip install 'pydantable[cloud]')."
+            "object-store URIs require fsspec (pip install 'pydantable[cloud]'). "
+            "If fsspec is installed, install a backend for your URI scheme (e.g. s3fs for s3://)."
         ) from e
     scheme = urlparse(uri).scheme.lower()
     if scheme in ("http", "https"):
         raise ValueError("use fetch_parquet_url / fetch_csv_url for http(s) URLs")
     fmt = format.lower()
-    with fsspec.open(uri, "rb") as f:  # type: ignore[call-arg]
-        raw = f.read()
+    try:
+        with fsspec.open(uri, "rb") as f:  # type: ignore[call-arg]
+            raw = _read_limited(f, max_bytes)
+    except OSError as e:
+        raise OSError(
+            f"failed to open or read {uri!r} via fsspec (check URI and backend drivers): {e}"
+        ) from e
     from ._core_io import rust_read_csv_path, rust_read_ndjson_path
     from .arrow import read_parquet_pyarrow
 

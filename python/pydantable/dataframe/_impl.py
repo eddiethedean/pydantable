@@ -541,6 +541,19 @@ class DataFrame(Generic[SchemaT]):
         return cls._from_scan_root(_read_ndjson(path, columns=columns, **scan_kwargs))
 
     @classmethod
+    def read_json(
+        cls,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+        **scan_kwargs: Any,
+    ) -> DataFrame[Any]:
+        """Lazy JSON Lines (same as :meth:`read_ndjson`)."""
+        from pydantable.io import read_json as _read_json
+
+        return cls._from_scan_root(_read_json(path, columns=columns, **scan_kwargs))
+
+    @classmethod
     def read_ipc(
         cls,
         path: str | Any,

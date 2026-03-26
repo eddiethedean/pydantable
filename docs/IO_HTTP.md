@@ -12,9 +12,9 @@ By default, URL and cloud-style helpers require **`experimental=True`** on each 
 
 - **`DataFrame[Schema].read_parquet_url(url, *, experimental=True, columns=None, **kwargs)`**
 - **`MyModel.read_parquet_url(...)`** — **`kwargs`** for **`fetch_bytes`** only (not **`scan_kwargs`**).
-- **`DataFrameModel`** has **no** **`aread_parquet_url`**; use **`pydantable.io.aread_parquet_url`** and construct **`DataFrame[Schema]`** if you need async.
+- **`pydantable.io.read_parquet_url_ctx`**, **`aread_parquet_url_ctx`**, and **`DataFrameModel.read_parquet_url_ctx`**, **`aread_parquet_url_ctx`** delete the temp file when the context block exits (preferred when you do not need the path yourself).
 
-The temp **`.parquet`** is **not** auto-deleted; see {doc}`IO_PARQUET` and {doc}`DATA_IO_SOURCES`.
+The temp **`.parquet`** from the non-context **`read_parquet_url`** is **not** auto-deleted; see {doc}`IO_PARQUET` and {doc}`DATA_IO_SOURCES`.
 
 **Eager URL helpers (column dict)**
 
@@ -28,7 +28,7 @@ Pass **`read_from_object_store(...)`** output to **`MyModel(cols)`** or **`DataF
 
 ### Raw bytes
 
-- **`fetch_bytes(url, *, experimental=True, headers=None, timeout=60.0)`** — **HTTP/HTTPS** only (stdlib **`urllib`**).
+- **`fetch_bytes(url, *, experimental=True, headers=None, timeout=60.0, max_bytes=None)`** — **HTTP/HTTPS** only (stdlib **`urllib`**). Set **`max_bytes`** to cap download size (**`ValueError`** if exceeded).
 
 ### Eager format helpers (`dict[str, list]`)
 
@@ -38,17 +38,18 @@ Pass **`read_from_object_store(...)`** output to **`MyModel(cols)`** or **`DataF
 | **`fetch_csv_url`** | Temp CSV file; Rust read with stdlib fallback. |
 | **`fetch_ndjson_url`** | Temp NDJSON file; Rust read. |
 
-**`kwargs`** beyond each function’s explicit parameters are passed through to **`fetch_bytes`** (e.g. **`headers`**, **`timeout`**).
+**`kwargs`** beyond each function’s explicit parameters are passed through to **`fetch_bytes`** (e.g. **`headers`**, **`timeout`**, **`max_bytes`**).
 
 ### Lazy Parquet URL
 
-- **`read_parquet_url`**, **`aread_parquet_url`** — return **`ScanFileRoot`**; same temp-file lifecycle as above.
+- **`read_parquet_url`**, **`aread_parquet_url`** — return **`ScanFileRoot`**; temp-file lifecycle as above unless you use a context manager.
+- **`read_parquet_url_ctx(dataframe_cls, url, ...)`**, **`aread_parquet_url_ctx`** — yield **`DataFrame[Schema]`** and unlink the temp path in **`finally`**.
 
 ### Object-store URIs (`s3://`, `gs://`, `az://`, …)
 
-- **`read_from_object_store(uri, *, experimental=True, format="parquet", **kwargs)`**
+- **`read_from_object_store(uri, *, experimental=True, format="parquet", max_bytes=None)`**
 
-Requires **`fsspec`** and a backend (e.g. **`s3fs`**). Install **`pydantable[cloud]`** or add dependencies manually. **`kwargs`** are forwarded to **`fsspec.open`**. **`format`** is **`"parquet"`** (default), **`"csv"`**, or **`"ndjson"`** / **`"jsonl"`** (object is read fully into memory, then decoded).
+Requires **`fsspec`** and a backend (e.g. **`s3fs`**). Install **`pydantable[cloud]`** or add dependencies manually. **`format`** is **`"parquet"`** (default), **`"csv"`**, or **`"ndjson"`** / **`"jsonl"`** (object is read into memory in chunks until complete or **`max_bytes`**). **`max_bytes`** limits how many bytes are buffered (**`ValueError`** if exceeded).
 
 ## Runnable example
 

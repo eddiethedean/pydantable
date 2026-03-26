@@ -9,6 +9,12 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any
 
+from ._extension import MissingRustExtensionError
+
+_MISSING_SYMBOL_PREFIX = (
+    "The pydantable native extension is present but does not implement "
+)
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -31,12 +37,9 @@ _RUST_CORE = _load_rust_core()
 
 
 def _require_rust_core() -> Any:
-    """Return the loaded extension module or raise :exc:`NotImplementedError`."""
+    """Return the loaded extension module or raise :exc:`MissingRustExtensionError`."""
     if _RUST_CORE is None:
-        raise NotImplementedError(
-            "Rust extension is not available. "
-            "Build the PyO3 module so `pydantable._core` can be imported."
-        )
+        raise MissingRustExtensionError()
     return _RUST_CORE
 
 
@@ -63,7 +66,10 @@ def execute_plan(
     """
     rust = _require_rust_core()
     if not hasattr(rust, "execute_plan"):
-        raise NotImplementedError("Rust extension does not implement `execute_plan`.")
+        raise MissingRustExtensionError(
+            f"{_MISSING_SYMBOL_PREFIX}`execute_plan`. "
+            "Reinstall or rebuild pydantable. See docs/DEVELOPER.md."
+        )
     try:
         return rust.execute_plan(plan, data, as_python_lists, streaming)
     except ValueError as e:
@@ -83,7 +89,9 @@ def write_parquet(
     """Write lazy plan + root to Parquet via Rust (no Python ``dict[str, list]``)."""
     rust = _require_rust_core()
     if not hasattr(rust, "sink_parquet"):
-        raise NotImplementedError("Rust extension does not implement `sink_parquet`.")
+        raise MissingRustExtensionError(
+            f"{_MISSING_SYMBOL_PREFIX}`sink_parquet`. See docs/DEVELOPER.md."
+        )
     rust.sink_parquet(plan, root_data, path, streaming, write_kwargs)
 
 
@@ -99,7 +107,9 @@ def write_csv(
     """Write lazy plan + root to CSV via Rust."""
     rust = _require_rust_core()
     if not hasattr(rust, "sink_csv"):
-        raise NotImplementedError("Rust extension does not implement `sink_csv`.")
+        raise MissingRustExtensionError(
+            f"{_MISSING_SYMBOL_PREFIX}`sink_csv`. See docs/DEVELOPER.md."
+        )
     rust.sink_csv(plan, root_data, path, streaming, separator & 0xFF, write_kwargs)
 
 
@@ -115,7 +125,9 @@ def write_ipc(
     """Write lazy plan + root to Arrow IPC file via Rust."""
     rust = _require_rust_core()
     if not hasattr(rust, "sink_ipc"):
-        raise NotImplementedError("Rust extension does not implement `sink_ipc`.")
+        raise MissingRustExtensionError(
+            f"{_MISSING_SYMBOL_PREFIX}`sink_ipc`. See docs/DEVELOPER.md."
+        )
     rust.sink_ipc(plan, root_data, path, streaming, compression, write_kwargs)
 
 
@@ -130,7 +142,9 @@ def write_ndjson(
     """Write lazy plan + root as newline-delimited JSON via Rust."""
     rust = _require_rust_core()
     if not hasattr(rust, "sink_ndjson"):
-        raise NotImplementedError("Rust extension does not implement `sink_ndjson`.")
+        raise MissingRustExtensionError(
+            f"{_MISSING_SYMBOL_PREFIX}`sink_ndjson`. See docs/DEVELOPER.md."
+        )
     rust.sink_ndjson(plan, root_data, path, streaming, write_kwargs)
 
 
@@ -148,8 +162,8 @@ def collect_batches(
     """
     rust = _require_rust_core()
     if not hasattr(rust, "collect_plan_batches"):
-        raise NotImplementedError(
-            "Rust extension does not implement `collect_plan_batches`."
+        raise MissingRustExtensionError(
+            f"{_MISSING_SYMBOL_PREFIX}`collect_plan_batches`. See docs/DEVELOPER.md."
         )
     return list(rust.collect_plan_batches(plan, root_data, batch_size, streaming))
 
@@ -170,7 +184,9 @@ def execute_join(
     """Join two plan/data roots; returns ``(new_data, schema_descriptors)``."""
     rust = _require_rust_core()
     if not hasattr(rust, "execute_join"):
-        raise NotImplementedError("Rust extension does not implement `execute_join`.")
+        raise MissingRustExtensionError(
+            f"{_MISSING_SYMBOL_PREFIX}`execute_join`. See docs/DEVELOPER.md."
+        )
     return rust.execute_join(
         left_plan,
         left_root_data,
@@ -197,8 +213,8 @@ def execute_groupby_agg(
     """Group and aggregate; returns materialized data and output schema descriptors."""
     rust = _require_rust_core()
     if not hasattr(rust, "execute_groupby_agg"):
-        raise NotImplementedError(
-            "Rust extension does not implement `execute_groupby_agg`."
+        raise MissingRustExtensionError(
+            f"{_MISSING_SYMBOL_PREFIX}`execute_groupby_agg`. See docs/DEVELOPER.md."
         )
     return rust.execute_groupby_agg(
         plan, root_data, list(by), aggregations, as_python_lists, streaming

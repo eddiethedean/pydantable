@@ -13,8 +13,11 @@ import csv
 import json
 import os
 import tempfile
+from contextlib import asynccontextmanager, contextmanager, suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO
+
+from pydantable._extension import MissingRustExtensionError
 
 from . import extras as extras
 from . import http as http
@@ -86,11 +89,12 @@ def _scan_file_root(
     try:
         from pydantable import _core as rust
     except ImportError as e:
-        raise NotImplementedError(
-            "Lazy file read requires the compiled pydantable._core extension."
-        ) from e
+        raise MissingRustExtensionError() from e
     if not hasattr(rust, "ScanFileRoot"):
-        raise NotImplementedError("pydantable._core.ScanFileRoot is not available.")
+        raise MissingRustExtensionError(
+            "The native extension does not export ScanFileRoot. Reinstall or rebuild pydantable. "
+            "See docs/DEVELOPER.md."
+        )
     sk = scan_kwargs if scan_kwargs else None
     return rust.ScanFileRoot(str(path), fmt, columns, sk)
 
@@ -143,6 +147,20 @@ def read_ipc(
     return _scan_file_root(path, "ipc", columns=columns, scan_kwargs=sk)
 
 
+def read_json(
+    path: str | Path,
+    *,
+    columns: list[str] | None = None,
+    **scan_kwargs: Any,
+) -> Any:
+    """Lazy JSON Lines read (local path); same engine as :func:`read_ndjson`.
+
+    For a JSON **array** of objects in one file, use :func:`materialize_json` and construct
+    a :class:`~pydantable.dataframe.DataFrame` from the column dict.
+    """
+    return read_ndjson(path, columns=columns, **scan_kwargs)
+
+
 def read_parquet_url(
     url: str,
     *,
@@ -164,6 +182,59 @@ def read_parquet_url(
         os.unlink(name)
         raise
     return _scan_file_root(name, "parquet", columns=columns, scan_kwargs=None)
+
+
+@contextmanager
+def read_parquet_url_ctx(
+    dataframe_cls: Any,
+    url: str,
+    *,
+    experimental: bool = True,
+    columns: list[str] | None = None,
+    **kwargs: Any,
+):
+    """Download Parquet from ``url`` to a temp file, yield ``DataFrame[Schema]``, delete the file after.
+
+    Pass the parametrized frame class (e.g. ``DataFrame[MySchema]``). The lazy plan must not
+    be used after the context exits (the backing file is removed).
+    """
+    root = read_parquet_url(url, experimental=experimental, columns=columns, **kwargs)
+    path = str(getattr(root, "path", "") or "")
+    if not path:
+        raise RuntimeError("ScanFileRoot.path is empty; cannot manage temp file lifecycle")
+    try:
+        yield dataframe_cls._from_scan_root(root)
+    finally:
+        with suppress(OSError):
+            os.unlink(path)
+
+
+@asynccontextmanager
+async def aread_parquet_url_ctx(
+    dataframe_cls: Any,
+    url: str,
+    *,
+    experimental: bool = True,
+    columns: list[str] | None = None,
+    executor: Any = None,
+    **kwargs: Any,
+):
+    """Async variant of :func:`read_parquet_url_ctx` (uses :func:`aread_parquet_url`)."""
+    root = await aread_parquet_url(
+        url,
+        experimental=experimental,
+        columns=columns,
+        executor=executor,
+        **kwargs,
+    )
+    path = str(getattr(root, "path", "") or "")
+    if not path:
+        raise RuntimeError("ScanFileRoot.path is empty; cannot manage temp file lifecycle")
+    try:
+        yield dataframe_cls._from_scan_root(root)
+    finally:
+        with suppress(OSError):
+            os.unlink(path)
 
 
 def materialize_parquet(
@@ -289,6 +360,60 @@ def materialize_ndjson(
         return {}
     keys = sorted({k for r in rows for k in r})
     return {k: [r.get(k) for r in rows] for k in keys}
+
+
+def _json_rows_to_columns(rows: list[dict[str, Any]]) -> dict[str, list[Any]]:
+    if not rows:
+        return {}
+    keys = sorted({k for row in rows for k in row})
+    return {k: [row.get(k) for row in rows] for k in keys}
+
+
+def materialize_json(
+    path: str | Path, *, engine: str | None = None
+) -> dict[str, list[Any]]:
+    """Load a JSON file into ``dict[str, list]``: either a JSON array of objects or JSON Lines.
+
+    If the first non-whitespace character is ``[``, the file is parsed as one JSON array.
+    Otherwise the file is read as newline-delimited JSON (same as :func:`materialize_ndjson`).
+    """
+    p = Path(path)
+    eng = (engine or _default_engine()).lower()
+    with p.open(encoding="utf-8") as f:
+        while True:
+            ch = f.read(1)
+            if not ch:
+                return {}
+            if not ch.isspace():
+                break
+        if ch == "[":
+            f.seek(0)
+            data = json.load(f)
+            if not isinstance(data, list):
+                raise ValueError(
+                    "materialize_json: expected a JSON array of objects when file starts with '['"
+                )
+            if not data:
+                return {}
+            if not all(isinstance(x, dict) for x in data):
+                raise ValueError("materialize_json: array elements must be JSON objects")
+            return _json_rows_to_columns(data)
+        f.seek(0)
+    return materialize_ndjson(p, engine=eng)
+
+
+def export_json(
+    path: str | Path,
+    data: dict[str, list[Any]],
+    *,
+    indent: int | None = None,
+) -> None:
+    """Write ``dict[str, list]`` as one JSON array of row objects."""
+    keys = list(data.keys())
+    n = len(data[keys[0]]) if keys else 0
+    rows = [{k: data[k][i] for k in keys} for i in range(n)]
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(rows, fh, indent=indent, default=str)
 
 
 def export_parquet(
@@ -448,6 +573,18 @@ async def aread_ipc(
     )
 
 
+async def aread_json(
+    path: str | Path,
+    *,
+    columns: list[str] | None = None,
+    executor: Executor | None = None,
+    **scan_kwargs: Any,
+) -> Any:
+    return await _run_io(
+        read_json, (path,), {"columns": columns, **scan_kwargs}, executor=executor
+    )
+
+
 async def amaterialize_parquet(
     source: _Source,
     *,
@@ -506,6 +643,17 @@ async def amaterialize_ndjson(
     )
 
 
+async def amaterialize_json(
+    path: str | Path,
+    *,
+    engine: str | None = None,
+    executor: Executor | None = None,
+) -> dict[str, list[Any]]:
+    return await _run_io(
+        materialize_json, (path,), {"engine": engine}, executor=executor
+    )
+
+
 async def aexport_parquet(
     path: str | Path,
     data: dict[str, list[Any]],
@@ -546,6 +694,16 @@ async def aexport_ipc(
     await _run_io(export_ipc, (path, data), {"engine": engine}, executor=executor)
 
 
+async def aexport_json(
+    path: str | Path,
+    data: dict[str, list[Any]],
+    *,
+    indent: int | None = None,
+    executor: Executor | None = None,
+) -> None:
+    await _run_io(export_json, (path, data), {"indent": indent}, executor=executor)
+
+
 async def afetch_sql(
     sql: str,
     bind: str | Any,
@@ -579,25 +737,31 @@ async def awrite_sql(
 
 
 __all__ = [
+    "MissingRustExtensionError",
     "aexport_csv",
     "aexport_ipc",
+    "aexport_json",
     "aexport_ndjson",
     "aexport_parquet",
     "afetch_sql",
     "amaterialize_csv",
     "amaterialize_ipc",
+    "amaterialize_json",
     "amaterialize_ndjson",
     "amaterialize_parquet",
     "aread_csv",
     "aread_csv_rap",
     "aread_ipc",
+    "aread_json",
     "aread_ndjson",
     "aread_parquet",
     "aread_parquet_url",
+    "aread_parquet_url_ctx",
     "arrow_table_to_column_dict",
     "awrite_sql",
     "export_csv",
     "export_ipc",
+    "export_json",
     "export_ndjson",
     "export_parquet",
     "extras",
@@ -609,6 +773,7 @@ __all__ = [
     "http",
     "materialize_csv",
     "materialize_ipc",
+    "materialize_json",
     "materialize_ndjson",
     "materialize_parquet",
     "rap_csv_available",
@@ -620,11 +785,13 @@ __all__ = [
     "read_excel",
     "read_from_object_store",
     "read_ipc",
+    "read_json",
     "read_kafka_json_batch",
     "read_ndjson",
     "read_orc",
     "read_parquet",
     "read_parquet_url",
+    "read_parquet_url_ctx",
     "read_snowflake",
     "record_batch_to_column_dict",
     "write_csv_stdout",

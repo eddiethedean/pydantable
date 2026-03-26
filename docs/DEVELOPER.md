@@ -29,7 +29,14 @@ source .venv/bin/activate
 
 For the `v1.0.0` release train, the release workflow generates **CycloneDX** SBOMs for:
 
-- The **Python environment** used to build/install the distribution.\n+- The **Rust crate** (`pydantable-core`).\n+\n+These SBOMs are attached to the GitHub Release and uploaded as workflow artifacts.
+- The **Python environment** used to build/install the distribution.
+- The **Rust crate** (`pydantable-core`).
+
+These SBOMs are attached to the GitHub Release and uploaded as workflow artifacts.
+
+## Rust feature flags (`pydantable-core`)
+
+The crate’s `[features]` block in `pydantable-core/Cargo.toml` gates the Polars engine (`polars_engine`, on by default). Splitting optional codecs or transports into finer-grained features would need coordinated **maturin** / **pyproject.toml** / CI changes; treat that as a release-engineering follow-up rather than everyday contributor work.
 
 ## Repository Layout
 
