@@ -41,6 +41,7 @@
       ~DataFrameModel.distinct
       ~DataFrameModel.drop
       ~DataFrameModel.drop_nulls
+      ~DataFrameModel.explain
       ~DataFrameModel.explode
       ~DataFrameModel.export_csv
       ~DataFrameModel.export_ipc

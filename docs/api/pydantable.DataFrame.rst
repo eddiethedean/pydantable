@@ -32,6 +32,7 @@
       ~DataFrame.distinct
       ~DataFrame.drop
       ~DataFrame.drop_nulls
+      ~DataFrame.explain
       ~DataFrame.explode
       ~DataFrame.fill_null
       ~DataFrame.filter
