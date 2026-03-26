@@ -323,7 +323,7 @@ Practical inputs that feed that phase:
 - [x] **Lazy write:** **`DataFrame.write_parquet`** / **`DataFrameModel.write_parquet`** (and **`write_csv`**, **`write_ipc`**, **`write_ndjson`**) — Rust pipeline output (internal **`sink_*`** symbols).
 - [x] **Breaking renames:** file **`read_*` / `aread_*`** → **`materialize_*` / `amaterialize_*`**; **`read_sql` / `aread_sql`** → **`fetch_sql` / `afetch_sql`**; HTTP **`read_*_url`** → **`fetch_*_url`**. **`DataFrameModel`** classmethods follow the same names.
 - [x] **Limitations:** **join**, **concat**, **group_by**, **melt**, **pivot**, **explode**, **unnest**, **dynamic group** on lazy file roots: see [`EXECUTION.md`](EXECUTION.md) matrix (evolves with Polars).
-- [x] **Docs + tests:** [`EXECUTION.md`](EXECUTION.md), [`DATA_IO_SOURCES.md`](DATA_IO_SOURCES.md), [`FASTAPI.md`](FASTAPI.md), [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md); **`tests/test_io_comprehensive.py`** (**`test_read_parquet_filter_write_roundtrip`**).
+- [x] **Docs + tests:** [`EXECUTION.md`](EXECUTION.md), [`DATA_IO_SOURCES.md`](DATA_IO_SOURCES.md), [`FASTAPI.md`](FASTAPI.md), [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md); **`tests/test_io_comprehensive.py`** (**`test_read_parquet_filter_write_roundtrip`**, HTTP **`fetch_*`**, SQL **`Connection`**); **`tests/test_io_improvements.py`** (JSON, **`max_bytes`**, URL context managers, **`MissingRustExtensionError`** subprocess, async I/O + **`DataFrameModel`** SQL shims); **`tests/test_hypothesis_properties.py`** (bounded lazy Parquet **`read_*` + filter**).
 
 **Later:** Polars **`streaming`** / **`PYDANTABLE_ENGINE_STREAMING`** knob; **`collect_batches`**; scan-backed joins.
 

@@ -242,13 +242,14 @@ jobs:
       - name: Install maturin and test deps
         run: |
           $PY -m pip install -U pip
-          $PY -m pip install maturin pytest pytest-asyncio pytest-xdist \
+          $PY -m pip install maturin pytest pytest-asyncio pytest-xdist pytest-cov \
             "numpy>=1.24" "pandas>=2.0" "hypothesis>=6.0" "pyarrow>=14.0" \
             "fastapi>=0.100" "httpx>=0.24" "sqlalchemy>=2.0,<3" \
             "python-multipart>=0.0.6" \
             "polars>=1.0.0,<2" "streamlit>=1.30,<2" "dataframe-api-compat>=0.2.7" \
             "fsspec>=2023.0" "openpyxl>=3.1" \
-            "kafka-python>=2.0" "google-cloud-bigquery>=3.0" "snowflake-connector-python>=3.0"
+            "kafka-python>=2.0" "google-cloud-bigquery>=3.0" "snowflake-connector-python>=3.0" \
+            "rapcsv>=0.2" "rapfiles>=0.1" "rapsqlite>=0.1"
 
       - name: Build and install extension
         run: $PY -m maturin develop --release
@@ -258,12 +259,21 @@ jobs:
       - name: Pytest
         env:
           MATRIX_OS: ${{ matrix.os }}
+          PYVER: ${{ matrix.python-version }}
         run: |
-          if [ "$MATRIX_OS" = "ubuntu-latest" ]; then
-            $PY -m pytest -q -n auto
-          else
-            $PY -m pytest -q
+          COV_ARGS=""
+          if [ "$MATRIX_OS" = "ubuntu-latest" ] && [ "$PYVER" = "3.11" ]; then
+            COV_ARGS="--cov=pydantable --cov-report=xml --cov-report=term-missing:skip-covered --cov-fail-under=0"
           fi
+          $PY -m pytest -q -n auto $COV_ARGS
+
+      - name: Upload coverage XML (Ubuntu Python 3.11)
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml-py311-ubuntu
+          path: coverage.xml
+          if-no-files-found: ignore
 
       - name: Verify doc examples (Ubuntu Python 3.11)
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'

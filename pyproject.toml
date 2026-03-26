@@ -185,6 +185,8 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
     "slow: performance guardrails (timing-based; exclude with -m 'not slow')",
+    "network: uses loopback HTTP server or similar (exclude with -m 'not network')",
+    "optional_cloud: requires optional cloud/extra deps (may skip via importorskip)",
 ]
 
 [tool.coverage.run]

@@ -357,3 +357,24 @@ def test_group_by_dynamic_rejects_zero_step(every: str) -> None:
     df = DataFrame[TS]({"id": [1], "ts": [0], "v": [1]})
     with pytest.raises(ValueError, match="positive every"):
         df.group_by_dynamic("ts", every=every, by=["id"]).agg(v_sum=("sum", "v"))
+
+
+@given(threshold=st.integers(min_value=1, max_value=3))
+@settings(max_examples=5, deadline=None)
+def test_lazy_parquet_filter_collect_matches_expected_rows(threshold: int) -> None:
+    pytest.importorskip("pydantable._core")
+    import tempfile
+    from pathlib import Path
+
+    from pydantable.io import export_parquet
+
+    class LV(Schema):
+        v: int
+
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "hyp_lazy.pq"
+        export_parquet(p, {"v": [1, 2, 3, 4]})
+        df = DataFrame[LV].read_parquet(str(p))
+        out = df.filter(df.v > threshold).collect(as_lists=True)
+        expected = [v for v in (1, 2, 3, 4) if v > threshold]
+        assert out["v"] == expected

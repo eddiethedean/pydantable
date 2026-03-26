@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import json
 import os
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import subprocess
+import sys
+from collections.abc import Callable
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 import pytest
 from pydantable import DataFrame, DataFrameModel, MissingRustExtensionError
 from pydantable.io import (
+    aexport_json,
+    amaterialize_json,
+    aread_parquet_url_ctx,
     export_json,
     export_parquet,
     fetch_bytes,
@@ -47,13 +53,14 @@ def test_materialize_json_array_and_lines(tmp_path: Path) -> None:
 def test_export_json_roundtrip(tmp_path: Path) -> None:
     path = tmp_path / "out.json"
     export_json(path, {"a": [1, 2], "b": ["x", "y"]})
-    import json
-
     got = json.loads(path.read_text(encoding="utf-8"))
     assert got == [{"a": 1, "b": "x"}, {"a": 2, "b": "y"}]
 
 
-def test_fetch_bytes_max_bytes() -> None:
+@pytest.mark.network
+def test_fetch_bytes_max_bytes(
+    http_serve: Callable[[type[BaseHTTPRequestHandler]], str],
+) -> None:
     class H(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             self.send_response(200)
@@ -63,16 +70,11 @@ def test_fetch_bytes_max_bytes() -> None:
         def log_message(self, *args: object) -> None:
             return
 
-    srv = HTTPServer(("127.0.0.1", 0), H)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    url = f"http://127.0.0.1:{srv.server_port}/b"
-    try:
-        assert fetch_bytes(url, experimental=True, max_bytes=10) == b"12345"
-        with pytest.raises(ValueError, match="max_bytes=3"):
-            fetch_bytes(url, experimental=True, max_bytes=3)
-    finally:
-        srv.shutdown()
-        srv.server_close()
+    base = http_serve(H)
+    url = f"{base}/b"
+    assert fetch_bytes(url, experimental=True, max_bytes=10) == b"12345"
+    with pytest.raises(ValueError, match="max_bytes=3"):
+        fetch_bytes(url, experimental=True, max_bytes=3)
 
 
 def test_read_from_object_store_max_bytes(tmp_path: Path) -> None:
@@ -94,7 +96,47 @@ def test_missing_rust_extension_is_notimplemented_subclass() -> None:
     assert isinstance(e, NotImplementedError)
 
 
-def test_read_parquet_url_ctx_cleans_temp(tmp_path: Path) -> None:
+def test_subprocess_read_parquet_raises_missing_rust_when_core_incomplete() -> None:
+    """Fresh interpreter with a stub ``pydantable._core`` (no ``ScanFileRoot``)."""
+    repo_root = Path(__file__).resolve().parents[1]
+    code = """
+import os, sys, tempfile, types
+from pathlib import Path
+
+root = Path(os.environ["PYDANTABLE_TEST_ROOT"])
+sys.path.insert(0, str(root / "python"))
+sys.modules["pydantable._core"] = types.ModuleType("pydantable._core")
+
+from pydantable.io import read_parquet
+from pydantable import MissingRustExtensionError
+
+p = Path(tempfile.mkdtemp()) / "missing.parquet"
+try:
+    read_parquet(p)
+except MissingRustExtensionError as e:
+    text = str(e)
+    if "ScanFileRoot" in text or "native extension" in text.lower():
+        sys.exit(0)
+    sys.exit(3)
+sys.exit(2)
+"""
+    env = {**os.environ, "PYDANTABLE_TEST_ROOT": str(repo_root)}
+    proc = subprocess.run(
+        [sys.executable, "-c", code],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=90,
+        check=False,
+    )
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
+@pytest.mark.network
+def test_read_parquet_url_ctx_cleans_temp(
+    tmp_path: Path,
+    http_serve: Callable[[type[BaseHTTPRequestHandler]], str],
+) -> None:
     pytest.importorskip("pydantable._core")
     pq = tmp_path / "in.pq"
     export_parquet(pq, {"k": [1]})
@@ -110,20 +152,65 @@ def test_read_parquet_url_ctx_cleans_temp(tmp_path: Path) -> None:
         def log_message(self, *args: object) -> None:
             return
 
-    srv = HTTPServer(("127.0.0.1", 0), H)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    url = f"http://127.0.0.1:{srv.server_port}/p"
-    try:
-        with read_parquet_url_ctx(
-            DataFrame[_Mini._SchemaModel], url, experimental=True
-        ) as df:
-            assert df.collect()[0].k == 1
-            pth = str(df._root_data.path)
-            assert os.path.isfile(pth)
-        assert not os.path.isfile(pth)
-    finally:
-        srv.shutdown()
-        srv.server_close()
+    base = http_serve(H)
+    url = f"{base}/p"
+    with read_parquet_url_ctx(
+        DataFrame[_Mini._SchemaModel], url, experimental=True
+    ) as df:
+        assert df.collect()[0].k == 1
+        pth = str(df._root_data.path)
+        assert os.path.isfile(pth)
+    assert not os.path.isfile(pth)
+
+
+@pytest.mark.asyncio
+@pytest.mark.network
+async def test_aread_parquet_url_ctx_cleans_temp(
+    tmp_path: Path,
+    http_serve: Callable[[type[BaseHTTPRequestHandler]], str],
+) -> None:
+    pytest.importorskip("pydantable._core")
+    pq = tmp_path / "in.pq"
+    export_parquet(pq, {"k": [1]})
+    blob = pq.read_bytes()
+
+    class H(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(blob)))
+            self.end_headers()
+            self.wfile.write(blob)
+
+        def log_message(self, *args: object) -> None:
+            return
+
+    base = http_serve(H)
+    url = f"{base}/p"
+    async with aread_parquet_url_ctx(
+        DataFrame[_Mini._SchemaModel], url, experimental=True
+    ) as df:
+        rows = await df.acollect()
+        assert rows[0].k == 1
+        pth = str(df._root_data.path)
+        assert os.path.isfile(pth)
+    assert not os.path.isfile(pth)
+
+
+@pytest.mark.asyncio
+async def test_amaterialize_json_matches_sync(tmp_path: Path) -> None:
+    p = tmp_path / "z.json"
+    p.write_text('[{"x": 1}]', encoding="utf-8")
+    sync = materialize_json(p)
+    async_got = await amaterialize_json(p)
+    assert async_got == sync
+
+
+@pytest.mark.asyncio
+async def test_aexport_json_roundtrip(tmp_path: Path) -> None:
+    path = tmp_path / "async.json"
+    await aexport_json(path, {"a": [1], "b": ["z"]})
+    got = json.loads(path.read_text(encoding="utf-8"))
+    assert got == [{"a": 1, "b": "z"}]
 
 
 def test_dataframe_model_export_write_sql_sqlite(tmp_path: Path) -> None:
@@ -140,6 +227,24 @@ def test_dataframe_model_export_write_sql_sqlite(tmp_path: Path) -> None:
     with eng.connect() as c:
         n = c.execute(text("SELECT COUNT(*) FROM t2")).scalar()
     assert n == 1
+
+
+@pytest.mark.asyncio
+async def test_dataframe_model_afrom_sql_awrite_sql_sqlite(tmp_path: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_path / "async_model.db"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t_async (k INTEGER)"))
+        conn.execute(text("INSERT INTO t_async VALUES (5)"))
+    m = await _Mini.afrom_sql("SELECT k FROM t_async", eng)
+    assert m.collect()[0].k == 5
+    await _Mini.awrite_sql({"k": [6]}, "t_async", eng, if_exists="append")
+    with eng.connect() as c:
+        rows = c.execute(text("SELECT k FROM t_async ORDER BY k")).fetchall()
+    assert [r[0] for r in rows] == [5, 6]
 
 
 def test_from_sql_is_alias_docstring() -> None:

@@ -177,6 +177,7 @@ def test_write_csv_stdout_stringio() -> None:
     assert "1" in raw and "2" in raw
 
 
+@pytest.mark.optional_cloud
 def test_read_bigquery_mocked(monkeypatch: pytest.MonkeyPatch) -> None:
     pa = pytest.importorskip("pyarrow")
     pytest.importorskip("google.cloud.bigquery")
@@ -201,6 +202,7 @@ def test_read_bigquery_mocked(monkeypatch: pytest.MonkeyPatch) -> None:
     assert got == {"bq": [11, 22]}
 
 
+@pytest.mark.optional_cloud
 def test_read_snowflake_mocked() -> None:
     pytest.importorskip("snowflake.connector")
 

@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import json
-import threading
 from concurrent.futures import ThreadPoolExecutor
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
 
 import pytest
+from conftest import http_server_thread
 from pydantable import DataFrame
 from pydantable.io import (
     aexport_ipc,
@@ -112,6 +112,7 @@ def test_read_sql_write_sql_sqlite(tmp_dir: Path) -> None:
     assert out == {"id": [1], "name": ["x"]}
 
 
+@pytest.mark.network
 def test_fetch_bytes_and_fetch_parquet_url(tmp_dir: Path) -> None:
     pa = pytest.importorskip("pyarrow")
     import pyarrow.parquet as pqw
@@ -131,9 +132,7 @@ def test_fetch_bytes_and_fetch_parquet_url(tmp_dir: Path) -> None:
         def log_message(self, *args: object) -> None:
             return
 
-    server = HTTPServer(("127.0.0.1", 0), Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
+    server, _ = http_server_thread(Handler)
     try:
         url = f"http://127.0.0.1:{server.server_port}/f.parquet"
         assert fetch_bytes(url, experimental=True) == raw
@@ -141,6 +140,7 @@ def test_fetch_bytes_and_fetch_parquet_url(tmp_dir: Path) -> None:
         assert got["c"] == [1, 2, 3]
     finally:
         server.shutdown()
+        server.server_close()
 
 
 def test_ndjson_lines_file(tmp_dir: Path) -> None:
@@ -342,15 +342,7 @@ async def test_awrite_sql_append(tmp_dir: Path) -> None:
     assert got == {"n": [1, 2]}
 
 
-def _http_server_thread(
-    handler_cls: type[BaseHTTPRequestHandler],
-) -> tuple[HTTPServer, threading.Thread]:
-    server = HTTPServer(("127.0.0.1", 0), handler_cls)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    return server, thread
-
-
+@pytest.mark.network
 def test_fetch_csv_url_local(tmp_dir: Path) -> None:
     csv_path = tmp_dir / "served.csv"
     csv_path.write_text("a,b\n1,2\n3,4\n", encoding="utf-8")
@@ -366,7 +358,7 @@ def test_fetch_csv_url_local(tmp_dir: Path) -> None:
         def log_message(self, *args: object) -> None:
             return
 
-    server, _ = _http_server_thread(H)
+    server, _ = http_server_thread(H)
     try:
         url = f"http://127.0.0.1:{server.server_port}/data.csv"
         got = fetch_csv_url(url, experimental=True)
@@ -375,8 +367,10 @@ def test_fetch_csv_url_local(tmp_dir: Path) -> None:
         assert got["b"] in ([2, 4], ["2", "4"])
     finally:
         server.shutdown()
+        server.server_close()
 
 
+@pytest.mark.network
 def test_fetch_ndjson_url_local(tmp_dir: Path) -> None:
     body = (json.dumps({"x": 1}) + "\n" + json.dumps({"x": 2}) + "\n").encode("utf-8")
 
@@ -390,13 +384,14 @@ def test_fetch_ndjson_url_local(tmp_dir: Path) -> None:
         def log_message(self, *args: object) -> None:
             return
 
-    server, _ = _http_server_thread(H)
+    server, _ = http_server_thread(H)
     try:
         url = f"http://127.0.0.1:{server.server_port}/l.jsonl"
         got = fetch_ndjson_url(url, experimental=True)
         assert got == {"x": [1, 2]}
     finally:
         server.shutdown()
+        server.server_close()
 
 
 def test_parquet_roundtrip_with_nulls(tmp_dir: Path) -> None:
@@ -458,6 +453,23 @@ def test_read_sql_with_connection(tmp_dir: Path) -> None:
     assert out == {"y": ["hi"]}
 
 
+def test_write_sql_with_connection(tmp_dir: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "wconn.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as c:
+        c.execute(text("CREATE TABLE wc (k INTEGER)"))
+    with eng.begin() as conn:
+        write_sql({"k": [99]}, "wc", conn, if_exists="append")
+    with eng.connect() as c2:
+        n = c2.execute(text("SELECT COUNT(*) FROM wc")).scalar()
+        row = c2.execute(text("SELECT k FROM wc")).scalar()
+    assert n == 1
+    assert row == 99
+
+
 def test_write_sql_invalid_if_exists(tmp_dir: Path) -> None:
     pytest.importorskip("sqlalchemy")
     from sqlalchemy import create_engine, text
@@ -503,6 +515,7 @@ def test_write_sql_empty_data_is_noop(tmp_dir: Path) -> None:
     write_sql({}, "z", eng, if_exists="append")
 
 
+@pytest.mark.network
 def test_fetch_bytes_experimental_via_env(
     tmp_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -524,16 +537,16 @@ def test_fetch_bytes_experimental_via_env(
         def log_message(self, *args: object) -> None:
             return
 
-    server = HTTPServer(("127.0.0.1", 0), Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
+    server, _ = http_server_thread(Handler)
     try:
         url = f"http://127.0.0.1:{server.server_port}/x.parquet"
         assert fetch_bytes(url, experimental=False) == raw
     finally:
         server.shutdown()
+        server.server_close()
 
 
+@pytest.mark.network
 def test_fetch_parquet_url_column_subset(tmp_dir: Path) -> None:
     pa = pytest.importorskip("pyarrow")
     import pyarrow.parquet as pqw
@@ -552,15 +565,14 @@ def test_fetch_parquet_url_column_subset(tmp_dir: Path) -> None:
         def log_message(self, *args: object) -> None:
             return
 
-    server = HTTPServer(("127.0.0.1", 0), Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
+    server, _ = http_server_thread(Handler)
     try:
         url = f"http://127.0.0.1:{server.server_port}/p.parquet"
         got = fetch_parquet_url(url, experimental=True, columns=["keep"])
         assert got == {"keep": [1]}
     finally:
         server.shutdown()
+        server.server_close()
 
 
 def test_read_csv_stdlib_path_when_engine_not_rust(tmp_dir: Path) -> None:
@@ -710,6 +722,7 @@ def test_write_csv_and_collect_batches(tmp_dir: Path) -> None:
     assert len(batches) == 2
 
 
+@pytest.mark.network
 def test_read_parquet_url_tmp_then_cleanup(tmp_dir: Path) -> None:
     pa = pytest.importorskip("pyarrow")
     import pyarrow.parquet as pqw
@@ -728,9 +741,7 @@ def test_read_parquet_url_tmp_then_cleanup(tmp_dir: Path) -> None:
         def log_message(self, *args: object) -> None:
             return
 
-    server = HTTPServer(("127.0.0.1", 0), Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
+    server, _ = http_server_thread(Handler)
     try:
         url = f"http://127.0.0.1:{server.server_port}/t.pq"
         root = read_parquet_url(url, experimental=True)
@@ -745,3 +756,4 @@ def test_read_parquet_url_tmp_then_cleanup(tmp_dir: Path) -> None:
         Path(path).unlink(missing_ok=True)
     finally:
         server.shutdown()
+        server.server_close()

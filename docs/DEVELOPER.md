@@ -152,6 +152,7 @@ Phase 4 boundary contract:
 - **`cargo test` in `pydantable-core/`** exercises Rust plan/expr contracts and PyO3 wiring. From the **repo root**, prefer **`make rust-test`** (or set `PYO3_PYTHON` to `.venv/bin/python` and `PYTHONPATH` to the venv’s `site-packages`, as in the `Makefile`): PyO3’s embedded interpreter does not always load `site-packages`, and some Polars-backed plan tests **import Python `polars`** — without that env, two tests can fail with `ModuleNotFoundError: polars`.
 - **`pytest` on `tests/`** is the **CI-facing** check for end-to-end behavior (`collect`, joins, UIs). Prefer adding user-visible regressions here when behavior crosses the Python boundary.
 - **Async tests:** **`pytest-asyncio`** is in **`[dev]`**; `pyproject.toml` sets **`asyncio_mode = auto`** so `async def` tests run without extra markers unless you prefer explicit `@pytest.mark.asyncio`.
+- **Markers:** **`slow`** — timing guardrails (`pytest -m "not slow"`). **`network`** — loopback HTTP servers (`pytest -m "not network"` for a faster local loop). **`optional_cloud`** — mocked/heavy cloud SDK tests (see `tests/test_io_extras_and_transports.py`). Registered in **`pyproject.toml`** **`[tool.pytest.ini_options]`** **`markers`**.
 
 ### Release ↔ tests map (0.15.0–0.20.0)
 
@@ -161,7 +162,7 @@ Use this table to locate **Python tests and doc-example smoke** that back shippe
 | --- | --- | --- |
 | **0.15.0** | Async `acollect` / `ato_*`, Arrow `map` ingest, PySpark `trim` / `abs` / …, `validate_data` removal | `tests/test_async_materialization.py`, `tests/test_pyarrow_map_ingest.py`, `tests/test_v015_features.py`, `tests/test_v015_constructor_api.py`; `tests/test_fastapi_recipes.py` (sync `TestClient` / OpenAPI from **0.14+** plus async materialization routes) |
 | **0.16.0** | Parquet/IPC **`dict[str, list]`** readers (later **`materialize_*`**), `to_arrow` / `ato_arrow`, `Table` / `RecordBatch` constructors, FastAPI multipart | `tests/test_arrow_interchange.py`; `tests/test_fastapi_recipes.py` (multipart Parquet); `scripts/verify_doc_examples.py` (Parquet + `to_arrow` smoke; see comment near `materialize_parquet`) |
-| **0.23.0** | **`read_*` / `aread_*`** lazy roots, **`DataFrame.write_*`**, **`export_*`**, I/O renames (**`materialize_*`**, **`fetch_sql`**, **`fetch_*_url`**) | `tests/test_io_comprehensive.py` (`test_read_parquet_filter_write_roundtrip`); `docs/EXECUTION.md` streaming matrix |
+| **0.23.0** | **`read_*` / `aread_*`** lazy roots, **`DataFrame.write_*`**, **`export_*`**, JSON/HTTP ctx, **`MissingRustExtensionError`**, I/O renames (**`materialize_*`**, **`fetch_sql`**, **`fetch_*_url`**) | `tests/test_io_comprehensive.py` (round-trips, HTTP **`fetch_*`**, SQL **`Connection`**); `tests/test_io_improvements.py` (JSON, **`max_bytes`**, URL ctx, subprocess stub-`_core` error, async I/O shims); `docs/EXECUTION.md` streaming matrix |
 | **0.16.1** | Map-column arithmetic `TypeError` (not panic); `validate_columns_strict` Arrow `pydantable.io` import fix | `tests/test_expr_070_surfaces.py`; `tests/test_arrow_interchange.py` (`test_dataframe_generic_accepts_pa_table`) |
 | **0.17.0** | Map `Expr` contracts after Arrow ingest; PySpark `functions` string/list/bytes wrappers | `tests/test_pyarrow_map_ingest.py` (`test_arrow_map_ingest_then_map_get_and_contains`); `tests/test_pyspark_sql.py` (new façade tests) |
 | **0.18.0** | Grouped Polars error context (`polars_err_ctx`); map-key deferral (docs); Hypothesis + integration `join` / `group_by` smoke | `tests/test_v018_features.py`; `tests/test_hypothesis_properties.py` (`test_group_by_sum_matches_manual`, `test_inner_join_unique_ids_row_count`, …); Rust: `execute_polars/common.rs` (`polars_err_format_tests`), `groupby_exec.rs` |
@@ -240,7 +241,9 @@ Parallel (uses `pytest-xdist` from the `dev` extra):
 .venv/bin/python -m pytest -q -n auto
 ```
 
-**Hypothesis** property tests live in `tests/test_hypothesis_properties.py` (installed via **`[dev]`**). They run under the same `pytest` command; examples use bounded `max_examples` for CI speed.
+**CI** (`.github/workflows/_shared-ci.yml` **python-tests**): every matrix leg runs **`pytest -q -n auto`** (Linux, Windows, macOS). **Ubuntu + Python 3.11** additionally runs **`--cov=pydantable --cov-report=xml --cov-report=term-missing:skip-covered --cov-fail-under=0`** and uploads **`coverage.xml`** as a workflow artifact (**`coverage-xml-py311-ubuntu`**). There is **no** enforced coverage floor yet.
+
+**Hypothesis** property tests live in `tests/test_hypothesis_properties.py` (installed via **`[dev]`** / CI pip list). They run under the same `pytest` command; examples use bounded `max_examples` for CI speed.
 
 Exclude timing-based guardrails (`tests/test_performance_guardrails.py`) for a quicker loop:
 
@@ -248,15 +251,21 @@ Exclude timing-based guardrails (`tests/test_performance_guardrails.py`) for a q
 .venv/bin/python -m pytest -q -m "not slow"
 ```
 
+Skip loopback HTTP tests locally if needed:
+
+```bash
+.venv/bin/python -m pytest -q -m "not network"
+```
+
 ### Coverage (optional)
 
-Install the `dev` extra, then measure line/branch coverage of `python/pydantable/` (no enforced threshold yet):
+Install the `dev` extra (includes **`pytest-cov`**), then measure line/branch coverage of `python/pydantable/` (no local threshold enforced):
 
 ```bash
 .venv/bin/python -m pytest -q --cov=pydantable --cov-report=term-missing
 ```
 
-XML for CI or tooling: add `--cov-report=xml` (writes `coverage.xml`; gitignored).
+XML for tooling: **`--cov-report=xml`** (writes **`coverage.xml`**; gitignored). **CI** produces the same XML on **Ubuntu 3.11** (see above).
 
 ### Lint/format/type-check
 
@@ -385,7 +394,7 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 
 ### Publishing (PyPI)
 
-Pushing a git tag matching `v*` (for example `v0.23.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then **`maturin build`** (per target) and **`twine upload --skip-existing dist/*`** to PyPI. The repository needs a **`PYPI_API_TOKEN`** secret (`TWINE_USERNAME` is **`__token__`** in the workflow). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test install** (`.github/workflows/_shared-ci.yml`, **Install maturin and test deps**) aligned with **`pyproject.toml`** **`[project.optional-dependencies]`** **`dev`** + **`pandas`** + **`polars`** (e.g. **`pytest-asyncio`**, **`polars`**, **`fastapi`**, **`httpx`**, **`python-multipart`**, **`pyarrow`**, **`hypothesis`**) so optional tests are not skipped on any OS/Python matrix leg or on tag builds.
+Pushing a git tag matching `v*` (for example `v0.23.0`) runs `.github/workflows/release.yml`: format, clippy, audit, deny, Python lint/tests, then **`maturin build`** (per target) and **`twine upload --skip-existing dist/*`** to PyPI. The repository needs a **`PYPI_API_TOKEN`** secret (`TWINE_USERNAME` is **`__token__`** in the workflow). The sdist/wheel version comes from `pyproject.toml` / Maturin on that commit. Keep the workflow’s **Python test install** (`.github/workflows/_shared-ci.yml`, **Install maturin and test deps**) aligned with **`pyproject.toml`** **`[project.optional-dependencies]`** **`dev`** + **`pandas`** + **`polars`** + **`pytest-cov`** + **`rapcsv`/`rapfiles`/`rapsqlite`** (plus the other CI-only pins: **`fastapi`**, **`httpx`**, **`sqlalchemy`**, **`streamlit`**, **`dataframe-api-compat`**, **`fsspec`**, **`openpyxl`**, **`kafka-python`**, **`google-cloud-bigquery`**, **`snowflake-connector-python`**, …) so optional tests are not skipped on matrix legs or on tag builds.
 
 **GNU manylinux wheels** are built with **`PyO3/maturin-action`** inside the default **manylinux Docker** images (`manylinux: 2_17` / `2_28`). Avoid **`container: off`** plus **`--zig`** on the host for those targets: linker failures and **OOM** are common with a Polars-sized dependency tree. **musllinux** jobs still use **`--zig`** in `release.yml` as needed.
 

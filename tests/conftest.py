@@ -1,9 +1,38 @@
 from __future__ import annotations
 
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
 import pytest
 from pydantic import BaseModel
+
+
+def http_server_thread(
+    handler_cls: type[BaseHTTPRequestHandler],
+) -> tuple[HTTPServer, threading.Thread]:
+    """Start a daemon thread serving ``handler_cls`` on a loopback port (for tests)."""
+    server = HTTPServer(("127.0.0.1", 0), handler_cls)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, thread
+
+
+@pytest.fixture
+def http_serve():
+    """Return a callable ``http_serve(Handler)`` → base URL; teardown closes servers."""
+
+    servers: list[HTTPServer] = []
+
+    def _serve(handler_cls: type[BaseHTTPRequestHandler]) -> str:
+        server, _ = http_server_thread(handler_cls)
+        servers.append(server)
+        return f"http://127.0.0.1:{server.server_port}"
+
+    yield _serve
+    for srv in servers:
+        srv.shutdown()
+        srv.server_close()
 
 
 def _materialized_table_to_dict(table: Any) -> dict[str, list[Any]]:
