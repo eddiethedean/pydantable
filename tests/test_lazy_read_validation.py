@@ -18,6 +18,11 @@ class _Row(BaseModel):
     id: int
 
 
+class _RowWithDefault(BaseModel):
+    id: int
+    note: str | None = "n/a"
+
+
 class _Model(DataFrameModel):
     id: int
 
@@ -350,3 +355,76 @@ def test_read_parquet_url_ignore_errors_applies_on_materialize(tmp_path: Path) -
     finally:
         server.shutdown()
         server.server_close()
+
+
+@pytest.mark.network
+def test_read_parquet_url_fill_missing_optional_false_with_explicit_default(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pyarrow")
+
+    pq_path = tmp_path / "in_default.parquet"
+    export_parquet(pq_path, {"id": [1, 2]})
+    blob = pq_path.read_bytes()
+
+    class H(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(blob)))
+            self.end_headers()
+            self.wfile.write(blob)
+
+        def log_message(self, *args: object) -> None:
+            return
+
+    server, _ = http_server_thread(H)
+    try:
+        url = f"http://127.0.0.1:{server.server_port}/in_default.parquet"
+        df = DataFrame[_RowWithDefault].read_parquet_url(
+            url,
+            experimental=True,
+            fill_missing_optional=False,
+        )
+        assert df.to_dict() == {"id": [1, 2], "note": ["n/a", "n/a"]}
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+@pytest.mark.asyncio
+async def test_dataframe_aread_csv_fill_missing_optional_false_with_explicit_default(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("pydantable._core")
+    path = tmp_path / "default_aread.csv"
+    path.write_text("id\n1\n2\n", encoding="utf-8")
+
+    df = await DataFrame[_RowWithDefault].aread_csv(
+        str(path),
+        fill_missing_optional=False,
+    )
+    assert df.to_dict() == {"id": [1, 2], "note": ["n/a", "n/a"]}
+
+
+def test_fill_missing_optional_false_with_default_does_not_trigger_error_callback(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("pydantable._core")
+    path = tmp_path / "default_callback.csv"
+    path.write_text("id\n1\n2\n", encoding="utf-8")
+
+    called = False
+
+    def on_fail(_items: list[dict[str, object]]) -> None:
+        nonlocal called
+        called = True
+
+    df = DataFrame[_RowWithDefault].read_csv(
+        str(path),
+        fill_missing_optional=False,
+        ignore_errors=True,
+        on_validation_errors=on_fail,
+    )
+    assert df.to_dict() == {"id": [1, 2], "note": ["n/a", "n/a"]}
+    assert called is False

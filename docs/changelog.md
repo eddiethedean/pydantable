@@ -4,7 +4,15 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- Ingest/docs consistency for missing optional behavior:
+  - `fill_missing_optional` documented consistently across constructor and typed lazy-read materialization paths.
+  - Explicit schema defaults on optional fields (for example `note: str | None = "n/a"` or `= None`) now take precedence when `fill_missing_optional=False` instead of raising.
+
+### Changed
+
+- Documentation now includes migration guidance from earlier `missing_optional` string-style wording (`"fill_none"` / `"error"`) to boolean `fill_missing_optional=True/False`.
 
 ## [0.23.0] — 2026-03-25
 

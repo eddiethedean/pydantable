@@ -26,7 +26,7 @@ The **`pydantable`** package re-exports a small subset of I/O (Parquet-focused l
 - `ignore_errors=True` (only meaningful when `trusted_mode` is `"off"`): invalid rows are skipped and `on_validation_errors` receives one batch payload.
 - `trusted_mode="shape_only"` / `"strict"`: skip per-cell validation (still enforces shape + nullability; `"strict"` adds dtype-compat checks). `ignore_errors` does not skip rows in these modes.
 - `fill_missing_optional=True` (default): missing optional columns are filled with `None` during ingest/materialization.
-- `fill_missing_optional=False`: missing optional columns/fields raise an error (including for typed lazy reads at materialization time).
+- `fill_missing_optional=False`: missing optional columns/fields raise an error unless the schema field has an explicit default; explicit defaults are used in that case.
 
 See {doc}`DATAFRAMEMODEL` for the detailed ingest contract.
 

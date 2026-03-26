@@ -55,6 +55,7 @@ In **Jupyter** / **VS Code** notebooks, **`user_df`** (or the last expression in
 `read_*` / `aread_*` are **lazy scans**: they do not build a Python `dict[str, list]` up front. For typed APIs (`DataFrame[Schema]` and `DataFrameModel`), ingest validation options are therefore applied when you **materialize**:
 
 - `to_dict()` / `collect()` / `to_arrow()` / `to_polars()` run the Rust engine and produce columns, then apply `trusted_mode` / `ignore_errors` / `on_validation_errors` to those columns before returning.
+- `fill_missing_optional` controls how missing optional fields/columns are handled at ingest/materialization.
 - `trusted_mode=None` / `"off"` is the **default**: full per-cell validation at materialization.
 - `ignore_errors=True` is only meaningful when `trusted_mode` is `"off"`: invalid rows are skipped and `on_validation_errors` receives one batch payload.
 - `trusted_mode="shape_only"` / `"strict"` skip per-cell validation but still enforce **shape** and **nullability**; `"strict"` also performs dtype-compat checks. `ignore_errors` does not skip rows in these modes.
@@ -173,14 +174,27 @@ Behavior contract:
 
 ### Missing optional fields default to `None`
 
-When ingesting data, **optional schema fields** (`Optional[T]` / `T | None`) do **not** need to be present in the input:
+When ingesting data, **optional schema fields** (`Optional[T]` / `T | None`) do **not** need to be present in the input when `fill_missing_optional=True`:
 
 - **Columnar input**: if a column is missing for an optional field, pydantable fills it with `None` for every row.
 - **Row input**: if a key is missing for an optional field, it defaults to `None` for that row.
 
 This applies both to constructors (`UserDF(...)`) and to typed lazy reads (`read_*` / `aread_*`) when you materialize.
 
+Precedence when `fill_missing_optional=False`:
+
+- If an optional field has an explicit class default (for example `note: str | None = "n/a"` or `= None`), missing input uses that default.
+- If an optional field has no explicit default, missing input raises.
+- This precedence is consistent across row input, columnar input, and typed lazy reads at materialization time.
+
 To change this behavior, pass `fill_missing_optional=False` to treat missing optional fields as an error (the default is `fill_missing_optional=True`).
+
+### Migration note
+
+`fill_missing_optional` is the current public API. If you were using earlier internal/planned wording around `missing_optional` string modes (`"fill_none"` / `"error"`), migrate to:
+
+- `fill_missing_optional=True` (old `"fill_none"`)
+- `fill_missing_optional=False` (old `"error"`)
 
 ## Transformations always return new models
 

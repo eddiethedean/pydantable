@@ -21,6 +21,11 @@ class _OptionalCol(BaseModel):
     note: str | None
 
 
+class _OptionalColWithDefault(BaseModel):
+    id: int
+    note: str | None = "n/a"
+
+
 def test_lazy_read_missing_required_column_raises_csv(tmp_path: Path) -> None:
     pytest.importorskip("pydantable._core")
     path = tmp_path / "missing.csv"
@@ -85,3 +90,29 @@ def test_lazy_read_missing_optional_column_can_error_csv(tmp_path: Path) -> None
     df = DataFrame[_OptionalCol].read_csv(str(path), fill_missing_optional=False)
     with pytest.raises(ValueError, match="Missing optional"):
         _ = df.to_dict()
+
+
+def test_lazy_read_missing_optional_column_with_default_allows_fill_false_csv(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("pydantable._core")
+    path = tmp_path / "opt_default.csv"
+    path.write_text("id\n1\n2\n", encoding="utf-8")
+
+    df = DataFrame[_OptionalColWithDefault].read_csv(
+        str(path), fill_missing_optional=False
+    )
+    assert df.to_dict() == {"id": [1, 2], "note": ["n/a", "n/a"]}
+
+
+def test_lazy_read_missing_optional_column_with_default_allows_fill_false_strict_mode(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("pydantable._core")
+    path = tmp_path / "opt_default_strict.csv"
+    path.write_text("id\n1\n2\n", encoding="utf-8")
+
+    df = DataFrame[_OptionalColWithDefault].read_csv(
+        str(path), trusted_mode="strict", fill_missing_optional=False
+    )
+    assert df.to_dict() == {"id": [1, 2], "note": ["n/a", "n/a"]}

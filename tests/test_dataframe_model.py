@@ -34,6 +34,11 @@ class _OptionalFieldWithDefaultDF(DataFrameModel):
     note: str | None = None
 
 
+class _OptionalFieldWithStringDefaultDF(DataFrameModel):
+    id: int
+    note: str | None = "n/a"
+
+
 def test_dataframe_model_column_input_happy_path():
     df = UserDF({"id": [1, 2], "age": [20, None]})
     assert df.schema_fields() == {"id": int, "age": int | None}
@@ -82,6 +87,16 @@ def test_dataframe_model_per_field_default_allows_missing_even_when_fill_false_c
 ):
     df = _OptionalFieldWithDefaultDF({"id": [1]}, fill_missing_optional=False)
     assert df.collect(as_lists=True) == {"id": [1], "note": [None]}
+
+
+def test_dataframe_model_non_none_default_applies_when_fill_false_rows() -> None:
+    df = _OptionalFieldWithStringDefaultDF([{"id": 1}], fill_missing_optional=False)
+    assert df.collect(as_lists=True) == {"id": [1], "note": ["n/a"]}
+
+
+def test_dataframe_model_non_none_default_applies_when_fill_false_columnar() -> None:
+    df = _OptionalFieldWithStringDefaultDF({"id": [1]}, fill_missing_optional=False)
+    assert df.collect(as_lists=True) == {"id": [1], "note": ["n/a"]}
 
 
 def test_dataframe_model_rejects_str_as_row_sequence() -> None:

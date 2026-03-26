@@ -122,7 +122,7 @@ from pydantable import DataFrameModel as DefaultDataFrameModel
 
 More examples: [FastAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html), [Polars-style workflows](https://pydantable.readthedocs.io/en/latest/POLARS_WORKFLOWS.html).
 
-**Validation policy:** Constructors validate strictly by default. For messy row lists, `ignore_errors=True` plus `on_validation_errors=callback` receives failed rows (`row_index`, `row`, Pydantic `errors`). Trusted bulk paths use `trusted_mode` (`off` / `shape_only` / `strict`). Details: [DataFrameModel](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html), [Supported types](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html).
+**Validation policy:** Constructors validate strictly by default. For messy row lists, `ignore_errors=True` plus `on_validation_errors=callback` receives failed rows (`row_index`, `row`, Pydantic `errors`). Trusted bulk paths use `trusted_mode` (`off` / `shape_only` / `strict`). Missing optional fields are controlled by `fill_missing_optional` (default `True`); when `False`, missing optionals raise unless the schema declares an explicit field default (`field: T | None = ...`). Details: [DataFrameModel](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html), [Supported types](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html).
 
 ---
 

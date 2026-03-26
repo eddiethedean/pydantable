@@ -35,6 +35,7 @@ from typing import (
 )
 
 from pydantic import BaseModel, TypeAdapter
+from pydantic_core import PydanticUndefined
 
 from pydantable.display import get_repr_html_limits
 from pydantable.expressions import ColumnRef, Expr
@@ -923,10 +924,17 @@ class DataFrame(Generic[SchemaT]):
                 if not nullable:
                     raise
                 if not self._io_validation_fill_missing_optional:
-                    raise ValueError(
-                        "Missing optional columns (configured as error): "
-                        f"{[missing_col]}"
-                    ) from e
+                    fi = self._current_schema_type.model_fields.get(missing_col)
+                    default = (
+                        getattr(fi, "default", PydanticUndefined)
+                        if fi is not None
+                        else PydanticUndefined
+                    )
+                    if default is PydanticUndefined:
+                        raise ValueError(
+                            "Missing optional columns (configured as error): "
+                            f"{[missing_col]}"
+                        ) from e
                 # Drop the missing optional column from the temporary plan and retry.
                 field_types.pop(missing_col, None)
                 plan = _require_rust_core().make_plan(field_types)
