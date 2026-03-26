@@ -1,8 +1,8 @@
 # Versioning and stability (0.x and 1.x)
 
-PydanTable is **0.x** today. This page states how maintainers intend to use **semver** on that train. **Behavioral** guarantees for transforms, nulls, joins, windows, materialization, and interchange live in {doc}`INTERFACE_CONTRACT`—treat that document as the semantics source of truth.
+PydanTable is **1.x** today. This page states how maintainers use **semver** on the stable train. **Behavioral** guarantees for transforms, nulls, joins, windows, materialization, and interchange live in {doc}`INTERFACE_CONTRACT`—treat that document as the semantics source of truth.
 
-## 0.x.y releases (current train)
+## 0.x.y releases (historical)
 
 - **Patch (`y`)** — Bug fixes, documentation-only updates, internal refactors, and test hardening that do **not** change documented public behavior.
 - **Minor (`0.x`)** — **Additive** changes: new `Expr` methods, new optional parameters with safe defaults, new documented APIs, or clarified contracts that align docs with long-standing behavior. **Changelog** entries should call out anything users might need to adopt consciously.

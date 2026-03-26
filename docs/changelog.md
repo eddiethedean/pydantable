@@ -18,7 +18,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 - Documentation now includes migration guidance from earlier `missing_optional` string-style wording (`"fill_none"` / `"error"`) to boolean `fill_missing_optional=True/False`.
 
-## [1.0.0] — planned
+## [1.0.0] — 2026-03-26
 
 ### Scope
 
