@@ -4,41 +4,40 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
-### Changed
-
-- **Breaking — lazy I/O naming:** **`scan_*` / `ascan_*`** → **`read_*` / `aread_*`**; **`DataFrame.sink_*` / `DataFrameModel.sink_*`** → **`write_*`**. Eager **`dict[str, list]` → file** in **`pydantable.io`** is **`export_*` / `aexport_*`** (not **`write_*`**, which now means lazy plan output on **`DataFrame`**). Top-level **`pydantable`** re-exports **`read_parquet`**, **`read_parquet_url`**, **`aread_parquet`**, **`aread_parquet_url`**, **`export_parquet`** (replacing **`scan_*`** / **`write_parquet`**).
-- **Errors:** Missing-extension failures from **`_scan_file_root`**, **`rust_engine`** sinks, and **`execute_plan`** now raise **`MissingRustExtensionError`** where applicable (still catchable as **`NotImplementedError`**).
-
-### Added
-
-- **Docs:** {doc}`IO_DECISION_TREE` — how to choose lazy vs eager I/O and **`pydantable.io`** vs top-level exports; engine matrix in {doc}`IO_OVERVIEW`; FASTAPI guidance on default **`asyncio.to_thread`** vs injected **`ThreadPoolExecutor`**. README and **index** / **EXECUTION** / **DATAFRAMEMODEL** / **QUICKSTART** / **DEVELOPER** refreshed for **0.23.x** I/O (JSON, URL context managers, **`MissingRustExtensionError`**, **`max_bytes`**).
-- **`MissingRustExtensionError`:** subclass of **`NotImplementedError`** with a stable message when the compiled **`pydantable._core`** extension is missing or incomplete (lazy scans, sinks, **`execute_plan`**).
-- **`read_parquet_url_ctx` / `aread_parquet_url_ctx`:** context managers that delete the temporary Parquet file when the block exits (see {doc}`IO_HTTP`).
-- **`DataFrameModel`:** classmethods **`export_*`**, **`write_sql`** / **`awrite_sql`**, **`from_sql`** / **`afrom_sql`** delegating to **`pydantable.io`**.
-- **HTTP / object store safety:** **`max_bytes`** on **`fetch_bytes`** and **`read_from_object_store`**; chunked reads with **`ValueError`** when exceeded.
-- **JSON (array of objects):** **`read_json`**, **`materialize_json`**, **`export_json`**, **`aread_json`**, **`amaterialize_json`**, **`aexport_json`** — local lazy scan and eager column dicts (see {doc}`IO_JSON`).
+Nothing yet.
 
 ## [0.23.0] — 2026-03-25
 
 ### Highlights
 
-- **Out-of-core file workflows:** **`read_parquet`**, **`read_csv`**, **`read_ndjson`**, **`read_ipc`** (and **`aread_*`**) return a **`ScanFileRoot`** so **`DataFrame` / `DataFrameModel`** can run transforms on a Polars **`LazyFrame`** without loading the full file into Python lists first.
+- **Out-of-core file workflows:** **`read_parquet`**, **`read_csv`**, **`read_ndjson`**, **`read_ipc`**, **`read_json`** (and **`aread_*`**) return a **`ScanFileRoot`** so **`DataFrame` / `DataFrameModel`** can run transforms on a Polars **`LazyFrame`** without loading the full file into Python lists first.
 - **`DataFrame.write_parquet`** (and **`write_csv`**, **`write_ipc`**, **`write_ndjson`**): write the lazy pipeline from the Rust engine without building a giant **`dict[str, list]`** for the result.
-- **Breaking — public I/O renames:** sync/async eager file reads into columns are **`materialize_*` / `amaterialize_*`**. Lazy local files use **`read_*` / `aread_*`**. Eager **`dict[str, list]` → file** uses **`export_*` / `aexport_*`**. SQL **`read_sql` / `aread_sql`** → **`fetch_sql` / `afetch_sql`**. HTTP URL readers **`read_parquet_url`**, **`read_csv_url`**, **`read_ndjson_url`** (0.22 names) → **`fetch_parquet_url`**, **`fetch_csv_url`**, **`fetch_ndjson_url`**. Lazy HTTP Parquet temp-file entry: **`read_parquet_url` / `aread_parquet_url`**. Top-level **`pydantable`** exports and **`DataFrameModel`** classmethods follow the same vocabulary.
+- **Breaking — public I/O renames:** sync/async eager file reads into columns are **`materialize_*` / `amaterialize_*`**. Lazy local files use **`read_*` / `aread_*`**. Eager **`dict[str, list]` → file** uses **`export_*` / `aexport_*`**. SQL **`read_sql` / `aread_sql`** → **`fetch_sql` / `afetch_sql`**. Eager HTTP(S) column readers (0.22 **`read_*_url`**) → **`fetch_parquet_url`**, **`fetch_csv_url`**, **`fetch_ndjson_url`**. **Lazy** HTTP Parquet (temp file on disk) stays **`read_parquet_url` / `aread_parquet_url`** — use **`read_parquet_url_ctx` / `aread_parquet_url_ctx`** to delete the temp file when done ({doc}`IO_HTTP`). Top-level **`pydantable`** exports and **`DataFrameModel`** classmethods follow the same vocabulary.
+- **Pre-release / internal names:** development builds that still exposed **`scan_*` / `ascan_*`** or **`sink_*`** for lazy I/O now align with the public **`read_*` / `write_*`** names; **`pydantable`** re-exports **`read_parquet`**, **`read_parquet_url`**, **`aread_parquet`**, **`aread_parquet_url`**, **`export_parquet`** (replacing **`scan_*` / `write_parquet`** on the package root).
+
+### Added
+
+- **JSON (array of objects):** **`read_json`**, **`materialize_json`**, **`export_json`**, **`aread_json`**, **`amaterialize_json`**, **`aexport_json`** — local lazy scan and eager column dicts (see {doc}`IO_JSON`).
+- **`read_parquet_url_ctx` / `aread_parquet_url_ctx`:** context managers that delete the temporary Parquet file when the block exits (see {doc}`IO_HTTP`).
+- **`DataFrameModel`:** classmethods **`export_*`**, **`write_sql`** / **`awrite_sql`**, **`from_sql`** / **`afrom_sql`** delegating to **`pydantable.io`**.
+- **`MissingRustExtensionError`:** subclass of **`NotImplementedError`** when **`pydantable._core`** is missing or incomplete on lazy scan/sink paths and **`execute_plan`** (still catchable as **`NotImplementedError`**).
+- **HTTP / object store safety:** **`max_bytes`** on **`fetch_bytes`** and **`read_from_object_store`**; chunked reads with **`ValueError`** when exceeded.
+- **Docs:** {doc}`IO_DECISION_TREE`, {doc}`IO_JSON`, {doc}`IO_HTTP` updates, engine matrix in {doc}`IO_OVERVIEW`, FASTAPI executor guidance; README and manual pages refreshed for **0.23.x** I/O.
 
 ### Details
 
-- **Rust:** **`ScanFileRoot`**, **`plan_to_lazyframe`**, internal **`sink_*`** exports for lazy writes; join/groupby/reshape entrypoints work with lazy file roots where implemented (see **`EXECUTION`** matrix).
+- **Rust:** **`ScanFileRoot`**, **`plan_to_lazyframe`**, internal sink exports for lazy writes; join/groupby/reshape entrypoints work with lazy file roots where implemented (see {doc}`EXECUTION` matrix).
 - **Python:** **`read_csv_stdin`** uses **`materialize_csv`** internally.
-- **Docs:** {doc}`EXECUTION` memory model and streaming/collect compatibility matrix ( **`PYDANTABLE_ENGINE_STREAMING`** reserved); {doc}`DATA_IO_SOURCES`, {doc}`FASTAPI`, {doc}`INTERFACE_CONTRACT`, {doc}`ROADMAP`, {doc}`README`.
+- **Docs:** {doc}`EXECUTION` memory model and streaming/collect compatibility matrix (**`PYDANTABLE_ENGINE_STREAMING`** reserved); {doc}`DATA_IO_SOURCES`, {doc}`FASTAPI`, {doc}`INTERFACE_CONTRACT`, {doc}`ROADMAP`, {doc}`README`.
 
 ### Migration (from 0.22.x)
 
-| Removed | Use instead |
-|---------|-------------|
-| **`read_parquet`**, **`aread_parquet`**, … | **`materialize_parquet`**, **`amaterialize_parquet`**, … |
+| Old (0.22.x) | Use instead (0.23.0) |
+|--------------|----------------------|
+| Eager file → **`dict[str, list]`** via **`read_parquet`**, **`aread_parquet`**, … | **`materialize_parquet`**, **`amaterialize_parquet`**, … |
 | **`read_sql`**, **`aread_sql`** | **`fetch_sql`**, **`afetch_sql`** |
-| **`read_parquet_url`**, … | **`fetch_parquet_url`**, … |
+| Eager URL → columns via **`read_parquet_url`** / **`read_csv_url`** / **`read_ndjson_url`** | **`fetch_parquet_url`**, **`fetch_csv_url`**, **`fetch_ndjson_url`** |
+| Lazy HTTP Parquet (unchanged name, new cleanup helpers) | Still **`read_parquet_url`** / **`aread_parquet_url`**; prefer **`read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** for automatic temp-file removal |
 | Large local file, filter → Parquet out | **`read_parquet`** + transforms + **`DataFrame.write_parquet`** |
 
 ## [0.22.0] — 2026-03-25
