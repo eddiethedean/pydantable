@@ -13,8 +13,8 @@ def render_plan_text(plan: dict[str, Any]) -> str:
     optionally with extra top-level keys added by the Python layer.
     """
     version = plan.get("version", "?")
-    streaming = plan.get("engine_streaming", None)
-    root_kind = plan.get("root_data_kind", None)
+    streaming = plan.get("engine_streaming")
+    root_kind = plan.get("root_data_kind")
 
     lines: list[str] = [f"Plan(version={version})"]
     if streaming is not None:
@@ -92,4 +92,3 @@ def explain(
     if format == "text":
         return render_plan_text(d)
     raise ValueError(f"Unsupported format: {format!r}")
-

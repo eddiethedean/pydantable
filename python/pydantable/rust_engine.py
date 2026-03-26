@@ -137,7 +137,9 @@ def write_ipc(
         raise MissingRustExtensionError(
             f"{_MISSING_SYMBOL_PREFIX}`sink_ipc`. See docs/DEVELOPER.md."
         )
-    with span("sink_ipc", streaming=bool(streaming), path=str(path), compression=compression):
+    with span(
+        "sink_ipc", streaming=bool(streaming), path=str(path), compression=compression
+    ):
         rust.sink_ipc(plan, root_data, path, streaming, compression, write_kwargs)
 
 
@@ -176,7 +178,9 @@ def collect_batches(
         raise MissingRustExtensionError(
             f"{_MISSING_SYMBOL_PREFIX}`collect_plan_batches`. See docs/DEVELOPER.md."
         )
-    with span("collect_plan_batches", batch_size=int(batch_size), streaming=bool(streaming)):
+    with span(
+        "collect_plan_batches", batch_size=int(batch_size), streaming=bool(streaming)
+    ):
         return list(rust.collect_plan_batches(plan, root_data, batch_size, streaming))
 
 
@@ -288,7 +292,9 @@ def execute_melt(
 ) -> tuple[Any, Any]:
     """Unpivot to long format (melt)."""
     rust = _require_rust_core()
-    with span("execute_melt", as_python_lists=bool(as_python_lists), streaming=bool(streaming)):
+    with span(
+        "execute_melt", as_python_lists=bool(as_python_lists), streaming=bool(streaming)
+    ):
         return rust.execute_melt(
             plan,
             root_data,
@@ -376,7 +382,7 @@ def execute_rolling_agg(
         on=on,
         column=column,
         window_size=window_size,
-        op=op,
+        agg_op=op,
         out_name=out_name,
         min_periods=int(min_periods),
     ):

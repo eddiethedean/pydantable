@@ -25,4 +25,3 @@ def test_observer_receives_execute_plan_event() -> None:
     ev = next(e for e in events if e.get("op") == "execute_plan")
     assert "duration_ms" in ev
     assert ev.get("ok") is True
-

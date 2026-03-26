@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 @dataclass(frozen=True)
@@ -58,4 +60,3 @@ def list_readers() -> list[PluginFn]:
 
 def list_writers() -> list[PluginFn]:
     return sorted(_WRITERS.values(), key=lambda p: p.name)
-

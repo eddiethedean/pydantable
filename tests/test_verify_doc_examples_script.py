@@ -7,7 +7,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 REPO = Path(__file__).resolve().parents[1]
 
 
@@ -26,4 +25,3 @@ def test_verify_doc_examples_script() -> None:
         check=False,
     )
     assert r.returncode == 0, f"verify_doc_examples failed:\n{r.stderr}\n{r.stdout}"
-

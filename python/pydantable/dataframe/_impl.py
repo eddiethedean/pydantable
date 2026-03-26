@@ -2254,7 +2254,9 @@ class DataFrame(Generic[SchemaT]):
         from pydantable.plan import explain as _explain
 
         use_streaming = _resolve_engine_streaming(streaming)
-        root_kind = "scan_file_root" if _is_scan_file_root(self._root_data) else "in_memory"
+        root_kind = (
+            "scan_file_root" if _is_scan_file_root(self._root_data) else "in_memory"
+        )
         return _explain(
             self._rust_plan,
             format=format,

@@ -12,4 +12,3 @@ def test_builtin_readers_registered() -> None:
 def test_get_reader_returns_callable() -> None:
     fn = get_reader("read_parquet")
     assert callable(fn)
-

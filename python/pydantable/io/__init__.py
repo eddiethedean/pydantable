@@ -261,7 +261,9 @@ def materialize_parquet(
     """
     eng = (engine or _default_engine()).lower()
     with span("io.materialize_parquet", engine=eng, columns=columns is not None):
-        use_rust = eng in ("auto", "rust") and columns is None and _is_local_path(source)
+        use_rust = (
+            eng in ("auto", "rust") and columns is None and _is_local_path(source)
+        )
         if use_rust and eng != "pyarrow":
             from ._core_io import rust_read_parquet_path
 
@@ -273,7 +275,9 @@ def materialize_parquet(
                     if eng == "rust":
                         raise
         if eng == "rust" and not use_rust:
-            raise ValueError("Rust Parquet read needs a local file path and columns=None")
+            raise ValueError(
+                "Rust Parquet read needs a local file path and columns=None"
+            )
         return read_parquet_pyarrow(source, columns=columns)
 
 
@@ -318,7 +322,11 @@ def materialize_csv(
     * ``engine="auto"``: try Rust, then fall back to stdlib ``csv`` on failure.
     * ``use_rap=True``: load via :func:`aread_csv_rap` (only when no running event loop).
     """
-    with span("io.materialize_csv", engine=(engine or _default_engine()).lower(), use_rap=bool(use_rap)):
+    with span(
+        "io.materialize_csv",
+        engine=(engine or _default_engine()).lower(),
+        use_rap=bool(use_rap),
+    ):
         if use_rap:
             try:
                 asyncio.get_running_loop()

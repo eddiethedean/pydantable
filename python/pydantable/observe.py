@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import os
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 Observer = Callable[[dict[str, Any]], None]
 
@@ -44,7 +45,7 @@ def emit(event: dict[str, Any]) -> None:
         return
     if trace_enabled():
         # Keep this intentionally simple and stdlib-only.
-        print(f"pydantable.trace {event}")  # noqa: T201
+        print(f"pydantable.trace {event}")
 
 
 class span:
@@ -55,7 +56,7 @@ class span:
         self._fields = fields
         self._t0: float | None = None
 
-    def __enter__(self) -> "span":
+    def __enter__(self) -> span:
         self._t0 = _now()
         return self
 
@@ -73,4 +74,3 @@ class span:
         if exc_type is not None:
             event["error_type"] = getattr(exc_type, "__name__", str(exc_type))
         emit(event)
-

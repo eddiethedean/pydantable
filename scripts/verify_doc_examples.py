@@ -8,6 +8,8 @@ Fails on assertion errors or import failures so README and Sphinx snippets stay
 in sync with the API.
 """
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import asyncio
@@ -15,15 +17,15 @@ import os
 import sys
 from pathlib import Path
 
+PROJECT_ROOT = str(Path(__file__).resolve().parents[1])
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from pydantable import DataFrameModel
 from pydantable.pandas import DataFrameModel as PandasDataFrameModel
 from pydantable.pyspark import DataFrameModel as PySparkDataFrameModel
 from pydantable.pyspark.sql import functions as F
 from pydantic import BaseModel
-
-PROJECT_ROOT = str(Path(__file__).resolve().parents[1])
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
 
 from scripts.doc_examples.cookbook import (
     run_fastapi_async_materialization,

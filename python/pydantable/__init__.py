@@ -11,14 +11,13 @@ Alternate facades live in :mod:`pydantable.pandas` (pandas-like names) and
 from __future__ import annotations
 
 from . import pandas as pandas
+from . import plugins as plugins
 from . import pyspark as pyspark
 from ._extension import MissingRustExtensionError
 from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
 from .display import get_repr_html_limits, reset_display_options, set_display_options
 from .expressions import Expr
-from .observe import get_observer, set_observer
-from . import plugins as plugins
 from .io import (
     afetch_sql,
     amaterialize_parquet,
@@ -32,6 +31,7 @@ from .io import (
     read_parquet,
     read_parquet_url,
 )
+from .observe import get_observer, set_observer
 from .schema import DtypeDriftWarning, Schema
 
 __all__ = [
@@ -47,18 +47,18 @@ __all__ = [
     "aread_parquet_url",
     "export_parquet",
     "fetch_sql",
-    "get_repr_html_limits",
     "get_observer",
+    "get_repr_html_limits",
     "materialize_ipc",
     "materialize_ndjson",
     "materialize_parquet",
-    "plugins",
     "pandas",
+    "plugins",
     "pyspark",
     "read_parquet",
     "read_parquet_url",
-    "set_observer",
     "reset_display_options",
     "set_display_options",
+    "set_observer",
 ]
 __version__ = "1.0.0"

@@ -76,4 +76,3 @@ def run_windows_framing_primer() -> None:
     w = Window.partitionBy("group").orderBy("v")
     out = df.with_columns(rn=row_number().over(w)).to_dict()
     assert "rn" in out
-

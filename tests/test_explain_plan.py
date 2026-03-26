@@ -23,4 +23,3 @@ def test_explain_json_is_serializable_shape() -> None:
     assert isinstance(j["steps"], list)
     assert j.get("engine_streaming") in (True, False)
     assert j.get("root_data_kind") in ("in_memory", "scan_file_root")
-
