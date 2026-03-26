@@ -16,6 +16,7 @@ import functools
 import html
 import importlib
 import os
+import re
 import statistics
 import types
 import warnings
@@ -442,6 +443,7 @@ class DataFrame(Generic[SchemaT]):
         data: Mapping[str, Sequence[Any]] | Any,
         *,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ) -> None:
@@ -455,6 +457,7 @@ class DataFrame(Generic[SchemaT]):
             self._schema_type,
             validate_elements=None,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -469,6 +472,7 @@ class DataFrame(Generic[SchemaT]):
         # scan roots are lazy and cannot validate rows up front.
         self._io_validation_enabled: bool = False
         self._io_validation_trusted_mode: Literal["off", "shape_only", "strict"] | None = None
+        self._io_validation_fill_missing_optional: bool = True
         self._io_validation_ignore_errors: bool = False
         self._io_validation_on_validation_errors: (
             Callable[[list[dict[str, Any]]], None] | None
@@ -480,6 +484,7 @@ class DataFrame(Generic[SchemaT]):
         root: Any,
         *,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ) -> DataFrame[Any]:
@@ -501,6 +506,7 @@ class DataFrame(Generic[SchemaT]):
         )
         df._io_validation_enabled = True
         df._io_validation_trusted_mode = trusted_mode
+        df._io_validation_fill_missing_optional = fill_missing_optional
         df._io_validation_ignore_errors = bool(ignore_errors)
         df._io_validation_on_validation_errors = on_validation_errors
         return df
@@ -512,6 +518,7 @@ class DataFrame(Generic[SchemaT]):
         *,
         columns: list[str] | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
@@ -522,6 +529,7 @@ class DataFrame(Generic[SchemaT]):
         return cls._from_scan_root(
             _read_parquet(path, columns=columns, **scan_kwargs),
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -534,10 +542,17 @@ class DataFrame(Generic[SchemaT]):
         columns: list[str] | None = None,
         executor: Executor | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> DataFrame[Any]:
+        """Async lazy Parquet read (local path).
+
+        Returns a typed lazy frame backed by a native `ScanFileRoot`. Ingest
+        validation options are applied when you materialize (`to_dict()` /
+        `collect()` / `to_arrow()` / `to_polars()`), not at scan time.
+        """
         from pydantable.io import aread_parquet as _aread_parquet
 
         root = await _aread_parquet(
@@ -546,6 +561,7 @@ class DataFrame(Generic[SchemaT]):
         return cls._from_scan_root(
             root,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -558,6 +574,7 @@ class DataFrame(Generic[SchemaT]):
         experimental: bool = True,
         columns: list[str] | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **kwargs: Any,
@@ -571,6 +588,7 @@ class DataFrame(Generic[SchemaT]):
         return cls._from_scan_root(
             _read_parquet_url(url, experimental=experimental, columns=columns, **kwargs),
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -584,10 +602,16 @@ class DataFrame(Generic[SchemaT]):
         columns: list[str] | None = None,
         executor: Executor | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **kwargs: Any,
     ) -> DataFrame[Any]:
+        """Async lazy Parquet over HTTP(S) (downloads to a temp file).
+
+        Prefer `DataFrameModel.aread_parquet_url_ctx` / `pydantable.io.aread_parquet_url_ctx`
+        for automatic temp-file cleanup. Validation options apply on materialization.
+        """
         from pydantable.io import aread_parquet_url as _aread_parquet_url
 
         root = await _aread_parquet_url(
@@ -600,6 +624,7 @@ class DataFrame(Generic[SchemaT]):
         return cls._from_scan_root(
             root,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -611,6 +636,7 @@ class DataFrame(Generic[SchemaT]):
         *,
         columns: list[str] | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
@@ -620,6 +646,7 @@ class DataFrame(Generic[SchemaT]):
         return cls._from_scan_root(
             _read_csv(path, columns=columns, **scan_kwargs),
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -632,16 +659,22 @@ class DataFrame(Generic[SchemaT]):
         columns: list[str] | None = None,
         executor: Executor | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> DataFrame[Any]:
+        """Async lazy CSV read (local path).
+
+        Validation options apply on materialization (see `aread_parquet`).
+        """
         from pydantable.io import aread_csv as _aread_csv
 
         root = await _aread_csv(path, columns=columns, executor=executor, **scan_kwargs)
         return cls._from_scan_root(
             root,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -653,6 +686,7 @@ class DataFrame(Generic[SchemaT]):
         *,
         columns: list[str] | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
@@ -662,6 +696,7 @@ class DataFrame(Generic[SchemaT]):
         return cls._from_scan_root(
             _read_ndjson(path, columns=columns, **scan_kwargs),
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -674,10 +709,15 @@ class DataFrame(Generic[SchemaT]):
         columns: list[str] | None = None,
         executor: Executor | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> DataFrame[Any]:
+        """Async lazy NDJSON read (local path).
+
+        Validation options apply on materialization (see `aread_parquet`).
+        """
         from pydantable.io import aread_ndjson as _aread_ndjson
 
         root = await _aread_ndjson(
@@ -686,6 +726,7 @@ class DataFrame(Generic[SchemaT]):
         return cls._from_scan_root(
             root,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -697,6 +738,7 @@ class DataFrame(Generic[SchemaT]):
         *,
         columns: list[str] | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
@@ -707,6 +749,7 @@ class DataFrame(Generic[SchemaT]):
         return cls._from_scan_root(
             _read_json(path, columns=columns, **scan_kwargs),
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -719,16 +762,22 @@ class DataFrame(Generic[SchemaT]):
         columns: list[str] | None = None,
         executor: Executor | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> DataFrame[Any]:
+        """Async lazy JSON Lines read (local path; alias of NDJSON engine).
+
+        Validation options apply on materialization (see `aread_parquet`).
+        """
         from pydantable.io import aread_json as _aread_json
 
         root = await _aread_json(path, columns=columns, executor=executor, **scan_kwargs)
         return cls._from_scan_root(
             root,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -740,6 +789,7 @@ class DataFrame(Generic[SchemaT]):
         *,
         columns: list[str] | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
@@ -749,6 +799,7 @@ class DataFrame(Generic[SchemaT]):
         return cls._from_scan_root(
             _read_ipc(path, columns=columns, **scan_kwargs),
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -761,16 +812,22 @@ class DataFrame(Generic[SchemaT]):
         columns: list[str] | None = None,
         executor: Executor | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> DataFrame[Any]:
+        """Async lazy Arrow IPC file read (local path).
+
+        Validation options apply on materialization (see `aread_parquet`).
+        """
         from pydantable.io import aread_ipc as _aread_ipc
 
         root = await _aread_ipc(path, columns=columns, executor=executor, **scan_kwargs)
         return cls._from_scan_root(
             root,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -793,6 +850,7 @@ class DataFrame(Generic[SchemaT]):
         obj._schema_type = None
         obj._io_validation_enabled = False
         obj._io_validation_trusted_mode = None
+        obj._io_validation_fill_missing_optional = True
         obj._io_validation_ignore_errors = False
         obj._io_validation_on_validation_errors = None
         return cast("DataFrame[Any]", obj)
@@ -814,9 +872,56 @@ class DataFrame(Generic[SchemaT]):
             self._current_schema_type,
             validate_elements=None,
             trusted_mode=mode,
+            fill_missing_optional=self._io_validation_fill_missing_optional,
             ignore_errors=self._io_validation_ignore_errors,
             on_validation_errors=self._io_validation_on_validation_errors,
         )
+
+    def _materialize_columns_with_missing_optional_fallback(
+        self, *, streaming: bool
+    ) -> dict[str, list[Any]]:
+        """
+        Materialize columns via the Rust engine, with a fallback for scan roots
+        missing optional schema fields.
+
+        Polars scans will error if a selected column is absent. For optional
+        schema fields, we treat missing columns as all-null and retry execution
+        with those columns omitted, then fill them with `None` during validation.
+        """
+        plan = self._rust_plan
+        field_types = dict(self._current_field_types)
+
+        missing_re = re.compile(r'not found: "([^"]+)" not found')
+        while True:
+            try:
+                return execute_plan(
+                    plan,
+                    self._root_data,
+                    as_python_lists=True,
+                    streaming=streaming,
+                    error_context=self._materialize_error_context(),
+                )
+            except ValueError as e:
+                # Only attempt this recovery on lazy scan roots.
+                if not _is_scan_file_root(self._root_data):
+                    raise
+                m = missing_re.search(str(e))
+                if not m:
+                    raise
+                missing_col = m.group(1)
+                ann = field_types.get(missing_col)
+                if ann is None:
+                    raise
+                _inner, nullable = _annotation_nullable_inner(ann)
+                if not nullable:
+                    raise
+                if not self._io_validation_fill_missing_optional:
+                    raise ValueError(
+                        f"Missing optional columns (configured as error): {[missing_col]}"
+                    ) from e
+                # Drop the missing optional column from the temporary plan and retry.
+                field_types.pop(missing_col, None)
+                plan = _require_rust_core().make_plan(field_types)
 
     @property
     def schema_type(self) -> type[BaseModel]:
@@ -1829,12 +1934,8 @@ class DataFrame(Generic[SchemaT]):
                 "collect() cannot specify both as_numpy=True and as_lists=True."
             )
         use_streaming = _resolve_engine_streaming(streaming)
-        column_dict = execute_plan(
-            self._rust_plan,
-            self._root_data,
-            as_python_lists=True,
-            streaming=use_streaming,
-            error_context=self._materialize_error_context(),
+        column_dict = self._materialize_columns_with_missing_optional_fallback(
+            streaming=use_streaming
         )
         column_dict = _coerce_enum_columns(column_dict, self._current_field_types)
         column_dict = self._apply_io_validation_if_configured(column_dict)
@@ -1853,12 +1954,8 @@ class DataFrame(Generic[SchemaT]):
         Pass ``streaming=`` or set ``PYDANTABLE_ENGINE_STREAMING`` like :meth:`collect`.
         """
         use_streaming = _resolve_engine_streaming(streaming)
-        raw = execute_plan(
-            self._rust_plan,
-            self._root_data,
-            as_python_lists=True,
-            streaming=use_streaming,
-            error_context=self._materialize_error_context(),
+        raw = self._materialize_columns_with_missing_optional_fallback(
+            streaming=use_streaming
         )
         raw = _coerce_enum_columns(raw, self._current_field_types)
         return self._apply_io_validation_if_configured(raw)

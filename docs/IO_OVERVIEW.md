@@ -16,11 +16,19 @@ The **`pydantable`** package re-exports a small subset of I/O (Parquet-focused l
 | **Lazy local file** | **`read_parquet`**, **`read_csv`**, **`read_ndjson`**, **`read_ipc`**, **`read_json`** | **`MyModel.read_*`** — classmethods; same **`**scan_kwargs`** |
 | **Lazy Parquet URL** | **`read_parquet_url`** | **`MyModel.read_parquet_url`** — **`**kwargs`** for **`fetch_bytes`** only |
 | **Temp Parquet URL cleanup** | Build frame inside **`read_parquet_url_ctx`** ( **`io`** ) or use **`DataFrameModel.read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** | Same — context managers unlink the download when the block exits ({doc}`IO_HTTP`) |
-| **Async lazy reads** | **`DataFrame[Schema]`** exposes sync **`read_*`** only — use **`DataFrameModel.aread_*`**, or **`await pydantable.io.aread_*`** and build the typed frame the same way sync **`read_parquet`** does from a **`ScanFileRoot`**. | **`aread_parquet`**, **`aread_csv`**, **`aread_ndjson`**, **`aread_ipc`**, **`aread_json`**, optional **`executor=`**; URL temp file without ctx: **`io.aread_parquet_url`**. |
+| **Async lazy reads** | **`DataFrame[Schema].aread_*`** (mirrors `DataFrameModel.aread_*`), or `await pydantable.io.aread_*` and build from `ScanFileRoot`. | **`aread_parquet`**, **`aread_csv`**, **`aread_ndjson`**, **`aread_ipc`**, **`aread_json`**, optional **`executor=`**; URL temp file without ctx: **`io.aread_parquet_url`**. |
 | **Eager reads** | Constructor **`DataFrame[Schema](cols)`** from **`dict[str, list]`** | **`materialize_*`**, **`fetch_sql`**, **`amaterialize_*`**, **`afetch_sql`** classmethods |
 | **Lazy writes** | **`write_parquet`**, **`write_csv`**, **`write_ipc`**, **`write_ndjson`** | Same **instance** methods on **`model`** — **`streaming`**, **`write_kwargs`**, etc. |
 
-Optional validation on eager paths: **`trusted_mode`**, **`ignore_errors`**, **`on_validation_errors`** (see {doc}`DATAFRAMEMODEL`).
+**Ingest validation options:** `trusted_mode`, `fill_missing_optional`, `ignore_errors`, `on_validation_errors` apply on **constructors** and on **typed lazy reads** (`DataFrame[Schema].read_*` / `aread_*`, `DataFrameModel.read_*` / `aread_*`) at **materialization time** (`to_dict()` / `collect()` / `to_arrow()` / `to_polars()`).
+
+- `trusted_mode=None` / `"off"`: full per-cell validation (default).
+- `ignore_errors=True` (only meaningful when `trusted_mode` is `"off"`): invalid rows are skipped and `on_validation_errors` receives one batch payload.
+- `trusted_mode="shape_only"` / `"strict"`: skip per-cell validation (still enforces shape + nullability; `"strict"` adds dtype-compat checks). `ignore_errors` does not skip rows in these modes.
+- `fill_missing_optional=True` (default): missing optional columns are filled with `None` during ingest/materialization.
+- `fill_missing_optional=False`: missing optional columns/fields raise an error (including for typed lazy reads at materialization time).
+
+See {doc}`DATAFRAMEMODEL` for the detailed ingest contract.
 
 **Glue I/O on `DataFrameModel`:** classmethods **`export_*`**, **`write_sql`** / **`awrite_sql`**, **`from_sql`** / **`afrom_sql`** delegate to **`pydantable.io`** (same signatures as the module functions). **`pydantable.io.extras`** remains module-only.
 

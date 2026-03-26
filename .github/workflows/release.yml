@@ -41,10 +41,10 @@ jobs:
         run: cargo install cargo-cyclonedx
 
       - name: Create Rust SBOM (crate)
-        run: cargo cyclonedx --manifest-path pydantable-core/Cargo.toml --format json --output-file sbom-rust.cdx.json
+        run: cargo cyclonedx --manifest-path pydantable-core/Cargo.toml --format json --override-filename sbom-rust.cdx.json
 
       - name: Upload SBOM artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: sbom-cyclonedx
           path: |

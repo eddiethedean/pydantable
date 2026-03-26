@@ -26,6 +26,7 @@ from typing import (
 )
 
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError, create_model
+from pydantic_core import PydanticUndefined
 
 _NoneType = type(None)
 
@@ -741,6 +742,7 @@ def validate_columns_strict(
     *,
     validate_elements: bool | None = None,
     trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+    fill_missing_optional: bool = True,
     ignore_errors: bool = False,
     on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> dict[str, Any] | Any:
@@ -824,19 +826,33 @@ def validate_columns_strict(
         return data
 
     field_types = schema_field_types(schema_type)
+    field_infos = dict(schema_type.model_fields)
     data_keys = set(data.keys())
     field_keys = set(field_types.keys())
 
-    missing = sorted(field_keys - data_keys)
     extra = sorted(data_keys - field_keys)
-    if missing:
-        raise ValueError(f"Missing required columns: {missing}")
     if extra:
         raise ValueError(f"Unknown columns for schema: {extra}")
 
     normalized: dict[str, Any] = {}
     lengths = set()
-    for name, _expected_type in field_types.items():
+    missing_optional_cols: list[str] = []
+    missing_optional_with_defaults: dict[str, Any] = {}
+    missing_required: list[str] = []
+    for name, annotation in field_types.items():
+        if name not in data:
+            _inner, nullable = _annotation_nullable_inner(annotation)
+            if nullable:
+                missing_optional_cols.append(name)
+                fi = field_infos.get(name)
+                if fi is not None:
+                    default = getattr(fi, "default", PydanticUndefined)
+                    if default is not PydanticUndefined:
+                        missing_optional_with_defaults[name] = default
+                continue
+            missing_required.append(name)
+            continue
+
         col = data[name]
         if mode == "off":
             col = _normalize_pyarrow_map_column(name, col, field_types[name], mode=mode)
@@ -851,13 +867,32 @@ def validate_columns_strict(
 
         normalized[name] = values
 
+    if missing_required:
+        raise ValueError(f"Missing required columns: {sorted(missing_required)}")
+
     if len(lengths) != 1:
         raise ValueError(
             f"All columns must have the same length; got {sorted(lengths)}"
         )
 
-    if mode == "off" and ignore_errors:
+    if missing_optional_cols:
+        if not fill_missing_optional:
+            missing_without_default = sorted(
+                [c for c in missing_optional_cols if c not in missing_optional_with_defaults]
+            )
+            if missing_without_default:
+                raise ValueError(
+                    "Missing optional columns (configured as error): "
+                    f"{missing_without_default}"
+                )
         n_rows = next(iter(lengths), 0)
+        for name in missing_optional_cols:
+            fill_value = missing_optional_with_defaults.get(name, None)
+            normalized[name] = [fill_value] * n_rows
+    else:
+        n_rows = next(iter(lengths), 0)
+
+    if mode == "off" and ignore_errors:
         adapters = {name: TypeAdapter(field_types[name]) for name in field_types}
         valid_rows: list[dict[str, Any]] = []
         failures: list[dict[str, Any]] = []

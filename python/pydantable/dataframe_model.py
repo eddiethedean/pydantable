@@ -32,8 +32,23 @@ from .schema import (
 
 def _field_defs_from_annotations(
     annotations: Mapping[str, Any],
+    *,
+    fill_missing_optional: bool = True,
+    field_defaults: Mapping[str, Any] | None = None,
 ) -> dict[str, tuple[Any, Any]]:
-    return {name: (dtype, ...) for name, dtype in annotations.items()}
+    from .schema import _annotation_nullable_inner
+
+    out: dict[str, tuple[Any, Any]] = {}
+    for name, dtype in annotations.items():
+        _inner, nullable = _annotation_nullable_inner(dtype)
+        if field_defaults is not None and name in field_defaults:
+            out[name] = (dtype, field_defaults[name])
+            continue
+        if nullable:
+            out[name] = (dtype, None if fill_missing_optional else ...)
+        else:
+            out[name] = (dtype, ...)
+    return out
 
 
 # ``str``, ``bytes``, ``memoryview``, etc. are ``Sequence`` but must not be treated
@@ -159,6 +174,8 @@ class DataFrameModel:
     """
 
     RowModel: type[BaseModel]
+    _RowModel_fill_missing_optional: type[BaseModel]
+    _RowModel_require_optional: type[BaseModel]
     _SchemaModel: type[Schema]
     _df: DataFrame[Any]
     _dataframe_cls: type[DataFrame[Any]] = DataFrame
@@ -187,16 +204,39 @@ class DataFrameModel:
 
         validate_dataframe_model_field_annotations(cls.__name__, annotations)
 
-        field_defs = _field_defs_from_annotations(annotations)
-        cls.RowModel = create_model(  # type: ignore[call-overload]
+        field_defaults: dict[str, Any] = {}
+        class_dict = getattr(cls, "__dict__", {})
+        for field_name in annotations:
+            if field_name in class_dict:
+                field_defaults[field_name] = class_dict[field_name]
+
+        field_defs_fill = _field_defs_from_annotations(
+            annotations, fill_missing_optional=True, field_defaults=field_defaults
+        )
+        field_defs_require = _field_defs_from_annotations(
+            annotations, fill_missing_optional=False, field_defaults=field_defaults
+        )
+        # Schema should not implicitly add defaults for optional fields; missing-column
+        # behavior is controlled by `fill_missing_optional` at ingest/materialization.
+        field_defs_schema = _field_defs_from_annotations(
+            annotations, fill_missing_optional=False, field_defaults=field_defaults
+        )
+
+        cls._RowModel_fill_missing_optional = create_model(  # type: ignore[call-overload]
             f"{cls.__name__}RowModel",
             __base__=Schema,
-            **field_defs,
+            **field_defs_fill,
         )
+        cls._RowModel_require_optional = create_model(  # type: ignore[call-overload]
+            f"{cls.__name__}RowModelRequireOptional",
+            __base__=Schema,
+            **field_defs_require,
+        )
+        cls.RowModel = cls._RowModel_fill_missing_optional
         cls._SchemaModel = create_model(  # type: ignore[call-overload]
             f"{cls.__name__}Schema",
             __base__=Schema,
-            **field_defs,
+            **field_defs_schema,
         )
 
     def __init__(
@@ -204,6 +244,7 @@ class DataFrameModel:
         data: Any,
         *,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ) -> None:
@@ -223,9 +264,14 @@ class DataFrameModel:
         ``trusted_mode='shape_only'`` so cell values are not validated twice.
         Columnar mappings use the ``trusted_mode`` you pass unchanged.
         """
+        row_model = (
+            self._RowModel_fill_missing_optional
+            if fill_missing_optional
+            else self._RowModel_require_optional
+        )
         normalized, from_rows = _normalize_input(
             data=data,
-            row_model=self.RowModel,
+            row_model=row_model,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -236,6 +282,7 @@ class DataFrameModel:
         self._df = dataframe_cls[self._SchemaModel](
             normalized,
             trusted_mode=inner_trusted,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -262,6 +309,7 @@ class DataFrameModel:
         *,
         columns: list[str] | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
@@ -273,6 +321,7 @@ class DataFrameModel:
             path,
             columns=columns,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
             **scan_kwargs,
@@ -287,6 +336,7 @@ class DataFrameModel:
         experimental: bool = True,
         columns: list[str] | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **kwargs: Any,
@@ -302,6 +352,7 @@ class DataFrameModel:
             experimental=experimental,
             columns=columns,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
             **kwargs,
@@ -315,6 +366,7 @@ class DataFrameModel:
         *,
         columns: list[str] | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
@@ -326,6 +378,7 @@ class DataFrameModel:
             path,
             columns=columns,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
             **scan_kwargs,
@@ -339,6 +392,7 @@ class DataFrameModel:
         *,
         columns: list[str] | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
@@ -350,6 +404,7 @@ class DataFrameModel:
             path,
             columns=columns,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
             **scan_kwargs,
@@ -363,6 +418,7 @@ class DataFrameModel:
         *,
         columns: list[str] | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
@@ -374,6 +430,7 @@ class DataFrameModel:
             path,
             columns=columns,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
             **scan_kwargs,
@@ -387,6 +444,7 @@ class DataFrameModel:
         *,
         columns: list[str] | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
@@ -398,6 +456,7 @@ class DataFrameModel:
             path,
             columns=columns,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
             **scan_kwargs,
@@ -729,6 +788,7 @@ class DataFrameModel:
         columns: list[str] | None = None,
         executor: Executor | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
@@ -741,6 +801,7 @@ class DataFrameModel:
         inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
             root,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -754,6 +815,7 @@ class DataFrameModel:
         columns: list[str] | None = None,
         executor: Executor | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
@@ -766,6 +828,7 @@ class DataFrameModel:
         inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
             root,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -779,6 +842,7 @@ class DataFrameModel:
         columns: list[str] | None = None,
         executor: Executor | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
@@ -791,6 +855,7 @@ class DataFrameModel:
         inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
             root,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -804,6 +869,7 @@ class DataFrameModel:
         columns: list[str] | None = None,
         executor: Executor | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
@@ -816,6 +882,7 @@ class DataFrameModel:
         inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
             root,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
@@ -829,6 +896,7 @@ class DataFrameModel:
         columns: list[str] | None = None,
         executor: Executor | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
@@ -841,6 +909,7 @@ class DataFrameModel:
         inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
             root,
             trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
