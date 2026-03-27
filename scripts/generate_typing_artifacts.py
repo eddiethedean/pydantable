@@ -4,7 +4,6 @@ import argparse
 import ast
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 _STUB_DATAFRAME_MODEL = """\
@@ -183,59 +182,54 @@ def _differs(path: Path, content: str) -> bool:
     return existing != content
 
 
-def _ruff_format_stub(path: Path, content: str) -> str:
+def _normalize_stub_content(repo_root: Path, path: Path, content: str) -> str:
     """
-    Format generated stub content with Ruff when available.
+    Lint-fix and format generated stub text the same way for `--check` and for writes.
 
-    This keeps generator output stable with CI's `ruff format --check`.
+    Uses the file's path relative to the repo so Ruff applies the same `pyproject`
+    rules as `ruff check` / `ruff format` on committed paths (tempfile-based runs
+    can diverge).
     """
-    suffix = path.suffix or ".pyi"
+    rel = str(path.relative_to(repo_root))
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="w+", suffix=suffix, encoding="utf-8", delete=True
-        ) as tmp:
-            tmp.write(content)
-            tmp.flush()
-            check_proc = subprocess.run(
-                [sys.executable, "-m", "ruff", "check", "--fix", tmp.name],
-                text=True,
-                capture_output=True,
-                check=False,
-            )
-            fmt_proc = subprocess.run(
-                [sys.executable, "-m", "ruff", "format", tmp.name],
-                text=True,
-                capture_output=True,
-                check=False,
-            )
-            if check_proc.returncode != 0 or fmt_proc.returncode != 0:
-                return content
-            tmp.seek(0)
-            return tmp.read()
+        check_proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "ruff",
+                "check",
+                "--fix-only",
+                "--stdin-filename",
+                rel,
+                "-",
+            ],
+            cwd=repo_root,
+            input=content,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        # fix-only: exit 0 even if only the formatter can clean up (e.g. line length).
+        checked = check_proc.stdout if check_proc.returncode == 0 else content
+        fmt_proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "ruff",
+                "format",
+                "--stdin-filename",
+                rel,
+                "-",
+            ],
+            cwd=repo_root,
+            input=checked,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        return fmt_proc.stdout if fmt_proc.returncode == 0 else checked
     except OSError:
         return content
-
-
-def _ruff_normalize_files(paths: list[Path]) -> None:
-    """Best-effort normalize generated stubs with Ruff in-place."""
-    if not paths:
-        return
-    path_args = [str(p) for p in paths]
-    try:
-        subprocess.run(
-            [sys.executable, "-m", "ruff", "check", "--fix", *path_args],
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        subprocess.run(
-            [sys.executable, "-m", "ruff", "format", *path_args],
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-    except OSError:
-        return
 
 
 def _render_init_stub(init_py: Path) -> str:
@@ -560,7 +554,7 @@ def main(argv: list[str] | None = None) -> int:
         (stub_pkg / "pyspark" / "sql" / "column.pyi", pyspark_sql_column_stub),
     ]
 
-    formatted_targets = [(p, _ruff_format_stub(p, c)) for (p, c) in targets]
+    formatted_targets = [(p, _normalize_stub_content(repo, p, c)) for (p, c) in targets]
 
     if args.check:
         changed = [
@@ -574,22 +568,16 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  - {p}")
             return 1
     else:
-        written_pkg: list[Path] = []
         for p, c in formatted_targets:
             if str(p).startswith(str(pkg)):
                 _write_if_changed(p, c)
-                written_pkg.append(p)
-        _ruff_normalize_files(written_pkg)
     (pkg / "py.typed").parent.mkdir(parents=True, exist_ok=True)
     (pkg / "py.typed").touch(exist_ok=True)
 
     if not args.check:
-        written_typings: list[Path] = []
         for p, c in formatted_targets:
             if str(p).startswith(str(stub_pkg)):
                 _write_if_changed(p, c)
-                written_typings.append(p)
-        _ruff_normalize_files(written_typings)
     return 0
 
 
