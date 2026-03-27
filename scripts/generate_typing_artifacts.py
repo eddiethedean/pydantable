@@ -4,7 +4,6 @@ import argparse
 import ast
 from pathlib import Path
 
-
 _STUB_DATAFRAME_MODEL = """\
 from __future__ import annotations
 
@@ -83,7 +82,9 @@ class DataFrameModel(Generic[RowT]):
         strategy: str | None = None,
         subset: Sequence[str] | None = None,
     ) -> DataFrameModel[Any]: ...
-    def drop_nulls(self, subset: Sequence[str] | None = None) -> DataFrameModel[Any]: ...
+    def drop_nulls(
+        self, subset: Sequence[str] | None = None
+    ) -> DataFrameModel[Any]: ...
     def melt(
         self,
         *,
@@ -232,12 +233,13 @@ def _render_init_stub(init_py: Path) -> str:
         lines.append(imports_src)
         lines.append("")
     if version_value is not None:
-        lines.append(f'__version__ = {version_value!r}')
+        lines.append(f"__version__ = {version_value!r}")
         lines.append("")
     # Keep explicit __all__ for editor/typing tooling parity.
     lines.append(all_src)
     lines.append("")
     return "\n".join(lines)
+
 
 def _stubify_function(fn: ast.AST) -> ast.AST:
     fn2 = ast.fix_missing_locations(ast.parse(ast.unparse(fn)).body[0])
@@ -258,9 +260,12 @@ def _stubify_function(fn: ast.AST) -> ast.AST:
     if fn2.name in {"__eq__", "__ne__"}:
         fn2.returns = ast.Name(id="Any", ctx=ast.Load())
     # Remove docstring if present.
-    if fn2.body and isinstance(fn2.body[0], ast.Expr) and isinstance(
-        fn2.body[0].value, ast.Constant
-    ) and isinstance(fn2.body[0].value.value, str):
+    if (
+        fn2.body
+        and isinstance(fn2.body[0], ast.Expr)
+        and isinstance(fn2.body[0].value, ast.Constant)
+        and isinstance(fn2.body[0].value.value, str)
+    ):
         fn2.body = fn2.body[1:]
     fn2.body = [ast.Expr(value=ast.Constant(value=Ellipsis))]
     return fn2
@@ -283,13 +288,15 @@ def _stubify_class(cls: ast.ClassDef) -> ast.ClassDef:
     for node in cls2.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             new_body.append(_stubify_function(node))  # type: ignore[arg-type]
-        elif isinstance(node, ast.Assign) or isinstance(node, ast.AnnAssign):
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
             # Keep simple attribute declarations.
             new_body.append(node)
         elif isinstance(node, ast.Pass):
             continue
-        elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(
-            node.value.value, str
+        elif (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
         ):
             # Drop docstring.
             continue
@@ -370,7 +377,9 @@ def _render_module_stub(
             if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
                 name = node.targets[0].id
                 if name in all_names or (
-                    include_all_public_defs and include_private_defs and name.startswith("_")
+                    include_all_public_defs
+                    and include_private_defs
+                    and name.startswith("_")
                 ):
                     defs[name] = node
                     if name not in ordered:
@@ -378,7 +387,9 @@ def _render_module_stub(
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
             name = node.target.id
             if name in all_names or (
-                include_all_public_defs and include_private_defs and name.startswith("_")
+                include_all_public_defs
+                and include_private_defs
+                and name.startswith("_")
             ):
                 defs[name] = node
                 if name not in ordered:
@@ -516,4 +527,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

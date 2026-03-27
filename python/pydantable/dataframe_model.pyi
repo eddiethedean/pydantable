@@ -5,13 +5,11 @@ from concurrent.futures import Executor
 from typing import Any, Generic, Literal, TypeVar
 
 from pydantic import BaseModel
-
 from typing_extensions import Self
 
 RowT = TypeVar("RowT", bound=BaseModel)
 AfterModelT = TypeVar("AfterModelT", bound="DataFrameModel[Any]")
 GroupedModelT = TypeVar("GroupedModelT", bound="DataFrameModel[Any]")
-
 
 class DataFrameModel(Generic[RowT]):
     _df: Any
@@ -19,7 +17,6 @@ class DataFrameModel(Generic[RowT]):
 
     @classmethod
     def _from_dataframe(cls, df: Any) -> Self: ...
-
     def __init__(
         self,
         data: Any,
@@ -29,30 +26,25 @@ class DataFrameModel(Generic[RowT]):
         ignore_errors: bool = False,
         on_validation_errors: Any | None = None,
     ) -> None: ...
-
     def schema_fields(self) -> dict[str, Any]: ...
-
     def as_model(
         self,
         model: type[AfterModelT],
         *,
         validate_schema: bool = True,
     ) -> AfterModelT: ...
-
     def try_as_model(
         self,
         model: type[AfterModelT],
         *,
         validate_schema: bool = True,
     ) -> AfterModelT | None: ...
-
     def assert_model(
         self,
         model: type[AfterModelT],
         *,
         validate_schema: bool = True,
     ) -> AfterModelT: ...
-
     def select(self, *cols: Any) -> DataFrameModel[Any]: ...
     def with_columns(self, **new_columns: Any) -> DataFrameModel[Any]: ...
     def drop(self, *columns: Any) -> DataFrameModel[Any]: ...
@@ -67,7 +59,6 @@ class DataFrameModel(Generic[RowT]):
         how: str = "inner",
         suffix: str = "_right",
     ) -> DataFrameModel[Any]: ...
-
     def fill_null(
         self,
         value: Any = None,
@@ -75,7 +66,9 @@ class DataFrameModel(Generic[RowT]):
         strategy: str | None = None,
         subset: Sequence[str] | None = None,
     ) -> DataFrameModel[Any]: ...
-    def drop_nulls(self, subset: Sequence[str] | None = None) -> DataFrameModel[Any]: ...
+    def drop_nulls(
+        self, subset: Sequence[str] | None = None
+    ) -> DataFrameModel[Any]: ...
     def melt(
         self,
         *,
@@ -105,7 +98,6 @@ class DataFrameModel(Generic[RowT]):
     ) -> DataFrameModel[Any]: ...
     def explode(self, columns: str | Sequence[str]) -> DataFrameModel[Any]: ...
     def unnest(self, columns: str | Sequence[str]) -> DataFrameModel[Any]: ...
-
     def to_dict(self, *, streaming: bool | None = None) -> dict[str, list[Any]]: ...
     def collect(
         self,
@@ -123,13 +115,11 @@ class DataFrameModel(Generic[RowT]):
         executor: Executor | None = None,
     ) -> dict[str, list[Any]]: ...
     async def arows(self, *, executor: Executor | None = None) -> list[RowT]: ...
-
     def filter(self, condition: Any) -> Self: ...
     def sort(self, *by: Any, descending: bool | Sequence[bool] = False) -> Self: ...
     def slice(self, offset: int, length: int) -> Self: ...
     def head(self, n: int = 5) -> Self: ...
     def tail(self, n: int = 5) -> Self: ...
-
     def group_by(self, *keys: Any) -> GroupedDataFrameModel[Self]: ...
     def group_by_dynamic(
         self,
@@ -140,14 +130,12 @@ class DataFrameModel(Generic[RowT]):
         by: Sequence[str] | None = None,
     ) -> DynamicGroupedDataFrameModel[Self]: ...
 
-
 class GroupedDataFrameModel(Generic[GroupedModelT]):
     _grouped_df: Any
     _model_type: type[GroupedModelT]
 
     def __init__(self, grouped_df: Any, model_type: type[GroupedModelT]) -> None: ...
     def agg(self, **aggregations: Any) -> DataFrameModel[Any]: ...
-
 
 class DynamicGroupedDataFrameModel(Generic[GroupedModelT]):
     _grouped_df: Any

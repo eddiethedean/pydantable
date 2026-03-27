@@ -365,10 +365,14 @@ def test_mypy_accepts_melt_unpivot_and_rolling_agg_return_model_without_material
         return df.melt(id_vars=["id"], value_vars=["age"])
 
     def unpivot_it(df: Before) -> Unpivoted:
-        return df.unpivot(index=["id"], on=["age"], variable_name="var", value_name="val")
+        return df.unpivot(
+            index=["id"], on=["age"], variable_name="var", value_name="val"
+        )
 
     def roll_it(df: Before) -> Rolled:
-        return df.rolling_agg(on="id", column="age", window_size=2, op="mean", out_name="age_mean")
+        return df.rolling_agg(
+            on="id", column="age", window_size=2, op="mean", out_name="age_mean"
+        )
     """
     proc = _run_mypy_snippet(tmp_path, code)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
@@ -444,7 +448,9 @@ def test_mypy_rolling_agg_count_maps_to_int(tmp_path: Path) -> None:
         age_count: int
 
     def roll(df: Before) -> After:
-        return df.rolling_agg(on="id", column="age", window_size=2, op="count", out_name="age_count")
+        return df.rolling_agg(
+            on="id", column="age", window_size=2, op="count", out_name="age_count"
+        )
     """
     proc = _run_mypy_snippet(tmp_path, code)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)

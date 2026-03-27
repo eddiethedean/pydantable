@@ -90,4 +90,3 @@ def test_try_as_model_can_skip_validation() -> None:
     df = Before({"id": [1]})
     out = df.try_as_model(Wrong, validate_schema=False)
     assert isinstance(out, Wrong)
-

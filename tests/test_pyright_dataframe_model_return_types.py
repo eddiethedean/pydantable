@@ -119,4 +119,3 @@ def test_pyright_sees_facade_modules(tmp_path: Path) -> None:
     """
     proc = _run_pyright_snippet(tmp_path, code)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
-

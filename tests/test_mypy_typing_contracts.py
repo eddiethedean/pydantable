@@ -88,4 +88,3 @@ def test_mypy_structural_model_with_row_protocol_rejects_wrong_row_model(
     proc = _run_mypy_snippet(tmp_path, code)
     assert proc.returncode != 0
     assert "Argument 1 to" in proc.stdout
-

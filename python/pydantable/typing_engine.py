@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 from pydantable.expressions import Expr
 from pydantable.rust_engine import _require_rust_core
@@ -46,4 +49,3 @@ def infer_schema_descriptors_with_columns(
             rust_cols[name] = rust.make_literal(value=value)
     plan2 = rust.plan_with_columns(plan, rust_cols)
     return plan2.schema_descriptors()
-

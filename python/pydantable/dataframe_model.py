@@ -11,7 +11,7 @@ import html
 import sys
 import typing
 from collections.abc import Callable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast, get_type_hints
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast
 
 from typing_extensions import Self
 
@@ -28,6 +28,7 @@ from .schema import (
     _is_polars_dataframe,
     validate_dataframe_model_field_annotations,
 )
+
 
 def _field_defs_from_annotations(
     annotations: Mapping[str, Any],
@@ -1182,9 +1183,7 @@ class DataFrameModel(Generic[RowT]):
         return cast("type[DataFrameModel[Any]]", derived)
 
     @classmethod
-    def _from_dataframe(
-        cls: type[ModelSelf], df: DataFrame[Any]
-    ) -> ModelSelf:
+    def _from_dataframe(cls: type[ModelSelf], df: DataFrame[Any]) -> ModelSelf:
         derived_type = cls._derived_model_type(df.schema_fields())
         obj = derived_type.__new__(derived_type)
         obj._df = df
@@ -1250,9 +1249,7 @@ class DataFrameModel(Generic[RowT]):
         mismatched: list[str] = []
         for k in sorted(expected_keys & actual_keys):
             if expected[k] != actual[k]:
-                mismatched.append(
-                    f"{k}: expected={expected[k]!r} actual={actual[k]!r}"
-                )
+                mismatched.append(f"{k}: expected={expected[k]!r} actual={actual[k]!r}")
         parts: list[str] = []
         if missing:
             parts.append(f"missing={missing}")
@@ -1275,7 +1272,9 @@ class DataFrameModel(Generic[RowT]):
         and mismatches are handled explicitly by the caller.
         """
         if not isinstance(model, type) or not issubclass(model, DataFrameModel):
-            raise TypeError("try_as_model(model=...) expects a DataFrameModel subclass.")
+            raise TypeError(
+                "try_as_model(model=...) expects a DataFrameModel subclass."
+            )
         if not validate_schema:
             return self.as_model(model, validate_schema=False)
         expected = self._expected_schema_fields(model)
@@ -1296,7 +1295,9 @@ class DataFrameModel(Generic[RowT]):
         Like :meth:`as_model`, but raises with a richer schema diff on mismatch.
         """
         if not isinstance(model, type) or not issubclass(model, DataFrameModel):
-            raise TypeError("assert_model(model=...) expects a DataFrameModel subclass.")
+            raise TypeError(
+                "assert_model(model=...) expects a DataFrameModel subclass."
+            )
         if not validate_schema:
             return self.as_model(model, validate_schema=False)
         expected = self._expected_schema_fields(model)
@@ -1477,9 +1478,7 @@ class DataFrameModel(Generic[RowT]):
     def filter(self, condition: Any) -> Self:
         return self._from_dataframe(self._df.filter(condition))
 
-    def sort(
-        self, *by: Any, descending: bool | Sequence[bool] = False
-    ) -> Self:
+    def sort(self, *by: Any, descending: bool | Sequence[bool] = False) -> Self:
         return self._from_dataframe(self._df.sort(*by, descending=descending))
 
     def unique(

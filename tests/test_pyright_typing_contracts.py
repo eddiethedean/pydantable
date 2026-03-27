@@ -84,4 +84,3 @@ def test_pyright_structural_model_with_row_protocol_rejects_wrong_row_model(
     """
     proc = _run_pyright_snippet(tmp_path, code)
     assert proc.returncode != 0
-

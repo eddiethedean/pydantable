@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable
-from concurrent.futures import Executor
-from typing import Protocol, TypeVar
+from typing import TYPE_CHECKING, Protocol, TypeVar
 
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable
+    from concurrent.futures import Executor
 
 RowT = TypeVar("RowT", bound=BaseModel)
 
@@ -25,4 +27,3 @@ class DataFrameModelWithRow(Protocol[RowT]):
 
 
 __all__ = ["DataFrameModelWithRow", "RowT"]
-

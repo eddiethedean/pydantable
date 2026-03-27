@@ -1444,7 +1444,7 @@ class DataFrame(Generic[SchemaT]):
         desc = rust_plan.schema_descriptors()
         derived_fields = self._field_types_from_descriptors(desc)
         # Preserve order: keep existing column order minus dropped columns.
-        desired_order = [k for k in self._current_field_types.keys() if k in derived_fields]
+        desired_order = [k for k in self._current_field_types if k in derived_fields]
         ordered: dict[str, Any] = {k: derived_fields[k] for k in desired_order}
         for k, v in derived_fields.items():
             if k not in ordered:
@@ -1472,9 +1472,11 @@ class DataFrame(Generic[SchemaT]):
         derived_fields = self._field_types_from_descriptors(desc, previous=rename_prev)
         # Preserve column order: renamed columns stay in the original position.
         desired_order: list[str] = []
-        for name in self._current_field_types.keys():
+        for name in self._current_field_types:
             desired_order.append(rename_map.get(name, name))
-        ordered: dict[str, Any] = {k: derived_fields[k] for k in desired_order if k in derived_fields}
+        ordered: dict[str, Any] = {
+            k: derived_fields[k] for k in desired_order if k in derived_fields
+        }
         for k, v in derived_fields.items():
             if k not in ordered:
                 ordered[k] = v

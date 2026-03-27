@@ -24,4 +24,3 @@ def test_typing_artifacts_generator_check_mode_passes() -> None:
     )
     if proc.returncode != 0:
         pytest.fail(f"--check failed:\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}")
-

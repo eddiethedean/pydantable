@@ -33,4 +33,3 @@ def test_schema_fields_order_is_stable_across_simple_transforms() -> None:
     selected = renamed.select("years", "id")
     # `select` order should match call order when literals are provided.
     assert list(selected.schema_fields().keys()) == ["years", "id"]
-
