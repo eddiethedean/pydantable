@@ -115,6 +115,89 @@ def test_pandas_ui_head_tail() -> None:
     assert df.tail(2).collect(as_lists=True) == {"id": [2, 3]}
 
 
+def test_pandas_ui_merge_rejects_extra_kwargs() -> None:
+    class L(PandasDataFrameModel):
+        a: int
+
+    class R(PandasDataFrameModel):
+        a: int
+
+    with pytest.raises(TypeError, match="unsupported keyword"):
+        L({"a": [1]}).merge(R({"a": [1]}), on="a", copy=False)
+
+
+def test_pandas_ui_merge_requires_on() -> None:
+    class L(PandasDataFrameModel):
+        a: int
+
+    class R(PandasDataFrameModel):
+        a: int
+
+    with pytest.raises(TypeError, match="requires on"):
+        L({"a": [1]}).merge(R({"a": [1]}))
+
+
+def test_pandas_ui_merge_rejects_indicator_and_validate() -> None:
+    class L(PandasDataFrameModel):
+        a: int
+
+    class R(PandasDataFrameModel):
+        a: int
+
+    base = L({"a": [1]}), R({"a": [1]})
+    with pytest.raises(NotImplementedError, match="indicator"):
+        base[0].merge(base[1], on="a", indicator=True)
+    with pytest.raises(NotImplementedError, match="validate"):
+        base[0].merge(base[1], on="a", validate="one_to_one")
+
+
+def test_pandas_ui_assign_rejects_series_like() -> None:
+    class User(PandasDataFrameModel):
+        id: int
+
+    class _FakeSeries:
+        pass
+
+    _FakeSeries.__name__ = "Series"
+    _FakeSeries.__module__ = "pandas.core.series"
+    df = User({"id": [1]})
+    with pytest.raises(TypeError, match="Series"):
+        df.assign(x=_FakeSeries())
+
+
+def test_pandas_ui_getitem_errors() -> None:
+    from pydantable.pandas import DataFrame, Schema
+
+    class Row(Schema):
+        a: int
+        b: int
+
+    df = DataFrame[Row]({"a": [1], "b": [2]})
+    with pytest.raises(ValueError, match="non-empty"):
+        df[[]]
+    with pytest.raises(TypeError, match="supports"):
+        df[object()]  # type: ignore[index]
+
+
+def test_pandas_ui_groupby_requires_columns() -> None:
+    class Row(PandasDataFrameModel):
+        k: int
+        v: int
+
+    df = Row({"k": [1], "v": [2]})
+    with pytest.raises(TypeError, match="at least one column"):
+        df.group_by("k").sum()
+
+
+def test_pandas_model_merge_type_error() -> None:
+    class User(PandasDataFrameModel):
+        id: int
+
+    df = User({"id": [1]})
+    with pytest.raises(TypeError, match="DataFrameModel"):
+        df.merge(object(), on="id")  # type: ignore[arg-type]
+
+
 def test_pandas_ui_groupby_sum_alias() -> None:
     class Row(PandasDataFrameModel):
         k: int

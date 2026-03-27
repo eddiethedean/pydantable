@@ -43,3 +43,10 @@ def test_typing_engine_with_columns_matches_runtime_schema_fields() -> None:
         df.schema_fields(), {"age2": df.age * 2}
     )
     assert set(desc) == set(out.schema_fields())
+
+
+def test_typing_engine_with_columns_literal_not_expr() -> None:
+    df = Users({"id": [1], "age": [2], "city": ["x"]})
+    out = df.with_columns(flag=True)
+    desc = infer_schema_descriptors_with_columns(df.schema_fields(), {"flag": True})
+    assert set(desc) == set(out.schema_fields())
