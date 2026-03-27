@@ -353,7 +353,7 @@ jobs:
       - name: Install maturin and test deps
         run: |
           $PY -m pip install -U pip
-          $PY -m pip install maturin mypy pytest pytest-asyncio pytest-xdist pytest-cov \
+          $PY -m pip install maturin mypy ruff pytest pytest-asyncio pytest-xdist pytest-cov \
             "numpy>=1.24" "pandas>=2.0" "hypothesis>=6.0" "pyarrow>=14.0" \
             "fastapi>=0.100" "httpx>=0.24" "sqlalchemy>=2.0,<3" \
             "python-multipart>=0.0.6" \
