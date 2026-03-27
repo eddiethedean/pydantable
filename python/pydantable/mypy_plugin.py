@@ -7,8 +7,11 @@ from mypy.nodes import (
     ARG_POS,
     DictExpr,
     Expression,
+    FloatExpr,
+    IntExpr,
     ListExpr,
     MemberExpr,
+    NameExpr,
     StrExpr,
     TupleExpr,
     TypeInfo,
@@ -101,6 +104,27 @@ def _literal_str_list(expr: Expression) -> list[str] | None:
                 return None
             vals.append(lit)
         return vals
+    if isinstance(expr, TupleExpr):
+        vals2: list[str] = []
+        for it in expr.items:
+            lit = _literal_str(it)
+            if lit is None:
+                return None
+            vals2.append(lit)
+        return vals2
+    return None
+
+
+def _literal_type(ctx: MethodContext, expr: Expression) -> Type | None:
+    api = cast(Any, ctx.api)
+    if isinstance(expr, StrExpr):
+        return api.named_type("builtins.str")
+    if isinstance(expr, IntExpr):
+        return api.named_type("builtins.int")
+    if isinstance(expr, FloatExpr):
+        return api.named_type("builtins.float")
+    if isinstance(expr, NameExpr) and expr.name in {"True", "False"}:
+        return api.named_type("builtins.bool")
     return None
 
 
@@ -160,13 +184,20 @@ def _hook(ctx: MethodContext, method: str) -> Type:
         fallback = model_arg
         grouped_keys = None
     if method == "with_columns":
-        for arg_name_list in ctx.arg_names:
-            if not arg_name_list:
-                continue
-            for name in arg_name_list:
-                if name is None:
+        # Best-effort: use mypy's inferred type for the kwarg expression when available.
+        # Fallback to literal type for simple constants; otherwise Any.
+        for args, kinds, names, types in zip(
+            ctx.args, ctx.arg_kinds, ctx.arg_names, ctx.arg_types
+        ):
+            for expr, kind, name, arg_t in zip(args, kinds, names, types):
+                if kind != ARG_NAMED or name is None:
                     continue
-                fields[name] = AnyType(TypeOfAny.special_form)
+                inferred = get_proper_type(arg_t)
+                if isinstance(inferred, AnyType):
+                    lit_t = _literal_type(ctx, expr)
+                    fields[name] = lit_t if lit_t is not None else inferred
+                else:
+                    fields[name] = arg_t
 
     elif method == "select":
         selected: dict[str, Type] = {}
@@ -174,13 +205,14 @@ def _hook(ctx: MethodContext, method: str) -> Type:
             for expr, kind in zip(args, kinds):
                 if kind != ARG_POS:
                     continue
-                col = _literal_str(expr)
-                if col is None:
+                cols = _literal_str_list(expr)
+                if cols is None:
                     continue
-                if col in fields:
-                    selected[col] = fields[col]
-                else:
-                    selected[col] = AnyType(TypeOfAny.special_form)
+                for col in cols:
+                    if col in fields:
+                        selected[col] = fields[col]
+                    else:
+                        selected[col] = AnyType(TypeOfAny.special_form)
         if selected:
             fields = selected
 
@@ -189,8 +221,10 @@ def _hook(ctx: MethodContext, method: str) -> Type:
             for expr, kind in zip(args, kinds):
                 if kind != ARG_POS:
                     continue
-                col = _literal_str(expr)
-                if col is not None:
+                cols = _literal_str_list(expr)
+                if cols is None:
+                    continue
+                for col in cols:
                     fields.pop(col, None)
 
     elif method == "rename":
@@ -288,15 +322,15 @@ def _hook(ctx: MethodContext, method: str) -> Type:
                     continue
                 op_expr, col_expr = expr.items
                 op = _literal_str(op_expr)
-                col = _literal_str(col_expr)
-                if col is not None:
-                    agg_input_cols.add(col)
+                col_agg: str | None = _literal_str(col_expr)
+                if col_agg is not None:
+                    agg_input_cols.add(col_agg)
                 if op == "count":
                     agg_outputs[name] = cast(Any, ctx.api).named_type("builtins.int")
                 elif op in {"mean", "std", "var"}:
                     agg_outputs[name] = cast(Any, ctx.api).named_type("builtins.float")
-                elif col is not None and col in fields:
-                    agg_outputs[name] = fields[col]
+                elif col_agg is not None and col_agg in fields:
+                    agg_outputs[name] = fields[col_agg]
                 else:
                     agg_outputs[name] = AnyType(TypeOfAny.special_form)
         grouped_fields: dict[str, Type] = {}
@@ -321,8 +355,8 @@ def _hook(ctx: MethodContext, method: str) -> Type:
     elif method in {"melt", "unpivot"}:
         # Best-effort inference when id/index columns are provided as literals.
         id_keys: list[str] | None = None
-        variable_name = "variable"
-        value_name = "value"
+        variable_name: str = "variable"
+        value_name: str = "value"
 
         for arg_names, args in zip(ctx.arg_names, ctx.args):
             if not arg_names:

@@ -86,6 +86,19 @@ include = [
     "python/pydantable/py.typed",
     "python/pydantable/__init__.pyi",
     "python/pydantable/dataframe_model.pyi",
+    "python/pydantable/display.pyi",
+    "python/pydantable/observe.pyi",
+    "python/pydantable/window_spec.pyi",
+    "python/pydantable/expressions.pyi",
+    "python/pydantable/pandas.pyi",
+    "python/pydantable/dataframe/__init__.pyi",
+    "python/pydantable/io/__init__.pyi",
+    "python/pydantable/schema/__init__.pyi",
+    "python/pydantable/pyspark/__init__.pyi",
+    "python/pydantable/pyspark/sql/__init__.pyi",
+    "python/pydantable/pyspark/sql/column.pyi",
+    "python/pydantable/pyspark/sql/functions.pyi",
+    "python/pydantable/pyspark/sql/window.pyi",
 ]
 features = ["pyo3/extension-module", "polars_engine"]
 exclude = [

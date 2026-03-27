@@ -12,6 +12,7 @@ This **documentation site** is the detailed manual. The repository **README** on
 - **Data workflows**: start with {doc}`DATAFRAMEMODEL`, then {doc}`IO_DECISION_TREE` and {doc}`IO_OVERVIEW`.
 - **Library/interop**: start with {doc}`INTERFACE_CONTRACT` and {doc}`VERSIONING`, then {doc}`PLAN_AND_PLUGINS`.
 - `DataFrameModel` transform chains can return typed after-schema models directly (no `to_dict()` materialization step). For pyright/Pylance, use `as_model(...)` (see {doc}`DATAFRAMEMODEL`).
+- Typing guide: {doc}`TYPING` (mypy plugin vs pyright/Pylance, inferred vs explicit patterns).
 
 If you’re not sure where something is documented, use {doc}`DOCS_MAP`.
 
@@ -21,6 +22,7 @@ If you’re not sure where something is documented, use {doc}`DOCS_MAP`.
 :caption: Getting started
 
 QUICKSTART
+TYPING
 DATAFRAMEMODEL
 SUPPORTED_TYPES
 FASTAPI

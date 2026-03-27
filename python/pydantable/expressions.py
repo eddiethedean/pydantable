@@ -12,6 +12,34 @@ from typing import TYPE_CHECKING, Any
 
 from .rust_engine import _require_rust_core
 
+# Public surface for stubs and docs.
+__all__ = [
+    "BinaryOp",
+    "ColumnRef",
+    "CompareOp",
+    "Expr",
+    "Literal",
+    "WhenChain",
+    "coalesce",
+    "concat",
+    "dense_rank",
+    "global_count",
+    "global_max",
+    "global_mean",
+    "global_min",
+    "global_row_count",
+    "global_sum",
+    "lag",
+    "lead",
+    "rank",
+    "row_number",
+    "when",
+    "window_max",
+    "window_mean",
+    "window_min",
+    "window_sum",
+]
+
 # Bound serialized AST size in :meth:`Expr.__repr__` for readable REPL output.
 _MAX_EXPR_REPR_AST = 200
 

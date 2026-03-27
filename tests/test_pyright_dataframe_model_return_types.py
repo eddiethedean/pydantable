@@ -104,3 +104,19 @@ def test_pyright_sees_as_model_variants(tmp_path: Path) -> None:
     proc = _run_pyright_snippet(tmp_path, code)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
+
+def test_pyright_sees_facade_modules(tmp_path: Path) -> None:
+    pytest.importorskip("pyright")
+    code = """
+    from pydantable import pandas, pyspark
+
+    # Smoke check key facade exports exist for editors.
+    _ = pandas.DataFrame
+    _ = pandas.DataFrameModel
+    _ = pyspark.DataFrame
+    _ = pyspark.DataFrameModel
+    _ = pyspark.sql.functions.col
+    """
+    proc = _run_pyright_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+

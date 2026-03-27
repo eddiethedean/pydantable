@@ -15,6 +15,13 @@ from __future__ import annotations
 import os
 from typing import NamedTuple
 
+__all__ = [
+    "ReprHtmlLimits",
+    "get_repr_html_limits",
+    "reset_display_options",
+    "set_display_options",
+]
+
 _DEFAULT_ROWS = 20
 _DEFAULT_COLS = 40
 _DEFAULT_CELL = 500

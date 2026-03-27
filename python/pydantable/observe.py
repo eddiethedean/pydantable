@@ -9,6 +9,8 @@ from typing import Any
 
 Observer = Callable[[dict[str, Any]], None]
 
+__all__ = ["Observer", "emit", "get_observer", "set_observer", "span", "trace_enabled"]
+
 _OBSERVER: Observer | None = None
 _TRACE_ENV = "PYDANTABLE_TRACE"
 

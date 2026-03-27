@@ -159,6 +159,77 @@ def test_mypy_accepts_select_drop_rename_return_model_without_materialize(
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
+def test_mypy_accepts_select_drop_with_list_literals(tmp_path: Path) -> None:
+    pytest.importorskip("mypy")
+    code = """
+    from pydantable import DataFrameModel
+
+    class Before(DataFrameModel):
+        id: int
+        age: int
+        city: str
+
+    class After(DataFrameModel):
+        id: int
+
+    def transform(df: Before) -> After:
+        return df.drop(["age", "city"]).select(["id"])
+    """
+    proc = _run_mypy_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
+def test_mypy_with_columns_infers_literal_and_arithmetic_types(tmp_path: Path) -> None:
+    pytest.importorskip("mypy")
+    code = """
+    from pydantable import DataFrameModel
+
+    class Before(DataFrameModel):
+        id: int
+        age: int
+
+    class After(DataFrameModel):
+        id: int
+        age: int
+        age2: int
+        flag: bool
+        label: str
+
+    def transform(df: Before) -> After:
+        out = df.with_columns(
+            age2=df.age * 2,
+            flag=True,
+            label="x",
+        )
+        return out
+    """
+    proc = _run_mypy_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
+def test_mypy_with_columns_rejects_type_mismatch_when_inferred(tmp_path: Path) -> None:
+    pytest.importorskip("mypy")
+    code = """
+    from pydantable import DataFrameModel
+
+    class Before(DataFrameModel):
+        id: int
+        age: int
+
+    class WrongAfter(DataFrameModel):
+        id: int
+        age: int
+        age2: str
+
+    def transform(df: Before) -> WrongAfter:
+        out = df.with_columns(age2=df.age * 2)
+        return out
+    """
+    proc = _run_mypy_snippet(tmp_path, code)
+    assert proc.returncode != 0
+    assert "Incompatible return value type" in proc.stdout
+
+
 def test_mypy_accepts_join_and_groupby_agg_return_model_without_materialize(
     tmp_path: Path,
 ) -> None:
