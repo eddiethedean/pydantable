@@ -82,7 +82,9 @@ def test_mypy_accepts_transformed_schema_wrapped_in_new_model(tmp_path: Path) ->
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
-def test_mypy_rejects_wrong_wrapped_model_for_transformed_schema(tmp_path: Path) -> None:
+def test_mypy_rejects_wrong_wrapped_model_for_transformed_schema(
+    tmp_path: Path,
+) -> None:
     pytest.importorskip("mypy")
     code = """
     from pydantable import DataFrameModel
@@ -112,7 +114,7 @@ def test_mypy_rejects_wrong_wrapped_model_for_transformed_schema(tmp_path: Path)
 def test_mypy_cannot_verify_schema_transform_return_model_without_materialize(
     tmp_path: Path,
 ) -> None:
-    """Today: transform methods return DataFrameModel, not a user-declared 'after' model."""
+    """Today, transform methods return DataFrameModel, not a declared after-model."""
     pytest.importorskip("mypy")
     code = """
     from pydantable import DataFrameModel
