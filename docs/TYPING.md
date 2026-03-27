@@ -1,4 +1,4 @@
-## Typing overview
+# Typing overview
 
 PydanTable targets two complementary typing experiences:
 
