@@ -35,6 +35,20 @@ class DataFrameModel:
         validate_schema: bool = True,
     ) -> AfterModelT: ...
 
+    def try_as_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        validate_schema: bool = True,
+    ) -> AfterModelT | None: ...
+
+    def assert_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        validate_schema: bool = True,
+    ) -> AfterModelT: ...
+
     def select(self, *cols: Any) -> DataFrameModel: ...
     def with_columns(self, **new_columns: Any) -> DataFrameModel: ...
     def drop(self, *columns: Any) -> DataFrameModel: ...
@@ -50,8 +64,53 @@ class DataFrameModel:
         suffix: str = "_right",
     ) -> DataFrameModel: ...
 
+    def fill_null(
+        self,
+        value: Any = None,
+        *,
+        strategy: str | None = None,
+        subset: Sequence[str] | None = None,
+    ) -> DataFrameModel: ...
+    def drop_nulls(self, subset: Sequence[str] | None = None) -> DataFrameModel: ...
+    def melt(
+        self,
+        *,
+        id_vars: Sequence[str] | None = None,
+        value_vars: Sequence[str] | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+    ) -> DataFrameModel: ...
+    def unpivot(
+        self,
+        *,
+        index: Sequence[str] | None = None,
+        on: Sequence[str] | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+    ) -> DataFrameModel: ...
+    def rolling_agg(
+        self,
+        *,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None = None,
+        min_periods: int = 1,
+    ) -> DataFrameModel: ...
+    def explode(self, columns: str | Sequence[str]) -> DataFrameModel: ...
+    def unnest(self, columns: str | Sequence[str]) -> DataFrameModel: ...
+
     def to_dict(self, *, streaming: bool | None = None) -> dict[str, list[Any]]: ...
-    def collect(self, *, streaming: bool | None = None) -> Any: ...
+    def collect(
+        self,
+        *,
+        as_lists: bool = False,
+        as_numpy: bool = False,
+        as_polars: bool | None = None,
+        streaming: bool | None = None,
+    ) -> Any: ...
     async def ato_dict(
         self,
         *,

@@ -62,5 +62,7 @@ These APIs **materialize** the plan to a Python `dict[str, list]` first, then bu
 Some type checkers (notably **pyright/Pylance**) cannot automatically infer schema-evolving return types from transformation chains.
 
 - For pyright/Pylance, use `DataFrameModel.as_model(AfterModel)` to state the after-model explicitly.
+- If you prefer not to raise on mismatch, use `try_as_model(AfterModel) -> AfterModel | None`.
+- If you want a richer mismatch explanation, use `assert_model(AfterModel)` (raises with a schema diff).
 - For mypy, transform chains can be typed automatically.
 

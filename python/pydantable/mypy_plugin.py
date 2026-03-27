@@ -22,7 +22,24 @@ from mypy.types import AnyType, Instance, Type, TypeOfAny, get_proper_type
 _BASE_FULLNAME = "pydantable.dataframe_model.DataFrameModel"
 _GROUPED_BASE_FULLNAME = "pydantable.dataframe_model.GroupedDataFrameModel"
 _DYNAMIC_GROUPED_BASE_FULLNAME = "pydantable.dataframe_model.DynamicGroupedDataFrameModel"
-_HOOK_NAMES = {"with_columns", "select", "drop", "rename", "join", "agg"}
+_HOOK_NAMES = {
+    "with_columns",
+    "select",
+    "drop",
+    "rename",
+    "join",
+    "agg",
+    # Schema-preserving transforms that currently return `DataFrameModel` at runtime.
+    "fill_null",
+    "drop_nulls",
+    "explode",
+    "unnest",
+    # Schema-evolving transforms.
+    "melt",
+    "unpivot",
+    "rolling_agg",
+    # `pivot` is intentionally omitted: output columns depend on data values.
+}
 _RESERVED_FIELDS = {
     "RowModel",
     "_RowModel_fill_missing_optional",
@@ -296,6 +313,76 @@ def _hook(ctx: MethodContext, method: str) -> Type:
                 if col_name not in agg_input_cols
             }
         fields = {**grouped_fields, **agg_outputs}
+
+    elif method in {"fill_null", "drop_nulls", "explode", "unnest"}:
+        # Schema-preserving transforms: keep the same field set/types.
+        pass
+
+    elif method in {"melt", "unpivot"}:
+        # Best-effort inference when id/index columns are provided as literals.
+        id_keys: list[str] | None = None
+        variable_name = "variable"
+        value_name = "value"
+
+        for arg_names, args in zip(ctx.arg_names, ctx.args):
+            if not arg_names:
+                continue
+            for name, expr in zip(arg_names, args):
+                if method == "melt":
+                    if name == "id_vars":
+                        id_keys = _literal_str_list(expr)
+                    elif name == "variable_name":
+                        lit = _literal_str(expr)
+                        if lit is not None:
+                            variable_name = lit
+                    elif name == "value_name":
+                        lit = _literal_str(expr)
+                        if lit is not None:
+                            value_name = lit
+                else:
+                    if name == "index":
+                        id_keys = _literal_str_list(expr)
+                    elif name == "variable_name":
+                        lit = _literal_str(expr)
+                        if lit is not None:
+                            variable_name = lit
+                    elif name == "value_name":
+                        lit = _literal_str(expr)
+                        if lit is not None:
+                            value_name = lit
+
+        if id_keys is not None:
+            out: dict[str, Type] = {}
+            for k in id_keys:
+                out[k] = fields.get(k, AnyType(TypeOfAny.special_form))
+            out[variable_name] = cast(Any, ctx.api).named_type("builtins.str")
+            out[value_name] = AnyType(TypeOfAny.special_form)
+            fields = out
+
+    elif method == "rolling_agg":
+        out_name: str | None = None
+        op_lit: str | None = None
+        col_lit: str | None = None
+        for arg_names, args in zip(ctx.arg_names, ctx.args):
+            if not arg_names:
+                continue
+            for name, expr in zip(arg_names, args):
+                if name == "out_name":
+                    out_name = _literal_str(expr)
+                elif name == "op":
+                    op_lit = _literal_str(expr)
+                elif name == "column":
+                    col_lit = _literal_str(expr)
+        if out_name is not None:
+            if op_lit == "count":
+                out_type = cast(Any, ctx.api).named_type("builtins.int")
+            elif op_lit in {"mean", "std", "var"}:
+                out_type = cast(Any, ctx.api).named_type("builtins.float")
+            elif col_lit is not None and col_lit in fields:
+                out_type = fields[col_lit]
+            else:
+                out_type = AnyType(TypeOfAny.special_form)
+            fields[out_name] = out_type
 
     return _resolve_matching_model(ctx, fields, fallback=fallback)
 

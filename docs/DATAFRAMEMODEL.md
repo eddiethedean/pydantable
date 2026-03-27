@@ -234,13 +234,20 @@ def pipeline(df: Before) -> After:
 ### Static typing: mypy vs pyright/Pylance
 
 - **mypy**: transform chains are typed automatically (schema-evolving return typing).
-- **pyright/Pylance**: use `as_model(...)` to state the intended after-model explicitly:
+- **pyright/Pylance**: use `as_model(...)` (or its safer variants) to state the intended after-model explicitly:
 
 ```python
 def pipeline(df: Before) -> After:
     out = df.with_columns(age2=df.age * 2).select("id", "age2")
     return out.as_model(After)
 ```
+
+For schema assertions with better ergonomics:
+
+- `try_as_model(After)` returns `After | None` (no exception on mismatch).
+- `assert_model(After)` raises with a richer diff (missing/extra/mismatched types).
+
+`as_model(..., validate_schema=False)` is a performance-oriented escape hatch. Prefer leaving validation on unless you have a strong guarantee that the upstream pipeline already enforces schema correctness (e.g. pinned transform chain + contract tests).
 
 ## Collision handling (replacement semantics)
 

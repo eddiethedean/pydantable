@@ -237,6 +237,100 @@ def test_mypy_schema_preserving_chain_accepts_same_model_type(tmp_path: Path) ->
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
+def test_mypy_schema_preserving_fill_null_and_drop_nulls_preserve_model_type(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("mypy")
+    code = """
+    from pydantable import DataFrameModel
+
+    class Users(DataFrameModel):
+        id: int
+        age: int
+
+    class Orders(DataFrameModel):
+        order_id: int
+
+    def ok(df: Users) -> Users:
+        return df.fill_null(0).drop_nulls()
+
+    def bad(df: Users) -> Orders:
+        return df.fill_null(0).drop_nulls()
+    """
+    proc = _run_mypy_snippet(tmp_path, code)
+    assert proc.returncode != 0
+    assert "Incompatible return value type" in proc.stdout
+
+
+def test_mypy_accepts_melt_unpivot_and_rolling_agg_return_model_without_materialize(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("mypy")
+    code = """
+    from pydantable import DataFrameModel
+
+    class Before(DataFrameModel):
+        id: int
+        age: int
+        city: str
+
+    class Melted(DataFrameModel):
+        id: int
+        variable: str
+        value: int
+
+    class Unpivoted(DataFrameModel):
+        id: int
+        var: str
+        val: int
+
+    class Rolled(DataFrameModel):
+        id: int
+        age: int
+        city: str
+        age_mean: float
+
+    def melt_it(df: Before) -> Melted:
+        return df.melt(id_vars=["id"], value_vars=["age"])
+
+    def unpivot_it(df: Before) -> Unpivoted:
+        return df.unpivot(index=["id"], on=["age"], variable_name="var", value_name="val")
+
+    def roll_it(df: Before) -> Rolled:
+        return df.rolling_agg(on="id", column="age", window_size=2, op="mean", out_name="age_mean")
+    """
+    proc = _run_mypy_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
+def test_mypy_melt_requires_literal_id_vars_for_refinement(tmp_path: Path) -> None:
+    pytest.importorskip("mypy")
+    code = """
+    from pydantable import DataFrameModel
+
+    class Before(DataFrameModel):
+        id: int
+        age: int
+
+    class Melted(DataFrameModel):
+        id: int
+        variable: str
+        value: int
+
+    def ok(df: Before) -> Before:
+        cols = ["id"]
+        # Non-literal id_vars: plugin should not refine; this must stay Before.
+        return df.melt(id_vars=cols, value_vars=["age"])
+
+    def bad(df: Before) -> Melted:
+        cols = ["id"]
+        return df.melt(id_vars=cols, value_vars=["age"])
+    """
+    proc = _run_mypy_snippet(tmp_path, code)
+    assert proc.returncode != 0
+    assert "Incompatible return value type" in proc.stdout
+
+
 def test_mypy_still_rejects_wrong_model_on_schema_preserving_chain(
     tmp_path: Path,
 ) -> None:

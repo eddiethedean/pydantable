@@ -63,3 +63,44 @@ def test_pyright_rejects_wrong_as_model_target(tmp_path: Path) -> None:
     # as long as as_model returns the declared target.
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
+
+def test_pyright_sees_full_public_exports_from_init_stub(tmp_path: Path) -> None:
+    pytest.importorskip("pyright")
+    code = """
+    import pydantable
+    from pydantable import DataFrame, Expr, Schema, DataFrameModel
+
+    reveal_type(pydantable.DataFrame)
+    reveal_type(pydantable.Expr)
+    reveal_type(pydantable.Schema)
+    reveal_type(pydantable.DataFrameModel)
+
+    # Smoke check that these names exist (the root stub used to hide them).
+    _ = (DataFrame, Expr, Schema, DataFrameModel)
+    """
+    proc = _run_pyright_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
+def test_pyright_sees_as_model_variants(tmp_path: Path) -> None:
+    pytest.importorskip("pyright")
+    code = """
+    from pydantable import DataFrameModel
+
+    class Before(DataFrameModel):
+        id: int
+
+    class After(DataFrameModel):
+        id: int
+
+    def f(df: Before) -> After:
+        # These are primarily ergonomics for pyright users.
+        out1 = df.assert_model(After)
+        out2 = df.try_as_model(After)
+        if out2 is None:
+            return out1
+        return out2
+    """
+    proc = _run_pyright_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+

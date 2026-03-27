@@ -1192,6 +1192,22 @@ class DataFrameModel:
     def schema_fields(self) -> dict[str, Any]:
         return self._df.schema_fields()
 
+    @staticmethod
+    def _expected_schema_fields(model: type[DataFrameModel]) -> dict[str, Any]:
+        """
+        Return the expected schema field mapping for `model`.
+
+        We intentionally avoid `typing.get_type_hints(model, ...)` here because that
+        evaluates inherited annotations (e.g. `_df: DataFrame[Any]`) which can
+        trigger runtime errors via `DataFrame.__class_getitem__`.
+        """
+        schema = model.schema_model()
+        return {
+            name: field.annotation
+            for name, field in schema.model_fields.items()
+            if not name.startswith("_")
+        }
+
     def as_model(
         self,
         model: type[AfterModelT],
@@ -1207,10 +1223,11 @@ class DataFrameModel:
         if not isinstance(model, type) or not issubclass(model, DataFrameModel):
             raise TypeError("as_model(model=...) expects a DataFrameModel subclass.")
         if validate_schema:
-            expected = dict(get_type_hints(model, include_extras=True))
-            expected = {k: v for k, v in expected.items() if not k.startswith("_")}
+            expected = self._expected_schema_fields(model)
             actual = self.schema_fields()
-            if set(expected) != set(actual) or any(expected[k] != actual[k] for k in expected):
+            if set(expected) != set(actual) or any(
+                expected[k] != actual[k] for k in expected if k in actual
+            ):
                 raise TypeError(
                     "as_model(schema mismatch): expected "
                     f"{sorted(expected)} got {sorted(actual)}"
@@ -1218,6 +1235,77 @@ class DataFrameModel:
         obj = model.__new__(model)
         obj._df = self._df
         return cast("AfterModelT", obj)
+
+    @staticmethod
+    def _schema_mismatch_details(
+        *,
+        expected: Mapping[str, Any],
+        actual: Mapping[str, Any],
+    ) -> str:
+        expected_keys = set(expected)
+        actual_keys = set(actual)
+        missing = sorted(expected_keys - actual_keys)
+        extra = sorted(actual_keys - expected_keys)
+        mismatched: list[str] = []
+        for k in sorted(expected_keys & actual_keys):
+            if expected[k] != actual[k]:
+                mismatched.append(
+                    f"{k}: expected={expected[k]!r} actual={actual[k]!r}"
+                )
+        parts: list[str] = []
+        if missing:
+            parts.append(f"missing={missing}")
+        if extra:
+            parts.append(f"extra={extra}")
+        if mismatched:
+            parts.append("mismatched_types=[" + ", ".join(mismatched) + "]")
+        return "; ".join(parts) if parts else "unknown mismatch"
+
+    def try_as_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        validate_schema: bool = True,
+    ) -> AfterModelT | None:
+        """
+        Like :meth:`as_model`, but returns ``None`` on schema mismatch.
+
+        This is useful for “best effort” pipelines where schema evolution is expected
+        and mismatches are handled explicitly by the caller.
+        """
+        if not isinstance(model, type) or not issubclass(model, DataFrameModel):
+            raise TypeError("try_as_model(model=...) expects a DataFrameModel subclass.")
+        if not validate_schema:
+            return self.as_model(model, validate_schema=False)
+        expected = self._expected_schema_fields(model)
+        actual = self.schema_fields()
+        if set(expected) != set(actual) or any(
+            expected[k] != actual[k] for k in expected if k in actual
+        ):
+            return None
+        return self.as_model(model, validate_schema=False)
+
+    def assert_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        validate_schema: bool = True,
+    ) -> AfterModelT:
+        """
+        Like :meth:`as_model`, but raises with a richer schema diff on mismatch.
+        """
+        if not isinstance(model, type) or not issubclass(model, DataFrameModel):
+            raise TypeError("assert_model(model=...) expects a DataFrameModel subclass.")
+        if not validate_schema:
+            return self.as_model(model, validate_schema=False)
+        expected = self._expected_schema_fields(model)
+        actual = self.schema_fields()
+        if set(expected) != set(actual) or any(
+            expected[k] != actual[k] for k in expected if k in actual
+        ):
+            details = self._schema_mismatch_details(expected=expected, actual=actual)
+            raise TypeError(f"assert_model(schema mismatch): {details}")
+        return self.as_model(model, validate_schema=False)
 
     @property
     def columns(self) -> list[str]:

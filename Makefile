@@ -5,6 +5,7 @@ MYPY ?= $(PYTHON) -m mypy
 CARGO_MANIFEST ?= pydantable-core/Cargo.toml
 
 .PHONY: check-full check-python check-rust ruff-format-check ruff-check mypy-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
+.PHONY: gen-typing check-typing
 
 check-full: check-python check-rust
 
@@ -18,6 +19,14 @@ ruff-check:
 
 mypy-check:
 	$(MYPY) python/pydantable
+
+gen-typing:
+	$(PYTHON) scripts/generate_typing_artifacts.py
+
+check-typing:
+	$(PYTHON) scripts/generate_typing_artifacts.py --check
+	$(MYPY) python/pydantable
+	$(PYTHON) -m pytest -q tests/test_mypy_dataframe_model_return_types.py tests/test_pyright_dataframe_model_return_types.py
 
 check-rust: rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 
