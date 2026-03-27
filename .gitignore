@@ -51,3 +51,6 @@ htmlcov/
 # Docs build output
 site/
 
+
+# Local CycloneDX output from cargo-cyclonedx / CI SBOM verify
+pydantable-core/sbom-rust.cdx.json
