@@ -20,6 +20,7 @@ from pydantable.io import (
     export_parquet,
     fetch_bytes,
     materialize_json,
+    materialize_parquet,
     read_from_object_store,
     read_json,
     read_ndjson,
@@ -48,6 +49,33 @@ def test_materialize_json_array_and_lines(tmp_path: Path) -> None:
     lines = tmp_path / "b.ndjson"
     lines.write_text('{"x": 3}\n', encoding="utf-8")
     assert materialize_json(lines) == {"x": [3]}
+
+
+def test_materialize_json_empty_and_whitespace_only(tmp_path: Path) -> None:
+    empty = tmp_path / "e.json"
+    empty.write_text("", encoding="utf-8")
+    assert materialize_json(empty) == {}
+
+    blank = tmp_path / "w.json"
+    blank.write_text("  \n\t  ", encoding="utf-8")
+    assert materialize_json(blank) == {}
+
+
+def test_materialize_json_array_validation_errors(tmp_path: Path) -> None:
+    bad_scalar = tmp_path / "bad1.json"
+    bad_scalar.write_text("[1, 2]", encoding="utf-8")
+    with pytest.raises(ValueError, match="must be JSON objects"):
+        materialize_json(bad_scalar)
+
+    bad_mixed = tmp_path / "bad2.json"
+    bad_mixed.write_text('[{"x": 1}, 2]', encoding="utf-8")
+    with pytest.raises(ValueError, match="must be JSON objects"):
+        materialize_json(bad_mixed)
+
+
+def test_materialize_parquet_rust_disallows_column_projection() -> None:
+    with pytest.raises(ValueError, match="Rust Parquet read"):
+        materialize_parquet("/any/path.parquet", columns=["c"], engine="rust")
 
 
 def test_export_json_roundtrip(tmp_path: Path) -> None:

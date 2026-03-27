@@ -351,6 +351,50 @@ def test_p6_rolling_agg_and_dynamic_groupby() -> None:
     assert "v_sum" in d_out and "v_count" in d_out
 
 
+def test_rolling_agg_validation_errors() -> None:
+    class TS(Schema):
+        id: int
+        ts: int
+        v: int | None
+        label: str
+
+    df = DataFrame[TS](
+        {
+            "id": [1, 1],
+            "ts": [0, 3600],
+            "v": [10, 20],
+            "label": ["a", "b"],
+        }
+    )
+    with pytest.raises(KeyError, match="existing on"):
+        df.rolling_agg(on="missing", column="v", window_size=2, op="sum", out_name="x")
+    with pytest.raises(KeyError, match="unknown grouping"):
+        df.rolling_agg(
+            on="ts",
+            column="v",
+            window_size=2,
+            op="sum",
+            out_name="x",
+            by=["nope"],
+        )
+    with pytest.raises(ValueError, match="suffix"):
+        df.rolling_agg(
+            on="ts", column="v", window_size="2x", op="sum", out_name="x", by=["id"]
+        )
+    with pytest.raises(TypeError, match="numeric/date"):
+        df.rolling_agg(
+            on="label",
+            column="v",
+            window_size=1,
+            op="sum",
+            out_name="x",
+        )
+    with pytest.raises(ValueError, match="Unsupported rolling"):
+        df.rolling_agg(
+            on="ts", column="v", window_size=1, op="median", out_name="x", by=["id"]
+        )
+
+
 def test_group_by_dynamic_rejects_non_positive_every() -> None:
     class TS(Schema):
         id: int

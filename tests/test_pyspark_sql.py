@@ -738,3 +738,141 @@ def test_pyspark_window_range_between_rejects_lag() -> None:
         df.withColumn("lg", F.lag(F.col("v", dtype=int), 1).over(w)).collect(
             as_lists=True
         )
+
+
+def test_sql_functions_column_alias_matches_col() -> None:
+    class S(Schema):
+        x: int
+
+    df = DataFrame[S]({"x": [1]})
+    a = df.select(F.column("x", dtype=int)).collect(as_lists=True)
+    b = df.select(F.col("x", dtype=int)).collect(as_lists=True)
+    assert a == b == {"x": [1]}
+
+
+def test_sql_functions_isnotnull() -> None:
+    class S(Schema):
+        y: int | None
+
+    df = DataFrame[S]({"y": [1, None]})
+    out = df.withColumn("nn", F.isnotnull(F.col("y", dtype=int | None))).collect(
+        as_lists=True
+    )
+    assert out["nn"] == [True, False]
+
+
+def test_sql_functions_coalesce_rejects_non_expr() -> None:
+    with pytest.raises(TypeError, match="Expr"):
+        F.coalesce(F.lit(1), "bad")  # type: ignore[arg-type]
+
+
+def test_sql_functions_dt_hour_minute_second() -> None:
+    class S(Schema):
+        ts: datetime
+
+    ts = datetime(2024, 6, 15, 14, 7, 9, tzinfo=timezone.utc)
+    df = DataFrame[S]({"ts": [ts]})
+    c = F.col("ts", dtype=datetime)
+    out = (
+        df.withColumn("h", F.hour(c))
+        .withColumn("mi", F.minute(c))
+        .withColumn("s", F.second(c))
+        .collect(as_lists=True)
+    )
+    assert out["h"] == [14]
+    assert out["mi"] == [7]
+    assert out["s"] == [9]
+
+
+def test_sql_functions_day_and_dayofmonth() -> None:
+    class S(Schema):
+        d: date
+
+    df = DataFrame[S]({"d": [date(2024, 3, 22)]})
+    c = F.col("d", dtype=date)
+    out = (
+        df.withColumn("dom1", F.day(c))
+        .withColumn("dom2", F.dayofmonth(c))
+        .collect(as_lists=True)
+    )
+    assert out["dom1"] == out["dom2"] == [22]
+
+
+def test_sql_functions_rank_and_dense_rank_over_window() -> None:
+    from pydantable.pyspark.sql import Window
+
+    class S(Schema):
+        g: int
+        v: int
+
+    df = DataFrame[S]({"g": [1, 1, 1], "v": [10, 10, 20]})
+    w = Window.partitionBy("g").orderBy("v", ascending=True)
+    out = (
+        df.withColumn("rk", F.rank().over(w))
+        .withColumn("drk", F.dense_rank().over(w))
+        .collect(as_lists=True)
+    )
+    assert out["rk"] == [1, 1, 3]
+    assert out["drk"] == [1, 1, 2]
+
+
+def test_sql_functions_global_agg_type_errors() -> None:
+    with pytest.raises(TypeError, match=r"sum\(\)"):
+        F.sum(7)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="avg"):
+        F.avg("x")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="max"):
+        F.max(None)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="min"):
+        F.min([])  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="count"):
+        F.count("nope")  # type: ignore[arg-type]
+
+
+def test_sql_functions_map_and_string_helpers_type_errors() -> None:
+    with pytest.raises(TypeError, match="str_replace"):
+        F.str_replace(1, "a", "b")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="strip_prefix"):
+        F.strip_prefix(True, "x")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="strip_suffix"):
+        F.strip_suffix(0, "x")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="strip_chars"):
+        F.strip_chars({}, "ab")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="strptime"):
+        F.strptime("not-expr", "%Y")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="binary_len"):
+        F.binary_len(1.0)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="map_keys"):
+        F.map_keys(1)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="map_values"):
+        F.map_values(1)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="map_len"):
+        F.map_len(1)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="map_get"):
+        F.map_get(1, "k")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="map_contains_key"):
+        F.map_contains_key(1, "k")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="map_entries"):
+        F.map_entries(1)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="map_from_entries"):
+        F.map_from_entries(1)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="element_at"):
+        F.element_at(1, "k")  # type: ignore[arg-type]
+
+
+def test_sql_functions_window_min_max_type_errors() -> None:
+    with pytest.raises(TypeError, match="window_min"):
+        F.window_min(1)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="window_max"):
+        F.window_max(1)  # type: ignore[arg-type]
+
+
+def test_sql_functions_strip_suffix_happy_path() -> None:
+    class S(Schema):
+        s: str
+
+    df = DataFrame[S]({"s": ["alpha.txt", "beta"]})
+    out = df.withColumn("t", F.strip_suffix(F.col("s", dtype=str), ".txt")).collect(
+        as_lists=True
+    )
+    assert out["t"] == ["alpha", "beta"]

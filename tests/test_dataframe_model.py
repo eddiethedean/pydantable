@@ -4,7 +4,7 @@ import warnings
 
 import pytest
 from pydantable import DataFrame, DataFrameModel, Schema
-from pydantable.io import export_ndjson, export_parquet
+from pydantable.io import export_ipc, export_json, export_ndjson, export_parquet
 from pydantable.schema import DtypeDriftWarning, is_supported_scalar_column_annotation
 from pydantic import ValidationError
 
@@ -141,6 +141,27 @@ def test_dataframe_model_materialize_ndjson_classmethod(tmp_path) -> None:
     assert df.collect(as_lists=True) == {"id": [3], "age": [None]}
 
 
+def test_dataframe_model_materialize_ipc_classmethod(tmp_path) -> None:
+    path = tmp_path / "m.arrow"
+    export_ipc(path, {"id": [4], "age": [12]})
+    df = UserDF.materialize_ipc(path, trusted_mode="shape_only")
+    assert df.collect(as_lists=True) == {"id": [4], "age": [12]}
+
+
+def test_dataframe_model_materialize_csv_classmethod(tmp_path) -> None:
+    path = tmp_path / "m.csv"
+    path.write_text("id,age\n5,7\n6,\n", encoding="utf-8")
+    df = UserDF.materialize_csv(path, trusted_mode="shape_only")
+    assert df.collect(as_lists=True) == {"id": [5, 6], "age": [7, None]}
+
+
+def test_dataframe_model_materialize_json_classmethod(tmp_path) -> None:
+    path = tmp_path / "rows.json"
+    export_json(path, {"id": [10, 11], "age": [3, None]})
+    df = UserDF.materialize_json(path, trusted_mode="shape_only")
+    assert df.collect(as_lists=True) == {"id": [10, 11], "age": [3, None]}
+
+
 def test_dataframe_model_fetch_sql_classmethod(tmp_path) -> None:
     pytest.importorskip("sqlalchemy")
     from sqlalchemy import create_engine, text
@@ -160,6 +181,38 @@ async def test_dataframe_model_amaterialize_parquet_classmethod(tmp_path) -> Non
     export_parquet(path, {"id": [9], "age": [11]})
     df = await UserDF.amaterialize_parquet(path, trusted_mode="shape_only")
     assert df.collect(as_lists=True) == {"id": [9], "age": [11]}
+
+
+@pytest.mark.asyncio
+async def test_dataframe_model_amaterialize_ipc_classmethod(tmp_path) -> None:
+    path = tmp_path / "am.arrow"
+    export_ipc(path, {"id": [8], "age": [3]})
+    df = await UserDF.amaterialize_ipc(path, trusted_mode="shape_only")
+    assert df.collect(as_lists=True) == {"id": [8], "age": [3]}
+
+
+@pytest.mark.asyncio
+async def test_dataframe_model_amaterialize_json_classmethod(tmp_path) -> None:
+    path = tmp_path / "aj.json"
+    export_json(path, {"id": [20], "age": [99]})
+    df = await UserDF.amaterialize_json(path, trusted_mode="shape_only")
+    assert df.collect(as_lists=True) == {"id": [20], "age": [99]}
+
+
+@pytest.mark.asyncio
+async def test_dataframe_model_amaterialize_csv_classmethod(tmp_path) -> None:
+    path = tmp_path / "ac.csv"
+    path.write_text("id,age\n30,40\n", encoding="utf-8")
+    df = await UserDF.amaterialize_csv(path, trusted_mode="shape_only")
+    assert df.collect(as_lists=True) == {"id": [30], "age": [40]}
+
+
+@pytest.mark.asyncio
+async def test_dataframe_model_amaterialize_ndjson_classmethod(tmp_path) -> None:
+    path = tmp_path / "an.ndjson"
+    export_ndjson(path, {"id": [21], "age": [None]})
+    df = await UserDF.amaterialize_ndjson(path, trusted_mode="shape_only")
+    assert df.collect(as_lists=True) == {"id": [21], "age": [None]}
 
 
 def test_dataframe_model_io_classmethod_rejects_bridge_base() -> None:

@@ -58,6 +58,83 @@ def test_csv_roundtrip_rust_or_fallback(tmp_dir: Path) -> None:
     assert [int(x) for x in got["n"]] == [1, 2]
 
 
+def test_export_csv_stdlib_fallback_when_rust_importerror(
+    tmp_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``engine=auto`` uses stdlib writer if Rust path raises ``ImportError``."""
+    import pydantable.io._core_io as core_io
+
+    real = core_io.rust_write_csv_path
+
+    def _raise(*args: object, **kwargs: object) -> None:
+        raise ImportError("no rust csv")
+
+    monkeypatch.setattr(core_io, "rust_write_csv_path", _raise)
+    path = tmp_dir / "fb.csv"
+    data = {"x": [9], "y": ["z"]}
+    export_csv(path, data, engine="auto")
+    monkeypatch.setattr(core_io, "rust_write_csv_path", real)
+    got = materialize_csv(path, engine="auto")
+    assert got == data
+
+
+def test_export_ndjson_stdlib_fallback_when_rust_importerror(
+    tmp_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import pydantable.io._core_io as core_io
+
+    real = core_io.rust_write_ndjson_path
+
+    def _raise(*args: object, **kwargs: object) -> None:
+        raise ImportError("no rust ndjson")
+
+    monkeypatch.setattr(core_io, "rust_write_ndjson_path", _raise)
+    path = tmp_dir / "fb.ndjson"
+    data = {"a": [1], "b": [True]}
+    export_ndjson(path, data, engine="auto")
+    monkeypatch.setattr(core_io, "rust_write_ndjson_path", real)
+    got = materialize_ndjson(path, engine="auto")
+    assert got == data
+
+
+def test_export_parquet_pyarrow_fallback_when_rust_importerror(
+    tmp_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import pydantable.io._core_io as core_io
+
+    real = core_io.rust_write_parquet_path
+
+    def _raise(*args: object, **kwargs: object) -> None:
+        raise ImportError("no rust parquet")
+
+    monkeypatch.setattr(core_io, "rust_write_parquet_path", _raise)
+    path = tmp_dir / "fb.parquet"
+    data = {"u": [1], "v": ["x"]}
+    export_parquet(path, data, engine="auto")
+    monkeypatch.setattr(core_io, "rust_write_parquet_path", real)
+    got = materialize_parquet(path, engine="auto")
+    assert got == data
+
+
+def test_export_ipc_pyarrow_fallback_when_rust_importerror(
+    tmp_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import pydantable.io._core_io as core_io
+
+    real = core_io.rust_write_ipc_path
+
+    def _raise(*args: object, **kwargs: object) -> None:
+        raise ImportError("no rust ipc")
+
+    monkeypatch.setattr(core_io, "rust_write_ipc_path", _raise)
+    path = tmp_dir / "fb.arrow"
+    data = {"a": [2]}
+    export_ipc(path, data, engine="auto")
+    monkeypatch.setattr(core_io, "rust_write_ipc_path", real)
+    got = materialize_ipc(path, engine="auto")
+    assert got == data
+
+
 def test_parquet_roundtrip(tmp_dir: Path) -> None:
     path = tmp_dir / "f.parquet"
     data = {"x": [10, 20], "y": ["p", "q"]}

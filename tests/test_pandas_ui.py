@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from conftest import assert_table_eq_sorted
 from pydantable import DataFrameModel as PolarsDataFrameModel
+from pydantable import Schema
 from pydantable.pandas import DataFrameModel as PandasDataFrameModel
 
 
@@ -115,6 +116,56 @@ def test_pandas_ui_head_tail() -> None:
     assert df.tail(2).collect(as_lists=True) == {"id": [2, 3]}
 
 
+def test_pandas_core_head_tail_empty_columns() -> None:
+    from pydantable.pandas import DataFrame as PDF
+
+    class Row(Schema):
+        x: int
+
+    df = PDF[Row]({"x": []})
+    assert df.head(3).collect(as_lists=True) == {"x": []}
+    assert df.tail(3).collect(as_lists=True) == {"x": []}
+
+
+def test_pandas_core_query_not_implemented() -> None:
+    from pydantable.pandas import DataFrame as PDF
+
+    class Row(Schema):
+        x: int
+
+    df = PDF[Row]({"x": [1]})
+    with pytest.raises(NotImplementedError, match="filter\\(Expr\\)"):
+        df.query("x > 0")
+
+
+def test_pandas_ui_merge_default_suffix_when_single_tuple_element() -> None:
+    class L(PandasDataFrameModel):
+        id: int
+        v: int
+
+    class R(PandasDataFrameModel):
+        id: int
+        v: int
+
+    left = L({"id": [1], "v": [10]})
+    right = R({"id": [1], "v": [20]})
+    out = left.merge(right, on="id", how="inner", suffixes=("_only",))
+    cols = list(out.schema_fields().keys())
+    assert any(c.endswith("_right") for c in cols)
+
+
+def test_pandas_model_group_mean_and_count() -> None:
+    class Row(PandasDataFrameModel):
+        k: int
+        v: int
+
+    df = Row({"k": [1, 1], "v": [10, 20]})
+    gm = df.group_by("k").mean("v").collect(as_lists=True)
+    gc = df.group_by("k").count("v").collect(as_lists=True)
+    assert gm["v_mean"] == [15]
+    assert gc["v_count"] == [2]
+
+
 def test_pandas_ui_merge_rejects_extra_kwargs() -> None:
     class L(PandasDataFrameModel):
         a: int
@@ -187,6 +238,10 @@ def test_pandas_ui_groupby_requires_columns() -> None:
     df = Row({"k": [1], "v": [2]})
     with pytest.raises(TypeError, match="at least one column"):
         df.group_by("k").sum()
+    with pytest.raises(TypeError, match="at least one column"):
+        df.group_by("k").mean()
+    with pytest.raises(TypeError, match="at least one column"):
+        df.group_by("k").count()
 
 
 def test_pandas_model_merge_type_error() -> None:

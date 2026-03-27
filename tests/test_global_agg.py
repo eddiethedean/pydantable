@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from pydantable import DataFrame
 from pydantable.expressions import (
     global_count,
@@ -10,6 +11,12 @@ from pydantable.expressions import (
     global_min,
     global_row_count,
     global_sum,
+    lag,
+    lead,
+    window_max,
+    window_mean,
+    window_min,
+    window_sum,
 )
 from pydantable.schema import Schema
 
@@ -109,3 +116,26 @@ def test_global_row_count_named() -> None:
     df = DataFrame[T]({"id": [1], "v": [1]})
     out = df.select(n=global_row_count()).collect(as_lists=True)
     assert out == {"n": [1]}
+
+
+def test_global_and_window_helpers_reject_non_expr() -> None:
+    with pytest.raises(TypeError, match="global_sum"):
+        global_sum(1)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="global_mean"):
+        global_mean("x")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="global_count"):
+        global_count([])  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="global_min"):
+        global_min(None)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="global_max"):
+        global_max(True)  # type: ignore[arg-type]
+    for fn, name in (
+        (window_sum, "window_sum"),
+        (window_mean, "window_mean"),
+        (window_min, "window_min"),
+        (window_max, "window_max"),
+        (lag, "lag"),
+        (lead, "lead"),
+    ):
+        with pytest.raises(TypeError, match=name):
+            fn(1)  # type: ignore[arg-type, operator]
