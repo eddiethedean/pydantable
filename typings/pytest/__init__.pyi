@@ -5,4 +5,3 @@ from typing import Any
 def importorskip(
     modname: str, minversion: str | None = None, reason: str | None = None
 ) -> Any: ...
-
