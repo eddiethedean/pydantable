@@ -6,13 +6,15 @@ All notable changes to this project are documented here. The format is inspired 
 
 <!-- Add notes here for the next 1.x release. -->
 
+## [1.1.0] — 2026-03-27
+
 ### Added
 
-- `DataFrameModel` transform chains can be typed as explicit after-model return types
-  without calling `to_dict()` / re-materializing between steps.
-- Added mypy regression coverage in `tests/test_mypy_dataframe_model_return_types.py`
-  for no-materialization typed transform returns across `select`, `drop`, `rename`,
-  `with_columns`, `join`, and `group_by(...).agg(...)`.
+- **Typing:** `DataFrameModel` transform methods return derived model types so mypy/pyright
+  can verify the schema after `select`, `drop`, `rename`, `with_columns`, `join`, and
+  `group_by(...).agg(...)` without materializing between steps (see GitHub issue #1).
+- **Tests:** expanded coverage (I/O fallbacks, PySpark/expr edges, schema helpers) and mypy
+  regression updates in `tests/test_mypy_dataframe_model_return_types.py`.
 
 ## [1.0.0] — 2026-03-26
 
