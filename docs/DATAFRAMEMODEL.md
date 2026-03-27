@@ -249,6 +249,40 @@ For schema assertions with better ergonomics:
 
 `as_model(..., validate_schema=False)` is a performance-oriented escape hatch. Prefer leaving validation on unless you have a strong guarantee that the upstream pipeline already enforces schema correctness (e.g. pinned transform chain + contract tests).
 
+#### Enabling the mypy plugin
+
+If you use **mypy**, enable the plugin in your mypy config:
+
+```toml
+[tool.mypy]
+plugins = ["pydantable.mypy_plugin"]
+```
+
+In this repo we run mypy with `mypy_path = "python"` and load the plugin by file path; in normal installed usage, the module form above is preferred.
+
+#### What mypy can infer today (and when it won’t)
+
+The plugin refines schema-evolving return types for common transforms when arguments are **literal enough**.
+
+- **Refined (schema-evolving)**:
+  - `select("a", "b", ...)` (literal column names)
+  - `drop("a", ...)` (literal column names)
+  - `rename({"old": "new", ...})` (dict literal)
+  - `join(other, on="k" | on=["k1", ...], suffix="_right")` (literal `on`/`suffix`)
+  - `group_by(...).agg(out=("op","col"), ...)` (named tuple-literals; a few ops map to `int`/`float`)
+  - `melt(id_vars=[...], variable_name="...", value_name="...")` (literal `id_vars` and names)
+  - `unpivot(index=[...], variable_name="...", value_name="...")` (literal `index` and names)
+  - `rolling_agg(..., op="...", out_name="...")` (literal `op`/`out_name`)
+
+- **Schema-preserving (kept as the same model)**:
+  - `fill_null(...)`, `drop_nulls(...)`, `explode(...)`, `unnest(...)`
+
+- **Not inferred / intentionally conservative**:
+  - Anything where column names are computed dynamically (variables, comprehensions, f-strings, unpacking).
+  - `pivot(...)` (output columns depend on data values).
+
+When inference can’t be made safely, mypy will fall back to the original model type. For pyright/Pylance, prefer explicit `.as_model(After)` / `.assert_model(After)`.
+
 ## Collision handling (replacement semantics)
 
 For `with_columns(...)`, column name collisions must use **replacement** semantics:

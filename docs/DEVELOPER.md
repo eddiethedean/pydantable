@@ -275,6 +275,12 @@ XML for tooling: **`--cov-report=xml`** (writes **`coverage.xml`**; gitignored).
 .venv/bin/basedpyright
 ```
 
+Typing-focused checks (generator drift + mypy + typing snippet tests):
+
+```bash
+make check-typing
+```
+
 ### Build docs (Sphinx)
 
 ```bash

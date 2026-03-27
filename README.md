@@ -56,6 +56,9 @@ print(result.collect())   # list of Pydantic row models
 - `DataFrameModel`: SQLModel-like table class (`class Orders(DataFrameModel): ...`).
 - `DataFrame[Schema]`: generic API over your own Pydantic `BaseModel`.
 - `Expr`: typed expressions used in transforms.
+- Static typing:
+  - **mypy** can infer schema-evolving return types for many transform chains (via the mypy plugin).
+  - **pyright/Pylance** relies on shipped stubs; use `as_model(...)` / `try_as_model(...)` / `assert_model(...)` when you want an explicit after-schema model.
 - Materialization:
   - `collect()` -> list of row models
   - `to_dict()` -> `dict[str, list]`
