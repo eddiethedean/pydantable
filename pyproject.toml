@@ -82,6 +82,11 @@ docs = [
 manifest-path = "pydantable-core/Cargo.toml"
 module-name = "pydantable._core"
 python-source = "python"
+include = [
+    "python/pydantable/py.typed",
+    "python/pydantable/__init__.pyi",
+    "python/pydantable/dataframe_model.pyi",
+]
 features = ["pyo3/extension-module", "polars_engine"]
 exclude = [
     "docs/_build",
@@ -108,6 +113,8 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 python_version = "3.10"
 mypy_path = "python"
 explicit_package_bases = true
+# Mypy plugin enables automatic schema-evolving return typing for DataFrameModel
+# transform chains. Pyright/Pylance relies on the shipped stubs + `as_model(...)`.
 plugins = ["python/pydantable/mypy_plugin.py"]
 
 # Tests use parametrized UI bases and column attrs that are Expr at runtime but

@@ -57,3 +57,10 @@ These APIs **materialize** the plan to a Python `dict[str, list]` first, then bu
 
 - Use **`read_*`** for large local files and pipelines where you will transform then write.\n+- Use **`materialize_*`** when you want a Python column dict in memory (small/medium data, tests).\n+\n+Use {doc}`IO_DECISION_TREE` to pick the right entrypoint.
 
+## Typing: why doesn’t my editor infer the after-schema type?
+
+Some type checkers (notably **pyright/Pylance**) cannot automatically infer schema-evolving return types from transformation chains.
+
+- For pyright/Pylance, use `DataFrameModel.as_model(AfterModel)` to state the after-model explicitly.
+- For mypy, transform chains can be typed automatically.
+

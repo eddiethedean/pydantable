@@ -24,7 +24,7 @@ jobs:
       - name: Install ruff and mypy
         run: |
           python -m pip install -U pip
-          python -m pip install ruff mypy
+          python -m pip install ruff mypy pyright
           python -m pip install "pydantic>=2.0,<3" "typing-extensions>=4.7"
 
       - name: Ruff format
@@ -35,6 +35,14 @@ jobs:
 
       - name: Mypy
         run: mypy python/pydantable
+
+      - name: Pyright
+        run: python -m pyright --project pyrightconfig.json
+
+      - name: Typing artifacts are up to date
+        run: |
+          python scripts/generate_typing_artifacts.py
+          git diff --exit-code
 
   python-package-contents:
     name: Packaging (sdist excludes)
@@ -353,6 +361,7 @@ jobs:
             "fsspec>=2023.0" "openpyxl>=3.1" \
             "kafka-python>=2.0" "google-cloud-bigquery>=3.0" "snowflake-connector-python>=3.0" \
             "rapcsv>=0.2" "rapfiles>=0.1" "rapsqlite>=0.1"
+          $PY -m pip install pyright
 
       - name: Build and install extension
         run: $PY -m maturin develop --release

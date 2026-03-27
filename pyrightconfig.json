@@ -1,0 +1,9 @@
+{
+  "include": ["tests/test_pyright_dataframe_model_return_types.py"],
+  "stubPath": "typings",
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.10",
+  "typeCheckingMode": "basic"
+}
+

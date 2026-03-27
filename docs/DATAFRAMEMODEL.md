@@ -231,6 +231,17 @@ def pipeline(df: Before) -> After:
     return df.with_columns(age2=df.age * 2).select("id", "age2")
 ```
 
+### Static typing: mypy vs pyright/Pylance
+
+- **mypy**: transform chains are typed automatically (schema-evolving return typing).
+- **pyright/Pylance**: use `as_model(...)` to state the intended after-model explicitly:
+
+```python
+def pipeline(df: Before) -> After:
+    out = df.with_columns(age2=df.age * 2).select("id", "age2")
+    return out.as_model(After)
+```
+
 ## Collision handling (replacement semantics)
 
 For `with_columns(...)`, column name collisions must use **replacement** semantics:

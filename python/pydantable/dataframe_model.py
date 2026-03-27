@@ -11,7 +11,7 @@ import html
 import sys
 import typing
 from collections.abc import Callable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast, get_type_hints
 
 from typing_extensions import Self
 
@@ -158,6 +158,7 @@ def _normalize_input(
 
 ModelSelf = TypeVar("ModelSelf", bound="DataFrameModel")
 GroupedModelT = TypeVar("GroupedModelT", bound="DataFrameModel")
+AfterModelT = TypeVar("AfterModelT", bound="DataFrameModel")
 
 
 class DataFrameModel:
@@ -1190,6 +1191,33 @@ class DataFrameModel:
 
     def schema_fields(self) -> dict[str, Any]:
         return self._df.schema_fields()
+
+    def as_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        validate_schema: bool = True,
+    ) -> AfterModelT:
+        """
+        Re-wrap this lazy pipeline as another `DataFrameModel` subclass.
+
+        This is primarily a static-typing escape hatch for type checkers that
+        cannot infer schema-evolving transform returns (e.g. pyright/Pylance).
+        """
+        if not isinstance(model, type) or not issubclass(model, DataFrameModel):
+            raise TypeError("as_model(model=...) expects a DataFrameModel subclass.")
+        if validate_schema:
+            expected = dict(get_type_hints(model, include_extras=True))
+            expected = {k: v for k, v in expected.items() if not k.startswith("_")}
+            actual = self.schema_fields()
+            if set(expected) != set(actual) or any(expected[k] != actual[k] for k in expected):
+                raise TypeError(
+                    "as_model(schema mismatch): expected "
+                    f"{sorted(expected)} got {sorted(actual)}"
+                )
+        obj = model.__new__(model)
+        obj._df = self._df
+        return cast("AfterModelT", obj)
 
     @property
     def columns(self) -> list[str]:
