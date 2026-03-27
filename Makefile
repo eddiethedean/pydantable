@@ -26,7 +26,11 @@ gen-typing:
 check-typing:
 	$(PYTHON) scripts/generate_typing_artifacts.py --check
 	$(MYPY) python/pydantable
-	$(PYTHON) -m pytest -q tests/test_mypy_dataframe_model_return_types.py tests/test_pyright_dataframe_model_return_types.py
+	$(PYTHON) -m pytest -q \
+		tests/test_mypy_dataframe_model_return_types.py \
+		tests/test_mypy_typing_contracts.py \
+		tests/test_pyright_dataframe_model_return_types.py \
+		tests/test_pyright_typing_contracts.py
 
 check-rust: rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 

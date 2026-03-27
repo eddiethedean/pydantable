@@ -7,6 +7,23 @@ PydanTable targets two complementary typing experiences:
 
 This page consolidates the typing story and links to the relevant contracts.
 
+## The typing contract (nominal model, derived row type, structural helpers)
+
+- **Nominal table type**: users name subclasses of `DataFrameModel` (for example `class Users(DataFrameModel): ...`).
+- **Row type is derived**: each `DataFrameModel` subclass generates a per-row Pydantic model exposed as `Users.RowModel`.
+- **Generics are for relationships / helpers**: for cross-model helpers, prefer structural typing rather than pretending `DataFrameModel[Row]` “is” a particular subclass.
+
+### Structural helper types (`pydantable.typing`)
+
+For reusable helpers that accept *any* model with a given row type, use the Protocol:
+
+```python
+from pydantable.typing import DataFrameModelWithRow
+
+def materialize_rows(m: DataFrameModelWithRow[RowT]) -> list[RowT]:
+    return m.rows()
+```
+
 ## pyright/Pylance workflow (explicit after-model)
 
 Pyright cannot express dependent “schema evolution” from transform chains, so the ergonomic pattern is:

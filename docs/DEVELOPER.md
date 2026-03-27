@@ -281,6 +281,17 @@ Typing-focused checks (generator drift + mypy + typing snippet tests):
 make check-typing
 ```
 
+Typing contract tests live in:
+
+- `tests/test_mypy_*typing*_contracts.py`
+- `tests/test_pyright_*typing*_contracts.py`
+
+When you add or change typing surface area:
+
+- update `scripts/generate_typing_artifacts.py` (stub templates)
+- re-run `python scripts/generate_typing_artifacts.py`
+- extend snippet-based typing tests and re-run `make check-typing`
+
 ### Build docs (Sphinx)
 
 ```bash

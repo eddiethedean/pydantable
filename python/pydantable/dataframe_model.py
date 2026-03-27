@@ -156,12 +156,13 @@ def _normalize_input(
     raise TypeError("DataFrameModel input must be a column mapping or row sequence.")
 
 
-ModelSelf = TypeVar("ModelSelf", bound="DataFrameModel")
-GroupedModelT = TypeVar("GroupedModelT", bound="DataFrameModel")
-AfterModelT = TypeVar("AfterModelT", bound="DataFrameModel")
+RowT = TypeVar("RowT", bound=BaseModel)
+ModelSelf = TypeVar("ModelSelf", bound="DataFrameModel[Any]")
+GroupedModelT = TypeVar("GroupedModelT", bound="DataFrameModel[Any]")
+AfterModelT = TypeVar("AfterModelT", bound="DataFrameModel[Any]")
 
 
-class DataFrameModel:
+class DataFrameModel(Generic[RowT]):
     """Columns on a subclass → generated ``RowModel`` and DataFrame-like methods.
 
     Annotate every field with a supported column type. :attr:`RowModel` validates
@@ -177,7 +178,7 @@ class DataFrameModel:
     :mod:`pydantable.io`.
     """
 
-    RowModel: type[BaseModel]
+    RowModel: type[RowT]
     _RowModel_fill_missing_optional: type[BaseModel]
     _RowModel_require_optional: type[BaseModel]
     _SchemaModel: type[Schema]
@@ -1168,7 +1169,7 @@ class DataFrameModel:
     @classmethod
     def _derived_model_type(
         cls, field_types: Mapping[str, Any]
-    ) -> type[DataFrameModel]:
+    ) -> type[DataFrameModel[Any]]:
         name = f"{cls.__name__}Derived"
         annotations = dict(field_types)
         # Inherit from the originating subclass for better DX/autocomplete and
@@ -1178,7 +1179,7 @@ class DataFrameModel:
             (cls,),
             {"__annotations__": annotations, "__module__": cls.__module__},
         )
-        return cast("type[DataFrameModel]", derived)
+        return cast("type[DataFrameModel[Any]]", derived)
 
     @classmethod
     def _from_dataframe(
@@ -1193,7 +1194,7 @@ class DataFrameModel:
         return self._df.schema_fields()
 
     @staticmethod
-    def _expected_schema_fields(model: type[DataFrameModel]) -> dict[str, Any]:
+    def _expected_schema_fields(model: type[DataFrameModel[Any]]) -> dict[str, Any]:
         """
         Return the expected schema field mapping for `model`.
 
@@ -1387,14 +1388,14 @@ class DataFrameModel:
         """Delegate Consortium Standard entrypoint to the inner :class:`DataFrame`."""
         return self._df.__dataframe_consortium_standard__(api_version=api_version)
 
-    def rows(self) -> list[BaseModel]:
+    def rows(self) -> list[RowT]:
         """
         Materialize this DataFrame into a list of per-row Pydantic models.
 
         Same as :meth:`collect` with default arguments (validated against the
         current inner schema type).
         """
-        return self.collect()
+        return cast("list[RowT]", self.collect())
 
     def to_dicts(self) -> list[dict[str, Any]]:
         """
@@ -1454,9 +1455,9 @@ class DataFrameModel:
         self,
         *,
         executor: Executor | None = None,
-    ) -> list[BaseModel]:
+    ) -> list[RowT]:
         """Async :meth:`rows` (same as ``await acollect()``)."""
-        return await self.acollect(executor=executor)
+        return cast("list[RowT]", await self.acollect(executor=executor))
 
     async def ato_dicts(
         self,
@@ -1467,10 +1468,10 @@ class DataFrameModel:
         rows = await self.arows(executor=executor)
         return [row.model_dump() for row in rows]
 
-    def select(self, *cols: Any) -> DataFrameModel:
+    def select(self, *cols: Any) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.select(*cols))
 
-    def with_columns(self, **new_columns: Any) -> DataFrameModel:
+    def with_columns(self, **new_columns: Any) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.with_columns(**new_columns))
 
     def filter(self, condition: Any) -> Self:
@@ -1491,10 +1492,10 @@ class DataFrameModel:
     ) -> Self:
         return self._from_dataframe(self._df.distinct(subset=subset, keep=keep))
 
-    def drop(self, *columns: Any) -> DataFrameModel:
+    def drop(self, *columns: Any) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.drop(*columns))
 
-    def rename(self, columns: Mapping[str, str]) -> DataFrameModel:
+    def rename(self, columns: Mapping[str, str]) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.rename(columns))
 
     def slice(self, offset: int, length: int) -> Self:
@@ -1512,12 +1513,12 @@ class DataFrameModel:
         *,
         strategy: str | None = None,
         subset: Sequence[str] | None = None,
-    ) -> DataFrameModel:
+    ) -> DataFrameModel[Any]:
         return self._from_dataframe(
             self._df.fill_null(value, strategy=strategy, subset=subset)
         )
 
-    def drop_nulls(self, subset: Sequence[str] | None = None) -> DataFrameModel:
+    def drop_nulls(self, subset: Sequence[str] | None = None) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.drop_nulls(subset=subset))
 
     def melt(
@@ -1527,7 +1528,7 @@ class DataFrameModel:
         value_vars: Sequence[str] | None = None,
         variable_name: str = "variable",
         value_name: str = "value",
-    ) -> DataFrameModel:
+    ) -> DataFrameModel[Any]:
         return self._from_dataframe(
             self._df.melt(
                 id_vars=id_vars,
@@ -1544,7 +1545,7 @@ class DataFrameModel:
         on: Sequence[str] | None = None,
         variable_name: str = "variable",
         value_name: str = "value",
-    ) -> DataFrameModel:
+    ) -> DataFrameModel[Any]:
         return self._from_dataframe(
             self._df.unpivot(
                 index=index,
@@ -1561,7 +1562,7 @@ class DataFrameModel:
         columns: Any,
         values: str | Sequence[str],
         aggregate_function: str = "first",
-    ) -> DataFrameModel:
+    ) -> DataFrameModel[Any]:
         return self._from_dataframe(
             self._df.pivot(
                 index=index,
@@ -1571,22 +1572,22 @@ class DataFrameModel:
             )
         )
 
-    def explode(self, columns: str | Sequence[str]) -> DataFrameModel:
+    def explode(self, columns: str | Sequence[str]) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.explode(columns))
 
-    def unnest(self, columns: str | Sequence[str]) -> DataFrameModel:
+    def unnest(self, columns: str | Sequence[str]) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.unnest(columns))
 
     def join(
         self,
-        other: DataFrameModel,
+        other: DataFrameModel[Any],
         *,
         on: str | Sequence[str] | None = None,
         left_on: Any = None,
         right_on: Any = None,
         how: str = "inner",
         suffix: str = "_right",
-    ) -> DataFrameModel:
+    ) -> DataFrameModel[Any]:
         if not isinstance(other, DataFrameModel):
             raise TypeError("join(other=...) expects another DataFrameModel instance.")
         return self._from_dataframe(
@@ -1613,7 +1614,7 @@ class DataFrameModel:
         out_name: str,
         by: Sequence[str] | None = None,
         min_periods: int = 1,
-    ) -> DataFrameModel:
+    ) -> DataFrameModel[Any]:
         return self._from_dataframe(
             self._df.rolling_agg(
                 on=on,
@@ -1645,7 +1646,7 @@ class DataFrameModel:
         return getattr(self._df, item)
 
     @classmethod
-    def row_model(cls) -> type[BaseModel]:
+    def row_model(cls) -> type[RowT]:
         return cls.RowModel
 
     @classmethod
@@ -1655,10 +1656,10 @@ class DataFrameModel:
     @classmethod
     def concat(
         cls,
-        dfs: Sequence[DataFrameModel],
+        dfs: Sequence[DataFrameModel[Any]],
         *,
         how: str = "vertical",
-    ) -> DataFrameModel:
+    ) -> DataFrameModel[Any]:
         if len(dfs) < 2:
             raise ValueError("concat() requires at least two DataFrameModel inputs.")
         if not all(isinstance(df, DataFrameModel) for df in dfs):
@@ -1690,7 +1691,7 @@ class GroupedDataFrameModel(Generic[GroupedModelT]):
             f"<b>GroupedDataFrameModel({title})</b></p>{inner}</div>"
         )
 
-    def agg(self, **aggregations: Any) -> DataFrameModel:
+    def agg(self, **aggregations: Any) -> DataFrameModel[Any]:
         """Same kwargs as :meth:`pydantable.dataframe.GroupedDataFrame.agg`."""
         return self._model_type._from_dataframe(self._grouped_df.agg(**aggregations))
 
@@ -1719,6 +1720,6 @@ class DynamicGroupedDataFrameModel(Generic[GroupedModelT]):
             f"<b>DynamicGroupedDataFrameModel({title})</b></p>{inner}</div>"
         )
 
-    def agg(self, **aggregations: Any) -> DataFrameModel:
+    def agg(self, **aggregations: Any) -> DataFrameModel[Any]:
         """Same rules as :meth:`pydantable.dataframe.DynamicGroupedDataFrame.agg`."""
         return self._model_type._from_dataframe(self._grouped_df.agg(**aggregations))

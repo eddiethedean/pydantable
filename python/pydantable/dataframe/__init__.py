@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ._impl import (
+from pydantable.dataframe._impl import (
     DataFrame,
     DynamicGroupedDataFrame,
     FilterStep,

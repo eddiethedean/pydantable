@@ -5,6 +5,8 @@ from typing import Any, Callable, cast
 from mypy.nodes import (
     ARG_NAMED,
     ARG_POS,
+    CallExpr,
+    ComparisonExpr,
     DictExpr,
     Expression,
     FloatExpr,
@@ -12,6 +14,7 @@ from mypy.nodes import (
     ListExpr,
     MemberExpr,
     NameExpr,
+    OpExpr,
     StrExpr,
     TupleExpr,
     TypeInfo,
@@ -128,6 +131,44 @@ def _literal_type(ctx: MethodContext, expr: Expression) -> Type | None:
     return None
 
 
+def _infer_expr_type_from_schema(
+    ctx: MethodContext,
+    *,
+    expr: Expression,
+    schema_fields: dict[str, Type],
+) -> Type | None:
+    """
+    Best-effort type inference for `with_columns` kwargs when mypy can't infer.
+
+    This intentionally handles only a small set of common expression patterns so
+    the plugin stays conservative.
+    """
+    api = cast(Any, ctx.api)
+    if isinstance(expr, MemberExpr):
+        if expr.name in schema_fields:
+            return schema_fields[expr.name]
+        return None
+    if isinstance(expr, OpExpr):
+        left_t = _infer_expr_type_from_schema(ctx, expr=expr.left, schema_fields=schema_fields)
+        right_t = _infer_expr_type_from_schema(ctx, expr=expr.right, schema_fields=schema_fields)
+        if left_t is None or right_t is None:
+            return None
+        int_t = api.named_type("builtins.int")
+        float_t = api.named_type("builtins.float")
+        # Numeric-only best effort.
+        if _types_compatible(left_t, float_t) or _types_compatible(right_t, float_t):
+            return float_t
+        if _types_compatible(left_t, int_t) and _types_compatible(right_t, int_t):
+            return int_t
+        return None
+    if isinstance(expr, ComparisonExpr):
+        return api.named_type("builtins.bool")
+    if isinstance(expr, CallExpr):
+        # Common case: Expr methods / globals; let mypy handle these when possible.
+        return None
+    return _literal_type(ctx, expr)
+
+
 def _types_compatible(expected: Type, actual: Type) -> bool:
     pe = get_proper_type(expected)
     pa = get_proper_type(actual)
@@ -194,8 +235,10 @@ def _hook(ctx: MethodContext, method: str) -> Type:
                     continue
                 inferred = get_proper_type(arg_t)
                 if isinstance(inferred, AnyType):
-                    lit_t = _literal_type(ctx, expr)
-                    fields[name] = lit_t if lit_t is not None else inferred
+                    best = _infer_expr_type_from_schema(
+                        ctx, expr=expr, schema_fields=fields
+                    )
+                    fields[name] = best if best is not None else inferred
                 else:
                     fields[name] = arg_t
 

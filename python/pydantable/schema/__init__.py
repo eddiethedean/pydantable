@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ._impl import (
+from pydantable.schema._impl import (
     DtypeDriftWarning,
     Schema,
     _annotation_nullable_inner,

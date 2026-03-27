@@ -442,11 +442,11 @@ and filters the response to that schema (see `docs/FASTAPI.md`).
 When you need row-wise output (e.g. for response serialization), the DataFrameModel
 produces:
 
-- `df.collect()` -> `list` of Pydantic models validated against the **current** inner schema type
-- `df.rows()` -> same as `collect()` (default arguments)
+- `df.collect()` -> `Any` (shape depends on flags like `as_lists` / `as_numpy` / `as_polars`)
+- `df.rows()` -> `list[RowModel]` (typed materialization API; validated against the current schema)
 - `df.to_dict()` -> columnar `dict[str, list]` (use for column-shaped API responses)
 - `df.to_dicts()` -> list of dicts (JSON-friendly), derived from row models
-- `await df.acollect()`, `await df.ato_dict()`, `await df.ato_polars()`, `await df.arows()`, `await df.ato_dicts()` -> **0.15.0+** async counterparts; **`await df.ato_arrow()`** -> **0.16.0+** (thread-offloaded; see `EXECUTION` / `FASTAPI`)
+- `await df.acollect()`, `await df.ato_dict()`, `await df.ato_polars()`, `await df.arows()`, `await df.ato_dicts()` -> async counterparts (`arows()` is the typed row materialization)
 
 This is the “bridge” between columnar execution and Pydantic row semantics.
 
