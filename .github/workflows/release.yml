@@ -23,6 +23,7 @@ jobs:
         with:
           python-version: "3.12"
 
+      # cargo-cyclonedx 0.5.9+ requires Rust 1.85 to build; pin 0.5.8 for CI compatibility.
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -38,7 +39,7 @@ jobs:
           cyclonedx-py environment --of JSON --output-file sbom-python.cdx.json
 
       - name: Install SBOM tools (Rust)
-        run: cargo install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx --version 0.5.8 --locked
 
       - name: Create Rust SBOM (crate)
         run: cargo cyclonedx --manifest-path pydantable-core/Cargo.toml --format json --override-filename sbom-rust.cdx

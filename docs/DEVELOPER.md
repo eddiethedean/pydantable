@@ -38,6 +38,8 @@ For the `v1.0.0` release train, the release workflow generates **CycloneDX** SBO
 
 These SBOMs are attached to the GitHub Release and uploaded as workflow artifacts.
 
+**CI note:** Workflows install **`cargo-cyclonedx` 0.5.8** with **`--locked`**. Version **0.5.9** raised that tool’s **MSRV to Rust 1.85**, so an unpinned **`cargo install cargo-cyclonedx`** can fail (e.g. exit code **101**) on runners whose default **`stable`** is still older. Bump the pinned version only after confirming `stable` on **ubuntu-latest** meets the release’s MSRV.
+
 ## Rust feature flags (`pydantable-core`)
 
 The crate’s `[features]` block in `pydantable-core/Cargo.toml` gates the Polars engine (`polars_engine`, on by default). Splitting optional codecs or transports into finer-grained features would need coordinated **maturin** / **pyproject.toml** / CI changes; treat that as a release-engineering follow-up rather than everyday contributor work.

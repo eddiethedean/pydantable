@@ -24,6 +24,8 @@ jobs:
 
       # `pip install .` builds via Maturin and needs `rustc` on PATH before this job
       # materializes the Python SBOM from the installed distribution.
+      # cargo-cyclonedx 0.5.9+ requires Rust 1.85 to build; pin 0.5.8 so `cargo install`
+      # keeps working on older `stable` images until runners catch up.
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -49,7 +51,7 @@ jobs:
             ${{ runner.os }}-cargo-sbom-
 
       - name: Install SBOM tools (Rust)
-        run: cargo install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx --version 0.5.8 --locked
 
       - name: Create Rust SBOM (crate)
         run: cargo cyclonedx --manifest-path pydantable-core/Cargo.toml --format json --override-filename sbom-rust.cdx
