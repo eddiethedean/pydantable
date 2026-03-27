@@ -48,6 +48,21 @@ def test_assert_model_error_includes_diff_details() -> None:
     assert "missing=" in msg or "extra=" in msg or "mismatched_types=" in msg
 
 
+def test_assert_model_reports_type_mismatches() -> None:
+    from pydantable import DataFrameModel
+
+    class Before(DataFrameModel):
+        id: int
+
+    class After(DataFrameModel):
+        id: str
+
+    df = Before({"id": [1]})
+    with pytest.raises(TypeError) as exc:
+        df.assert_model(After)
+    assert "mismatched_types=" in str(exc.value)
+
+
 def test_as_model_can_skip_validation() -> None:
     from pydantable import DataFrameModel
 
@@ -60,5 +75,19 @@ def test_as_model_can_skip_validation() -> None:
     df = Before({"id": [1]})
     # Escape hatch: allows re-wrapping without schema validation.
     out = df.as_model(Wrong, validate_schema=False)
+    assert isinstance(out, Wrong)
+
+
+def test_try_as_model_can_skip_validation() -> None:
+    from pydantable import DataFrameModel
+
+    class Before(DataFrameModel):
+        id: int
+
+    class Wrong(DataFrameModel):
+        nope: int
+
+    df = Before({"id": [1]})
+    out = df.try_as_model(Wrong, validate_schema=False)
     assert isinstance(out, Wrong)
 

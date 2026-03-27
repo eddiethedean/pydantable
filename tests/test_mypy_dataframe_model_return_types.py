@@ -331,6 +331,54 @@ def test_mypy_melt_requires_literal_id_vars_for_refinement(tmp_path: Path) -> No
     assert "Incompatible return value type" in proc.stdout
 
 
+def test_mypy_unpivot_requires_literal_index_for_refinement(tmp_path: Path) -> None:
+    pytest.importorskip("mypy")
+    code = """
+    from pydantable import DataFrameModel
+
+    class Before(DataFrameModel):
+        id: int
+        age: int
+
+    class Unpivoted(DataFrameModel):
+        id: int
+        variable: str
+        value: int
+
+    def ok(df: Before) -> Before:
+        idx = ["id"]
+        return df.unpivot(index=idx, on=["age"])
+
+    def bad(df: Before) -> Unpivoted:
+        idx = ["id"]
+        return df.unpivot(index=idx, on=["age"])
+    """
+    proc = _run_mypy_snippet(tmp_path, code)
+    assert proc.returncode != 0
+    assert "Incompatible return value type" in proc.stdout
+
+
+def test_mypy_rolling_agg_count_maps_to_int(tmp_path: Path) -> None:
+    pytest.importorskip("mypy")
+    code = """
+    from pydantable import DataFrameModel
+
+    class Before(DataFrameModel):
+        id: int
+        age: int
+
+    class After(DataFrameModel):
+        id: int
+        age: int
+        age_count: int
+
+    def roll(df: Before) -> After:
+        return df.rolling_agg(on="id", column="age", window_size=2, op="count", out_name="age_count")
+    """
+    proc = _run_mypy_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
 def test_mypy_still_rejects_wrong_model_on_schema_preserving_chain(
     tmp_path: Path,
 ) -> None:
