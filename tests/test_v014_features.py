@@ -100,6 +100,7 @@ def test_order_by_multi_column_nulls_last_list_runs() -> None:
 
 def test_order_by_multi_column_mismatched_nulls_last_raises() -> None:
     """Unframed `.over` cannot mix per-key nulls_last (single Polars SortOptions)."""
+
     class WM(Schema):
         g: int
         a: int
