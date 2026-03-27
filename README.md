@@ -59,6 +59,7 @@ print(result.collect())   # list of Pydantic row models
 - Static typing:
   - **mypy** can infer schema-evolving return types for many transform chains (via the mypy plugin).
   - **pyright/Pylance** relies on shipped stubs; use `as_model(...)` / `try_as_model(...)` / `assert_model(...)` when you want an explicit after-schema model.
+- **1.2.0 column types** (`typing.Literal[...]`, `ipaddress` IPv4/IPv6, `WKB`, `Annotated[str, ...]`) are documented in [SUPPORTED_TYPES](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html) (including `Expr` comparison notes).
 - Materialization:
   - `collect()` -> list of row models
   - `to_dict()` -> `dict[str, list]`

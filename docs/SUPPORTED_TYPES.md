@@ -54,6 +54,69 @@ the Rust dtype (logical **`str`** / Polars **Utf8**), while **Pydantic** on
 **`Annotated[str, pydantic.HttpUrl]`**). Match other projects’ “newtype string” patterns
 without a separate Rust `base` type.
 
+### Practical notes (1.2.0 scalars)
+
+**`typing.Literal[...]`**
+
+- Parameters must be **all `str`**, **all `int`**, or **all `bool`** (no mixing).
+- **`filter(col == literal)`** is checked when the expression is built: the constant must
+  appear in the column’s `Literal` set (same idea for `!=`).
+- Nullable columns use **`Literal[...] | None`** (or `Optional[...]`); `None` is not a
+  `Literal` member for those checks.
+
+**IP addresses (`IPv4Address`, `IPv6Address`)**
+
+- Column input may be **strings**; pydantable normalizes to **`ipaddress`** instances
+  under default validation.
+- In **`Expr` comparisons**, wrap addresses on the RHS with **`IPv4Address(...)`** /
+  **`IPv6Address(...)`**. The Python expression builder types the RHS literal as **`str`**
+  otherwise, which does not satisfy the IP column dtype in **`compare_op`** (even though
+  the Rust core allows some IP/string combinations in other paths).
+
+**`WKB`**
+
+- `pydantable.types.WKB` is a **`bytes`** subclass with Pydantic integration for row models.
+- Use **`WKB(b"...")`** (or equal `WKB` cells) on the RHS of **`==`** / **`!=`** for
+  reliable typing. **`Expr.binary_len()`** is implemented for **`bytes`** columns; for
+  **`WKB`**, use **`df.col.cast(bytes).binary_len()`** today.
+
+**`Annotated[str, ...]`**
+
+- For **`collect()`** / **`RowModel`**, Pydantic enforces your metadata (length, URL,
+  regex, etc.). Invalid cells may only surface at **materialization** time unless the
+  constructor path validates early—see tests in **`tests/test_extended_scalar_dtypes_v12.py`**.
+
+```python
+from __future__ import annotations
+
+import ipaddress
+from typing import Annotated, Literal
+
+from pydantic import Field, HttpUrl
+
+from pydantable import DataFrameModel
+from pydantable.types import WKB
+
+
+class Row(DataFrameModel):
+    env: Literal["dev", "prod"]
+    host: ipaddress.IPv4Address
+    geom: WKB | None
+    url: Annotated[str, HttpUrl]
+
+
+df = Row(
+    {
+        "env": ["dev"],
+        "host": ["192.168.0.1"],
+        "geom": [WKB(b"\x01\x02")],
+        "url": ["https://example.com"],
+    }
+)
+needle = ipaddress.IPv4Address("192.168.0.1")
+subset = df.filter(df.env == "dev").filter(df.host == needle)
+```
+
 ## Nested Pydantic models (struct columns)
 
 A column may use a **`Schema` / `BaseModel` subclass** whose fields are themselves

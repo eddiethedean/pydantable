@@ -32,7 +32,9 @@ Defining the class does not print anything; it registers `UserDF.RowModel` and t
 
 ### Field annotations (supported dtypes)
 
-Column fields must use **scalar** types from **`SUPPORTED_TYPES.md`** (`int`, `float`, `bool`, `str`, `datetime`, `date`, `timedelta`, and nullable forms such as `Optional[T]` / `T | None`). If you declare an unsupported annotation (for example `list[int]` or `int | str` on one field), pydantable raises **`TypeError` while the class body is executing**—before instances can be constructed—so bad schemas fail at import/definition time. Plain **`Schema`** subclasses used with **`DataFrame[Schema]`** do not get this early check; see **`SUPPORTED_TYPES.md`** (“When unsupported field types fail”).
+Column fields must use **scalar** types from **`SUPPORTED_TYPES.md`** (`int`, `float`, `bool`, `str`, `datetime`, `date`, `timedelta`, and nullable forms such as `Optional[T]` / `T | None`). **Since 1.2.0**, that table also includes **`typing.Literal[...]`** (homogeneous `str` / `int` / `bool` members), **`ipaddress.IPv4Address`** / **`IPv6Address`**, **`pydantable.types.WKB`**, and **`Annotated[str, ...]`** for Pydantic-validated strings; see **`SUPPORTED_TYPES.md`** (“Practical notes (1.2.0 scalars)”) for `filter` / `Expr` quirks.
+
+If you declare an unsupported annotation (for example `list[int]` or `int | str` on one field), pydantable raises **`TypeError` while the class body is executing**—before instances can be constructed—so bad schemas fail at import/definition time. Plain **`Schema`** subclasses used with **`DataFrame[Schema]`** do not get this early check; see **`SUPPORTED_TYPES.md`** (“When unsupported field types fail”).
 
 From this definition, `DataFrameModel` generates:
 - `UserDF.RowModel`: a Pydantic model for a single row

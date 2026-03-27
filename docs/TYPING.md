@@ -82,6 +82,25 @@ Inference is intentionally conservative: it refines return types when arguments 
 
 When the plugin can’t infer safely, it falls back to the original model type (and you can still use `as_model(...)`).
 
+### 1.2.0 column types (Literal, IP, WKB, `Annotated[str, ...]`)
+
+These scalars are ordinary fields on your `DataFrameModel` subclass: the plugin still
+matches transform outputs by **field name** and **static field type** from the class
+body (`Literal[...]`, `ipaddress` classes, `WKB`, and plain or `Annotated` strings show
+up in mypy’s analysis like `int` / `str`).
+
+Pyright users keep the same workflow as other scalars: chained methods are typed as
+`DataFrameModel[Any]` in stubs, so use **`as_model(After)`** / **`try_as_model`** /
+**`assert_model`** when you need an explicit **`After`** type after `select` /
+`with_columns` / `rename`.
+
+Contract coverage lives in:
+
+- `tests/test_extended_scalar_dtypes_v12.py` (runtime + schema helpers)
+- `tests/test_typing_engine_parity.py` (Rust plan descriptors vs runtime `schema_fields`)
+- `tests/test_mypy_dataframe_model_return_types.py` (`test_mypy_accepts_literal_ip_wkb_...`)
+- `tests/test_pyright_dataframe_model_return_types.py` (`test_pyright_accepts_literal_ip_wkb_...`)
+
 ## Stubs and drift prevention
 
 PydanTable ships `py.typed` and `.pyi` stubs for the public surface. In the repo:
