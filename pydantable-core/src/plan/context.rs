@@ -56,27 +56,27 @@ pub fn root_data_to_ctx(
                 let lit = match expected {
                     DTypeDesc::Scalar {
                         base: Some(BaseType::Int),
-                        
+                        ..
                     } => LiteralValue::Int(item.extract::<i64>()?),
                     DTypeDesc::Scalar {
                         base: Some(BaseType::Float),
-                        
+                        ..
                     } => LiteralValue::Float(item.extract::<f64>()?),
                     DTypeDesc::Scalar {
                         base: Some(BaseType::Bool),
-                        
+                        ..
                     } => LiteralValue::Bool(item.extract::<bool>()?),
                     DTypeDesc::Scalar {
                         base: Some(BaseType::Str),
-                        
+                        ..
                     } => LiteralValue::Str(item.extract::<String>()?),
                     DTypeDesc::Scalar {
                         base: Some(BaseType::Enum),
-                        
+                        ..
                     } => LiteralValue::EnumStr(py_enum_to_wire_string(&item)?),
                     DTypeDesc::Scalar {
                         base: Some(BaseType::Uuid),
-                        
+                        ..
                     } => {
                         let s = if let Ok(s) = item.extract::<String>() {
                             s
@@ -86,12 +86,23 @@ pub fn root_data_to_ctx(
                         LiteralValue::Uuid(s)
                     }
                     DTypeDesc::Scalar {
+                        base: Some(BaseType::Ipv4 | BaseType::Ipv6),
+                        ..
+                    } => {
+                        let s = if let Ok(s) = item.extract::<String>() {
+                            s
+                        } else {
+                            item.str()?.extract()?
+                        };
+                        LiteralValue::Str(s)
+                    }
+                    DTypeDesc::Scalar {
                         base: Some(BaseType::Decimal),
-                        
+                        ..
                     } => LiteralValue::Decimal(py_decimal_to_scaled_i128(&item)?),
                     DTypeDesc::Scalar {
                         base: Some(BaseType::DateTime),
-                        
+                        ..
                     } => {
                         let dt = item.downcast::<PyDateTime>()?;
                         let secs: f64 = dt.call_method0("timestamp")?.extract()?;
@@ -99,7 +110,7 @@ pub fn root_data_to_ctx(
                     }
                     DTypeDesc::Scalar {
                         base: Some(BaseType::Date),
-                        
+                        ..
                     } => {
                         let d = item.downcast::<PyDate>()?;
                         let ordinal: i32 = d.call_method0("toordinal")?.extract()?;
@@ -107,7 +118,7 @@ pub fn root_data_to_ctx(
                     }
                     DTypeDesc::Scalar {
                         base: Some(BaseType::Duration),
-                        
+                        ..
                     } => {
                         let td = item.downcast::<PyDelta>()?;
                         let secs: f64 = td.call_method0("total_seconds")?.extract()?;
@@ -115,7 +126,7 @@ pub fn root_data_to_ctx(
                     }
                     DTypeDesc::Scalar {
                         base: Some(BaseType::Time),
-                        
+                        ..
                     } => {
                         let t = item.downcast::<PyTime>()?;
                         let h: i64 = t.getattr("hour")?.extract()?;
@@ -126,8 +137,8 @@ pub fn root_data_to_ctx(
                         LiteralValue::TimeNanos(nanos)
                     }
                     DTypeDesc::Scalar {
-                        base: Some(BaseType::Binary),
-                        
+                        base: Some(BaseType::Binary | BaseType::Wkb),
+                        ..
                     } => {
                         let b = item.downcast::<PyBytes>()?;
                         LiteralValue::Binary(b.as_bytes().to_vec())

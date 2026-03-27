@@ -6,7 +6,9 @@ use std::collections::HashSet;
 
 use pyo3::prelude::*;
 
-use crate::dtype::{dtype_structural_eq, widen_scalar_drop_literals, BaseType, DTypeDesc, LiteralSet};
+use crate::dtype::{
+    dtype_structural_eq, widen_scalar_drop_literals, BaseType, DTypeDesc, LiteralSet,
+};
 
 use super::ir::{
     ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart,
@@ -47,10 +49,7 @@ fn validate_literal_membership_compare(
     for (col_side, lit_side) in [(left, right), (right, left)] {
         if let ExprNode::ColumnRef { dtype, .. } = col_side {
             if let Some(ls) = dtype.literals() {
-                if let ExprNode::Literal {
-                    value: Some(v), ..
-                } = lit_side
-                {
+                if let ExprNode::Literal { value: Some(v), .. } = lit_side {
                     if !literal_set_contains(ls, v) {
                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                             "Comparison literal is not in the column typing.Literal[...] value set.",
@@ -672,11 +671,8 @@ impl ExprNode {
     }
 
     pub fn make_binary_op(op: ArithOp, left: ExprNode, right: ExprNode) -> PyResult<Self> {
-        let dtype = widen_scalar_drop_literals(Self::infer_arith_dtype(
-            op,
-            left.dtype(),
-            right.dtype(),
-        )?);
+        let dtype =
+            widen_scalar_drop_literals(Self::infer_arith_dtype(op, left.dtype(), right.dtype())?);
         Ok(ExprNode::BinaryOp {
             op,
             left: Box::new(left),
@@ -2426,7 +2422,10 @@ impl ExprNode {
                                             };
                                             ab == bb
                                         }
-                                        BaseType::Str | BaseType::Enum => {
+                                        BaseType::Str
+                                        | BaseType::Enum
+                                        | BaseType::Ipv4
+                                        | BaseType::Ipv6 => {
                                             let as_ = match &va {
                                                 LiteralValue::Str(s) | LiteralValue::EnumStr(s) => {
                                                     s.as_str()
@@ -2446,8 +2445,8 @@ impl ExprNode {
                                                 }
                                                 _ => {
                                                     return Err(PyErr::new::<
-                                                            pyo3::exceptions::PyTypeError,
-                                                            _,
+                                                        pyo3::exceptions::PyTypeError,
+                                                        _,
                                                         >(
                                                             "Typed equality expected str-like operands.",
                                                         ));
@@ -2561,7 +2560,7 @@ impl ExprNode {
                                                 ));
                                             }
                                         },
-                                        BaseType::Binary => match (va, vb) {
+                                        BaseType::Binary | BaseType::Wkb => match (va, vb) {
                                             (LiteralValue::Binary(a), LiteralValue::Binary(b)) => {
                                                 a == b
                                             }
@@ -2616,7 +2615,10 @@ impl ExprNode {
                                                 CmpOp::Eq | CmpOp::Ne => unreachable!(),
                                             }
                                         }
-                                        BaseType::Str | BaseType::Enum => {
+                                        BaseType::Str
+                                        | BaseType::Enum
+                                        | BaseType::Ipv4
+                                        | BaseType::Ipv6 => {
                                             let as_ = match &va {
                                                 LiteralValue::Str(s) | LiteralValue::EnumStr(s) => {
                                                     s.as_str()
@@ -2804,7 +2806,7 @@ impl ExprNode {
                                                 _ => false,
                                             }
                                         }
-                                        BaseType::Binary => {
+                                        BaseType::Binary | BaseType::Wkb => {
                                             let (a, b) = match (va, vb) {
                                                 (
                                                     LiteralValue::Binary(a),
@@ -3643,6 +3645,18 @@ fn cast_literal_value(v: LiteralValue, target: BaseType) -> PyResult<LiteralValu
             LiteralValue::Binary(b) => Ok(LiteralValue::Binary(b)),
             _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "cast() to binary supports bytes literal only.",
+            )),
+        },
+        BaseType::Ipv4 | BaseType::Ipv6 => match v {
+            LiteralValue::Str(s) => Ok(LiteralValue::Str(s)),
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() to ip address supports str literal only.",
+            )),
+        },
+        BaseType::Wkb => match v {
+            LiteralValue::Binary(b) => Ok(LiteralValue::Binary(b)),
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "cast() to WKB supports bytes literal only.",
             )),
         },
         BaseType::Duration => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(

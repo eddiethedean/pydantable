@@ -6,8 +6,6 @@ import ipaddress
 from typing import Annotated, Literal
 
 import pytest
-from pydantic import Field, HttpUrl, TypeAdapter, ValidationError
-
 from pydantable import DataFrameModel
 from pydantable.schema import (
     descriptor_matches_column_annotation,
@@ -15,6 +13,7 @@ from pydantable.schema import (
     is_supported_column_annotation,
 )
 from pydantable.types import WKB
+from pydantic import Field, HttpUrl, TypeAdapter, ValidationError
 
 
 def test_is_supported_literal_ip_wkb() -> None:

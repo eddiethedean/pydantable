@@ -153,7 +153,7 @@ def test_pyright_accepts_literal_ip_wkb_annotated_model_and_as_model(
 
     def reshaped(df: Before) -> After:
         out = df.rename({"addr": "ip"}).drop("link")
-        # Chained methods are typed as DataFrameModel[Any] in stubs; use `df` for Expr refs.
+        # Stubs type chained methods as DataFrameModel[Any]; use `df` for Expr refs.
         step = out.with_columns(dup_mode=df.mode).select("mode", "ip", "g", "dup_mode")
         return step.as_model(After)
     """

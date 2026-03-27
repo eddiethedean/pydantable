@@ -555,8 +555,7 @@ pub(crate) fn series_to_py_list(
                     AnyValue::Null => py.None(),
                     AnyValue::Binary(b) => ctor.call1((PyBytes::new(py, b),))?.into_py(py),
                     AnyValue::BinaryOwned(b) => {
-                        ctor.call1((PyBytes::new(py, b.as_slice()),))?
-                            .into_py(py)
+                        ctor.call1((PyBytes::new(py, b.as_slice()),))?.into_py(py)
                     }
                     _ => {
                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(

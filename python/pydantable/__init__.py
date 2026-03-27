@@ -36,6 +36,7 @@ from .schema import DtypeDriftWarning, Schema
 from .types import WKB
 
 __all__ = [
+    "WKB",
     "DataFrame",
     "DataFrameModel",
     "DtypeDriftWarning",
@@ -61,6 +62,5 @@ __all__ = [
     "reset_display_options",
     "set_display_options",
     "set_observer",
-    "WKB",
 ]
 __version__ = "1.2.0"

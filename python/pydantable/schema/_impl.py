@@ -104,7 +104,7 @@ def _is_literal_origin(origin: Any) -> bool:
     if origin is Literal:
         return True
     try:
-        import typing_extensions as te  # noqa: PLC0415
+        import typing_extensions as te
 
         return origin is te.Literal
     except ImportError:
@@ -1113,7 +1113,7 @@ def dtype_descriptor_to_annotation(descriptor: Mapping[str, Any]) -> Any:
     nullable = bool(descriptor.get("nullable", False))
     lit_list = descriptor.get("literals")
 
-    from pydantable.types import WKB as WKBType  # noqa: PLC0415
+    from pydantable.types import WKB as WKBType
 
     base_map: dict[str, Any] = {
         "int": int,
@@ -1139,12 +1139,13 @@ def dtype_descriptor_to_annotation(descriptor: Mapping[str, Any]) -> Any:
     if lit_list is not None:
         if base not in ("str", "int", "bool"):
             raise TypeError(
-                f"Invalid descriptor: literals= only valid for str/int/bool base, got {base!r}"
+                "Invalid descriptor: literals= only valid for str/int/bool base, "
+                f"got {base!r}"
             )
         if not isinstance(lit_list, (list, tuple)):
             raise TypeError(f"Invalid literals list in descriptor: {descriptor!r}")
         vals = tuple(lit_list)
-        lit_ann = cast(Any, Literal.__getitem__(vals))
+        lit_ann = cast("Any", Literal.__getitem__(vals))
         if nullable:
             return lit_ann | None
         return lit_ann

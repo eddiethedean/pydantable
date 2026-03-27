@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
 
 
@@ -16,9 +15,7 @@ class WKB(bytes):
     """
 
     @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source_type: Any, handler: GetCoreSchemaHandler
-    ) -> CoreSchema:
+    def __get_pydantic_core_schema__(cls, source_type: Any, handler: Any) -> CoreSchema:
         def coerce(v: object) -> WKB:
             if isinstance(v, WKB):
                 return v

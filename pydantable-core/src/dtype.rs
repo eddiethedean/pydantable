@@ -156,11 +156,7 @@ impl DTypeDesc {
     /// After assigning `Literal(None)` to a typed column, the column is nullable.
     pub fn with_assigned_none_nullability(self) -> Self {
         match self {
-            DTypeDesc::Scalar {
-                base,
-                literals,
-                ..
-            } => DTypeDesc::Scalar {
+            DTypeDesc::Scalar { base, literals, .. } => DTypeDesc::Scalar {
                 base,
                 nullable: true,
                 literals,
@@ -295,10 +291,7 @@ fn is_wkb_type(py_type: &Bound<'_, PyType>) -> PyResult<bool> {
     Ok(module == "pydantable.types" && is_py_type(py_type, "WKB"))
 }
 
-fn py_literal_values_to_dtype(
-    py: Python<'_>,
-    tuple: &Bound<'_, PyTuple>,
-) -> PyResult<DTypeDesc> {
+fn py_literal_values_to_dtype(py: Python<'_>, tuple: &Bound<'_, PyTuple>) -> PyResult<DTypeDesc> {
     use std::collections::BTreeSet;
     let mut strings: BTreeSet<String> = BTreeSet::new();
     let mut ints: BTreeSet<i64> = BTreeSet::new();
@@ -336,7 +329,8 @@ fn py_literal_values_to_dtype(
         ));
     }
 
-    let n_kinds = (!strings.is_empty() as u8) + (!ints.is_empty() as u8) + (!bools.is_empty() as u8);
+    let n_kinds =
+        (!strings.is_empty() as u8) + (!ints.is_empty() as u8) + (!bools.is_empty() as u8);
     if n_kinds != 1 {
         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
             "typing.Literal[...] column dtypes must be all-str, all-int, or all-bool (not mixed).",
@@ -445,11 +439,7 @@ pub fn py_annotation_to_dtype(py: Python<'_>, dtype_obj: &Bound<'_, PyAny>) -> P
     let mut dt = py_annotation_to_dtype_impl(py, &inner)?;
     if opt_union {
         dt = match dt {
-            DTypeDesc::Scalar {
-                base,
-                literals,
-                ..
-            } => DTypeDesc::Scalar {
+            DTypeDesc::Scalar { base, literals, .. } => DTypeDesc::Scalar {
                 base,
                 nullable: true,
                 literals,
@@ -676,15 +666,11 @@ fn py_annotation_to_dtype_impl(
     if seen_none {
         if let Some(inner) = seen_inner {
             return Ok(match inner {
-            DTypeDesc::Scalar {
-                base,
-                literals,
-                ..
-            } => DTypeDesc::Scalar {
-                base,
-                nullable: true,
-                literals,
-            },
+                DTypeDesc::Scalar { base, literals, .. } => DTypeDesc::Scalar {
+                    base,
+                    nullable: true,
+                    literals,
+                },
                 DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
                     fields,
                     nullable: true,
@@ -830,9 +816,7 @@ fn literal_set_to_py_typing_literal(
         }
     };
     let tup_b = tup.bind(py);
-    Ok(literal
-        .call_method1("__getitem__", (tup_b,))?
-        .into_py(py))
+    Ok(literal.call_method1("__getitem__", (tup_b,))?.into_py(py))
 }
 
 fn create_model_for_struct_dtype(
@@ -957,7 +941,10 @@ fn scalar_base_to_py_type(py: Python<'_>, base: BaseType) -> PyResult<PyObject> 
             .import_bound("ipaddress")?
             .getattr("IPv6Address")?
             .into_py(py),
-        BaseType::Wkb => py.import_bound("pydantable.types")?.getattr("WKB")?.into_py(py),
+        BaseType::Wkb => py
+            .import_bound("pydantable.types")?
+            .getattr("WKB")?
+            .into_py(py),
     })
 }
 

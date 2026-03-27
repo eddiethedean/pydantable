@@ -3,7 +3,7 @@ from __future__ import annotations
 import ipaddress
 from typing import Literal
 
-from pydantable import DataFrameModel, WKB
+from pydantable import WKB, DataFrameModel
 from pydantable.typing_engine import (
     infer_schema_descriptors_drop,
     infer_schema_descriptors_rename,
@@ -95,7 +95,5 @@ def test_typing_engine_v12_rename_matches_runtime() -> None:
 def test_typing_engine_v12_with_columns_matches_runtime() -> None:
     df = _v12_sample()
     out = df.with_columns(two=df.mode)
-    desc = infer_schema_descriptors_with_columns(
-        df.schema_fields(), {"two": df.mode}
-    )
+    desc = infer_schema_descriptors_with_columns(df.schema_fields(), {"two": df.mode})
     assert set(desc) == set(out.schema_fields())

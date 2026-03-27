@@ -290,19 +290,19 @@ fn dtype_desc_to_polars_data_type(d: &DTypeDesc) -> PyResult<DataType> {
     match d {
         DTypeDesc::Scalar {
             base: Some(BaseType::Int),
-        ..
+            ..
         } => Ok(DataType::Int64),
         DTypeDesc::Scalar {
             base: Some(BaseType::Float),
-        ..
+            ..
         } => Ok(DataType::Float64),
         DTypeDesc::Scalar {
             base: Some(BaseType::Bool),
-        ..
+            ..
         } => Ok(DataType::Boolean),
         DTypeDesc::Scalar {
             base: Some(BaseType::Str | BaseType::Enum),
-        ..
+            ..
         } => Ok(DataType::String),
         DTypeDesc::Scalar {
             base: Some(BaseType::Uuid),
@@ -318,19 +318,19 @@ fn dtype_desc_to_polars_data_type(d: &DTypeDesc) -> PyResult<DataType> {
         } => Ok(DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE)),
         DTypeDesc::Scalar {
             base: Some(BaseType::DateTime),
-        ..
+            ..
         } => Ok(DataType::Datetime(TimeUnit::Microseconds, None)),
         DTypeDesc::Scalar {
             base: Some(BaseType::Date),
-        ..
+            ..
         } => Ok(DataType::Date),
         DTypeDesc::Scalar {
             base: Some(BaseType::Duration),
-        ..
+            ..
         } => Ok(DataType::Duration(TimeUnit::Microseconds)),
         DTypeDesc::Scalar {
             base: Some(BaseType::Time),
-        ..
+            ..
         } => Ok(DataType::Time),
         DTypeDesc::Scalar {
             base: Some(BaseType::Binary | BaseType::Wkb),
@@ -377,7 +377,7 @@ fn py_list_to_series(
     match dtype {
         DTypeDesc::Scalar {
             base: Some(BaseType::Int),
-        ..
+            ..
         } => {
             let mut v: Vec<Option<i64>> = Vec::with_capacity(list.len());
             for item in list.iter() {
@@ -392,7 +392,7 @@ fn py_list_to_series(
         }
         DTypeDesc::Scalar {
             base: Some(BaseType::Float),
-        ..
+            ..
         } => {
             let mut v: Vec<Option<f64>> = Vec::with_capacity(list.len());
             for item in list.iter() {
@@ -407,7 +407,7 @@ fn py_list_to_series(
         }
         DTypeDesc::Scalar {
             base: Some(BaseType::Bool),
-        ..
+            ..
         } => {
             let mut v: Vec<Option<bool>> = Vec::with_capacity(list.len());
             for item in list.iter() {
@@ -422,7 +422,7 @@ fn py_list_to_series(
         }
         DTypeDesc::Scalar {
             base: Some(BaseType::Str),
-        ..
+            ..
         } => {
             let mut v: Vec<Option<String>> = Vec::with_capacity(list.len());
             for item in list.iter() {
@@ -437,7 +437,7 @@ fn py_list_to_series(
         }
         DTypeDesc::Scalar {
             base: Some(BaseType::Enum),
-        ..
+            ..
         } => {
             let mut v: Vec<Option<String>> = Vec::with_capacity(list.len());
             for item in list.iter() {
@@ -516,7 +516,7 @@ fn py_list_to_series(
         }
         DTypeDesc::Scalar {
             base: Some(BaseType::DateTime),
-        ..
+            ..
         } => {
             let mut v: Vec<Option<i64>> = Vec::with_capacity(list.len());
             for item in list.iter() {
@@ -536,7 +536,7 @@ fn py_list_to_series(
         }
         DTypeDesc::Scalar {
             base: Some(BaseType::Date),
-        ..
+            ..
         } => {
             let mut v: Vec<Option<i32>> = Vec::with_capacity(list.len());
             for item in list.iter() {
@@ -551,7 +551,7 @@ fn py_list_to_series(
         }
         DTypeDesc::Scalar {
             base: Some(BaseType::Duration),
-        ..
+            ..
         } => {
             let mut v: Vec<Option<i64>> = Vec::with_capacity(list.len());
             for item in list.iter() {
@@ -568,7 +568,7 @@ fn py_list_to_series(
         }
         DTypeDesc::Scalar {
             base: Some(BaseType::Time),
-        ..
+            ..
         } => {
             let mut v: Vec<Option<i64>> = Vec::with_capacity(list.len());
             for item in list.iter() {

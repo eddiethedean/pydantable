@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format is inspired 
 
 <!-- Add notes here for the next 1.x release. -->
 
+## [1.2.0] — 2026-03-28
+
+### Added
+
+- **Column types (see {doc}`SUPPORTED_TYPES`):**
+  - **`typing.Literal[...]`** — homogeneous **`str`**, **`int`**, or **`bool`** members only; dtype descriptors include an optional **`literals`** list; invalid **`filter(col == ...)`** constants are rejected when the expression is built.
+  - **`ipaddress.IPv4Address`** / **`IPv6Address`** — Polars **Utf8**, canonical string form; string cells coerce on ingest.
+  - **`pydantable.types.WKB`** — **`bytes`** subclass for Well-Known Binary geometry; Polars **Binary** (same **`Expr`** surface as **`bytes`** where applicable).
+  - **`Annotated[str, ...]`** — logical **`str`** in the Rust plan; Pydantic applies metadata on **`collect()`** / **`RowModel`**.
+- **Tests:** `tests/test_extended_scalar_dtypes_v12.py`, typing-engine parity for these scalars, mypy/pyright **DataFrameModel** chain snippets.
+- **Docs:** practical notes for **`Expr`** comparisons (IP/WKB operands), {doc}`TYPING` (1.2 scalars), {doc}`DATAFRAMEMODEL` field list.
+
+### Fixed
+
+- **`cargo check -p pydantable-core --no-default-features`:** exhaustive **`DTypeDesc::Scalar`** matches and row-wise **`CompareOp`** / **`cast_literal_value`** coverage for **IPv4** / **IPv6** / **WKB** when **`polars_engine`** is off.
+- **CI:** **SBOM** jobs pin **`cargo-cyclonedx` 0.5.8** (**`--locked`**) so installing the tool does not require Rust **1.85+** (see {doc}`DEVELOPER`).
+
+### Typing / lint
+
+- **`__all__`** and Ruff-driven cleanups on **`schema`**, **`types`**, and tests.
+
 ## [1.1.0] — 2026-03-27
 
 ### Added
