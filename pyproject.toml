@@ -71,6 +71,9 @@ docs = [
     "sphinx-autodoc-typehints",
     "sphinx-copybutton",
     "sphinx-rtd-theme",
+    # Optional at runtime, but required for Sphinx + sphinx-autodoc-typehints to resolve
+    # SQLAlchemy forward refs on DataFrameModel I/O methods (matches CI docs job and RTD).
+    "sqlalchemy>=2.0,<3",
 ]
 
 [tool.maturin]
