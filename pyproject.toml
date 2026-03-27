@@ -225,6 +225,8 @@ markers = [
 [tool.coverage.run]
 branch = true
 source = ["python/pydantable"]
+# Loaded by mypy only; pytest never exercises it meaningfully but it dominates stmt count.
+omit = ["**/mypy_plugin.py"]
 
 [tool.coverage.report]
 exclude_lines = [
