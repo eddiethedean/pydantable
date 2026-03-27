@@ -256,13 +256,18 @@ class DataFrameModel:
         ``ignore_errors=True``, invalid rows are skipped and details can be
         observed via ``on_validation_errors``.
 
-        Row sequences are validated **per row** with :meth:`RowModel.model_validate`
-        (including when you set ``trusted_mode='shape_only'`` on the dataframe—
-        that flag currently applies to the inner column pass, not this row step).
-        For default ``trusted_mode`` (``off`` / omitted), the inner
-        :class:`~pydantable.dataframe.DataFrame` is opened in
-        ``trusted_mode='shape_only'`` so cell values are not validated twice.
-        Columnar mappings use the ``trusted_mode`` you pass unchanged.
+        **Row sequences** are always normalized with :meth:`RowModel.model_validate`
+        per row **before** building the inner :class:`~pydantable.dataframe.DataFrame`.
+        ``trusted_mode`` does **not** bypass that step: ``trusted_mode='shape_only'``
+        still validates each row fully; the flag applies only to the subsequent
+        columnar pass (same as column-only input). Use columnar
+        ``{name: list}`` input if you need ``shape_only`` / ``strict`` on bulk
+        data without per-row Pydantic validation.
+
+        For default ``trusted_mode`` (``off`` / omitted) with row input, the inner
+        dataframe uses ``trusted_mode='shape_only'`` so cell values are not
+        validated twice after rows are normalized. Columnar mappings use the
+        ``trusted_mode`` you pass unchanged.
         """
         row_model = (
             self._RowModel_fill_missing_optional

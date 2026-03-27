@@ -50,6 +50,24 @@ def test_dataframe_model_row_input_happy_path():
     assert df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
 
 
+def test_dataframe_model_row_input_trusted_shape_only_still_row_validates() -> None:
+    """trusted_mode does not skip RowModel validation for list-of-rows input."""
+    with pytest.raises(ValidationError):
+        UserDF(
+            [{"id": 1, "age": "not-an-int"}],
+            trusted_mode="shape_only",
+        )
+
+
+def test_dataframe_model_row_list_shape_only_collects_like_default_rows() -> None:
+    """Row validation runs first; shape_only then applies to the inner column pass."""
+    row_df = UserDF(
+        [{"id": 1, "age": 20}, {"id": 2, "age": None}],
+        trusted_mode="shape_only",
+    )
+    assert row_df.collect(as_lists=True) == {"id": [1, 2], "age": [20, None]}
+
+
 def test_dataframe_model_missing_optional_field_is_filled_columnar() -> None:
     df = _OptionalFieldDF({"id": [1, 2]})
     assert df.collect(as_lists=True) == {"id": [1, 2], "note": [None, None]}

@@ -16,8 +16,8 @@ This matches the common SQL rule that **offset** bounds in `RANGE` apply to the 
 
 Use **`Window.partitionBy(...).orderBy(..., nulls_last=...)`** (bool or per-column list, same length as sort columns). Default **`nulls_last=False`** matches prior pydantable behavior: **nulls sort before non-nulls** for an ascending key.
 
-- **Framed** windows (**`rowsBetween`** / **`rangeBetween`**) use the full per-key **`nulls_last`** flags in the Rust partition sort.
-- **Unframed** Polars **`.over(...)`** lowering passes **only the first** `orderBy` column’s **`nulls_last`** into Polars **`SortOptions`**; additional keys still participate in sort order, but their null placement flags are **not** forwarded separately—avoid relying on mixed per-key null placement for unframed multi-key windows unless you validate against your version.
+- **Framed** windows (**`rowsBetween`** / **`rangeBetween`**) use the full per-key **`nulls_last`** (and **`ascending`**) flags in the Rust partition sort.
+- **Unframed** Polars **`.over(...)`** lowering uses **one** Polars **`SortOptions`** for the whole multi-column order. If **`orderBy`** keys specify **different** **`ascending`** or **`nulls_last`** values, pydantable raises **`ValueError`** instead of running with incorrect semantics; use matching options on every key or switch to a framed window.
 
 Dialects still differ on corner cases; pin versions and test for production contracts.
 

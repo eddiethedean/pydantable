@@ -12,6 +12,8 @@ See `docs/DEVELOPER.md` (release ↔ tests map) for a maintainer-facing index.
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
 from io import BytesIO
 
 import pytest
@@ -93,6 +95,36 @@ def test_testclient_async_acollect_and_ato_dict() -> None:
     r2 = client.post("/bulk-async", json={"id": [1, 2], "age": [10, None]})
     assert r2.status_code == 200
     assert r2.json() == {"id": [1, 2], "age": [10, None]}
+
+
+def test_lifespan_thread_pool_executor_acollect() -> None:
+    """Executable check for `docs/FASTAPI.md` lifespan + `acollect(executor=...)`."""
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        executor = ThreadPoolExecutor(
+            max_workers=2,
+            thread_name_prefix="pydantable-test",
+        )
+        app.state.df_executor = executor
+        yield
+        executor.shutdown(wait=True)
+
+    app = FastAPI(lifespan=lifespan)
+
+    @app.post("/users-async-ex", response_model=list[UserRow])
+    async def create_users_async(rows: list[UserDF.RowModel]):
+        df = UserDF(rows)
+        ex = app.state.df_executor
+        return await df.acollect(executor=ex)
+
+    with TestClient(app) as client:
+        r = client.post(
+            "/users-async-ex",
+            json=[{"id": 1, "age": 20}, {"id": 2, "age": None}],
+        )
+    assert r.status_code == 200
+    assert r.json() == [{"id": 1, "age": 20}, {"id": 2, "age": None}]
 
 
 def test_streaming_response_after_ato_dict() -> None:

@@ -133,6 +133,20 @@ fn apply_window_over(
     partition_by: &[String],
     order_by: &[(String, bool, bool)],
 ) -> PyResult<PolarsExpr> {
+    if order_by.len() > 1 {
+        let (asc0, nl0) = (order_by[0].1, order_by[0].2);
+        for (_name, asc, nl) in order_by.iter().skip(1) {
+            if *asc != asc0 || *nl != nl0 {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "unframed multi-column window orderBy must use the same `ascending` and \
+                     `nulls_last` for every sort key (Polars `.over` accepts only one SortOptions \
+                     for all order columns). Use one order key, use matching options on all keys, \
+                     or use a framed window (`rowsBetween` / `rangeBetween`), where per-key null \
+                     placement is honored.",
+                ));
+            }
+        }
+    }
     let part_cols: Vec<PolarsExpr> = partition_by.iter().map(|n| col(n.as_str())).collect();
     let partition_arg = if part_cols.is_empty() {
         None

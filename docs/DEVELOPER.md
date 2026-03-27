@@ -225,7 +225,7 @@ Cross-check each bullet in `docs/changelog.md` for recent minors against tests o
 
 ### Optional follow-ups (non-blocking)
 
-- **`lifespan`** + **`ThreadPoolExecutor`** integration pytest, if we want parity beyond `FASTAPI.md` prose.
+- **`lifespan`** + **`ThreadPoolExecutor`:** covered by **`tests/test_fastapi_recipes.py`** **`test_lifespan_thread_pool_executor_acollect`** (mirrors **`docs/FASTAPI.md`** async lifespan snippet).
 - Split `tests/test_fastapi_recipes.py` by concern (sync vs async vs multipart) only if maintainers want stronger file-level separation; default is section comments in the single module.
 
 ### Run Python tests
@@ -241,7 +241,7 @@ Parallel (uses `pytest-xdist` from the `dev` extra):
 .venv/bin/python -m pytest -q -n auto
 ```
 
-**CI** (`.github/workflows/_shared-ci.yml` **python-tests**): every matrix leg runs **`pytest -q -n auto`** (Linux, Windows, macOS). **Ubuntu + Python 3.11** additionally runs **`--cov=pydantable --cov-report=xml --cov-report=term-missing:skip-covered --cov-fail-under=0`** and uploads **`coverage.xml`** as a workflow artifact (**`coverage-xml-py311-ubuntu`**). There is **no** enforced coverage floor yet.
+**CI** (`.github/workflows/_shared-ci.yml` **python-tests**): every matrix leg runs **`pytest -q -n auto`** (Linux, Windows, macOS). **Ubuntu + Python 3.11** additionally runs **`--cov=pydantable --cov-report=xml --cov-report=term-missing:skip-covered --cov-fail-under=78`** and uploads **`coverage.xml`** as a workflow artifact (**`coverage-xml-py311-ubuntu`**).
 
 **Hypothesis** property tests live in `tests/test_hypothesis_properties.py` (installed via **`[dev]`** / CI pip list). They run under the same `pytest` command; examples use bounded `max_examples` for CI speed.
 

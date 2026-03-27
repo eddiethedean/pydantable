@@ -15,6 +15,7 @@ import enum
 import functools
 import html
 import importlib
+import logging
 import os
 import re
 import statistics
@@ -1167,6 +1168,9 @@ class DataFrame(Generic[SchemaT]):
         try:
             return self._repr_html_impl()
         except Exception as e:  # pragma: no cover - defensive for notebook UX
+            logging.getLogger(__name__).debug(
+                "HTML repr failed; rendering error fallback.", exc_info=True
+            )
             err = html.escape(str(e))
             return (
                 '<div class="pydantable-render pydantable-render--error" '
@@ -1937,8 +1941,9 @@ class DataFrame(Generic[SchemaT]):
         """
         if as_polars is not None:
             warnings.warn(
-                "as_polars is deprecated; use to_polars() for a Polars DataFrame, "
-                "or collect(as_lists=True) / to_dict() for columnar dicts.",
+                "as_polars is deprecated and will be removed in pydantable 2.0.0; "
+                "use to_polars() for a Polars DataFrame, or collect(as_lists=True) "
+                "/ to_dict() for columnar dicts.",
                 DeprecationWarning,
                 stacklevel=2,
             )

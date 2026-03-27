@@ -6,11 +6,11 @@ Used with window functions in :mod:`pydantable.expressions` (e.g. ``row_number``
 Window ``orderBy`` supports per-key **ascending** / **descending** and optional
 **``nulls_last``** (``True`` ≈ **NULLS LAST**, ``False`` ≈ **NULLS FIRST**). The
 default is ``nulls_last=False`` (nulls sort before non-nulls for ascending keys),
-matching previous pydantable framed-window behavior. For Polars ``.over(...)``
-lowering, **only the first** ``orderBy`` column's ``nulls_last`` is passed to
-Polars ``SortOptions``; multi-key **framed** execution (``rowsBetween`` /
-``rangeBetween``) uses the full per-key null placement. See
-``docs/WINDOW_SQL_SEMANTICS.md``.
+matching previous pydantable framed-window behavior. **Unframed** multi-key
+``orderBy`` (no ``rowsBetween`` / ``rangeBetween``) lowers to Polars ``.over``,
+which accepts only **one** ``SortOptions`` for all sort columns: **mixed** per-key
+``ascending`` or ``nulls_last`` raises **``ValueError``**. **Framed** windows use
+the full per-key placement. See ``docs/WINDOW_SQL_SEMANTICS.md``.
 """
 
 from __future__ import annotations

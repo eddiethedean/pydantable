@@ -65,6 +65,12 @@ Major releases are required for breaking changes, including:
 - **Minor:** add `DataFrame.read_foo(...)` with default-off behavior and docs/tests.
 - **Major:** change `collect()` default return shape or remove a long-standing method.
 
+## Planned removals (`2.0.0`)
+
+The following deprecated parameters are scheduled for removal in **`2.0.0`** (a **major** release per the policy above):
+
+- **`as_polars=`** on **`DataFrame.collect`**, **`DataFrame.acollect`**, and the **`DataFrameModel`** collection shims — use **`to_polars()`** / **`ato_polars()`** (and **`collect(as_lists=True)`** / **`to_dict()`** for columnar dicts).
+
 ## Related documentation
 
 - {doc}`INTERFACE_CONTRACT` — guaranteed behavior for the typed API.

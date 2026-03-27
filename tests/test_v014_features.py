@@ -93,9 +93,46 @@ def test_order_by_multi_column_nulls_last_list_runs() -> None:
             "b": [10, 20, 30],
         }
     )
-    w = Window.partitionBy("g").orderBy("a", "b", nulls_last=[True, False])
+    w = Window.partitionBy("g").orderBy("a", "b", nulls_last=[False, False])
     out = df.with_columns(rn=row_number().over(w)).collect(as_lists=True)
     assert sorted(out["rn"]) == [1, 2, 3]
+
+
+def test_order_by_multi_column_mismatched_nulls_last_raises() -> None:
+    """Unframed `.over` cannot mix per-key nulls_last (single Polars SortOptions)."""
+    class WM(Schema):
+        g: int
+        a: int
+        b: int
+
+    df = DataFrame[WM](
+        {
+            "g": [1, 1, 1],
+            "a": [1, 1, 2],
+            "b": [10, 20, 30],
+        }
+    )
+    w = Window.partitionBy("g").orderBy("a", "b", nulls_last=[True, False])
+    with pytest.raises(ValueError, match="unframed multi-column window orderBy"):
+        df.with_columns(rn=row_number().over(w)).collect(as_lists=True)
+
+
+def test_order_by_multi_column_mismatched_ascending_raises() -> None:
+    class WM(Schema):
+        g: int
+        a: int
+        b: int
+
+    df = DataFrame[WM](
+        {
+            "g": [1, 1, 1],
+            "a": [1, 1, 2],
+            "b": [10, 20, 30],
+        }
+    )
+    w = Window.partitionBy("g").orderBy("a", "b", ascending=[True, False])
+    with pytest.raises(ValueError, match="unframed multi-column window orderBy"):
+        df.with_columns(rn=row_number().over(w)).collect(as_lists=True)
 
 
 def test_lag_respects_nulls_last_in_window_order() -> None:
