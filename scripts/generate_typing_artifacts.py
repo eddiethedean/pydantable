@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import argparse
 import ast
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 _STUB_DATAFRAME_MODEL = """\
@@ -178,6 +181,61 @@ def _write_if_changed(path: Path, content: str) -> None:
 def _differs(path: Path, content: str) -> bool:
     existing = path.read_text(encoding="utf-8") if path.exists() else None
     return existing != content
+
+
+def _ruff_format_stub(path: Path, content: str) -> str:
+    """
+    Format generated stub content with Ruff when available.
+
+    This keeps generator output stable with CI's `ruff format --check`.
+    """
+    suffix = path.suffix or ".pyi"
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w+", suffix=suffix, encoding="utf-8", delete=True
+        ) as tmp:
+            tmp.write(content)
+            tmp.flush()
+            check_proc = subprocess.run(
+                [sys.executable, "-m", "ruff", "check", "--fix", tmp.name],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            fmt_proc = subprocess.run(
+                [sys.executable, "-m", "ruff", "format", tmp.name],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            if check_proc.returncode != 0 or fmt_proc.returncode != 0:
+                return content
+            tmp.seek(0)
+            return tmp.read()
+    except OSError:
+        return content
+
+
+def _ruff_normalize_files(paths: list[Path]) -> None:
+    """Best-effort normalize generated stubs with Ruff in-place."""
+    if not paths:
+        return
+    path_args = [str(p) for p in paths]
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "ruff", "check", "--fix", *path_args],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        subprocess.run(
+            [sys.executable, "-m", "ruff", "format", *path_args],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return
 
 
 def _render_init_stub(init_py: Path) -> str:
@@ -502,8 +560,12 @@ def main(argv: list[str] | None = None) -> int:
         (stub_pkg / "pyspark" / "sql" / "column.pyi", pyspark_sql_column_stub),
     ]
 
+    formatted_targets = [(p, _ruff_format_stub(p, c)) for (p, c) in targets]
+
     if args.check:
-        changed = [str(p.relative_to(repo)) for (p, c) in targets if _differs(p, c)]
+        changed = [
+            str(p.relative_to(repo)) for (p, c) in formatted_targets if _differs(p, c)
+        ]
         if changed:
             print("Typing artifacts are out of date. Re-run:")
             print("  python scripts/generate_typing_artifacts.py")
@@ -512,16 +574,22 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  - {p}")
             return 1
     else:
-        for p, c in targets:
+        written_pkg: list[Path] = []
+        for p, c in formatted_targets:
             if str(p).startswith(str(pkg)):
                 _write_if_changed(p, c)
+                written_pkg.append(p)
+        _ruff_normalize_files(written_pkg)
     (pkg / "py.typed").parent.mkdir(parents=True, exist_ok=True)
     (pkg / "py.typed").touch(exist_ok=True)
 
     if not args.check:
-        for p, c in targets:
+        written_typings: list[Path] = []
+        for p, c in formatted_targets:
             if str(p).startswith(str(stub_pkg)):
                 _write_if_changed(p, c)
+                written_typings.append(p)
+        _ruff_normalize_files(written_typings)
     return 0
 
 
