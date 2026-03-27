@@ -108,6 +108,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 python_version = "3.10"
 mypy_path = "python"
 explicit_package_bases = true
+plugins = ["python/pydantable/mypy_plugin.py"]
 
 # Tests use parametrized UI bases and column attrs that are Expr at runtime but
 # look like optional scalars to static analysis; typecheck the package only.
@@ -162,6 +163,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "snowflake.connector"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "snowflake"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

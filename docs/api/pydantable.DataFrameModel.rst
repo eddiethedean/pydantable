@@ -1,9 +1,13 @@
-﻿pydantable.DataFrameModel
+pydantable.DataFrameModel
 =========================
 
 .. currentmodule:: pydantable
 
 .. autoclass:: DataFrameModel
+
+   Transform chains on ``DataFrameModel`` return derived, after-schema model types so
+   typed pipelines can flow into new model contracts without materializing to
+   ``dict[str, list]`` first.
 
    
    .. automethod:: __init__

@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is inspired 
 
 <!-- Add notes here for the next 1.x release. -->
 
+### Added
+
+- `DataFrameModel` transform chains can be typed as explicit after-model return types
+  without calling `to_dict()` / re-materializing between steps.
+- Added mypy regression coverage in `tests/test_mypy_dataframe_model_return_types.py`
+  for no-materialization typed transform returns across `select`, `drop`, `rename`,
+  `with_columns`, `join`, and `group_by(...).agg(...)`.
+
 ## [1.0.0] — 2026-03-26
 
 ### Scope

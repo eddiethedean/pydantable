@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from typing_extensions import Self
+
 from .dataframe import DataFrame as CoreDataFrame
 from .dataframe import GroupedDataFrame as CoreGroupedDataFrame
 from .dataframe_model import DataFrameModel as CoreDataFrameModel
@@ -187,10 +189,10 @@ class PandasDataFrameModel(CoreDataFrameModel):
             "expressions (see pydantable.expressions)."
         )
 
-    def head(self, n: int = 5) -> CoreDataFrameModel:
+    def head(self, n: int = 5) -> Self:
         return type(self)._from_dataframe(self._df.head(n))
 
-    def tail(self, n: int = 5) -> CoreDataFrameModel:
+    def tail(self, n: int = 5) -> Self:
         return type(self)._from_dataframe(self._df.tail(n))
 
     def __getitem__(self, key: str | list[str]) -> Any:

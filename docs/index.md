@@ -11,6 +11,7 @@ This **documentation site** is the detailed manual. The repository **README** on
 - **Services (FastAPI)**: start with {doc}`FASTAPI`, then {doc}`DATAFRAMEMODEL` and {doc}`EXECUTION`.
 - **Data workflows**: start with {doc}`DATAFRAMEMODEL`, then {doc}`IO_DECISION_TREE` and {doc}`IO_OVERVIEW`.
 - **Library/interop**: start with {doc}`INTERFACE_CONTRACT` and {doc}`VERSIONING`, then {doc}`PLAN_AND_PLUGINS`.
+- `DataFrameModel` transform chains can return typed after-schema models directly (no `to_dict()` materialization step).
 
 If you’re not sure where something is documented, use {doc}`DOCS_MAP`.
 

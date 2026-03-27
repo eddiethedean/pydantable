@@ -11,7 +11,7 @@ import html
 import sys
 import typing
 from collections.abc import Callable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast
 
 from typing_extensions import Self
 
@@ -28,7 +28,6 @@ from .schema import (
     _is_polars_dataframe,
     validate_dataframe_model_field_annotations,
 )
-
 
 def _field_defs_from_annotations(
     annotations: Mapping[str, Any],
@@ -155,6 +154,10 @@ def _normalize_input(
         )
 
     raise TypeError("DataFrameModel input must be a column mapping or row sequence.")
+
+
+ModelSelf = TypeVar("ModelSelf", bound="DataFrameModel")
+GroupedModelT = TypeVar("GroupedModelT", bound="DataFrameModel")
 
 
 class DataFrameModel:
@@ -1177,11 +1180,13 @@ class DataFrameModel:
         return cast("type[DataFrameModel]", derived)
 
     @classmethod
-    def _from_dataframe(cls, df: DataFrame[Any]) -> DataFrameModel:
+    def _from_dataframe(
+        cls: type[ModelSelf], df: DataFrame[Any]
+    ) -> ModelSelf:
         derived_type = cls._derived_model_type(df.schema_fields())
         obj = derived_type.__new__(derived_type)
         obj._df = df
-        return obj
+        return cast("ModelSelf", obj)
 
     def schema_fields(self) -> dict[str, Any]:
         return self._df.schema_fields()
@@ -1352,22 +1357,22 @@ class DataFrameModel:
     def with_columns(self, **new_columns: Any) -> DataFrameModel:
         return self._from_dataframe(self._df.with_columns(**new_columns))
 
-    def filter(self, condition: Any) -> DataFrameModel:
+    def filter(self, condition: Any) -> Self:
         return self._from_dataframe(self._df.filter(condition))
 
     def sort(
         self, *by: Any, descending: bool | Sequence[bool] = False
-    ) -> DataFrameModel:
+    ) -> Self:
         return self._from_dataframe(self._df.sort(*by, descending=descending))
 
     def unique(
         self, subset: Sequence[str] | None = None, *, keep: str = "first"
-    ) -> DataFrameModel:
+    ) -> Self:
         return self._from_dataframe(self._df.unique(subset=subset, keep=keep))
 
     def distinct(
         self, subset: Sequence[str] | None = None, *, keep: str = "first"
-    ) -> DataFrameModel:
+    ) -> Self:
         return self._from_dataframe(self._df.distinct(subset=subset, keep=keep))
 
     def drop(self, *columns: Any) -> DataFrameModel:
@@ -1376,13 +1381,13 @@ class DataFrameModel:
     def rename(self, columns: Mapping[str, str]) -> DataFrameModel:
         return self._from_dataframe(self._df.rename(columns))
 
-    def slice(self, offset: int, length: int) -> DataFrameModel:
+    def slice(self, offset: int, length: int) -> Self:
         return self._from_dataframe(self._df.slice(offset, length))
 
-    def head(self, n: int = 5) -> DataFrameModel:
+    def head(self, n: int = 5) -> Self:
         return self._from_dataframe(self._df.head(n))
 
-    def tail(self, n: int = 5) -> DataFrameModel:
+    def tail(self, n: int = 5) -> Self:
         return self._from_dataframe(self._df.tail(n))
 
     def fill_null(
@@ -1479,7 +1484,7 @@ class DataFrameModel:
             )
         )
 
-    def group_by(self, *keys: Any) -> GroupedDataFrameModel:
+    def group_by(self: ModelSelf, *keys: Any) -> GroupedDataFrameModel[ModelSelf]:
         return GroupedDataFrameModel(self._df.group_by(*keys), self.__class__)
 
     def rolling_agg(
@@ -1512,10 +1517,11 @@ class DataFrameModel:
         every: str,
         period: str | None = None,
         by: Sequence[str] | None = None,
-    ) -> DynamicGroupedDataFrameModel:
+    ) -> DynamicGroupedDataFrameModel[ModelSelf]:
+        model_type = cast("type[ModelSelf]", self.__class__)
         return DynamicGroupedDataFrameModel(
             self._df.group_by_dynamic(index_column, every=every, period=period, by=by),
-            self.__class__,
+            model_type,
         )
 
     def __getattr__(self, item: str) -> Any:
@@ -1544,10 +1550,10 @@ class DataFrameModel:
         return cls._from_dataframe(DataFrame.concat([df._df for df in dfs], how=how))
 
 
-class GroupedDataFrameModel:
+class GroupedDataFrameModel(Generic[GroupedModelT]):
     """Result of ``DataFrameModel.group_by``; use :meth:`agg` to produce a new model."""
 
-    def __init__(self, grouped_df: Any, model_type: type[DataFrameModel]) -> None:
+    def __init__(self, grouped_df: Any, model_type: type[GroupedModelT]) -> None:
         self._grouped_df = grouped_df
         self._model_type = model_type
 
@@ -1573,10 +1579,10 @@ class GroupedDataFrameModel:
         return self._model_type._from_dataframe(self._grouped_df.agg(**aggregations))
 
 
-class DynamicGroupedDataFrameModel:
+class DynamicGroupedDataFrameModel(Generic[GroupedModelT]):
     """Time-based ``group_by_dynamic`` grouping; call :meth:`agg` to finalize."""
 
-    def __init__(self, grouped_df: Any, model_type: type[DataFrameModel]) -> None:
+    def __init__(self, grouped_df: Any, model_type: type[GroupedModelT]) -> None:
         self._grouped_df = grouped_df
         self._model_type = model_type
 

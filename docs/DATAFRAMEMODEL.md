@@ -216,6 +216,21 @@ This enables strong typing all the way into FastAPI responses:
 - `UserDF` -> `UserDF_WithColumns` (derived schema)
 - `UserDF_WithColumns` -> `UserDF_SelectProjection` (derived schema)
 
+No intermediate materialization is required for this typing flow:
+
+```python
+class Before(DataFrameModel):
+    id: int
+    age: int
+
+class After(DataFrameModel):
+    id: int
+    age2: int
+
+def pipeline(df: Before) -> After:
+    return df.with_columns(age2=df.age * 2).select("id", "age2")
+```
+
 ## Collision handling (replacement semantics)
 
 For `with_columns(...)`, column name collisions must use **replacement** semantics:
