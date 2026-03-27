@@ -120,3 +120,42 @@ def test_pyright_sees_facade_modules(tmp_path: Path) -> None:
     """
     proc = _run_pyright_snippet(tmp_path, code)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
+def test_pyright_accepts_literal_ip_wkb_annotated_model_and_as_model(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("pyright")
+    code = """
+    from __future__ import annotations
+
+    import ipaddress
+    from typing import Annotated, Literal
+
+    from pydantic import HttpUrl
+
+    from pydantable import DataFrameModel, WKB
+
+    class Before(DataFrameModel):
+        mode: Literal["dev", "prod"]
+        addr: ipaddress.IPv4Address
+        g: WKB
+        link: Annotated[str, HttpUrl]
+
+    class After(DataFrameModel):
+        mode: Literal["dev", "prod"]
+        ip: ipaddress.IPv4Address
+        g: WKB
+        dup_mode: Literal["dev", "prod"]
+
+    def narrowed(df: Before) -> Before:
+        return df.filter(df.mode == "dev")
+
+    def reshaped(df: Before) -> After:
+        out = df.rename({"addr": "ip"}).drop("link")
+        # Chained methods are typed as DataFrameModel[Any] in stubs; use `df` for Expr refs.
+        step = out.with_columns(dup_mode=df.mode).select("mode", "ip", "g", "dup_mode")
+        return step.as_model(After)
+    """
+    proc = _run_pyright_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)

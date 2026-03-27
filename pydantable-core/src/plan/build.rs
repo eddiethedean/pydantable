@@ -367,6 +367,7 @@ pub fn plan_fill_null(
                     DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
                         base,
                         nullable: false,
+                        literals: None,
                     },
                     DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
                         fields,

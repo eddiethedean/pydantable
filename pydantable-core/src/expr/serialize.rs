@@ -24,6 +24,9 @@ fn base_type_json(b: BaseType) -> &'static str {
         BaseType::Duration => "duration",
         BaseType::Time => "time",
         BaseType::Binary => "binary",
+        BaseType::Ipv4 => "ipv4",
+        BaseType::Ipv6 => "ipv6",
+        BaseType::Wkb => "wkb",
     }
 }
 

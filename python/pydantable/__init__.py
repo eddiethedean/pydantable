@@ -33,6 +33,7 @@ from .io import (
 )
 from .observe import get_observer, set_observer
 from .schema import DtypeDriftWarning, Schema
+from .types import WKB
 
 __all__ = [
     "DataFrame",
@@ -60,5 +61,6 @@ __all__ = [
     "reset_display_options",
     "set_display_options",
     "set_observer",
+    "WKB",
 ]
-__version__ = "1.1.0"
+__version__ = "1.2.0"

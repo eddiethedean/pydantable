@@ -23,10 +23,12 @@ from .io import (
 )
 from .observe import get_observer, set_observer
 from .schema import DtypeDriftWarning, Schema
+from .types import WKB
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 __all__ = [
+    "WKB",
     "DataFrame",
     "DataFrameModel",
     "DtypeDriftWarning",

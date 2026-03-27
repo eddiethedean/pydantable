@@ -56,6 +56,17 @@ impl ExprHandle {
                 LiteralValue::Uuid(s)
             }
             crate::dtype::DTypeDesc::Scalar {
+                base: Some(BaseType::Ipv4 | BaseType::Ipv6),
+                ..
+            } => {
+                let s = if let Ok(s) = value.extract::<String>() {
+                    s
+                } else {
+                    value.str()?.extract()?
+                };
+                LiteralValue::Str(s)
+            }
+            crate::dtype::DTypeDesc::Scalar {
                 base: Some(BaseType::Decimal),
                 ..
             } => LiteralValue::Decimal(py_decimal_to_scaled_i128(value)?),
@@ -96,7 +107,7 @@ impl ExprHandle {
                 LiteralValue::TimeNanos(ns)
             }
             crate::dtype::DTypeDesc::Scalar {
-                base: Some(BaseType::Binary),
+                base: Some(BaseType::Binary | BaseType::Wkb),
                 ..
             } => {
                 let b = value.downcast::<PyBytes>()?;

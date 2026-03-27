@@ -7,6 +7,7 @@ Functions such as :func:`is_supported_column_annotation` define allowed field ty
 from __future__ import annotations
 
 import enum
+import ipaddress
 import os
 import types
 import uuid
@@ -73,8 +74,57 @@ def _warn_shape_only_would_fail_strict(name: str, annotation: Any) -> None:
 
 
 _SUPPORTED_NON_NULL_SCALAR_TYPES = frozenset(
-    {int, float, bool, str, bytes, uuid.UUID, Decimal, datetime, date, time, timedelta}
+    {
+        int,
+        float,
+        bool,
+        str,
+        bytes,
+        uuid.UUID,
+        Decimal,
+        datetime,
+        date,
+        time,
+        timedelta,
+        ipaddress.IPv4Address,
+        ipaddress.IPv6Address,
+    }
 )
+
+
+def _is_wkb_type(tp: Any) -> bool:
+    return (
+        isinstance(tp, type)
+        and tp.__name__ == "WKB"
+        and getattr(tp, "__module__", "") == "pydantable.types"
+    )
+
+
+def _is_literal_origin(origin: Any) -> bool:
+    if origin is Literal:
+        return True
+    try:
+        import typing_extensions as te  # noqa: PLC0415
+
+        return origin is te.Literal
+    except ImportError:
+        return False
+
+
+def _check_literal_column_args(args: tuple[Any, ...]) -> bool:
+    if not args:
+        return False
+    kinds: set[str] = set()
+    for a in args:
+        if isinstance(a, str):
+            kinds.add("str")
+        elif isinstance(a, bool):
+            kinds.add("bool")
+        elif isinstance(a, int) and not isinstance(a, bool):
+            kinds.add("int")
+        else:
+            return False
+    return len(kinds) == 1
 
 
 def _unwrap_annotated(annotation: Any) -> Any:
@@ -90,6 +140,8 @@ def _unwrap_annotated(annotation: Any) -> Any:
 def _is_supported_non_null_scalar_type(tp: Any) -> bool:
     """True if ``tp`` is one allowed non-null scalar or enum (before ``| None``)."""
     if tp in _SUPPORTED_NON_NULL_SCALAR_TYPES:
+        return True
+    if _is_wkb_type(tp):
         return True
     return isinstance(tp, type) and issubclass(tp, enum.Enum) and tp is not enum.Enum
 
@@ -110,10 +162,14 @@ def is_supported_scalar_column_annotation(annotation: Any) -> bool:
             return False
         inner = args[0]
         inner = _unwrap_annotated(inner)
-        if get_origin(inner) is not None:
+        if get_origin(inner) is not None and not _is_literal_origin(get_origin(inner)):
             return False
+        if get_origin(inner) is not None and _is_literal_origin(get_origin(inner)):
+            return _check_literal_column_args(get_args(inner))
         return _is_supported_non_null_scalar_type(inner)
     if origin is not None:
+        if _is_literal_origin(origin):
+            return _check_literal_column_args(get_args(ann))
         return False
     if isinstance(ann, type) and issubclass(ann, BaseModel):
         return False
@@ -162,6 +218,8 @@ def _is_supported_column_annotation_inner(
             return False
         return _is_supported_column_annotation_inner(val_t, _model_stack=_model_stack)
     if origin is not None:
+        if _is_literal_origin(origin):
+            return _check_literal_column_args(get_args(ann))
         return False
     if isinstance(ann, type) and issubclass(ann, BaseModel):
         if ann in _model_stack:
@@ -1053,6 +1111,9 @@ def dtype_descriptor_to_annotation(descriptor: Mapping[str, Any]) -> Any:
 
     base = descriptor.get("base")
     nullable = bool(descriptor.get("nullable", False))
+    lit_list = descriptor.get("literals")
+
+    from pydantable.types import WKB as WKBType  # noqa: PLC0415
 
     base_map: dict[str, Any] = {
         "int": int,
@@ -1067,10 +1128,26 @@ def dtype_descriptor_to_annotation(descriptor: Mapping[str, Any]) -> Any:
         "duration": timedelta,
         "time": time,
         "binary": bytes,
+        "ipv4": ipaddress.IPv4Address,
+        "ipv6": ipaddress.IPv6Address,
+        "wkb": WKBType,
         "unknown": Any,
     }
     if base not in base_map:
         raise TypeError(f"Unsupported Rust dtype descriptor base: {base!r}")
+
+    if lit_list is not None:
+        if base not in ("str", "int", "bool"):
+            raise TypeError(
+                f"Invalid descriptor: literals= only valid for str/int/bool base, got {base!r}"
+            )
+        if not isinstance(lit_list, (list, tuple)):
+            raise TypeError(f"Invalid literals list in descriptor: {descriptor!r}")
+        vals = tuple(lit_list)
+        lit_ann = cast(Any, Literal.__getitem__(vals))
+        if nullable:
+            return lit_ann | None
+        return lit_ann
 
     py_t = base_map[base]
     if nullable:
@@ -1111,6 +1188,8 @@ _RUST_BASE_FOR_PY_SCALAR: dict[type, str] = {
     timedelta: "duration",
     time: "time",
     bytes: "binary",
+    ipaddress.IPv4Address: "ipv4",
+    ipaddress.IPv6Address: "ipv6",
 }
 
 
@@ -1180,6 +1259,28 @@ def descriptor_matches_column_annotation(
     exp_base = descriptor.get("base")
     if not isinstance(exp_base, str):
         return False
+    inner_u = _unwrap_annotated(inner)
+    origin_i = get_origin(inner_u)
+    lit_raw = descriptor.get("literals")
+
+    if lit_raw is not None:
+        if not _is_literal_origin(origin_i):
+            return False
+        if not isinstance(lit_raw, (list, tuple)):
+            return False
+        args = get_args(inner_u)
+        if set(args) != set(lit_raw):
+            return False
+        if exp_base == "str":
+            return all(isinstance(a, str) for a in args)
+        if exp_base == "int":
+            return all(type(a) is int for a in args)
+        if exp_base == "bool":
+            return all(isinstance(a, bool) for a in args)
+        return False
+
+    if _is_literal_origin(origin_i):
+        return False
     if get_origin(inner) is not None:
         return False
     if isinstance(inner, type) and issubclass(inner, BaseModel):
@@ -1192,6 +1293,8 @@ def descriptor_matches_column_annotation(
             and issubclass(inner, enum.Enum)
             and inner is not enum.Enum
         )
+    if exp_base == "wkb":
+        return _is_wkb_type(inner)
     expected_py = None
     for py_t, rust_s in _RUST_BASE_FOR_PY_SCALAR.items():
         if rust_s == exp_base:

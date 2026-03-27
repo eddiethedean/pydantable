@@ -6,7 +6,7 @@ use std::collections::HashSet;
 
 use pyo3::prelude::*;
 
-use crate::dtype::{dtype_structural_eq, BaseType, DTypeDesc};
+use crate::dtype::{dtype_structural_eq, widen_scalar_drop_literals, BaseType, DTypeDesc, LiteralSet};
 
 use super::ir::{
     ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart,
@@ -22,8 +22,45 @@ enum ListAggKind {
 fn dtype_is_string_like(dtype: &DTypeDesc) -> bool {
     matches!(
         dtype.as_scalar_base_field().flatten(),
-        Some(BaseType::Str | BaseType::Enum)
+        Some(BaseType::Str | BaseType::Enum | BaseType::Uuid | BaseType::Ipv4 | BaseType::Ipv6)
     )
+}
+
+fn literal_set_contains(ls: &LiteralSet, v: &LiteralValue) -> bool {
+    match (ls, v) {
+        (LiteralSet::Str(vals), LiteralValue::Str(s)) => vals.iter().any(|x| x == s),
+        (LiteralSet::Str(vals), LiteralValue::EnumStr(s)) => vals.iter().any(|x| x == s),
+        (LiteralSet::Int(vals), LiteralValue::Int(i)) => vals.contains(i),
+        (LiteralSet::Bool(vals), LiteralValue::Bool(b)) => vals.contains(b),
+        _ => false,
+    }
+}
+
+fn validate_literal_membership_compare(
+    left: &ExprNode,
+    right: &ExprNode,
+    op: CmpOp,
+) -> PyResult<()> {
+    if !matches!(op, CmpOp::Eq | CmpOp::Ne) {
+        return Ok(());
+    }
+    for (col_side, lit_side) in [(left, right), (right, left)] {
+        if let ExprNode::ColumnRef { dtype, .. } = col_side {
+            if let Some(ls) = dtype.literals() {
+                if let ExprNode::Literal {
+                    value: Some(v), ..
+                } = lit_side
+                {
+                    if !literal_set_contains(ls, v) {
+                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                            "Comparison literal is not in the column typing.Literal[...] value set.",
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(not(feature = "polars_engine"))]
@@ -302,12 +339,14 @@ impl ExprNode {
                     return Ok(DTypeDesc::Scalar {
                         base: Some(BaseType::DateTime),
                         nullable,
+                        literals: None,
                     });
                 }
                 (BaseType::DateTime, BaseType::Duration, Sub) => {
                     return Ok(DTypeDesc::Scalar {
                         base: Some(BaseType::DateTime),
                         nullable,
+                        literals: None,
                     });
                 }
                 (BaseType::Date, BaseType::Duration, Add)
@@ -315,12 +354,14 @@ impl ExprNode {
                     return Ok(DTypeDesc::Scalar {
                         base: Some(BaseType::Date),
                         nullable,
+                        literals: None,
                     });
                 }
                 (BaseType::Date, BaseType::Duration, Sub) => {
                     return Ok(DTypeDesc::Scalar {
                         base: Some(BaseType::Date),
                         nullable,
+                        literals: None,
                     });
                 }
                 _ => {}
@@ -372,12 +413,14 @@ impl ExprNode {
             return Ok(DTypeDesc::Scalar {
                 base: Some(BaseType::Float),
                 nullable,
+                literals: None,
             });
         }
 
         Ok(DTypeDesc::Scalar {
             base: Some(inferred_base),
             nullable,
+            literals: None,
         })
     }
 
@@ -395,6 +438,7 @@ impl ExprNode {
                     return Ok(DTypeDesc::Scalar {
                         base: Some(BaseType::Bool),
                         nullable,
+                        literals: None,
                     });
                 }
                 if left.is_struct() || right.is_struct() {
@@ -449,6 +493,9 @@ impl ExprNode {
                     || (lb == BaseType::Str && rb == BaseType::Enum)
                     || (lb == BaseType::Enum && rb == BaseType::Str)
                     || (lb == BaseType::Uuid && rb == BaseType::Uuid)
+                    || (lb == BaseType::Ipv4 && rb == BaseType::Ipv4)
+                    || (lb == BaseType::Ipv6 && rb == BaseType::Ipv6)
+                    || (lb == BaseType::Wkb && rb == BaseType::Wkb)
                     || (lb == BaseType::Decimal && rb == BaseType::Decimal)
                     || (lb == BaseType::DateTime && rb == BaseType::DateTime)
                     || (lb == BaseType::Date && rb == BaseType::Date)
@@ -465,6 +512,7 @@ impl ExprNode {
                 Ok(DTypeDesc::Scalar {
                     base: Some(BaseType::Bool),
                     nullable,
+                    literals: None,
                 })
             }
             CmpOp::Lt | CmpOp::Le | CmpOp::Gt | CmpOp::Ge => {
@@ -521,13 +569,18 @@ impl ExprNode {
                     || (lb == BaseType::Date && rb == BaseType::Date)
                     || (lb == BaseType::Duration && rb == BaseType::Duration)
                     || (lb == BaseType::Time && rb == BaseType::Time);
+                let allowed_ip = (lb == BaseType::Ipv4 && rb == BaseType::Ipv4)
+                    || (lb == BaseType::Ipv6 && rb == BaseType::Ipv6);
+                let allowed_wkb = lb == BaseType::Wkb && rb == BaseType::Wkb;
 
                 if !(allowed_numeric
                     || allowed_str
                     || allowed_enum
                     || allowed_uuid
                     || allowed_decimal
-                    || allowed_temporal)
+                    || allowed_temporal
+                    || allowed_ip
+                    || allowed_wkb)
                 {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "Ordering comparisons require numeric-numeric, str/str-like, uuid-uuid, decimal-decimal, or same temporal operands.",
@@ -537,6 +590,7 @@ impl ExprNode {
                 Ok(DTypeDesc::Scalar {
                     base: Some(BaseType::Bool),
                     nullable,
+                    literals: None,
                 })
             }
         }
@@ -618,7 +672,11 @@ impl ExprNode {
     }
 
     pub fn make_binary_op(op: ArithOp, left: ExprNode, right: ExprNode) -> PyResult<Self> {
-        let dtype = Self::infer_arith_dtype(op, left.dtype(), right.dtype())?;
+        let dtype = widen_scalar_drop_literals(Self::infer_arith_dtype(
+            op,
+            left.dtype(),
+            right.dtype(),
+        )?);
         Ok(ExprNode::BinaryOp {
             op,
             left: Box::new(left),
@@ -628,6 +686,7 @@ impl ExprNode {
     }
 
     pub fn make_compare_op(op: CmpOp, left: ExprNode, right: ExprNode) -> PyResult<Self> {
+        validate_literal_membership_compare(&left, &right, op)?;
         let dtype = Self::infer_compare_dtype(op, left.dtype(), right.dtype())?;
         Ok(ExprNode::CompareOp {
             op,
@@ -690,6 +749,12 @@ impl ExprNode {
                 | (BaseType::Date, BaseType::Str)
                 | (BaseType::Str, BaseType::Date)
                 | (BaseType::Str, BaseType::DateTime)
+                | (BaseType::Ipv4, BaseType::Str | BaseType::Ipv4)
+                | (BaseType::Str, BaseType::Ipv4)
+                | (BaseType::Ipv6, BaseType::Str | BaseType::Ipv6)
+                | (BaseType::Str, BaseType::Ipv6)
+                | (BaseType::Wkb, BaseType::Binary | BaseType::Wkb)
+                | (BaseType::Binary, BaseType::Wkb)
         );
         if !allowed {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -702,6 +767,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(base),
                 nullable: input_nullable || target.nullable_flag(),
+                literals: None,
             },
         })
     }
@@ -757,6 +823,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(first_base),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -807,6 +874,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(first_base),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -920,6 +988,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Str),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -968,6 +1037,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Str),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -987,6 +1057,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -1012,6 +1083,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Str),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -1034,6 +1106,7 @@ impl ExprNode {
                         DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
                             base,
                             nullable: true,
+                            literals: None,
                         },
                         DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
                             fields,
@@ -1089,10 +1162,12 @@ impl ExprNode {
             UnaryNumericOp::Abs | UnaryNumericOp::Round { .. } => DTypeDesc::Scalar {
                 base: Some(in_base),
                 nullable,
+                literals: None,
             },
             UnaryNumericOp::Floor | UnaryNumericOp::Ceil => DTypeDesc::Scalar {
                 base: Some(BaseType::Float),
                 nullable,
+                literals: None,
             },
         };
         Ok(ExprNode::UnaryNumeric {
@@ -1118,6 +1193,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Str),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -1145,6 +1221,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Bool),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -1168,6 +1245,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Bool),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -1209,6 +1287,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -1225,6 +1304,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -1260,6 +1340,7 @@ impl ExprNode {
             DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
                 base,
                 nullable: true,
+                literals: None,
             },
             DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
                 fields,
@@ -1309,6 +1390,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Bool),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -1341,6 +1423,7 @@ impl ExprNode {
         let dtype = DTypeDesc::Scalar {
             base: Some(base),
             nullable: list_nullable,
+            literals: None,
         };
         let inner = Box::new(inner);
         Ok(match kind {
@@ -1380,6 +1463,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Date),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -1462,6 +1546,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable: true,
+                literals: None,
             },
         })
     }
@@ -1494,6 +1579,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable: true,
+                literals: None,
             },
         })
     }
@@ -1514,10 +1600,12 @@ impl ExprNode {
             BaseType::Int => Ok(DTypeDesc::Scalar {
                 base: Some(if mean { BaseType::Float } else { BaseType::Int }),
                 nullable: true,
+                literals: None,
             }),
             BaseType::Float => Ok(DTypeDesc::Scalar {
                 base: Some(BaseType::Float),
                 nullable: true,
+                literals: None,
             }),
             BaseType::Decimal => Ok(DTypeDesc::Scalar {
                 base: Some(if mean {
@@ -1526,6 +1614,7 @@ impl ExprNode {
                     BaseType::Decimal
                 }),
                 nullable: true,
+                literals: None,
             }),
             _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "window sum/mean require int, float, or decimal column.",
@@ -1677,6 +1766,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable: true,
+                literals: None,
             },
         })
     }
@@ -1697,6 +1787,7 @@ impl ExprNode {
             BaseType::Int | BaseType::Float | BaseType::Decimal => Ok(DTypeDesc::Scalar {
                 base: Some(b),
                 nullable: true,
+                literals: None,
             }),
             _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "global min/max require int, float, or decimal column.",
@@ -1738,6 +1829,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable: false,
+                literals: None,
             },
         }
     }
@@ -1758,11 +1850,13 @@ impl ExprNode {
             DTypeDesc::Scalar {
                 base: Some(BaseType::DateTime),
                 nullable,
+                literals: None,
             }
         } else {
             DTypeDesc::Scalar {
                 base: Some(BaseType::Date),
                 nullable,
+                literals: None,
             }
         };
         Ok(ExprNode::Strptime {
@@ -1787,6 +1881,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -1803,6 +1898,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -1819,6 +1915,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -1836,6 +1933,7 @@ impl ExprNode {
             DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
                 base,
                 nullable: true,
+                literals: None,
             },
             DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
                 fields,
@@ -1870,6 +1968,7 @@ impl ExprNode {
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Bool),
                 nullable,
+                literals: None,
             },
         })
     }
@@ -1887,6 +1986,7 @@ impl ExprNode {
                 inner: Box::new(DTypeDesc::Scalar {
                     base: Some(BaseType::Str),
                     nullable: false,
+                    literals: None,
                 }),
                 nullable,
             },
@@ -1932,6 +2032,7 @@ impl ExprNode {
                             DTypeDesc::Scalar {
                                 base: Some(BaseType::Str),
                                 nullable: false,
+                                literals: None,
                             },
                         ),
                         ("value".to_string(), value.as_ref().clone()),
@@ -1993,6 +2094,7 @@ impl ExprNode {
         Ok(DTypeDesc::Scalar {
             base: Some(base),
             nullable: true,
+            literals: None,
         })
     }
 

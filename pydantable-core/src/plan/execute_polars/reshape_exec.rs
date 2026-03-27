@@ -148,6 +148,7 @@ pub fn execute_melt_polars(
         DTypeDesc::Scalar {
             base: Some(base),
             nullable,
+            literals: None,
         },
     );
 
@@ -329,6 +330,7 @@ pub fn execute_pivot_polars(
                 _ => DTypeDesc::Scalar {
                     base: Some(base),
                     nullable: true,
+                    literals: None,
                 },
             };
             generated_cols.push((name.clone(), v.clone(), out_d.clone()));
@@ -721,10 +723,12 @@ pub fn execute_groupby_dynamic_agg_polars(
             "count" => DTypeDesc::Scalar {
                 base: Some(crate::dtype::BaseType::Int),
                 nullable: false,
+                literals: None,
             },
             "mean" => DTypeDesc::Scalar {
                 base: Some(crate::dtype::BaseType::Float),
                 nullable: true,
+                literals: None,
             },
             "sum" | "min" | "max" => in_dtype.clone(),
             other => {
@@ -755,6 +759,7 @@ fn dtype_after_explode(inner: &DTypeDesc) -> DTypeDesc {
         DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
             base: *base,
             nullable: true,
+            literals: None,
         },
         DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
             fields: fields.clone(),

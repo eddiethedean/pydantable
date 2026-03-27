@@ -122,6 +122,30 @@ fn literals_to_series(values: &[LiteralValue], base: BaseType) -> PyResult<Serie
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("{e}")))?
                 .into_series())
         }
+        BaseType::Ipv4 | BaseType::Ipv6 => {
+            let v: Vec<String> = values
+                .iter()
+                .map(|x| match x {
+                    LiteralValue::Str(s) => Ok(s.clone()),
+                    _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "isin() ip address list expected str literals.",
+                    )),
+                })
+                .collect::<PyResult<_>>()?;
+            Ok(Series::new("".into(), v))
+        }
+        BaseType::Wkb => {
+            let v: Vec<Vec<u8>> = values
+                .iter()
+                .map(|x| match x {
+                    LiteralValue::Binary(b) => Ok(b.clone()),
+                    _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "isin() WKB list expected bytes literals.",
+                    )),
+                })
+                .collect::<PyResult<_>>()?;
+            Ok(Series::new("".into(), v))
+        }
         _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
             "isin() unsupported dtype for list literal.",
         )),
@@ -212,7 +236,7 @@ impl ExprNode {
                             ..
                         } => Ok(null_expr.cast(DataType::String)),
                         crate::dtype::DTypeDesc::Scalar {
-                            base: Some(BaseType::Uuid),
+                            base: Some(BaseType::Uuid | BaseType::Ipv4 | BaseType::Ipv6),
                             ..
                         } => Ok(null_expr.cast(DataType::String)),
                         crate::dtype::DTypeDesc::Scalar {
@@ -238,7 +262,7 @@ impl ExprNode {
                             ..
                         } => Ok(null_expr.cast(DataType::Time)),
                         crate::dtype::DTypeDesc::Scalar {
-                            base: Some(BaseType::Binary),
+                            base: Some(BaseType::Binary | BaseType::Wkb),
                             ..
                         } => Ok(null_expr.cast(DataType::Binary)),
                         crate::dtype::DTypeDesc::Scalar { base: None, .. } => Ok(null_expr),
@@ -306,7 +330,7 @@ impl ExprNode {
                         ..
                     } => DataType::String,
                     crate::dtype::DTypeDesc::Scalar {
-                        base: Some(BaseType::Uuid),
+                        base: Some(BaseType::Uuid | BaseType::Ipv4 | BaseType::Ipv6),
                         ..
                     } => DataType::String,
                     crate::dtype::DTypeDesc::Scalar {
@@ -325,6 +349,14 @@ impl ExprNode {
                         base: Some(BaseType::Duration),
                         ..
                     } => DataType::Duration(TimeUnit::Microseconds),
+                    crate::dtype::DTypeDesc::Scalar {
+                        base: Some(BaseType::Time),
+                        ..
+                    } => DataType::Time,
+                    crate::dtype::DTypeDesc::Scalar {
+                        base: Some(BaseType::Binary | BaseType::Wkb),
+                        ..
+                    } => DataType::Binary,
                     _ => {
                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                             "cast() target dtype must have known scalar base.",

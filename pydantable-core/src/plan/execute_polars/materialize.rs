@@ -156,6 +156,42 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             )),
         },
         DTypeDesc::Scalar {
+            base: Some(BaseType::Ipv4),
+            ..
+        } => match av {
+            AnyValue::String(s) => {
+                let ip_mod = py.import_bound("ipaddress")?;
+                let ctor = ip_mod.getattr("IPv4Address")?;
+                Ok(ctor.call1((s.to_string(),))?.into_py(py))
+            }
+            AnyValue::StringOwned(s) => {
+                let ip_mod = py.import_bound("ipaddress")?;
+                let ctor = ip_mod.getattr("IPv4Address")?;
+                Ok(ctor.call1((s.to_string(),))?.into_py(py))
+            }
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Expected str AnyValue for IPv4 column.",
+            )),
+        },
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Ipv6),
+            ..
+        } => match av {
+            AnyValue::String(s) => {
+                let ip_mod = py.import_bound("ipaddress")?;
+                let ctor = ip_mod.getattr("IPv6Address")?;
+                Ok(ctor.call1((s.to_string(),))?.into_py(py))
+            }
+            AnyValue::StringOwned(s) => {
+                let ip_mod = py.import_bound("ipaddress")?;
+                let ctor = ip_mod.getattr("IPv6Address")?;
+                Ok(ctor.call1((s.to_string(),))?.into_py(py))
+            }
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Expected str AnyValue for IPv6 column.",
+            )),
+        },
+        DTypeDesc::Scalar {
             base: Some(BaseType::Decimal),
             ..
         } => match av {
@@ -231,6 +267,24 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             AnyValue::BinaryOwned(b) => Ok(PyBytes::new(py, b.as_slice()).into_py(py)),
             _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Expected binary AnyValue.",
+            )),
+        },
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Wkb),
+            ..
+        } => match av {
+            AnyValue::Binary(b) => {
+                let types_mod = py.import_bound("pydantable.types")?;
+                let ctor = types_mod.getattr("WKB")?;
+                Ok(ctor.call1((PyBytes::new(py, b),))?.into_py(py))
+            }
+            AnyValue::BinaryOwned(b) => {
+                let types_mod = py.import_bound("pydantable.types")?;
+                let ctor = types_mod.getattr("WKB")?;
+                Ok(ctor.call1((PyBytes::new(py, b.as_slice()),))?.into_py(py))
+            }
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Expected binary AnyValue for WKB column.",
             )),
         },
         DTypeDesc::List { inner, .. } => {
@@ -370,6 +424,40 @@ pub(crate) fn series_to_py_list(
             }
         }
         DTypeDesc::Scalar {
+            base: Some(BaseType::Ipv4),
+            ..
+        } => {
+            let casted = series.cast(&DataType::String).map_err(polars_err)?;
+            let ip_mod = py.import_bound("ipaddress")?;
+            let ctor = ip_mod.getattr("IPv4Address")?;
+            for item in casted.str().map_err(polars_err)?.into_iter() {
+                match item {
+                    Some(v) => {
+                        let u = ctor.call1((v,))?;
+                        values.push(u.into_py(py));
+                    }
+                    None => values.push(py.None()),
+                }
+            }
+        }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Ipv6),
+            ..
+        } => {
+            let casted = series.cast(&DataType::String).map_err(polars_err)?;
+            let ip_mod = py.import_bound("ipaddress")?;
+            let ctor = ip_mod.getattr("IPv6Address")?;
+            for item in casted.str().map_err(polars_err)?.into_iter() {
+                match item {
+                    Some(v) => {
+                        let u = ctor.call1((v,))?;
+                        values.push(u.into_py(py));
+                    }
+                    None => values.push(py.None()),
+                }
+            }
+        }
+        DTypeDesc::Scalar {
             base: Some(BaseType::Decimal),
             ..
         } => {
@@ -456,6 +544,29 @@ pub(crate) fn series_to_py_list(
                 values.push(py_v);
             }
         }
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Wkb),
+            ..
+        } => {
+            let types_mod = py.import_bound("pydantable.types")?;
+            let ctor = types_mod.getattr("WKB")?;
+            for av in series.iter() {
+                let py_v = match av {
+                    AnyValue::Null => py.None(),
+                    AnyValue::Binary(b) => ctor.call1((PyBytes::new(py, b),))?.into_py(py),
+                    AnyValue::BinaryOwned(b) => {
+                        ctor.call1((PyBytes::new(py, b.as_slice()),))?
+                            .into_py(py)
+                    }
+                    _ => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                            "Expected binary AnyValue for WKB column.",
+                        ));
+                    }
+                };
+                values.push(py_v);
+            }
+        }
         DTypeDesc::Map { value, .. } => {
             for av in series.iter() {
                 let py_v = match av {
@@ -516,49 +627,60 @@ pub(crate) fn dtype_from_polars(dt: &DataType) -> PyResult<DTypeDesc> {
             Ok(DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable: true,
+                literals: None,
             })
         }
         DataType::UInt8 | DataType::UInt16 | DataType::UInt32 | DataType::UInt64 => {
             Ok(DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
                 nullable: true,
+                literals: None,
             })
         }
         DataType::Float32 | DataType::Float64 => Ok(DTypeDesc::Scalar {
             base: Some(BaseType::Float),
             nullable: true,
+            literals: None,
         }),
         DataType::Boolean => Ok(DTypeDesc::Scalar {
             base: Some(BaseType::Bool),
             nullable: true,
+            literals: None,
         }),
         DataType::String => Ok(DTypeDesc::Scalar {
             base: Some(BaseType::Str),
             nullable: true,
+            literals: None,
         }),
         DataType::Decimal(_, _) => Ok(DTypeDesc::Scalar {
             base: Some(BaseType::Decimal),
             nullable: true,
+            literals: None,
         }),
         DataType::Datetime(_, _) => Ok(DTypeDesc::Scalar {
             base: Some(BaseType::DateTime),
             nullable: true,
+            literals: None,
         }),
         DataType::Date => Ok(DTypeDesc::Scalar {
             base: Some(BaseType::Date),
             nullable: true,
+            literals: None,
         }),
         DataType::Duration(_) => Ok(DTypeDesc::Scalar {
             base: Some(BaseType::Duration),
             nullable: true,
+            literals: None,
         }),
         DataType::Time => Ok(DTypeDesc::Scalar {
             base: Some(BaseType::Time),
             nullable: true,
+            literals: None,
         }),
         DataType::Binary => Ok(DTypeDesc::Scalar {
             base: Some(BaseType::Binary),
             nullable: true,
+            literals: None,
         }),
         DataType::Struct(flds) => {
             let mut fields: Vec<(String, DTypeDesc)> = Vec::with_capacity(flds.len());

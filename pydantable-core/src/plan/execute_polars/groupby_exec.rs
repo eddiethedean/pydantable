@@ -131,6 +131,7 @@ pub fn execute_groupby_agg_polars(
                     DTypeDesc::Scalar {
                         base: Some(crate::dtype::BaseType::Int),
                         nullable: false,
+                        literals: None,
                     },
                 );
                 agg_exprs.push(col(&in_col).count().alias(&out_name));
@@ -154,6 +155,7 @@ pub fn execute_groupby_agg_polars(
                     DTypeDesc::Scalar {
                         base: Some(base),
                         nullable: true,
+                        literals: None,
                     },
                 );
                 // Polars returns `0` for `sum` over all-null values.
@@ -183,6 +185,7 @@ pub fn execute_groupby_agg_polars(
                     DTypeDesc::Scalar {
                         base: Some(crate::dtype::BaseType::Float),
                         nullable: true,
+                        literals: None,
                     },
                 );
                 // Same masking approach as for `sum`: all-null -> None.
@@ -202,6 +205,7 @@ pub fn execute_groupby_agg_polars(
                     DTypeDesc::Scalar {
                         base: Some(base),
                         nullable: true,
+                        literals: None,
                     },
                 );
                 agg_exprs.push(col(&in_col).min().alias(&out_name));
@@ -217,6 +221,7 @@ pub fn execute_groupby_agg_polars(
                     DTypeDesc::Scalar {
                         base: Some(base),
                         nullable: true,
+                        literals: None,
                     },
                 );
                 agg_exprs.push(col(&in_col).max().alias(&out_name));
@@ -240,6 +245,7 @@ pub fn execute_groupby_agg_polars(
                     DTypeDesc::Scalar {
                         base: Some(crate::dtype::BaseType::Float),
                         nullable: true,
+                        literals: None,
                     },
                 );
                 agg_exprs.push(col(&in_col).median().alias(&out_name));
@@ -263,6 +269,7 @@ pub fn execute_groupby_agg_polars(
                     DTypeDesc::Scalar {
                         base: Some(crate::dtype::BaseType::Float),
                         nullable: true,
+                        literals: None,
                     },
                 );
                 agg_exprs.push(col(&in_col).std(1).alias(&out_name));
@@ -286,6 +293,7 @@ pub fn execute_groupby_agg_polars(
                     DTypeDesc::Scalar {
                         base: Some(crate::dtype::BaseType::Float),
                         nullable: true,
+                        literals: None,
                     },
                 );
                 agg_exprs.push(col(&in_col).var(1).alias(&out_name));
@@ -301,6 +309,7 @@ pub fn execute_groupby_agg_polars(
                     DTypeDesc::Scalar {
                         base: Some(base),
                         nullable: true,
+                        literals: None,
                     },
                 );
                 agg_exprs.push(col(&in_col).first().alias(&out_name));
@@ -316,6 +325,7 @@ pub fn execute_groupby_agg_polars(
                     DTypeDesc::Scalar {
                         base: Some(base),
                         nullable: true,
+                        literals: None,
                     },
                 );
                 agg_exprs.push(col(&in_col).last().alias(&out_name));
@@ -326,6 +336,7 @@ pub fn execute_groupby_agg_polars(
                     DTypeDesc::Scalar {
                         base: Some(crate::dtype::BaseType::Int),
                         nullable: false,
+                        literals: None,
                     },
                 );
                 // SQL-like behavior: distinct count ignores NULL values.

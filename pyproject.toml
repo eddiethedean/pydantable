@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "pydantable"
-version = "1.1.0"
+version = "1.2.0"
 description = "Strongly-typed DataFrames for Python, powered by Rust."
 readme = "README.md"
 license = { text = "MIT" }
@@ -86,6 +86,7 @@ module-name = "pydantable._core"
 python-source = "python"
 include = [
     "python/pydantable/py.typed",
+    "python/pydantable/types.pyi",
     "python/pydantable/__init__.pyi",
     "python/pydantable/dataframe_model.pyi",
     "python/pydantable/display.pyi",

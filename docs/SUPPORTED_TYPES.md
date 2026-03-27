@@ -3,7 +3,8 @@
 This page is the **authoritative list** of column types pydantable accepts on
 `DataFrameModel` / `DataFrame[Schema]` fields, uses in **expression typing**
 (Rust AST), and maps to **Rust schema descriptors** (scalar:
-`{"base": ..., "nullable": ...}`, nested struct:
+`{"base": ..., "nullable": ...}` plus optional homogeneous **`"literals": [...]`** for
+`typing.Literal[...]` columns, nested struct:
 `{"kind": "struct", "nullable": ..., "fields": [...]}`, or homogeneous list:
 `{"kind": "list", "nullable": ..., "inner": <descriptor>}`).
 
@@ -27,6 +28,10 @@ Each column in your schema is one **scalar** Python type from this set:
 | `time` | `from datetime import time` | `time` (Polars **Time**; wall clock, distinct from `datetime` / `timedelta`) |
 | `timedelta` | `from datetime import timedelta` | `duration` |
 | `bytes` | built-in | `binary` (Polars **Binary**; limited `Expr` surface) |
+| `typing.Literal[...]` | `from typing import Literal` | Same `base` as the homogeneous value kind (`str` / `int` / `bool`); descriptor includes **`literals`** list (all-`str`, all-`int`, or all-`bool` parameters only; **no mixing**). Stored like plain `str` / `int` / `bool`. **`filter(col == "x")`** is rejected at **expression build time** if `"x"` is not in the `Literal` set. |
+| `IPv4Address` | `from ipaddress import IPv4Address` | `ipv4` (Polars **Utf8**; canonical IPv4 string) |
+| `IPv6Address` | `from ipaddress import IPv6Address` | `ipv6` (Polars **Utf8**; canonical IPv6 string) |
+| `WKB` | `from pydantable.types import WKB` | `wkb` (Polars **Binary**; `bytes` subclass with Pydantic validation; same limited `Expr` surface as **`bytes`**) |
 
 Use these types in **Pydantic field annotations** on `DataFrameModel` subclasses (or
 `Schema` models for `DataFrame[Schema]`). Runtime cell values must be instances
@@ -40,6 +45,14 @@ Nullable columns use the same base types with **`None`** as a cell value:
 
 Expression results and filter conditions follow SQL-like null rules; see
 `INTERFACE_CONTRACT.md`.
+
+## Typed strings (`Annotated[str, ...]`)
+
+**`Annotated[str, ...]`** is accepted as a column annotation: metadata is stripped for
+the Rust dtype (logical **`str`** / Polars **Utf8**), while **Pydantic** on
+`collect()` / `RowModel` still applies your constraints (for example
+**`Annotated[str, pydantic.HttpUrl]`**). Match other projects’ “newtype string” patterns
+without a separate Rust `base` type.
 
 ## Nested Pydantic models (struct columns)
 
@@ -175,16 +188,18 @@ These are **out of scope** for the current schema system:
 
 ## Future / planned types (roadmap direction)
 
-The following are **not implemented today**; they are the intended direction for
-richer schemas and APIs. Ordering and timing follow project priorities (see
-`ROADMAP.md`); this list is **not** a commitment to ship every item.
+The following are **not implemented today**; follow project priorities in `ROADMAP.md`.
 
 | Planned category | Examples | Notes |
 |------------------|----------|--------|
-| **Literal / typing-only categoricals** | `Literal["a","b"]` as a distinct dtype (today: use a concrete **`enum.Enum`** subclass). | Narrower validation story than free-form `enum`. |
-| **Geospatial / extension dtypes** | e.g. WKB, GeoJSON-backed types | Only if there is a clear Polars/Arrow story and API surface. |
+| **Richer geospatial** | e.g. GeoJSON column type, CRS metadata | **`WKB`** covers opaque binary geometry today; heavier GIS scope is deferred. |
 
-**Already shipped (scalar columns):** **`uuid.UUID`**, **`decimal.Decimal`**, concrete **`enum.Enum`**, **`datetime`**, **`date`**, **`time`**, **`timedelta`**, **`bytes`**, plus homogeneous **`dict[str, T]`** map columns. **Homogeneous `list[T]`** columns, **`explode()`**, list **`Expr`** helpers, and **`unnest()`** on **struct** columns (see `ROADMAP.md`).
+**Already shipped (scalar columns):** primitives in the table above, including
+**`typing.Literal[...]`** (homogeneous str/int/bool), **`ipaddress.IPv4Address`** /
+**`IPv6Address`**, **`pydantable.types.WKB`**, **`uuid.UUID`**, **`decimal.Decimal`**, concrete
+**`enum.Enum`**, **`datetime`**, **`date`**, **`time`**, **`timedelta`**, **`bytes`**, plus
+homogeneous **`dict[str, T]`** map columns, **Homogeneous `list[T]`** columns, **`explode()`**,
+list **`Expr`** helpers, and **`unnest()`** on **struct** columns (see `ROADMAP.md`).
 
 ## Runtime column payloads (Python)
 

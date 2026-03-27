@@ -545,3 +545,68 @@ def test_mypy_rejects_wrong_after_model_for_groupby_agg(tmp_path: Path) -> None:
     proc = _run_mypy_snippet(tmp_path, code)
     assert proc.returncode != 0
     assert "Incompatible return value type" in proc.stdout
+
+
+def test_mypy_accepts_literal_ip_wkb_annotated_str_transform_chain(
+    tmp_path: Path,
+) -> None:
+    """1.2 scalars participate in plugin-driven return type resolution."""
+    pytest.importorskip("mypy")
+    code = """
+    from __future__ import annotations
+
+    import ipaddress
+    from typing import Annotated, Literal
+
+    from pydantic import HttpUrl
+
+    from pydantable import DataFrameModel, WKB
+
+    class Before(DataFrameModel):
+        mode: Literal["dev", "prod"]
+        addr: ipaddress.IPv4Address
+        g: WKB
+        link: Annotated[str, HttpUrl]
+
+    class After(DataFrameModel):
+        mode: Literal["dev", "prod"]
+        ip: ipaddress.IPv4Address
+        g: WKB
+        dup_mode: Literal["dev", "prod"]
+
+    def transform(df: Before) -> After:
+        out = df.rename({"addr": "ip"}).drop("link")
+        return out.with_columns(dup_mode=out.mode).select("mode", "ip", "g", "dup_mode")
+    """
+    proc = _run_mypy_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
+def test_mypy_rejects_bad_after_for_literal_ip_wkb_chain(tmp_path: Path) -> None:
+    pytest.importorskip("mypy")
+    code = """
+    from __future__ import annotations
+
+    import ipaddress
+    from typing import Literal
+
+    from pydantable import DataFrameModel, WKB
+
+    class Before(DataFrameModel):
+        mode: Literal["dev", "prod"]
+        addr: ipaddress.IPv4Address
+        g: WKB
+
+    class WrongAfter(DataFrameModel):
+        mode: str
+        ip: ipaddress.IPv4Address
+        g: bytes
+        dup_mode: Literal["dev", "prod"]
+
+    def bad(df: Before) -> WrongAfter:
+        out = df.rename({"addr": "ip"})
+        return out.with_columns(dup_mode=out.mode).select("mode", "ip", "g", "dup_mode")
+    """
+    proc = _run_mypy_snippet(tmp_path, code)
+    assert proc.returncode != 0
+    assert "Incompatible return value type" in proc.stdout

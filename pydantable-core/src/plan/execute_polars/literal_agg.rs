@@ -83,6 +83,23 @@ pub(super) fn py_dict_to_literal_ctx(
                 Some(crate::dtype::BaseType::Binary) => {
                     LiteralValue::Binary(item.extract::<Vec<u8>>()?)
                 }
+                Some(crate::dtype::BaseType::Ipv4) => {
+                    let py = item.py();
+                    let ip_mod = py.import_bound("ipaddress")?;
+                    let cls = ip_mod.getattr("IPv4Address")?;
+                    let obj = cls.call1((item,))?;
+                    LiteralValue::Str(obj.str()?.extract()?)
+                }
+                Some(crate::dtype::BaseType::Ipv6) => {
+                    let py = item.py();
+                    let ip_mod = py.import_bound("ipaddress")?;
+                    let cls = ip_mod.getattr("IPv6Address")?;
+                    let obj = cls.call1((item,))?;
+                    LiteralValue::Str(obj.str()?.extract()?)
+                }
+                Some(crate::dtype::BaseType::Wkb) => {
+                    LiteralValue::Binary(item.extract::<Vec<u8>>()?)
+                }
                 None => {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "Unsupported unknown-base dtype in reshape path.",
