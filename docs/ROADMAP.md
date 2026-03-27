@@ -1,6 +1,6 @@
 # PydanTable roadmap (shipped → v1.0.0)
 
-**Latest release: `1.0.0`.** **Shipped in 0.23.0** adds **lazy `read_*` / `aread_*` file roots** (Parquet, CSV, NDJSON, IPC, **JSON**), **`DataFrame.write_*`** lazy pipeline output, **`export_*`** for eager dict→file, **`DataFrameModel`** glue (**`from_sql`**, **`write_sql`**, **`read_parquet_url_ctx`**), **HTTP/object-store `max_bytes`**, **`MissingRustExtensionError`**, and **breaking renames** (**`materialize_*`**, **`fetch_sql`**, **`fetch_*_url`**)—see **Shipped in 0.23.0** below and {doc}`IO_OVERVIEW`. **0.22.0** introduced the **`pydantable.io`** package (vocabulary evolved in **0.23.0**; see {doc}`changelog`). Earlier **0.20.0** / **0.21.0** items (**UX** docs, **Streamlit** interchange, …) remain in their sections. **ipywidgets** / interactive explorers remain **Later** unless promoted. This document also summarizes shipped history, **Planned v1.0.0** for the **production-ready** major release, and **Later** / **After v1.0.0** backlogs.
+**Latest release: `1.0.0`.** The **Planned v1.0.0** checklist (below) is **complete** for that tag. **Shipped in 0.23.0** adds **lazy `read_*` / `aread_*` file roots** (Parquet, CSV, NDJSON, IPC, **JSON**), **`DataFrame.write_*`** lazy pipeline output, **`export_*`** for eager dict→file, **`DataFrameModel`** glue (**`from_sql`**, **`write_sql`**, **`read_parquet_url_ctx`**), **HTTP/object-store `max_bytes`**, **`MissingRustExtensionError`**, and **breaking renames** (**`materialize_*`**, **`fetch_sql`**, **`fetch_*_url`**)—see **Shipped in 0.23.0** below and {doc}`IO_OVERVIEW`. **0.22.0** introduced the **`pydantable.io`** package (vocabulary evolved in **0.23.0**; see {doc}`changelog`). Earlier **0.20.0** / **0.21.0** items (**UX** docs, **Streamlit** interchange, …) remain in their sections. **ipywidgets** / interactive explorers remain **Later** unless promoted. This document also summarizes shipped history and **Later** / **After v1.0.0** backlogs.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
@@ -329,9 +329,9 @@ Practical inputs that feed that phase:
 
 ---
 
-## Planned v1.0.0 (production-ready major release)
+## Planned v1.0.0 (production-ready major release) — completed for `1.0.0`
 
-**Goal:** tag **`v1.0.0`** when the project is ready to tell production users and library authors: **stable public API** under **semver**, **documented** semantics, and **repeatable** release quality—not a large new feature dump. **1.0.0** follows **0.20.x**; anything that does not block that bar belongs in **Later** or **After v1.0.0**.
+**Goal (achieved for `v1.0.0`):** a **stable public API** under **semver**, **documented** semantics, and **repeatable** release quality—not a large new feature dump.
 
 - [x] **Precondition:** **Shipped in 0.19.0** and **0.20.0** (above) are complete or any remaining gap is noted in this file or [`changelog.md`](changelog.md).
 - [x] **Semver contract:** publish a **1.0** policy (expand [`VERSIONING.md`](VERSIONING.md) and/or [`README.md`](README.md)): what counts as **patch** vs **minor** vs **major** for **1.x** for `DataFrame` / `DataFrameModel` / `Expr` / Rust extension boundaries; confirm [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) is the behavioral source of truth. (**0.x** expectations already live in [`VERSIONING.md`](VERSIONING.md).)

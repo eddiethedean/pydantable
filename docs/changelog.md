@@ -4,19 +4,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
-### Added
-
-- Ingest/docs consistency for missing optional behavior:
-  - `fill_missing_optional` documented consistently across constructor and typed lazy-read materialization paths.
-  - Explicit schema defaults on optional fields (for example `note: str | None = "n/a"` or `= None`) now take precedence when `fill_missing_optional=False` instead of raising.
-- `v1.0.0` readiness docs:
-  - explicit 1.x semver policy in `VERSIONING.md`,
-  - 1.0 release gate checklist/security-advisory handling in `DEVELOPER.md`,
-  - roadmap/README/index updates for 1.0 communication and support matrix policy.
-
-### Changed
-
-- Documentation now includes migration guidance from earlier `missing_optional` string-style wording (`"fill_none"` / `"error"`) to boolean `fill_missing_optional=True/False`.
+<!-- Add notes here for the next 1.x release. -->
 
 ## [1.0.0] — 2026-03-26
 
@@ -25,6 +13,21 @@ All notable changes to this project are documented here. The format is inspired 
 - Production-ready major release focused on API stability and semver contract clarity.
 - No large new execution-engine features are required for the tag.
 
+### Added
+
+- Ingest/docs consistency for missing optional behavior:
+  - `fill_missing_optional` documented consistently across constructor and typed lazy-read materialization paths.
+  - Explicit schema defaults on optional fields (for example `note: str | None = "n/a"` or `= None`) now take precedence when `fill_missing_optional=False` instead of raising.
+- **1.0.0** readiness documentation:
+  - explicit 1.x semver policy in {doc}`VERSIONING`,
+  - release gate checklist and security-advisory handling in {doc}`DEVELOPER`,
+  - roadmap, README, and docs index updates for 1.0 communication and support matrix policy.
+- **`[docs]`** extra includes **SQLAlchemy** so Sphinx (**`-W`**) and `sphinx-autodoc-typehints` resolve `DataFrameModel` **`Engine`** / **`Connection`** annotations in CI (matches Read the Docs).
+
+### Changed
+
+- Documentation includes migration guidance from earlier `missing_optional` string-style wording (`"fill_none"` / `"error"`) to boolean `fill_missing_optional=True/False`.
+
 ### Stability commitments
 
 - 1.x patch/minor/major policy is defined in {doc}`VERSIONING`.
@@ -32,7 +35,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Upgrade guidance
 
-- Canonical upgrade path from 0.20.x/0.23.x is documented in `README.md` and linked from docs index.
+- Canonical upgrade path from 0.20.x/0.23.x is documented in `README.md` and linked from the docs index; I/O renames from 0.22.x/0.23.x are summarized under **0.23.0** below.
 
 ## [0.23.0] — 2026-03-25
 

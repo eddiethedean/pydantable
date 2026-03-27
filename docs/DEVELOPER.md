@@ -394,7 +394,7 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 
 ## `v1.0.0` release gate checklist
 
-Use this checklist on the exact commit intended for tag `v1.0.0`:
+Use this checklist on the exact commit intended for tag `v1.0.0` (and again for future **1.x.y** tags as needed):
 
 - [ ] `make check-full` passes.
 - [ ] `cargo test --manifest-path pydantable-core/Cargo.toml --all-features` passes.
@@ -421,4 +421,4 @@ Pushing a git tag matching `v*` (for example `v0.23.0`) runs `.github/workflows/
 
 **GNU manylinux wheels** are built with **`PyO3/maturin-action`** inside the default **manylinux Docker** images (`manylinux: 2_17` / `2_28`). Avoid **`container: off`** plus **`--zig`** on the host for those targets: linker failures and **OOM** are common with a Polars-sized dependency tree. **musllinux** jobs still use **`--zig`** in `release.yml` as needed.
 
-The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v0.23.0`**).
+The version in `pyproject.toml` on the commit you tag is the one PyPI receives — use **`v` + that version** (for example **`v1.0.0`**, **`v0.23.0`**).

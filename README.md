@@ -8,6 +8,10 @@
 
 Typed DataFrame workflows for Python services, with Pydantic schemas and a Rust execution core.
 
+## Version 1.0
+
+**1.0.0** is the stable major release: **semver** for the public Python API is described in the [versioning policy](https://pydantable.readthedocs.io/en/latest/VERSIONING.html), and behavior is specified in the [interface contract](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html). Upgrading from **0.23.x** or earlier: see the [changelog](https://pydantable.readthedocs.io/en/latest/changelog.html) (I/O renames around **0.23.0**).
+
 ## Why PydanTable
 
 - Define table shape once using Pydantic types.
