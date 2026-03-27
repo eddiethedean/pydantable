@@ -41,12 +41,12 @@ jobs:
         run: cargo install cargo-cyclonedx
 
       - name: Create Rust SBOM (crate)
-        run: cargo cyclonedx --manifest-path pydantable-core/Cargo.toml --format json --override-filename sbom-rust.cdx.json
+        run: cargo cyclonedx --manifest-path pydantable-core/Cargo.toml --format json --override-filename sbom-rust.cdx
 
       - name: Verify SBOM files exist
         run: |
           test -s sbom-python.cdx.json
-          test -s sbom-rust.cdx.json
+          test -s pydantable-core/sbom-rust.cdx.json
 
       - name: Upload SBOM artifacts
         uses: actions/upload-artifact@v5
@@ -54,14 +54,14 @@ jobs:
           name: sbom-cyclonedx
           path: |
             sbom-python.cdx.json
-            sbom-rust.cdx.json
+            pydantable-core/sbom-rust.cdx.json
 
       - name: Attach SBOMs to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             sbom-python.cdx.json
-            sbom-rust.cdx.json
+            pydantable-core/sbom-rust.cdx.json
 
   publish-pypi-manylinux-x86_64:
     name: PyPI manylinux x86_64 + sdist
