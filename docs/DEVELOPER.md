@@ -29,16 +29,12 @@ Activate when working interactively:
 source .venv/bin/activate
 ```
 
-## SBOMs (CycloneDX)
+## Optional CycloneDX SBOMs (local)
 
-For the `v1.0.0` release train, the release workflow generates **CycloneDX** SBOMs for:
-
-- The **Python environment** used to build/install the distribution.
-- The **Rust crate** (`pydantable-core`).
-
-These SBOMs are attached to the GitHub Release and uploaded as workflow artifacts.
-
-**CI note:** Workflows install **`cargo-cyclonedx` 0.5.8** with **`--locked`**. Version **0.5.9** raised that tool’s **MSRV to Rust 1.85**, so an unpinned **`cargo install cargo-cyclonedx`** can fail (e.g. exit code **101**) on runners whose default **`stable`** is still older. Bump the pinned version only after confirming `stable` on **ubuntu-latest** meets the release’s MSRV.
+CI and the tag **Release** workflow do **not** generate SBOMs. If you need **CycloneDX**
+files for compliance, install **`cyclonedx-bom`** and **`cargo-cyclonedx`** locally and run
+**`cyclonedx-py environment`** / **`cargo cyclonedx`** against your checkout (see historical
+**1.2.0** changelog notes for the former automation shape).
 
 ## Rust feature flags (`pydantable-core`)
 
@@ -420,7 +416,7 @@ Use this checklist on the exact commit intended for tag `v1.0.0` (and again for 
 - [ ] `cargo check --manifest-path pydantable-core/Cargo.toml --no-default-features` passes.
 - [ ] full Python test suite passes in the CI-equivalent environment (`pytest -n auto` and required optional-deps legs).
 - [ ] `tests/test_version_alignment.py` passes (`__version__ == _core.rust_version()`).
-- [ ] release workflow dry-run evidence is captured (wheel/sdist + SBOM artifact expectations met).
+- [ ] release workflow dry-run evidence is captured (wheel/sdist expectations met).
 
 ### Security advisory policy (1.x)
 

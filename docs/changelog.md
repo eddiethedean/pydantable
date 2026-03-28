@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is inspired 
 
 <!-- Add notes here for the next 1.x release. -->
 
+### Removed
+
+- **CI / Release:** CycloneDX SBOM generation and upload jobs (too fragile for default
+  automation); generate SBOMs locally if required (see {doc}`DEVELOPER` **Optional CycloneDX SBOMs**).
+
 ## [1.2.0] — 2026-03-28
 
 ### Added
@@ -21,7 +26,6 @@ All notable changes to this project are documented here. The format is inspired 
 ### Fixed
 
 - **`cargo check -p pydantable-core --no-default-features`:** exhaustive **`DTypeDesc::Scalar`** matches and row-wise **`CompareOp`** / **`cast_literal_value`** coverage for **IPv4** / **IPv6** / **WKB** when **`polars_engine`** is off.
-- **CI:** **SBOM** jobs pin **`cargo-cyclonedx` 0.5.8** (**`--locked`**) so installing the tool does not require Rust **1.85+** (see {doc}`DEVELOPER`).
 
 ### Typing / lint
 
