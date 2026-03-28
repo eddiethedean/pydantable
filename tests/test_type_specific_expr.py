@@ -14,6 +14,10 @@ class _Num(Schema):
     y: float
 
 
+class _IntOnly(Schema):
+    x: int
+
+
 class _Str(Schema):
     s: str
 
@@ -148,9 +152,39 @@ def test_string_predicates_reject_non_string_column() -> None:
             df.with_columns(z=meth(arg))
 
 
+def test_string_format_ops_reject_non_string_column() -> None:
+    """str_reverse, pad, zfill, regex extract, JSONPath require string-like columns."""
+    df = DataFrame[_IntOnly]({"x": [1]})
+    with pytest.raises(TypeError, match="string"):
+        df.with_columns(z=df.x.str_reverse())
+    with pytest.raises(TypeError, match="string"):
+        df.with_columns(z=df.x.str_pad_start(3, "0"))
+    with pytest.raises(TypeError, match="string"):
+        df.with_columns(z=df.x.str_zfill(3))
+    with pytest.raises(TypeError, match="string"):
+        df.with_columns(z=df.x.str_extract_regex(r"\d", 0))
+    with pytest.raises(TypeError, match="string"):
+        df.with_columns(z=df.x.str_json_path_match("$.a"))
+
+
+def test_list_join_sort_unique_reject_non_list_column() -> None:
+    df = DataFrame[_Str]({"s": ["a"]})
+    for meth_name, args in (
+        ("list_join", (",",)),
+        ("list_sort", ()),
+        ("list_unique", ()),
+    ):
+        meth = getattr(df.s, meth_name)
+        with pytest.raises(TypeError, match="list"):
+            if args:
+                df.with_columns(z=meth(*args))
+            else:
+                df.with_columns(z=meth())
+
+
 def test_dt_weekday_quarter_reject_time_column() -> None:
     df = DataFrame[_Tonly]({"t": [time(12, 0, 0)]})
-    for meth_name in ("dt_weekday", "dt_quarter"):
+    for meth_name in ("dt_weekday", "dt_quarter", "dt_week"):
         meth = getattr(df.t, meth_name)
         with pytest.raises(TypeError, match=r"datetime|date|temporal"):
             df.with_columns(z=meth())
@@ -431,6 +465,24 @@ def test_dt_week_matches_python_isocalendar() -> None:
     out = df.with_columns(w=df.d.dt_week()).to_dict()
     assert out["w"] == [d.isocalendar().week for d in samples]
 
+    # Datetime column: week from calendar date (naive wall time).
+    dts = [
+        datetime(2024, 1, 1, 15, 30, 0),
+        datetime(2020, 12, 31, 0, 0, 0),
+    ]
+    df2 = DataFrame[_Dt]({"ts": dts})
+    out2 = df2.with_columns(w=df2.ts.dt_week()).to_dict()
+    assert out2["w"] == [dt.date().isocalendar().week for dt in dts]
+
+
+def test_dt_week_year_boundary_week_53() -> None:
+    """ISO week can be 53 in some years; align with Python isocalendar."""
+    d = date(2020, 12, 31)
+    df = DataFrame[_Donly]({"d": [d]})
+    out = df.with_columns(w=df.d.dt_week()).to_dict()
+    assert out["w"] == [d.isocalendar().week]
+    assert out["w"][0] == 53
+
 
 def test_list_join_sort_unique() -> None:
     df = DataFrame[_ListStr](
@@ -459,6 +511,63 @@ def test_list_join_rejects_non_str_list() -> None:
     df = DataFrame[_ListInt]({"items": [[1, 2]]})
     with pytest.raises(TypeError, match=r"list_join|list\[str\]"):
         df.with_columns(x=df.items.list_join(","))
+
+
+def test_list_join_empty_and_unicode_separator() -> None:
+    df = DataFrame[_ListStr]({"tok": [[], ["caf", "é"], ["a", "b"]]})
+    out = df.with_columns(
+        j=df.tok.list_join(","),
+        ju=df.tok.list_join(" · "),
+    ).collect(as_lists=True)
+    assert out["j"] == ["", "caf,é", "a,b"]
+    assert out["ju"] == ["", "caf · é", "a · b"]
+
+
+def test_list_sort_int_list_nulls_last() -> None:
+    df = DataFrame[_ListInt]({"items": [[3, 1, 2], [1, 0, 2]]})
+    out = df.with_columns(
+        a=df.items.list_sort(),
+        d=df.items.list_sort(descending=True),
+        nl=df.items.list_sort(nulls_last=True),
+    ).collect(as_lists=True)
+    assert out["a"] == [[1, 2, 3], [0, 1, 2]]
+    assert out["d"] == [[3, 2, 1], [2, 1, 0]]
+    assert out["nl"] == [[1, 2, 3], [0, 1, 2]]
+
+
+def test_list_sort_float_list() -> None:
+    df = DataFrame[_ListFloat]({"nums": [[2.5, 1.0], [0.0, -1.0]]})
+    out = df.with_columns(s=df.nums.list_sort()).collect(as_lists=True)
+    assert out["s"] == [[1.0, 2.5], [-1.0, 0.0]]
+
+
+def test_str_reverse_unicode_and_null_string() -> None:
+    # Polars ``str.reverse`` follows its UTF-8 rules (combining marks may move).
+    df = DataFrame[_StrOpt]({"s": ["a\u0301b", None, "😀!"]})
+    out = df.with_columns(r=df.s.str_reverse()).collect(as_lists=True)
+    assert out["r"][0] == "\u0062\u0061\u0301"
+    assert out["r"][1] is None
+    assert out["r"][2] == "!😀"
+
+
+def test_str_pad_fill_char_validation() -> None:
+    df = DataFrame[_Str]({"s": ["a"]})
+    with pytest.raises(ValueError, match="empty"):
+        df.with_columns(x=df.s.str_pad_start(3, ""))
+    with pytest.raises(ValueError, match="single"):
+        df.with_columns(x=df.s.str_pad_end(3, "ab"))
+
+
+def test_str_extract_regex_oob_group_null() -> None:
+    df = DataFrame[_Str]({"s": ["a1"]})
+    out = df.with_columns(huge=df.s.str_extract_regex(r"a(\d)", 99)).to_dict()
+    assert out["huge"] == [None]
+
+
+def test_str_json_path_match_string_scalar_encoded() -> None:
+    df = DataFrame[_Str]({"s": [r'{"a": "z"}']})
+    out = df.with_columns(v=df.s.str_json_path_match("$.a")).collect(as_lists=True)
+    assert out["v"] == ["z"]
 
 
 def test_string_reverse_pad_zfill() -> None:
@@ -505,9 +614,3 @@ def test_str_json_path_empty_raises() -> None:
     df = DataFrame[_Str]({"s": ['{"a":1}']})
     with pytest.raises(ValueError, match="empty"):
         df.with_columns(v=df.s.str_json_path_match(""))
-
-
-def test_dt_week_rejects_time_column() -> None:
-    df = DataFrame[_Tonly]({"t": [time(12, 0, 0)]})
-    with pytest.raises(TypeError, match=r"datetime|date|temporal"):
-        df.with_columns(w=df.t.dt_week())

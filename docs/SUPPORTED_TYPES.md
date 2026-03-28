@@ -242,21 +242,27 @@ Temporal part extraction and `dt_date()` on timezone-aware `datetime` values fol
 
 **`str_split(delimiter)`** returns **`list[str]`** per row. The delimiter is a **literal** string (not regex). An **empty delimiter** follows Polars split rules (typically **per-character** splits for non-empty strings; an **empty** input string often yields an **empty** list). **Null** inputs remain **null**.
 
-### Semantics: `dt_weekday`, `dt_quarter`, and `list_mean`
+### Semantics: `dt_weekday`, `dt_quarter`, `dt_week`, and `list_mean`
 
-- **`dt_weekday()`** / **`dt_quarter()`** are allowed only on **`date`** or **`datetime`** (not on **`time`**); other dtypes raise **`TypeError`** at expression build time. **Weekday** matches **ISO** ordering as in Polars: **Monday = 1** … **Sunday = 7** (aligned with **`datetime.isoweekday()`**). **Quarter** is **1–4** from the calendar month.
+- **`dt_weekday()`** / **`dt_quarter()`** / **`dt_week()`** are allowed only on **`date`** or **`datetime`** (not on **`time`**); other dtypes raise **`TypeError`** at expression build time. **Weekday** matches **ISO** ordering as in Polars: **Monday = 1** … **Sunday = 7** (aligned with **`datetime.isoweekday()`**). **Quarter** is **1–4** from the calendar month. **`dt_week()`** is the **ISO 8601** week number **1–53** (same as **`date.isocalendar().week`** and Polars **`dt.week()`**); on **`datetime`**, the week is taken from the **calendar date** of the stored timestamp (wall time, engine timezone rules apply for aware dtypes).
 - **`list_mean()`** requires **`list[int]`** or **`list[float]`**; other element types raise **`TypeError`**. The result is always **`float`**. **Empty lists** and **null list cells** yield **null** in the output column.
 
 ### Semantics: `list_join`, `list_sort`, `list_unique`
 
-- **`list_join`**: only **`list[str]`**; otherwise **`TypeError`**. **`ignore_nulls`** is passed through to Polars **`list.join`** (null entries inside a list may be skipped when **`True`**).
+- **`list_join`**: only **`list[str]`**; otherwise **`TypeError`**. An **empty** list cell yields an **empty** string. **`ignore_nulls`** is passed through to Polars **`list.join`** (null **elements** inside a list may be skipped when **`True`**). Multi-codepoint **`separator`** strings are allowed (UTF-8).
 - **`list_sort`**: list elements must be **`int`**, **`float`**, **`bool`**, **`str`**, **`date`**, **`datetime`**, **`time`**, **`enum`**, or **`uuid`** (scalar list cells). **`descending`**, **`nulls_last`**, and **`maintain_order`** map to Polars **`SortOptions`** for **`list.sort`**.
 - **`list_unique`**: same element-type restriction as **`list_sort`**. **`stable=True`** uses Polars **`unique_stable`** (keep first-seen order among duplicates).
 
+### Semantics: `str_reverse`, `str_pad`, `str_zfill`
+
+- **`str_reverse()`**: Polars **`str.reverse`** (UTF-8 string reversal). **Combining characters** and other Unicode edge cases follow **Polars** rules, not necessarily naive per-codepoint reversal. **Null** string cells stay **null**.
+- **`str_pad_start` / `str_pad_end`**: **`fill_char`** must be a **single** non-empty Unicode scalar (one user-perceived character). **Empty** **`fill_char`** or **more than one** character raises **`ValueError`** when the expression is built. **Null** inputs stay **null**.
+- **`str_zfill`**: same **null** propagation as other string ops; numeric-string padding follows Polars **`str.zfill`**.
+
 ### Semantics: `str_extract_regex` and `str_json_path_match`
 
-- **`str_extract_regex`**: empty **`pattern`** raises **`ValueError`** when the expression is built. Uses Polars **`str.extract`** (Rust regex). **`group_index`** **`0`** is the full match; **`1+`** are capture groups. Out-of-range group or non-matching rows often yield **null** at execution.
-- **`str_json_path_match`**: **`path`** uses Polars JSONPath (**`$...`** style). Empty **`path`** raises **`ValueError`**. Each cell must hold JSON text; **malformed JSON** or **no match** typically yields **null** (engine-dependent). The output dtype is **`str`** (matched fragment as string, e.g. JSON scalars without quotes per Polars).
+- **`str_extract_regex`**: empty **`pattern`** raises **`ValueError`** when the expression is built. Uses Polars **`str.extract`** (Rust regex). **`group_index`** **`0`** is the full match; **`1+`** are capture groups. **Out-of-range** **`group_index`** or non-matching rows typically yield **null** at execution (no error per row).
+- **`str_json_path_match`**: **`path`** uses Polars JSONPath (**`$...`** style). Empty **`path`** raises **`ValueError`**. Each cell must hold JSON text; **malformed JSON** or **no match** typically yields **null** (engine-dependent). The output dtype is **`str`** (matched fragment as string, e.g. JSON scalars without quotes per Polars). Use a **`str`** column whose values are JSON documents (or JSON embedded in a string literal), not a separate JSON dtype.
 
 ## Not supported as schema column types
 

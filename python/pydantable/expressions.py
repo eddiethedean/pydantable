@@ -319,12 +319,20 @@ class Expr:  # type: ignore[override]
         return Expr(rust_expr=rust.expr_string_split(self._rust_expr, str(delimiter)))
 
     def str_reverse(self) -> Expr:
-        """Reverse each string (UTF-8 character order, Polars ``str.reverse``)."""
+        """Reverse each string (Polars ``str.reverse``).
+
+        Unicode edge cases (e.g. combining marks) follow Polars, not naive
+        codepoint reversal. See ``SUPPORTED_TYPES``.
+        """
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_str_reverse(self._rust_expr))
 
     def str_pad_start(self, length: int, fill_char: str = " ") -> Expr:
-        """Pad start to at least ``length`` characters (character count, not bytes)."""
+        """Pad start to at least ``length`` characters (character count).
+
+        ``fill_char`` must be exactly one non-empty character; otherwise
+        ``ValueError`` at build time.
+        """
         rust = _require_rust_core()
         return Expr(
             rust_expr=rust.expr_str_pad_start(
@@ -333,7 +341,10 @@ class Expr:  # type: ignore[override]
         )
 
     def str_pad_end(self, length: int, fill_char: str = " ") -> Expr:
-        """Pad end to at least ``length`` characters."""
+        """Pad end to at least ``length`` characters.
+
+        Same ``fill_char`` rules as :meth:`str_pad_start`.
+        """
         rust = _require_rust_core()
         return Expr(
             rust_expr=rust.expr_str_pad_end(
@@ -576,7 +587,11 @@ class Expr:  # type: ignore[override]
         return Expr(rust_expr=rust.expr_list_mean(self._rust_expr))
 
     def list_join(self, separator: str, *, ignore_nulls: bool = False) -> Expr:
-        """Join each ``list[str]`` cell with ``separator`` (Polars ``list.join``)."""
+        """Join each ``list[str]`` cell (Polars ``list.join``).
+
+        Empty lists yield empty strings. ``ignore_nulls`` skips null list
+        elements when ``True``. See ``SUPPORTED_TYPES``.
+        """
         rust = _require_rust_core()
         return Expr(
             rust_expr=rust.expr_list_join(
@@ -591,7 +606,11 @@ class Expr:  # type: ignore[override]
         nulls_last: bool = False,
         maintain_order: bool = False,
     ) -> Expr:
-        """Sort each list cell (orderable element types; see ``SUPPORTED_TYPES``)."""
+        """Sort each list cell in place (``list[int]``, ``list[float]``, etc.).
+
+        ``descending``, ``nulls_last``, and ``maintain_order`` map to Polars
+        ``list.sort`` options. Element-type rules are in ``SUPPORTED_TYPES``.
+        """
         rust = _require_rust_core()
         return Expr(
             rust_expr=rust.expr_list_sort(

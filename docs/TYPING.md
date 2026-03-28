@@ -112,6 +112,8 @@ PydanTable ships `py.typed` and `.pyi` stubs for the public surface. In the repo
 ## Related docs
 
 - `DATAFRAMEMODEL.md`: end-user guide with typing examples.
-- `SUPPORTED_TYPES.md`: dtype/nullable contract used by expression typing.
+- `SUPPORTED_TYPES.md`: dtype/nullable contract and **per-method** `Expr` rules
+  (what dtypes each method accepts, null behavior, Polars vs stub execution).
+- `INTERFACE_CONTRACT.md`: engine capabilities (Polars-backed vs row-wise stub).
 - `TROUBLESHOOTING.md`: common typing pitfalls.
 
