@@ -272,12 +272,13 @@ fn expr_string_unary(
         ("strip", None) => StringUnaryOp::Strip,
         ("upper", None) => StringUnaryOp::Upper,
         ("lower", None) => StringUnaryOp::Lower,
+        ("reverse", None) => StringUnaryOp::Reverse,
         ("strip_prefix", Some(s)) => StringUnaryOp::StripPrefix(s.to_string()),
         ("strip_suffix", Some(s)) => StringUnaryOp::StripSuffix(s.to_string()),
         ("strip_chars", Some(s)) => StringUnaryOp::StripChars(s.to_string()),
         _ => {
             return Err(pyo3::exceptions::PyValueError::new_err(
-                "string_unary: use op 'strip'|'upper'|'lower' (no arg), or \
+                "string_unary: use op 'strip'|'upper'|'lower'|'reverse' (no arg), or \
                  'strip_prefix'|'strip_suffix'|'strip_chars' with a string arg.",
             ));
         }
@@ -328,9 +329,10 @@ fn expr_temporal_part(inner: Bound<'_, PyExpr>, part: String) -> PyResult<PyExpr
         "nanosecond" => TemporalPart::Nanosecond,
         "weekday" => TemporalPart::Weekday,
         "quarter" => TemporalPart::Quarter,
+        "week" => TemporalPart::Week,
         _ => {
             return Err(pyo3::exceptions::PyValueError::new_err(
-                "temporal part must be year|month|day|hour|minute|second|nanosecond|weekday|quarter",
+                "temporal part must be year|month|day|hour|minute|second|nanosecond|weekday|quarter|week",
             ));
         }
     };
@@ -388,6 +390,112 @@ fn expr_list_sum(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
 fn expr_list_mean(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
     Ok(PyExpr {
         node: ExprNode::make_list_mean(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (inner, separator, *, ignore_nulls = false))]
+fn expr_list_join(
+    inner: Bound<'_, PyExpr>,
+    separator: String,
+    ignore_nulls: bool,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_list_join(inner.borrow().node.clone(), separator, ignore_nulls)?,
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (inner, *, descending = false, nulls_last = false, maintain_order = false))]
+fn expr_list_sort(
+    inner: Bound<'_, PyExpr>,
+    descending: bool,
+    nulls_last: bool,
+    maintain_order: bool,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_list_sort(
+            inner.borrow().node.clone(),
+            descending,
+            nulls_last,
+            maintain_order,
+        )?,
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (inner, *, stable = false))]
+fn expr_list_unique(inner: Bound<'_, PyExpr>, stable: bool) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_list_unique(inner.borrow().node.clone(), stable)?,
+    })
+}
+
+#[pyfunction]
+fn expr_str_reverse(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_str_reverse(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_str_pad_start(
+    inner: Bound<'_, PyExpr>,
+    length: u32,
+    fill_char: String,
+) -> PyResult<PyExpr> {
+    let mut it = fill_char.chars();
+    let ch = it
+        .next()
+        .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("fill_char must not be empty."))?;
+    if it.next().is_some() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "fill_char must be a single Unicode character.",
+        ));
+    }
+    Ok(PyExpr {
+        node: ExprNode::make_str_pad_start(inner.borrow().node.clone(), length, ch)?,
+    })
+}
+
+#[pyfunction]
+fn expr_str_pad_end(inner: Bound<'_, PyExpr>, length: u32, fill_char: String) -> PyResult<PyExpr> {
+    let mut it = fill_char.chars();
+    let ch = it
+        .next()
+        .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("fill_char must not be empty."))?;
+    if it.next().is_some() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "fill_char must be a single Unicode character.",
+        ));
+    }
+    Ok(PyExpr {
+        node: ExprNode::make_str_pad_end(inner.borrow().node.clone(), length, ch)?,
+    })
+}
+
+#[pyfunction]
+fn expr_str_zfill(inner: Bound<'_, PyExpr>, length: u32) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_str_zfill(inner.borrow().node.clone(), length)?,
+    })
+}
+
+#[pyfunction]
+fn expr_str_extract_regex(
+    inner: Bound<'_, PyExpr>,
+    pattern: String,
+    group_index: usize,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_string_extract(inner.borrow().node.clone(), pattern, group_index)?,
+    })
+}
+
+#[pyfunction]
+fn expr_str_json_path_match(inner: Bound<'_, PyExpr>, path: String) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_string_json_path_match(inner.borrow().node.clone(), path)?,
     })
 }
 
@@ -744,6 +852,15 @@ pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr_list_max, m)?)?;
     m.add_function(wrap_pyfunction!(expr_list_sum, m)?)?;
     m.add_function(wrap_pyfunction!(expr_list_mean, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_list_join, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_list_sort, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_list_unique, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_str_reverse, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_str_pad_start, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_str_pad_end, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_str_zfill, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_str_extract_regex, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_str_json_path_match, m)?)?;
     m.add_function(wrap_pyfunction!(expr_string_split, m)?)?;
     m.add_function(wrap_pyfunction!(expr_datetime_to_date, m)?)?;
     m.add_function(wrap_pyfunction!(expr_window_row_number, m)?)?;

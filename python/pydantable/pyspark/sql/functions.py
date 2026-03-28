@@ -164,6 +164,11 @@ def quarter(column: Expr) -> Expr:
     return column.dt_quarter()
 
 
+def weekofyear(column: Expr) -> Expr:
+    """ISO 8601 week number 1-53 (core :meth:`Expr.dt_week`)."""
+    return column.dt_week()
+
+
 def lower(column: Expr) -> Expr:
     """Lowercase string column (Spark ``lower``)."""
     return column.lower()
@@ -223,6 +228,42 @@ def split(column: Expr, delimiter: str) -> Expr:
     if not isinstance(column, Expr):
         raise TypeError("functions.split() expects a typed column Expr.")
     return column.str_split(delimiter)
+
+
+def reverse(column: Expr) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.reverse() expects a typed column Expr.")
+    return column.str_reverse()
+
+
+def lpad(column: Expr, length: int, pad: str = " ") -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.lpad() expects a typed column Expr.")
+    return column.str_pad_start(length, pad)
+
+
+def rpad(column: Expr, length: int, pad: str = " ") -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.rpad() expects a typed column Expr.")
+    return column.str_pad_end(length, pad)
+
+
+def lpad_zero(column: Expr, length: int) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.lpad_zero() expects a typed column Expr.")
+    return column.str_zfill(length)
+
+
+def regexp_extract(column: Expr, pattern: str, group_index: int = 1) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.regexp_extract() expects a typed column Expr.")
+    return column.str_extract_regex(pattern, group_index)
+
+
+def json_path_match(column: Expr, path: str) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.json_path_match() expects a typed column Expr.")
+    return column.str_json_path_match(path)
 
 
 def strip_prefix(column: Expr, prefix: str) -> Expr:
@@ -300,6 +341,34 @@ def list_mean(column: Expr) -> Expr:
     if not isinstance(column, Expr):
         raise TypeError("functions.list_mean() expects a typed column Expr.")
     return column.list_mean()
+
+
+def list_join(column: Expr, delimiter: str, *, ignore_nulls: bool = False) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.list_join() expects a typed column Expr.")
+    return column.list_join(delimiter, ignore_nulls=ignore_nulls)
+
+
+def list_sort(
+    column: Expr,
+    *,
+    descending: bool = False,
+    nulls_last: bool = False,
+    maintain_order: bool = False,
+) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.list_sort() expects a typed column Expr.")
+    return column.list_sort(
+        descending=descending,
+        nulls_last=nulls_last,
+        maintain_order=maintain_order,
+    )
+
+
+def array_distinct(column: Expr, *, stable: bool = False) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.array_distinct() expects a typed column Expr.")
+    return column.list_unique(stable=stable)
 
 
 def abs(column: Expr) -> Expr:
@@ -504,6 +573,7 @@ def element_at(column: Expr, key: str) -> Expr:
 
 __all__ = [
     "abs",
+    "array_distinct",
     "avg",
     "between",
     "binary_len",
@@ -526,18 +596,23 @@ __all__ = [
     "isin",
     "isnotnull",
     "isnull",
+    "json_path_match",
     "lag",
     "lead",
     "length",
     "list_contains",
     "list_get",
+    "list_join",
     "list_len",
     "list_max",
     "list_mean",
     "list_min",
+    "list_sort",
     "list_sum",
     "lit",
     "lower",
+    "lpad",
+    "lpad_zero",
     "map_contains_key",
     "map_entries",
     "map_from_entries",
@@ -553,9 +628,12 @@ __all__ = [
     "nanosecond",
     "quarter",
     "rank",
+    "regexp_extract",
     "regexp_replace",
+    "reverse",
     "round",
     "row_number",
+    "rpad",
     "second",
     "split",
     "starts_with",
@@ -571,6 +649,7 @@ __all__ = [
     "trim",
     "unix_timestamp",
     "upper",
+    "weekofyear",
     "when",
     "window_avg",
     "window_max",

@@ -270,6 +270,23 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
                     dict.set_item("op", "strip_chars")?;
                     dict.set_item("chars", c.as_str())?;
                 }
+                StringUnaryOp::Reverse => {
+                    dict.set_item("op", "reverse")?;
+                }
+                StringUnaryOp::PadStart { length, fill_char } => {
+                    dict.set_item("op", "pad_start")?;
+                    dict.set_item("length", *length)?;
+                    dict.set_item("fill_char", fill_char.to_string())?;
+                }
+                StringUnaryOp::PadEnd { length, fill_char } => {
+                    dict.set_item("op", "pad_end")?;
+                    dict.set_item("length", *length)?;
+                    dict.set_item("fill_char", fill_char.to_string())?;
+                }
+                StringUnaryOp::ZFill { length } => {
+                    dict.set_item("op", "zfill")?;
+                    dict.set_item("length", *length)?;
+                }
             }
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
         }
@@ -305,6 +322,7 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
                     TemporalPart::Nanosecond => "nanosecond",
                     TemporalPart::Weekday => "weekday",
                     TemporalPart::Quarter => "quarter",
+                    TemporalPart::Week => "week",
                 },
             )?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
@@ -339,12 +357,57 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             dict.set_item("kind", "list_mean")?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
         }
+        ExprNode::ListJoin {
+            inner,
+            separator,
+            ignore_nulls,
+            ..
+        } => {
+            dict.set_item("kind", "list_join")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+            dict.set_item("separator", separator.as_str())?;
+            dict.set_item("ignore_nulls", *ignore_nulls)?;
+        }
+        ExprNode::ListSort {
+            inner,
+            descending,
+            nulls_last,
+            maintain_order,
+            ..
+        } => {
+            dict.set_item("kind", "list_sort")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+            dict.set_item("descending", *descending)?;
+            dict.set_item("nulls_last", *nulls_last)?;
+            dict.set_item("maintain_order", *maintain_order)?;
+        }
+        ExprNode::ListUnique { inner, stable, .. } => {
+            dict.set_item("kind", "list_unique")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+            dict.set_item("stable", *stable)?;
+        }
         ExprNode::StringSplit {
             inner, delimiter, ..
         } => {
             dict.set_item("kind", "string_split")?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
             dict.set_item("delimiter", delimiter.as_str())?;
+        }
+        ExprNode::StringExtract {
+            inner,
+            pattern,
+            group_index,
+            ..
+        } => {
+            dict.set_item("kind", "string_extract")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+            dict.set_item("pattern", pattern.as_str())?;
+            dict.set_item("group_index", *group_index)?;
+        }
+        ExprNode::StringJsonPathMatch { inner, path, .. } => {
+            dict.set_item("kind", "string_json_path_match")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+            dict.set_item("path", path.as_str())?;
         }
         ExprNode::DatetimeToDate { inner, .. } => {
             dict.set_item("kind", "datetime_to_date")?;

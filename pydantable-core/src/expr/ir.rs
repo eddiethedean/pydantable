@@ -59,6 +59,22 @@ pub enum StringUnaryOp {
     StripSuffix(String),
     /// Trim any of the given characters from both ends (Polars `strip_chars`).
     StripChars(String),
+    /// Reverse UTF-8 string (Polars `str.reverse`).
+    Reverse,
+    /// Pad start to at least `length` characters (`str.pad_start`).
+    PadStart {
+        length: u32,
+        fill_char: char,
+    },
+    /// Pad end to at least `length` characters (`str.pad_end`).
+    PadEnd {
+        length: u32,
+        fill_char: char,
+    },
+    /// Zero-pad after sign (`str.zfill`).
+    ZFill {
+        length: u32,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -81,6 +97,8 @@ pub enum TemporalPart {
     Weekday,
     /// Calendar quarter 1–4 (`datetime` / `date`).
     Quarter,
+    /// ISO 8601 week number 1–53 (`datetime` / `date`; Polars `dt.week()`).
+    Week,
 }
 
 /// String column predicate producing `bool` (Polars `str` namespace).
@@ -258,10 +276,44 @@ pub enum ExprNode {
         inner: Box<ExprNode>,
         dtype: DTypeDesc,
     },
+    /// Join `list[str]` with separator → `str`.
+    ListJoin {
+        inner: Box<ExprNode>,
+        separator: String,
+        ignore_nulls: bool,
+        dtype: DTypeDesc,
+    },
+    /// Sort each list cell (orderable scalar elements).
+    ListSort {
+        inner: Box<ExprNode>,
+        descending: bool,
+        nulls_last: bool,
+        maintain_order: bool,
+        dtype: DTypeDesc,
+    },
+    /// Deduplicate each list cell (first-seen order unless `stable`).
+    ListUnique {
+        inner: Box<ExprNode>,
+        stable: bool,
+        dtype: DTypeDesc,
+    },
     /// Split string column by delimiter → `list[str]`.
     StringSplit {
         inner: Box<ExprNode>,
         delimiter: String,
+        dtype: DTypeDesc,
+    },
+    /// Regex capture (`str.extract`); group 0 = whole match, 1+ = capture groups.
+    StringExtract {
+        inner: Box<ExprNode>,
+        pattern: String,
+        group_index: usize,
+        dtype: DTypeDesc,
+    },
+    /// JSONPath match against a JSON string cell (`str.json_path_match`); result `str` (null if no match / invalid JSON per Polars).
+    StringJsonPathMatch {
+        inner: Box<ExprNode>,
+        path: String,
         dtype: DTypeDesc,
     },
     /// `datetime` column → calendar `date` (Polars `dt.date()`).

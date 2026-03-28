@@ -68,7 +68,12 @@ impl PolarsPlanRunner {
             | ExprNode::ListMax { inner, .. }
             | ExprNode::ListSum { inner, .. }
             | ExprNode::ListMean { inner, .. }
+            | ExprNode::ListJoin { inner, .. }
+            | ExprNode::ListSort { inner, .. }
+            | ExprNode::ListUnique { inner, .. }
             | ExprNode::StringSplit { inner, .. }
+            | ExprNode::StringExtract { inner, .. }
+            | ExprNode::StringJsonPathMatch { inner, .. }
             | ExprNode::DatetimeToDate { inner, .. }
             | ExprNode::Strptime { inner, .. }
             | ExprNode::UnixTimestamp { inner, .. }

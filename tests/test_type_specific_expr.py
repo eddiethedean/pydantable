@@ -423,3 +423,91 @@ def test_list_get_contains_min_max_sum() -> None:
     df2 = DataFrame[_ListFloat]({"nums": [[1.5, 2.5], [0.0]]})
     out2 = df2.with_columns(s=df2.nums.list_sum()).collect(as_lists=True)
     assert out2["s"] == [4.0, 0.0]
+
+
+def test_dt_week_matches_python_isocalendar() -> None:
+    samples = [date(2024, 1, 1), date(2015, 1, 1), date(2021, 1, 4)]
+    df = DataFrame[_Donly]({"d": samples})
+    out = df.with_columns(w=df.d.dt_week()).to_dict()
+    assert out["w"] == [d.isocalendar().week for d in samples]
+
+
+def test_list_join_sort_unique() -> None:
+    df = DataFrame[_ListStr](
+        {
+            "tok": [
+                ["b", "a", "b"],
+                ["x", "y"],
+            ],
+        }
+    )
+    out = df.with_columns(
+        j=df.tok.list_join(","),
+        so=df.tok.list_sort(),
+        sd=df.tok.list_sort(descending=True),
+        u=df.tok.list_unique(),
+        us=df.tok.list_unique(stable=True),
+    ).collect(as_lists=True)
+    assert out["j"] == ["b,a,b", "x,y"]
+    assert out["so"] == [["a", "b", "b"], ["x", "y"]]
+    assert out["sd"][0] == ["b", "b", "a"]
+    assert out["u"][0] in (["a", "b"], ["b", "a"])
+    assert out["us"][0] == ["b", "a"]
+
+
+def test_list_join_rejects_non_str_list() -> None:
+    df = DataFrame[_ListInt]({"items": [[1, 2]]})
+    with pytest.raises(TypeError, match=r"list_join|list\[str\]"):
+        df.with_columns(x=df.items.list_join(","))
+
+
+def test_string_reverse_pad_zfill() -> None:
+    df = DataFrame[_Str]({"s": ["ab", "42", "-7", "x"]})
+    out = df.with_columns(
+        r=df.s.str_reverse(),
+        ps=df.s.str_pad_start(4, "0"),
+        pe=df.s.str_pad_end(4, "."),
+        z=df.s.str_zfill(4),
+    ).collect(as_lists=True)
+    assert out["r"] == ["ba", "24", "7-", "x"]
+    assert out["ps"] == ["00ab", "0042", "00-7", "000x"]
+    assert out["pe"] == ["ab..", "42..", "-7..", "x..."]
+    assert out["z"] == ["00ab", "0042", "-007", "000x"]
+
+
+def test_str_extract_regex_groups() -> None:
+    df = DataFrame[_Str]({"s": ["a1b2", "nope"]})
+    out = df.with_columns(
+        g0=df.s.str_extract_regex(r"a(\d)b(\d)", 0),
+        g1=df.s.str_extract_regex(r"a(\d)b(\d)", 1),
+        g2=df.s.str_extract_regex(r"a(\d)b(\d)", 2),
+    ).to_dict()
+    assert out["g0"] == ["a1b2", None]
+    assert out["g1"] == ["1", None]
+    assert out["g2"] == ["2", None]
+
+
+def test_str_extract_empty_pattern_raises() -> None:
+    df = DataFrame[_Str]({"s": ["a"]})
+    with pytest.raises(ValueError, match="empty"):
+        df.with_columns(x=df.s.str_extract_regex("", 1))
+
+
+def test_str_json_path_match_basic() -> None:
+    df = DataFrame[_StrOpt]({"s": [r'{"a": 1}', r'{"a": "z"}', "not-json", None]})
+    out = df.with_columns(v=df.s.str_json_path_match("$.a")).to_dict()
+    assert out["v"][0] is not None
+    assert out["v"][2] is None
+    assert out["v"][3] is None
+
+
+def test_str_json_path_empty_raises() -> None:
+    df = DataFrame[_Str]({"s": ['{"a":1}']})
+    with pytest.raises(ValueError, match="empty"):
+        df.with_columns(v=df.s.str_json_path_match(""))
+
+
+def test_dt_week_rejects_time_column() -> None:
+    df = DataFrame[_Tonly]({"t": [time(12, 0, 0)]})
+    with pytest.raises(TypeError, match=r"datetime|date|temporal"):
+        df.with_columns(w=df.t.dt_week())

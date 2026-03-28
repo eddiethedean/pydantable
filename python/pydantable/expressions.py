@@ -318,6 +318,58 @@ class Expr:  # type: ignore[override]
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_string_split(self._rust_expr, str(delimiter)))
 
+    def str_reverse(self) -> Expr:
+        """Reverse each string (UTF-8 character order, Polars ``str.reverse``)."""
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_str_reverse(self._rust_expr))
+
+    def str_pad_start(self, length: int, fill_char: str = " ") -> Expr:
+        """Pad start to at least ``length`` characters (character count, not bytes)."""
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_str_pad_start(
+                self._rust_expr, int(length), str(fill_char)
+            )
+        )
+
+    def str_pad_end(self, length: int, fill_char: str = " ") -> Expr:
+        """Pad end to at least ``length`` characters."""
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_str_pad_end(
+                self._rust_expr, int(length), str(fill_char)
+            )
+        )
+
+    def str_zfill(self, length: int) -> Expr:
+        """Zero-pad strings to ``length`` (sign handled like Polars ``str.zfill``)."""
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_str_zfill(self._rust_expr, int(length)))
+
+    def str_extract_regex(self, pattern: str, group_index: int = 1) -> Expr:
+        """Extract a regex capture group per row (Rust ``regex`` dialect).
+
+        ``group_index`` 0 is the full match; 1+ are capture groups. Empty
+        ``pattern`` raises ``ValueError``. No match or invalid regex may yield
+        null; see ``SUPPORTED_TYPES``.
+        """
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_str_extract_regex(
+                self._rust_expr, str(pattern), int(group_index)
+            )
+        )
+
+    def str_json_path_match(self, path: str) -> Expr:
+        """JSONPath against JSON text cells (Polars ``str.json_path_match``).
+
+        Returns a **string** column (serialized match). Malformed JSON or no
+        match often yields null at execution time. Empty ``path`` raises
+        ``ValueError``.
+        """
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_str_json_path_match(self._rust_expr, str(path)))
+
     def strip_prefix(self, prefix: str) -> Expr:
         rust = _require_rust_core()
         return Expr(
@@ -410,6 +462,16 @@ class Expr:  # type: ignore[override]
         """
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "quarter"))
+
+    def dt_week(self) -> Expr:
+        """ISO 8601 week number 1-53 (``date`` / ``datetime``; Polars ``dt.week``).
+
+        Same definition as Python ``datetime.date.isocalendar().week`` /
+        Polars ``dt.week()`` (weeks start Monday; week 1 contains the first
+        Thursday of the year). Not valid on ``time`` columns.
+        """
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "week"))
 
     def dt_date(self) -> Expr:
         rust = _require_rust_core()
@@ -512,6 +574,44 @@ class Expr:  # type: ignore[override]
         """
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_list_mean(self._rust_expr))
+
+    def list_join(self, separator: str, *, ignore_nulls: bool = False) -> Expr:
+        """Join each ``list[str]`` cell with ``separator`` (Polars ``list.join``)."""
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_list_join(
+                self._rust_expr, str(separator), ignore_nulls=bool(ignore_nulls)
+            )
+        )
+
+    def list_sort(
+        self,
+        *,
+        descending: bool = False,
+        nulls_last: bool = False,
+        maintain_order: bool = False,
+    ) -> Expr:
+        """Sort each list cell (orderable element types; see ``SUPPORTED_TYPES``)."""
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_list_sort(
+                self._rust_expr,
+                descending=bool(descending),
+                nulls_last=bool(nulls_last),
+                maintain_order=bool(maintain_order),
+            )
+        )
+
+    def list_unique(self, *, stable: bool = False) -> Expr:
+        """Deduplicate list elements per row.
+
+        With ``stable=True``, first-seen order is preserved (Polars
+        ``unique_stable``).
+        """
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_list_unique(self._rust_expr, stable=bool(stable))
+        )
 
 
 class WhenChain:

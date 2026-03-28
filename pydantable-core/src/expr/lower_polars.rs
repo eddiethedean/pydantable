@@ -481,6 +481,14 @@ impl ExprNode {
                     StringUnaryOp::StripPrefix(p) => Ok(e.str().strip_prefix(lit(p.as_str()))),
                     StringUnaryOp::StripSuffix(s) => Ok(e.str().strip_suffix(lit(s.as_str()))),
                     StringUnaryOp::StripChars(c) => Ok(e.str().strip_chars(lit(c.as_str()))),
+                    StringUnaryOp::Reverse => Ok(e.str().reverse()),
+                    StringUnaryOp::PadStart { length, fill_char } => {
+                        Ok(e.str().pad_start(lit(*length as i64), *fill_char))
+                    }
+                    StringUnaryOp::PadEnd { length, fill_char } => {
+                        Ok(e.str().pad_end(lit(*length as i64), *fill_char))
+                    }
+                    StringUnaryOp::ZFill { length } => Ok(e.str().zfill(lit(*length as i64))),
                 }
             }
             ExprNode::LogicalBinary {
@@ -507,6 +515,7 @@ impl ExprNode {
                     TemporalPart::Nanosecond => Ok(dt.nanosecond()),
                     TemporalPart::Weekday => Ok(dt.weekday()),
                     TemporalPart::Quarter => Ok(dt.quarter()),
+                    TemporalPart::Week => Ok(dt.week()),
                 }
             }
             ExprNode::ListLen { inner, .. } => Ok(inner.to_polars_expr()?.list().len()),
@@ -522,9 +531,52 @@ impl ExprNode {
             ExprNode::ListMax { inner, .. } => Ok(inner.to_polars_expr()?.list().max()),
             ExprNode::ListSum { inner, .. } => Ok(inner.to_polars_expr()?.list().sum()),
             ExprNode::ListMean { inner, .. } => Ok(inner.to_polars_expr()?.list().mean()),
+            ExprNode::ListJoin {
+                inner,
+                separator,
+                ignore_nulls,
+                ..
+            } => Ok(inner
+                .to_polars_expr()?
+                .list()
+                .join(lit(separator.as_str()), *ignore_nulls)),
+            ExprNode::ListSort {
+                inner,
+                descending,
+                nulls_last,
+                maintain_order,
+                ..
+            } => {
+                let opts = SortOptions::default()
+                    .with_order_descending(*descending)
+                    .with_nulls_last(*nulls_last)
+                    .with_maintain_order(*maintain_order);
+                Ok(inner.to_polars_expr()?.list().sort(opts))
+            }
+            ExprNode::ListUnique { inner, stable, .. } => {
+                let e = inner.to_polars_expr()?;
+                Ok(if *stable {
+                    e.list().unique_stable()
+                } else {
+                    e.list().unique()
+                })
+            }
             ExprNode::StringSplit {
                 inner, delimiter, ..
             } => Ok(inner.to_polars_expr()?.str().split(lit(delimiter.as_str()))),
+            ExprNode::StringExtract {
+                inner,
+                pattern,
+                group_index,
+                ..
+            } => Ok(inner
+                .to_polars_expr()?
+                .str()
+                .extract(lit(pattern.as_str()), *group_index)),
+            ExprNode::StringJsonPathMatch { inner, path, .. } => Ok(inner
+                .to_polars_expr()?
+                .str()
+                .json_path_match(lit(path.as_str()))),
             ExprNode::DatetimeToDate { inner, .. } => Ok(inner.to_polars_expr()?.dt().date()),
             ExprNode::Strptime {
                 inner,

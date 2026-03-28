@@ -123,6 +123,56 @@ fn iso_weekday_monday1(y: i32, month: i32, day: i32) -> i64 {
     (((w + 6).rem_euclid(7)) + 1) as i64
 }
 
+/// ISO 8601 week number 1–53 (matches Polars `dt.week()` / Python `date.isocalendar().week`).
+#[cfg(not(feature = "polars_engine"))]
+fn iso_week_from_ymd(y: i32, month: u32, day: u32) -> i64 {
+    use chrono::Datelike;
+    chrono::NaiveDate::from_ymd_opt(y, month, day)
+        .map(|d| d.iso_week().week() as i64)
+        .unwrap_or(1)
+}
+
+#[cfg(not(feature = "polars_engine"))]
+fn str_pad_start_chars(s: &str, length: u32, ch: char) -> String {
+    let n = length as usize;
+    let wc = s.chars().count();
+    if wc >= n {
+        return s.to_string();
+    }
+    std::iter::repeat(ch).take(n - wc).collect::<String>() + s
+}
+
+#[cfg(not(feature = "polars_engine"))]
+fn str_pad_end_chars(s: &str, length: u32, ch: char) -> String {
+    let n = length as usize;
+    let wc = s.chars().count();
+    if wc >= n {
+        return s.to_string();
+    }
+    let mut out = s.to_string();
+    out.extend(std::iter::repeat(ch).take(n - wc));
+    out
+}
+
+#[cfg(not(feature = "polars_engine"))]
+fn str_zfill_chars(s: &str, length: u32) -> String {
+    let neg = s.starts_with('-');
+    let body = if neg { &s[1..] } else { s };
+    let n = length as usize;
+    let body_w = body.chars().count();
+    let total = body_w + usize::from(neg);
+    if total >= n {
+        return s.to_string();
+    }
+    let pad = n - total;
+    let zeros: String = std::iter::repeat('0').take(pad).collect();
+    if neg {
+        format!("-{zeros}{body}")
+    } else {
+        format!("{zeros}{body}")
+    }
+}
+
 #[cfg(not(feature = "polars_engine"))]
 fn literal_between_inclusive(x: &LiteralValue, lo: &LiteralValue, hi: &LiteralValue) -> bool {
     if let (Some(xw), Some(lw), Some(hw)) = (wire_str(x), wire_str(lo), wire_str(hi)) {
@@ -183,7 +233,12 @@ impl ExprNode {
             | ExprNode::ListMax { dtype, .. }
             | ExprNode::ListSum { dtype, .. }
             | ExprNode::ListMean { dtype, .. }
+            | ExprNode::ListJoin { dtype, .. }
+            | ExprNode::ListSort { dtype, .. }
+            | ExprNode::ListUnique { dtype, .. }
             | ExprNode::StringSplit { dtype, .. }
+            | ExprNode::StringExtract { dtype, .. }
+            | ExprNode::StringJsonPathMatch { dtype, .. }
             | ExprNode::DatetimeToDate { dtype, .. }
             | ExprNode::Strptime { dtype, .. }
             | ExprNode::UnixTimestamp { dtype, .. }
@@ -276,7 +331,12 @@ impl ExprNode {
             | ExprNode::ListMax { inner, .. }
             | ExprNode::ListSum { inner, .. }
             | ExprNode::ListMean { inner, .. }
+            | ExprNode::ListJoin { inner, .. }
+            | ExprNode::ListSort { inner, .. }
+            | ExprNode::ListUnique { inner, .. }
             | ExprNode::StringSplit { inner, .. }
+            | ExprNode::StringExtract { inner, .. }
+            | ExprNode::StringJsonPathMatch { inner, .. }
             | ExprNode::DatetimeToDate { inner, .. }
             | ExprNode::Strptime { inner, .. }
             | ExprNode::UnixTimestamp { inner, .. }
@@ -1250,6 +1310,22 @@ impl ExprNode {
         })
     }
 
+    pub fn make_str_reverse(inner: ExprNode) -> PyResult<Self> {
+        Self::make_string_unary(inner, StringUnaryOp::Reverse)
+    }
+
+    pub fn make_str_pad_start(inner: ExprNode, length: u32, fill_char: char) -> PyResult<Self> {
+        Self::make_string_unary(inner, StringUnaryOp::PadStart { length, fill_char })
+    }
+
+    pub fn make_str_pad_end(inner: ExprNode, length: u32, fill_char: char) -> PyResult<Self> {
+        Self::make_string_unary(inner, StringUnaryOp::PadEnd { length, fill_char })
+    }
+
+    pub fn make_str_zfill(inner: ExprNode, length: u32) -> PyResult<Self> {
+        Self::make_string_unary(inner, StringUnaryOp::ZFill { length })
+    }
+
     pub fn make_logical_binary(op: LogicalOp, left: ExprNode, right: ExprNode) -> PyResult<Self> {
         let is_bool = |d: &DTypeDesc| {
             matches!(
@@ -1318,7 +1394,8 @@ impl ExprNode {
             | TemporalPart::Month
             | TemporalPart::Day
             | TemporalPart::Weekday
-            | TemporalPart::Quarter => {
+            | TemporalPart::Quarter
+            | TemporalPart::Week => {
                 if !(is_dt || is_date) {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "That temporal part requires a datetime or date column.",
@@ -1552,6 +1629,173 @@ impl ExprNode {
                     literals: None,
                 }),
                 nullable,
+            },
+        })
+    }
+
+    fn dtype_is_sortable_list_element(d: &DTypeDesc) -> bool {
+        matches!(
+            d,
+            DTypeDesc::Scalar {
+                base: Some(
+                    BaseType::Int
+                        | BaseType::Float
+                        | BaseType::Bool
+                        | BaseType::Str
+                        | BaseType::Date
+                        | BaseType::DateTime
+                        | BaseType::Time
+                        | BaseType::Enum
+                        | BaseType::Uuid
+                ),
+                ..
+            }
+        )
+    }
+
+    pub fn make_list_join(
+        inner: ExprNode,
+        separator: String,
+        ignore_nulls: bool,
+    ) -> PyResult<Self> {
+        let nullable = match inner.dtype() {
+            DTypeDesc::List {
+                inner: e, nullable, ..
+            } => match e.as_ref() {
+                DTypeDesc::Scalar {
+                    base: Some(BaseType::Str),
+                    ..
+                } => nullable,
+                _ => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "list_join() requires list[str].",
+                    ));
+                }
+            },
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "list_join() requires a list-typed column.",
+                ));
+            }
+        };
+        Ok(ExprNode::ListJoin {
+            inner: Box::new(inner),
+            separator,
+            ignore_nulls,
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Str),
+                nullable,
+                literals: None,
+            },
+        })
+    }
+
+    pub fn make_list_sort(
+        inner: ExprNode,
+        descending: bool,
+        nulls_last: bool,
+        maintain_order: bool,
+    ) -> PyResult<Self> {
+        let dtype = match &inner.dtype() {
+            DTypeDesc::List { inner: elt, .. } => {
+                if !Self::dtype_is_sortable_list_element(elt.as_ref()) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "list_sort() requires list elements that are int, float, bool, str, date, datetime, time, enum, or uuid.",
+                    ));
+                }
+                inner.dtype().clone()
+            }
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "list_sort() requires a list-typed column.",
+                ));
+            }
+        };
+        Ok(ExprNode::ListSort {
+            inner: Box::new(inner),
+            descending,
+            nulls_last,
+            maintain_order,
+            dtype,
+        })
+    }
+
+    pub fn make_list_unique(inner: ExprNode, stable: bool) -> PyResult<Self> {
+        let dtype = match &inner.dtype() {
+            DTypeDesc::List { inner: elt, .. } => {
+                if !Self::dtype_is_sortable_list_element(elt.as_ref()) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "list_unique() requires list elements that are int, float, bool, str, date, datetime, time, enum, or uuid.",
+                    ));
+                }
+                inner.dtype().clone()
+            }
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "list_unique() requires a list-typed column.",
+                ));
+            }
+        };
+        Ok(ExprNode::ListUnique {
+            inner: Box::new(inner),
+            stable,
+            dtype,
+        })
+    }
+
+    pub fn make_string_extract(
+        inner: ExprNode,
+        pattern: String,
+        group_index: usize,
+    ) -> PyResult<Self> {
+        if inner.dtype().is_struct()
+            || inner.dtype().is_list()
+            || !dtype_is_string_like(&inner.dtype())
+        {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "str_extract_regex() requires a string-like column.",
+            ));
+        }
+        if pattern.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Regex pattern must not be empty.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::StringExtract {
+            inner: Box::new(inner),
+            pattern,
+            group_index,
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Str),
+                nullable,
+                literals: None,
+            },
+        })
+    }
+
+    pub fn make_string_json_path_match(inner: ExprNode, path: String) -> PyResult<Self> {
+        if inner.dtype().is_struct()
+            || inner.dtype().is_list()
+            || !dtype_is_string_like(&inner.dtype())
+        {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "str_json_path_match() requires a string-like column.",
+            ));
+        }
+        if path.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "JSONPath pattern must not be empty.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::StringJsonPathMatch {
+            inner: Box::new(inner),
+            path,
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Str),
+                nullable,
+                literals: None,
             },
         })
     }
@@ -3309,6 +3553,18 @@ impl ExprNode {
                             StringUnaryOp::StripChars(ref c) => {
                                 Some(LiteralValue::Str(trim_matches_char_set(s, c)))
                             }
+                            StringUnaryOp::Reverse => {
+                                Some(LiteralValue::Str(s.chars().rev().collect()))
+                            }
+                            StringUnaryOp::PadStart { length, fill_char } => Some(
+                                LiteralValue::Str(str_pad_start_chars(s, *length, *fill_char)),
+                            ),
+                            StringUnaryOp::PadEnd { length, fill_char } => {
+                                Some(LiteralValue::Str(str_pad_end_chars(s, *length, *fill_char)))
+                            }
+                            StringUnaryOp::ZFill { length } => {
+                                Some(LiteralValue::Str(str_zfill_chars(s, *length)))
+                            }
                         };
                         match v {
                             Some(LiteralValue::Str(s)) => str_like(s.as_str()),
@@ -3397,6 +3653,7 @@ impl ExprNode {
                                     iso_weekday_monday1(y, mo as i32, d as i32)
                                 }
                                 TemporalPart::Quarter => ((i64::from(mo) - 1) / 3) + 1,
+                                TemporalPart::Week => iso_week_from_ymd(y, mo, d),
                             };
                             Some(LiteralValue::Int(i))
                         }
@@ -3409,7 +3666,8 @@ impl ExprNode {
                             | TemporalPart::Month
                             | TemporalPart::Day
                             | TemporalPart::Weekday
-                            | TemporalPart::Quarter => {
+                            | TemporalPart::Quarter
+                            | TemporalPart::Week => {
                                 let (y, mo, d) = utc_calendar_from_epoch_days(days);
                                 let i = match part {
                                     TemporalPart::Year => i64::from(y),
@@ -3419,6 +3677,7 @@ impl ExprNode {
                                         iso_weekday_monday1(y, mo as i32, d as i32)
                                     }
                                     TemporalPart::Quarter => ((i64::from(mo) - 1) / 3) + 1,
+                                    TemporalPart::Week => iso_week_from_ymd(y, mo, d),
                                     _ => unreachable!(),
                                 };
                                 Some(LiteralValue::Int(i))
@@ -3429,7 +3688,8 @@ impl ExprNode {
                             | TemporalPart::Month
                             | TemporalPart::Day
                             | TemporalPart::Weekday
-                            | TemporalPart::Quarter => None,
+                            | TemporalPart::Quarter
+                            | TemporalPart::Week => None,
                             TemporalPart::Hour => {
                                 Some(LiteralValue::Int((ns / NS_PER_HOUR).rem_euclid(24)))
                             }
@@ -3454,7 +3714,12 @@ impl ExprNode {
             | ExprNode::ListMax { .. }
             | ExprNode::ListSum { .. }
             | ExprNode::ListMean { .. }
+            | ExprNode::ListJoin { .. }
+            | ExprNode::ListSort { .. }
+            | ExprNode::ListUnique { .. }
             | ExprNode::StringSplit { .. }
+            | ExprNode::StringExtract { .. }
+            | ExprNode::StringJsonPathMatch { .. }
             | ExprNode::Strptime { .. }
             | ExprNode::UnixTimestamp { .. }
             | ExprNode::BinaryLength { .. }
