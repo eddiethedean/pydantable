@@ -77,6 +77,21 @@ pub enum TemporalPart {
     Second,
     /// Sub-second component (`datetime` and `time` columns).
     Nanosecond,
+    /// Calendar weekday (Polars `dt.weekday()`; Monday = 1, Sunday = 7).
+    Weekday,
+    /// Calendar quarter 1–4 (`datetime` / `date`).
+    Quarter,
+}
+
+/// String column predicate producing `bool` (Polars `str` namespace).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum StringPredicateKind {
+    StartsWith,
+    EndsWith,
+    /// When `literal` is true, match a substring; when false, `pattern` is a **Rust regex**.
+    Contains {
+        literal: bool,
+    },
 }
 
 /// Unit for [`ExprNode::UnixTimestamp`].
@@ -163,11 +178,19 @@ pub enum ExprNode {
         inner: Box<ExprNode>,
         dtype: DTypeDesc,
     },
-    /// Replace all non-overlapping occurrences of `pattern` (literal substring).
+    /// Replace occurrences of `pattern`; `literal` uses substring replace, else Rust regex.
     StringReplace {
         inner: Box<ExprNode>,
         pattern: String,
         replacement: String,
+        literal: bool,
+        dtype: DTypeDesc,
+    },
+    /// `str` predicates: prefix / suffix / contains (literal or regex).
+    StringPredicate {
+        inner: Box<ExprNode>,
+        kind: StringPredicateKind,
+        pattern: String,
         dtype: DTypeDesc,
     },
     /// Extract one field from a struct-typed expression (Polars `struct.field`).
@@ -228,6 +251,17 @@ pub enum ExprNode {
     },
     ListSum {
         inner: Box<ExprNode>,
+        dtype: DTypeDesc,
+    },
+    /// Per-row mean of a numeric list (`int` / `float` elements) as `float`.
+    ListMean {
+        inner: Box<ExprNode>,
+        dtype: DTypeDesc,
+    },
+    /// Split string column by delimiter → `list[str]`.
+    StringSplit {
+        inner: Box<ExprNode>,
+        delimiter: String,
         dtype: DTypeDesc,
     },
     /// `datetime` column → calendar `date` (Polars `dt.date()`).

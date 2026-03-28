@@ -5,8 +5,8 @@ use pyo3::prelude::*;
 use crate::dtype::{BaseType, DECIMAL_PRECISION, DECIMAL_SCALE};
 
 use super::ir::{
-    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart,
-    UnaryNumericOp, UnixTimestampUnit, WindowOp,
+    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringPredicateKind,
+    StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit, WindowOp,
 };
 
 use polars::lazy::dsl::{
@@ -429,11 +429,33 @@ impl ExprNode {
                 inner,
                 pattern,
                 replacement,
+                literal,
                 ..
             } => {
                 let e = inner.to_polars_expr()?;
                 Ok(e.str()
-                    .replace_all(lit(pattern.as_str()), lit(replacement.as_str()), true))
+                    .replace_all(lit(pattern.as_str()), lit(replacement.as_str()), *literal))
+            }
+            ExprNode::StringPredicate {
+                inner,
+                kind,
+                pattern,
+                ..
+            } => {
+                let e = inner.to_polars_expr()?;
+                let p = lit(pattern.as_str());
+                match kind {
+                    StringPredicateKind::StartsWith => Ok(e.str().starts_with(p)),
+                    StringPredicateKind::EndsWith => Ok(e.str().ends_with(p)),
+                    // Polars 0.53: `contains(pat, strict)` is always regex; `strict` is invalid-regex
+                    // handling. Literal substring match is `contains_literal`.
+                    StringPredicateKind::Contains { literal: true } => {
+                        Ok(e.str().contains_literal(p))
+                    }
+                    StringPredicateKind::Contains { literal: false } => {
+                        Ok(e.str().contains(p, false))
+                    }
+                }
             }
             ExprNode::StructField { base, field, .. } => Ok(base
                 .to_polars_expr()?
@@ -483,6 +505,8 @@ impl ExprNode {
                     TemporalPart::Minute => Ok(dt.minute()),
                     TemporalPart::Second => Ok(dt.second()),
                     TemporalPart::Nanosecond => Ok(dt.nanosecond()),
+                    TemporalPart::Weekday => Ok(dt.weekday()),
+                    TemporalPart::Quarter => Ok(dt.quarter()),
                 }
             }
             ExprNode::ListLen { inner, .. } => Ok(inner.to_polars_expr()?.list().len()),
@@ -497,6 +521,10 @@ impl ExprNode {
             ExprNode::ListMin { inner, .. } => Ok(inner.to_polars_expr()?.list().min()),
             ExprNode::ListMax { inner, .. } => Ok(inner.to_polars_expr()?.list().max()),
             ExprNode::ListSum { inner, .. } => Ok(inner.to_polars_expr()?.list().sum()),
+            ExprNode::ListMean { inner, .. } => Ok(inner.to_polars_expr()?.list().mean()),
+            ExprNode::StringSplit {
+                inner, delimiter, ..
+            } => Ok(inner.to_polars_expr()?.str().split(lit(delimiter.as_str()))),
             ExprNode::DatetimeToDate { inner, .. } => Ok(inner.to_polars_expr()?.dt().date()),
             ExprNode::Strptime {
                 inner,

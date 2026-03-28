@@ -154,6 +154,16 @@ def dayofmonth(column: Expr) -> Expr:
     return column.dt_day()
 
 
+def dayofweek(column: Expr) -> Expr:
+    """ISO weekday (Monday = 1 … Sunday = 7); ``date`` or ``datetime``."""
+    return column.dt_weekday()
+
+
+def quarter(column: Expr) -> Expr:
+    """Calendar quarter 1-4."""
+    return column.dt_quarter()
+
+
 def lower(column: Expr) -> Expr:
     """Lowercase string column (Spark ``lower``)."""
     return column.lower()
@@ -169,16 +179,50 @@ def trim(column: Expr) -> Expr:
     return column.strip()
 
 
-def str_replace(column: Expr, pattern: str, replacement: str) -> Expr:
-    """Replace all occurrences of literal ``pattern`` with ``replacement``."""
+def str_replace(
+    column: Expr, pattern: str, replacement: str, *, literal: bool = True
+) -> Expr:
+    """Replace matches; default substring replace; ``literal=False`` is Rust regex."""
     if not isinstance(column, Expr):
         raise TypeError("functions.str_replace() expects a typed column Expr.")
-    return column.str_replace(pattern, replacement)
+    return column.str_replace(pattern, replacement, literal=literal)
 
 
 def regexp_replace(column: Expr, pattern: str, replacement: str) -> Expr:
-    """Spark-style name for literal substring replace (same as :func:`str_replace`)."""
-    return str_replace(column, pattern, replacement)
+    """Regex replace (Rust ``regex`` dialect, not Python ``re``)."""
+    return str_replace(column, pattern, replacement, literal=False)
+
+
+def starts_with(column: Expr, prefix: str) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.starts_with() expects a typed column Expr.")
+    return column.starts_with(prefix)
+
+
+def ends_with(column: Expr, suffix: str) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.ends_with() expects a typed column Expr.")
+    return column.ends_with(suffix)
+
+
+def contains(column: Expr, substring: str) -> Expr:
+    """Literal substring test (core :meth:`Expr.str_contains`)."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.contains() expects a typed column Expr.")
+    return column.str_contains(substring)
+
+
+def str_contains_pat(column: Expr, pattern: str, *, literal: bool = False) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.str_contains_pat() expects a typed column Expr.")
+    return column.str_contains_pat(pattern, literal=literal)
+
+
+def split(column: Expr, delimiter: str) -> Expr:
+    """Split to ``list[str]`` (core :meth:`Expr.str_split`)."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.split() expects a typed column Expr.")
+    return column.str_split(delimiter)
 
 
 def strip_prefix(column: Expr, prefix: str) -> Expr:
@@ -250,6 +294,12 @@ def list_sum(column: Expr) -> Expr:
     if not isinstance(column, Expr):
         raise TypeError("functions.list_sum() expects a typed column Expr.")
     return column.list_sum()
+
+
+def list_mean(column: Expr) -> Expr:
+    if not isinstance(column, Expr):
+        raise TypeError("functions.list_mean() expects a typed column Expr.")
+    return column.list_mean()
 
 
 def abs(column: Expr) -> Expr:
@@ -463,11 +513,14 @@ __all__ = [
     "col",
     "column",
     "concat",
+    "contains",
     "count",
     "day",
     "dayofmonth",
+    "dayofweek",
     "dense_rank",
     "element_at",
+    "ends_with",
     "floor",
     "hour",
     "isin",
@@ -480,6 +533,7 @@ __all__ = [
     "list_get",
     "list_len",
     "list_max",
+    "list_mean",
     "list_min",
     "list_sum",
     "lit",
@@ -497,11 +551,15 @@ __all__ = [
     "minute",
     "month",
     "nanosecond",
+    "quarter",
     "rank",
     "regexp_replace",
     "round",
     "row_number",
     "second",
+    "split",
+    "starts_with",
+    "str_contains_pat",
     "str_replace",
     "strip_chars",
     "strip_prefix",

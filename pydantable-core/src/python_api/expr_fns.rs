@@ -6,7 +6,7 @@ use pyo3::types::PyAny;
 use crate::dtype::{py_annotation_to_dtype, DTypeDesc};
 use crate::expr::{
     op_symbol_to_arith, op_symbol_to_cmp, ArithOp, CmpOp, ExprHandle, ExprNode, LogicalOp,
-    StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit,
+    StringPredicateKind, StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit,
 };
 
 use super::types::PyExpr;
@@ -183,13 +183,43 @@ fn expr_string_length(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
 }
 
 #[pyfunction]
+#[pyo3(signature = (inner, pattern, replacement, *, literal = true))]
 fn expr_string_replace(
     inner: Bound<'_, PyExpr>,
     pattern: String,
     replacement: String,
+    literal: bool,
 ) -> PyResult<PyExpr> {
     Ok(PyExpr {
-        node: ExprNode::make_string_replace(inner.borrow().node.clone(), pattern, replacement)?,
+        node: ExprNode::make_string_replace(
+            inner.borrow().node.clone(),
+            pattern,
+            replacement,
+            literal,
+        )?,
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (inner, op, pattern, *, literal = true))]
+fn expr_string_predicate(
+    inner: Bound<'_, PyExpr>,
+    op: String,
+    pattern: String,
+    literal: bool,
+) -> PyResult<PyExpr> {
+    let kind = match op.as_str() {
+        "starts_with" => StringPredicateKind::StartsWith,
+        "ends_with" => StringPredicateKind::EndsWith,
+        "contains" => StringPredicateKind::Contains { literal },
+        other => {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "string_predicate op must be starts_with|ends_with|contains, got {other:?}",
+            )));
+        }
+    };
+    Ok(PyExpr {
+        node: ExprNode::make_string_predicate(inner.borrow().node.clone(), kind, pattern)?,
     })
 }
 
@@ -296,9 +326,11 @@ fn expr_temporal_part(inner: Bound<'_, PyExpr>, part: String) -> PyResult<PyExpr
         "minute" => TemporalPart::Minute,
         "second" => TemporalPart::Second,
         "nanosecond" => TemporalPart::Nanosecond,
+        "weekday" => TemporalPart::Weekday,
+        "quarter" => TemporalPart::Quarter,
         _ => {
             return Err(pyo3::exceptions::PyValueError::new_err(
-                "temporal part must be year|month|day|hour|minute|second|nanosecond",
+                "temporal part must be year|month|day|hour|minute|second|nanosecond|weekday|quarter",
             ));
         }
     };
@@ -349,6 +381,20 @@ fn expr_list_max(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
 fn expr_list_sum(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
     Ok(PyExpr {
         node: ExprNode::make_list_sum(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_list_mean(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_list_mean(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_string_split(inner: Bound<'_, PyExpr>, delimiter: String) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_string_split(inner.borrow().node.clone(), delimiter)?,
     })
 }
 
@@ -680,6 +726,7 @@ pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr_substring, m)?)?;
     m.add_function(wrap_pyfunction!(expr_string_length, m)?)?;
     m.add_function(wrap_pyfunction!(expr_string_replace, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_string_predicate, m)?)?;
     m.add_function(wrap_pyfunction!(expr_struct_field, m)?)?;
     m.add_function(wrap_pyfunction!(expr_abs, m)?)?;
     m.add_function(wrap_pyfunction!(expr_round, m)?)?;
@@ -696,6 +743,8 @@ pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr_list_min, m)?)?;
     m.add_function(wrap_pyfunction!(expr_list_max, m)?)?;
     m.add_function(wrap_pyfunction!(expr_list_sum, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_list_mean, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_string_split, m)?)?;
     m.add_function(wrap_pyfunction!(expr_datetime_to_date, m)?)?;
     m.add_function(wrap_pyfunction!(expr_window_row_number, m)?)?;
     m.add_function(wrap_pyfunction!(expr_window_rank, m)?)?;

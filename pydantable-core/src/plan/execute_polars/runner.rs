@@ -62,10 +62,13 @@ impl PolarsPlanRunner {
             ExprNode::InList { inner, .. }
             | ExprNode::StringLength { inner, .. }
             | ExprNode::StringReplace { inner, .. }
+            | ExprNode::StringPredicate { inner, .. }
             | ExprNode::ListLen { inner, .. }
             | ExprNode::ListMin { inner, .. }
             | ExprNode::ListMax { inner, .. }
             | ExprNode::ListSum { inner, .. }
+            | ExprNode::ListMean { inner, .. }
+            | ExprNode::StringSplit { inner, .. }
             | ExprNode::DatetimeToDate { inner, .. }
             | ExprNode::Strptime { inner, .. }
             | ExprNode::UnixTimestamp { inner, .. }

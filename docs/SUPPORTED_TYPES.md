@@ -221,15 +221,31 @@ Beyond generic arithmetic and comparisons, the following are supported (see
 `Expr` in the Python API):
 
 - **Numeric:** `abs()`, `round(decimals=...)`, `floor()`, `ceil()` on `int` / `float` columns.
-- **String:** `strip()`, `upper()`, `lower()`, `str_replace(old, new)` (literal substrings), `strip_prefix`, `strip_suffix`, `strip_chars`, plus `substr`, `char_length`, `concat`.
+- **String:** `strip()`, `upper()`, `lower()`, `str_replace(old, new, literal=True)` (default: literal substring; `literal=False` uses **Rust `regex`**, not Python `re`), `starts_with`, `ends_with`, `str_contains` (literal substring), `str_contains_pat(pattern, literal=False)` (regex when `literal=False`), `str_split(delimiter)` → **`list[str]`**, `strip_prefix`, `strip_suffix`, `strip_chars`, plus `substr`, `char_length`, `concat`.
 - **Boolean:** `&`, `|`, `~` for combining boolean-typed expressions.
-- **Datetime / date / time:** `dt_year()` … `dt_day()` on **`date`** or **`datetime`**; `dt_hour()` … **`dt_nanosecond()`** on **`datetime`** or **`time`**; **`dt_date()`** on **`datetime`** (calendar `date`). **`strptime(format, to_datetime=...)`** parses **`str`** → **`date`** or **`datetime`**. **`unix_timestamp(unit=...)`** returns epoch **`int`** from **`date`** / **`datetime`**. **`datetime ± timedelta`** and **`date ± timedelta`** use typed binary ops (see Rust `infer_arith_dtype`).
-- **Homogeneous lists:** `list_len()`, **`list_get(index)`** (int index; OOB → null), **`list_contains(value)`**, **`list_min()`** / **`list_max()`** / **`list_sum()`** on `list[int]` or `list[float]` (min/max/sum are numeric lists only).
+- **Datetime / date / time:** `dt_year()` … `dt_day()` on **`date`** or **`datetime`**; **`dt_weekday()`** (ISO weekday: Monday = 1 … Sunday = 7, same as Polars) and **`dt_quarter()`** (1–4) on **`date`** or **`datetime`**; `dt_hour()` … **`dt_nanosecond()`** on **`datetime`** or **`time`**; **`dt_date()`** on **`datetime`** (calendar `date`). **`strptime(format, to_datetime=...)`** parses **`str`** → **`date`** or **`datetime`**. **`unix_timestamp(unit=...)`** returns epoch **`int`** from **`date`** / **`datetime`**. **`datetime ± timedelta`** and **`date ± timedelta`** use typed binary ops (see Rust `infer_arith_dtype`).
+- **Homogeneous lists:** `list_len()`, **`list_get(index)`** (int index; OOB → null), **`list_contains(value)`**, **`list_min()`** / **`list_max()`** / **`list_sum()`** / **`list_mean()`** on `list[int]` or `list[float]` (**`list_mean`** result is **`float`**; empty list cells yield null).
 - **Maps (`dict[str, T]`):** **`map_len()`** (number of entries), **`map_get(key)`** (value or null), **`map_contains_key(key)`** (boolean), **`map_keys()`** (list of keys), **`map_values()`** (list of values), **`map_entries()`** (list of `{key, value}` structs); physical encoding is `List(Struct{key, value})`.
 - **Binary (`bytes`):** **`binary_len()`** (per-row byte length).
 - **Cast:** `cast(T)` supports the usual primitive conversions plus `datetime` → `date` / `str` and `date` → `str`, and **`str` → `date` / `datetime`** using Polars’ string parsing (ISO-8601-shaped strings; behavior follows Polars). For a **fixed format**, use **`strptime(format, ...)`** instead of `cast`.
 
 Temporal part extraction and `dt_date()` on timezone-aware `datetime` values follow Polars’ interpretation of the stored dtype.
+
+### Semantics: string predicates, regex, and `str_split`
+
+**Boolean predicates** (`starts_with`, `ends_with`, `str_contains`, `str_contains_pat`) return a **boolean** column. **Null** string cells produce **null** in the output (SQL-style three-valued logic).
+
+- **`str_contains(substring)`** is always a **literal** substring search (metacharacters such as `.` are not special).
+- **`str_contains_pat(pattern, *, literal=False)`** uses the **Rust [`regex`](https://docs.rs/regex/latest/regex/)** crate when **`literal=False`**. This is **not** Python’s **`re`** module: escaping and feature flags differ. Use **`literal=True`** for a literal substring match with the same API.
+- **Empty `pattern`** with **`literal=False`** is **rejected when the expression is built** (`ValueError`). **Invalid** regex syntax may surface as **null** per row at execution time (Polars), not necessarily as a raised error; prefer validating patterns in application code when you need strict failures.
+- **`str_replace(..., literal=False)`** applies the same Rust-regex match semantics for the **search** pattern; replacement follows Polars **`replace_all`** behavior.
+
+**`str_split(delimiter)`** returns **`list[str]`** per row. The delimiter is a **literal** string (not regex). An **empty delimiter** follows Polars split rules (typically **per-character** splits for non-empty strings; an **empty** input string often yields an **empty** list). **Null** inputs remain **null**.
+
+### Semantics: `dt_weekday`, `dt_quarter`, and `list_mean`
+
+- **`dt_weekday()`** / **`dt_quarter()`** are allowed only on **`date`** or **`datetime`** (not on **`time`**); other dtypes raise **`TypeError`** at expression build time. **Weekday** matches **ISO** ordering as in Polars: **Monday = 1** … **Sunday = 7** (aligned with **`datetime.isoweekday()`**). **Quarter** is **1–4** from the calendar month.
+- **`list_mean()`** requires **`list[int]`** or **`list[float]`**; other element types raise **`TypeError`**. The result is always **`float`**. **Empty lists** and **null list cells** yield **null** in the output column.
 
 ## Not supported as schema column types
 

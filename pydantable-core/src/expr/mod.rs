@@ -8,8 +8,8 @@ mod serialize;
 mod typing;
 
 pub use ir::{
-    ArithOp, CmpOp, ExprNode, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart, UnaryNumericOp,
-    UnixTimestampUnit,
+    ArithOp, CmpOp, ExprNode, LiteralValue, LogicalOp, StringPredicateKind, StringUnaryOp,
+    TemporalPart, UnaryNumericOp, UnixTimestampUnit,
 };
 #[cfg(feature = "polars_engine")]
 pub use ir::{WindowFrame, WindowOp};

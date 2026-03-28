@@ -241,13 +241,82 @@ class Expr:  # type: ignore[override]
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_string_unary(self._rust_expr, "lower"))
 
-    def str_replace(self, pattern: str, replacement: str) -> Expr:
+    def str_replace(
+        self, pattern: str, replacement: str, *, literal: bool = True
+    ) -> Expr:
+        """Replace matches.
+
+        Default ``literal=True`` is substring replace.
+        Use ``literal=False`` for Rust regex (syntax differs from Python ``re``;
+        see docs).
+
+        Invalid regex patterns may yield null cells at execution (Polars) rather
+        than raise.
+        """
         rust = _require_rust_core()
         return Expr(
             rust_expr=rust.expr_string_replace(
-                self._rust_expr, str(pattern), str(replacement)
+                self._rust_expr,
+                str(pattern),
+                str(replacement),
+                literal=bool(literal),
             )
         )
+
+    def starts_with(self, prefix: str) -> Expr:
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_string_predicate(
+                self._rust_expr, "starts_with", str(prefix)
+            )
+        )
+
+    def ends_with(self, suffix: str) -> Expr:
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_string_predicate(
+                self._rust_expr, "ends_with", str(suffix)
+            )
+        )
+
+    def str_contains(self, substring: str) -> Expr:
+        """True where the string contains ``substring`` (literal, not regex).
+
+        The empty substring matches every non-null string (Polars substring
+        ``contains`` semantics).
+        """
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_string_predicate(
+                self._rust_expr, "contains", str(substring), literal=True
+            )
+        )
+
+    def str_contains_pat(self, pattern: str, *, literal: bool = False) -> Expr:
+        """Substring or Rust-regex match.
+
+        ``literal=False`` uses the Rust ``regex`` dialect (not Python ``re``).
+        Raises ``ValueError`` if ``pattern`` is empty in regex mode.
+        Malformed regex may yield null per row at execution; see
+        ``SUPPORTED_TYPES`` docs.
+        """
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_string_predicate(
+                self._rust_expr, "contains", str(pattern), literal=bool(literal)
+            )
+        )
+
+    def str_split(self, delimiter: str) -> Expr:
+        """Split string column into ``list[str]`` (per-row).
+
+        Delimiter is literal (not regex). Empty ``delimiter`` follows Polars UTF-8
+        split rules.
+        Null string cells stay null. Edge cases are documented in
+        ``SUPPORTED_TYPES``.
+        """
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_string_split(self._rust_expr, str(delimiter)))
 
     def strip_prefix(self, prefix: str) -> Expr:
         rust = _require_rust_core()
@@ -325,6 +394,22 @@ class Expr:  # type: ignore[override]
         """Sub-second nanoseconds component (``datetime`` or ``time`` columns)."""
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "nanosecond"))
+
+    def dt_weekday(self) -> Expr:
+        """ISO weekday on ``date`` / ``datetime`` (Mon=1 ... Sun=7, same as Polars).
+
+        Not valid on ``time`` columns (``TypeError`` at build time).
+        """
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "weekday"))
+
+    def dt_quarter(self) -> Expr:
+        """Calendar quarter 1-4 on ``date`` / ``datetime``.
+
+        Not valid on ``time`` columns (``TypeError`` at build time).
+        """
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "quarter"))
 
     def dt_date(self) -> Expr:
         rust = _require_rust_core()
@@ -418,6 +503,15 @@ class Expr:  # type: ignore[override]
     def list_sum(self) -> Expr:
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_list_sum(self._rust_expr))
+
+    def list_mean(self) -> Expr:
+        """Mean of each numeric list cell as ``float``.
+
+        Requires ``list[int]`` or ``list[float]``. Empty lists and null list cells
+        yield null.
+        """
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_list_mean(self._rust_expr))
 
 
 class WhenChain:

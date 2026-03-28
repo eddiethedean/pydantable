@@ -11,8 +11,9 @@ use crate::dtype::{
 };
 
 use super::ir::{
-    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart,
-    UnaryNumericOp, UnixTimestampUnit, WindowFrame, WindowOp, WindowOrderKey,
+    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringPredicateKind,
+    StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit, WindowFrame, WindowOp,
+    WindowOrderKey,
 };
 
 enum ListAggKind {
@@ -108,6 +109,20 @@ fn utc_ymdhms_from_unix_micros(us: i64) -> (i32, u32, u32, u32, u32, u32) {
     (y, mo, d, h, mi, s)
 }
 
+/// ISO weekday: Monday = 1, Sunday = 7 (matches Polars `dt.weekday()`).
+#[cfg(not(feature = "polars_engine"))]
+fn iso_weekday_monday1(y: i32, month: i32, day: i32) -> i64 {
+    let mut y = y;
+    let mut m = month;
+    if m < 3 {
+        m += 12;
+        y -= 1;
+    }
+    let t = [0i32, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
+    let w = (day + t[(m - 1) as usize] + y + y / 4 - y / 100 + y / 400) % 7;
+    (((w + 6).rem_euclid(7)) + 1) as i64
+}
+
 #[cfg(not(feature = "polars_engine"))]
 fn literal_between_inclusive(x: &LiteralValue, lo: &LiteralValue, hi: &LiteralValue) -> bool {
     if let (Some(xw), Some(lw), Some(hw)) = (wire_str(x), wire_str(lo), wire_str(hi)) {
@@ -154,6 +169,7 @@ impl ExprNode {
             | ExprNode::Substring { dtype, .. }
             | ExprNode::StringLength { dtype, .. }
             | ExprNode::StringReplace { dtype, .. }
+            | ExprNode::StringPredicate { dtype, .. }
             | ExprNode::StructField { dtype, .. }
             | ExprNode::UnaryNumeric { dtype, .. }
             | ExprNode::StringUnary { dtype, .. }
@@ -166,6 +182,8 @@ impl ExprNode {
             | ExprNode::ListMin { dtype, .. }
             | ExprNode::ListMax { dtype, .. }
             | ExprNode::ListSum { dtype, .. }
+            | ExprNode::ListMean { dtype, .. }
+            | ExprNode::StringSplit { dtype, .. }
             | ExprNode::DatetimeToDate { dtype, .. }
             | ExprNode::Strptime { dtype, .. }
             | ExprNode::UnixTimestamp { dtype, .. }
@@ -248,6 +266,7 @@ impl ExprNode {
             }
             ExprNode::StringLength { inner, .. }
             | ExprNode::StringReplace { inner, .. }
+            | ExprNode::StringPredicate { inner, .. }
             | ExprNode::UnaryNumeric { inner, .. }
             | ExprNode::StringUnary { inner, .. }
             | ExprNode::LogicalNot { inner, .. }
@@ -256,6 +275,8 @@ impl ExprNode {
             | ExprNode::ListMin { inner, .. }
             | ExprNode::ListMax { inner, .. }
             | ExprNode::ListSum { inner, .. }
+            | ExprNode::ListMean { inner, .. }
+            | ExprNode::StringSplit { inner, .. }
             | ExprNode::DatetimeToDate { inner, .. }
             | ExprNode::Strptime { inner, .. }
             | ExprNode::UnixTimestamp { inner, .. }
@@ -1062,6 +1083,7 @@ impl ExprNode {
         inner: ExprNode,
         pattern: String,
         replacement: String,
+        literal: bool,
     ) -> PyResult<Self> {
         if inner.dtype().is_struct()
             || inner.dtype().is_list()
@@ -1076,8 +1098,42 @@ impl ExprNode {
             inner: Box::new(inner),
             pattern,
             replacement,
+            literal,
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Str),
+                nullable,
+                literals: None,
+            },
+        })
+    }
+
+    pub fn make_string_predicate(
+        inner: ExprNode,
+        kind: StringPredicateKind,
+        pattern: String,
+    ) -> PyResult<Self> {
+        if inner.dtype().is_struct()
+            || inner.dtype().is_list()
+            || !dtype_is_string_like(&inner.dtype())
+        {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "String predicate requires a string-like column.",
+            ));
+        }
+        if let StringPredicateKind::Contains { literal: false } = &kind {
+            if pattern.is_empty() {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "Regex pattern must not be empty.",
+                ));
+            }
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::StringPredicate {
+            inner: Box::new(inner),
+            kind,
+            pattern,
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Bool),
                 nullable,
                 literals: None,
             },
@@ -1258,10 +1314,14 @@ impl ExprNode {
         let is_date = base == Some(BaseType::Date);
         let is_time = base == Some(BaseType::Time);
         match part {
-            TemporalPart::Year | TemporalPart::Month | TemporalPart::Day => {
+            TemporalPart::Year
+            | TemporalPart::Month
+            | TemporalPart::Day
+            | TemporalPart::Weekday
+            | TemporalPart::Quarter => {
                 if !(is_dt || is_date) {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "year(), month(), day() require a datetime or date column.",
+                        "That temporal part requires a datetime or date column.",
                     ));
                 }
             }
@@ -1439,6 +1499,61 @@ impl ExprNode {
 
     pub fn make_list_sum(inner: ExprNode) -> PyResult<Self> {
         Self::make_list_numeric_agg(inner, ListAggKind::Sum)
+    }
+
+    pub fn make_list_mean(inner: ExprNode) -> PyResult<Self> {
+        let list_nullable = match inner.dtype() {
+            DTypeDesc::List {
+                inner: e, nullable, ..
+            } => match e.as_ref() {
+                DTypeDesc::Scalar {
+                    base: Some(BaseType::Int | BaseType::Float),
+                    ..
+                } => nullable,
+                _ => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "list_mean() requires list[int] or list[float].",
+                    ));
+                }
+            },
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "list_mean() requires a list-typed column.",
+                ));
+            }
+        };
+        Ok(ExprNode::ListMean {
+            inner: Box::new(inner),
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Float),
+                nullable: list_nullable,
+                literals: None,
+            },
+        })
+    }
+
+    pub fn make_string_split(inner: ExprNode, delimiter: String) -> PyResult<Self> {
+        if inner.dtype().is_struct()
+            || inner.dtype().is_list()
+            || !dtype_is_string_like(&inner.dtype())
+        {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "str_split() requires a string-like column.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::StringSplit {
+            inner: Box::new(inner),
+            delimiter,
+            dtype: DTypeDesc::List {
+                inner: Box::new(DTypeDesc::Scalar {
+                    base: Some(BaseType::Str),
+                    nullable: true,
+                    literals: None,
+                }),
+                nullable,
+            },
+        })
     }
 
     pub fn make_datetime_to_date(inner: ExprNode) -> PyResult<Self> {
@@ -3084,8 +3199,14 @@ impl ExprNode {
                 inner,
                 pattern,
                 replacement,
+                literal,
                 ..
             } => {
+                if !literal {
+                    return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                        "Regex str_replace is only supported with the Polars execution engine.",
+                    ));
+                }
                 let vals = inner.eval(ctx, n)?;
                 let pat = pattern.as_str();
                 let rep = replacement.as_str();
@@ -3097,6 +3218,39 @@ impl ExprNode {
                             Some(LiteralValue::Str(s.replace(pat, rep)))
                         }
                         _ => None,
+                    })
+                    .collect())
+            }
+            ExprNode::StringPredicate {
+                inner,
+                kind,
+                pattern,
+                ..
+            } => {
+                if matches!(kind, StringPredicateKind::Contains { literal: false }) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                        "Regex str_contains is only supported with the Polars execution engine.",
+                    ));
+                }
+                let vals = inner.eval(ctx, n)?;
+                let pat = pattern.as_str();
+                Ok(vals
+                    .into_iter()
+                    .map(|v| {
+                        let str_like = |s: &str| {
+                            let b = match kind {
+                                StringPredicateKind::StartsWith => s.starts_with(pat),
+                                StringPredicateKind::EndsWith => s.ends_with(pat),
+                                StringPredicateKind::Contains { literal: true } => s.contains(pat),
+                                StringPredicateKind::Contains { literal: false } => unreachable!(),
+                            };
+                            Some(LiteralValue::Bool(b))
+                        };
+                        match v {
+                            Some(LiteralValue::Str(s)) => str_like(s.as_str()),
+                            Some(LiteralValue::EnumStr(s)) => str_like(s.as_str()),
+                            _ => None,
+                        }
                     })
                     .collect())
             }
@@ -3239,6 +3393,10 @@ impl ExprNode {
                                     let sub_us = us.rem_euclid(1_000_000);
                                     sub_us * 1000
                                 }
+                                TemporalPart::Weekday => {
+                                    iso_weekday_monday1(y, mo as i32, d as i32)
+                                }
+                                TemporalPart::Quarter => ((i64::from(mo) - 1) / 3) + 1,
                             };
                             Some(LiteralValue::Int(i))
                         }
@@ -3247,19 +3405,31 @@ impl ExprNode {
                             | TemporalPart::Minute
                             | TemporalPart::Second
                             | TemporalPart::Nanosecond => None,
-                            TemporalPart::Year | TemporalPart::Month | TemporalPart::Day => {
+                            TemporalPart::Year
+                            | TemporalPart::Month
+                            | TemporalPart::Day
+                            | TemporalPart::Weekday
+                            | TemporalPart::Quarter => {
                                 let (y, mo, d) = utc_calendar_from_epoch_days(days);
                                 let i = match part {
                                     TemporalPart::Year => i64::from(y),
                                     TemporalPart::Month => i64::from(mo),
                                     TemporalPart::Day => i64::from(d),
+                                    TemporalPart::Weekday => {
+                                        iso_weekday_monday1(y, mo as i32, d as i32)
+                                    }
+                                    TemporalPart::Quarter => ((i64::from(mo) - 1) / 3) + 1,
                                     _ => unreachable!(),
                                 };
                                 Some(LiteralValue::Int(i))
                             }
                         },
                         Some(LiteralValue::TimeNanos(ns)) if is_time => match part {
-                            TemporalPart::Year | TemporalPart::Month | TemporalPart::Day => None,
+                            TemporalPart::Year
+                            | TemporalPart::Month
+                            | TemporalPart::Day
+                            | TemporalPart::Weekday
+                            | TemporalPart::Quarter => None,
                             TemporalPart::Hour => {
                                 Some(LiteralValue::Int((ns / NS_PER_HOUR).rem_euclid(24)))
                             }
@@ -3283,6 +3453,8 @@ impl ExprNode {
             | ExprNode::ListMin { .. }
             | ExprNode::ListMax { .. }
             | ExprNode::ListSum { .. }
+            | ExprNode::ListMean { .. }
+            | ExprNode::StringSplit { .. }
             | ExprNode::Strptime { .. }
             | ExprNode::UnixTimestamp { .. }
             | ExprNode::BinaryLength { .. }

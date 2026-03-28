@@ -6,8 +6,8 @@ use pyo3::types::{PyBytes, PyDict, PyList};
 use crate::dtype::{dtype_to_descriptor_py, BaseType};
 
 use super::ir::{
-    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringUnaryOp, TemporalPart,
-    UnaryNumericOp, UnixTimestampUnit, WindowFrame, WindowOp,
+    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringPredicateKind,
+    StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit, WindowFrame, WindowOp,
 };
 
 fn base_type_json(b: BaseType) -> &'static str {
@@ -200,12 +200,32 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             inner,
             pattern,
             replacement,
+            literal,
             ..
         } => {
             dict.set_item("kind", "string_replace")?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
             dict.set_item("pattern", pattern.as_str())?;
             dict.set_item("replacement", replacement.as_str())?;
+            dict.set_item("literal", *literal)?;
+        }
+        ExprNode::StringPredicate {
+            inner,
+            kind,
+            pattern,
+            ..
+        } => {
+            dict.set_item("kind", "string_predicate")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+            dict.set_item("pattern", pattern.as_str())?;
+            match kind {
+                StringPredicateKind::StartsWith => dict.set_item("op", "starts_with")?,
+                StringPredicateKind::EndsWith => dict.set_item("op", "ends_with")?,
+                StringPredicateKind::Contains { literal } => {
+                    dict.set_item("op", "contains")?;
+                    dict.set_item("literal", *literal)?;
+                }
+            }
         }
         ExprNode::StructField { base, field, .. } => {
             dict.set_item("kind", "struct_field")?;
@@ -283,6 +303,8 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
                     TemporalPart::Minute => "minute",
                     TemporalPart::Second => "second",
                     TemporalPart::Nanosecond => "nanosecond",
+                    TemporalPart::Weekday => "weekday",
+                    TemporalPart::Quarter => "quarter",
                 },
             )?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
@@ -312,6 +334,17 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
         ExprNode::ListSum { inner, .. } => {
             dict.set_item("kind", "list_sum")?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+        }
+        ExprNode::ListMean { inner, .. } => {
+            dict.set_item("kind", "list_mean")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+        }
+        ExprNode::StringSplit {
+            inner, delimiter, ..
+        } => {
+            dict.set_item("kind", "string_split")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+            dict.set_item("delimiter", delimiter.as_str())?;
         }
         ExprNode::DatetimeToDate { inner, .. } => {
             dict.set_item("kind", "datetime_to_date")?;
