@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is inspired 
 
 <!-- Add notes here for the next 1.x release. -->
 
+## [1.3.0] — 2026-03-29
+
+### Added
+
+- **Expr (type-specific):** `list_join`, `list_sort`, and `list_unique` on homogeneous
+  lists; `dt_week` (ISO week, `date` / `datetime`); `str_reverse`, `str_pad_start` /
+  `str_pad_end`, `str_zfill`, `str_extract_regex`, and `str_json_path_match` (Polars
+  engine; semantics in {doc}`SUPPORTED_TYPES` and {doc}`INTERFACE_CONTRACT`).
+- **Docs / tests:** expanded expression contracts in {doc}`SUPPORTED_TYPES` and
+  {doc}`TYPING`; integration coverage in `tests/test_type_specific_expr.py`.
+
 ### Removed
 
 - **CI / Release:** CycloneDX SBOM generation and upload jobs (too fragile for default

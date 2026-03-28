@@ -1,11 +1,12 @@
 # PydanTable roadmap (shipped → v1.0.0)
 
-**Latest release: `1.2.0`.** The **Planned v1.0.0** checklist (below) is **complete** for that tag. **Shipped in 0.23.0** adds **lazy `read_*` / `aread_*` file roots** (Parquet, CSV, NDJSON, IPC, **JSON**), **`DataFrame.write_*`** lazy pipeline output, **`export_*`** for eager dict→file, **`DataFrameModel`** glue (**`from_sql`**, **`write_sql`**, **`read_parquet_url_ctx`**), **HTTP/object-store `max_bytes`**, **`MissingRustExtensionError`**, and **breaking renames** (**`materialize_*`**, **`fetch_sql`**, **`fetch_*_url`**)—see **Shipped in 0.23.0** below and {doc}`IO_OVERVIEW`. **0.22.0** introduced the **`pydantable.io`** package (vocabulary evolved in **0.23.0**; see {doc}`changelog`). Earlier **0.20.0** / **0.21.0** items (**UX** docs, **Streamlit** interchange, …) remain in their sections. **ipywidgets** / interactive explorers remain **Later** unless promoted. This document also summarizes shipped history and **Later** / **After v1.0.0** backlogs.
+**Latest release: `1.3.0`.** The **Planned v1.0.0** checklist (below) is **complete** for that tag. **Shipped in 0.23.0** adds **lazy `read_*` / `aread_*` file roots** (Parquet, CSV, NDJSON, IPC, **JSON**), **`DataFrame.write_*`** lazy pipeline output, **`export_*`** for eager dict→file, **`DataFrameModel`** glue (**`from_sql`**, **`write_sql`**, **`read_parquet_url_ctx`**), **HTTP/object-store `max_bytes`**, **`MissingRustExtensionError`**, and **breaking renames** (**`materialize_*`**, **`fetch_sql`**, **`fetch_*_url`**)—see **Shipped in 0.23.0** below and {doc}`IO_OVERVIEW`. **0.22.0** introduced the **`pydantable.io`** package (vocabulary evolved in **0.23.0**; see {doc}`changelog`). Earlier **0.20.0** / **0.21.0** items (**UX** docs, **Streamlit** interchange, …) remain in their sections. **ipywidgets** / interactive explorers remain **Later** unless promoted. This document also summarizes shipped history and **Later** / **After v1.0.0** backlogs.
 
 Release history (high level): [`changelog.md`](changelog.md).
 
 For Polars-style API parity at the method level, see
-[`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md). Window **RANGE** rules for multi-column `orderBy` are documented in [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md) (PostgreSQL-style first-key axis; not universal SQL parity).
+[`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md). **Future Expr /
+table methods** we may add next are under [**Future method candidates**](#future-expr-and-dataframe-method-candidates-not-scheduled) (below). Window **RANGE** rules for multi-column `orderBy` are documented in [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md) (PostgreSQL-style first-key axis; not universal SQL parity).
 
 ---
 
@@ -354,6 +355,97 @@ Work **not** scheduled in the **0.17.0–0.20.0** shipped sections or **Planned 
 - [ ] **Chunked / streaming** async iterators for JSON or row batches (no minimal contract yet).
 - [ ] Longer-horizon experiments that do not fit the **pre-1.0** train (**0.17–0.19**) or the **v1.0.0** production gate.
 - [ ] **FastAPI ecosystem (optional):** thin **`pydantable[fastapi]`** extra with **pinned** **`fastapi` / `starlette`**, **middleware**, or **router** kits—**only** if demand and maintenance bandwidth are clear.
+
+---
+
+## Future Expr and DataFrame method candidates (not scheduled)
+
+**Additive** APIs aligned with Polars / PySpark ergonomics. Each needs Rust IR + typing +
+`INTERFACE_CONTRACT` / `SUPPORTED_TYPES` updates, façade mirrors where applicable, and
+contract tests. Order is **not** priority order.
+
+### String and text
+
+- [ ] **`str_replace_all`** / **regex replace-all** distinct from single **`str_replace`**
+  (Rust-regex dialect; document vs Polars naming).
+- [ ] **`str_extract_all`** → **`list[str]`** (all non-overlapping matches; dtype story for
+  empty matches).
+- [ ] **`str_count_matches`** (regex or literal; consistent with existing predicate dialect
+  split).
+- [ ] **`str_find`** / **`str_rfind`** (substring index or null; Unicode scalar index rules).
+- [ ] **`str_pad_start` / `str_pad_end` variants:** width from another column (expression
+  width) if we extend the IR beyond scalar **`length`**.
+- [ ] **Unicode normalize** (`NFC` / `NFD` / …) as an opt-in string unary (policy: which
+  forms are supported on the Polars path).
+- [ ] **Parsing helpers on `str`:** **`parse_int`**, **`parse_float`**, **`parse_bool`**
+  (strict vs loose; null on failure).
+- [ ] **`base64_encode` / `base64_decode`** (Binary ↔ str contracts).
+- [ ] **Title / case variants:** e.g. Polars **`to_titlecase`** if distinct from
+  **`upper`/`lower`** for user locales.
+
+### Numeric and boolean
+
+- [ ] **`clip(lower, upper)`** on **`int` / `float`** (inclusive bounds; null propagation).
+- [ ] **`sign`**; **`is_nan`**, **`is_finite`**, **`is_infinite`** on float (and **Decimal**
+  policy).
+- [ ] **Element-wise math:** **`pow`**, **`sqrt`**, **`log`**, **`log10`**, **`exp`**
+  (separate from **`round`/`floor`/`ceil`**).
+- [ ] **Typed `between(low, high)`** as **`Expr`** (inclusive/exclusive flags; three-valued
+  logic with nulls).
+- [ ] **Bitwise ops** on integers where dtypes are unambiguous (`&`, `|`, `^`, `~` or named
+  methods).
+
+### Temporal
+
+- [ ] **ISO week-year pairing:** **`dt_iso_year`** (or **`dt_week_year`**) alongside
+  **`dt_week`** where users expect ISO year boundaries.
+- [ ] **Offset / truncate / round:** **`dt_offset_by`**, **`dt_truncate`**, **`dt_round`**
+  (calendar buckets; timezone-aware semantics must match Polars and docs).
+- [ ] **`dt_combine`** ( **`date` + `time` → `datetime`** ) and related constructors from
+  parts.
+
+### Lists
+
+- [ ] **`list_slice`**, **`list_head`**, **`list_tail`** (count / index from end; OOB rules
+  like **`list_get`**).
+- [ ] **`list_concat`** (per-row concat of two **`list[T]`** columns with compatible **`T`**).
+- [ ] **`list_drop_nulls`** / **`list_compact`** (null elements inside list cells).
+- [ ] **`list_arg_min`**, **`list_arg_max`** (index of min/max; tie-break policy).
+- [ ] **`list_std`**, **`list_var`** (population vs sample; mirror Polars).
+- [ ] **`list_reverse`**, **`list_shuffle`** (deterministic seed story if we expose RNG).
+- [ ] **`list_eval`** / element-wise lambda (very large scope; likely last—needs a typed
+  closure or limited sub-language).
+
+### Structs and maps
+
+- [ ] **`struct_rename_fields`**, **`struct_with_fields`** (add/replace nested fields by
+  name).
+- [ ] **`struct_json_encode`** / **`struct_json_path_match`** symmetry with string JSON
+  helpers.
+- [ ] **Map transforms:** **`map_filter`**, **`map_entries_sorted`**, **`map_zip`** where
+  Polars exposes stable operations and our schema story stays **`dict[str, T]`**.
+
+### Windows and ranking
+
+- [ ] **`percent_rank`**, **`ntile`**, **`cume_dist`** (frame and null ordering spelled out
+  per **`WINDOW_SQL_SEMANTICS`**; **`row_number`**, **`rank`**, and **`dense_rank`** already
+  exist).
+- [ ] **`first_value` / `last_value`** with **ignore nulls** flags (Polars parity).
+- [ ] **`lag` / `lead`** extensions: optional **default** value when the shift falls outside
+  the partition (Spark-style **`default`** parameter).
+
+### Table-level and analytics helpers
+
+- [ ] **`DataFrame` / `DataFrameModel`:** **`quantile`**, **`median`** (multi-column),
+  **`corr`** / **`cov`** matrix helpers (materialization cost documented).
+- [ ] **`approx_n_unique`** / HyperLogLog-style sketch (if we add global or grouped
+  approx aggregates).
+
+### Interop and literals
+
+- [ ] **`Expr.hash`** / row fingerprint (algorithm choice; stable across sessions or not).
+- [ ] **Arrow / Polars scalar bridging** in expressions (only if we define a strict
+  embedding contract).
 
 ---
 
