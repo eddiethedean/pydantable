@@ -6,7 +6,7 @@ Release history (high level): [`changelog.md`](changelog.md).
 
 For Polars-style API parity at the method level, see
 [`POLARS_TRANSFORMATIONS_ROADMAP.md`](POLARS_TRANSFORMATIONS_ROADMAP.md). **Future Expr /
-table methods** we may add next are under [**Future method candidates**](#future-expr-and-dataframe-method-candidates-not-scheduled) (below). Window **RANGE** rules for multi-column `orderBy` are documented in [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md) (PostgreSQL-style first-key axis; not universal SQL parity).
+table methods** we may add next are under [**Future method candidates**](future-expr-and-dataframe-method-candidates-not-scheduled) (below). Window **RANGE** rules for multi-column `orderBy` are documented in [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md) (PostgreSQL-style first-key axis; not universal SQL parity).
 
 ---
 
@@ -358,6 +358,7 @@ Work **not** scheduled in the **0.17.0–0.20.0** shipped sections or **Planned 
 
 ---
 
+(future-expr-and-dataframe-method-candidates-not-scheduled)=
 ## Future Expr and DataFrame method candidates (not scheduled)
 
 **Additive** APIs aligned with Polars / PySpark ergonomics. Each needs Rust IR + typing +
