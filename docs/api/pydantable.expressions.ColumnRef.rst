@@ -26,19 +26,27 @@
       ~ColumnRef.dt_minute
       ~ColumnRef.dt_month
       ~ColumnRef.dt_nanosecond
+      ~ColumnRef.dt_quarter
       ~ColumnRef.dt_second
+      ~ColumnRef.dt_week
+      ~ColumnRef.dt_weekday
       ~ColumnRef.dt_year
       ~ColumnRef.element_at
+      ~ColumnRef.ends_with
       ~ColumnRef.floor
       ~ColumnRef.is_not_null
       ~ColumnRef.is_null
       ~ColumnRef.isin
       ~ColumnRef.list_contains
       ~ColumnRef.list_get
+      ~ColumnRef.list_join
       ~ColumnRef.list_len
       ~ColumnRef.list_max
+      ~ColumnRef.list_mean
       ~ColumnRef.list_min
+      ~ColumnRef.list_sort
       ~ColumnRef.list_sum
+      ~ColumnRef.list_unique
       ~ColumnRef.lower
       ~ColumnRef.map_contains_key
       ~ColumnRef.map_entries
@@ -50,7 +58,17 @@
       ~ColumnRef.over
       ~ColumnRef.referenced_columns
       ~ColumnRef.round
+      ~ColumnRef.starts_with
+      ~ColumnRef.str_contains
+      ~ColumnRef.str_contains_pat
+      ~ColumnRef.str_extract_regex
+      ~ColumnRef.str_json_path_match
+      ~ColumnRef.str_pad_end
+      ~ColumnRef.str_pad_start
       ~ColumnRef.str_replace
+      ~ColumnRef.str_reverse
+      ~ColumnRef.str_split
+      ~ColumnRef.str_zfill
       ~ColumnRef.strip
       ~ColumnRef.strip_chars
       ~ColumnRef.strip_prefix
