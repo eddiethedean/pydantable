@@ -168,11 +168,11 @@ Rolling/dynamic contracts:
 - **`DataFrame.to_arrow`** / **`DataFrame.ato_arrow`:** same logical materialization as **`to_dict`**, then build a PyArrow **`Table`** in Python (**not** a zero-copy view of internal Polars buffers). **`DataFrameModel`** exposes the same methods by delegation.
 - **Constructors:** **`pyarrow.Table`** and **`RecordBatch`** are accepted when **`pyarrow`** is installed (converted to Python lists before validation); see {doc}`SUPPORTED_TYPES`.
 
-## Async materialization, `submit`, and `astream` (1.5.0+)
+## Async materialization, `submit`, `stream`, and `astream` (1.5.0+)
 
 - **`acollect`** / **`ato_dict`** / **`ato_polars`** / **`ato_arrow`:** same logical result as the synchronous methods. Ordering of rows in columnar output follows the same **non-guarantee** as **`to_dict()`** ({doc}`Ordering`).
 - **`submit` → `ExecutionHandle`:** **`await handle.result()`** is equivalent to **`collect()`** with the same keyword arguments. **`handle.cancel()`** only affects the wait on a **`concurrent.futures.Future`** when cancellation wins the race before work starts; it does **not** cooperatively abort an in-flight Polars **`collect`**.
-- **`astream`:** performs **one** terminal engine materialization, then yields **`dict[str, list]`** batches of adjacent rows (same slicing contract as **`collect_batches`**). This is **chunked replay**, not a guarantee of bounded memory for unbounded scans. Batch order follows the same row-order policy as **`to_dict()`** unless the plan includes an explicit **`sort`**. Requires the **`polars`** Python package for chunk conversion.
+- **`stream`** / **`astream`:** perform **one** terminal engine materialization, then yield **`dict[str, list]`** batches of adjacent rows (same slicing contract as **`collect_batches`**). **`stream`** is synchronous (for **`def`** routes and **`StreamingResponse`**); **`astream`** is async. This is **chunked replay**, not a guarantee of bounded memory for unbounded scans. Batch order follows the same row-order policy as **`to_dict()`** unless the plan includes an explicit **`sort`**. Requires the **`polars`** Python package for chunk conversion.
 
 ## Polars `LazyFrame` escape hatch (deferred)
 

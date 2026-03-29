@@ -6,8 +6,9 @@ forwards transforms. Materialization is via :meth:`DataFrame.collect`,
 Non-blocking variants :meth:`DataFrame.acollect`, :meth:`DataFrame.ato_dict`,
 :meth:`DataFrame.ato_polars`, and :meth:`DataFrame.ato_arrow` prefer a Rust awaitable
 (Tokio + ``pyo3-async-runtimes``) when available, else :func:`asyncio.to_thread` /
-``executor=``. :meth:`DataFrame.submit` runs :meth:`collect` in the background;
-:meth:`DataFrame.astream` yields column chunks after one engine collect.
+``executor=``. :meth:`DataFrame.submit` runs :meth:`collect` in the background.
+:meth:`DataFrame.stream` (sync) and :meth:`DataFrame.astream` (async) yield column
+``dict`` chunks after one engine collect for streaming HTTP responses (e.g. FastAPI).
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Generic,
+    Iterator,
     Literal,
     TypeVar,
     Union,
@@ -2411,6 +2413,46 @@ class DataFrame(Generic[SchemaT]):
             streaming=use_streaming,
         )
 
+    def stream(
+        self,
+        *,
+        batch_size: int = 65_536,
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+    ) -> Iterator[dict[str, list[Any]]]:
+        """Yield ``dict[str, list]`` row chunks after one full engine collect.
+
+        Synchronous counterpart of :meth:`astream` for **sync** route handlers and
+        ``StreamingResponse`` iterators that must not ``await``. Same semantics as
+        :meth:`collect_batches` (full collect, then slice — not out-of-core
+        streaming). Requires ``pip install 'pydantable[polars]'`` for chunk
+        conversion.
+
+        **FastAPI:** use ``stream()`` from ``def`` routes; use ``async for`` over
+        ``astream()`` from ``async def`` routes when you want the event loop free
+        between chunks.
+        """
+        try:
+            importlib.import_module("polars")
+        except ImportError as e:
+            raise ImportError(
+                "polars is required for stream(). Install with: "
+                "pip install 'pydantable[polars]'"
+            ) from e
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            default=self._engine_streaming_default,
+        )
+        pl_batches = rust_collect_batches(
+            self._rust_plan,
+            self._root_data,
+            batch_size=batch_size,
+            streaming=use_streaming,
+        )
+        for pl_df in pl_batches:
+            yield pl_df.to_dict(as_series=False)
+
     def to_polars(
         self, *, streaming: bool | None = None, engine_streaming: bool | None = None
     ) -> Any:
@@ -2681,7 +2723,11 @@ class DataFrame(Generic[SchemaT]):
         engine_streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> Any:
-        """Yield ``dict[str, list]`` chunks after one full engine collect (see :meth:`collect_batches`)."""
+        """Yield ``dict[str, list]`` chunks after one full engine collect.
+
+        Async counterpart of :meth:`stream` for ``async def`` handlers. See
+        :meth:`stream` for semantics and FastAPI usage.
+        """
         use_streaming = _resolve_engine_streaming(
             streaming=streaming,
             engine_streaming=engine_streaming,

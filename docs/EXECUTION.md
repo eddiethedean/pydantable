@@ -10,7 +10,7 @@ inside the native extension. Python does **not** require the `polars` package fo
 
 **Fire-and-forget (1.5.0+):** **`DataFrame.submit()`** / **`DataFrameModel.submit()`** return an **`ExecutionHandle`**; **`await handle.result()`** matches **`collect()`** for the same arguments. Without **`executor=`**, a daemon thread runs **`collect`**. **`handle.cancel()`** only cancels the backing **`concurrent.futures.Future`** if work has not started; it does **not** stop in-flight Polars execution.
 
-**Chunked async iteration (1.5.0+):** **`async for batch in df.astream(...)`** yields **`dict[str, list]`** chunks after **one** full engine collect (same slicing strategy as **`collect_batches`** — not Polars’ native lazy batch iterator and **not** out-of-core streaming). Requires **`pydantable[polars]`** so chunk **`to_dict`** is defined on the Polars objects returned from Rust.
+**Chunked iteration (1.5.0+):** **`for batch in df.stream(...)`** (sync) and **`async for batch in df.astream(...)`** (async) yield **`dict[str, list]`** chunks after **one** full engine collect (same slicing strategy as **`collect_batches`** — not Polars’ native lazy batch iterator and **not** out-of-core streaming). Requires **`pydantable[polars]`** for chunk conversion. **`stream()`** suits sync **FastAPI** **`def`** routes with **`StreamingResponse`**; **`astream()`** suits **`async def`** routes. See {doc}`FASTAPI`.
 
 Cancelling an **`await acollect()`** (etc.) does **not** cancel in-flight native work. The **GIL** still serializes some Python callbacks; **`ato_polars()`** and **`ato_arrow()`** both build their respective outputs from a materialized columnar **`dict`** (extra allocation vs calling Polars or PyArrow alone on raw buffers).
 
@@ -68,7 +68,7 @@ if you need a Polars **`DataFrame`** in Python. Install **`pydantable[arrow]`** 
 | **`info()`**, **`repr()`** | Schema / root-buffer **`shape`** only; no row data materialization. |
 | **Async** **`acollect`** / **`ato_dict`** / … | Same work as sync; prefers Rust/Tokio awaitable when available, else thread pool ({doc}`FASTAPI`). |
 | **`submit`** / **`ExecutionHandle.result`** | Same as **`collect`**; background thread or **`executor.submit`**. |
-| **`astream`** | One full collect, then **`dict[str, list]`** row slices (like **`collect_batches`**). |
+| **`stream`** / **`astream`** | One full collect, then **`dict[str, list]`** row slices (like **`collect_batches`**). |
 
 Set **`PYDANTABLE_VERBOSE_ERRORS=1`** to append a short **`schema=…`** context line when Rust raises **`ValueError`** during **`execute_plan`** (debugging only).
 

@@ -13,7 +13,8 @@ For FastAPI services, `pydantable` gives you:
 - **`collect()`** — `list` of Pydantic models for the **current** projection (ideal for `response_model=list[YourRow]`)
 - **`to_dict()`** — `dict[str, list]` when the response is **column-shaped** JSON
 - **`acollect()`**, **`ato_dict()`**, **`ato_polars()`**, **`ato_arrow()`** — same semantics off the event loop (Rust/Tokio awaitable when available; see below)
-- **`submit()`** + **`await handle.result()`** — background **`collect()`**; **`astream()`** — async iteration of column chunks after one collect ({doc}`EXECUTION`)
+- **`submit()`** + **`await handle.result()`** — background **`collect()`**
+- **`stream()`** / **`astream()`** — sync / async iteration of **`dict[str, list]`** column chunks after one engine collect (for streaming HTTP bodies; see {doc}`EXECUTION`). Use **`stream()`** in **`def`** routes with **`StreamingResponse`**; use **`async for`** over **`astream()`** in **`async def`** routes.
 - **`pydantable.io`** — **`read_*` / `materialize_*` / `export_*`** for **Parquet**, **Arrow IPC**, **CSV**, **NDJSON**, **JSON** (array of objects; {doc}`IO_JSON`) (Rust-first on local paths where the wheel supports it; **PyArrow** for buffers, column subsets, streaming IPC). For **out-of-core** pipelines use **`read_*`** + transforms + **`DataFrame.write_*`**. **HTTP Parquet:** prefer **`read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** so temp files are removed after the handler ({doc}`IO_HTTP`). Extras: **`[sql]`** (SQLAlchemy **`fetch_sql`** / **`write_sql`**), **`[cloud]`** (**`fsspec`** URLs), **`[rap]`** (true-async CSV via **`aread_csv_rap`**). See **`pip install 'pydantable[io]'`** for **PyArrow + Polars** together.
 - **`amaterialize_parquet`**, **`amaterialize_ipc`**, **`amaterialize_csv`**, **`amaterialize_ndjson`**, **`amaterialize_json`** and **`aexport_*`** mirrors — eager file I/O **off the event loop** (**`asyncio.to_thread`** by default, or your **`executor=`**). Use inside **`async def`** when you need a full **`dict[str, list]`** (e.g. to pass into **`DataFrameModel`**), or to **export** columns to a path.
 - **`afetch_sql`** / **`awrite_sql`** — SQLAlchemy-backed table I/O without blocking the loop (same threading model).
@@ -363,9 +364,14 @@ async def create_users_async(rows: list[UserDF.RowModel]):
 
 Without a custom executor, **`await df.acollect()`** is enough: pydantable uses **`asyncio.to_thread`**.
 
-### Chunked or streaming JSON
+### Chunked column dicts (`stream` / `astream`)
 
-There is **no** built-in row-by-row or column-chunk **`async` iterator** for materialization yet. For **`StreamingResponse`**, a practical pattern is to **`await df.ato_dict()`** (or **`await df.arows()`**) and then stream **serialized chunks** you build yourself (for example **NDJSON** lines or pre-sized batches), keeping in mind that the full result may already be in memory after **`ato_dict`**. For very large tables, prefer **pagination** or **external storage** at the API design level.
+**`DataFrame.stream()`** and **`DataFrame.astream()`** yield **`dict[str, list]`** batches after **one** engine collect (same contract as **`collect_batches`**; see {doc}`EXECUTION`). They do **not** avoid holding the full materialized result in memory before chunking—use **pagination** or **external storage** when the table is too large for one collect.
+
+- **Sync route + `StreamingResponse`:** iterate **`for batch in df.stream(batch_size=...)`** and serialize each batch (for example **NDJSON** lines).
+- **`async def` route:** **`async for batch in df.astream(batch_size=..., executor=...)`** so **`to_dict`** per chunk can run off the event loop when configured.
+
+If you need **one** blob first, **`await df.ato_dict()`** / **`await df.arows()`** and then build your own response shape is still valid.
 
 ## Large tables, Polars, Arrow, and trust boundaries
 

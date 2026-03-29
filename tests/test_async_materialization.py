@@ -1,5 +1,7 @@
 """Async materialization APIs (acollect / ato_dict / ato_polars / submit / astream).
 
+**stream** (sync chunked dicts) is covered here alongside **astream**.
+
 **ato_arrow** is covered in ``tests/test_arrow_interchange.py`` (0.16.0), not here.
 """
 
@@ -312,6 +314,80 @@ async def test_astream_batch_size_one() -> None:
     df = Tiny({"x": [1, 2, 3]})
     chunks = [c async for c in df.astream(batch_size=1)]
     assert [c["x"] for c in chunks] == [[1], [2], [3]]
+
+
+def test_stream_yields_column_dict_chunks() -> None:
+    pytest.importorskip("polars")
+    df = Tiny({"x": list(range(5))})
+    chunks = list(df.stream(batch_size=2))
+    assert len(chunks) == 3
+    merged: list[int] = []
+    for b in chunks:
+        merged.extend(b["x"])
+    assert merged == list(range(5))
+
+
+def test_stream_matches_collect_batches_shapes() -> None:
+    pytest.importorskip("polars")
+    df = TwoCol({"a": [1, 2, 3], "b": [4, 5, 6]})
+    stream_chunks = list(df.stream(batch_size=2))
+    sync_batches = df.collect_batches(batch_size=2)
+    assert len(stream_chunks) == len(sync_batches)
+    for sc, pl_df in zip(stream_chunks, sync_batches, strict=True):
+        assert sc == pl_df.to_dict(as_series=False)
+
+
+@pytest.mark.asyncio
+async def test_stream_parity_with_astream() -> None:
+    pytest.importorskip("polars")
+    df = TwoCol({"a": [1, 2, 3], "b": [4, 5, 6]})
+    async_chunks = [c async for c in df.astream(batch_size=2)]
+    sync_chunks = list(df.stream(batch_size=2))
+    assert async_chunks == sync_chunks
+
+
+def test_stream_empty_frame_no_chunks() -> None:
+    pytest.importorskip("polars")
+    df = Tiny({"x": []})
+    assert list(df.stream(batch_size=10)) == []
+
+
+def test_stream_engine_streaming_smoke() -> None:
+    pytest.importorskip("polars")
+    df = Tiny({"x": [1, 2]})
+    chunks = list(df.stream(batch_size=1, engine_streaming=False))
+    assert len(chunks) == 2
+
+
+def test_dataframe_submit_and_stream() -> None:
+    pytest.importorskip("polars")
+    df = DataFrame[SSchema]({"x": [1, 2, 3]})
+    handle = df.submit(as_lists=True)
+    assert asyncio.run(handle.result()) == {"x": [1, 2, 3]}
+    chunks = list(df.stream(batch_size=2))
+    assert len(chunks) == 2
+    assert chunks[0]["x"] + chunks[1]["x"] == [1, 2, 3]
+
+
+def test_stream_raises_import_error_when_polars_missing() -> None:
+    pytest.importorskip("polars")
+    df = Tiny({"x": [1]})
+
+    _real_import = importlib.import_module
+
+    def _fail_polars(name: str, *a: object, **kw: object) -> object:
+        if name == "polars":
+            raise ImportError("no polars")
+        return _real_import(name, *a, **kw)
+
+    with (
+        mock.patch(
+            "pydantable.dataframe._impl.importlib.import_module",
+            side_effect=_fail_polars,
+        ),
+        pytest.raises(ImportError, match="polars is required for stream"),
+    ):
+        list(df.stream())
 
 
 @pytest.mark.asyncio

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from concurrent.futures import Executor
-from typing import Any, Generic, Literal, TypeVar
+from typing import Any, Generic, Iterator, Literal, TypeVar
 
 from pydantic import BaseModel
 
@@ -172,6 +172,13 @@ class DataFrameModel(Generic[RowT]):
         engine_streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> ExecutionHandle: ...
+    def stream(
+        self,
+        *,
+        batch_size: int = 65_536,
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+    ) -> Iterator[dict[str, list[Any]]]: ...
     def astream(
         self,
         *,

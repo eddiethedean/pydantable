@@ -1792,6 +1792,20 @@ class DataFrameModel(Generic[RowT]):
             executor=executor,
         )
 
+    def stream(
+        self,
+        *,
+        batch_size: int = 65_536,
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+    ) -> Any:
+        """Delegate to :meth:`DataFrame.stream`."""
+        return self._df.stream(
+            batch_size=batch_size,
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+        )
+
     def astream(
         self,
         *,
