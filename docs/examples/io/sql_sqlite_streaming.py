@@ -23,7 +23,9 @@ def main() -> None:
                 conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
                 conn.execute(
                     text(
-                        "WITH RECURSIVE seq(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 1000) "
+                        "WITH RECURSIVE seq(x) AS ("
+                        "SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 1000"
+                        ") "
                         "INSERT INTO t SELECT x FROM seq"
                     )
                 )
@@ -46,4 +48,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

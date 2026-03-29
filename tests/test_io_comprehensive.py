@@ -17,8 +17,8 @@ from pydantable.io import (
     aexport_ipc,
     aexport_ndjson,
     aexport_parquet,
-    aiter_sql,
     afetch_sql,
+    aiter_sql,
     amaterialize_csv,
     amaterialize_ipc,
     amaterialize_ndjson,
@@ -204,7 +204,9 @@ def test_fetch_sql_streams_but_materializes_final_dict(tmp_dir: Path) -> None:
         # enough rows to exercise internal fetchmany loop
         conn.execute(
             text(
-                "WITH RECURSIVE seq(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 5000) "
+                "WITH RECURSIVE seq(x) AS ("
+                "SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 5000"
+                ") "
                 "INSERT INTO t SELECT x FROM seq"
             )
         )
@@ -231,7 +233,9 @@ def test_fetch_sql_large_result_spans_multiple_internal_batches(tmp_dir: Path) -
         # > 65_536 rows to span multiple internal fetchmany batches.
         conn.execute(
             text(
-                "WITH RECURSIVE seq(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 70000) "
+                "WITH RECURSIVE seq(x) AS ("
+                "SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 70000"
+                ") "
                 "INSERT INTO t SELECT x FROM seq"
             )
         )
@@ -271,6 +275,7 @@ def test_write_sql_appends_in_multiple_executemany_roundtrips(tmp_dir: Path) -> 
     out = fetch_sql("SELECT COUNT(*) AS c FROM t", eng)
     assert out["c"] == [25_050]
 
+
 def test_iter_sql_batches_sqlite(tmp_dir: Path) -> None:
     pytest.importorskip("sqlalchemy")
     from sqlalchemy import create_engine, text
@@ -282,7 +287,9 @@ def test_iter_sql_batches_sqlite(tmp_dir: Path) -> None:
         # insert a size that forces multiple batches with small batch_size
         conn.execute(
             text(
-                "WITH RECURSIVE seq(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 25) "
+                "WITH RECURSIVE seq(x) AS ("
+                "SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 25"
+                ") "
                 "INSERT INTO t SELECT x FROM seq"
             )
         )
@@ -362,7 +369,9 @@ async def test_aiter_sql_batches_sqlite(tmp_dir: Path) -> None:
         conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
         conn.execute(
             text(
-                "WITH RECURSIVE seq(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 20) "
+                "WITH RECURSIVE seq(x) AS ("
+                "SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 20"
+                ") "
                 "INSERT INTO t SELECT x FROM seq"
             )
         )
@@ -377,11 +386,14 @@ async def test_aiter_sql_batches_sqlite(tmp_dir: Path) -> None:
 async def test_aiter_sql_propagates_sql_errors(tmp_dir: Path) -> None:
     pytest.importorskip("sqlalchemy")
     from sqlalchemy import create_engine
+    from sqlalchemy.exc import SQLAlchemyError
 
     db = tmp_dir / "err.sqlite"
     eng = create_engine(f"sqlite:///{db}")
-    with pytest.raises(Exception):
-        async for _b in aiter_sql("SELECT definitely_not_a_column FROM missing_table", eng):
+    with pytest.raises(SQLAlchemyError):
+        async for _b in aiter_sql(
+            "SELECT definitely_not_a_column FROM missing_table", eng
+        ):
             pass
 
 

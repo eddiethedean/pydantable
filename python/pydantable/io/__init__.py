@@ -834,6 +834,7 @@ __all__ = [
     "aexport_ndjson",
     "aexport_parquet",
     "afetch_sql",
+    "aiter_sql",
     "amaterialize_csv",
     "amaterialize_ipc",
     "amaterialize_json",
@@ -860,8 +861,8 @@ __all__ = [
     "fetch_ndjson_url",
     "fetch_parquet_url",
     "fetch_sql",
-    "iter_sql",
     "http",
+    "iter_sql",
     "materialize_csv",
     "materialize_ipc",
     "materialize_json",
@@ -886,7 +887,6 @@ __all__ = [
     "read_snowflake",
     "record_batch_to_column_dict",
     "write_csv_stdout",
-    "aiter_sql",
     "write_sql",
 ]
 

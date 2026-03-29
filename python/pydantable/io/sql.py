@@ -7,11 +7,10 @@ SQLite, SQL Server, Oracle, etc.). Install the matching **DBAPI driver** for you
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Iterator, Mapping, Sequence
 
     from sqlalchemy.engine import Connection, Engine
 
@@ -106,10 +105,11 @@ def iter_sql(
 
     params = dict(parameters or {})
 
-    def _rows_to_cols(rows: list[Mapping[str, Any]]) -> dict[str, list[Any]]:
+    def _rows_to_cols(rows: Sequence[Any]) -> dict[str, list[Any]]:
         if not rows:
             return {}
-        keys = list(rows[0].keys())
+        first = rows[0]
+        keys = list(first.keys())
         return {k: [row[k] for row in rows] for k in keys}
 
     if isinstance(bind, SAConnection):
