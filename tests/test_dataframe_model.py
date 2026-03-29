@@ -175,6 +175,56 @@ def test_dataframe_model_fetch_sql_classmethod(tmp_path) -> None:
     assert df.collect(as_lists=True) == {"id": [7], "age": [8]}
 
 
+def test_dataframe_model_iter_sql_yields_typed_batches(tmp_path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_path / "iter_sql.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (id INTEGER, age INTEGER)"))
+        conn.execute(text("INSERT INTO t VALUES (1, 10), (2, 20)"))
+
+    batches = list(
+        UserDF.iter_sql(
+            "SELECT id, age FROM t ORDER BY id",
+            eng,
+            batch_size=1,
+            trusted_mode="shape_only",
+        )
+    )
+    assert len(batches) == 2
+    assert all(type(b) is UserDF for b in batches)
+    flat = {
+        "id": [x for b in batches for x in b.collect(as_lists=True)["id"]],
+        "age": [x for b in batches for x in b.collect(as_lists=True)["age"]],
+    }
+    assert flat == {"id": [1, 2], "age": [10, 20]}
+
+
+@pytest.mark.asyncio
+async def test_dataframe_model_aiter_sql_yields_typed_batches(tmp_path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_path / "aiter_sql.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (id INTEGER, age INTEGER)"))
+        conn.execute(text("INSERT INTO t VALUES (3, 30), (4, 40)"))
+
+    out: list[UserDF] = []
+    async for b in UserDF.aiter_sql(
+        "SELECT id, age FROM t ORDER BY id",
+        eng,
+        batch_size=2,
+        trusted_mode="shape_only",
+    ):
+        out.append(b)
+    assert len(out) == 1
+    assert out[0].collect(as_lists=True) == {"id": [3, 4], "age": [30, 40]}
+
+
 @pytest.mark.asyncio
 async def test_dataframe_model_amaterialize_parquet_classmethod(tmp_path) -> None:
     path = tmp_path / "a.pq"

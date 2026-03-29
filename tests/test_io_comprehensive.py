@@ -12,8 +12,9 @@ from unittest.mock import patch
 
 import pytest
 from conftest import http_server_thread
-from pydantable import DataFrame
+from pydantable import DataFrame, DataFrameModel
 from pydantable.io import (
+    StreamingColumns,
     aexport_ipc,
     aexport_ndjson,
     aexport_parquet,
@@ -182,6 +183,27 @@ async def test_amaterialize_csv(tmp_dir: Path) -> None:
     assert [int(x) for x in got["v"]] == [3, 4]
 
 
+def test_streaming_columns_lazy_merge_matches_flat_dict() -> None:
+    sc = StreamingColumns(
+        [{"a": [1, 2], "b": [10, 20]}, {"a": [3], "b": [30]}, {"a": [], "b": []}]
+    )
+    assert list(sc) == ["a", "b"]
+    assert len(sc) == 2
+    assert sc["a"] == [1, 2, 3]
+    assert sc["b"] == [10, 20, 30]
+    # second access uses cache
+    assert sc["a"] is sc["a"]
+    assert sc.to_dict() == {"a": [1, 2, 3], "b": [10, 20, 30]}
+    assert len(sc.batches()) == 3
+
+
+def test_streaming_columns_empty_batches_is_empty_mapping() -> None:
+    sc = StreamingColumns([])
+    assert list(sc) == []
+    assert len(sc) == 0
+    assert sc.to_dict() == {}
+
+
 def test_read_sql_write_sql_sqlite(tmp_dir: Path) -> None:
     pytest.importorskip("sqlalchemy")
     from sqlalchemy import create_engine, text
@@ -225,6 +247,38 @@ def test_fetch_sql_auto_stream_threshold_returns_streaming_columns(
     got = out.to_dict()  # type: ignore[union-attr]
     assert got["n"][0] == 1
     assert got["n"][-1] == 50
+
+
+def test_fetch_sql_auto_stream_disabled_returns_plain_dict(
+    tmp_dir: Path,
+) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "no_auto_stream.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+        conn.execute(
+            text(
+                "WITH RECURSIVE seq(x) AS ("
+                "SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 50"
+                ") "
+                "INSERT INTO t SELECT x FROM seq"
+            )
+        )
+
+    out = fetch_sql(
+        "SELECT n FROM t ORDER BY n",
+        eng,
+        auto_stream=False,
+        auto_stream_threshold_rows=10,
+        batch_size=7,
+    )
+    assert isinstance(out, dict)
+    assert not isinstance(out, StreamingColumns)
+    assert out["n"][0] == 1
+    assert out["n"][-1] == 50
 
 
 def test_fetch_sql_streams_but_materializes_final_dict(tmp_dir: Path) -> None:
@@ -426,6 +480,144 @@ def test_iter_sql_batch_size_validation(tmp_dir: Path) -> None:
     eng = create_engine(f"sqlite:///{tmp_dir / 'bs.sqlite'}")
     with pytest.raises(ValueError, match="batch_size"):
         _ = list(iter_sql("SELECT 1", eng, batch_size=0))
+
+
+def test_iter_sql_respects_fetch_batch_size_env(
+    tmp_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pytest.importorskip("sqlalchemy")
+    monkeypatch.setenv("PYDANTABLE_SQL_FETCH_BATCH_SIZE", "5")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "env_bs.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+        conn.execute(
+            text(
+                "WITH RECURSIVE seq(x) AS ("
+                "SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 12"
+                ") "
+                "INSERT INTO t SELECT x FROM seq"
+            )
+        )
+
+    batches = list(iter_sql("SELECT n FROM t ORDER BY n", eng))
+    assert len(batches) == 3
+    flat = [x for b in batches for x in b["n"]]
+    assert flat == list(range(1, 13))  # 12 rows → batches of 5, 5, 2
+
+
+def test_iter_sql_rejects_bad_fetch_batch_size_env(
+    tmp_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pytest.importorskip("sqlalchemy")
+    monkeypatch.setenv("PYDANTABLE_SQL_FETCH_BATCH_SIZE", "not-an-int")
+    from sqlalchemy import create_engine
+
+    eng = create_engine(f"sqlite:///{tmp_dir / 'badenv.sqlite'}")
+    with pytest.raises(ValueError, match="PYDANTABLE_SQL_FETCH_BATCH_SIZE"):
+        _ = list(iter_sql("SELECT 1", eng))
+
+
+def test_write_sql_chunk_size_zero_kwarg_rejected(tmp_dir: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "chunk0.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+    with pytest.raises(ValueError, match="chunk_size"):
+        write_sql({"n": [1]}, "t", eng, chunk_size=0)
+
+
+def test_write_sql_rejects_bad_write_chunk_size_env(
+    tmp_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pytest.importorskip("sqlalchemy")
+    monkeypatch.setenv("PYDANTABLE_SQL_WRITE_CHUNK_SIZE", "0")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "bad_chunk_env.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+    with pytest.raises(ValueError, match="PYDANTABLE_SQL_WRITE_CHUNK_SIZE"):
+        write_sql({"n": [1]}, "t", eng)
+
+
+def test_write_sql_batches_empty_iterator_does_not_touch_table(
+    tmp_dir: Path,
+) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "empty_batches.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+
+    write_sql_batches(iter(()), "t", eng, if_exists="append")
+    out = fetch_sql("SELECT COUNT(*) AS c FROM t", eng)
+    plain = out.to_dict() if hasattr(out, "to_dict") else out
+    assert plain["c"] == [0]
+
+
+def test_write_sql_batches_accepts_dataframe_model_batches(tmp_dir: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    class _BatchDF(DataFrameModel):
+        n: int
+
+    db = tmp_dir / "dfm_batches.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+
+    write_sql_batches(
+        [_BatchDF({"n": [1, 2]}), _BatchDF({"n": [3]})],
+        "t",
+        eng,
+        if_exists="append",
+    )
+    out = fetch_sql("SELECT n FROM t ORDER BY n", eng)
+    plain = out.to_dict() if hasattr(out, "to_dict") else out
+    assert plain["n"] == [1, 2, 3]
+
+
+@pytest.mark.asyncio
+async def test_awrite_sql_batches_empty_iterator_does_not_touch_table(
+    tmp_dir: Path,
+) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "aempty_batches.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+
+    async def _empty():
+        for _ in range(0):
+            yield {"n": [1]}
+
+    await awrite_sql_batches(_empty(), "t", eng, if_exists="append")
+    out = fetch_sql("SELECT COUNT(*) AS c FROM t", eng)
+    plain = out.to_dict() if hasattr(out, "to_dict") else out
+    assert plain["c"] == [0]
+
+
+@pytest.mark.asyncio
+async def test_aiter_sql_batch_size_zero_raises(tmp_dir: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine
+
+    eng = create_engine(f"sqlite:///{tmp_dir / 'az.sqlite'}")
+    with pytest.raises(ValueError, match="batch_size"):
+        async for _ in aiter_sql("SELECT 1", eng, batch_size=0):
+            pass
 
 
 @pytest.mark.asyncio

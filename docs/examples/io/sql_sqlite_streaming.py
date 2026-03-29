@@ -1,5 +1,8 @@
 """SQLite: streaming SQL batches with :func:`pydantable.io.iter_sql`.
 
+For automatic fetch behavior, env-tunable batch sizes, and the **StreamingColumns**
+container returned by large **fetch_sql** calls, see the **IO_SQL** documentation page.
+
 Run::
 
     python docs/examples/io/sql_sqlite_streaming.py

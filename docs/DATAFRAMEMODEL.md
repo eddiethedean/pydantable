@@ -50,7 +50,7 @@ In **Jupyter** / **VS Code** notebooks, **`user_df`** (or the last expression in
 
 ## Classmethod I/O (`0.23.0+`)
 
-**`DataFrameModel`** mirrors **`pydantable.io`** for the common paths: lazy **`read_*` / `aread_*`**, eager **`materialize_*` / `fetch_sql` / `from_sql`**, lazy **`read_parquet_url`** and context **`read_parquet_url_ctx` / `aread_parquet_url_ctx`**, eager **`export_*`**, and **`write_sql` / `awrite_sql`**. Same arguments and semantics as the module functions; see {doc}`IO_OVERVIEW` and per-format guides under **Data I/O** in the toctree.
+**`DataFrameModel`** mirrors **`pydantable.io`** for the common paths: lazy **`read_*` / `aread_*`**, eager **`materialize_*` / **`fetch_sql`** / **`afetch_sql`** / **`from_sql`**, **streaming** **`iter_sql`** / **`aiter_sql`** (typed batch models for large **`SELECT`** results), lazy **`read_parquet_url`** and context **`read_parquet_url_ctx` / `aread_parquet_url_ctx`**, eager **`export_*`**, and writes via **`pydantable.io.write_sql`** / **`awrite_sql`** (and batch sinks **`write_sql_batches`** / **`awrite_sql_batches`**). Same arguments and semantics as the module functions where applicable; see {doc}`IO_OVERVIEW`, {doc}`IO_SQL`, and per-format guides under **Data I/O** in the toctree.
 
 ### Lazy reads and ingest validation
 
