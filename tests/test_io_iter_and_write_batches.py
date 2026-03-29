@@ -40,6 +40,16 @@ def test_ndjson_iter_and_write_batches_roundtrip(tmp_path: Path) -> None:
     assert batches[0]["a"] == [1, 2, 3]
     assert batches[0]["b"] == ["x", "y", "z"]
 
+def test_write_ndjson_batches_append(tmp_path: Path) -> None:
+    p = tmp_path / "a.ndjson"
+    write_ndjson_batches(p, iter([{"a": [1], "b": ["x"]}]), mode="w")
+    write_ndjson_batches(p, iter([{"a": [2], "b": ["y"]}]), mode="a")
+    lines = [ln for ln in p.read_text(encoding="utf-8").splitlines() if ln]
+    assert [json.loads(ln) for ln in lines] == [{"a": 1, "b": "x"}, {"a": 2, "b": "y"}]
+
+    with pytest.raises(ValueError, match="mode"):
+        write_ndjson_batches(p, iter([{"a": [1]}]), mode="rb")  # type: ignore[arg-type]
+
 
 def test_parquet_iter_and_write_batches(tmp_path: Path) -> None:
     pa = pytest.importorskip("pyarrow")
@@ -106,6 +116,21 @@ def test_ipc_file_vs_stream_mismatch_is_not_auto_detected(tmp_path: Path) -> Non
     with pytest.raises(Exception):
         list(iter_ipc(path, as_stream=False))
 
+def test_ipc_iter_from_bytes_buffer() -> None:
+    pytest.importorskip("pyarrow")
+    import pyarrow as pa
+    from pyarrow import ipc
+
+    from pydantable.io import iter_ipc
+
+    sink = pa.BufferOutputStream()
+    with ipc.new_stream(sink, pa.schema([("a", pa.int64())])) as writer:
+        writer.write(pa.RecordBatch.from_arrays([pa.array([1, 2, 3])], names=["a"]))
+    buf = sink.getvalue().to_pybytes()
+
+    batches = list(iter_ipc(buf, as_stream=True))
+    assert iter_concat_batches(iter(batches)) == {"a": [1, 2, 3]}
+
 
 def test_json_array_roundtrip_and_validation(tmp_path: Path) -> None:
     path = tmp_path / "arr.json"
@@ -123,6 +148,13 @@ def test_json_array_roundtrip_and_validation(tmp_path: Path) -> None:
     bad.write_text('{"k":1}', encoding="utf-8")
     with pytest.raises(ValueError, match="top-level array"):
         list(iter_json_array(bad))
+
+def test_ndjson_unions_keys_within_each_batch() -> None:
+    # Keys are unioned within each batch; missing values become None.
+    b = next(iter_ndjson(StringIO('{"a":1}\n{"b":2}\n'), batch_size=10))
+    assert set(b) == {"a", "b"}
+    assert b["a"] == [1, None]
+    assert b["b"] == [None, 2]
 
 
 def test_iter_json_lines_alias_matches_ndjson(tmp_path: Path) -> None:
@@ -189,6 +221,10 @@ def test_ensure_rectangular_and_concat() -> None:
 
     with pytest.raises(ValueError, match="same length"):
         ensure_rectangular({"a": [1], "b": [1, 2]})
+
+    # Writers should reject non-rectangular batches.
+    with pytest.raises(ValueError, match="same length"):
+        write_csv_batches(StringIO(), iter([{"a": [1], "b": [1, 2]}]))
 
     # Column keys are fixed from the first batch; extra keys in later batches are ignored.
     merged = iter_concat_batches(iter([{"x": [1, 2]}, {"x": [3], "y": ["a"]}]))
