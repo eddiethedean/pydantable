@@ -14,6 +14,13 @@ from .arrow import (
     record_batch_to_column_dict,
 )
 from .extras import (
+    iter_avro,
+    iter_bigquery,
+    iter_delta,
+    iter_excel,
+    iter_kafka_json,
+    iter_orc,
+    iter_snowflake,
     read_avro,
     read_bigquery,
     read_csv_stdin,
@@ -31,8 +38,22 @@ from .http import (
     fetch_parquet_url,
     read_from_object_store,
 )
+from .iter_file import (
+    iter_csv,
+    iter_ipc,
+    iter_json_array,
+    iter_json_lines,
+    iter_ndjson,
+    iter_parquet,
+)
 from .rap_support import aread_csv_rap, rap_csv_available
 from .sql import StreamingColumns, fetch_sql, iter_sql, write_sql
+from .write_batches import (
+    write_csv_batches,
+    write_ipc_batches,
+    write_ndjson_batches,
+    write_parquet_batches,
+)
 
 _Source = str | Path | BinaryIO | bytes
 
@@ -247,6 +268,49 @@ async def aiter_sql(
     batch_size: int = 65536,
     executor: Executor | None = None,
 ): ...
+async def _aiter_from_iter(it: Any, *, executor: Executor | None): ...
+async def aiter_parquet(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    columns: list[str] | None = None,
+    executor: Executor | None = None,
+): ...
+async def aiter_ipc(
+    source: _Source,
+    *,
+    batch_size: int = 65536,
+    as_stream: bool = False,
+    executor: Executor | None = None,
+): ...
+async def aiter_csv(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+): ...
+async def aiter_ndjson(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+): ...
+async def aiter_json_lines(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+): ...
+async def aiter_json_array(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+): ...
 async def awrite_sql(
     data: dict[str, list[Any]],
     table_name: str,
@@ -285,6 +349,12 @@ __all__ = [
     "aexport_ndjson",
     "aexport_parquet",
     "afetch_sql",
+    "aiter_csv",
+    "aiter_ipc",
+    "aiter_json_array",
+    "aiter_json_lines",
+    "aiter_ndjson",
+    "aiter_parquet",
     "aiter_sql",
     "amaterialize_csv",
     "amaterialize_ipc",
@@ -314,6 +384,19 @@ __all__ = [
     "fetch_parquet_url",
     "fetch_sql",
     "http",
+    "iter_avro",
+    "iter_bigquery",
+    "iter_csv",
+    "iter_delta",
+    "iter_excel",
+    "iter_ipc",
+    "iter_json_array",
+    "iter_json_lines",
+    "iter_kafka_json",
+    "iter_ndjson",
+    "iter_orc",
+    "iter_parquet",
+    "iter_snowflake",
     "iter_sql",
     "materialize_csv",
     "materialize_ipc",
@@ -338,7 +421,11 @@ __all__ = [
     "read_parquet_url_ctx",
     "read_snowflake",
     "record_batch_to_column_dict",
+    "write_csv_batches",
     "write_csv_stdout",
+    "write_ipc_batches",
+    "write_ndjson_batches",
+    "write_parquet_batches",
     "write_sql",
     "write_sql_batches",
 ]
@@ -351,6 +438,12 @@ __all__ = [
     "aexport_ndjson",
     "aexport_parquet",
     "afetch_sql",
+    "aiter_csv",
+    "aiter_ipc",
+    "aiter_json_array",
+    "aiter_json_lines",
+    "aiter_ndjson",
+    "aiter_parquet",
     "aiter_sql",
     "amaterialize_csv",
     "amaterialize_ipc",
@@ -380,6 +473,19 @@ __all__ = [
     "fetch_parquet_url",
     "fetch_sql",
     "http",
+    "iter_avro",
+    "iter_bigquery",
+    "iter_csv",
+    "iter_delta",
+    "iter_excel",
+    "iter_ipc",
+    "iter_json_array",
+    "iter_json_lines",
+    "iter_kafka_json",
+    "iter_ndjson",
+    "iter_orc",
+    "iter_parquet",
+    "iter_snowflake",
     "iter_sql",
     "materialize_csv",
     "materialize_ipc",
@@ -404,7 +510,11 @@ __all__ = [
     "read_parquet_url_ctx",
     "read_snowflake",
     "record_batch_to_column_dict",
+    "write_csv_batches",
     "write_csv_stdout",
+    "write_ipc_batches",
+    "write_ndjson_batches",
+    "write_parquet_batches",
     "write_sql",
     "write_sql_batches",
 ]

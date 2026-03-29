@@ -1024,6 +1024,8 @@ class DataFrame(Generic[SchemaT]):
         obj._io_validation_fill_missing_optional = True
         obj._io_validation_ignore_errors = False
         obj._io_validation_on_validation_errors = None
+        # Optional default for Polars streaming collect on this object.
+        obj._engine_streaming_default = None
         return cast("DataFrame[Any]", obj)
 
     def _apply_io_validation_if_configured(
@@ -2422,6 +2424,7 @@ class DataFrame(Generic[SchemaT]):
         as_numpy: bool = False,
         as_polars: bool | None = None,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> Any:
         """
@@ -2438,6 +2441,7 @@ class DataFrame(Generic[SchemaT]):
                 as_numpy=as_numpy,
                 as_polars=as_polars,
                 streaming=streaming,
+                engine_streaming=engine_streaming,
             ),
             executor=executor,
         )
@@ -2446,11 +2450,14 @@ class DataFrame(Generic[SchemaT]):
         self,
         *,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> dict[str, list[Any]]:
         """Async version of :meth:`to_dict` (see :meth:`acollect`)."""
         return await _materialize_in_thread(
-            functools.partial(self.to_dict, streaming=streaming),
+            functools.partial(
+                self.to_dict, streaming=streaming, engine_streaming=engine_streaming
+            ),
             executor=executor,
         )
 

@@ -14,6 +14,13 @@ from .arrow import (
     record_batch_to_column_dict,
 )
 from .extras import (
+    iter_avro,
+    iter_bigquery,
+    iter_delta,
+    iter_excel,
+    iter_kafka_json,
+    iter_orc,
+    iter_snowflake,
     read_avro,
     read_bigquery,
     read_csv_stdin,
@@ -31,151 +38,22 @@ from .http import (
     fetch_parquet_url,
     read_from_object_store,
 )
+from .iter_file import (
+    iter_csv,
+    iter_ipc,
+    iter_json_array,
+    iter_json_lines,
+    iter_ndjson,
+    iter_parquet,
+)
 from .rap_support import aread_csv_rap, rap_csv_available
 from .sql import StreamingColumns, fetch_sql, iter_sql, write_sql
-
-# Streaming batch I/O helpers (iterators)
-def iter_parquet(
-    path: str | Path, *, batch_size: int = 65536, columns: list[str] | None = None
-) -> Any: ...
-def iter_ipc(
-    source: _Source, *, batch_size: int = 65536, as_stream: bool = False
-) -> Any: ...
-def iter_csv(
-    path: str | Path, *, batch_size: int = 65536, encoding: str = "utf-8"
-) -> Any: ...
-def iter_ndjson(
-    path: str | Path, *, batch_size: int = 65536, encoding: str = "utf-8"
-) -> Any: ...
-def iter_json_lines(
-    path: str | Path, *, batch_size: int = 65536, encoding: str = "utf-8"
-) -> Any: ...
-def iter_json_array(
-    path: str | Path, *, batch_size: int = 65536, encoding: str = "utf-8"
-) -> Any: ...
-
-async def aiter_parquet(
-    path: str | Path,
-    *,
-    batch_size: int = 65536,
-    columns: list[str] | None = None,
-    executor: Executor | None = None,
-): ...
-async def aiter_ipc(
-    source: _Source,
-    *,
-    batch_size: int = 65536,
-    as_stream: bool = False,
-    executor: Executor | None = None,
-): ...
-async def aiter_csv(
-    path: str | Path,
-    *,
-    batch_size: int = 65536,
-    encoding: str = "utf-8",
-    executor: Executor | None = None,
-): ...
-async def aiter_ndjson(
-    path: str | Path,
-    *,
-    batch_size: int = 65536,
-    encoding: str = "utf-8",
-    executor: Executor | None = None,
-): ...
-async def aiter_json_lines(
-    path: str | Path,
-    *,
-    batch_size: int = 65536,
-    encoding: str = "utf-8",
-    executor: Executor | None = None,
-): ...
-async def aiter_json_array(
-    path: str | Path,
-    *,
-    batch_size: int = 65536,
-    encoding: str = "utf-8",
-    executor: Executor | None = None,
-): ...
-
-# Batch writers
-def write_parquet_batches(
-    path: str | Path | BinaryIO,
-    batches: Any,
-    *,
-    compression: str | None = None,
-) -> None: ...
-def write_ipc_batches(
-    path: str | Path | BinaryIO,
-    batches: Any,
-    *,
-    as_stream: bool = True,
-) -> None: ...
-def write_csv_batches(
-    path: str | Path,
-    batches: Any,
-    *,
-    mode: str = "w",
-    encoding: str = "utf-8",
-    write_header: bool = True,
-) -> None: ...
-def write_ndjson_batches(
-    path: str | Path,
-    batches: Any,
-    *,
-    mode: str = "w",
-    encoding: str = "utf-8",
-) -> None: ...
-
-# Extras iterators
-def iter_excel(
-    path: str | Path,
-    *,
-    sheet_name: str | int = 0,
-    batch_size: int = 65536,
-    experimental: bool = True,
-) -> Any: ...
-def iter_delta(
-    path: str | Path,
-    *,
-    batch_size: int = 65536,
-    experimental: bool = True,
-) -> Any: ...
-def iter_avro(
-    path: str | Path,
-    *,
-    batch_size: int = 65536,
-    experimental: bool = True,
-) -> Any: ...
-def iter_orc(
-    path: str | Path,
-    *,
-    batch_size: int = 65536,
-    experimental: bool = True,
-) -> Any: ...
-def iter_bigquery(
-    query: str,
-    *,
-    project: str | None = None,
-    batch_size: int = 65536,
-    experimental: bool = True,
-    **kwargs: Any,
-) -> Any: ...
-def iter_snowflake(
-    sql: str,
-    *,
-    batch_size: int = 65536,
-    experimental: bool = True,
-    **connect_kwargs: Any,
-) -> Any: ...
-def iter_kafka_json(
-    topic: str,
-    *,
-    bootstrap_servers: str,
-    max_messages: int | None = None,
-    batch_size: int = 1000,
-    experimental: bool = True,
-    **consumer_config: Any,
-) -> Any: ...
+from .write_batches import (
+    write_csv_batches,
+    write_ipc_batches,
+    write_ndjson_batches,
+    write_parquet_batches,
+)
 
 _Source = str | Path | BinaryIO | bytes
 
@@ -390,6 +268,49 @@ async def aiter_sql(
     batch_size: int = 65536,
     executor: Executor | None = None,
 ): ...
+async def _aiter_from_iter(it: Any, *, executor: Executor | None): ...
+async def aiter_parquet(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    columns: list[str] | None = None,
+    executor: Executor | None = None,
+): ...
+async def aiter_ipc(
+    source: _Source,
+    *,
+    batch_size: int = 65536,
+    as_stream: bool = False,
+    executor: Executor | None = None,
+): ...
+async def aiter_csv(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+): ...
+async def aiter_ndjson(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+): ...
+async def aiter_json_lines(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+): ...
+async def aiter_json_array(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+): ...
 async def awrite_sql(
     data: dict[str, list[Any]],
     table_name: str,
@@ -428,6 +349,12 @@ __all__ = [
     "aexport_ndjson",
     "aexport_parquet",
     "afetch_sql",
+    "aiter_csv",
+    "aiter_ipc",
+    "aiter_json_array",
+    "aiter_json_lines",
+    "aiter_ndjson",
+    "aiter_parquet",
     "aiter_sql",
     "amaterialize_csv",
     "amaterialize_ipc",
@@ -457,6 +384,19 @@ __all__ = [
     "fetch_parquet_url",
     "fetch_sql",
     "http",
+    "iter_avro",
+    "iter_bigquery",
+    "iter_csv",
+    "iter_delta",
+    "iter_excel",
+    "iter_ipc",
+    "iter_json_array",
+    "iter_json_lines",
+    "iter_kafka_json",
+    "iter_ndjson",
+    "iter_orc",
+    "iter_parquet",
+    "iter_snowflake",
     "iter_sql",
     "materialize_csv",
     "materialize_ipc",
@@ -481,7 +421,11 @@ __all__ = [
     "read_parquet_url_ctx",
     "read_snowflake",
     "record_batch_to_column_dict",
+    "write_csv_batches",
     "write_csv_stdout",
+    "write_ipc_batches",
+    "write_ndjson_batches",
+    "write_parquet_batches",
     "write_sql",
     "write_sql_batches",
 ]
@@ -494,6 +438,12 @@ __all__ = [
     "aexport_ndjson",
     "aexport_parquet",
     "afetch_sql",
+    "aiter_csv",
+    "aiter_ipc",
+    "aiter_json_array",
+    "aiter_json_lines",
+    "aiter_ndjson",
+    "aiter_parquet",
     "aiter_sql",
     "amaterialize_csv",
     "amaterialize_ipc",
@@ -523,6 +473,19 @@ __all__ = [
     "fetch_parquet_url",
     "fetch_sql",
     "http",
+    "iter_avro",
+    "iter_bigquery",
+    "iter_csv",
+    "iter_delta",
+    "iter_excel",
+    "iter_ipc",
+    "iter_json_array",
+    "iter_json_lines",
+    "iter_kafka_json",
+    "iter_ndjson",
+    "iter_orc",
+    "iter_parquet",
+    "iter_snowflake",
     "iter_sql",
     "materialize_csv",
     "materialize_ipc",
@@ -547,7 +510,11 @@ __all__ = [
     "read_parquet_url_ctx",
     "read_snowflake",
     "record_batch_to_column_dict",
+    "write_csv_batches",
     "write_csv_stdout",
+    "write_ipc_batches",
+    "write_ndjson_batches",
+    "write_parquet_batches",
     "write_sql",
     "write_sql_batches",
 ]

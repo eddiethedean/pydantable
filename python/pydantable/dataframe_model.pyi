@@ -98,86 +98,7 @@ class DataFrameModel(Generic[RowT]):
     ) -> DataFrameModel[Any]: ...
     def explode(self, columns: str | Sequence[str]) -> DataFrameModel[Any]: ...
     def unnest(self, columns: str | Sequence[str]) -> DataFrameModel[Any]: ...
-    @classmethod
-    def iter_parquet(
-        cls,
-        path: Any,
-        *,
-        batch_size: int = 65536,
-        columns: list[str] | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        fill_missing_optional: bool = True,
-        ignore_errors: bool = False,
-        on_validation_errors: Any | None = None,
-    ) -> Any: ...
-    @classmethod
-    def iter_ipc(
-        cls,
-        source: Any,
-        *,
-        batch_size: int = 65536,
-        as_stream: bool = False,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        fill_missing_optional: bool = True,
-        ignore_errors: bool = False,
-        on_validation_errors: Any | None = None,
-    ) -> Any: ...
-    @classmethod
-    def iter_csv(
-        cls,
-        path: Any,
-        *,
-        batch_size: int = 65536,
-        encoding: str = "utf-8",
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        fill_missing_optional: bool = True,
-        ignore_errors: bool = False,
-        on_validation_errors: Any | None = None,
-    ) -> Any: ...
-    @classmethod
-    def iter_ndjson(
-        cls,
-        path: Any,
-        *,
-        batch_size: int = 65536,
-        encoding: str = "utf-8",
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        fill_missing_optional: bool = True,
-        ignore_errors: bool = False,
-        on_validation_errors: Any | None = None,
-    ) -> Any: ...
-
-    @classmethod
-    def write_parquet_batches(
-        cls, path: Any, batches: Any, *, compression: str | None = None
-    ) -> None: ...
-    @classmethod
-    def write_ipc_batches(
-        cls, path: Any, batches: Any, *, as_stream: bool = True
-    ) -> None: ...
-    @classmethod
-    def write_csv_batches(
-        cls,
-        path: Any,
-        batches: Any,
-        *,
-        mode: str = "w",
-        encoding: str = "utf-8",
-        write_header: bool = True,
-    ) -> None: ...
-    @classmethod
-    def write_ndjson_batches(
-        cls,
-        path: Any,
-        batches: Any,
-        *,
-        mode: str = "w",
-        encoding: str = "utf-8",
-    ) -> None: ...
-
-    def to_dict(
-        self, *, streaming: bool | None = None, engine_streaming: bool | None = None
-    ) -> dict[str, list[Any]]: ...
+    def to_dict(self, *, streaming: bool | None = None) -> dict[str, list[Any]]: ...
     def collect(
         self,
         *,
@@ -185,14 +106,12 @@ class DataFrameModel(Generic[RowT]):
         as_numpy: bool = False,
         as_polars: bool | None = None,
         streaming: bool | None = None,
-        engine_streaming: bool | None = None,
     ) -> Any: ...
     def rows(self) -> list[RowT]: ...
     async def ato_dict(
         self,
         *,
         streaming: bool | None = None,
-        engine_streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> dict[str, list[Any]]: ...
     async def arows(self, *, executor: Executor | None = None) -> list[RowT]: ...
