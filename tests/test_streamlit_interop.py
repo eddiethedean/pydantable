@@ -5,6 +5,7 @@ import warnings
 import pytest
 
 pytest.importorskip("pyarrow")
+pytest.importorskip("pandas")
 pytest.importorskip("streamlit")
 
 
@@ -32,7 +33,9 @@ def test_streamlit_dataframe_interchange_smoke() -> None:
         # with Streamlit behavior while still covering the editor path.
         with suppress(StreamlitAPIException):
             st.data_editor(df)
-        st.data_editor(df.to_arrow())
+        # Streamlit may internally convert through pandas; give it an explicit pandas DF
+        # to avoid pyarrow metadata/attrs serialization edge cases across versions.
+        st.data_editor(df.to_arrow().to_pandas())
 
     with warnings.catch_warnings():
         warnings.filterwarnings(

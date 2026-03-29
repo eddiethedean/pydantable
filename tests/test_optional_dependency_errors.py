@@ -47,6 +47,8 @@ def test_dataframe_consortium_standard_missing_dataframe_api_compat(
 
 
 def test_dataframe_model_consortium_standard_delegates() -> None:
+    pytest.importorskip("dataframe_api_compat")
+
     class SmallDF(DataFrameModel):
         x: int
 

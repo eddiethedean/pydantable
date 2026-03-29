@@ -787,7 +787,15 @@ async def aiter_sql(
     loop = asyncio.get_running_loop()
 
     def _put(item: object) -> None:
-        loop.call_soon_threadsafe(q.put_nowait, item)
+        # Backpressure: never drop batches if the async consumer is slow.
+        # We block the producer thread until the event loop enqueues the item.
+        try:
+            fut = asyncio.run_coroutine_threadsafe(q.put(item), loop)
+            fut.result()
+        except BaseException:
+            # If the consumer task is cancelled / loop is closing, don't crash the
+            # background producer thread (pytest treats that as a warning).
+            return
 
     def _runner() -> None:
         try:
