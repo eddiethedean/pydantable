@@ -204,7 +204,7 @@ async def upload_parquet_async(file: UploadFile):
         Path(path).unlink(missing_ok=True)
 ```
 
-### Async SQL (`afetch_sql` / `awrite_sql`)
+### Async SQL (`afetch_sql` / `awrite_sql` / `aiter_sql`)
 
 **SQLAlchemy 2.x** (**`pip install 'pydantable[sql]'`** plus your **DBAPI** driver): **`fetch_sql`** / **`write_sql`** support any SQLAlchemy URL (**PostgreSQL**, **MySQL**, **SQLite**, **SQL Server**, …). In **`async def`** handlers, use **`afetch_sql`** / **`awrite_sql`**. Keep **`SELECT`** parameterized; never build SQL from untrusted request fields without binds.
 
@@ -213,7 +213,7 @@ from typing import Annotated, Any
 
 from fastapi import Body
 
-from pydantable.io import afetch_sql, awrite_sql
+from pydantable.io import afetch_sql, aiter_sql, awrite_sql
 
 
 @app.get("/rows")
@@ -224,6 +224,20 @@ async def rows(database_url: str):
         parameters={"a": True},
     )
     return cols
+
+
+@app.get("/rows-streaming")
+async def rows_streaming(database_url: str):
+    # Stream batches to keep peak memory bounded.
+    out: list[dict[str, list[Any]]] = []
+    async for batch in aiter_sql(
+        "SELECT id, name FROM t WHERE active = :a",
+        database_url,
+        parameters={"a": True},
+        batch_size=10_000,
+    ):
+        out.append(batch)
+    return {"batches": len(out)}
 
 
 @app.post("/bulk-insert")

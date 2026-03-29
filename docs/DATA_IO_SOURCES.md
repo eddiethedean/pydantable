@@ -104,6 +104,7 @@ Pydantable already executes typed plans in **Rust** (Polars-backed). Putting **f
 
 - **Any SQLAlchemy URL or engine:** e.g. **`postgresql+psycopg://…`**, **`mysql+pymysql://…`**, **`sqlite:///…`**, **`mssql+pyodbc://…`**, etc.
 - **Sync execution** inside SQLAlchemy; from **`async def`** routes use **`afetch_sql`** / **`awrite_sql`** (**`asyncio.to_thread`** or **`executor=`**) so the event loop is not blocked.
+- For **large result sets**, prefer **streaming batches** with **`iter_sql`** / **`aiter_sql`** to avoid materializing the full result into one in-memory `dict[str, list]`.
 - **`write_sql` … `if_exists="replace"`** uses generic **DDL** (**`DropTable` / `CreateTable`**); exotic dialects or production schemas may still prefer migrations instead.
 
 **Native async SQLAlchemy (asyncpg, …)**

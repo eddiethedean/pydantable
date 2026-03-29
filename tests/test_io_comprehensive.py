@@ -17,6 +17,7 @@ from pydantable.io import (
     aexport_ipc,
     aexport_ndjson,
     aexport_parquet,
+    aiter_sql,
     afetch_sql,
     amaterialize_csv,
     amaterialize_ipc,
@@ -33,6 +34,7 @@ from pydantable.io import (
     fetch_ndjson_url,
     fetch_parquet_url,
     fetch_sql,
+    iter_sql,
     materialize_csv,
     materialize_ipc,
     materialize_ndjson,
@@ -189,6 +191,198 @@ def test_read_sql_write_sql_sqlite(tmp_dir: Path) -> None:
     write_sql({"id": [1], "name": ["x"]}, "m", eng, if_exists="append")
     out = fetch_sql("SELECT * FROM m", eng)
     assert out == {"id": [1], "name": ["x"]}
+
+
+def test_fetch_sql_streams_but_materializes_final_dict(tmp_dir: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "many.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+        # enough rows to exercise internal fetchmany loop
+        conn.execute(
+            text(
+                "WITH RECURSIVE seq(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 5000) "
+                "INSERT INTO t SELECT x FROM seq"
+            )
+        )
+
+    got = fetch_sql("SELECT n FROM t ORDER BY n", eng)
+    assert got["n"][0] == 1
+    assert got["n"][-1] == 5000
+
+
+def test_fetch_sql_large_result_spans_multiple_internal_batches(tmp_dir: Path) -> None:
+    """
+    fetch_sql should not rely on result.mappings().all().
+
+    We can't easily assert fetchmany() was called without deep mocking, but we *can*
+    ensure correctness on a result set larger than the internal batch size.
+    """
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "huge.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+        # > 65_536 rows to span multiple internal fetchmany batches.
+        conn.execute(
+            text(
+                "WITH RECURSIVE seq(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 70000) "
+                "INSERT INTO t SELECT x FROM seq"
+            )
+        )
+
+    got = fetch_sql("SELECT n FROM t ORDER BY n", eng)
+    assert got["n"][0] == 1
+    assert got["n"][-1] == 70000
+
+
+def test_write_sql_appends_in_multiple_executemany_roundtrips(tmp_dir: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, event, text
+
+    db = tmp_dir / "write_chunks.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+
+    insert_execs: list[str] = []
+
+    def before_cursor_execute(
+        _conn, _cursor, statement, _parameters, _context, _executemany
+    ):
+        stmt = str(statement or "")
+        if stmt.lstrip().upper().startswith("INSERT"):
+            insert_execs.append(stmt)
+
+    event.listen(eng, "before_cursor_execute", before_cursor_execute)
+    try:
+        # Internal chunk size is 10_000; force 3 chunks.
+        data = {"n": list(range(1, 25_051))}
+        write_sql(data, "t", eng, if_exists="append")
+    finally:
+        event.remove(eng, "before_cursor_execute", before_cursor_execute)
+
+    assert len(insert_execs) == 3
+    out = fetch_sql("SELECT COUNT(*) AS c FROM t", eng)
+    assert out["c"] == [25_050]
+
+def test_iter_sql_batches_sqlite(tmp_dir: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "batch.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+        # insert a size that forces multiple batches with small batch_size
+        conn.execute(
+            text(
+                "WITH RECURSIVE seq(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 25) "
+                "INSERT INTO t SELECT x FROM seq"
+            )
+        )
+
+    batches = list(iter_sql("SELECT n FROM t ORDER BY n", eng, batch_size=7))
+    assert len(batches) >= 3
+    flat = [x for b in batches for x in b["n"]]
+    assert flat == list(range(1, 26))
+
+
+def test_iter_sql_empty_result_yields_nothing(tmp_dir: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "empty.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+
+    assert list(iter_sql("SELECT n FROM t WHERE 1=0", eng, batch_size=10)) == []
+
+
+def test_iter_sql_parameters_and_connection_bind(tmp_dir: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "params.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+        conn.execute(text("INSERT INTO t VALUES (1), (2), (3), (4), (5)"))
+        batches = list(
+            iter_sql(
+                "SELECT n FROM t WHERE n >= :min_n ORDER BY n",
+                conn,
+                parameters={"min_n": 3},
+                batch_size=2,
+            )
+        )
+
+    flat = [x for b in batches for x in b["n"]]
+    assert flat == [3, 4, 5]
+
+
+def test_iter_sql_url_bind(tmp_dir: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "url.sqlite"
+    url = f"sqlite:///{db}"
+    eng = create_engine(url)
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+        conn.execute(text("INSERT INTO t VALUES (9), (10)"))
+
+    batches = list(iter_sql("SELECT n FROM t ORDER BY n", url, batch_size=1))
+    assert [x for b in batches for x in b["n"]] == [9, 10]
+
+
+def test_iter_sql_batch_size_validation(tmp_dir: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine
+
+    eng = create_engine(f"sqlite:///{tmp_dir / 'bs.sqlite'}")
+    with pytest.raises(ValueError, match="batch_size"):
+        _ = list(iter_sql("SELECT 1", eng, batch_size=0))
+
+
+@pytest.mark.asyncio
+async def test_aiter_sql_batches_sqlite(tmp_dir: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "abatch.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+        conn.execute(
+            text(
+                "WITH RECURSIVE seq(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 20) "
+                "INSERT INTO t SELECT x FROM seq"
+            )
+        )
+
+    out: list[int] = []
+    async for b in aiter_sql("SELECT n FROM t ORDER BY n", eng, batch_size=6):
+        out.extend(b["n"])
+    assert out == list(range(1, 21))
+
+
+@pytest.mark.asyncio
+async def test_aiter_sql_propagates_sql_errors(tmp_dir: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine
+
+    db = tmp_dir / "err.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with pytest.raises(Exception):
+        async for _b in aiter_sql("SELECT definitely_not_a_column FROM missing_table", eng):
+            pass
 
 
 @pytest.mark.network

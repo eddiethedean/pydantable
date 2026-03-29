@@ -47,7 +47,7 @@ from .http import (
     read_from_object_store,
 )
 from .rap_support import aread_csv_rap, rap_csv_available
-from .sql import fetch_sql, write_sql
+from .sql import fetch_sql, iter_sql, write_sql
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -753,6 +753,62 @@ async def afetch_sql(
     )
 
 
+async def aiter_sql(
+    sql: str,
+    bind: str | Any,
+    *,
+    parameters: Mapping[str, Any] | None = None,
+    batch_size: int = 65_536,
+    executor: Executor | None = None,
+):
+    """
+    Async generator yielding batches from :func:`iter_sql` without blocking the event loop.
+
+    This runs the synchronous SQLAlchemy cursor in a background thread and streams
+    batch dicts through an ``asyncio.Queue``.
+    """
+    import asyncio
+    import threading
+
+    if batch_size <= 0:
+        raise ValueError("batch_size must be a positive integer")
+
+    q: asyncio.Queue[object] = asyncio.Queue(maxsize=2)
+    sentinel = object()
+
+    loop = asyncio.get_running_loop()
+
+    def _put(item: object) -> None:
+        loop.call_soon_threadsafe(q.put_nowait, item)
+
+    def _runner() -> None:
+        try:
+            for batch in iter_sql(
+                sql,
+                bind,
+                parameters=parameters,
+                batch_size=batch_size,
+            ):
+                _put(batch)
+        except BaseException as e:  # propagate exceptions to async consumer
+            _put(e)
+        finally:
+            _put(sentinel)
+
+    if executor is not None:
+        loop.run_in_executor(executor, _runner)
+    else:
+        threading.Thread(target=_runner, daemon=True).start()
+
+    while True:
+        item = await q.get()
+        if item is sentinel:
+            return
+        if isinstance(item, BaseException):
+            raise item
+        yield item  # dict[str, list[Any]]
+
+
 async def awrite_sql(
     data: dict[str, list[Any]],
     table_name: str,
@@ -804,6 +860,7 @@ __all__ = [
     "fetch_ndjson_url",
     "fetch_parquet_url",
     "fetch_sql",
+    "iter_sql",
     "http",
     "materialize_csv",
     "materialize_ipc",
@@ -829,6 +886,7 @@ __all__ = [
     "read_snowflake",
     "record_batch_to_column_dict",
     "write_csv_stdout",
+    "aiter_sql",
     "write_sql",
 ]
 
@@ -844,6 +902,7 @@ register_reader("materialize_ndjson", materialize_ndjson, stable=True)
 register_reader("materialize_ipc", materialize_ipc, stable=True)
 register_reader("materialize_json", materialize_json, stable=True)
 register_reader("fetch_sql", fetch_sql, requires_extra="sql", stable=True)
+register_reader("iter_sql", iter_sql, requires_extra="sql", stable=True)
 
 register_writer("export_parquet", export_parquet, stable=True)
 register_writer("export_csv", export_csv, stable=True)

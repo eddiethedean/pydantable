@@ -7,6 +7,7 @@ SQLite, SQL Server, Oracle, etc.). Install the matching **DBAPI driver** for you
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -45,22 +46,89 @@ def fetch_sql(
     from sqlalchemy.engine import Engine as SAEngine
 
     params = dict(parameters or {})
+    # Stream under the hood to avoid materializing the full row-mapping list
+    # (still returns one fully-materialized column dict).
+    cols: dict[str, list[Any]] = {}
+    keys: list[str] | None = None
+
+    def _consume(result: Any) -> None:
+        nonlocal cols, keys
+        # Use a moderate batch size to keep overhead low while bounding peak memory.
+        batch_size = 65_536
+        while True:
+            chunk = result.mappings().fetchmany(batch_size)
+            if not chunk:
+                break
+            if keys is None:
+                keys = list(chunk[0].keys())
+                cols = {k: [] for k in keys}
+            for row in chunk:
+                for k in keys:  # type: ignore[union-attr]
+                    cols[k].append(row[k])
+
     if isinstance(bind, SAConnection):
-        result = bind.execute(text(sql), params)
-        rows = result.mappings().all()
+        result = bind.execution_options(stream_results=True).execute(text(sql), params)
+        _consume(result)
+        return cols
+
+    eng = bind if isinstance(bind, SAEngine) else create_engine(bind)
+    with eng.connect() as conn:
+        result = conn.execution_options(stream_results=True).execute(text(sql), params)
+        _consume(result)
+    return cols
+
+
+def iter_sql(
+    sql: str,
+    bind: str | Engine | Connection,
+    *,
+    parameters: Mapping[str, Any] | None = None,
+    batch_size: int = 65_536,
+) -> Iterator[dict[str, list[Any]]]:
+    """
+    Execute ``sql`` and yield results in batches as ``dict[column_name, list]``.
+
+    This is a streaming alternative to :func:`fetch_sql` for large result sets.
+    Each yielded batch is fully materialized in Python, but the full result set
+    is never loaded at once.
+
+    Notes:
+    - ``sql`` should be a ``SELECT`` (or other statement returning rows).
+    - Use **bound parameters** only — never interpolate untrusted input into ``sql``.
+    - ``bind`` may be a SQLAlchemy URL string, ``Engine``, or ``Connection``.
+    """
+    if batch_size <= 0:
+        raise ValueError("batch_size must be a positive integer")
+
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import Connection as SAConnection
+    from sqlalchemy.engine import Engine as SAEngine
+
+    params = dict(parameters or {})
+
+    def _rows_to_cols(rows: list[Mapping[str, Any]]) -> dict[str, list[Any]]:
         if not rows:
             return {}
         keys = list(rows[0].keys())
         return {k: [row[k] for row in rows] for k in keys}
 
+    if isinstance(bind, SAConnection):
+        result = bind.execution_options(stream_results=True).execute(text(sql), params)
+        while True:
+            chunk = result.mappings().fetchmany(batch_size)
+            if not chunk:
+                break
+            yield _rows_to_cols(chunk)
+        return
+
     eng = bind if isinstance(bind, SAEngine) else create_engine(bind)
     with eng.connect() as conn:
-        result = conn.execute(text(sql), params)
-        rows = result.mappings().all()
-    if not rows:
-        return {}
-    keys = list(rows[0].keys())
-    return {k: [row[k] for row in rows] for k in keys}
+        result = conn.execution_options(stream_results=True).execute(text(sql), params)
+        while True:
+            chunk = result.mappings().fetchmany(batch_size)
+            if not chunk:
+                break
+            yield _rows_to_cols(chunk)
 
 
 def _infer_columns(data: dict[str, list[Any]]):
@@ -111,7 +179,17 @@ def write_sql(
     if len(lengths) != 1:
         raise ValueError("all columns in data must have the same length")
     n = lengths.pop()
-    rows = [{k: data[k][i] for k in data} for i in range(n)]
+    keys = list(data.keys())
+
+    def _row_chunks(chunk_size: int = 10_000):
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be a positive integer")
+        for start in range(0, n, chunk_size):
+            end = min(start + chunk_size, n)
+            chunk = []
+            for i in range(start, end):
+                chunk.append({k: data[k][i] for k in keys})
+            yield chunk
 
     eng = _to_engine(bind)
     insp = inspect(eng)
@@ -131,7 +209,8 @@ def write_sql(
                 schema=schema,
             )
             conn.execute(CreateTable(tbl))
-            conn.execute(insert(tbl), rows)
+            for chunk in _row_chunks():
+                conn.execute(insert(tbl), chunk)
             return
 
         if not exists:
@@ -140,4 +219,5 @@ def write_sql(
             )
         md = MetaData()
         tbl = Table(table_name, md, schema=schema, autoload_with=conn)
-        conn.execute(insert(tbl), rows)
+        for chunk in _row_chunks():
+            conn.execute(insert(tbl), chunk)
