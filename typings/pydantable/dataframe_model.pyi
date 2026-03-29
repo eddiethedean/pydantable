@@ -4,10 +4,9 @@ from collections.abc import Mapping, Sequence
 from concurrent.futures import Executor
 from typing import Any, Generic, Literal, TypeVar
 
+from pydantable.dataframe import ExecutionHandle
 from pydantic import BaseModel
 from typing_extensions import Self
-
-from pydantable.dataframe import ExecutionHandle
 
 RowT = TypeVar("RowT", bound=BaseModel)
 AfterModelT = TypeVar("AfterModelT", bound="DataFrameModel[Any]")

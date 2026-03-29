@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import importlib
 import warnings
 from unittest import mock
 
 import pytest
-from pydantable import DataFrameModel
+from pydantable import DataFrame, DataFrameModel
+from pydantable.schema import Schema
 
 
 class Tiny(DataFrameModel):
@@ -70,15 +72,13 @@ async def test_arows_ato_dicts() -> None:
     assert dicts == [{"x": 1}, {"x": 2}]
 
 
+class SSchema(Schema):
+    x: int
+
+
 @pytest.mark.asyncio
 async def test_dataframe_acollect_core() -> None:
-    from pydantable import DataFrame
-    from pydantable.schema import Schema
-
-    class S(Schema):
-        x: int
-
-    df = DataFrame[S]({"x": [3]})
+    df = DataFrame[SSchema]({"x": [3]})
     rows = await df.acollect()
     assert len(rows) == 1 and rows[0].x == 3
 
@@ -174,18 +174,16 @@ async def test_ato_dict_uses_custom_executor() -> None:
     assert d == {"a": [1], "b": [2]}
 
 
+class MapSchema(Schema):
+    m: dict[str, int]
+
+
 @pytest.mark.asyncio
 async def test_ato_dict_after_pyarrow_map_column() -> None:
     pa = pytest.importorskip("pyarrow")
-    from pydantable import DataFrame
-    from pydantable.schema import Schema
-
-    class M(Schema):
-        m: dict[str, int]
-
     mt = pa.map_(pa.string(), pa.int64())
     arr = pa.array([[("u", 11), ("v", 22)]], type=mt)
-    df = DataFrame[M]({"m": arr}, trusted_mode="strict")
+    df = DataFrame[MapSchema]({"m": arr}, trusted_mode="strict")
     col = await df.ato_dict()
     assert col == {"m": [{"u": 11, "v": 22}]}
 
@@ -251,3 +249,172 @@ async def test_astream_matches_collect_batches_shapes() -> None:
     assert len(async_chunks) == len(sync_batches)
     for ac, pl_df in zip(async_chunks, sync_batches, strict=True):
         assert ac == pl_df.to_dict(as_series=False)
+
+
+@pytest.mark.asyncio
+async def test_submit_propagates_collect_validation_error() -> None:
+    df = Tiny({"x": [1]})
+    handle = df.submit(as_numpy=True, as_lists=True)
+    with pytest.raises(ValueError, match="as_numpy=True and as_lists=True"):
+        await handle.result()
+
+
+@pytest.mark.asyncio
+async def test_submit_as_numpy() -> None:
+    np = pytest.importorskip("numpy")
+    df = Tiny({"x": [1, 2]})
+    handle = df.submit(as_numpy=True)
+    out = await handle.result()
+    assert isinstance(out["x"], np.ndarray)
+    assert out["x"].tolist() == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_execution_handle_result_idempotent() -> None:
+    df = Tiny({"x": [9]})
+    handle = df.submit(as_lists=True)
+    col1 = await handle.result()
+    col2 = await handle.result()
+    assert col1 == col2 == {"x": [9]}
+
+
+@pytest.mark.asyncio
+async def test_dataframe_submit_and_astream() -> None:
+    pytest.importorskip("polars")
+    df = DataFrame[SSchema]({"x": [1, 2, 3]})
+    handle = df.submit(as_lists=True)
+    assert await handle.result() == {"x": [1, 2, 3]}
+    chunks = [c async for c in df.astream(batch_size=2)]
+    assert len(chunks) == 2
+    assert chunks[0]["x"] + chunks[1]["x"] == [1, 2, 3]
+
+
+@pytest.mark.asyncio
+async def test_astream_empty_frame_no_chunks() -> None:
+    pytest.importorskip("polars")
+    df = Tiny({"x": []})
+    chunks = [c async for c in df.astream(batch_size=10)]
+    assert chunks == []
+
+
+@pytest.mark.asyncio
+async def test_astream_single_row_one_chunk() -> None:
+    pytest.importorskip("polars")
+    df = Tiny({"x": [42]})
+    chunks = [c async for c in df.astream(batch_size=100)]
+    assert len(chunks) == 1
+    assert chunks[0] == {"x": [42]}
+
+
+@pytest.mark.asyncio
+async def test_astream_batch_size_one() -> None:
+    pytest.importorskip("polars")
+    df = Tiny({"x": [1, 2, 3]})
+    chunks = [c async for c in df.astream(batch_size=1)]
+    assert [c["x"] for c in chunks] == [[1], [2], [3]]
+
+
+@pytest.mark.asyncio
+async def test_astream_raises_import_error_when_polars_missing() -> None:
+    pytest.importorskip("polars")
+    df = Tiny({"x": [1]})
+
+    _real_import = importlib.import_module
+
+    def _fail_polars(name: str, *a: object, **kw: object) -> object:
+        if name == "polars":
+            raise ImportError("no polars")
+        return _real_import(name, *a, **kw)
+
+    with (
+        mock.patch(
+            "pydantable.dataframe._impl.importlib.import_module",
+            side_effect=_fail_polars,
+        ),
+        pytest.raises(ImportError, match="polars is required for astream"),
+    ):
+        async for _ in df.astream():
+            pass
+
+
+@pytest.mark.asyncio
+async def test_astream_engine_streaming_smoke() -> None:
+    pytest.importorskip("polars")
+    df = Tiny({"x": [1, 2]})
+    chunks = [c async for c in df.astream(batch_size=1, engine_streaming=False)]
+    assert len(chunks) == 2
+
+
+@pytest.mark.asyncio
+async def test_ato_arrow_matches_sync() -> None:
+    pytest.importorskip("pyarrow")
+    df = Tiny({"x": [1, 2]})
+    sync_t = df.to_arrow()
+    async_t = await df.ato_arrow()
+    assert sync_t.equals(async_t)
+
+
+@pytest.mark.asyncio
+async def test_acollect_when_async_execute_plan_disabled_uses_thread_fallback() -> None:
+    df = Tiny({"x": [1, 2, 3]})
+    with mock.patch(
+        "pydantable.dataframe._impl.rust_has_async_execute_plan",
+        return_value=False,
+    ):
+        col = await df.acollect(as_lists=True)
+    assert col == {"x": [1, 2, 3]}
+
+
+@pytest.mark.asyncio
+async def test_astream_when_async_batches_disabled_uses_thread_fallback() -> None:
+    pytest.importorskip("polars")
+    df = TwoCol({"a": [1, 2], "b": [3, 4]})
+    with mock.patch(
+        "pydantable.dataframe._impl.rust_has_async_collect_plan_batches",
+        return_value=False,
+    ):
+        chunks = [c async for c in df.astream(batch_size=1)]
+    assert len(chunks) == 2
+    assert chunks[0] == {"a": [1], "b": [3]}
+    assert chunks[1] == {"a": [2], "b": [4]}
+
+
+@pytest.mark.asyncio
+async def test_gather_mixed_acollect_and_submit() -> None:
+    d1 = Tiny({"x": [1]})
+    d2 = Tiny({"x": [2]})
+    h = d2.submit(as_lists=True)
+    col, fut_result = await asyncio.gather(d1.acollect(as_lists=True), h.result())
+    assert col == {"x": [1]}
+    assert fut_result == {"x": [2]}
+
+
+@pytest.mark.asyncio
+async def test_execution_handle_cancel_after_done_returns_false() -> None:
+    df = Tiny({"x": [1]})
+    h = df.submit(as_lists=True)
+    await h.result()
+    assert h.done()
+    assert h.cancel() is False
+
+
+@pytest.mark.asyncio
+async def test_astream_with_executor_for_row_conversion() -> None:
+    pytest.importorskip("polars")
+    df = Tiny({"x": [1, 2]})
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+        chunks = [c async for c in df.astream(batch_size=1, executor=ex)]
+    assert len(chunks) == 2
+
+
+@pytest.mark.asyncio
+async def test_acollect_thread_fallback_matches_sync_after_filter() -> None:
+    """When async_execute_plan is unavailable, ato_dict still matches to_dict."""
+    df = TwoCol({"a": [1, 2, 3], "b": [10, 20, 30]})
+    chained = df.filter(df.a >= 2)
+    with mock.patch(
+        "pydantable.dataframe._impl.rust_has_async_execute_plan",
+        return_value=False,
+    ):
+        async_d = await chained.ato_dict()
+    assert async_d == chained.to_dict()
