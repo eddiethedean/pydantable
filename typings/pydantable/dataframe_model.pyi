@@ -7,6 +7,8 @@ from typing import Any, Generic, Literal, TypeVar
 from pydantic import BaseModel
 from typing_extensions import Self
 
+from pydantable.dataframe import ExecutionHandle
+
 RowT = TypeVar("RowT", bound=BaseModel)
 AfterModelT = TypeVar("AfterModelT", bound="DataFrameModel[Any]")
 GroupedModelT = TypeVar("GroupedModelT", bound="DataFrameModel[Any]")
@@ -106,15 +108,63 @@ class DataFrameModel(Generic[RowT]):
         as_numpy: bool = False,
         as_polars: bool | None = None,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
     ) -> Any: ...
     def rows(self) -> list[RowT]: ...
+    def to_dicts(self) -> list[dict[str, Any]]: ...
+    async def acollect(
+        self,
+        *,
+        as_lists: bool = False,
+        as_numpy: bool = False,
+        as_polars: bool | None = None,
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        executor: Executor | None = None,
+    ) -> Any: ...
     async def ato_dict(
         self,
         *,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> dict[str, list[Any]]: ...
+    async def ato_polars(
+        self,
+        *,
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        executor: Executor | None = None,
+    ) -> Any: ...
+    async def ato_arrow(
+        self,
+        *,
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        executor: Executor | None = None,
+    ) -> Any: ...
+    def submit(
+        self,
+        *,
+        as_lists: bool = False,
+        as_numpy: bool = False,
+        as_polars: bool | None = None,
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        executor: Executor | None = None,
+    ) -> ExecutionHandle: ...
+    def astream(
+        self,
+        *,
+        batch_size: int = 65_536,
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        executor: Executor | None = None,
+    ) -> Any: ...
     async def arows(self, *, executor: Executor | None = None) -> list[RowT]: ...
+    async def ato_dicts(
+        self, *, executor: Executor | None = None
+    ) -> list[dict[str, Any]]: ...
     def filter(self, condition: Any) -> Self: ...
     def sort(self, *by: Any, descending: bool | Sequence[bool] = False) -> Self: ...
     def slice(self, offset: int, length: int) -> Self: ...

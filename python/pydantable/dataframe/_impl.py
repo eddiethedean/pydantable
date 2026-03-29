@@ -4,13 +4,16 @@ Logical plans and expression typing live in Rust; Python holds schema state and
 forwards transforms. Materialization is via :meth:`DataFrame.collect`,
 :meth:`DataFrame.to_dict`, :meth:`DataFrame.to_polars`, or :meth:`DataFrame.to_arrow`.
 Non-blocking variants :meth:`DataFrame.acollect`, :meth:`DataFrame.ato_dict`,
-:meth:`DataFrame.ato_polars`, and :meth:`DataFrame.ato_arrow` run the same work in a
-worker thread.
+:meth:`DataFrame.ato_polars`, and :meth:`DataFrame.ato_arrow` prefer a Rust awaitable
+(Tokio + ``pyo3-async-runtimes``) when available, else :func:`asyncio.to_thread` /
+``executor=``. :meth:`DataFrame.submit` runs :meth:`collect` in the background;
+:meth:`DataFrame.astream` yields column chunks after one engine collect.
 """
 
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import enum
 import functools
 import html
@@ -18,6 +21,7 @@ import importlib
 import logging
 import os
 import re
+import threading
 import statistics
 import types
 import warnings
@@ -42,6 +46,9 @@ from pydantable.display import get_repr_html_limits
 from pydantable.expressions import ColumnRef, Expr
 from pydantable.rust_engine import (
     _require_rust_core,
+    async_collect_plan_batches,
+    async_execute_plan,
+    collect_batches as rust_collect_batches,
     execute_concat,
     execute_explode,
     execute_groupby_agg,
@@ -51,9 +58,8 @@ from pydantable.rust_engine import (
     execute_pivot,
     execute_plan,
     execute_unnest,
-)
-from pydantable.rust_engine import (
-    collect_batches as rust_collect_batches,
+    rust_has_async_collect_plan_batches,
+    rust_has_async_execute_plan,
 )
 from pydantable.rust_engine import (
     write_csv as rust_write_csv,
@@ -371,6 +377,25 @@ async def _materialize_in_thread(
     if executor is not None:
         return await loop.run_in_executor(executor, fn)
     return await asyncio.to_thread(fn)
+
+
+class ExecutionHandle:
+    """Background materialization from :meth:`DataFrame.submit`; await :meth:`result`."""
+
+    __slots__ = ("_fut",)
+
+    def __init__(self, fut: concurrent.futures.Future[Any]) -> None:
+        self._fut = fut
+
+    def done(self) -> bool:
+        return self._fut.done()
+
+    def cancel(self) -> bool:
+        """Cancel the wait only; in-flight engine work may still complete."""
+        return self._fut.cancel()
+
+    async def result(self) -> Any:
+        return await asyncio.wrap_future(self._fut)
 
 
 def _is_bool_or_nullable_bool(dtype: Any) -> bool:
@@ -1103,6 +1128,67 @@ class DataFrame(Generic[SchemaT]):
                 # Drop the missing optional column from the temporary plan and retry.
                 field_types.pop(missing_col, None)
                 plan = _require_rust_core().make_plan(field_types)
+
+    async def _materialize_columns_with_missing_optional_fallback_async(
+        self, *, streaming: bool, executor: Executor | None
+    ) -> dict[str, list[Any]]:
+        if not rust_has_async_execute_plan():
+            return await _materialize_in_thread(
+                functools.partial(
+                    self._materialize_columns_with_missing_optional_fallback,
+                    streaming=streaming,
+                ),
+                executor=executor,
+            )
+        plan = self._rust_plan
+        field_types = dict(self._current_field_types)
+
+        missing_re = re.compile(r'not found: "([^"]+)" not found')
+        while True:
+            try:
+                return await async_execute_plan(
+                    plan,
+                    self._root_data,
+                    as_python_lists=True,
+                    streaming=streaming,
+                    error_context=self._materialize_error_context(),
+                )
+            except ValueError as e:
+                if not _is_scan_file_root(self._root_data):
+                    raise
+                m = missing_re.search(str(e))
+                if not m:
+                    raise
+                missing_col = m.group(1)
+                ann = field_types.get(missing_col)
+                if ann is None:
+                    raise
+                _, nullable = _annotation_nullable_inner(ann)
+                if not nullable:
+                    raise
+                if not self._io_validation_fill_missing_optional:
+                    fi = self._current_schema_type.model_fields.get(missing_col)
+                    default = (
+                        getattr(fi, "default", PydanticUndefined)
+                        if fi is not None
+                        else PydanticUndefined
+                    )
+                    if default is PydanticUndefined:
+                        raise ValueError(
+                            "Missing optional columns (configured as error): "
+                            f"{[missing_col]}"
+                        ) from e
+                field_types.pop(missing_col, None)
+                plan = _require_rust_core().make_plan(field_types)
+
+    async def _materialize_columns_async(
+        self, *, streaming: bool, executor: Executor | None
+    ) -> dict[str, list[Any]]:
+        raw = await self._materialize_columns_with_missing_optional_fallback_async(
+            streaming=streaming, executor=executor
+        )
+        raw = _coerce_enum_columns(raw, self._current_field_types)
+        return self._apply_io_validation_if_configured(raw)
 
     @property
     def schema_type(self) -> type[BaseModel]:
@@ -2428,23 +2514,53 @@ class DataFrame(Generic[SchemaT]):
         executor: Executor | None = None,
     ) -> Any:
         """
-        Async version of :meth:`collect`: same semantics, but blocking work runs
-        in :func:`asyncio.to_thread` or in ``executor`` when provided.
+        Async version of :meth:`collect`: same semantics.
+
+        When the native extension exposes ``async_execute_plan``, engine work is
+        awaited via a Rust/Tokio coroutine; otherwise the same logic runs in
+        :func:`asyncio.to_thread` or in ``executor``.
 
         Cancelling the awaiting task does **not** cancel in-flight Rust/Polars
-        execution; the worker thread runs to completion.
+        execution.
         """
-        return await _materialize_in_thread(
-            functools.partial(
-                self.collect,
-                as_lists=as_lists,
-                as_numpy=as_numpy,
-                as_polars=as_polars,
+        if as_polars is not None:
+            warnings.warn(
+                "as_polars is deprecated and will be removed in pydantable 2.0.0; "
+                "use to_polars() for a Polars DataFrame, or collect(as_lists=True) "
+                "/ to_dict() for columnar dicts.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if as_polars:
+                return await self.ato_polars(
+                    streaming=streaming,
+                    engine_streaming=engine_streaming,
+                    executor=executor,
+                )
+            return await self.ato_dict(
                 streaming=streaming,
                 engine_streaming=engine_streaming,
-            ),
-            executor=executor,
+                executor=executor,
+            )
+        if as_numpy and as_lists:
+            raise ValueError(
+                "collect() cannot specify both as_numpy=True and as_lists=True."
+            )
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            default=self._engine_streaming_default,
         )
+        column_dict = await self._materialize_columns_async(
+            streaming=use_streaming, executor=executor
+        )
+        if as_lists:
+            return column_dict
+        if as_numpy:
+            import numpy as np  # type: ignore[import-not-found]
+
+            return {k: np.asarray(v) for k, v in column_dict.items()}
+        return _rows_from_column_dict(column_dict, self._current_schema_type)
 
     async def ato_dict(
         self,
@@ -2454,11 +2570,13 @@ class DataFrame(Generic[SchemaT]):
         executor: Executor | None = None,
     ) -> dict[str, list[Any]]:
         """Async version of :meth:`to_dict` (see :meth:`acollect`)."""
-        return await _materialize_in_thread(
-            functools.partial(
-                self.to_dict, streaming=streaming, engine_streaming=engine_streaming
-            ),
-            executor=executor,
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            default=self._engine_streaming_default,
+        )
+        return await self._materialize_columns_async(
+            streaming=use_streaming, executor=executor
         )
 
     async def ato_polars(
@@ -2474,12 +2592,22 @@ class DataFrame(Generic[SchemaT]):
         This still materializes a columnar Python dict first, then builds the
         Polars frame—same copies as the synchronous path.
         """
-        return await _materialize_in_thread(
-            functools.partial(
-                self.to_polars, streaming=streaming, engine_streaming=engine_streaming
-            ),
-            executor=executor,
+        try:
+            pl = importlib.import_module("polars")
+        except ImportError as e:
+            raise ImportError(
+                "polars is required for to_polars(). Install with: "
+                "pip install 'pydantable[polars]'"
+            ) from e
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            default=self._engine_streaming_default,
         )
+        d = await self._materialize_columns_async(
+            streaming=use_streaming, executor=executor
+        )
+        return pl.DataFrame(d)
 
     async def ato_arrow(
         self,
@@ -2493,12 +2621,102 @@ class DataFrame(Generic[SchemaT]):
 
         Same materialization and copies as the synchronous path.
         """
-        return await _materialize_in_thread(
-            functools.partial(
-                self.to_arrow, streaming=streaming, engine_streaming=engine_streaming
-            ),
-            executor=executor,
+        try:
+            pa = importlib.import_module("pyarrow")
+        except ImportError as e:
+            raise ImportError(
+                "pyarrow is required for to_arrow(). Install with: "
+                "pip install 'pydantable[arrow]'"
+            ) from e
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            default=self._engine_streaming_default,
         )
+        d = await self._materialize_columns_async(
+            streaming=use_streaming, executor=executor
+        )
+        return pa.Table.from_pydict(d)
+
+    def submit(
+        self,
+        *,
+        as_lists: bool = False,
+        as_numpy: bool = False,
+        as_polars: bool | None = None,
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        executor: Executor | None = None,
+    ) -> ExecutionHandle:
+        """Start :meth:`collect` in the background; await :meth:`ExecutionHandle.result`."""
+
+        def _run() -> Any:
+            return self.collect(
+                as_lists=as_lists,
+                as_numpy=as_numpy,
+                as_polars=as_polars,
+                streaming=streaming,
+                engine_streaming=engine_streaming,
+            )
+
+        if executor is not None:
+            fut: concurrent.futures.Future[Any] = executor.submit(_run)
+        else:
+            fut = concurrent.futures.Future[Any]()
+
+            def _bg() -> None:
+                try:
+                    fut.set_result(_run())
+                except Exception as e:
+                    fut.set_exception(e)
+
+            threading.Thread(target=_bg, daemon=True).start()
+        return ExecutionHandle(fut)
+
+    async def astream(
+        self,
+        *,
+        batch_size: int = 65_536,
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        executor: Executor | None = None,
+    ) -> Any:
+        """Yield ``dict[str, list]`` chunks after one full engine collect (see :meth:`collect_batches`)."""
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            default=self._engine_streaming_default,
+        )
+        if rust_has_async_collect_plan_batches():
+            pl_batches = await async_collect_plan_batches(
+                self._rust_plan,
+                self._root_data,
+                batch_size=batch_size,
+                streaming=use_streaming,
+            )
+        else:
+            pl_batches = await _materialize_in_thread(
+                functools.partial(
+                    self.collect_batches,
+                    batch_size=batch_size,
+                    streaming=streaming,
+                    engine_streaming=engine_streaming,
+                ),
+                executor=executor,
+            )
+        try:
+            importlib.import_module("polars")
+        except ImportError as e:
+            raise ImportError(
+                "polars is required for astream() (Polars chunk type). Install with: "
+                "pip install 'pydantable[polars]'"
+            ) from e
+        for pl_df in pl_batches:
+            col = await _materialize_in_thread(
+                functools.partial(pl_df.to_dict, as_series=False),
+                executor=executor,
+            )
+            yield col
 
     def explain(
         self,

@@ -74,7 +74,7 @@ Pydantable already executes typed plans in **Rust** (Polars-backed). Putting **f
 ### Async Rust ↔ FastAPI
 
 - **Option A (simplest):** Rust exposes **sync** `read_*` / `write_*` that release the GIL; Python **`aread_*`** = **`asyncio.to_thread`** (same as **`acollect`** today).
-- **Option B (deeper):** **`tokio`** runtime inside the extension + **`pyo3-asyncio`** (or equivalent) to await Rust futures from **`async def`** routes—higher integration cost; use when profiling shows thread-pool overhead dominates.
+- **Option B (deeper):** **`pyo3-async-runtimes`** + Tokio inside **`pydantable._core`** for **`async_execute_plan`** / **`async_collect_plan_batches`** (see {doc}`EXECUTION`). File and SQL **`aread_*`** / **`afetch_*`** still use thread offload by default.
 
 ### Tradeoffs to accept
 

@@ -6,7 +6,13 @@ inside the native extension. Python does **not** require the `polars` package fo
 
 **Synchronous materialization (default):** **`collect()`**, **`to_dict()`**, **`collect(as_lists=True)`**, **`collect(as_numpy=True)`**, optional **`to_polars()`**, and optional **`to_arrow()`** run **blocking** Rust + Polars work on the **current thread** ( **`to_arrow()`** then builds a PyArrow **`Table`** from the materialized columnar **`dict`** in Python).
 
-**Async materialization (0.15.0+):** **`await acollect()`**, **`await ato_dict()`**, **`await ato_polars()`**, and **`await ato_arrow()`** on **`DataFrame`** run the same logic in a **worker thread** via **`asyncio.to_thread`**, or in a **`concurrent.futures.Executor`** passed as **`executor=`**. **`DataFrameModel`** mirrors this with **`acollect`**, **`ato_dict`**, **`ato_polars`**, **`ato_arrow`**, **`arows`**, and **`ato_dicts`**. Cancelling the awaiting task does **not** cancel in-flight native work. The **GIL** still serializes some Python callbacks; **`ato_polars()`** and **`ato_arrow()`** both build their respective outputs from a materialized columnar **`dict`** (extra allocation vs calling Polars or PyArrow alone on raw buffers).
+**Async materialization (0.15.0+):** **`await acollect()`**, **`await ato_dict()`**, **`await ato_polars()`**, and **`await ato_arrow()`** on **`DataFrame`** run the same logic as sync materialization. When **`pydantable._core`** exposes **`async_execute_plan`**, the engine call is awaited as a **Rust coroutine** built with **`pyo3-async-runtimes`** and **Tokio** (`spawn_blocking` around **`execute_plan`**). If that symbol is absent (older wheels), work falls back to **`asyncio.to_thread`** or a **`concurrent.futures.Executor`** passed as **`executor=`**. **`DataFrameModel`** mirrors **`acollect`**, **`ato_dict`**, **`ato_polars`**, **`ato_arrow`**, **`arows`**, and **`ato_dicts`**.
+
+**Fire-and-forget (1.5.0+):** **`DataFrame.submit()`** / **`DataFrameModel.submit()`** return an **`ExecutionHandle`**; **`await handle.result()`** matches **`collect()`** for the same arguments. Without **`executor=`**, a daemon thread runs **`collect`**. **`handle.cancel()`** only cancels the backing **`concurrent.futures.Future`** if work has not started; it does **not** stop in-flight Polars execution.
+
+**Chunked async iteration (1.5.0+):** **`async for batch in df.astream(...)`** yields **`dict[str, list]`** chunks after **one** full engine collect (same slicing strategy as **`collect_batches`** — not Polars’ native lazy batch iterator and **not** out-of-core streaming). Requires **`pydantable[polars]`** so chunk **`to_dict`** is defined on the Polars objects returned from Rust.
+
+Cancelling an **`await acollect()`** (etc.) does **not** cancel in-flight native work. The **GIL** still serializes some Python callbacks; **`ato_polars()`** and **`ato_arrow()`** both build their respective outputs from a materialized columnar **`dict`** (extra allocation vs calling Polars or PyArrow alone on raw buffers).
 
 **File / I/O helpers (0.22.0+):** **`pydantable.io`** separates **lazy file roots** from **eager materialization**. Per-format read/write reference: {doc}`IO_OVERVIEW`. **Which entrypoint?** {doc}`IO_DECISION_TREE`.
 
@@ -60,7 +66,9 @@ if you need a Polars **`DataFrame`** in Python. Install **`pydantable[arrow]`** 
 | **`_repr_html_()`** / Jupyter HTML | Materializes **`head(N)`** + **`to_dict()`** for the preview bounds (see **Display options**). |
 | **`describe()`** | One **`to_dict()`** on the current plan; string columns compute **`n_unique`** with a full scan of non-null values. |
 | **`info()`**, **`repr()`** | Schema / root-buffer **`shape`** only; no row data materialization. |
-| **Async** **`acollect`** / **`ato_dict`** / … | Same work as sync; runs in a thread pool ({doc}`FASTAPI`). |
+| **Async** **`acollect`** / **`ato_dict`** / … | Same work as sync; prefers Rust/Tokio awaitable when available, else thread pool ({doc}`FASTAPI`). |
+| **`submit`** / **`ExecutionHandle.result`** | Same as **`collect`**; background thread or **`executor.submit`**. |
+| **`astream`** | One full collect, then **`dict[str, list]`** row slices (like **`collect_batches`**). |
 
 Set **`PYDANTABLE_VERBOSE_ERRORS=1`** to append a short **`schema=…`** context line when Rust raises **`ValueError`** during **`execute_plan`** (debugging only).
 

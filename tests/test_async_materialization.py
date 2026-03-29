@@ -1,4 +1,4 @@
-"""Async materialization APIs (acollect / ato_dict / ato_polars).
+"""Async materialization APIs (acollect / ato_dict / ato_polars / submit / astream).
 
 **ato_arrow** is covered in ``tests/test_arrow_interchange.py`` (0.16.0), not here.
 """
@@ -188,3 +188,66 @@ async def test_ato_dict_after_pyarrow_map_column() -> None:
     df = DataFrame[M]({"m": arr}, trusted_mode="strict")
     col = await df.ato_dict()
     assert col == {"m": [{"u": 11, "v": 22}]}
+
+
+@pytest.mark.asyncio
+async def test_submit_result_matches_collect() -> None:
+    df = Tiny({"x": [1, 2]})
+    handle = df.submit()
+    assert not handle.done()
+    rows = await handle.result()
+    assert handle.done()
+    assert [r.x for r in rows] == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_submit_as_lists() -> None:
+    df = Tiny({"x": [7, 8]})
+    handle = df.submit(as_lists=True)
+    col = await handle.result()
+    assert col == {"x": [7, 8]}
+
+
+@pytest.mark.asyncio
+async def test_submit_with_executor() -> None:
+    df = TwoCol({"a": [1], "b": [2]})
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+        handle = df.submit(as_lists=True, executor=ex)
+        col = await handle.result()
+    assert col == {"a": [1], "b": [2]}
+
+
+@pytest.mark.asyncio
+async def test_gather_submit_handles() -> None:
+    d1 = Tiny({"x": [1]})
+    d2 = Tiny({"x": [2]})
+    h1 = d1.submit(as_lists=True)
+    h2 = d2.submit(as_lists=True)
+    r1, r2 = await asyncio.gather(h1.result(), h2.result())
+    assert r1 == {"x": [1]}
+    assert r2 == {"x": [2]}
+
+
+@pytest.mark.asyncio
+async def test_astream_yields_column_dict_chunks() -> None:
+    pytest.importorskip("polars")
+    df = Tiny({"x": list(range(5))})
+    chunks: list[dict[str, list[int]]] = []
+    async for batch in df.astream(batch_size=2):
+        chunks.append(batch)
+    assert len(chunks) == 3
+    merged: list[int] = []
+    for b in chunks:
+        merged.extend(b["x"])
+    assert merged == list(range(5))
+
+
+@pytest.mark.asyncio
+async def test_astream_matches_collect_batches_shapes() -> None:
+    pytest.importorskip("polars")
+    df = TwoCol({"a": [1, 2, 3], "b": [4, 5, 6]})
+    async_chunks = [c async for c in df.astream(batch_size=2)]
+    sync_batches = df.collect_batches(batch_size=2)
+    assert len(async_chunks) == len(sync_batches)
+    for ac, pl_df in zip(async_chunks, sync_batches, strict=True):
+        assert ac == pl_df.to_dict(as_series=False)

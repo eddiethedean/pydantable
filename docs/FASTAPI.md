@@ -12,7 +12,8 @@ For FastAPI services, `pydantable` gives you:
 - typed dataframe transformations in handlers or services
 - **`collect()`** — `list` of Pydantic models for the **current** projection (ideal for `response_model=list[YourRow]`)
 - **`to_dict()`** — `dict[str, list]` when the response is **column-shaped** JSON
-- **`acollect()`**, **`ato_dict()`**, **`ato_polars()`**, **`ato_arrow()`** — same semantics off the event loop (see below)
+- **`acollect()`**, **`ato_dict()`**, **`ato_polars()`**, **`ato_arrow()`** — same semantics off the event loop (Rust/Tokio awaitable when available; see below)
+- **`submit()`** + **`await handle.result()`** — background **`collect()`**; **`astream()`** — async iteration of column chunks after one collect ({doc}`EXECUTION`)
 - **`pydantable.io`** — **`read_*` / `materialize_*` / `export_*`** for **Parquet**, **Arrow IPC**, **CSV**, **NDJSON**, **JSON** (array of objects; {doc}`IO_JSON`) (Rust-first on local paths where the wheel supports it; **PyArrow** for buffers, column subsets, streaming IPC). For **out-of-core** pipelines use **`read_*`** + transforms + **`DataFrame.write_*`**. **HTTP Parquet:** prefer **`read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** so temp files are removed after the handler ({doc}`IO_HTTP`). Extras: **`[sql]`** (SQLAlchemy **`fetch_sql`** / **`write_sql`**), **`[cloud]`** (**`fsspec`** URLs), **`[rap]`** (true-async CSV via **`aread_csv_rap`**). See **`pip install 'pydantable[io]'`** for **PyArrow + Polars** together.
 - **`amaterialize_parquet`**, **`amaterialize_ipc`**, **`amaterialize_csv`**, **`amaterialize_ndjson`**, **`amaterialize_json`** and **`aexport_*`** mirrors — eager file I/O **off the event loop** (**`asyncio.to_thread`** by default, or your **`executor=`**). Use inside **`async def`** when you need a full **`dict[str, list]`** (e.g. to pass into **`DataFrameModel`**), or to **export** columns to a path.
 - **`afetch_sql`** / **`awrite_sql`** — SQLAlchemy-backed table I/O without blocking the loop (same threading model).
@@ -20,7 +21,7 @@ For FastAPI services, `pydantable` gives you:
 
 **Synchronous materialization** (`collect()`, `to_dict()`, `collect(as_lists=True)`, optional `to_polars()`) runs **blocking** Rust + Polars work on the **current thread**.
 
-**Asynchronous materialization (0.15.0+):** `await df.acollect()`, `await df.ato_dict()`, `await df.ato_polars()`, and ( **0.16.0+** ) `await df.ato_arrow()` run that blocking work in **`asyncio.to_thread`** by default, or in a **`concurrent.futures.Executor`** you pass as `executor=...`. Use this from **`async def`** route handlers so the ASGI event loop stays responsive. Cancelling the waiter does **not** cancel in-flight engine work; see [`EXECUTION.md`](EXECUTION.md) for limits (GIL, copies, `to_polars`, `to_arrow`).
+**Asynchronous materialization (0.15.0+):** `await df.acollect()`, `await df.ato_dict()`, `await df.ato_polars()`, and ( **0.16.0+** ) `await df.ato_arrow()` prefer a Rust **`async_execute_plan`** coroutine when the wheel supports it; otherwise the same work runs in **`asyncio.to_thread`** or in a **`concurrent.futures.Executor`** (`executor=...`). Use this from **`async def`** route handlers so the ASGI event loop stays responsive. Cancelling the waiter does **not** cancel in-flight engine work; see [`EXECUTION.md`](EXECUTION.md) for limits (GIL, copies, `to_polars`, `to_arrow`).
 
 **`DataFrameModel`** also exposes **`arows()`** and **`ato_dicts()`** as async counterparts to **`rows()`** / **`to_dicts()`**.
 

@@ -314,7 +314,7 @@ Practical inputs that feed that phase:
 - [x] **Docs:** **`DATA_IO_SOURCES.md`**, **`EXECUTION.md`**, **`FASTAPI.md`**, **`changelog.md`**, this section.
 - [x] **Tests:** **`tests/test_io_comprehensive.py`**.
 
-**Deferred / not in-tree:** Rust **`sqlx`** drivers (documented SQLAlchemy-first); **`pyo3-asyncio`** + Tokio for I/O (thread offload remains default).
+**Deferred / not in-tree:** Rust **`sqlx`** drivers (documented SQLAlchemy-first). Engine materialization can use **`pyo3-async-runtimes`** + Tokio (**`async_execute_plan`**); general file/SQL I/O still prefers thread offload unless documented otherwise ({doc}`EXECUTION`).
 
 ---
 
@@ -352,7 +352,8 @@ Work **not** scheduled in the **0.17.0–0.20.0** shipped sections or **Planned 
 
 - [ ] **Non-string map keys** (**`dict[int, T]`** and Arrow maps whose keys are not UTF-8 strings): still **not shipped** after **0.20.0** (explicitly deferred; see **Shipped in 0.18.0** / **0.19.0** and [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md)). **Heterogeneous** keys / full **Arrow + expression** parity may be revisited after **v1.0.0** unless promoted earlier.
 - [ ] Items deferred from earlier releases when priorities change.
-- [ ] **Chunked / streaming** async iterators for JSON or row batches (no minimal contract yet).
+- [x] **Chunked async iterator (`astream`):** **`DataFrame.astream`** / **`DataFrameModel.astream`** yield column **`dict`** chunks after one engine collect (same as **`collect_batches`** semantics — not incremental scan streaming). See {doc}`EXECUTION`, {doc}`INTERFACE_CONTRACT`.
+- [ ] **JSON-native** incremental async iterators (line-delimited / array streaming without full **`dict`** materialization first) — not shipped.
 - [ ] Longer-horizon experiments that do not fit the **pre-1.0** train (**0.17–0.19**) or the **v1.0.0** production gate.
 - [ ] **FastAPI ecosystem (optional):** thin **`pydantable[fastapi]`** extra with **pinned** **`fastapi` / `starlette`**, **middleware**, or **router** kits—**only** if demand and maintenance bandwidth are clear.
 

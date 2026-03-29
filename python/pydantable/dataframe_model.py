@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 from pydantic import BaseModel, ValidationError, create_model
 
-from .dataframe import DataFrame
+from .dataframe import DataFrame, ExecutionHandle
 from .schema import (
     Schema,
     _is_polars_dataframe,
@@ -1770,6 +1770,42 @@ class DataFrameModel(Generic[RowT]):
         """Async :meth:`to_arrow`."""
         return await self._df.ato_arrow(
             streaming=streaming, engine_streaming=engine_streaming, executor=executor
+        )
+
+    def submit(
+        self,
+        *,
+        as_lists: bool = False,
+        as_numpy: bool = False,
+        as_polars: bool | None = None,
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        executor: Executor | None = None,
+    ) -> ExecutionHandle:
+        """Delegate to :meth:`DataFrame.submit`."""
+        return self._df.submit(
+            as_lists=as_lists,
+            as_numpy=as_numpy,
+            as_polars=as_polars,
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            executor=executor,
+        )
+
+    def astream(
+        self,
+        *,
+        batch_size: int = 65_536,
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        executor: Executor | None = None,
+    ) -> Any:
+        """Delegate to :meth:`DataFrame.astream`."""
+        return self._df.astream(
+            batch_size=batch_size,
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            executor=executor,
         )
 
     async def arows(

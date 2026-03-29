@@ -91,11 +91,11 @@ print(result.collect())   # list of Pydantic row models
 
 ## Development
 
+Create and use a virtual environment at **`.venv`** in the repo root (the `Makefile` defaults to `.venv/bin/python`). Contributor setup, Maturin/Rust builds, and release workflow: [DEVELOPER](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html).
+
 ```bash
 make check-full
 ```
-
-Contributor setup and release workflow: [DEVELOPER](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html)
 
 ## License
 

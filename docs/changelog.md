@@ -4,7 +4,15 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
-<!-- Add notes here for the next 1.x release. -->
+### Added
+
+- **Rust async bridge:** **`async_execute_plan`** and **`async_collect_plan_batches`** on **`pydantable._core`** (Tokio + **`pyo3-async-runtimes`**); **`acollect`** / **`ato_*`** prefer this awaitable when present.
+- **`DataFrame.submit`** / **`DataFrameModel.submit`** and **`ExecutionHandle`** (**`result`**, **`done`**, **`cancel`**) for background **`collect`**.
+- **`DataFrame.astream`** / **`DataFrameModel.astream`**: async iteration of column **`dict`** chunks after one engine collect (see {doc}`EXECUTION`).
+
+### Docs
+
+- {doc}`EXECUTION`, {doc}`INTERFACE_CONTRACT`, {doc}`ROADMAP`, {doc}`DATA_IO_SOURCES`, and **`docs/async_ideas/`** aligned with the above.
 
 ## [1.5.0] — 2026-03-29
 

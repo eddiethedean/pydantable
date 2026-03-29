@@ -1,5 +1,7 @@
 # Pydantable Async Execution Design
 
+**Status:** Design notes. **Canonical behavior:** [EXECUTION.md](../EXECUTION.md), [INTERFACE_CONTRACT.md](../INTERFACE_CONTRACT.md). The extension uses **`pyo3-async-runtimes`** (not the legacy **`pyo3-asyncio`** crate name).
+
 ## Overview
 This document defines the async execution model for Pydantable, a Rust-backed DataFrame engine with Python bindings.
 
@@ -28,8 +30,8 @@ Fire-and-forget execution returning a handle.
 ## Rust-Python Bridge
 
 - Use PyO3 for bindings
-- Use pyo3-asyncio for async bridge
-- Rust returns Future mapped to Python awaitable
+- Use **`pyo3-async-runtimes`** (Tokio) for the **`async_execute_plan`** awaitable
+- Rust returns a Python awaitable mapped from a Tokio future
 
 ## Example
 
@@ -39,6 +41,5 @@ result = await df.acollect()
 
 ## Future Extensions
 
-- Streaming via astream()
-- Backpressure support
+- True incremental streaming / backpressure (today’s **`astream`** is chunked after one collect)
 - Distributed execution

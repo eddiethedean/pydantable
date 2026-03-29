@@ -44,6 +44,16 @@ def _require_rust_core() -> Any:
     return _RUST_CORE
 
 
+def rust_has_async_execute_plan() -> bool:
+    """True if ``_core`` was built with :func:`async_execute_plan` (Tokio bridge)."""
+    return _RUST_CORE is not None and hasattr(_RUST_CORE, "async_execute_plan")
+
+
+def rust_has_async_collect_plan_batches() -> bool:
+    """True if ``_core`` exposes :func:`async_collect_plan_batches`."""
+    return _RUST_CORE is not None and hasattr(_RUST_CORE, "async_collect_plan_batches")
+
+
 def _verbose_plan_errors_enabled() -> bool:
     v = os.environ.get("PYDANTABLE_VERBOSE_ERRORS", "").strip().lower()
     return v in ("1", "true", "yes")
@@ -83,6 +93,59 @@ def execute_plan(
             if _verbose_plan_errors_enabled() and error_context:
                 raise ValueError(f"{e}\n[context: {error_context}]") from e
             raise
+
+
+async def async_execute_plan(
+    plan: Any,
+    data: Any,
+    *,
+    as_python_lists: bool = False,
+    streaming: bool = False,
+    error_context: str | None = None,
+) -> Any:
+    """Awaitable engine materialization (Rust pyo3-async-runtimes + Tokio pool)."""
+    rust = _require_rust_core()
+    if not hasattr(rust, "async_execute_plan"):
+        raise MissingRustExtensionError(
+            f"{_MISSING_SYMBOL_PREFIX}`async_execute_plan`. "
+            "Rebuild pydantable from source. See docs/DEVELOPER.md."
+        )
+    with span(
+        "async_execute_plan",
+        as_python_lists=bool(as_python_lists),
+        streaming=bool(streaming),
+        error_context=error_context,
+    ):
+        try:
+            return await rust.async_execute_plan(plan, data, as_python_lists, streaming)
+        except ValueError as e:
+            if _verbose_plan_errors_enabled() and error_context:
+                raise ValueError(f"{e}\n[context: {error_context}]") from e
+            raise
+
+
+async def async_collect_plan_batches(
+    plan: Any,
+    root_data: Any,
+    *,
+    batch_size: int = 65_536,
+    streaming: bool = False,
+) -> list[Any]:
+    """Async wrapper for :func:`collect_batches` (full collect, then row slices)."""
+    rust = _require_rust_core()
+    if not hasattr(rust, "async_collect_plan_batches"):
+        raise MissingRustExtensionError(
+            f"{_MISSING_SYMBOL_PREFIX}`async_collect_plan_batches`. "
+            "Rebuild pydantable from source. See docs/DEVELOPER.md."
+        )
+    with span(
+        "async_collect_plan_batches",
+        batch_size=int(batch_size),
+        streaming=bool(streaming),
+    ):
+        return await rust.async_collect_plan_batches(
+            plan, root_data, batch_size, streaming
+        )
 
 
 def write_parquet(

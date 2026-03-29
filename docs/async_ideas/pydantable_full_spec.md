@@ -1,5 +1,7 @@
 # Pydantable Production-Grade Execution & Async Architecture Spec
 
+**Status:** Architecture sketch. **Shipped subset:** [EXECUTION.md](../EXECUTION.md) (**`acollect`**, **`submit`**, **`astream`**, Rust **`async_execute_plan`**). **Not shipped here:** distributed execution, Arrow Flight, adaptive planning (see [ROADMAP.md](../ROADMAP.md)).
+
 ## 1. Vision
 
 Pydantable is a Rust-backed DataFrame engine with first-class async
@@ -85,7 +87,7 @@ Features: - Awaitable result - Cancellation support - Status polling
 ### Technology
 
 -   PyO3
--   pyo3-asyncio
+-   **`pyo3-async-runtimes`** (Tokio runtime; supersedes the older **`pyo3-asyncio`** naming in docs)
 
 ### Flow
 
