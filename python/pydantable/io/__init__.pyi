@@ -34,6 +34,149 @@ from .http import (
 from .rap_support import aread_csv_rap, rap_csv_available
 from .sql import StreamingColumns, fetch_sql, iter_sql, write_sql
 
+# Streaming batch I/O helpers (iterators)
+def iter_parquet(
+    path: str | Path, *, batch_size: int = 65536, columns: list[str] | None = None
+) -> Any: ...
+def iter_ipc(
+    source: _Source, *, batch_size: int = 65536, as_stream: bool = False
+) -> Any: ...
+def iter_csv(
+    path: str | Path, *, batch_size: int = 65536, encoding: str = "utf-8"
+) -> Any: ...
+def iter_ndjson(
+    path: str | Path, *, batch_size: int = 65536, encoding: str = "utf-8"
+) -> Any: ...
+def iter_json_lines(
+    path: str | Path, *, batch_size: int = 65536, encoding: str = "utf-8"
+) -> Any: ...
+def iter_json_array(
+    path: str | Path, *, batch_size: int = 65536, encoding: str = "utf-8"
+) -> Any: ...
+
+async def aiter_parquet(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    columns: list[str] | None = None,
+    executor: Executor | None = None,
+): ...
+async def aiter_ipc(
+    source: _Source,
+    *,
+    batch_size: int = 65536,
+    as_stream: bool = False,
+    executor: Executor | None = None,
+): ...
+async def aiter_csv(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+): ...
+async def aiter_ndjson(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+): ...
+async def aiter_json_lines(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+): ...
+async def aiter_json_array(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+): ...
+
+# Batch writers
+def write_parquet_batches(
+    path: str | Path | BinaryIO,
+    batches: Any,
+    *,
+    compression: str | None = None,
+) -> None: ...
+def write_ipc_batches(
+    path: str | Path | BinaryIO,
+    batches: Any,
+    *,
+    as_stream: bool = True,
+) -> None: ...
+def write_csv_batches(
+    path: str | Path,
+    batches: Any,
+    *,
+    mode: str = "w",
+    encoding: str = "utf-8",
+    write_header: bool = True,
+) -> None: ...
+def write_ndjson_batches(
+    path: str | Path,
+    batches: Any,
+    *,
+    mode: str = "w",
+    encoding: str = "utf-8",
+) -> None: ...
+
+# Extras iterators
+def iter_excel(
+    path: str | Path,
+    *,
+    sheet_name: str | int = 0,
+    batch_size: int = 65536,
+    experimental: bool = True,
+) -> Any: ...
+def iter_delta(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    experimental: bool = True,
+) -> Any: ...
+def iter_avro(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    experimental: bool = True,
+) -> Any: ...
+def iter_orc(
+    path: str | Path,
+    *,
+    batch_size: int = 65536,
+    experimental: bool = True,
+) -> Any: ...
+def iter_bigquery(
+    query: str,
+    *,
+    project: str | None = None,
+    batch_size: int = 65536,
+    experimental: bool = True,
+    **kwargs: Any,
+) -> Any: ...
+def iter_snowflake(
+    sql: str,
+    *,
+    batch_size: int = 65536,
+    experimental: bool = True,
+    **connect_kwargs: Any,
+) -> Any: ...
+def iter_kafka_json(
+    topic: str,
+    *,
+    bootstrap_servers: str,
+    max_messages: int | None = None,
+    batch_size: int = 1000,
+    experimental: bool = True,
+    **consumer_config: Any,
+) -> Any: ...
+
 _Source = str | Path | BinaryIO | bytes
 
 _ENGINE_ENV = "PYDANTABLE_IO_ENGINE"

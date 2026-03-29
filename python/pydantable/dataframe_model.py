@@ -319,6 +319,7 @@ class DataFrameModel(Generic[RowT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -331,6 +332,7 @@ class DataFrameModel(Generic[RowT]):
         inner = dataframe_cls[cls._SchemaModel].read_parquet(
             path,
             columns=columns,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -340,12 +342,38 @@ class DataFrameModel(Generic[RowT]):
         return cls._wrap_inner_df(inner)
 
     @classmethod
+    def iter_parquet(
+        cls,
+        path: str | Any,
+        *,
+        batch_size: int = 65_536,
+        columns: list[str] | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ):
+        """Yield Parquet batches as typed DataFrameModel instances."""
+        cls._dfm_require_subclass_with_schema()
+        from .io.iter_file import iter_parquet as _iter
+
+        for cols_dict in _iter(path, batch_size=batch_size, columns=columns):
+            yield cls(
+                cols_dict,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+
+    @classmethod
     def read_parquet_url(
         cls,
         url: str,
         *,
         experimental: bool = True,
         columns: list[str] | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -362,6 +390,7 @@ class DataFrameModel(Generic[RowT]):
             url,
             experimental=experimental,
             columns=columns,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -376,6 +405,7 @@ class DataFrameModel(Generic[RowT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -388,6 +418,7 @@ class DataFrameModel(Generic[RowT]):
         inner = dataframe_cls[cls._SchemaModel].read_ipc(
             path,
             columns=columns,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -397,11 +428,37 @@ class DataFrameModel(Generic[RowT]):
         return cls._wrap_inner_df(inner)
 
     @classmethod
+    def iter_ipc(
+        cls,
+        source: str | Any,
+        *,
+        batch_size: int = 65_536,
+        as_stream: bool = False,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ):
+        """Yield IPC batches as typed DataFrameModel instances."""
+        cls._dfm_require_subclass_with_schema()
+        from .io.iter_file import iter_ipc as _iter
+
+        for cols_dict in _iter(source, batch_size=batch_size, as_stream=as_stream):
+            yield cls(
+                cols_dict,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+
+    @classmethod
     def read_csv(
         cls,
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -414,6 +471,7 @@ class DataFrameModel(Generic[RowT]):
         inner = dataframe_cls[cls._SchemaModel].read_csv(
             path,
             columns=columns,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -423,11 +481,37 @@ class DataFrameModel(Generic[RowT]):
         return cls._wrap_inner_df(inner)
 
     @classmethod
+    def iter_csv(
+        cls,
+        path: str | Any,
+        *,
+        batch_size: int = 65_536,
+        encoding: str = "utf-8",
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ):
+        """Yield CSV batches as typed DataFrameModel instances."""
+        cls._dfm_require_subclass_with_schema()
+        from .io.iter_file import iter_csv as _iter
+
+        for cols_dict in _iter(path, batch_size=batch_size, encoding=encoding):
+            yield cls(
+                cols_dict,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+
+    @classmethod
     def read_ndjson(
         cls,
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -440,6 +524,7 @@ class DataFrameModel(Generic[RowT]):
         inner = dataframe_cls[cls._SchemaModel].read_ndjson(
             path,
             columns=columns,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -449,11 +534,37 @@ class DataFrameModel(Generic[RowT]):
         return cls._wrap_inner_df(inner)
 
     @classmethod
+    def iter_ndjson(
+        cls,
+        path: str | Any,
+        *,
+        batch_size: int = 65_536,
+        encoding: str = "utf-8",
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ):
+        """Yield NDJSON/JSONL batches as typed DataFrameModel instances."""
+        cls._dfm_require_subclass_with_schema()
+        from .io.iter_file import iter_ndjson as _iter
+
+        for cols_dict in _iter(path, batch_size=batch_size, encoding=encoding):
+            yield cls(
+                cols_dict,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+
+    @classmethod
     def read_json(
         cls,
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -466,6 +577,7 @@ class DataFrameModel(Generic[RowT]):
         inner = dataframe_cls[cls._SchemaModel].read_json(
             path,
             columns=columns,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -808,6 +920,7 @@ class DataFrameModel(Generic[RowT]):
         *,
         columns: list[str] | None = None,
         executor: Executor | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -821,6 +934,7 @@ class DataFrameModel(Generic[RowT]):
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
             root,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -835,6 +949,7 @@ class DataFrameModel(Generic[RowT]):
         *,
         columns: list[str] | None = None,
         executor: Executor | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -848,6 +963,7 @@ class DataFrameModel(Generic[RowT]):
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
             root,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -862,6 +978,7 @@ class DataFrameModel(Generic[RowT]):
         *,
         columns: list[str] | None = None,
         executor: Executor | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -875,6 +992,7 @@ class DataFrameModel(Generic[RowT]):
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
             root,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -889,6 +1007,7 @@ class DataFrameModel(Generic[RowT]):
         *,
         columns: list[str] | None = None,
         executor: Executor | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -902,6 +1021,7 @@ class DataFrameModel(Generic[RowT]):
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
             root,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -916,6 +1036,7 @@ class DataFrameModel(Generic[RowT]):
         *,
         columns: list[str] | None = None,
         executor: Executor | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -929,6 +1050,7 @@ class DataFrameModel(Generic[RowT]):
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
             root,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -1166,21 +1288,32 @@ class DataFrameModel(Generic[RowT]):
         path: str | Any,
         *,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         write_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Write the lazy plan to Parquet (no Python column dict materialization)."""
-        self._df.write_parquet(path, streaming=streaming, write_kwargs=write_kwargs)
+        self._df.write_parquet(
+            path,
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            write_kwargs=write_kwargs,
+        )
 
     def write_csv(
         self,
         path: str | Any,
         *,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         separator: str = ",",
         write_kwargs: dict[str, Any] | None = None,
     ) -> None:
         self._df.write_csv(
-            path, streaming=streaming, separator=separator, write_kwargs=write_kwargs
+            path,
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            separator=separator,
+            write_kwargs=write_kwargs,
         )
 
     def write_ipc(
@@ -1188,12 +1321,14 @@ class DataFrameModel(Generic[RowT]):
         path: str | Any,
         *,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         compression: str | None = None,
         write_kwargs: dict[str, Any] | None = None,
     ) -> None:
         self._df.write_ipc(
             path,
             streaming=streaming,
+            engine_streaming=engine_streaming,
             compression=compression,
             write_kwargs=write_kwargs,
         )
@@ -1203,17 +1338,105 @@ class DataFrameModel(Generic[RowT]):
         path: str | Any,
         *,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         write_kwargs: dict[str, Any] | None = None,
     ) -> None:
-        self._df.write_ndjson(path, streaming=streaming, write_kwargs=write_kwargs)
+        self._df.write_ndjson(
+            path,
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            write_kwargs=write_kwargs,
+        )
+
+    @classmethod
+    def write_parquet_batches(
+        cls,
+        path: str | Any,
+        batches: Any,
+        *,
+        compression: str | None = None,
+    ) -> None:
+        """Write an iterator of batch dicts or DataFrameModels to Parquet (PyArrow)."""
+        from .io import write_parquet_batches as _write
+
+        def _iter():
+            for b in batches:
+                yield b.to_dict() if hasattr(b, "to_dict") else b
+
+        _write(path, _iter(), compression=compression)
+
+    @classmethod
+    def write_ipc_batches(
+        cls,
+        path: str | Any,
+        batches: Any,
+        *,
+        as_stream: bool = True,
+    ) -> None:
+        """Write an iterator of batch dicts or DataFrameModels to IPC (PyArrow)."""
+        from .io import write_ipc_batches as _write
+
+        def _iter():
+            for b in batches:
+                yield b.to_dict() if hasattr(b, "to_dict") else b
+
+        _write(path, _iter(), as_stream=as_stream)
+
+    @classmethod
+    def write_csv_batches(
+        cls,
+        path: str | Any,
+        batches: Any,
+        *,
+        mode: str = "w",
+        encoding: str = "utf-8",
+        write_header: bool = True,
+    ) -> None:
+        """Write an iterator of batch dicts or DataFrameModels to CSV."""
+        from .io import write_csv_batches as _write
+
+        def _iter():
+            for b in batches:
+                yield b.to_dict() if hasattr(b, "to_dict") else b
+
+        _write(
+            path,
+            _iter(),
+            mode=mode,
+            encoding=encoding,
+            write_header=write_header,
+        )
+
+    @classmethod
+    def write_ndjson_batches(
+        cls,
+        path: str | Any,
+        batches: Any,
+        *,
+        mode: str = "w",
+        encoding: str = "utf-8",
+    ) -> None:
+        """Write an iterator of batch dicts or DataFrameModels to NDJSON."""
+        from .io import write_ndjson_batches as _write
+
+        def _iter():
+            for b in batches:
+                yield b.to_dict() if hasattr(b, "to_dict") else b
+
+        _write(path, _iter(), mode=mode, encoding=encoding)
 
     def collect_batches(
         self,
         *,
         batch_size: int = 65_536,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
     ) -> list[Any]:
-        return self._df.collect_batches(batch_size=batch_size, streaming=streaming)
+        return self._df.collect_batches(
+            batch_size=batch_size,
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+        )
 
     def __repr__(self) -> str:
         inner = "\n".join(f"  {line}" for line in repr(self._df).split("\n"))
@@ -1435,25 +1658,33 @@ class DataFrameModel(Generic[RowT]):
         as_numpy: bool = False,
         as_polars: bool | None = None,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
     ) -> Any:
         return self._df.collect(
             as_lists=as_lists,
             as_numpy=as_numpy,
             as_polars=as_polars,
             streaming=streaming,
+            engine_streaming=engine_streaming,
         )
 
-    def to_dict(self, *, streaming: bool | None = None) -> dict[str, list[Any]]:
-        return self._df.to_dict(streaming=streaming)
+    def to_dict(
+        self, *, streaming: bool | None = None, engine_streaming: bool | None = None
+    ) -> dict[str, list[Any]]:
+        return self._df.to_dict(streaming=streaming, engine_streaming=engine_streaming)
 
-    def to_polars(self, *, streaming: bool | None = None) -> Any:
-        return self._df.to_polars(streaming=streaming)
+    def to_polars(
+        self, *, streaming: bool | None = None, engine_streaming: bool | None = None
+    ) -> Any:
+        return self._df.to_polars(streaming=streaming, engine_streaming=engine_streaming)
 
-    def to_arrow(self, *, streaming: bool | None = None) -> Any:
+    def to_arrow(
+        self, *, streaming: bool | None = None, engine_streaming: bool | None = None
+    ) -> Any:
         """
         Materialize as a PyArrow ``Table`` (delegates to :meth:`DataFrame.to_arrow`).
         """
-        return self._df.to_arrow(streaming=streaming)
+        return self._df.to_arrow(streaming=streaming, engine_streaming=engine_streaming)
 
     def __dataframe__(
         self, *, nan_as_null: bool = False, allow_copy: bool = True
@@ -1490,6 +1721,7 @@ class DataFrameModel(Generic[RowT]):
         as_numpy: bool = False,
         as_polars: bool | None = None,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> Any:
         """Async :meth:`collect` (delegates to :meth:`DataFrame.acollect`)."""
@@ -1498,6 +1730,7 @@ class DataFrameModel(Generic[RowT]):
             as_numpy=as_numpy,
             as_polars=as_polars,
             streaming=streaming,
+            engine_streaming=engine_streaming,
             executor=executor,
         )
 
@@ -1505,28 +1738,37 @@ class DataFrameModel(Generic[RowT]):
         self,
         *,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> dict[str, list[Any]]:
         """Async :meth:`to_dict`."""
-        return await self._df.ato_dict(streaming=streaming, executor=executor)
+        return await self._df.ato_dict(
+            streaming=streaming, engine_streaming=engine_streaming, executor=executor
+        )
 
     async def ato_polars(
         self,
         *,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> Any:
         """Async :meth:`to_polars`."""
-        return await self._df.ato_polars(streaming=streaming, executor=executor)
+        return await self._df.ato_polars(
+            streaming=streaming, engine_streaming=engine_streaming, executor=executor
+        )
 
     async def ato_arrow(
         self,
         *,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> Any:
         """Async :meth:`to_arrow`."""
-        return await self._df.ato_arrow(streaming=streaming, executor=executor)
+        return await self._df.ato_arrow(
+            streaming=streaming, engine_streaming=engine_streaming, executor=executor
+        )
 
     async def arows(
         self,

@@ -34,10 +34,31 @@ from .extras import (
     read_csv_stdin,
     read_delta,
     read_excel,
+    iter_avro,
+    iter_bigquery,
+    iter_delta,
+    iter_excel,
+    iter_kafka_json,
+    iter_orc,
+    iter_snowflake,
     read_kafka_json_batch,
     read_orc,
     read_snowflake,
     write_csv_stdout,
+)
+from .iter_file import (
+    iter_csv,
+    iter_ipc,
+    iter_json_array,
+    iter_json_lines,
+    iter_ndjson,
+    iter_parquet,
+)
+from .write_batches import (
+    write_csv_batches,
+    write_ipc_batches,
+    write_ndjson_batches,
+    write_parquet_batches,
 )
 from .http import (
     fetch_bytes,
@@ -825,6 +846,131 @@ async def aiter_sql(
         yield item  # dict[str, list[Any]]
 
 
+async def _aiter_from_iter(
+    it: Any,
+    *,
+    executor: Executor | None,
+):
+    """
+    Convert a synchronous iterator yielding batches into an async generator.
+
+    Uses the same queue/backpressure approach as :func:`aiter_sql`.
+    """
+    import asyncio
+    import threading
+
+    q: asyncio.Queue[object] = asyncio.Queue(maxsize=2)
+    sentinel = object()
+    loop = asyncio.get_running_loop()
+
+    def _put(item: object) -> None:
+        try:
+            fut = asyncio.run_coroutine_threadsafe(q.put(item), loop)
+            fut.result()
+        except BaseException:
+            return
+
+    def _runner() -> None:
+        try:
+            for batch in it:
+                _put(batch)
+        except BaseException as e:
+            _put(e)
+        finally:
+            _put(sentinel)
+
+    if executor is not None:
+        loop.run_in_executor(executor, _runner)
+    else:
+        threading.Thread(target=_runner, daemon=True).start()
+
+    while True:
+        item = await q.get()
+        if item is sentinel:
+            return
+        if isinstance(item, BaseException):
+            raise item
+        yield item
+
+
+async def aiter_parquet(
+    path: str | Path,
+    *,
+    batch_size: int = 65_536,
+    columns: list[str] | None = None,
+    executor: Executor | None = None,
+):
+    """Async batches from :func:`iter_parquet`."""
+    it = iter_parquet(path, batch_size=batch_size, columns=columns)
+    async for batch in _aiter_from_iter(it, executor=executor):
+        yield batch
+
+
+async def aiter_ipc(
+    source: _Source,
+    *,
+    batch_size: int = 65_536,
+    as_stream: bool = False,
+    executor: Executor | None = None,
+):
+    """Async batches from :func:`iter_ipc`."""
+    it = iter_ipc(source, batch_size=batch_size, as_stream=as_stream)
+    async for batch in _aiter_from_iter(it, executor=executor):
+        yield batch
+
+
+async def aiter_csv(
+    path: str | Path,
+    *,
+    batch_size: int = 65_536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+):
+    """Async batches from :func:`iter_csv`."""
+    it = iter_csv(path, batch_size=batch_size, encoding=encoding)
+    async for batch in _aiter_from_iter(it, executor=executor):
+        yield batch
+
+
+async def aiter_ndjson(
+    path: str | Path,
+    *,
+    batch_size: int = 65_536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+):
+    """Async batches from :func:`iter_ndjson`."""
+    it = iter_ndjson(path, batch_size=batch_size, encoding=encoding)
+    async for batch in _aiter_from_iter(it, executor=executor):
+        yield batch
+
+
+async def aiter_json_lines(
+    path: str | Path,
+    *,
+    batch_size: int = 65_536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+):
+    """Async batches from :func:`iter_json_lines`."""
+    it = iter_json_lines(path, batch_size=batch_size, encoding=encoding)
+    async for batch in _aiter_from_iter(it, executor=executor):
+        yield batch
+
+
+async def aiter_json_array(
+    path: str | Path,
+    *,
+    batch_size: int = 65_536,
+    encoding: str = "utf-8",
+    executor: Executor | None = None,
+):
+    """Async batches from :func:`iter_json_array`."""
+    it = iter_json_array(path, batch_size=batch_size, encoding=encoding)
+    async for batch in _aiter_from_iter(it, executor=executor):
+        yield batch
+
+
 async def awrite_sql(
     data: dict[str, list[Any]],
     table_name: str,
@@ -897,6 +1043,13 @@ async def awrite_sql_batches(
 
 
 __all__ = [
+    "iter_avro",
+    "iter_bigquery",
+    "iter_delta",
+    "iter_excel",
+    "iter_kafka_json",
+    "iter_orc",
+    "iter_snowflake",
     "MissingRustExtensionError",
     "aexport_csv",
     "aexport_ipc",
@@ -904,6 +1057,12 @@ __all__ = [
     "aexport_ndjson",
     "aexport_parquet",
     "afetch_sql",
+    "aiter_csv",
+    "aiter_ipc",
+    "aiter_json_array",
+    "aiter_json_lines",
+    "aiter_ndjson",
+    "aiter_parquet",
     "aiter_sql",
     "amaterialize_csv",
     "amaterialize_ipc",
@@ -933,6 +1092,12 @@ __all__ = [
     "fetch_parquet_url",
     "fetch_sql",
     "http",
+    "iter_csv",
+    "iter_ipc",
+    "iter_json_array",
+    "iter_json_lines",
+    "iter_ndjson",
+    "iter_parquet",
     "iter_sql",
     "materialize_csv",
     "materialize_ipc",
@@ -957,7 +1122,11 @@ __all__ = [
     "read_parquet_url_ctx",
     "read_snowflake",
     "record_batch_to_column_dict",
+    "write_csv_batches",
     "write_csv_stdout",
+    "write_ipc_batches",
+    "write_ndjson_batches",
+    "write_parquet_batches",
     "write_sql",
     "write_sql_batches",
 ]

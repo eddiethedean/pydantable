@@ -409,13 +409,27 @@ class WithColumnsStep:
 _ENGINE_STREAMING_ENV = "PYDANTABLE_ENGINE_STREAMING"
 
 
-def _resolve_engine_streaming(explicit: bool | None) -> bool:
-    """Polars collect engine: ``streaming=True`` or env ``PYDANTABLE_ENGINE_STREAMING``.
+def _resolve_engine_streaming(
+    *,
+    streaming: bool | None = None,
+    engine_streaming: bool | None = None,
+    default: bool | None = None,
+) -> bool:
+    """Resolve Polars collect engine streaming flag.
 
-    Truthy env values: ``1``, ``true``, ``yes``.
+    Resolution order:
+    - explicit `engine_streaming=` (preferred alias)
+    - explicit `streaming=` (legacy name used throughout the API)
+    - `default=` (per-object default, e.g. set on scan roots)
+    - env `PYDANTABLE_ENGINE_STREAMING` (truthy: 1/true/yes)
     """
+    if streaming is not None and engine_streaming is not None:
+        raise TypeError("Pass either streaming= or engine_streaming=, not both.")
+    explicit = engine_streaming if engine_streaming is not None else streaming
     if explicit is not None:
-        return explicit
+        return bool(explicit)
+    if default is not None:
+        return bool(default)
     v = os.environ.get(_ENGINE_STREAMING_ENV, "").strip().lower()
     return v in ("1", "true", "yes")
 
@@ -481,12 +495,15 @@ class DataFrame(Generic[SchemaT]):
         self._io_validation_on_validation_errors: (
             Callable[[list[dict[str, Any]]], None] | None
         ) = None
+        # Optional default for Polars streaming collect on this object.
+        self._engine_streaming_default: bool | None = None
 
     @classmethod
     def _from_scan_root(
         cls,
         root: Any,
         *,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -513,6 +530,7 @@ class DataFrame(Generic[SchemaT]):
         df._io_validation_fill_missing_optional = fill_missing_optional
         df._io_validation_ignore_errors = bool(ignore_errors)
         df._io_validation_on_validation_errors = on_validation_errors
+        df._engine_streaming_default = engine_streaming
         return df
 
     @classmethod
@@ -521,6 +539,7 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -532,6 +551,7 @@ class DataFrame(Generic[SchemaT]):
 
         return cls._from_scan_root(
             _read_parquet(path, columns=columns, **scan_kwargs),
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -545,6 +565,7 @@ class DataFrame(Generic[SchemaT]):
         *,
         columns: list[str] | None = None,
         executor: Executor | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -564,6 +585,7 @@ class DataFrame(Generic[SchemaT]):
         )
         return cls._from_scan_root(
             root,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -577,6 +599,7 @@ class DataFrame(Generic[SchemaT]):
         *,
         experimental: bool = True,
         columns: list[str] | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -593,6 +616,7 @@ class DataFrame(Generic[SchemaT]):
             _read_parquet_url(
                 url, experimental=experimental, columns=columns, **kwargs
             ),
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -607,6 +631,7 @@ class DataFrame(Generic[SchemaT]):
         experimental: bool = True,
         columns: list[str] | None = None,
         executor: Executor | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -630,6 +655,7 @@ class DataFrame(Generic[SchemaT]):
         )
         return cls._from_scan_root(
             root,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -642,6 +668,7 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -652,6 +679,7 @@ class DataFrame(Generic[SchemaT]):
 
         return cls._from_scan_root(
             _read_csv(path, columns=columns, **scan_kwargs),
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -665,6 +693,7 @@ class DataFrame(Generic[SchemaT]):
         *,
         columns: list[str] | None = None,
         executor: Executor | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -680,6 +709,7 @@ class DataFrame(Generic[SchemaT]):
         root = await _aread_csv(path, columns=columns, executor=executor, **scan_kwargs)
         return cls._from_scan_root(
             root,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -692,6 +722,7 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -702,6 +733,7 @@ class DataFrame(Generic[SchemaT]):
 
         return cls._from_scan_root(
             _read_ndjson(path, columns=columns, **scan_kwargs),
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -715,6 +747,7 @@ class DataFrame(Generic[SchemaT]):
         *,
         columns: list[str] | None = None,
         executor: Executor | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -732,6 +765,7 @@ class DataFrame(Generic[SchemaT]):
         )
         return cls._from_scan_root(
             root,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -744,6 +778,7 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -755,6 +790,7 @@ class DataFrame(Generic[SchemaT]):
 
         return cls._from_scan_root(
             _read_json(path, columns=columns, **scan_kwargs),
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -768,6 +804,7 @@ class DataFrame(Generic[SchemaT]):
         *,
         columns: list[str] | None = None,
         executor: Executor | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -785,6 +822,7 @@ class DataFrame(Generic[SchemaT]):
         )
         return cls._from_scan_root(
             root,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -797,6 +835,7 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         columns: list[str] | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -807,6 +846,7 @@ class DataFrame(Generic[SchemaT]):
 
         return cls._from_scan_root(
             _read_ipc(path, columns=columns, **scan_kwargs),
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
@@ -820,6 +860,7 @@ class DataFrame(Generic[SchemaT]):
         *,
         columns: list[str] | None = None,
         executor: Executor | None = None,
+        engine_streaming: bool | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
@@ -835,11 +876,132 @@ class DataFrame(Generic[SchemaT]):
         root = await _aread_ipc(path, columns=columns, executor=executor, **scan_kwargs)
         return cls._from_scan_root(
             root,
+            engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
+
+    @classmethod
+    def iter_parquet(
+        cls,
+        path: str | Any,
+        *,
+        batch_size: int = 65_536,
+        columns: list[str] | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ):
+        """Stream Parquet as batches of in-memory typed frames (PyArrow-backed)."""
+        from pydantable.io.iter_file import iter_parquet as _iter
+
+        for cols_dict in _iter(path, batch_size=batch_size, columns=columns):
+            yield cls(
+                cols_dict,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+
+    @classmethod
+    def iter_ipc(
+        cls,
+        source: str | Any,
+        *,
+        batch_size: int = 65_536,
+        as_stream: bool = False,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ):
+        """Stream IPC as batches of in-memory typed frames (PyArrow-backed)."""
+        from pydantable.io.iter_file import iter_ipc as _iter
+
+        for cols_dict in _iter(source, batch_size=batch_size, as_stream=as_stream):
+            yield cls(
+                cols_dict,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+
+    @classmethod
+    def iter_csv(
+        cls,
+        path: str | Any,
+        *,
+        batch_size: int = 65_536,
+        encoding: str = "utf-8",
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ):
+        """Stream CSV as batches of in-memory typed frames (stdlib CSV)."""
+        from pydantable.io.iter_file import iter_csv as _iter
+
+        for cols_dict in _iter(path, batch_size=batch_size, encoding=encoding):
+            yield cls(
+                cols_dict,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+
+    @classmethod
+    def iter_ndjson(
+        cls,
+        path: str | Any,
+        *,
+        batch_size: int = 65_536,
+        encoding: str = "utf-8",
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ):
+        """Stream NDJSON/JSONL as batches of in-memory typed frames (stdlib json)."""
+        from pydantable.io.iter_file import iter_ndjson as _iter
+
+        for cols_dict in _iter(path, batch_size=batch_size, encoding=encoding):
+            yield cls(
+                cols_dict,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+
+    @classmethod
+    def iter_json_lines(
+        cls,
+        path: str | Any,
+        *,
+        batch_size: int = 65_536,
+        encoding: str = "utf-8",
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ):
+        """Stream JSON Lines as batches of in-memory typed frames."""
+        from pydantable.io.iter_file import iter_json_lines as _iter
+
+        for cols_dict in _iter(path, batch_size=batch_size, encoding=encoding):
+            yield cls(
+                cols_dict,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
 
     @classmethod
     def _from_plan(
@@ -1565,7 +1727,9 @@ class DataFrame(Generic[SchemaT]):
         value_name: str = "value",
         streaming: bool | None = None,
     ) -> DataFrame[Any]:
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming, default=self._engine_streaming_default
+        )
         out_data, schema_descriptors = execute_melt(
             self._rust_plan,
             self._root_data,
@@ -1628,7 +1792,9 @@ class DataFrame(Generic[SchemaT]):
                 "pivot(columns=...) expects a column name or single-column ColumnRef."
             )
         value_cols = [values] if isinstance(values, str) else list(values)
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming, default=self._engine_streaming_default
+        )
         out_data, schema_descriptors = execute_pivot(
             self._rust_plan,
             self._root_data,
@@ -1655,7 +1821,9 @@ class DataFrame(Generic[SchemaT]):
         self, columns: str | Sequence[str], *, streaming: bool | None = None
     ) -> DataFrame[Any]:
         cols = [columns] if isinstance(columns, str) else list(columns)
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming, default=self._engine_streaming_default
+        )
         out_data, schema_descriptors = execute_explode(
             self._rust_plan, self._root_data, cols, streaming=use_streaming
         )
@@ -1675,7 +1843,9 @@ class DataFrame(Generic[SchemaT]):
         self, columns: str | Sequence[str], *, streaming: bool | None = None
     ) -> DataFrame[Any]:
         cols = [columns] if isinstance(columns, str) else list(columns)
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming, default=self._engine_streaming_default
+        )
         out_data, schema_descriptors = execute_unnest(
             self._rust_plan, self._root_data, cols, streaming=use_streaming
         )
@@ -1754,7 +1924,9 @@ class DataFrame(Generic[SchemaT]):
                     "join() left_on and right_on must have the same length."
                 )
 
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming, default=self._engine_streaming_default
+        )
         joined_data, schema_descriptors = execute_join(
             self._rust_plan,
             self._root_data,
@@ -1941,6 +2113,7 @@ class DataFrame(Generic[SchemaT]):
         as_numpy: bool = False,
         as_polars: bool | None = None,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
     ) -> Any:
         """
         Materialize this typed logical DataFrame.
@@ -1980,7 +2153,11 @@ class DataFrame(Generic[SchemaT]):
             raise ValueError(
                 "collect() cannot specify both as_numpy=True and as_lists=True."
             )
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            default=self._engine_streaming_default,
+        )
         column_dict = self._materialize_columns_with_missing_optional_fallback(
             streaming=use_streaming
         )
@@ -1994,13 +2171,22 @@ class DataFrame(Generic[SchemaT]):
             return {k: np.asarray(v) for k, v in column_dict.items()}
         return _rows_from_column_dict(column_dict, self._current_schema_type)
 
-    def to_dict(self, *, streaming: bool | None = None) -> dict[str, list[Any]]:
+    def to_dict(
+        self,
+        *,
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+    ) -> dict[str, list[Any]]:
         """Columnar materialization (alias for ``collect(as_lists=True)`` shape).
 
         **Cost:** full Rust execution for the current plan. See {doc}`EXECUTION`.
         Pass ``streaming=`` or set ``PYDANTABLE_ENGINE_STREAMING`` like :meth:`collect`.
         """
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            default=self._engine_streaming_default,
+        )
         raw = self._materialize_columns_with_missing_optional_fallback(
             streaming=use_streaming
         )
@@ -2012,6 +2198,7 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         write_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Write this lazy plan to Parquet without a Python ``dict[str, list]``.
@@ -2022,7 +2209,11 @@ class DataFrame(Generic[SchemaT]):
         ``write_kwargs`` may include Polars writer options such as ``compression``,
         ``row_group_size``, ``data_page_size``, ``statistics``, ``parallel``.
         """
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            default=self._engine_streaming_default,
+        )
         rust_write_parquet(
             self._rust_plan,
             self._root_data,
@@ -2036,13 +2227,18 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         separator: str = ",",
         write_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Write this lazy plan to CSV from Rust (no Python column dict)."""
         if len(separator) != 1:
             raise ValueError("write_csv separator must be a single character.")
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            default=self._engine_streaming_default,
+        )
         rust_write_csv(
             self._rust_plan,
             self._root_data,
@@ -2057,6 +2253,7 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         compression: str | None = None,
         write_kwargs: dict[str, Any] | None = None,
     ) -> None:
@@ -2064,7 +2261,11 @@ class DataFrame(Generic[SchemaT]):
 
         ``compression`` is ``None``, ``'lz4'``, or ``'zstd'``.
         """
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            default=self._engine_streaming_default,
+        )
         rust_write_ipc(
             self._rust_plan,
             self._root_data,
@@ -2079,13 +2280,18 @@ class DataFrame(Generic[SchemaT]):
         path: str | Any,
         *,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         write_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Write newline-delimited JSON from Rust.
 
         ``write_kwargs`` may include ``json_format``.
         """
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            default=self._engine_streaming_default,
+        )
         rust_write_ndjson(
             self._rust_plan,
             self._root_data,
@@ -2099,12 +2305,17 @@ class DataFrame(Generic[SchemaT]):
         *,
         batch_size: int = 65_536,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
     ) -> list[Any]:
         """Return Polars ``DataFrame`` chunks after one engine collect.
 
         See {doc}`EXECUTION`.
         """
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            default=self._engine_streaming_default,
+        )
         return rust_collect_batches(
             self._rust_plan,
             self._root_data,
@@ -2112,7 +2323,9 @@ class DataFrame(Generic[SchemaT]):
             streaming=use_streaming,
         )
 
-    def to_polars(self, *, streaming: bool | None = None) -> Any:
+    def to_polars(
+        self, *, streaming: bool | None = None, engine_streaming: bool | None = None
+    ) -> Any:
         """
         Materialize as a Polars ``DataFrame`` (requires the optional ``polars``
         Python package: ``pip install 'pydantable[polars]'``).
@@ -2127,9 +2340,13 @@ class DataFrame(Generic[SchemaT]):
                 "polars is required for to_polars(). Install with: "
                 "pip install 'pydantable[polars]'"
             ) from e
-        return pl.DataFrame(self.to_dict(streaming=streaming))
+        return pl.DataFrame(
+            self.to_dict(streaming=streaming, engine_streaming=engine_streaming)
+        )
 
-    def to_arrow(self, *, streaming: bool | None = None) -> Any:
+    def to_arrow(
+        self, *, streaming: bool | None = None, engine_streaming: bool | None = None
+    ) -> Any:
         """
         Materialize as a PyArrow ``Table`` (requires the optional ``pyarrow``
         package: ``pip install 'pydantable[arrow]'``).
@@ -2146,7 +2363,9 @@ class DataFrame(Generic[SchemaT]):
                 "pyarrow is required for to_arrow(). Install with: "
                 "pip install 'pydantable[arrow]'"
             ) from e
-        return pa.Table.from_pydict(self.to_dict(streaming=streaming))
+        return pa.Table.from_pydict(
+            self.to_dict(streaming=streaming, engine_streaming=engine_streaming)
+        )
 
     def __dataframe__(
         self, *, nan_as_null: bool = False, allow_copy: bool = True
@@ -2239,6 +2458,7 @@ class DataFrame(Generic[SchemaT]):
         self,
         *,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> Any:
         """
@@ -2248,7 +2468,9 @@ class DataFrame(Generic[SchemaT]):
         Polars frame—same copies as the synchronous path.
         """
         return await _materialize_in_thread(
-            functools.partial(self.to_polars, streaming=streaming),
+            functools.partial(
+                self.to_polars, streaming=streaming, engine_streaming=engine_streaming
+            ),
             executor=executor,
         )
 
@@ -2256,6 +2478,7 @@ class DataFrame(Generic[SchemaT]):
         self,
         *,
         streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> Any:
         """
@@ -2264,7 +2487,9 @@ class DataFrame(Generic[SchemaT]):
         Same materialization and copies as the synchronous path.
         """
         return await _materialize_in_thread(
-            functools.partial(self.to_arrow, streaming=streaming),
+            functools.partial(
+                self.to_arrow, streaming=streaming, engine_streaming=engine_streaming
+            ),
             executor=executor,
         )
 
@@ -2284,7 +2509,9 @@ class DataFrame(Generic[SchemaT]):
         """
         from pydantable.plan import explain as _explain
 
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming, default=self._engine_streaming_default
+        )
         root_kind = (
             "scan_file_root" if _is_scan_file_root(self._root_data) else "in_memory"
         )
@@ -2311,7 +2538,9 @@ class DataFrame(Generic[SchemaT]):
         out_schema_type = base._current_schema_type
         merged_ft = dict(base._current_field_types)
         out_plan = base._rust_plan
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming, default=base._engine_streaming_default
+        )
         for df in dfs[1:]:
             out_data, schema_descriptors = execute_concat(
                 out_plan,
@@ -2394,7 +2623,9 @@ class GroupedDataFrame:
                 )
             agg_specs[out_name] = (op, in_col)
 
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming, default=self._df._engine_streaming_default
+        )
         grouped_data, schema_descriptors = execute_groupby_agg(
             self._df._rust_plan,
             self._df._root_data,
@@ -2478,7 +2709,9 @@ class DynamicGroupedDataFrame:
                 raise TypeError("agg() op and column must be strings.")
             agg_specs[out_name] = (op, in_col)
 
-        use_streaming = _resolve_engine_streaming(streaming)
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming, default=self._df._engine_streaming_default
+        )
         out_data, schema_descriptors = execute_groupby_dynamic_agg(
             self._df._rust_plan,
             self._df._root_data,
