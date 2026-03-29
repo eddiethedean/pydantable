@@ -1,15 +1,16 @@
 PYTHON ?= .venv/bin/python
 RUFF ?= $(PYTHON) -m ruff
 MYPY ?= $(PYTHON) -m mypy
+PYRIGHT ?= $(PYTHON) -m pyright
 
 CARGO_MANIFEST ?= pydantable-core/Cargo.toml
 
-.PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check mypy-check sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
+.PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check mypy-check pyright-check sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 .PHONY: gen-typing check-typing
 
 check-full: check-python check-docs check-rust
 
-check-python: ruff-format-check ruff-check mypy-check
+check-python: ruff-format-check ruff-check mypy-check pyright-check check-typing
 
 check-docs: sphinx-check
 
@@ -21,6 +22,9 @@ ruff-check:
 
 mypy-check:
 	$(MYPY) python/pydantable
+
+pyright-check:
+	$(PYRIGHT) --project pyrightconfig.json
 
 # Matches CI "Docs (sphinx -W)" check.
 sphinx-check:
