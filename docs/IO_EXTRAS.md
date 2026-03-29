@@ -32,6 +32,7 @@ After **`read_excel`**, **`read_delta`**, **`read_bigquery`**, …:
 ### Streaming / messaging
 
 - **`read_kafka_json_batch(topic, *, bootstrap_servers, max_messages=100, experimental=True, **consumer_config)`** — **`pydantable[kafka]`**.
+- **Batch iterators (1.5.0+):** when a backend supports chunked reads, **`iter_excel`**, **`iter_delta`**, **`iter_avro`**, **`iter_orc`**, **`iter_bigquery`**, **`iter_snowflake`**, and **`iter_kafka_json`** yield the same **`dict[str, list]`** shape as **`iter_csv`** / **`iter_parquet`** (see {doc}`IO_OVERVIEW`). Some sources still buffer internally (e.g. full JSON-array loads); check docstrings and optional extras.
 
 ### Stdin / stdout
 

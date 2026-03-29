@@ -25,6 +25,8 @@ Service patterns: {doc}`FASTAPI` and {doc}`ROADMAP`. Transport table: {doc}`DATA
 
 **Streaming:** pass **`streaming=True`** to **`collect()`**, **`to_dict()`**, **`to_polars()`**, **`to_arrow()`**, **`write_parquet()`**, **`write_csv()`**, **`write_ipc()`**, **`write_ndjson()`**, **`join()`**, **`concat()`**, **`melt()`**, **`pivot()`**, **`explode()`**, **`unnest()`**, **`GroupedDataFrame.agg()`**, **`DynamicGroupedDataFrame.agg()`**, or the async mirrors; or set **`PYDANTABLE_ENGINE_STREAMING=1`** (truthy: **`1`**, **`true`**, **`yes`**) so the default is Polars’ **`Engine::Streaming`** **`collect`** where supported. Explicit **`streaming=False`** overrides the env var. This is **best-effort**: unsupported plans may error or behave like in-memory collect depending on Polars.
 
+**`engine_streaming` alias (1.5.0+):** you may pass **`engine_streaming=True`** / **`False`** instead of **`streaming=`** on the same APIs. Passing **both** **`streaming`** and **`engine_streaming`** raises **`TypeError`**. Typed lazy **`read_*` / `aread_*`** can set **`engine_streaming=`** when opening a file root; that value becomes the frame’s default for later **`collect()`** / **`to_*`** / lazy **`write_*`** unless you override **`streaming`** / **`engine_streaming`** on the call.
+
 **Streaming vs in-memory (executor family, high level):**
 
 | Executor family | Honors **`streaming=`** / env on terminal collect |

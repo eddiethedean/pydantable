@@ -57,6 +57,19 @@ Use these when you want **`ScanFileRoot`**, raw column dicts, or file I/O withou
 | **`fetch_*_url`**, **`fetch_sql`**, **`read_from_object_store`**, **`pydantable.io.extras`** | Other sources that return **`dict[str, list]`** (or build column dicts) for **`DataFrameModel`** / constructors. |
 | **`export_*` / `aexport_*`**, **`write_sql` / `awrite_sql`** | Eager writes from an in-memory column dict or your own pipeline. |
 
+## Batched column dict I/O (`iter_*`, `write_*_batches`, `aiter_*`)
+
+For **bounded memory** pipelines in plain Python (outside the Rust **`LazyFrame`** plan), **`pydantable.io`** exposes **iterators** that yield **`dict[str, list]`** in chunks, plus **writers** that append many such batches to one file.
+
+- **Contract:** each yielded batch is **rectangular**: every column list has the same length. Helpers **`ensure_rectangular`** and **`iter_concat_batches`** live in **`pydantable.io.batches`**.
+- **Core formats:** **`iter_parquet`**, **`iter_ipc`**, **`iter_csv`**, **`iter_ndjson`** (**`iter_json_lines`** is an alias), **`iter_json_array`** — and **`write_parquet_batches`**, **`write_ipc_batches`**, **`write_csv_batches`**, **`write_ndjson_batches`**. **Parquet**, **IPC**, and **JSON-array** batch paths need **`pydantable[arrow]`** (PyArrow). **CSV** / **NDJSON** use the stdlib (plus **`json`**).
+- **IPC file vs stream:** **`iter_ipc`** / **`write_ipc_batches`** take **`as_stream=`**. Defaults differ (**reader** assumes on-disk **file** format; **writer** defaults to **stream** format). For a round-trip, pass the **same** flag on read and write (see {doc}`IO_IPC`).
+- **Async:** **`aiter_parquet`**, **`aiter_ipc`**, **`aiter_csv`**, **`aiter_ndjson`**, **`aiter_json_lines`**, **`aiter_json_array`** mirror the sync iterators (thread offload). **`aiter_sql`** streams SQL batches similarly ({doc}`IO_SQL`).
+- **Extras:** **`iter_excel`**, **`iter_delta`**, **`iter_avro`**, **`iter_orc`**, **`iter_bigquery`**, **`iter_snowflake`**, **`iter_kafka_json`** — same column-dict batch shape where the underlying library allows streaming; see {doc}`IO_EXTRAS`.
+- **Top-level imports:** many of these names are also re-exported from **`pydantable`** alongside **`DataFrame`** / **`DataFrameModel`** for quick scripts.
+
+This layer is **orthogonal** to **lazy **`read_*`** / **`write_*`** on **`DataFrame`**: use **`read_*`** when you want the Rust engine and Polars planning; use **`iter_*`** when you already have a **pull**-style batch loop in Python or need a format PyArrow reads without building a **`ScanFileRoot`**.
+
 ## One page per source or target family
 
 | Topic | Guide |

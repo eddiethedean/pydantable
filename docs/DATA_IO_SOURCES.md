@@ -10,6 +10,8 @@ This document lists **common and useful** places applications read and write tab
 2. **`materialize_*` / `amaterialize_*`** — eager **`dict[str, list]`** reads (**Rust** on local paths where possible; **PyArrow** for bytes, HTTP bodies, column subsets, streaming IPC).
 3. **`DataFrame.write_parquet`**, **`write_csv`**, **`write_ipc`**, **`write_ndjson`** (and **`DataFrameModel`** mirrors) — write the lazy pipeline from Rust without a giant Python dict.
 
+4. **Batched `dict[str, list]` I/O (1.5.0+)** — **`pydantable.io.iter_*` / `aiter_*`** and **`write_*_batches`** for pull-style, chunk-sized reads and writes (PyArrow-backed for Parquet/IPC where noted). See {doc}`IO_OVERVIEW` (**Batched column dict I/O**). **`DataFrameModel.write_*_batches`** accepts iterators of column dicts (or row objects with **`to_dict()`**) for the same shapes.
+
 ## Lazy read **`**scan_kwargs`** and write **`write_kwargs`**
 
 **Reads** (**`read_parquet`**, **`read_csv`**, **`read_ndjson`**, **`read_ipc`**, and async **`aread_*`**) accept Polars scan options as keyword arguments; they are forwarded to the Rust layer as **`scan_kwargs`**. **Writes** accept an optional **`write_kwargs=dict`** (same idea for the Polars sink). Unknown keys raise **`ValueError`** with an **allowed:** list.

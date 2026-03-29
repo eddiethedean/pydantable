@@ -4,6 +4,8 @@
 
 This covers **Arrow IPC file** (`.arrow` / `.feather`-style single file), not arbitrary **streaming IPC** on a socket unless you materialize through PyArrow yourself.
 
+**Batch iterators / writers (1.5.0+):** **`iter_ipc`** and **`write_ipc_batches`** take **`as_stream=`**. Use the **same** value on read and write: on-disk IPC **file** format is **`as_stream=False`**; IPC **stream** bytes are **`as_stream=True`** (the **`write_ipc_batches`** default). See {doc}`IO_OVERVIEW` (**Batched column dict I/O**).
+
 ## Read (sources)
 
 ### `DataFrame[Schema]` and `DataFrameModel`
@@ -33,6 +35,7 @@ IPC sink options are intentionally narrow: use top-level **`compression=`**. **N
 ### `pydantable.io`
 
 - **`export_ipc`**, **`aexport_ipc`**
+- **`iter_ipc`**, **`aiter_ipc`**, **`write_ipc_batches`** — rectangular **`dict[str, list]`** batches (PyArrow); **`as_stream`** must match how the bytes were produced.
 
 ## Runnable example
 

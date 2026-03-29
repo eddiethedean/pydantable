@@ -17,6 +17,7 @@ Each line of the file is one JSON object; the scanner infers or aligns columns a
 - **`read_ndjson`**, **`aread_ndjson`**
 - **`materialize_ndjson`**, **`amaterialize_ndjson`**
 - **`fetch_ndjson_url`** — HTTP(S) → temp file → read
+- **`iter_ndjson`**, **`iter_json_lines`** (alias), **`aiter_ndjson`**, **`aiter_json_lines`**, **`write_ndjson_batches`** — JSON-object lines batched into **`dict[str, list]`** ({doc}`IO_OVERVIEW`).
 
 **`scan_kwargs`:** **`low_memory`**, **`rechunk`**, **`ignore_errors`**, **`n_rows`**, **`infer_schema_length`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
 
@@ -32,6 +33,7 @@ Each line of the file is one JSON object; the scanner infers or aligns columns a
 ### `pydantable.io`
 
 - **`export_ndjson`**, **`aexport_ndjson`**
+- **`write_ndjson_batches`** — stream many batches to one NDJSON file.
 
 ## Runnable example
 

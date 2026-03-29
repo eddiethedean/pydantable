@@ -38,6 +38,11 @@ The temp file for **`read_parquet_url`** is **not** deleted automatically; see {
 - **`materialize_parquet(source, *, columns=None, engine=None)`**, **`amaterialize_parquet`**
 - **`fetch_parquet_url`** — download and decode in one step (PyArrow on bytes)
 
+**Batched (`dict[str, list]`, PyArrow)**
+
+- **`iter_parquet(path, *, batch_size=..., columns=None)`** / **`aiter_parquet`** — yield rectangular column dicts (optional **`columns`** projection).
+- **`write_parquet_batches(path, batches, *, compression=None)`** — append multiple batches as row groups in one file.
+
 **`scan_kwargs`:** for example **`n_rows`**, **`low_memory`**, **`rechunk`**, **`use_statistics`**, **`cache`**, **`glob`**, **`allow_missing_columns`**, **`parallel`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
 
 ## Write (targets)
@@ -52,6 +57,7 @@ The temp file for **`read_parquet_url`** is **not** deleted automatically; see {
 ### `pydantable.io`
 
 - **`export_parquet(path, data, *, engine=None)`**, **`aexport_parquet`** — eager **`dict[str, list]`** → file (Rust when available, else PyArrow with **`pydantable[arrow]`**).
+- **`write_parquet_batches`** — many batches → one Parquet file (PyArrow; see {doc}`IO_OVERVIEW` batch section).
 
 ## Runnable examples
 

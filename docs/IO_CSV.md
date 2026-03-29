@@ -15,6 +15,7 @@
 - **`read_csv`**, **`aread_csv`** — lazy **`ScanFileRoot`**
 - **`materialize_csv`**, **`amaterialize_csv`** — eager **`dict[str, list]`** (**`engine`**, **`use_rap`** on sync path)
 - **`fetch_csv_url`** — HTTP(S) → temp file → read; temp removed after read
+- **`iter_csv`**, **`aiter_csv`**, **`write_csv_batches`** — stdlib **`csv`** batching over paths or text streams; cell values are **strings** (or **`None`** for short rows). See {doc}`IO_OVERVIEW` (**Batched column dict I/O**).
 
 **`scan_kwargs`:** for example **`separator`**, **`has_header`**, **`skip_rows`**, **`skip_lines`**, **`n_rows`**, **`infer_schema_length`**, **`ignore_errors`**, **`low_memory`**, **`rechunk`**, **`glob`**, **`cache`**, **`quote_char`**, **`eol_char`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
 
@@ -32,6 +33,7 @@
 ### `pydantable.io`
 
 - **`export_csv`**, **`aexport_csv`** — eager column dict → file.
+- **`write_csv_batches`** — append many rectangular batches to one CSV (**`mode="w"`** / **`"a"`**, **`write_header`**).
 
 ## Runnable example
 

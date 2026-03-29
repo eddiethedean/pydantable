@@ -73,8 +73,16 @@ def iter_ipc(
         else:
             reader = ipc.open_file(buf)
 
+    def _batches() -> Iterator[Any]:  # RecordBatch
+        if as_stream:
+            yield from reader
+            return
+        n = reader.num_record_batches
+        for i in range(n):
+            yield reader.get_batch(i)
+
     with reader:
-        for batch in reader:
+        for batch in _batches():
             d = batch.to_pydict()
             out = {k: list(v) for k, v in d.items()}
             ensure_rectangular(out)
