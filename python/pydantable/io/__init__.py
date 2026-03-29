@@ -29,11 +29,6 @@ from .arrow import (
     record_batch_to_column_dict,
 )
 from .extras import (
-    read_avro,
-    read_bigquery,
-    read_csv_stdin,
-    read_delta,
-    read_excel,
     iter_avro,
     iter_bigquery,
     iter_delta,
@@ -41,10 +36,22 @@ from .extras import (
     iter_kafka_json,
     iter_orc,
     iter_snowflake,
+    read_avro,
+    read_bigquery,
+    read_csv_stdin,
+    read_delta,
+    read_excel,
     read_kafka_json_batch,
     read_orc,
     read_snowflake,
     write_csv_stdout,
+)
+from .http import (
+    fetch_bytes,
+    fetch_csv_url,
+    fetch_ndjson_url,
+    fetch_parquet_url,
+    read_from_object_store,
 )
 from .iter_file import (
     iter_csv,
@@ -54,21 +61,14 @@ from .iter_file import (
     iter_ndjson,
     iter_parquet,
 )
+from .rap_support import aread_csv_rap, rap_csv_available
+from .sql import StreamingColumns, fetch_sql, iter_sql, write_sql
 from .write_batches import (
     write_csv_batches,
     write_ipc_batches,
     write_ndjson_batches,
     write_parquet_batches,
 )
-from .http import (
-    fetch_bytes,
-    fetch_csv_url,
-    fetch_ndjson_url,
-    fetch_parquet_url,
-    read_from_object_store,
-)
-from .rap_support import aread_csv_rap, rap_csv_available
-from .sql import StreamingColumns, fetch_sql, iter_sql, write_sql
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -1043,13 +1043,6 @@ async def awrite_sql_batches(
 
 
 __all__ = [
-    "iter_avro",
-    "iter_bigquery",
-    "iter_delta",
-    "iter_excel",
-    "iter_kafka_json",
-    "iter_orc",
-    "iter_snowflake",
     "MissingRustExtensionError",
     "aexport_csv",
     "aexport_ipc",
@@ -1092,12 +1085,19 @@ __all__ = [
     "fetch_parquet_url",
     "fetch_sql",
     "http",
+    "iter_avro",
+    "iter_bigquery",
     "iter_csv",
+    "iter_delta",
+    "iter_excel",
     "iter_ipc",
     "iter_json_array",
     "iter_json_lines",
+    "iter_kafka_json",
     "iter_ndjson",
+    "iter_orc",
     "iter_parquet",
+    "iter_snowflake",
     "iter_sql",
     "materialize_csv",
     "materialize_ipc",

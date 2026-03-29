@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 from io import StringIO
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from pydantable.io import (
     aiter_csv,
@@ -32,13 +35,16 @@ def test_csv_iter_and_write_batches_roundtrip(tmp_path: Path) -> None:
 
 def test_ndjson_iter_and_write_batches_roundtrip(tmp_path: Path) -> None:
     src = tmp_path / "src.ndjson"
-    src.write_text('{"a":1,"b":"x"}\n{"a":2,"b":"y"}\n{"a":3,"b":"z"}\n', encoding="utf-8")
+    src.write_text(
+        '{"a":1,"b":"x"}\n{"a":2,"b":"y"}\n{"a":3,"b":"z"}\n', encoding="utf-8"
+    )
     out = tmp_path / "out.ndjson"
     write_ndjson_batches(out, iter_ndjson(src, batch_size=2), mode="w")
     batches = list(iter_ndjson(out, batch_size=10))
     assert len(batches) == 1
     assert batches[0]["a"] == [1, 2, 3]
     assert batches[0]["b"] == ["x", "y", "z"]
+
 
 def test_write_ndjson_batches_append(tmp_path: Path) -> None:
     p = tmp_path / "a.ndjson"
@@ -54,7 +60,6 @@ def test_write_ndjson_batches_append(tmp_path: Path) -> None:
 def test_parquet_iter_and_write_batches(tmp_path: Path) -> None:
     pa = pytest.importorskip("pyarrow")
     import pyarrow.parquet as pq
-
     from pydantable.io import iter_parquet, write_parquet_batches
 
     table = pa.Table.from_pydict({"a": [1, 2, 3], "b": ["x", "y", "z"]})
@@ -72,11 +77,14 @@ def test_parquet_iter_and_write_batches(tmp_path: Path) -> None:
 def test_parquet_iter_respects_columns_and_batch_size(tmp_path: Path) -> None:
     pa = pytest.importorskip("pyarrow")
     import pyarrow.parquet as pq
-
     from pydantable.io import iter_parquet
 
     table = pa.Table.from_pydict(
-        {"a": [1, 2, 3, 4, 5], "b": ["u", "v", "w", "x", "y"], "c": [0.1, 0.2, 0.3, 0.4, 0.5]}
+        {
+            "a": [1, 2, 3, 4, 5],
+            "b": ["u", "v", "w", "x", "y"],
+            "c": [0.1, 0.2, 0.3, 0.4, 0.5],
+        }
     )
     src = tmp_path / "wide.parquet"
     pq.write_table(table, src)
@@ -113,14 +121,16 @@ def test_ipc_file_vs_stream_mismatch_is_not_auto_detected(tmp_path: Path) -> Non
 
     path = tmp_path / "only_stream.arrow"
     write_ipc_batches(path, iter([{"x": [1]}]), as_stream=True)
-    with pytest.raises(Exception):
+    import pyarrow as pa
+
+    with pytest.raises((TypeError, ValueError, pa.ArrowInvalid)):
         list(iter_ipc(path, as_stream=False))
+
 
 def test_ipc_iter_from_bytes_buffer() -> None:
     pytest.importorskip("pyarrow")
     import pyarrow as pa
     from pyarrow import ipc
-
     from pydantable.io import iter_ipc
 
     sink = pa.BufferOutputStream()
@@ -141,13 +151,15 @@ def test_json_array_roundtrip_and_validation(tmp_path: Path) -> None:
     batches = list(iter_json_array(path, batch_size=2))
     assert len(batches) == 2
     assert batches[0]["s"] == ["a", "b"]
-    # Last chunk is only the final object; keys are unioned within the batch (here just ``k``).
+    # Last chunk is only the final object; keys are unioned within the batch
+    # (here just ``k``).
     assert batches[1] == {"k": [3]}
 
     bad = tmp_path / "not_array.json"
     bad.write_text('{"k":1}', encoding="utf-8")
     with pytest.raises(ValueError, match="top-level array"):
         list(iter_json_array(bad))
+
 
 def test_ndjson_unions_keys_within_each_batch() -> None:
     # Keys are unioned within each batch; missing values become None.
@@ -160,7 +172,9 @@ def test_ndjson_unions_keys_within_each_batch() -> None:
 def test_iter_json_lines_alias_matches_ndjson(tmp_path: Path) -> None:
     p = tmp_path / "x.ndjson"
     p.write_text('{"a":1}\n{"a":2}\n', encoding="utf-8")
-    assert list(iter_json_lines(p, batch_size=10)) == list(iter_ndjson(p, batch_size=10))
+    assert list(iter_json_lines(p, batch_size=10)) == list(
+        iter_ndjson(p, batch_size=10)
+    )
 
 
 def test_csv_and_ndjson_invalid_batch_size() -> None:
@@ -194,7 +208,9 @@ def test_csv_short_rows_and_header_only(tmp_path: Path) -> None:
 def test_write_csv_batches_append_and_invalid_mode(tmp_path: Path) -> None:
     base = tmp_path / "a.csv"
     write_csv_batches(base, iter([{"u": [1], "v": ["a"]}]), mode="w")
-    write_csv_batches(base, iter([{"u": [2], "v": ["b"]}]), mode="a", write_header=False)
+    write_csv_batches(
+        base, iter([{"u": [2], "v": ["b"]}]), mode="a", write_header=False
+    )
     text = base.read_text(encoding="utf-8")
     lines = [ln for ln in text.strip().split("\n") if ln]
     assert lines == ["u,v", "1,a", "2,b"]
@@ -226,7 +242,8 @@ def test_ensure_rectangular_and_concat() -> None:
     with pytest.raises(ValueError, match="same length"):
         write_csv_batches(StringIO(), iter([{"a": [1], "b": [1, 2]}]))
 
-    # Column keys are fixed from the first batch; extra keys in later batches are ignored.
+    # Column keys are fixed from the first batch; extra keys in later batches
+    # are ignored.
     merged = iter_concat_batches(iter([{"x": [1, 2]}, {"x": [3], "y": ["a"]}]))
     assert merged == {"x": [1, 2, 3]}
 
@@ -248,4 +265,3 @@ async def test_aiter_csv_matches_iter_csv(tmp_path: Path) -> None:
     async for b in aiter_csv(p, batch_size=1):
         async_batches.append(b)
     assert async_batches == sync_batches
-

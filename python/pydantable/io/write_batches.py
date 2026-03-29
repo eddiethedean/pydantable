@@ -2,17 +2,22 @@ from __future__ import annotations
 
 import csv
 import json
-from collections.abc import Iterable
+from contextlib import suppress
 from pathlib import Path
-from typing import Any, BinaryIO, TextIO
+from typing import IO, TYPE_CHECKING, Any, BinaryIO, TextIO
 
 from .batches import ensure_rectangular
 
+if TYPE_CHECKING:
+    from _csv import _writer as _CsvWriter
+    from collections.abc import Iterable
+
 _PathLike = str | Path
+_TextStream = TextIO | IO[str]
 
 
 def write_csv_batches(
-    path: _PathLike | TextIO,
+    path: _PathLike | _TextStream,
     batches: Iterable[dict[str, list[Any]]],
     *,
     mode: str = "w",
@@ -25,38 +30,39 @@ def write_csv_batches(
     """
     if mode not in ("w", "a"):
         raise ValueError("mode must be 'w' or 'a'")
-    close_after = False
     if isinstance(path, (str, Path)):
-        fh = open(path, mode, newline=newline, encoding=encoding)
-        close_after = True
-    else:
-        fh = path
+        with open(path, mode, newline=newline, encoding=encoding) as fh:
+            write_csv_batches(
+                fh,
+                batches,
+                mode=mode,
+                encoding=encoding,
+                newline=newline,
+                write_header=write_header,
+            )
+        return
 
-    try:
-        writer: csv.writer | None = None
-        header: list[str] | None = None
-        first = True
-        for batch in batches:
-            if not batch:
-                continue
-            ensure_rectangular(batch)
-            if header is None:
-                header = list(batch.keys())
-                writer = csv.writer(fh)
-            assert header is not None and writer is not None
-            if first and write_header and mode == "w":
-                writer.writerow(header)
-            n = len(next(iter(batch.values())))
-            for i in range(n):
-                writer.writerow([batch[h][i] for h in header])
-            first = False
-    finally:
-        if close_after:
-            fh.close()
+    writer: _CsvWriter | None = None
+    header: list[str] | None = None
+    first = True
+    for batch in batches:
+        if not batch:
+            continue
+        ensure_rectangular(batch)
+        if header is None:
+            header = list(batch.keys())
+            writer = csv.writer(path)
+        assert header is not None and writer is not None
+        if first and write_header and mode == "w":
+            writer.writerow(header)
+        n = len(next(iter(batch.values())))
+        for i in range(n):
+            writer.writerow([batch[h][i] for h in header])
+        first = False
 
 
 def write_ndjson_batches(
-    path: _PathLike | TextIO,
+    path: _PathLike | _TextStream,
     batches: Iterable[dict[str, list[Any]]],
     *,
     mode: str = "w",
@@ -67,26 +73,20 @@ def write_ndjson_batches(
     """
     if mode not in ("w", "a"):
         raise ValueError("mode must be 'w' or 'a'")
-    close_after = False
     if isinstance(path, (str, Path)):
-        fh = open(path, mode, encoding=encoding)
-        close_after = True
-    else:
-        fh = path
+        with open(path, mode, encoding=encoding) as fh:
+            write_ndjson_batches(fh, batches, mode=mode, encoding=encoding)
+        return
 
-    try:
-        for batch in batches:
-            if not batch:
-                continue
-            ensure_rectangular(batch)
-            keys = list(batch.keys())
-            n = len(next(iter(batch.values())))
-            for i in range(n):
-                row = {k: batch[k][i] for k in keys}
-                fh.write(json.dumps(row, default=str) + "\n")
-    finally:
-        if close_after:
-            fh.close()
+    for batch in batches:
+        if not batch:
+            continue
+        ensure_rectangular(batch)
+        keys = list(batch.keys())
+        n = len(next(iter(batch.values())))
+        for i in range(n):
+            row = {k: batch[k][i] for k in keys}
+            path.write(json.dumps(row, default=str) + "\n")
 
 
 def write_ipc_batches(
@@ -108,12 +108,10 @@ def write_ipc_batches(
             "write_ipc_batches requires pyarrow (pip install 'pydantable[arrow]')."
         ) from e
 
-    close_after = False
     if isinstance(path, (str, Path)):
-        fh = open(path, "wb")
-        close_after = True
-    else:
-        fh = path
+        with open(path, "wb") as fh:
+            write_ipc_batches(fh, batches, as_stream=as_stream)
+        return
 
     writer = None
     try:
@@ -123,21 +121,16 @@ def write_ipc_batches(
             ensure_rectangular(batch)
             table = pa.Table.from_pydict(batch)
             if writer is None:
-                if as_stream:
-                    writer = ipc.new_stream(fh, table.schema)
-                else:
-                    writer = ipc.new_file(fh, table.schema)
+                writer = (
+                    ipc.new_stream(path, table.schema)
+                    if as_stream
+                    else ipc.new_file(path, table.schema)
+                )
             writer.write_table(table)
-        if writer is not None:
-            writer.close()
     finally:
         if writer is not None:
-            try:
+            with suppress(Exception):
                 writer.close()
-            except Exception:
-                pass
-        if close_after:
-            fh.close()
 
 
 def write_parquet_batches(
@@ -153,18 +146,16 @@ def write_parquet_batches(
     """
     try:
         import pyarrow as pa  # type: ignore[import-not-found]
-        import pyarrow.parquet as pq  # type: ignore[import-not-found]
+        import pyarrow.parquet as pq  # type: ignore[import-untyped]
     except ImportError as e:
         raise ImportError(
             "write_parquet_batches requires pyarrow (pip install 'pydantable[arrow]')."
         ) from e
 
-    close_after = False
     if isinstance(path, (str, Path)):
-        fh = open(path, "wb")
-        close_after = True
-    else:
-        fh = path
+        with open(path, "wb") as fh:
+            write_parquet_batches(fh, batches, compression=compression)
+        return
 
     writer = None
     try:
@@ -174,16 +165,9 @@ def write_parquet_batches(
             ensure_rectangular(batch)
             table = pa.Table.from_pydict(batch)
             if writer is None:
-                writer = pq.ParquetWriter(fh, table.schema, compression=compression)
+                writer = pq.ParquetWriter(path, table.schema, compression=compression)
             writer.write_table(table)
-        if writer is not None:
-            writer.close()
     finally:
         if writer is not None:
-            try:
+            with suppress(Exception):
                 writer.close()
-            except Exception:
-                pass
-        if close_after:
-            fh.close()
-

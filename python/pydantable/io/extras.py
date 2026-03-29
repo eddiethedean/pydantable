@@ -6,9 +6,12 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, BinaryIO, Iterator, TextIO, cast
+from typing import TYPE_CHECKING, Any, BinaryIO, TextIO, cast
 
 from .batches import ensure_rectangular
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 _EXPERIMENTAL_ENV = "PYDANTABLE_IO_EXPERIMENTAL"
 
@@ -476,6 +479,7 @@ def iter_kafka_json(
         out = {k: [r.get(k) for r in rows] for k in keys}
         ensure_rectangular(out)
         yield out
+
 
 def read_csv_stdin(
     stream: TextIO | None = None,

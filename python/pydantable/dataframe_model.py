@@ -1676,7 +1676,9 @@ class DataFrameModel(Generic[RowT]):
     def to_polars(
         self, *, streaming: bool | None = None, engine_streaming: bool | None = None
     ) -> Any:
-        return self._df.to_polars(streaming=streaming, engine_streaming=engine_streaming)
+        return self._df.to_polars(
+            streaming=streaming, engine_streaming=engine_streaming
+        )
 
     def to_arrow(
         self, *, streaming: bool | None = None, engine_streaming: bool | None = None

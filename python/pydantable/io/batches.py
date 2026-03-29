@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 def ensure_rectangular(batch: dict[str, list[Any]]) -> dict[str, list[Any]]:
@@ -18,7 +20,9 @@ def ensure_rectangular(batch: dict[str, list[Any]]) -> dict[str, list[Any]]:
     return batch
 
 
-def iter_concat_batches(batches: Iterator[dict[str, list[Any]]]) -> dict[str, list[Any]]:
+def iter_concat_batches(
+    batches: Iterator[dict[str, list[Any]]],
+) -> dict[str, list[Any]]:
     """
     Concatenate an iterator of rectangular column batches into one column dict.
 
@@ -36,4 +40,3 @@ def iter_concat_batches(batches: Iterator[dict[str, list[Any]]]) -> dict[str, li
         for k in keys:
             out[k].extend(batch.get(k, []))
     return out
-

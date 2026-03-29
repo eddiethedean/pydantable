@@ -59,6 +59,10 @@
       ~DataFrameModel.group_by_dynamic
       ~DataFrameModel.head
       ~DataFrameModel.info
+      ~DataFrameModel.iter_csv
+      ~DataFrameModel.iter_ipc
+      ~DataFrameModel.iter_ndjson
+      ~DataFrameModel.iter_parquet
       ~DataFrameModel.iter_sql
       ~DataFrameModel.join
       ~DataFrameModel.materialize_csv
@@ -96,9 +100,13 @@
       ~DataFrameModel.value_counts
       ~DataFrameModel.with_columns
       ~DataFrameModel.write_csv
+      ~DataFrameModel.write_csv_batches
       ~DataFrameModel.write_ipc
+      ~DataFrameModel.write_ipc_batches
       ~DataFrameModel.write_ndjson
+      ~DataFrameModel.write_ndjson_batches
       ~DataFrameModel.write_parquet
+      ~DataFrameModel.write_parquet_batches
       ~DataFrameModel.write_sql
    
    

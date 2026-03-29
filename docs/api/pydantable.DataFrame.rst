@@ -40,6 +40,11 @@
       ~DataFrame.group_by_dynamic
       ~DataFrame.head
       ~DataFrame.info
+      ~DataFrame.iter_csv
+      ~DataFrame.iter_ipc
+      ~DataFrame.iter_json_lines
+      ~DataFrame.iter_ndjson
+      ~DataFrame.iter_parquet
       ~DataFrame.join
       ~DataFrame.melt
       ~DataFrame.pivot

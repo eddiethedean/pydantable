@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import csv
 import json
-from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, BinaryIO, TextIO
+from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
 from .batches import ensure_rectangular
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 _PathLike = str | Path
 
@@ -25,7 +27,7 @@ def iter_parquet(
     if batch_size <= 0:
         raise ValueError("batch_size must be a positive integer")
     try:
-        import pyarrow.parquet as pq  # type: ignore[import-not-found]
+        import pyarrow.parquet as pq  # type: ignore[import-untyped]
     except ImportError as e:
         raise ImportError(
             "iter_parquet requires pyarrow (pip install 'pydantable[arrow]')."
@@ -68,10 +70,7 @@ def iter_ipc(
             reader = ipc.open_file(str(source))
     else:
         buf = pa.py_buffer(source)
-        if as_stream:
-            reader = ipc.open_stream(buf)
-        else:
-            reader = ipc.open_file(buf)
+        reader = ipc.open_stream(buf) if as_stream else ipc.open_file(buf)
 
     def _batches() -> Iterator[Any]:  # RecordBatch
         if as_stream:
@@ -104,36 +103,36 @@ def iter_csv(
     """
     if batch_size <= 0:
         raise ValueError("batch_size must be a positive integer")
-    close_after = False
     if isinstance(path, (str, Path)):
-        fh = open(path, newline=newline, encoding=encoding)
-        close_after = True
-    else:
-        fh = path
+        with open(path, newline=newline, encoding=encoding) as fh:
+            yield from iter_csv(
+                fh,
+                batch_size=batch_size,
+                encoding=encoding,
+                newline=newline,
+            )
+        return
+
+    reader = csv.reader(path)
     try:
-        reader = csv.reader(fh)
-        try:
-            header = next(reader)
-        except StopIteration:
-            return
-        header = [str(h) for h in header]
-        cols: dict[str, list[Any]] = {h: [] for h in header}
-        n = 0
-        for row in reader:
-            for i, h in enumerate(header):
-                cols[h].append(row[i] if i < len(row) else None)
-            n += 1
-            if n >= batch_size:
-                ensure_rectangular(cols)
-                yield cols
-                cols = {h: [] for h in header}
-                n = 0
-        if n:
+        header = next(reader)
+    except StopIteration:
+        return
+    header = [str(h) for h in header]
+    cols: dict[str, list[Any]] = {h: [] for h in header}
+    n = 0
+    for row in reader:
+        for i, h in enumerate(header):
+            cols[h].append(row[i] if i < len(row) else None)
+        n += 1
+        if n >= batch_size:
             ensure_rectangular(cols)
             yield cols
-    finally:
-        if close_after:
-            fh.close()
+            cols = {h: [] for h in header}
+            n = 0
+    if n:
+        ensure_rectangular(cols)
+        yield cols
 
 
 def iter_ndjson(
@@ -149,30 +148,25 @@ def iter_ndjson(
     """
     if batch_size <= 0:
         raise ValueError("batch_size must be a positive integer")
-    close_after = False
     if isinstance(path, (str, Path)):
-        fh = open(path, "r", encoding=encoding)
-        close_after = True
-    else:
-        fh = path
-    try:
-        rows: list[dict[str, Any]] = []
-        for line in fh:
-            line = line.strip()
-            if not line:
-                continue
-            obj = json.loads(line)
-            if not isinstance(obj, dict):
-                raise ValueError("NDJSON lines must be JSON objects")
-            rows.append(obj)
-            if len(rows) >= batch_size:
-                yield _rows_to_columns(rows)
-                rows = []
-        if rows:
+        with open(path, encoding=encoding) as fh:
+            yield from iter_ndjson(fh, batch_size=batch_size, encoding=encoding)
+        return
+
+    rows: list[dict[str, Any]] = []
+    for line in path:
+        line = line.strip()
+        if not line:
+            continue
+        obj = json.loads(line)
+        if not isinstance(obj, dict):
+            raise ValueError("NDJSON lines must be JSON objects")
+        rows.append(obj)
+        if len(rows) >= batch_size:
             yield _rows_to_columns(rows)
-    finally:
-        if close_after:
-            fh.close()
+            rows = []
+    if rows:
+        yield _rows_to_columns(rows)
 
 
 def iter_json_lines(
@@ -199,29 +193,24 @@ def iter_json_array(
     """
     if batch_size <= 0:
         raise ValueError("batch_size must be a positive integer")
-    close_after = False
     if isinstance(path, (str, Path)):
-        fh = open(path, "r", encoding=encoding)
-        close_after = True
-    else:
-        fh = path
-    try:
-        data = json.load(fh)
-        if not isinstance(data, list):
-            raise ValueError("JSON array reader expects a top-level array")
-        rows: list[dict[str, Any]] = []
-        for item in data:
-            if not isinstance(item, dict):
-                raise ValueError("JSON array elements must be objects")
-            rows.append(item)
-            if len(rows) >= batch_size:
-                yield _rows_to_columns(rows)
-                rows = []
-        if rows:
+        with open(path, encoding=encoding) as fh:
+            yield from iter_json_array(fh, batch_size=batch_size, encoding=encoding)
+        return
+
+    data = json.load(path)
+    if not isinstance(data, list):
+        raise ValueError("JSON array reader expects a top-level array")
+    rows: list[dict[str, Any]] = []
+    for item in data:
+        if not isinstance(item, dict):
+            raise ValueError("JSON array elements must be objects")
+        rows.append(item)
+        if len(rows) >= batch_size:
             yield _rows_to_columns(rows)
-    finally:
-        if close_after:
-            fh.close()
+            rows = []
+    if rows:
+        yield _rows_to_columns(rows)
 
 
 def _rows_to_columns(rows: list[dict[str, Any]]) -> dict[str, list[Any]]:
@@ -231,4 +220,3 @@ def _rows_to_columns(rows: list[dict[str, Any]]) -> dict[str, list[Any]]:
     out = {k: [r.get(k) for r in rows] for k in keys}
     ensure_rectangular(out)
     return out
-
