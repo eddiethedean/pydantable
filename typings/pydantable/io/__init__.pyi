@@ -32,7 +32,7 @@ from .http import (
     read_from_object_store,
 )
 from .rap_support import aread_csv_rap, rap_csv_available
-from .sql import fetch_sql, write_sql
+from .sql import StreamingColumns, fetch_sql, iter_sql, write_sql
 
 _Source = str | Path | BinaryIO | bytes
 
@@ -234,8 +234,19 @@ async def afetch_sql(
     bind: str | Any,
     *,
     parameters: Mapping[str, Any] | None = None,
+    batch_size: int | None = None,
+    auto_stream: bool = True,
+    auto_stream_threshold_rows: int | None = None,
     executor: Executor | None = None,
-) -> dict[str, list[Any]]: ...
+) -> dict[str, list[Any]] | StreamingColumns: ...
+async def aiter_sql(
+    sql: str,
+    bind: str | Any,
+    *,
+    parameters: Mapping[str, Any] | None = None,
+    batch_size: int = 65536,
+    executor: Executor | None = None,
+): ...
 async def awrite_sql(
     data: dict[str, list[Any]],
     table_name: str,
@@ -243,6 +254,26 @@ async def awrite_sql(
     *,
     schema: str | None = None,
     if_exists: str = "append",
+    chunk_size: int | None = None,
+    executor: Executor | None = None,
+) -> None: ...
+def write_sql_batches(
+    batches: Any,
+    table_name: str,
+    bind: str | Any,
+    *,
+    schema: str | None = None,
+    if_exists: str = "append",
+    chunk_size: int | None = None,
+) -> None: ...
+async def awrite_sql_batches(
+    batches: Any,
+    table_name: str,
+    bind: str | Any,
+    *,
+    schema: str | None = None,
+    if_exists: str = "append",
+    chunk_size: int | None = None,
     executor: Executor | None = None,
 ) -> None: ...
 
@@ -254,6 +285,7 @@ __all__ = [
     "aexport_ndjson",
     "aexport_parquet",
     "afetch_sql",
+    "aiter_sql",
     "amaterialize_csv",
     "amaterialize_ipc",
     "amaterialize_json",
@@ -269,6 +301,7 @@ __all__ = [
     "aread_parquet_url_ctx",
     "arrow_table_to_column_dict",
     "awrite_sql",
+    "awrite_sql_batches",
     "export_csv",
     "export_ipc",
     "export_json",
@@ -281,6 +314,7 @@ __all__ = [
     "fetch_parquet_url",
     "fetch_sql",
     "http",
+    "iter_sql",
     "materialize_csv",
     "materialize_ipc",
     "materialize_json",
@@ -306,6 +340,7 @@ __all__ = [
     "record_batch_to_column_dict",
     "write_csv_stdout",
     "write_sql",
+    "write_sql_batches",
 ]
 
 __all__ = [
@@ -316,6 +351,7 @@ __all__ = [
     "aexport_ndjson",
     "aexport_parquet",
     "afetch_sql",
+    "aiter_sql",
     "amaterialize_csv",
     "amaterialize_ipc",
     "amaterialize_json",
@@ -331,6 +367,7 @@ __all__ = [
     "aread_parquet_url_ctx",
     "arrow_table_to_column_dict",
     "awrite_sql",
+    "awrite_sql_batches",
     "export_csv",
     "export_ipc",
     "export_json",
@@ -343,6 +380,7 @@ __all__ = [
     "fetch_parquet_url",
     "fetch_sql",
     "http",
+    "iter_sql",
     "materialize_csv",
     "materialize_ipc",
     "materialize_json",
@@ -368,4 +406,5 @@ __all__ = [
     "record_batch_to_column_dict",
     "write_csv_stdout",
     "write_sql",
+    "write_sql_batches",
 ]

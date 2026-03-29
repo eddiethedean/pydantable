@@ -25,6 +25,7 @@ from pydantable.io import (
     amaterialize_parquet,
     arrow_table_to_column_dict,
     awrite_sql,
+    awrite_sql_batches,
     export_csv,
     export_ipc,
     export_ndjson,
@@ -42,6 +43,7 @@ from pydantable.io import (
     read_parquet_url,
     record_batch_to_column_dict,
     write_sql,
+    write_sql_batches,
 )
 from pydantic import BaseModel
 
@@ -193,6 +195,38 @@ def test_read_sql_write_sql_sqlite(tmp_dir: Path) -> None:
     assert out == {"id": [1], "name": ["x"]}
 
 
+def test_fetch_sql_auto_stream_threshold_returns_streaming_columns(
+    tmp_dir: Path,
+) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "auto_stream.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+        conn.execute(
+            text(
+                "WITH RECURSIVE seq(x) AS ("
+                "SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 50"
+                ") "
+                "INSERT INTO t SELECT x FROM seq"
+            )
+        )
+
+    out = fetch_sql(
+        "SELECT n FROM t ORDER BY n",
+        eng,
+        auto_stream=True,
+        auto_stream_threshold_rows=10,
+        batch_size=7,
+    )
+    assert hasattr(out, "to_dict")
+    got = out.to_dict()  # type: ignore[union-attr]
+    assert got["n"][0] == 1
+    assert got["n"][-1] == 50
+
+
 def test_fetch_sql_streams_but_materializes_final_dict(tmp_dir: Path) -> None:
     pytest.importorskip("sqlalchemy")
     from sqlalchemy import create_engine, text
@@ -298,6 +332,42 @@ def test_iter_sql_batches_sqlite(tmp_dir: Path) -> None:
     assert len(batches) >= 3
     flat = [x for b in batches for x in b["n"]]
     assert flat == list(range(1, 26))
+
+
+def test_write_sql_batches_appends_all_rows(tmp_dir: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "sink.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+
+    batches = [{"n": [1, 2, 3]}, {"n": [4]}, {"n": [5, 6]}]
+    write_sql_batches(batches, "t", eng, if_exists="append")
+    out = fetch_sql("SELECT n FROM t ORDER BY n", eng)
+    out2 = out.to_dict() if hasattr(out, "to_dict") else out
+    assert out2["n"] == [1, 2, 3, 4, 5, 6]
+
+
+@pytest.mark.asyncio
+async def test_awrite_sql_batches_appends_all_rows(tmp_dir: Path) -> None:
+    pytest.importorskip("sqlalchemy")
+    from sqlalchemy import create_engine, text
+
+    db = tmp_dir / "asink.sqlite"
+    eng = create_engine(f"sqlite:///{db}")
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
+
+    async def _gen():
+        yield {"n": [1, 2]}
+        yield {"n": [3]}
+
+    await awrite_sql_batches(_gen(), "t", eng, if_exists="append")
+    out = fetch_sql("SELECT n FROM t ORDER BY n", eng)
+    out2 = out.to_dict() if hasattr(out, "to_dict") else out
+    assert out2["n"] == [1, 2, 3]
 
 
 def test_iter_sql_empty_result_yields_nothing(tmp_dir: Path) -> None:

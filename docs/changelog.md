@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is inspired 
 
 <!-- Add notes here for the next 1.x release. -->
 
+## [1.4.0] — 2026-03-29
+
+### Added
+
+- **SQL streaming (SQLAlchemy):** `iter_sql` / `aiter_sql` for batch iteration of `SELECT` results; `DataFrameModel.iter_sql` / `aiter_sql` yield typed batch models.
+- **SQL batch sinks:** `write_sql_batches` / `awrite_sql_batches` for end-to-end streaming (consume batches without building one giant in-memory dict).
+
+### Changed
+
+- **`fetch_sql` / `afetch_sql`:** support `batch_size=` and automatic streaming behavior for large results (may return a streaming container with `.to_dict()`).
+- **`write_sql` / `awrite_sql`:** support `chunk_size=` and stream inserts in chunks to reduce peak memory use.
+
 ## [1.3.0] — 2026-03-29
 
 ### Added

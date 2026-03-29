@@ -47,7 +47,7 @@ from .http import (
     read_from_object_store,
 )
 from .rap_support import aread_csv_rap, rap_csv_available
-from .sql import fetch_sql, iter_sql, write_sql
+from .sql import StreamingColumns, fetch_sql, iter_sql, write_sql
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -743,12 +743,20 @@ async def afetch_sql(
     bind: str | Any,
     *,
     parameters: Mapping[str, Any] | None = None,
+    batch_size: int | None = None,
+    auto_stream: bool = True,
+    auto_stream_threshold_rows: int | None = None,
     executor: Executor | None = None,
-) -> dict[str, list[Any]]:
+) -> dict[str, list[Any]] | StreamingColumns:
     return await _run_io(
         fetch_sql,
         (sql, bind),
-        {"parameters": parameters},
+        {
+            "parameters": parameters,
+            "batch_size": batch_size,
+            "auto_stream": auto_stream,
+            "auto_stream_threshold_rows": auto_stream_threshold_rows,
+        },
         executor=executor,
     )
 
@@ -816,14 +824,68 @@ async def awrite_sql(
     *,
     schema: str | None = None,
     if_exists: str = "append",
+    chunk_size: int | None = None,
     executor: Executor | None = None,
 ) -> None:
     await _run_io(
         write_sql,
         (data, table_name, bind),
-        {"schema": schema, "if_exists": if_exists},
+        {"schema": schema, "if_exists": if_exists, "chunk_size": chunk_size},
         executor=executor,
     )
+
+
+def write_sql_batches(
+    batches: Any,
+    table_name: str,
+    bind: str | Any,
+    *,
+    schema: str | None = None,
+    if_exists: str = "append",
+    chunk_size: int | None = None,
+) -> None:
+    """
+    Write an iterator of batch column dicts to SQL.
+
+    Each batch is a ``dict[str, list]`` (e.g. from :func:`iter_sql` or a
+    :class:`~pydantable.DataFrameModel` batch via ``.to_dict()``).
+    """
+    first = True
+    for batch in batches:
+        cols = batch.to_dict() if hasattr(batch, "to_dict") else batch
+        mode = if_exists if first else "append"
+        write_sql(
+            cols,
+            table_name,
+            bind,
+            schema=schema,
+            if_exists=mode,
+            chunk_size=chunk_size,
+        )
+        first = False
+
+
+async def awrite_sql_batches(
+    batches: Any,
+    table_name: str,
+    bind: str | Any,
+    *,
+    schema: str | None = None,
+    if_exists: str = "append",
+    chunk_size: int | None = None,
+    executor: Executor | None = None,
+) -> None:
+    first = True
+    async for batch in batches:
+        cols = batch.to_dict() if hasattr(batch, "to_dict") else batch
+        mode = if_exists if first else "append"
+        await _run_io(
+            write_sql,
+            (cols, table_name, bind),
+            {"schema": schema, "if_exists": mode, "chunk_size": chunk_size},
+            executor=executor,
+        )
+        first = False
 
 
 __all__ = [
@@ -850,6 +912,7 @@ __all__ = [
     "aread_parquet_url_ctx",
     "arrow_table_to_column_dict",
     "awrite_sql",
+    "awrite_sql_batches",
     "export_csv",
     "export_ipc",
     "export_json",
@@ -888,6 +951,7 @@ __all__ = [
     "record_batch_to_column_dict",
     "write_csv_stdout",
     "write_sql",
+    "write_sql_batches",
 ]
 
 # Built-in plugin registrations (additive)

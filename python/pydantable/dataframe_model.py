@@ -594,6 +594,9 @@ class DataFrameModel(Generic[RowT]):
         bind: str | Engine | Connection,
         *,
         parameters: Mapping[str, Any] | None = None,
+        batch_size: int | None = None,
+        auto_stream: bool = True,
+        auto_stream_threshold_rows: int | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
@@ -602,7 +605,14 @@ class DataFrameModel(Generic[RowT]):
         cls._dfm_require_subclass_with_schema()
         from .io import fetch_sql as _fetch_sql
 
-        cols = _fetch_sql(sql, bind, parameters=parameters)
+        cols = _fetch_sql(
+            sql,
+            bind,
+            parameters=parameters,
+            batch_size=batch_size,
+            auto_stream=auto_stream,
+            auto_stream_threshold_rows=auto_stream_threshold_rows,
+        )
         return cls(
             cols,
             trusted_mode=trusted_mode,
@@ -1046,6 +1056,9 @@ class DataFrameModel(Generic[RowT]):
         bind: str | Engine | Connection,
         *,
         parameters: Mapping[str, Any] | None = None,
+        batch_size: int | None = None,
+        auto_stream: bool = True,
+        auto_stream_threshold_rows: int | None = None,
         executor: Executor | None = None,
         trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
         ignore_errors: bool = False,
@@ -1054,13 +1067,76 @@ class DataFrameModel(Generic[RowT]):
         cls._dfm_require_subclass_with_schema()
         from .io import afetch_sql as _afs
 
-        cols = await _afs(sql, bind, parameters=parameters, executor=executor)
+        cols = await _afs(
+            sql,
+            bind,
+            parameters=parameters,
+            batch_size=batch_size,
+            auto_stream=auto_stream,
+            auto_stream_threshold_rows=auto_stream_threshold_rows,
+            executor=executor,
+        )
         return cls(
             cols,
             trusted_mode=trusted_mode,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
         )
+
+    @classmethod
+    def iter_sql(
+        cls,
+        sql: str,
+        bind: str | Engine | Connection,
+        *,
+        parameters: Mapping[str, Any] | None = None,
+        batch_size: int | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ):
+        """Stream SQL batches as typed :class:`DataFrameModel` instances."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import iter_sql as _iter
+
+        for cols in _iter(sql, bind, parameters=parameters, batch_size=batch_size):
+            yield cls(
+                cols,
+                trusted_mode=trusted_mode,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+
+    @classmethod
+    async def aiter_sql(
+        cls,
+        sql: str,
+        bind: str | Engine | Connection,
+        *,
+        parameters: Mapping[str, Any] | None = None,
+        batch_size: int | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ):
+        """Async stream SQL batches as typed :class:`DataFrameModel` instances."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import aiter_sql as _aiter
+
+        async for cols in _aiter(
+            sql,
+            bind,
+            parameters=parameters,
+            batch_size=batch_size,
+            executor=executor,
+        ):
+            yield cls(
+                cols,
+                trusted_mode=trusted_mode,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
 
     @classmethod
     async def afrom_sql(

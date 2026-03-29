@@ -17,6 +17,7 @@
       ~DataFrameModel.acollect
       ~DataFrameModel.afetch_sql
       ~DataFrameModel.afrom_sql
+      ~DataFrameModel.aiter_sql
       ~DataFrameModel.amaterialize_csv
       ~DataFrameModel.amaterialize_ipc
       ~DataFrameModel.amaterialize_json
@@ -58,6 +59,7 @@
       ~DataFrameModel.group_by_dynamic
       ~DataFrameModel.head
       ~DataFrameModel.info
+      ~DataFrameModel.iter_sql
       ~DataFrameModel.join
       ~DataFrameModel.materialize_csv
       ~DataFrameModel.materialize_ipc

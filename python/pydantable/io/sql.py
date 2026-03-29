@@ -7,12 +7,105 @@ SQLite, SQL Server, Oracle, etc.). Install the matching **DBAPI driver** for you
 
 from __future__ import annotations
 
+import os
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Mapping, Sequence
+    from collections.abc import Iterator, Sequence
 
     from sqlalchemy.engine import Connection, Engine
+
+
+_ENV_FETCH_BATCH_SIZE = "PYDANTABLE_SQL_FETCH_BATCH_SIZE"
+_ENV_WRITE_CHUNK_SIZE = "PYDANTABLE_SQL_WRITE_CHUNK_SIZE"
+_ENV_AUTO_STREAM_THRESHOLD_ROWS = "PYDANTABLE_SQL_AUTO_STREAM_THRESHOLD_ROWS"
+
+_DEFAULT_FETCH_BATCH_SIZE = 65_536
+_DEFAULT_WRITE_CHUNK_SIZE = 10_000
+# Heuristic: above this, return a streaming container by default.
+_DEFAULT_AUTO_STREAM_THRESHOLD_ROWS = 200_000
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        val = int(raw)
+    except ValueError as e:
+        raise ValueError(f"{name} must be an int, got {raw!r}") from e
+    if val <= 0:
+        raise ValueError(f"{name} must be positive, got {val}")
+    return val
+
+
+def _fetch_batch_size(batch_size: int | None) -> int:
+    if batch_size is not None:
+        if batch_size <= 0:
+            raise ValueError("batch_size must be a positive integer")
+        return int(batch_size)
+    return _env_int(_ENV_FETCH_BATCH_SIZE, _DEFAULT_FETCH_BATCH_SIZE)
+
+
+def _write_chunk_size(chunk_size: int | None) -> int:
+    if chunk_size is not None:
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be a positive integer")
+        return int(chunk_size)
+    return _env_int(_ENV_WRITE_CHUNK_SIZE, _DEFAULT_WRITE_CHUNK_SIZE)
+
+
+def _auto_stream_threshold_rows(threshold: int | None) -> int:
+    if threshold is not None:
+        if threshold <= 0:
+            raise ValueError("auto_stream_threshold_rows must be a positive integer")
+        return int(threshold)
+    return _env_int(
+        _ENV_AUTO_STREAM_THRESHOLD_ROWS, _DEFAULT_AUTO_STREAM_THRESHOLD_ROWS
+    )
+
+
+class StreamingColumns(Mapping[str, list[Any]]):
+    """
+    Large SQL result container that can be materialized on demand.
+
+    Behaves like a mapping of ``{column_name: list}`` (lists are materialized per
+    column on access). Use :meth:`to_dict` to materialize the full column dict.
+    """
+
+    def __init__(self, batches: list[dict[str, list[Any]]]) -> None:
+        self._batches = batches
+        self._cache: dict[str, list[Any]] = {}
+        self._keys: list[str] = []
+        for b in batches:
+            if b:
+                self._keys = list(b.keys())
+                break
+
+    def __iter__(self):
+        return iter(self._keys)
+
+    def __len__(self) -> int:
+        return len(self._keys)
+
+    def __getitem__(self, key: str) -> list[Any]:
+        if key in self._cache:
+            return self._cache[key]
+        out: list[Any] = []
+        for b in self._batches:
+            if not b:
+                continue
+            out.extend(b.get(key, []))
+        self._cache[key] = out
+        return out
+
+    def batches(self) -> list[dict[str, list[Any]]]:
+        """Return the underlying list of batch dicts."""
+        return self._batches
+
+    def to_dict(self) -> dict[str, list[Any]]:
+        return {k: self[k] for k in self._keys}
 
 
 def _to_engine(bind: str | Engine | Connection) -> Engine:
@@ -32,7 +125,10 @@ def fetch_sql(
     bind: str | Engine | Connection,
     *,
     parameters: Mapping[str, Any] | None = None,
-) -> dict[str, list[Any]]:
+    batch_size: int | None = None,
+    auto_stream: bool = True,
+    auto_stream_threshold_rows: int | None = None,
+) -> dict[str, list[Any]] | StreamingColumns:
     """
     Execute ``sql`` and return rows as ``dict[column_name, list]`` (materialized).
 
@@ -40,41 +136,34 @@ def fetch_sql(
     :class:`~sqlalchemy.engine.Engine` / :class:`~sqlalchemy.engine.Connection`.
     Use **bound parameters** only — never interpolate untrusted input into ``sql``.
     """
-    from sqlalchemy import create_engine, text
-    from sqlalchemy.engine import Connection as SAConnection
-    from sqlalchemy.engine import Engine as SAEngine
+    bs = _fetch_batch_size(batch_size)
+    thresh = _auto_stream_threshold_rows(auto_stream_threshold_rows)
 
-    params = dict(parameters or {})
-    # Stream under the hood to avoid materializing the full row-mapping list
-    # (still returns one fully-materialized column dict).
-    cols: dict[str, list[Any]] = {}
-    keys: list[str] | None = None
+    batches: list[dict[str, list[Any]]] = []
+    total = 0
+    streaming = False
+    for b in iter_sql(sql, bind, parameters=parameters, batch_size=bs):
+        if not b:
+            continue
+        batches.append(b)
+        # any column length works; iter_sql batches are rectangular
+        any_col = next(iter(b.values()))
+        total += len(any_col)
+        if auto_stream and total > thresh:
+            streaming = True
 
-    def _consume(result: Any) -> None:
-        nonlocal cols, keys
-        # Use a moderate batch size to keep overhead low while bounding peak memory.
-        batch_size = 65_536
-        while True:
-            chunk = result.mappings().fetchmany(batch_size)
-            if not chunk:
-                break
-            if keys is None:
-                keys = list(chunk[0].keys())
-                cols = {k: [] for k in keys}
-            for row in chunk:
-                for k in keys:  # type: ignore[union-attr]
-                    cols[k].append(row[k])
-
-    if isinstance(bind, SAConnection):
-        result = bind.execution_options(stream_results=True).execute(text(sql), params)
-        _consume(result)
-        return cols
-
-    eng = bind if isinstance(bind, SAEngine) else create_engine(bind)
-    with eng.connect() as conn:
-        result = conn.execution_options(stream_results=True).execute(text(sql), params)
-        _consume(result)
-    return cols
+    if not batches:
+        return {}
+    if streaming:
+        return StreamingColumns(batches)
+    if len(batches) == 1:
+        return batches[0]
+    keys = list(batches[0].keys())
+    out: dict[str, list[Any]] = {k: [] for k in keys}
+    for b in batches:
+        for k in keys:
+            out[k].extend(b.get(k, []))
+    return out
 
 
 def iter_sql(
@@ -82,7 +171,7 @@ def iter_sql(
     bind: str | Engine | Connection,
     *,
     parameters: Mapping[str, Any] | None = None,
-    batch_size: int = 65_536,
+    batch_size: int | None = None,
 ) -> Iterator[dict[str, list[Any]]]:
     """
     Execute ``sql`` and yield results in batches as ``dict[column_name, list]``.
@@ -96,8 +185,7 @@ def iter_sql(
     - Use **bound parameters** only — never interpolate untrusted input into ``sql``.
     - ``bind`` may be a SQLAlchemy URL string, ``Engine``, or ``Connection``.
     """
-    if batch_size <= 0:
-        raise ValueError("batch_size must be a positive integer")
+    bs = _fetch_batch_size(batch_size)
 
     from sqlalchemy import create_engine, text
     from sqlalchemy.engine import Connection as SAConnection
@@ -115,7 +203,7 @@ def iter_sql(
     if isinstance(bind, SAConnection):
         result = bind.execution_options(stream_results=True).execute(text(sql), params)
         while True:
-            chunk = result.mappings().fetchmany(batch_size)
+            chunk = result.mappings().fetchmany(bs)
             if not chunk:
                 break
             yield _rows_to_cols(chunk)
@@ -125,7 +213,7 @@ def iter_sql(
     with eng.connect() as conn:
         result = conn.execution_options(stream_results=True).execute(text(sql), params)
         while True:
-            chunk = result.mappings().fetchmany(batch_size)
+            chunk = result.mappings().fetchmany(bs)
             if not chunk:
                 break
             yield _rows_to_cols(chunk)
@@ -157,6 +245,7 @@ def write_sql(
     *,
     schema: str | None = None,
     if_exists: str = "append",
+    chunk_size: int | None = None,
 ) -> None:
     """
     Insert ``data`` (column dict) into ``table_name``.
@@ -180,12 +269,11 @@ def write_sql(
         raise ValueError("all columns in data must have the same length")
     n = lengths.pop()
     keys = list(data.keys())
+    chunk_n = _write_chunk_size(chunk_size)
 
-    def _row_chunks(chunk_size: int = 10_000):
-        if chunk_size <= 0:
-            raise ValueError("chunk_size must be a positive integer")
-        for start in range(0, n, chunk_size):
-            end = min(start + chunk_size, n)
+    def _row_chunks():
+        for start in range(0, n, chunk_n):
+            end = min(start + chunk_n, n)
             chunk = []
             for i in range(start, end):
                 chunk.append({k: data[k][i] for k in keys})
