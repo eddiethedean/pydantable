@@ -27,7 +27,7 @@ def iter_parquet(
     if batch_size <= 0:
         raise ValueError("batch_size must be a positive integer")
     try:
-        import pyarrow.parquet as pq  # type: ignore[import-untyped]
+        import pyarrow.parquet as pq  # type: ignore[import-not-found,import-untyped]
     except ImportError as e:
         raise ImportError(
             "iter_parquet requires pyarrow (pip install 'pydantable[arrow]')."

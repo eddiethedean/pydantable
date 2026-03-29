@@ -146,7 +146,7 @@ def write_parquet_batches(
     """
     try:
         import pyarrow as pa  # type: ignore[import-not-found]
-        import pyarrow.parquet as pq  # type: ignore[import-untyped]
+        import pyarrow.parquet as pq  # type: ignore[import-not-found,import-untyped]
     except ImportError as e:
         raise ImportError(
             "write_parquet_batches requires pyarrow (pip install 'pydantable[arrow]')."
