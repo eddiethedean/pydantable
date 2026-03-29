@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is inspired 
 
 <!-- Add notes here for the next 1.x release. -->
 
+## [1.5.0] — 2026-03-29
+
+### Added
+
+- **Batched column-dict I/O:** `iter_*` / `aiter_*` readers and `write_*_batches` writers for core formats (Parquet, IPC, CSV, NDJSON, JSON array/lines) plus selected extras (Excel/Delta/Avro/ORC/BigQuery/Snowflake/Kafka where supported).
+- **Engine streaming default propagation:** `engine_streaming=` alias and per-frame defaults set by lazy `read_*` / `aread_*`, applied to later `collect()` / `to_*` / lazy `write_*` unless overridden.
+
+### Fixed
+
+- **IPC batch iteration:** `iter_ipc(..., as_stream=False)` now works with PyArrow `RecordBatchFileReader` (file format readers are not iterable in some versions).
+
 ## [1.4.0] — 2026-03-29
 
 ### Added
