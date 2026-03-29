@@ -4,12 +4,14 @@ MYPY ?= $(PYTHON) -m mypy
 
 CARGO_MANIFEST ?= pydantable-core/Cargo.toml
 
-.PHONY: check-full check-python check-rust ruff-format-check ruff-check mypy-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
+.PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check mypy-check sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 .PHONY: gen-typing check-typing
 
-check-full: check-python check-rust
+check-full: check-python check-docs check-rust
 
 check-python: ruff-format-check ruff-check mypy-check
+
+check-docs: sphinx-check
 
 ruff-format-check:
 	$(RUFF) format --check .
@@ -19,6 +21,10 @@ ruff-check:
 
 mypy-check:
 	$(MYPY) python/pydantable
+
+# Matches CI "Docs (sphinx -W)" check.
+sphinx-check:
+	$(PYTHON) -m sphinx -W -b html docs docs/_build/html
 
 gen-typing:
 	$(PYTHON) scripts/generate_typing_artifacts.py

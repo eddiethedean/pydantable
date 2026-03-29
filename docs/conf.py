@@ -55,7 +55,8 @@ extensions = [
 ]
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build"]
+# Keep internal drafts and build artifacts out of strict (-W) CI builds.
+exclude_patterns = ["_build", "async_ideas/*"]
 
 autosummary_generate = True
 autodoc_typehints = "description"
