@@ -1,3 +1,5 @@
+:orphan:
+
 # Example FastAPI service layout
 
 Copy this folder as a starting point for a **multi-router** app that uses:
