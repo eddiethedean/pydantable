@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Added
 
+- **`pydantable.fastapi`:** **`columnar_body_model`**, **`columnar_body_model_from_dataframe_model`**, **`columnar_dependency`**, **`rows_dependency`** — OpenAPI-friendly columnar bodies and **`Depends`** factories for **`DataFrameModel`**; see {doc}`/FASTAPI`.
+- **`pydantable.testing.fastapi`:** **`fastapi_app_with_executor`**, **`fastapi_test_client`** (lifespan-aware **`TestClient`** for **`executor_lifespan`** / **`get_executor`**).
 - **`pydantable.fastapi`:** **`ndjson_streaming_response`** / **`ndjson_chunk_bytes`** for NDJSON **`StreamingResponse`** from **`astream()`** without hand-rolling encoders.
 - **`pydantable.fastapi`** (optional **`pip install 'pydantable[fastapi]'`**): **`executor_lifespan`**, **`get_executor`** (``Depends``), **`register_exception_handlers`** for **`MissingRustExtensionError`** / **`pydantic.ValidationError`**. See {doc}`/GOLDEN_PATH_FASTAPI` and {doc}`/FASTAPI`.
 - **`pydantable.typing.SupportsLazyAsyncMaterialize`:** structural ``Protocol`` for objects with async terminal materialization via **`acollect`** (``DataFrameModel`` and ``AwaitableDataFrameModel``).
@@ -24,6 +26,8 @@ All notable changes to this project are documented here. The format is inspired 
 
 - New {doc}`/FASTAPI_ENHANCEMENTS` (roadmap + “when to use what” matrix); links from {doc}`/GOLDEN_PATH_FASTAPI`, {doc}`/FASTAPI`, {doc}`/DOCS_MAP`.
 - {doc}`/FASTAPI_ENHANCEMENTS`: production **lifespan** snippet (**`executor_lifespan`**, **`get_executor`**, **`register_exception_handlers`**), NDJSON helper semantics, troubleshooting table (422 vs 503, empty streams, executor tuning); **`tests/test_pydantable_fastapi_integration.py`** covers empty NDJSON, Unicode/null, custom **`media_type`**, **`astream`** batching, and golden-path stream parsing.
+- {doc}`/FASTAPI` **Columnar OpenAPI and Depends**; {doc}`/cookbook/fastapi_columnar_bodies` uses generated models; **`tests/test_pydantable_fastapi_columnar.py`** covers OpenAPI schema, aliases, **`rows_dependency`**, and **`pydantable.testing.fastapi`**.
+- {doc}`/FASTAPI` / {doc}`/FASTAPI_ENHANCEMENTS` / cookbook: columnar **422** vs **`ValueError`** (**500**), nested **`list[NestedModel]`**, **`TestClient(raise_server_exceptions=False)`**; expanded **`tests/test_pydantable_fastapi_columnar.py`** (cache, nested routes, length mismatch, **`register_handlers`**).
 - {doc}`TYPING`: expanded **`SupportsLazyAsyncMaterialize`** (when to use vs **`DataFrameModelWithRow`**, runtime **`isinstance`** caveats, examples); {doc}`DATAFRAMEMODEL` cross-link from async lazy I/O.
 - New {doc}`MATERIALIZATION` page; {doc}`EXECUTION`, {doc}`INTERFACE_CONTRACT`, {doc}`DATAFRAMEMODEL`, {doc}`DOCS_MAP` cross-links.
 - {doc}`/DATAFRAMEMODEL` **Three layers** (ASCII diagram + rule of thumb + lazy-shape warning); {doc}`/cookbook/async_lazy_pipeline`; {doc}`/cookbook/fastapi_async_materialization` prefers **`collect`** / **`to_dict`**.

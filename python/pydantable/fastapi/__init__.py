@@ -19,13 +19,24 @@ from starlette.responses import StreamingResponse
 
 from pydantable._extension import MissingRustExtensionError
 
+from .columnar import (
+    columnar_body_model,
+    columnar_body_model_from_dataframe_model,
+    columnar_dependency,
+    rows_dependency,
+)
+
 __all__ = [
     "MissingRustExtensionError",
+    "columnar_body_model",
+    "columnar_body_model_from_dataframe_model",
+    "columnar_dependency",
     "executor_lifespan",
     "get_executor",
     "ndjson_chunk_bytes",
     "ndjson_streaming_response",
     "register_exception_handlers",
+    "rows_dependency",
 ]
 
 

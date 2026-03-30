@@ -22,8 +22,39 @@ Then import `pydantable.fastapi` (not required for basic FastAPI usage):
 - **`get_executor(request)`** — for **`Depends(get_executor)`**, returning **`request.app.state.executor`** (or **`None`** if unset).
 - **`register_exception_handlers(app)`** — registers HTTP handlers for **`MissingRustExtensionError`** (**503**) and in-handler **`pydantic.ValidationError`** (**422**); see {ref}`fastapi-errors`.
 - **`ndjson_streaming_response(astream_iter)`** / **`ndjson_chunk_bytes(astream_iter)`** — build **`application/x-ndjson`** **`StreamingResponse`** from **`await df.astream(...)`** without duplicating JSON line encoding; see {doc}`/FASTAPI_ENHANCEMENTS`.
+- **`columnar_body_model`**, **`columnar_body_model_from_dataframe_model`** — build a Pydantic model whose fields are **`list[T]`** per column (OpenAPI-friendly **`dict[str, list]`**). Optional **`example=`** / **`json_schema_extra=`** for Swagger examples.
+- **`columnar_dependency(model_cls, ...)`**, **`rows_dependency(model_cls, ...)`** — **`Depends(...)`** factories that validate the request body and return a **`DataFrameModel`** instance (columnar JSON or **`list[RowModel]`**), forwarding **`trusted_mode`** and related **`DataFrameModel`** kwargs.
 
 Inbound request validation is still FastAPI’s default **`RequestValidationError`** (**422**) when the *request body* fails to parse.
+
+(columnar-openapi-fastapi)=
+## Columnar OpenAPI and `Depends`
+
+Use **`columnar_body_model_from_dataframe_model(MyDF)`** as **`Body`** / **`response_model`** when clients send or receive column-shaped JSON (same shape as **`to_dict()`**). For routes, prefer **`columnar_dependency`** so you inject a **`MyDF`** directly:
+
+```python
+from typing import Annotated
+
+from fastapi import Depends, FastAPI
+
+from pydantable.fastapi import columnar_dependency
+
+app = FastAPI()
+
+@app.post("/ingest")
+def ingest(df: Annotated[User, Depends(columnar_dependency(User, trusted_mode="strict"))]) -> dict:
+    return df.to_dict()
+```
+
+For **row-array** JSON bodies, use **`rows_dependency(User)`**; OpenAPI documents **`list[User.RowModel]`**.
+
+**Nested row fields** (e.g. **`inner: NestedModel`**) become **`list[NestedModel]`** in columnar JSON (one nested object per row index). That shape is valid but can be heavy on the wire; prefer flat columns when you can.
+
+**Validation layers:** Pydantic validates each column as **`list[T]`** (wrong element types → **422** before your handler). **Row/column length consistency** and engine rules are enforced when constructing **`DataFrameModel`** inside the dependency; mismatched column lengths raise **`ValueError`** (**500** unless you catch or map it—see {ref}`fastapi-errors`). For stricter API errors, validate lengths in a route wrapper or map **`ValueError`** to **`HTTPException(400)`**.
+
+**NDJSON** streaming responses do not get a per-chunk OpenAPI schema (same as any streaming body); columnar **`response_model`** applies to single JSON **`to_dict()`** responses only.
+
+**Testing:** **`pydantable.testing.fastapi`** provides **`fastapi_app_with_executor()`** and **`fastapi_test_client(app)`** (context manager) so **`executor_lifespan`** runs under **`TestClient`** and **`get_executor`** works. Use **`TestClient(..., raise_server_exceptions=False)`** when asserting **500** responses from dependencies. See **`tests/test_pydantable_fastapi_columnar.py`**.
 
 (fastapi-errors)=
 ## HTTP errors and exception handlers

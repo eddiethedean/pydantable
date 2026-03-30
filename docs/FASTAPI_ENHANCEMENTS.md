@@ -64,6 +64,8 @@ responses. Install **`pip install 'pydantable[fastapi]'`**.
 | Empty stream body | **`astream()`** produced no chunks (empty frame or zero batches); NDJSON is still valid with an empty body. |
 | High latency under concurrent requests | Raise **`executor_lifespan(..., max_workers=...)`** or reduce competing work on the default thread pool ({doc}`/EXECUTION`). |
 | Client disconnect does not stop engine work | Documented limitation: cancelling **`await acollect()`** does not cancel in-flight Rust work ({doc}`/EXECUTION`). |
+| **500** after **422**-valid columnar JSON | **`DataFrameModel`** construction in **`columnar_dependency`** / **`rows_dependency`** can raise **`ValueError`** (e.g. column length mismatch). Map in the route or with an exception handler; not a **`RequestValidationError`**. |
+| OpenAPI shows **`list`** but clients send wrong element type | FastAPI returns **422** from Pydantic; fix payload types. |
 
 ## Phased roadmap
 
@@ -73,15 +75,15 @@ responses. Install **`pip install 'pydantable[fastapi]'`**.
 - Combined **lifespan + exception handlers** pattern documented here (explicit **`executor_lifespan`** + **`register_exception_handlers`** — no hidden globals).
 - This **quick reference** table and cross-links.
 
-### Phase 2 — OpenAPI / bodies
+### Phase 2 — OpenAPI / bodies (shipped)
 
-- Columnar JSON as structured Pydantic models with **`openapi_examples`** / **`Field(examples=…)`**.
-- Optional response wrappers so columnar **`dict[str, list]`** responses appear in OpenAPI.
+- **`columnar_body_model`** / **`columnar_body_model_from_dataframe_model`** in **`pydantable.fastapi`** — generated Pydantic models with **`list[T]`** per column, optional **`example=`** / **`json_schema_extra=`** for OpenAPI.
+- Use the same model as **`response_model`** for columnar JSON (**`to_dict()`** shape). NDJSON streams still have no per-line OpenAPI schema.
 
-### Phase 3 — Dependencies
+### Phase 3 — Dependencies (shipped)
 
-- **`Depends`** factories that build a typed **`DataFrame`** / **`DataFrameModel`** from row-list or validated columnar bodies (extends {doc}`/cookbook/fastapi_columnar_bodies`).
-- Optional **named executors** (e.g. **`app.state.executors["io"]`**) for separate pools.
+- **`columnar_dependency`** / **`rows_dependency`** build a **`DataFrameModel`** from validated bodies; see {doc}`/FASTAPI` **Columnar OpenAPI and Depends** and {doc}`/cookbook/fastapi_columnar_bodies`.
+- Optional **named executors** (e.g. **`app.state.executors["io"]`**) for separate pools — not packaged; pattern only.
 
 ### Phase 4 — Errors
 
@@ -95,9 +97,9 @@ responses. Install **`pip install 'pydantable[fastapi]'`**.
 
 - Documented **`BackgroundTasks`** + **`submit`** / **`ExecutionHandle`** patterns for deferred materialization.
 
-### Phase 7 — Testing
+### Phase 7 — Testing (shipped)
 
-- **`pytest`** fixtures or **`pydantable.testing.fastapi`** helpers ( **`TestClient`**, executor, temp files).
+- **`pydantable.testing.fastapi`:** **`fastapi_app_with_executor`**, **`fastapi_test_client`** (lifespan-aware **`TestClient`**). See {doc}`/FASTAPI` **Columnar OpenAPI and Depends**.
 
 ### Phase 8 — Templates
 
