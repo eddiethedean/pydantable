@@ -153,6 +153,8 @@ class PandasDataFrame(CoreDataFrame):
         on: str | list[str] | None = None,
         left_on: str | list[str] | None = None,
         right_on: str | list[str] | None = None,
+        left_by: str | list[str] | None = None,
+        right_by: str | list[str] | None = None,
         left_index: bool = False,
         right_index: bool = False,
         suffixes: tuple[str, str] = ("_x", "_y"),
@@ -166,6 +168,16 @@ class PandasDataFrame(CoreDataFrame):
             raise TypeError(
                 f"merge() got unsupported keyword arguments: {sorted(kw)!r}"
             )
+        if left_by is not None or right_by is not None:
+            raise NotImplementedError(
+                "merge(left_by=..., right_by=...) is not supported."
+            )
+        if not isinstance(suffixes, tuple) or len(suffixes) != 2:
+            raise TypeError(
+                "merge(suffixes=...) must be a tuple[str, str] of length 2."
+            )
+        if not all(isinstance(s, str) for s in suffixes):
+            raise TypeError("merge(suffixes=...) must be a tuple[str, str].")
         # `indicator` is handled below (when True).
         suffix = suffixes[1] if suffixes and len(suffixes) >= 2 else "_right"
         on_list = _as_list_str(on, name="on")
@@ -671,6 +683,45 @@ class PandasDataFrame(CoreDataFrame):
                     "query(): bare list/tuple literals are only supported as the "
                     "right side of 'in'."
                 )
+            if isinstance(node, ast.Call):
+                if not isinstance(node.func, ast.Name):
+                    raise NotImplementedError(
+                        "query(): only simple function calls are supported."
+                    )
+                fname = node.func.id
+                if fname in {"isnull", "notnull"}:
+                    if len(node.args) != 1 or node.keywords:
+                        raise TypeError(
+                            f"query(): {fname}() expects one positional argument."
+                        )
+                    target = _compile(node.args[0])
+                    return (
+                        target.is_null() if fname == "isnull" else target.is_not_null()
+                    )
+                if fname in {"contains", "startswith", "endswith"}:
+                    if len(node.args) != 2 or node.keywords:
+                        raise TypeError(
+                            f"query(): {fname}() expects (column, string) "
+                            "positional args."
+                        )
+                    col_expr = _compile(node.args[0])
+                    if not isinstance(node.args[1], ast.Constant):
+                        raise NotImplementedError(
+                            f"query(): {fname}() requires a literal string."
+                        )
+                    sub = node.args[1].value
+                    if not isinstance(sub, str):
+                        raise TypeError(
+                            f"query(): {fname}() requires a string literal."
+                        )
+                    if fname == "contains":
+                        return col_expr.str_contains(sub)
+                    if fname == "startswith":
+                        return col_expr.starts_with(sub)
+                    return col_expr.ends_with(sub)
+                raise NotImplementedError(
+                    f"query(): unsupported function call {fname!r}."
+                )
             if isinstance(node, ast.Name):
                 # Treat bare identifiers as columns.
                 if node.id in self.schema_fields():
@@ -717,8 +768,16 @@ class PandasDataFrame(CoreDataFrame):
                 "sort_values(ignore_index=True) is not supported; "
                 "pydantable has no pandas Index semantics."
             )
-        if key is not None:
-            raise NotImplementedError("sort_values(key=...) is not supported.")
+        key_id: str | None
+        if key is None:
+            key_id = None
+        elif isinstance(key, str):
+            key_id = key.strip().lower()
+        else:
+            raise NotImplementedError(
+                "sort_values(key=...) only supports string identifiers (plan-only); "
+                "Python callables are not supported."
+            )
         by_list = [by] if isinstance(by, str) else list(by)
         if not by_list:
             raise TypeError("sort_values(by=...) requires at least one column.")
@@ -728,7 +787,30 @@ class PandasDataFrame(CoreDataFrame):
             desc = [not bool(v) for v in list(ascending)]
             if len(desc) != len(by_list):
                 raise ValueError("sort_values(): ascending must match len(by).")
-        return self.sort(*by_list, descending=desc)
+        if key_id is None:
+            return self.sort(*by_list, descending=desc)
+        if key_id not in {"lower", "upper", "abs"}:
+            raise NotImplementedError(
+                f"sort_values(key={key!r}) is not supported; expected one of "
+                "'lower', 'upper', 'abs', or None."
+            )
+        tmp_cols: list[str] = []
+        tmp_exprs: list[Expr] = []
+        for c in by_list:
+            tmp = f"__pd_sort_key_{key_id}__{c}"
+            tmp_cols.append(tmp)
+            base = self.col(c)
+            if key_id == "abs":
+                tmp_exprs.append(base.abs())
+            elif key_id == "lower":
+                tmp_exprs.append(base.lower())
+            else:
+                tmp_exprs.append(base.upper())
+        tmp_df = self.with_columns(
+            **{n: e for n, e in zip(tmp_cols, tmp_exprs, strict=True)}
+        )
+        sorted_df = tmp_df.sort(*tmp_cols, descending=desc)
+        return CoreDataFrame.drop(sorted_df, *tmp_cols)
 
     def drop(
         self,

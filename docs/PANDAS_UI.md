@@ -64,8 +64,9 @@ Maps to **`join`**: `on` is required; the **right suffix** is taken from `suffix
 - `how="cross"` (Cartesian product). Keys (`on/left_on/right_on`) are rejected for cross joins.
 - `left_on` / `right_on` (including different key names). Output uses a pandas-like policy: right key columns are dropped, and for `how="outer"` / `how="right"` the left key columns are filled from the right keys for right-only rows.
 - `validate=...` (`one_to_one`, `one_to_many`, `many_to_one`, `many_to_many` and `1:1` / `1:m` / `m:1` / `m:m` aliases).
-- `indicator=True` (adds `_merge` with values `left_only` / `right_only` / `both`). **Current limitation:** for key-only frames (no non-key columns on one side), `indicator=True` raises `NotImplementedError`.
+- `indicator=True` (adds `_merge` with values `left_only` / `right_only` / `both`).
 - `copy=...` is accepted for parity (no effect; logical plans are copy-free).
+- `left_by` / `right_by` are accepted for parity but currently raise `NotImplementedError`.
 
 **Still raises `NotImplementedError` for:**
 
@@ -86,10 +87,11 @@ Unknown keyword arguments raise **`TypeError`**.
 | `on` / `left_on` / `right_on` | supported (but not with `how="cross"`) |
 | `suffixes` | supported (right suffix is used; collisions raise `ValueError`) |
 | `validate` | supported |
-| `indicator` | supported with limitation (needs non-key cols on both sides) |
+| `indicator` | supported |
 | `copy` | accepted (no-op) |
-| `sort` | accepted, raises `NotImplementedError` when `True` |
-| `left_index` / `right_index` | accepted, raises `NotImplementedError` when `True` |
+| `sort` | supported for key-based merges; rejected for cross and index merges |
+| `left_index` / `right_index` | supported for `left_index=True, right_index=True` (limited, eager) |
+| `left_by` / `right_by` | accepted, raises `NotImplementedError` |
 
 ### Introspection
 
@@ -121,7 +123,14 @@ Supports a **limited** boolean expression grammar and compiles to `filter(Expr)`
 - Column refs: bare identifiers (e.g. `age > 10`)
 - Literals: ints, floats, quoted strings, `None`, `True`/`False`
 
-Unsupported syntax (function calls, attribute access, subscripts, etc.) raises `NotImplementedError`.
+Additionally supports a small whitelist of helper functions (function-call form only; no attribute access):
+
+- `contains(col, "sub")`
+- `startswith(col, "pre")`
+- `endswith(col, "suf")`
+- `isnull(col)` / `notnull(col)`
+
+Unsupported syntax (other function calls, attribute access, subscripts, etc.) raises `NotImplementedError`.
 
 **Accepted parameters (typed-first):**
 
@@ -156,7 +165,8 @@ Alias for `sort(...)` with pandas-shaped arguments.
 **Accepted parameters (typed-first):**
 
 - `ascending`: `bool` or `list[bool]` (must match `by` length).
-- `na_position`, `kind`, `key`: accepted but raise `NotImplementedError`.
+- `na_position`, `kind`: accepted but raise `NotImplementedError`.
+- `key`: supported only as one of the string identifiers `"lower"`, `"upper"`, `"abs"` (case-insensitive). Python callables raise `NotImplementedError`.
 - `ignore_index`: `False` is accepted; `True` raises `NotImplementedError` (no Index semantics).
 
 **Realistic pattern:** sort then materialize:
