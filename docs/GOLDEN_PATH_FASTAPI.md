@@ -22,7 +22,7 @@ integration guide and error-handling table.
 |-------|------|
 | **`executor_lifespan`** | Attaches a `ThreadPoolExecutor` to **`app.state.executor`** so **`acollect(executor=...)`**, **`pydantable.io`** `amaterialize_*` / `afetch_sql`, and similar offload work off the asyncio loop **without** starving the default thread pool under load. |
 | **`get_executor`** + **`Depends`** | Injects that pool into handlers; **`None`** if you skip lifespan (still valid for **`acollect`**). |
-| **`register_exception_handlers`** | **`MissingRustExtensionError` → 503**, in-route **`pydantic.ValidationError` → 422** (see {ref}`fastapi-errors`). |
+| **`register_exception_handlers`** | **`MissingRustExtensionError` → 503**, **`ColumnLengthMismatchError` → 400**, in-route **`pydantic.ValidationError` → 422** (see {ref}`fastapi-errors`). |
 | **Typed routes** | **`list[DataFrameModel.RowModel]`** bodies and **`response_model=list[YourRow]`** keep OpenAPI and clients aligned. |
 | **Streaming** | **`astream()`** + **`ndjson_streaming_response`** from **`pydantable.fastapi`** for NDJSON (one JSON object per line). See {doc}`/FASTAPI_ENHANCEMENTS` (NDJSON semantics, production **lifespan** snippet, troubleshooting). |
 
@@ -69,6 +69,7 @@ curl -s -N localhost:8000/api/v1/users/stream
 
 ## Related docs
 
+- Multi-router example (routers + lifespan): `docs/examples/fastapi/service_layout/` (README in that folder)
 - Roadmap and “when to use what”: {doc}`/FASTAPI_ENHANCEMENTS`
 - Full FastAPI guide: {doc}`/FASTAPI`
 - HTTP status mapping: {ref}`fastapi-errors` (in {doc}`/FASTAPI`)

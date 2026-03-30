@@ -34,6 +34,7 @@ All notable changes to this project are documented here. The format is inspired 
 - New {doc}`MATERIALIZATION` page; {doc}`EXECUTION`, {doc}`INTERFACE_CONTRACT`, {doc}`DATAFRAMEMODEL`, {doc}`DOCS_MAP` cross-links.
 - {doc}`/DATAFRAMEMODEL` **Three layers** (ASCII diagram + rule of thumb + lazy-shape warning); {doc}`/cookbook/async_lazy_pipeline`; {doc}`/cookbook/fastapi_async_materialization` prefers **`collect`** / **`to_dict`**.
 - {doc}`ROADMAP`, {doc}`DATA_IO_SOURCES`, and **`docs/async_ideas/`** aligned with async/submit/stream work where applicable.
+- **README**, {doc}`index`, {doc}`DOCS_MAP`, {doc}`GOLDEN_PATH_FASTAPI`, {doc}`TROUBLESHOOTING`: FastAPI helpers, **`pydantable.errors`**, cookbooks, **`service_layout`**, and testing helpers cross-linked; troubleshooting bullets repaired.
 
 ## [1.5.0] — 2026-03-29
 

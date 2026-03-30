@@ -40,4 +40,9 @@ Use this page when you know **what you need to do**, but not **where it is docum
 - **Developer guide**: {doc}`DEVELOPER`
 - **Performance notes**: {doc}`PERFORMANCE`
 - **Changelog**: {doc}`changelog`
+- **Troubleshooting / FAQ**: {doc}`TROUBLESHOOTING`
+
+### Errors and HTTP mapping (services)
+
+- **`pydantable.errors`**: **`ColumnLengthMismatchError`**, **`PydantableUserError`** — used by strict column validation and mapped by **`register_exception_handlers`** in {doc}`FASTAPI` (see {ref}`fastapi-errors` there).
 

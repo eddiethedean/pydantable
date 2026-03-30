@@ -39,7 +39,9 @@ See {doc}`DEVELOPER` for contributor setup.
 
 Row order is **not** a stable API guarantee for many operations.
 
-- Compare results by sorting on identity keys (join keys, group keys).\n+- The test suite uses this pattern intentionally.\n+- See {doc}`INTERFACE_CONTRACT` (Ordering).
+- Compare results by sorting on identity keys (join keys, group keys).
+- The test suite uses this pattern intentionally.
+- See {doc}`INTERFACE_CONTRACT` (Ordering).
 
 ## Async: why doesn’t cancellation stop execution?
 
@@ -51,11 +53,16 @@ If you need strict cancellation semantics, design your service route around time
 
 These APIs **materialize** the plan to a Python `dict[str, list]` first, then build Arrow/Polars objects in Python.
 
-- `to_arrow()` is not a zero-copy export of engine buffers.\n+- Prefer lazy file workflows (`read_*` → transforms → `write_*`) for large data.\n+- See {doc}`EXECUTION` (Materialization costs).
+- `to_arrow()` is not a zero-copy export of engine buffers.
+- Prefer lazy file workflows (`read_*` → transforms → `write_*`) for large data.
+- See {doc}`EXECUTION` (Materialization costs).
 
 ## I/O: when should I use `read_*` vs `materialize_*`?
 
-- Use **`read_*`** for large local files and pipelines where you will transform then write.\n+- Use **`materialize_*`** when you want a Python column dict in memory (small/medium data, tests).\n+\n+Use {doc}`IO_DECISION_TREE` to pick the right entrypoint.
+- Use **`read_*`** for large local files and pipelines where you will transform then write.
+- Use **`materialize_*`** when you want a Python column dict in memory (small/medium data, tests).
+
+Use {doc}`IO_DECISION_TREE` to pick the right entrypoint.
 
 ## Typing: why doesn’t my editor infer the after-schema type?
 
@@ -65,4 +72,18 @@ Some type checkers (notably **pyright/Pylance**) cannot automatically infer sche
 - If you prefer not to raise on mismatch, use `try_as_model(AfterModel) -> AfterModel | None`.
 - If you want a richer mismatch explanation, use `assert_model(AfterModel)` (raises with a schema diff).
 - For mypy, transform chains can be typed automatically.
+
+## FastAPI: `MissingRustExtensionError` on import
+
+**Symptom:** `import pydantable.fastapi` raises {doc}`MissingRustExtensionError` (same as core).
+
+**Fix:** build or install the native extension as in [MissingRustExtensionError](#missingrustextensionerror) above. The FastAPI helpers require the compiled package.
+
+## FastAPI: column length mismatch returns **400** but I expected **500**
+
+If you call **`validate_columns_strict`** or construct a frame from unequal-length columns and **`register_exception_handlers`** is installed, **`ColumnLengthMismatchError`** is mapped to **HTTP 400** (bad request), not **500**. Disable the handler or catch the exception in the route if you need different behavior.
+
+## FastAPI: tests hang or executor is missing in `TestClient`
+
+Use **`pydantable.testing.fastapi.fastapi_app_with_executor`** / **`fastapi_test_client`** so the app’s lifespan runs and **`RequestContext.executor`** is bound. See {doc}`FASTAPI` (Testing helpers).
 
