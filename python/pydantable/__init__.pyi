@@ -4,11 +4,11 @@ from . import pandas as pandas
 from . import plugins as plugins
 from . import pyspark as pyspark
 from ._extension import MissingRustExtensionError
-from .errors import ColumnLengthMismatchError, PydantableUserError
 from .awaitable_dataframe_model import AwaitableDataFrameModel
 from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
 from .display import get_repr_html_limits, reset_display_options, set_display_options
+from .errors import ColumnLengthMismatchError, PydantableUserError
 from .expressions import Expr
 from .io import (
     afetch_sql,
@@ -63,8 +63,8 @@ __all__ = [
     "DtypeDriftWarning",
     "Expr",
     "MissingRustExtensionError",
-    "PydantableUserError",
     "PlanMaterialization",
+    "PydantableUserError",
     "Schema",
     "afetch_sql",
     "aiter_csv",
