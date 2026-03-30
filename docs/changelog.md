@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-03-30
+
+Summary: **FastAPI** helpers (columnar OpenAPI bodies, NDJSON, **`register_exception_handlers`**), **`pydantable.errors`**, **`submit` / `stream` / `astream`**, **`PlanMaterialization`**, awaitable lazy reads (**`AwaitableDataFrameModel`**), Rust **async** plan execution when available, and docs/cookbooks for services. **Breaking:** removed legacy **`DataFrameModel`** eager SQL / **`materialize_*`** shims—use **`pydantable.io`** and **`read_*` / `aread_*`** as described under **Removed** below.
+
 ### Removed
 
 - **`DataFrameModel`** eager I/O shims: **`materialize_*`**, **`amaterialize_*`**, **`fetch_sql`**, **`afetch_sql`**, **`iter_sql`**, **`aiter_sql`**, **`from_sql`**, **`afrom_sql`**. Use **`pydantable.io`** for eager **`dict[str, list]`** loads and **`SQL`** streaming, then **`MyModel(cols, ...)`**; keep lazy scans on **`read_*`** / **`aread_*`**.

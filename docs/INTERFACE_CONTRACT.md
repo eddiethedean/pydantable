@@ -173,7 +173,7 @@ Rolling/dynamic contracts:
 
 Lazy **`DataFrame`** / **`DataFrameModel`** plans are materialized through one of **four** scheduling patterns: **blocking** (**`collect`**, **`to_dict`**, …), **async** (**`acollect`**, **`ato_dict`**, …), **deferred** (**`submit`** → **`ExecutionHandle`**), or **chunked** (**`stream`** / **`astream`**). They share engine semantics; see {doc}`MATERIALIZATION` for the full table and **`PlanMaterialization`** labels.
 
-## Async materialization, `submit`, `stream`, and `astream` (1.5.0+)
+## Async materialization, `submit`, `stream`, and `astream` (1.6.0+)
 
 - **`acollect`** / **`ato_dict`** / **`ato_polars`** / **`ato_arrow`:** same logical result as the synchronous methods. Ordering of rows in columnar output follows the same **non-guarantee** as **`to_dict()`** ({ref}`ordering`).
 - **`submit` → `ExecutionHandle`:** **`await handle.result()`** is equivalent to **`collect()`** with the same keyword arguments. **`handle.cancel()`** only affects the wait on a **`concurrent.futures.Future`** when cancellation wins the race before work starts; it does **not** cooperatively abort an in-flight Polars **`collect`**.
