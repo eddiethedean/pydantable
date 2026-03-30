@@ -24,21 +24,16 @@ def executor_lifespan(
     max_workers: int | None = ...,
     thread_name_prefix: str = ...,
 ) -> AbstractAsyncContextManager[None]: ...
-
 def get_executor(request: Request) -> Executor | None: ...
-
 async def ndjson_chunk_bytes(
     chunks: AsyncIterator[dict[str, Any]],
 ) -> AsyncIterator[bytes]: ...
-
 def ndjson_streaming_response(
     chunks: AsyncIterator[dict[str, Any]],
     *,
     media_type: str = ...,
 ) -> StreamingResponse: ...
-
 def register_exception_handlers(app: FastAPI) -> None: ...
-
 def columnar_body_model(
     row_model: type[BaseModel],
     *,
@@ -46,7 +41,6 @@ def columnar_body_model(
     json_schema_extra: dict[str, Any] | None = ...,
     example: dict[str, list[Any]] | None = ...,
 ) -> type[BaseModel]: ...
-
 def columnar_body_model_from_dataframe_model(
     model_cls: type[DataFrameModel[Any]],
     *,
@@ -54,7 +48,6 @@ def columnar_body_model_from_dataframe_model(
     json_schema_extra: dict[str, Any] | None = ...,
     example: dict[str, list[Any]] | None = ...,
 ) -> type[BaseModel]: ...
-
 def columnar_dependency(
     model_cls: type[_DFM],
     *,
@@ -64,7 +57,6 @@ def columnar_dependency(
     json_schema_extra: dict[str, Any] | None = ...,
     example: dict[str, list[Any]] | None = ...,
 ) -> Callable[..., _DFM]: ...
-
 def rows_dependency(
     model_cls: type[_DFM],
     *,

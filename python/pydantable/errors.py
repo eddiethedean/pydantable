@@ -14,4 +14,5 @@ class PydantableUserError(ValueError):
 class ColumnLengthMismatchError(PydantableUserError):
     """Raised when column lists for a schema mapping differ in length."""
 
+
 __all__ = ["ColumnLengthMismatchError", "PydantableUserError"]

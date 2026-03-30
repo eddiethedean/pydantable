@@ -41,10 +41,7 @@ def main() -> None:
                 eng,
                 if_exists="append",
             )
-            sql = (
-                "SELECT line_total_cents FROM order_lines "
-                "ORDER BY line_total_cents"
-            )
+            sql = "SELECT line_total_cents FROM order_lines ORDER BY line_total_cents"
             got2 = OrderLine(fetch_sql(sql, eng))
             assert got2.to_dict()["line_total_cents"] == [12_50, 4999]
         finally:

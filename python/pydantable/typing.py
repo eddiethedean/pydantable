@@ -9,10 +9,11 @@ if TYPE_CHECKING:
     from concurrent.futures import Executor
 
 RowT = TypeVar("RowT", bound=BaseModel)
+_RowT_co = TypeVar("_RowT_co", bound=BaseModel, covariant=True)
 
 
 @runtime_checkable
-class SupportsLazyAsyncMaterialize(Protocol[RowT]):
+class SupportsLazyAsyncMaterialize(Protocol[_RowT_co]):
     """Structural type for async terminal materialization via :meth:`acollect`.
 
     Use this when a helper should accept **either**:

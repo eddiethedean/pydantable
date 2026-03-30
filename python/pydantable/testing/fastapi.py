@@ -22,6 +22,7 @@ def fastapi_app_with_executor(
     Use with :func:`fastapi_test_client` so ``app.state.executor`` is set during
     requests.
     """
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         async with executor_lifespan(

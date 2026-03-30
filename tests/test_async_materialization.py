@@ -1222,9 +1222,7 @@ async def test_concurrent_aread_parquet_chains_acollect_integration(
     class UserDF(DataFrameModel):
         x: int
 
-    chains = [
-        UserDF.aread_parquet(p, trusted_mode="shape_only") for p in paths
-    ]
+    chains = [UserDF.aread_parquet(p, trusted_mode="shape_only") for p in paths]
     cols = await asyncio.gather(*[c.acollect(as_lists=True) for c in chains])
     assert cols[0] == {"x": [0, 1]}
     assert cols[1] == {"x": [10, 11]}

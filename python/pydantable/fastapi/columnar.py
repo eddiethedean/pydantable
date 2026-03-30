@@ -77,13 +77,14 @@ def columnar_body_model(
         else:
             field_defs[py_name] = (list_ann, Field(..., description=desc))
 
-    config_kwargs: dict[str, Any] = {}
     if merged_extra is not None:
-        config_kwargs["json_schema_extra"] = merged_extra
+        body_config = ConfigDict(json_schema_extra=merged_extra)
+    else:
+        body_config = ConfigDict()
 
     model_cls = create_model(  # type: ignore[call-overload]
         name,
-        __config__=ConfigDict(**config_kwargs) if config_kwargs else ConfigDict(),
+        __config__=body_config,
         **field_defs,
     )
     _COLUMNAR_MODEL_CACHE[key] = model_cls
@@ -98,7 +99,7 @@ def columnar_body_model_from_dataframe_model(
     example: dict[str, list[Any]] | None = None,
 ) -> type[BaseModel]:
     """Like :func:`columnar_body_model` but uses ``model_cls.RowModel``."""
-    row_model: type[BaseModel] = getattr(model_cls, "RowModel")
+    row_model: type[BaseModel] = model_cls.RowModel
     name = model_name or f"{model_cls.__name__}ColumnarBody"
     return columnar_body_model(
         row_model,
@@ -155,7 +156,7 @@ def rows_dependency(
 
     The parameter type is ``list[model_cls.RowModel]`` (validated per row).
     """
-    row_model: type[BaseModel] = getattr(model_cls, "RowModel")
+    row_model: type[BaseModel] = model_cls.RowModel
 
     def dep(rows: Any) -> Any:
         return cast(
@@ -169,5 +170,6 @@ def rows_dependency(
             ),
         )
 
-    dep.__annotations__ = {"rows": list[row_model], "return": model_cls}
+    # Dynamic annotation uses runtime ``row_model`` (not a static type alias).
+    dep.__annotations__ = {"rows": list[row_model], "return": model_cls}  # type: ignore[valid-type]
     return dep

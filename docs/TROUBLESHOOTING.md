@@ -75,9 +75,9 @@ Some type checkers (notably **pyright/Pylance**) cannot automatically infer sche
 
 ## FastAPI: `MissingRustExtensionError` on import
 
-**Symptom:** `import pydantable.fastapi` raises {doc}`MissingRustExtensionError` (same as core).
+**Symptom:** `import pydantable.fastapi` raises **`MissingRustExtensionError`** (same as importing the core package without a built wheel).
 
-**Fix:** build or install the native extension as in [MissingRustExtensionError](#missingrustextensionerror) above. The FastAPI helpers require the compiled package.
+**Fix:** build or install the native extension as in the **`MissingRustExtensionError`** section at the top of this page. The FastAPI helpers require the compiled package.
 
 ## FastAPI: column length mismatch returns **400** but I expected **500**
 

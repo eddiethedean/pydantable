@@ -25,7 +25,7 @@ pub fn async_execute_plan<'py>(
         let py_result = tokio::task::spawn_blocking(move || {
             Python::with_gil(|py| {
                 let root = root_data.bind(py);
-                execute_plan_inner(py, &plan_inner, &root, as_python_lists, streaming)
+                execute_plan_inner(py, &plan_inner, root, as_python_lists, streaming)
             })
         })
         .await
@@ -60,7 +60,7 @@ pub fn async_collect_plan_batches<'py>(
                 collect_plan_batches_polars(
                     py,
                     &plan_inner,
-                    &root_data.bind(py),
+                    root_data.bind(py),
                     batch_size,
                     streaming,
                 )
@@ -81,11 +81,12 @@ pub fn async_collect_plan_batches<'py>(
 #[pyo3(signature = (plan, root_data, batch_size=65_536, streaming=false))]
 pub fn async_collect_plan_batches<'py>(
     _py: Python<'py>,
-    _plan: &PyPlan,
-    _root_data: Bound<'py, PyAny>,
-    _batch_size: usize,
-    _streaming: bool,
+    plan: &PyPlan,
+    root_data: Bound<'py, PyAny>,
+    batch_size: usize,
+    streaming: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
+    let _ = (plan, root_data, batch_size, streaming);
     Err(pyo3::exceptions::PyRuntimeError::new_err(
         "async_collect_plan_batches requires pydantable-core built with the `polars_engine` feature.",
     ))

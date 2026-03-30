@@ -160,9 +160,11 @@ def test_dataframe_model_read_parquet_lazy_matches_materialize(tmp_path) -> None
 async def test_aread_parquet_chain_acollect(tmp_path) -> None:
     path = tmp_path / "chain.pq"
     export_parquet(path, {"id": [1, 2], "age": [10, None]})
-    rows = await UserDF.aread_parquet(path, trusted_mode="shape_only").select(
-        "id", "age"
-    ).acollect()
+    rows = (
+        await UserDF.aread_parquet(path, trusted_mode="shape_only")
+        .select("id", "age")
+        .acollect()
+    )
     assert [r.id for r in rows] == [1, 2]
     assert [r.age for r in rows] == [10, None]
 
@@ -224,9 +226,11 @@ async def test_aread_parquet_await_lazy_metadata_properties(tmp_path) -> None:
 async def test_aread_parquet_then_acollect(tmp_path) -> None:
     path = tmp_path / "then.pq"
     export_parquet(path, {"id": [1], "age": [5]})
-    rows = await UserDF.aread_parquet(path, trusted_mode="shape_only").then(
-        lambda df: df.select("id")
-    ).acollect()
+    rows = (
+        await UserDF.aread_parquet(path, trusted_mode="shape_only")
+        .then(lambda df: df.select("id"))
+        .acollect()
+    )
     assert [r.id for r in rows] == [1]
 
 
@@ -238,9 +242,11 @@ async def test_aread_parquet_then_async_fn(tmp_path) -> None:
     async def pick_id(df: UserDF) -> UserDF:
         return df.select("id")
 
-    rows = await UserDF.aread_parquet(path, trusted_mode="shape_only").then(
-        pick_id
-    ).acollect()
+    rows = (
+        await UserDF.aread_parquet(path, trusted_mode="shape_only")
+        .then(pick_id)
+        .acollect()
+    )
     assert [r.id for r in rows] == [2]
 
 

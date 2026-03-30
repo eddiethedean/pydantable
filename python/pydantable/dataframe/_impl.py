@@ -22,8 +22,8 @@ import importlib
 import logging
 import os
 import re
-import threading
 import statistics
+import threading
 import types
 import warnings
 from dataclasses import dataclass
@@ -32,7 +32,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Generic,
-    Iterator,
     Literal,
     TypeVar,
     Union,
@@ -50,7 +49,6 @@ from pydantable.rust_engine import (
     _require_rust_core,
     async_collect_plan_batches,
     async_execute_plan,
-    collect_batches as rust_collect_batches,
     execute_concat,
     execute_explode,
     execute_groupby_agg,
@@ -62,6 +60,9 @@ from pydantable.rust_engine import (
     execute_unnest,
     rust_has_async_collect_plan_batches,
     rust_has_async_execute_plan,
+)
+from pydantable.rust_engine import (
+    collect_batches as rust_collect_batches,
 )
 from pydantable.rust_engine import (
     write_csv as rust_write_csv,
@@ -87,7 +88,7 @@ from pydantable.schema import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Callable, Iterator, Mapping, Sequence
     from concurrent.futures import Executor
 
 
@@ -382,7 +383,7 @@ async def _materialize_in_thread(
 
 
 class ExecutionHandle:
-    """Background materialization from :meth:`DataFrame.submit`; await :meth:`result`."""
+    """Background :meth:`DataFrame.submit` job; await :meth:`result`."""
 
     __slots__ = ("_fut",)
 
@@ -2690,7 +2691,7 @@ class DataFrame(Generic[SchemaT]):
         engine_streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> ExecutionHandle:
-        """Start :meth:`collect` in the background; await :meth:`ExecutionHandle.result`."""
+        """Background :meth:`collect`; await :meth:`ExecutionHandle.result`."""
 
         def _run() -> Any:
             return self.collect(
