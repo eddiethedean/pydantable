@@ -60,6 +60,15 @@ curl -s localhost:8000/api/v1/users \
 curl -s -N localhost:8000/api/v1/users/stream
 ```
 
+Expected output (example):
+
+```text
+{"status":"ok"}
+[{"id":1,"age":30},{"id":2,"age":null}]
+{"id": [1, 2], "age": [10, null]}
+{"id": [3], "age": [40]}
+```
+
 ## Production checklist
 
 - **Paths:** If you accept filesystem paths from clients, **allowlist** directories and reject **`..`** and symlinks where unsafe; see {doc}`/FASTAPI` Parquet examples.

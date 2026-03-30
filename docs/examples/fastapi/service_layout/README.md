@@ -29,6 +29,13 @@ curl -sS -X POST http://127.0.0.1:8000/ingest/columnar \
   -d '{"user_id":[10,20],"email":["ada@example.com","bob@example.org"],"score":[99.5,null]}'
 ```
 
+Expected output (example):
+
+```text
+{"status":"ok","service":"pydantable-example-layout"}
+{"email":["ada@example.com","bob@example.org"],"user_id":[10,20],"score":[99.5,null]}
+```
+
 OpenAPI: `http://127.0.0.1:8000/docs`
 
 This tree is **not** an installable package; run **`uvicorn`** from **this directory** (or put this folder on **`PYTHONPATH`**) so `routers` imports resolve.
