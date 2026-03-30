@@ -60,9 +60,7 @@ def columnar_body_model(
 
     field_defs: dict[str, Any] = {}
     for py_name, finfo in row_model.model_fields.items():
-        ann = finfo.annotation
-        if ann is None:
-            ann = Any
+        ann: Any = finfo.annotation if finfo.annotation is not None else Any
         list_ann = _column_list_annotation(ann)
         desc = finfo.description
         if finfo.validation_alias is not None:

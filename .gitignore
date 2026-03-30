@@ -9,6 +9,7 @@ __pycache__/
 venv/
 .venv/
 .venv-mypy/
+.venv-mypy-min/
 build/
 dist/
 *.egg-info/

@@ -7,10 +7,11 @@ CARGO_MANIFEST ?= pydantable-core/Cargo.toml
 
 .PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check mypy-check pyright-check sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 .PHONY: gen-typing check-typing
+.PHONY: mypy-check-minimal
 
 check-full: check-python check-docs check-rust
 
-check-python: ruff-format-check ruff-check mypy-check pyright-check check-typing
+check-python: ruff-format-check ruff-check mypy-check mypy-check-minimal pyright-check check-typing
 
 check-docs: sphinx-check
 
@@ -22,6 +23,14 @@ ruff-check:
 
 mypy-check:
 	$(MYPY) python/pydantable
+
+# Mirror CI's mypy environment (no optional deps like numpy installed).
+# This catches missing ``# type: ignore[import-not-found]`` on optional imports.
+mypy-check-minimal:
+	@if [ ! -x .venv-mypy-min/bin/python ]; then python3 -m venv .venv-mypy-min; fi
+	@.venv-mypy-min/bin/python -m pip -q install -U pip >/dev/null
+	@.venv-mypy-min/bin/python -m pip -q install mypy pydantic >/dev/null
+	@MYPYPATH=python .venv-mypy-min/bin/python -m mypy python/pydantable
 
 pyright-check:
 	$(PYRIGHT) --project pyrightconfig.json
