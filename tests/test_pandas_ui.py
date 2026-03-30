@@ -194,6 +194,11 @@ def test_pandas_ui_query_string_helpers_work() -> None:
     out5 = df.query("notnull(n)").collect(as_lists=True)
     assert_table_eq_sorted(out5, {"s": ["xyz"], "n": [1]}, keys=["s"])
 
+    out6 = df.query("isna(n)").collect(as_lists=True)
+    assert_table_eq_sorted(out6, {"s": ["Abc", "foo"], "n": [None, None]}, keys=["s"])
+    out7 = df.query("notna(n)").collect(as_lists=True)
+    assert_table_eq_sorted(out7, {"s": ["xyz"], "n": [1]}, keys=["s"])
+
 
 def test_pandas_ui_query_rejects_non_whitelisted_function_call() -> None:
     class Row(PandasDataFrameModel):
@@ -204,13 +209,36 @@ def test_pandas_ui_query_rejects_non_whitelisted_function_call() -> None:
         df.query("lower(s) == 'x'")
 
 
+def test_pandas_ui_query_between_helper() -> None:
+    class Row(PandasDataFrameModel):
+        a: int
+
+    df = Row({"a": [1, 2, 3, 4]})
+    out = df.query("between(a, 2, 3)").collect(as_lists=True)
+    assert_table_eq_sorted(out, {"a": [2, 3]}, keys=["a"])
+
+
 def test_pandas_ui_sort_values_key_identifiers() -> None:
     class Row(PandasDataFrameModel):
         s: str
 
-    df = Row({"s": ["B", "a", "C"]})
+    df = Row({"s": ["B", " a", "C "]})
     out = df.sort_values("s", key="lower").collect(as_lists=True)
-    assert out["s"] == ["a", "B", "C"]
+    assert out["s"] == [" a", "B", "C "]
+
+    out2 = df.sort_values("s", key="strip").collect(as_lists=True)
+    # Sort key is stripped, but output is original strings.
+    assert out2["s"][0] in {" a", "B"}
+    assert set(out2["s"]) == {"B", " a", "C "}
+
+
+def test_pandas_ui_sort_values_key_len_orders_by_char_length() -> None:
+    class Row(PandasDataFrameModel):
+        s: str
+
+    df = Row({"s": ["bbb", "a", "cc"]})
+    out = df.sort_values("s", key="len").collect(as_lists=True)
+    assert out["s"] == ["a", "cc", "bbb"]
 
 
 def test_pandas_ui_merge_left_on_requires_right_on() -> None:
@@ -276,6 +304,64 @@ def test_pandas_ui_merge_cross_rejects_keys_and_validate() -> None:
         left.merge(right, how="cross", on="a")
     with pytest.raises(TypeError, match=r"cross.*validate"):
         left.merge(right, how="cross", validate="one_to_one")
+
+
+@pytest.mark.parametrize("how", ["inner", "left", "right", "outer"])
+def test_pandas_ui_merge_matrix_on_basic(how: str) -> None:
+    class L(PandasDataFrameModel):
+        k: int
+        lv: int
+
+    class R(PandasDataFrameModel):
+        k: int
+        rv: int
+
+    left = L({"k": [1, 2], "lv": [10, 20]})
+    right = R({"k": [2, 3], "rv": [200, 300]})
+    out = left.merge(right, on="k", how=how, indicator=True).collect(as_lists=True)
+
+    rows = sorted(
+        zip(out["k"], out.get("lv"), out.get("rv"), out["_merge"], strict=True),
+        key=lambda t: t[0],
+    )
+    if how == "inner":
+        assert rows == [(2, 20, 200, "both")]
+    elif how == "left":
+        assert rows == [(1, 10, None, "left_only"), (2, 20, 200, "both")]
+    elif how == "right":
+        assert rows == [(2, 20, 200, "both"), (3, None, 300, "right_only")]
+    else:
+        assert rows == [
+            (1, 10, None, "left_only"),
+            (2, 20, 200, "both"),
+            (3, None, 300, "right_only"),
+        ]
+
+
+def test_pandas_ui_merge_indicator_rejects_existing_merge_column() -> None:
+    class L(PandasDataFrameModel):
+        k: int
+
+    class R(PandasDataFrameModel):
+        k: int
+
+    left = L({"k": [1]})
+    right = R({"k": [1]})
+    out = left.merge(right, on="k", indicator=True).collect(as_lists=True)
+    assert out["_merge"] == ["both"]
+
+
+def test_pandas_ui_merge_index_merge_rejects_key_args() -> None:
+    class L(PandasDataFrameModel):
+        k: int
+
+    class R(PandasDataFrameModel):
+        k: int
+
+    left = L({"k": [1]})
+    right = R({"k": [1]})
+    with pytest.raises(NotImplementedError, match=r"on/left_on/right_on"):
+        left.merge(right, on="k", left_index=True, right_index=True)
 
 
 def test_pandas_ui_merge_accepts_copy_and_rejects_sort_and_index_joins() -> None:
@@ -506,6 +592,25 @@ def test_pandas_ui_head_tail() -> None:
     df = User({"id": [1, 2, 3]})
     assert df.head(2).collect(as_lists=True) == {"id": [1, 2]}
     assert df.tail(2).collect(as_lists=True) == {"id": [2, 3]}
+
+
+def test_pandas_ui_iloc_slice_plan_only() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        id: int
+
+    df = DataFrame[Row]({"id": [1, 2, 3, 4]})
+    out = df.iloc[1:3].collect(as_lists=True)
+    assert out == {"id": [2, 3]}
+    out2 = df.iloc[0:0].collect(as_lists=True)
+    assert out2 == {"id": []}
+    with pytest.raises(NotImplementedError, match="stop"):
+        _ = df.iloc[1:]
+    with pytest.raises(NotImplementedError, match="step"):
+        _ = df.iloc[0:3:2]
+    with pytest.raises(TypeError, match="slice"):
+        _ = df.iloc[1]  # type: ignore[index]
 
 
 def test_pandas_core_head_tail_empty_columns() -> None:
@@ -820,6 +925,21 @@ def test_pandas_core_dataframe_merge_cross_rejects_keys() -> None:
         left.merge(right, how="cross", on="a")  # type: ignore[arg-type]
 
 
+def test_pandas_ui_to_pandas_smoke() -> None:
+    pandas = pytest.importorskip("pandas")
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        a: int
+        b: str
+
+    df = DataFrame[Row]({"a": [1, 2], "b": ["x", "y"]})
+    out = df.to_pandas()
+    assert isinstance(out, pandas.DataFrame)
+    assert list(out.columns) == ["a", "b"]
+    assert out.to_dict(orient="list") == {"a": [1, 2], "b": ["x", "y"]}
+
+
 def test_pandas_ui_merge_rejects_extra_kwargs() -> None:
     class L(PandasDataFrameModel):
         a: int
@@ -960,6 +1080,22 @@ def test_pandas_ui_groupby_requires_columns() -> None:
         df.group_by("k").mean()
     with pytest.raises(TypeError, match="at least one column"):
         df.group_by("k").count()
+
+
+def test_pandas_ui_groupby_rejects_pandas_params() -> None:
+    class Row(PandasDataFrameModel):
+        k: int
+        v: int
+
+    df = Row({"k": [1], "v": [2]})
+    with pytest.raises(NotImplementedError, match="dropna"):
+        df.group_by("k", dropna=False)  # type: ignore[arg-type]
+    with pytest.raises(NotImplementedError, match="as_index"):
+        df.group_by("k", as_index=False)  # type: ignore[arg-type]
+    with pytest.raises(NotImplementedError, match="sort"):
+        df.group_by("k", sort=True)  # type: ignore[arg-type]
+    with pytest.raises(NotImplementedError, match="observed"):
+        df.group_by("k", observed=True)  # type: ignore[arg-type]
 
 
 def test_pandas_model_merge_type_error() -> None:

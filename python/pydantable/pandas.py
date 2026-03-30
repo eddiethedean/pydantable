@@ -689,14 +689,16 @@ class PandasDataFrame(CoreDataFrame):
                         "query(): only simple function calls are supported."
                     )
                 fname = node.func.id
-                if fname in {"isnull", "notnull"}:
+                if fname in {"isnull", "notnull", "isna", "notna"}:
                     if len(node.args) != 1 or node.keywords:
                         raise TypeError(
                             f"query(): {fname}() expects one positional argument."
                         )
                     target = _compile(node.args[0])
                     return (
-                        target.is_null() if fname == "isnull" else target.is_not_null()
+                        target.is_null()
+                        if fname in {"isnull", "isna"}
+                        else target.is_not_null()
                     )
                 if fname in {"contains", "startswith", "endswith"}:
                     if len(node.args) != 2 or node.keywords:
@@ -719,6 +721,16 @@ class PandasDataFrame(CoreDataFrame):
                     if fname == "startswith":
                         return col_expr.starts_with(sub)
                     return col_expr.ends_with(sub)
+                if fname == "between":
+                    if len(node.args) != 3 or node.keywords:
+                        raise TypeError(
+                            "query(): between() expects (expr, low, high) "
+                            "positional args."
+                        )
+                    target = _compile(node.args[0])
+                    low = _compile(node.args[1])
+                    high = _compile(node.args[2])
+                    return (target >= low) & (target <= high)
                 raise NotImplementedError(
                     f"query(): unsupported function call {fname!r}."
                 )
@@ -789,10 +801,10 @@ class PandasDataFrame(CoreDataFrame):
                 raise ValueError("sort_values(): ascending must match len(by).")
         if key_id is None:
             return self.sort(*by_list, descending=desc)
-        if key_id not in {"lower", "upper", "abs"}:
+        if key_id not in {"lower", "upper", "abs", "strip", "length", "len"}:
             raise NotImplementedError(
                 f"sort_values(key={key!r}) is not supported; expected one of "
-                "'lower', 'upper', 'abs', or None."
+                "'lower', 'upper', 'abs', 'strip', 'length', 'len', or None."
             )
         tmp_cols: list[str] = []
         tmp_exprs: list[Expr] = []
@@ -805,7 +817,13 @@ class PandasDataFrame(CoreDataFrame):
             elif key_id == "lower":
                 tmp_exprs.append(base.lower())
             else:
-                tmp_exprs.append(base.upper())
+                if key_id == "upper":
+                    tmp_exprs.append(base.upper())
+                elif key_id == "strip":
+                    tmp_exprs.append(base.strip())
+                else:
+                    # length / len
+                    tmp_exprs.append(base.char_length())
         tmp_df = self.with_columns(
             **{n: e for n, e in zip(tmp_cols, tmp_exprs, strict=True)}
         )
@@ -980,6 +998,22 @@ class PandasDataFrame(CoreDataFrame):
                 casts[name] = self.col(name).cast(dt)
         return self.with_columns(**casts) if casts else self
 
+    def to_pandas(self) -> Any:
+        """
+        Materialize this typed frame into a `pandas.DataFrame`.
+
+        This is an eager convenience method.
+        """
+        try:
+            import pandas as pd  # type: ignore[import-not-found]
+        except Exception as e:  # pragma: no cover
+            raise ModuleNotFoundError(
+                "to_pandas() requires the optional 'pandas' dependency."
+            ) from e
+        data = self.collect(as_lists=True)
+        cols = list(self.schema_fields().keys())
+        return pd.DataFrame({c: data.get(c, []) for c in cols})
+
     def head(self, n: int = 5) -> CoreDataFrame:
         """
         Return the first ``n`` rows after materializing the current logical plan.
@@ -1036,7 +1070,43 @@ class PandasDataFrame(CoreDataFrame):
             "DataFrame indexing supports a single column name (str) or list[str]."
         )
 
-    def group_by(self, *keys: Any) -> PandasGroupedDataFrame:
+    class _ILoc:
+        def __init__(self, df: PandasDataFrame):
+            self._df = df
+
+        def __getitem__(self, key: slice) -> CoreDataFrame:
+            if not isinstance(key, slice):
+                raise TypeError("iloc[...] only supports slice objects.")
+            if key.step not in (None, 1):
+                raise NotImplementedError("iloc slicing does not support step.")
+            start = 0 if key.start is None else int(key.start)
+            stop = None if key.stop is None else int(key.stop)
+            if stop is None:
+                raise NotImplementedError("iloc[start:] is not supported without stop.")
+            if stop < start:
+                return self._df.slice(0, 0)
+            return self._df.slice(start, stop - start)
+
+    @property
+    def iloc(self) -> _ILoc:
+        return PandasDataFrame._ILoc(self)
+
+    def group_by(
+        self,
+        *keys: Any,
+        dropna: Any = None,
+        as_index: Any = None,
+        sort: Any = None,
+        observed: Any = None,
+    ) -> PandasGroupedDataFrame:
+        if dropna is not None:
+            raise NotImplementedError("group_by(dropna=...) is not supported.")
+        if as_index is not None:
+            raise NotImplementedError("group_by(as_index=...) is not supported.")
+        if sort is not None:
+            raise NotImplementedError("group_by(sort=...) is not supported.")
+        if observed is not None:
+            raise NotImplementedError("group_by(observed=...) is not supported.")
         inner = super().group_by(*keys)
         return PandasGroupedDataFrame(inner._df, inner._keys)
 
@@ -1189,8 +1259,8 @@ class PandasDataFrameModel(CoreDataFrameModel):
     def __getitem__(self, key: str | list[str]) -> Any:
         return self._df[key]  # type: ignore[index]
 
-    def group_by(self, *keys: Any) -> PandasGroupedDataFrameModel:
-        g = self._df.group_by(*keys)
+    def group_by(self, *keys: Any, **kwargs: Any) -> PandasGroupedDataFrameModel:
+        g = self._df.group_by(*keys, **kwargs)
         return PandasGroupedDataFrameModel(g, type(self))
 
 

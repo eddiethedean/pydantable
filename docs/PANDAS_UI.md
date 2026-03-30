@@ -129,6 +129,8 @@ Additionally supports a small whitelist of helper functions (function-call form 
 - `startswith(col, "pre")`
 - `endswith(col, "suf")`
 - `isnull(col)` / `notnull(col)`
+- `isna(col)` / `notna(col)` (aliases)
+- `between(col, low, high)` (inclusive)
 
 Unsupported syntax (other function calls, attribute access, subscripts, etc.) raises `NotImplementedError`.
 
@@ -166,8 +168,20 @@ Alias for `sort(...)` with pandas-shaped arguments.
 
 - `ascending`: `bool` or `list[bool]` (must match `by` length).
 - `na_position`, `kind`: accepted but raise `NotImplementedError`.
-- `key`: supported only as one of the string identifiers `"lower"`, `"upper"`, `"abs"` (case-insensitive). Python callables raise `NotImplementedError`.
+- `key`: supported only as one of the string identifiers `"lower"`, `"upper"`, `"abs"`, `"strip"`, `"length"`, `"len"` (case-insensitive). Python callables raise `NotImplementedError`.
 - `ignore_index`: `False` is accepted; `True` raises `NotImplementedError` (no Index semantics).
+
+### `.iloc[...]` (limited)
+
+`iloc` supports a minimal, **plan-only** slice form backed by the core `slice()` operator:
+
+- `df.iloc[start:stop]` (no `step`)
+
+Not supported (raises `NotImplementedError` / `TypeError`): scalar row access, list-of-indices, or slices with `step`.
+
+### `to_pandas()` (eager)
+
+`to_pandas()` materializes the current logical plan and returns a `pandas.DataFrame` (requires the optional `pandas` dependency).
 
 **Realistic pattern:** sort then materialize:
 
