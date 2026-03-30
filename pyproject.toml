@@ -220,6 +220,23 @@ ignore_missing_imports = true
 module = "google.cloud"
 ignore_missing_imports = true
 
+# Optional runtime deps: installed only with `[fastapi]` / `[dev]`.
+[[tool.mypy.overrides]]
+module = "fastapi"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "fastapi.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "starlette"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "starlette.*"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 pythonpath = ["python"]
 testpaths = ["tests"]
