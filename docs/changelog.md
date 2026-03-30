@@ -10,6 +10,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Added
 
+- **`pydantable.fastapi`:** **`ndjson_streaming_response`** / **`ndjson_chunk_bytes`** for NDJSON **`StreamingResponse`** from **`astream()`** without hand-rolling encoders.
 - **`pydantable.fastapi`** (optional **`pip install 'pydantable[fastapi]'`**): **`executor_lifespan`**, **`get_executor`** (``Depends``), **`register_exception_handlers`** for **`MissingRustExtensionError`** / **`pydantic.ValidationError`**. See {doc}`/GOLDEN_PATH_FASTAPI` and {doc}`/FASTAPI`.
 - **`pydantable.typing.SupportsLazyAsyncMaterialize`:** structural ``Protocol`` for objects with async terminal materialization via **`acollect`** (``DataFrameModel`` and ``AwaitableDataFrameModel``).
 - **`AwaitableDataFrameModel`:** **`aread_parquet`**, **`aread_ipc`**, **`aread_csv`**, **`aread_ndjson`**, and **`aread_json`** return a chainable awaitable (``select`` / ``filter`` / … then ``await …acollect()``) so async routes avoid nested ``await`` on the read. **Lazy metadata:** ``await …columns`` / ``shape`` / ``empty`` / ``dtypes``; **`then`** for custom sync/async steps; **`concat`** to merge multiple pending chains or concrete models. **Async-first names:** unprefixed terminals on the chain — **`collect`**, **`to_dict`**, **`to_polars`**, **`to_arrow`**, **`rows`**, **`to_dicts`**, **`stream`** (aliases of the ``a*`` methods); **`DataFrameModel.Async.read_*`** / **`Async.write_sql`** / **`Async.export_*`** mirror **`aread_*`** / **`awrite_sql`** / **`aexport_*`** without the ``a`` prefix (``read_parquet`` cannot replace **`aread_parquet`** on the class itself because **`read_parquet`** is the sync lazy reader). Pending chains show a **descriptive ``repr``** (read path + chained transforms).
@@ -21,6 +22,8 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Docs
 
+- New {doc}`/FASTAPI_ENHANCEMENTS` (roadmap + “when to use what” matrix); links from {doc}`/GOLDEN_PATH_FASTAPI`, {doc}`/FASTAPI`, {doc}`/DOCS_MAP`.
+- {doc}`/FASTAPI_ENHANCEMENTS`: production **lifespan** snippet (**`executor_lifespan`**, **`get_executor`**, **`register_exception_handlers`**), NDJSON helper semantics, troubleshooting table (422 vs 503, empty streams, executor tuning); **`tests/test_pydantable_fastapi_integration.py`** covers empty NDJSON, Unicode/null, custom **`media_type`**, **`astream`** batching, and golden-path stream parsing.
 - {doc}`TYPING`: expanded **`SupportsLazyAsyncMaterialize`** (when to use vs **`DataFrameModelWithRow`**, runtime **`isinstance`** caveats, examples); {doc}`DATAFRAMEMODEL` cross-link from async lazy I/O.
 - New {doc}`MATERIALIZATION` page; {doc}`EXECUTION`, {doc}`INTERFACE_CONTRACT`, {doc}`DATAFRAMEMODEL`, {doc}`DOCS_MAP` cross-links.
 - {doc}`/DATAFRAMEMODEL` **Three layers** (ASCII diagram + rule of thumb + lazy-shape warning); {doc}`/cookbook/async_lazy_pipeline`; {doc}`/cookbook/fastapi_async_materialization` prefers **`collect`** / **`to_dict`**.

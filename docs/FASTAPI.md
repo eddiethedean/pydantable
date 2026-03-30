@@ -6,7 +6,7 @@ materialize **row lists** for JSON responses.
 
 **Start here:** {doc}`GOLDEN_PATH_FASTAPI` (one runnable async app: lifespan, `Depends`, `acollect`, streaming).
 
-**Related recipes:** {doc}`/cookbook/fastapi_columnar_bodies` (column-shaped JSON bodies), {doc}`/cookbook/fastapi_async_materialization`, {doc}`/cookbook/async_lazy_pipeline` (lazy `aread_*` → transforms → materialize).
+**Related recipes:** {doc}`/cookbook/fastapi_columnar_bodies` (column-shaped JSON bodies), {doc}`/cookbook/fastapi_async_materialization`, {doc}`/cookbook/async_lazy_pipeline` (lazy `aread_*` → transforms → materialize). **Roadmap / “when to use what”:** {doc}`/FASTAPI_ENHANCEMENTS`.
 
 ## Optional `pydantable.fastapi` helpers
 
@@ -21,6 +21,7 @@ Then import `pydantable.fastapi` (not required for basic FastAPI usage):
 - **`executor_lifespan(app, max_workers=..., thread_name_prefix=...)`** — async context manager that attaches a `ThreadPoolExecutor` to **`app.state.executor`** for **`acollect(executor=...)`** and **`pydantable.io`** helpers.
 - **`get_executor(request)`** — for **`Depends(get_executor)`**, returning **`request.app.state.executor`** (or **`None`** if unset).
 - **`register_exception_handlers(app)`** — registers HTTP handlers for **`MissingRustExtensionError`** (**503**) and in-handler **`pydantic.ValidationError`** (**422**); see {ref}`fastapi-errors`.
+- **`ndjson_streaming_response(astream_iter)`** / **`ndjson_chunk_bytes(astream_iter)`** — build **`application/x-ndjson`** **`StreamingResponse`** from **`await df.astream(...)`** without duplicating JSON line encoding; see {doc}`/FASTAPI_ENHANCEMENTS`.
 
 Inbound request validation is still FastAPI’s default **`RequestValidationError`** (**422**) when the *request body* fails to parse.
 

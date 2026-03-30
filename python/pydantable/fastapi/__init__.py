@@ -6,13 +6,16 @@ FastAPI in your service.
 
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncIterator  # noqa: TC003
 from concurrent.futures import Executor, ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI  # noqa: TC002
 from pydantic import ValidationError
 from starlette.requests import Request  # noqa: TC002
+from starlette.responses import StreamingResponse
 
 from pydantable._extension import MissingRustExtensionError
 
@@ -20,6 +23,8 @@ __all__ = [
     "MissingRustExtensionError",
     "executor_lifespan",
     "get_executor",
+    "ndjson_chunk_bytes",
+    "ndjson_streaming_response",
     "register_exception_handlers",
 ]
 
@@ -55,6 +60,34 @@ async def executor_lifespan(
         yield
     finally:
         executor.shutdown(wait=True)
+
+
+async def ndjson_chunk_bytes(
+    chunks: AsyncIterator[dict[str, Any]],
+) -> AsyncIterator[bytes]:
+    """Yield ``dict[str, list]`` chunks as UTF-8 NDJSON lines (JSON + newline).
+
+    Use with the async iterator from :meth:`pydantable.dataframe.DataFrame.astream`
+    when building a custom :class:`starlette.responses.StreamingResponse`.
+    """
+    async for chunk in chunks:
+        yield json.dumps(chunk).encode("utf-8") + b"\n"
+
+
+def ndjson_streaming_response(
+    chunks: AsyncIterator[dict[str, Any]],
+    *,
+    media_type: str = "application/x-ndjson",
+) -> StreamingResponse:
+    """Wrap an ``astream()`` iterator as a NDJSON :class:`StreamingResponse`.
+
+    Each chunk is JSON-encoded on its own line (common for streaming columnar
+    dicts to HTTP clients).
+    """
+    return StreamingResponse(
+        ndjson_chunk_bytes(chunks),
+        media_type=media_type,
+    )
 
 
 def get_executor(request: Request) -> Executor | None:

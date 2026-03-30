@@ -24,7 +24,7 @@ integration guide and error-handling table.
 | **`get_executor`** + **`Depends`** | Injects that pool into handlers; **`None`** if you skip lifespan (still valid for **`acollect`**). |
 | **`register_exception_handlers`** | **`MissingRustExtensionError` → 503**, in-route **`pydantic.ValidationError` → 422** (see {ref}`fastapi-errors`). |
 | **Typed routes** | **`list[DataFrameModel.RowModel]`** bodies and **`response_model=list[YourRow]`** keep OpenAPI and clients aligned. |
-| **Streaming** | **`astream()`** + **`StreamingResponse`** for large columnar payloads (one JSON object per line is a common NDJSON pattern). |
+| **Streaming** | **`astream()`** + **`ndjson_streaming_response`** from **`pydantable.fastapi`** for NDJSON (one JSON object per line). See {doc}`/FASTAPI_ENHANCEMENTS` (NDJSON semantics, production **lifespan** snippet, troubleshooting). |
 
 ## Async I/O beyond this page
 
@@ -69,6 +69,7 @@ curl -s -N localhost:8000/api/v1/users/stream
 
 ## Related docs
 
+- Roadmap and “when to use what”: {doc}`/FASTAPI_ENHANCEMENTS`
 - Full FastAPI guide: {doc}`/FASTAPI`
 - HTTP status mapping: {ref}`fastapi-errors` (in {doc}`/FASTAPI`)
 - Columnar JSON bodies: {doc}`/cookbook/fastapi_columnar_bodies`

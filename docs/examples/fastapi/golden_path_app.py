@@ -21,15 +21,14 @@ the GOLDEN_PATH_FASTAPI doc and the async_lazy_pipeline cookbook in the repo doc
 
 from __future__ import annotations
 
-import json
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, FastAPI
-from fastapi.responses import StreamingResponse
 from pydantable import DataFrameModel
 from pydantable.fastapi import (
     executor_lifespan,
     get_executor,
+    ndjson_streaming_response,
     register_exception_handlers,
 )
 from pydantic import BaseModel
@@ -83,12 +82,7 @@ async def stream_users(executor=Depends(get_executor)):  # noqa: B008
         {"id": [1, 2, 3], "age": [10, None, 40]},
         trusted_mode="shape_only",
     )
-
-    async def ndjson_body():
-        async for chunk in df.astream(batch_size=2, executor=executor):
-            yield json.dumps(chunk).encode("utf-8") + b"\n"
-
-    return StreamingResponse(ndjson_body(), media_type="application/x-ndjson")
+    return ndjson_streaming_response(df.astream(batch_size=2, executor=executor))
 
 
 app.include_router(api)
