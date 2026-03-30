@@ -218,6 +218,39 @@ def test_pandas_ui_query_between_helper() -> None:
     assert_table_eq_sorted(out, {"a": [2, 3]}, keys=["a"])
 
 
+def test_pandas_ui_query_between_rejects_wrong_arity() -> None:
+    class Row(PandasDataFrameModel):
+        a: int
+
+    df = Row({"a": [1]})
+    with pytest.raises(TypeError, match=r"between\(\) expects"):
+        df.query("between(a, 1)")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match=r"between\(\) expects"):
+        df.query("between(a, 1, 2, 3)")  # type: ignore[arg-type]
+
+
+def test_pandas_ui_query_isna_notna_reject_wrong_arity() -> None:
+    class Row(PandasDataFrameModel):
+        a: int | None
+
+    df = Row({"a": [None]})
+    with pytest.raises(TypeError, match=r"isna\(\) expects"):
+        df.query("isna()")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match=r"notna\(\) expects"):
+        df.query("notna(a, a)")  # type: ignore[arg-type]
+
+
+def test_pandas_ui_query_between_supports_external_constants() -> None:
+    class Row(PandasDataFrameModel):
+        a: int
+
+    df = Row({"a": [1, 2, 3, 4]})
+    out = df.query("between(a, lo, hi)", local_dict={"lo": 2, "hi": 3}).collect(
+        as_lists=True
+    )
+    assert_table_eq_sorted(out, {"a": [2, 3]}, keys=["a"])
+
+
 def test_pandas_ui_sort_values_key_identifiers() -> None:
     class Row(PandasDataFrameModel):
         s: str
@@ -239,6 +272,24 @@ def test_pandas_ui_sort_values_key_len_orders_by_char_length() -> None:
     df = Row({"s": ["bbb", "a", "cc"]})
     out = df.sort_values("s", key="len").collect(as_lists=True)
     assert out["s"] == ["a", "cc", "bbb"]
+
+
+def test_pandas_ui_sort_values_key_unknown_rejected() -> None:
+    class Row(PandasDataFrameModel):
+        s: str
+
+    df = Row({"s": ["a"]})
+    with pytest.raises(NotImplementedError, match="sort_values\\(key="):
+        df.sort_values("s", key="wat")  # type: ignore[arg-type]
+
+
+def test_pandas_ui_sort_values_key_temp_cols_not_leaked() -> None:
+    class Row(PandasDataFrameModel):
+        s: str
+
+    df = Row({"s": ["B", "a"]})
+    out = df.sort_values("s", key="lower")
+    assert all(not c.startswith("__pd_sort_key_") for c in out.schema_fields())
 
 
 def test_pandas_ui_merge_left_on_requires_right_on() -> None:
@@ -611,6 +662,28 @@ def test_pandas_ui_iloc_slice_plan_only() -> None:
         _ = df.iloc[0:3:2]
     with pytest.raises(TypeError, match="slice"):
         _ = df.iloc[1]  # type: ignore[index]
+
+
+def test_pandas_ui_iloc_slice_stop_lt_start_is_empty() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        id: int
+
+    df = DataFrame[Row]({"id": [1, 2, 3]})
+    out = df.iloc[2:1].collect(as_lists=True)
+    assert out == {"id": []}
+
+
+def test_pandas_ui_iloc_slice_allows_none_start() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        id: int
+
+    df = DataFrame[Row]({"id": [1, 2, 3]})
+    out = df.iloc[:2].collect(as_lists=True)
+    assert out == {"id": [1, 2]}
 
 
 def test_pandas_core_head_tail_empty_columns() -> None:
