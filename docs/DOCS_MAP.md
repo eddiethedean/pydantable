@@ -5,7 +5,7 @@ Use this page when you know **what you need to do**, but not **where it is docum
 ## Start here (by goal)
 
 - **Model a table schema and do typed transforms**: {doc}`DATAFRAMEMODEL` (primary user guide).
-- **Build an API with FastAPI**: {doc}`GOLDEN_PATH_FASTAPI` (shortest runnable path), then {doc}`FASTAPI` (request bodies, responses, async patterns, columnar OpenAPI / **`Depends`**); roadmap → {doc}`FASTAPI_ENHANCEMENTS`; observability → {doc}`/cookbook/fastapi_observability`; background **`submit`** → {doc}`/cookbook/fastapi_background_tasks`; lazy async scans → {doc}`/cookbook/async_lazy_pipeline`. **Example layout:** `docs/examples/fastapi/service_layout/`. **Integration tests:** **`pydantable.testing.fastapi`** (**`fastapi_test_client`**, **`fastapi_app_with_executor`**).
+- **Build an API with FastAPI**: {doc}`GOLDEN_PATH_FASTAPI` (shortest runnable path), then {doc}`FASTAPI` (common patterns + reference tables), and {doc}`FASTAPI_ADVANCED` (less-common async/I/O patterns). Roadmap → {doc}`FASTAPI_ENHANCEMENTS`; observability → {doc}`/cookbook/fastapi_observability`; background **`submit`** → {doc}`/cookbook/fastapi_background_tasks`; lazy async scans → {doc}`/cookbook/async_lazy_pipeline`. **Example layout:** `docs/examples/fastapi/service_layout/`. **Integration tests:** **`pydantable.testing.fastapi`** (**`fastapi_test_client`**, **`fastapi_app_with_executor`**).
 - **Understand execution/materialization costs**: {doc}`EXECUTION`; **four plan materialization modes** (blocking / async / deferred / chunked): {doc}`MATERIALIZATION`.
 - **Choose an I/O entrypoint**: {doc}`IO_DECISION_TREE`, then the per-format pages under {doc}`IO_OVERVIEW`.
 - **Know what behavior is guaranteed (joins/nulls/windows/order)**: {doc}`INTERFACE_CONTRACT`.
