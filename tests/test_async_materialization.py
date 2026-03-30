@@ -1116,6 +1116,7 @@ async def test_concurrent_native_async_execute_plan_wall_clock_overlap() -> None
     """Deprecated: timing-based overlap tests are intentionally removed."""
     pytest.skip("Removed: wall-clock overlap assertions are too flaky on CI.")
 
+
 #
 # NOTE: the original wall-clock overlap assertions were removed because they are
 # sensitive to OS scheduling jitter (especially on macOS runners) and cause
