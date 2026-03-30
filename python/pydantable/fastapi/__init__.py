@@ -18,6 +18,7 @@ from starlette.requests import Request  # noqa: TC002
 from starlette.responses import StreamingResponse
 
 from pydantable._extension import MissingRustExtensionError
+from pydantable.errors import ColumnLengthMismatchError, PydantableUserError
 
 from .columnar import (
     columnar_body_model,
@@ -27,7 +28,9 @@ from .columnar import (
 )
 
 __all__ = [
+    "ColumnLengthMismatchError",
     "MissingRustExtensionError",
+    "PydantableUserError",
     "columnar_body_model",
     "columnar_body_model_from_dataframe_model",
     "columnar_dependency",
@@ -114,19 +117,30 @@ def register_exception_handlers(app: FastAPI) -> None:
     """Register HTTP-friendly handlers for common pydantable / Pydantic errors.
 
     - :exc:`~pydantable.MissingRustExtensionError` → **503** (native extension missing).
+    - :exc:`~pydantable.errors.ColumnLengthMismatchError` → **400** with ``detail``
+      string.
     - :exc:`pydantic.ValidationError` → **422** with ``detail`` as Pydantic's error
       list.
 
     Inbound request body validation is usually handled by FastAPI as
     :exc:`fastapi.exceptions.RequestValidationError` (**422**) before your route runs.
     This handler covers :exc:`~pydantic.ValidationError` raised inside handlers (for
-    example manual ``model_validate``). Do **not** register a blanket handler for
-    :exc:`ValueError` from the engine — map those explicitly in your routes.
+    example manual ``model_validate``). Other :exc:`ValueError` subclasses from the
+    engine are **not** handled here — map those in your routes if needed.
 
     Idempotent for duplicate registration: re-calling on the same app replaces handlers
     for the same exception types (Starlette/FastAPI behavior).
     """
     from fastapi.responses import JSONResponse
+
+    @app.exception_handler(ColumnLengthMismatchError)
+    async def _column_length_mismatch(
+        request: Request, exc: ColumnLengthMismatchError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=400,
+            content={"detail": str(exc)},
+        )
 
     @app.exception_handler(MissingRustExtensionError)
     async def _missing_rust(

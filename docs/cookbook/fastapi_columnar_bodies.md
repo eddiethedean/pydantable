@@ -20,37 +20,54 @@ from pydantable.fastapi import columnar_body_model_from_dataframe_model
 
 
 class User(DataFrameModel):
-    id: int
-    age: int | None
+    user_id: int
+    email: str
+    signup_year: int | None = None
 
 
 UsersColumnar = columnar_body_model_from_dataframe_model(
     User,
-    example={"id": [1, 2], "age": [20, None]},
+    example={
+        "user_id": [1001, 1002],
+        "email": ["ada@example.com", "bob@example.org"],
+        "signup_year": [2024, None],
+    },
 )
-body = UsersColumnar(id=[1, 2], age=[20, None])
+body = UsersColumnar(
+    user_id=[1001, 1002],
+    email=["ada@example.com", "bob@example.org"],
+    signup_year=[2024, None],
+)
 df = User(body.model_dump())
-assert df.to_dict() == {"id": [1, 2], "age": [20, None]}
+assert df.to_dict() == {
+    "user_id": [1001, 1002],
+    "email": ["ada@example.com", "bob@example.org"],
+    "signup_year": [2024, None],
+}
 ```
 
 ## Recipe (`Depends` on the frame)
 
 For FastAPI routes, use **`columnar_dependency`** so the handler receives a
-**`DataFrameModel`** directly:
+**`DataFrameModel`** directly. Call **`register_exception_handlers`** once so
+**`ColumnLengthMismatchError`** becomes **400** instead of **500**:
 
 ```python
 from typing import Annotated
 
 from fastapi import Depends, FastAPI
 
-from pydantable.fastapi import columnar_dependency
+from pydantable.fastapi import columnar_dependency, register_exception_handlers
 
 app = FastAPI()
+register_exception_handlers(app)
 
-@app.post("/users")
-def create_users(
+
+@app.post("/users/batch")
+def ingest_users_batch(
     df: Annotated[User, Depends(columnar_dependency(User, trusted_mode="strict"))],
 ) -> dict[str, list]:
+    # e.g. df.select(...).filter(...) then return await … in an async route
     return df.to_dict()
 ```
 
@@ -60,6 +77,6 @@ See {doc}`/FASTAPI` **Columnar OpenAPI and Depends** and **`tests/test_pydantabl
 
 ## Pitfalls
 
-- **Length mismatches** across columns: Pydantic may accept the JSON, then **`DataFrameModel`** raises **`ValueError`** when lengths differ—typically **500** in FastAPI unless you handle it. Validate lengths explicitly if you need **4xx** with a custom message.
+- **Length mismatches** across columns: Pydantic may accept the JSON, then **`DataFrameModel`** raises **`ColumnLengthMismatchError`**. With **`register_exception_handlers`**, FastAPI returns **400**; otherwise you often see **500**. Validate lengths explicitly if you need a custom **4xx** body.
 - **Validation cost** depends on `trusted_mode` (see {doc}`/DATAFRAMEMODEL`).
 - **Nested** row fields become **`list[NestedModel]`** in columnar JSON (see {doc}`/FASTAPI` **Columnar OpenAPI and Depends**).

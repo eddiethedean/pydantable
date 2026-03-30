@@ -6,7 +6,7 @@ materialize **row lists** for JSON responses.
 
 **Start here:** {doc}`GOLDEN_PATH_FASTAPI` (one runnable async app: lifespan, `Depends`, `acollect`, streaming).
 
-**Related recipes:** {doc}`/cookbook/fastapi_columnar_bodies` (column-shaped JSON bodies), {doc}`/cookbook/fastapi_async_materialization`, {doc}`/cookbook/async_lazy_pipeline` (lazy `aread_*` → transforms → materialize). **Roadmap / “when to use what”:** {doc}`/FASTAPI_ENHANCEMENTS`.
+**Related recipes:** {doc}`/cookbook/fastapi_columnar_bodies` (column-shaped JSON bodies), {doc}`/cookbook/fastapi_async_materialization`, {doc}`/cookbook/fastapi_observability` (request IDs + **`observe`**), {doc}`/cookbook/fastapi_background_tasks` (**`BackgroundTasks`** + **`submit`**), {doc}`/cookbook/async_lazy_pipeline` (lazy `aread_*` → transforms → materialize). Example **service layout** (routers + lifespan): `docs/examples/fastapi/service_layout/` in the repo. **Roadmap / “when to use what”:** {doc}`/FASTAPI_ENHANCEMENTS`.
 
 ## Optional `pydantable.fastapi` helpers
 
@@ -20,7 +20,7 @@ Then import `pydantable.fastapi` (not required for basic FastAPI usage):
 
 - **`executor_lifespan(app, max_workers=..., thread_name_prefix=...)`** — async context manager that attaches a `ThreadPoolExecutor` to **`app.state.executor`** for **`acollect(executor=...)`** and **`pydantable.io`** helpers.
 - **`get_executor(request)`** — for **`Depends(get_executor)`**, returning **`request.app.state.executor`** (or **`None`** if unset).
-- **`register_exception_handlers(app)`** — registers HTTP handlers for **`MissingRustExtensionError`** (**503**) and in-handler **`pydantic.ValidationError`** (**422**); see {ref}`fastapi-errors`.
+- **`register_exception_handlers(app)`** — registers HTTP handlers for **`MissingRustExtensionError`** (**503**), **`ColumnLengthMismatchError`** (**400**), and in-handler **`pydantic.ValidationError`** (**422**); see {ref}`fastapi-errors`.
 - **`ndjson_streaming_response(astream_iter)`** / **`ndjson_chunk_bytes(astream_iter)`** — build **`application/x-ndjson`** **`StreamingResponse`** from **`await df.astream(...)`** without duplicating JSON line encoding; see {doc}`/FASTAPI_ENHANCEMENTS`.
 - **`columnar_body_model`**, **`columnar_body_model_from_dataframe_model`** — build a Pydantic model whose fields are **`list[T]`** per column (OpenAPI-friendly **`dict[str, list]`**). Optional **`example=`** / **`json_schema_extra=`** for Swagger examples.
 - **`columnar_dependency(model_cls, ...)`**, **`rows_dependency(model_cls, ...)`** — **`Depends(...)`** factories that validate the request body and return a **`DataFrameModel`** instance (columnar JSON or **`list[RowModel]`**), forwarding **`trusted_mode`** and related **`DataFrameModel`** kwargs.
@@ -50,7 +50,7 @@ For **row-array** JSON bodies, use **`rows_dependency(User)`**; OpenAPI document
 
 **Nested row fields** (e.g. **`inner: NestedModel`**) become **`list[NestedModel]`** in columnar JSON (one nested object per row index). That shape is valid but can be heavy on the wire; prefer flat columns when you can.
 
-**Validation layers:** Pydantic validates each column as **`list[T]`** (wrong element types → **422** before your handler). **Row/column length consistency** and engine rules are enforced when constructing **`DataFrameModel`** inside the dependency; mismatched column lengths raise **`ValueError`** (**500** unless you catch or map it—see {ref}`fastapi-errors`). For stricter API errors, validate lengths in a route wrapper or map **`ValueError`** to **`HTTPException(400)`**.
+**Validation layers:** Pydantic validates each column as **`list[T]`** (wrong element types → **422** before your handler). **Row/column length consistency** is enforced when constructing **`DataFrameModel`** inside the dependency; mismatched lengths raise **`ColumnLengthMismatchError`** (subclass of **`ValueError`**). With **`register_exception_handlers`**, that maps to **400**; without it, you typically see **500**—see {ref}`fastapi-errors`.
 
 **NDJSON** streaming responses do not get a per-chunk OpenAPI schema (same as any streaming body); columnar **`response_model`** applies to single JSON **`to_dict()`** responses only.
 
@@ -64,7 +64,8 @@ For **row-array** JSON bodies, use **`rows_dependency(User)`**; OpenAPI document
 | Invalid JSON body shape / types at the boundary | `fastapi.exceptions.RequestValidationError` | **422** | FastAPI’s default handler (before your route runs). |
 | Manual validation inside a route (e.g. `model_validate`) | `pydantic.ValidationError` | **422** | Use **`register_exception_handlers`** from **`pydantable.fastapi`**, or map yourself. |
 | Native extension missing | `MissingRustExtensionError` | **503** | **`register_exception_handlers`** returns a JSON **`detail`** string. |
-| Engine / plan / transform errors | Often `ValueError` | **400** / **422** / **500** | **Do not** map all `ValueError`s globally; handle per route or use `HTTPException`. |
+| Mismatched column lengths after Pydantic accepted the body | `ColumnLengthMismatchError` | **400** | From **`register_exception_handlers`**; JSON **`{"detail": "<message>"}`**. |
+| Engine / plan / transform errors | Often `ValueError` | **400** / **422** / **500** | **Do not** map all `ValueError`s globally; **`register_exception_handlers`** only adds **`ColumnLengthMismatchError`**. |
 
 ## Why this matters
 

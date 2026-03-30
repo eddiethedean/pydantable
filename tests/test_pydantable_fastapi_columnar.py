@@ -11,12 +11,13 @@ pytest.importorskip("fastapi")
 
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
-from pydantable import DataFrameModel
+from pydantable import ColumnLengthMismatchError, DataFrameModel
 from pydantable.fastapi import (
     columnar_body_model,
     columnar_body_model_from_dataframe_model,
     columnar_dependency,
     get_executor,
+    register_exception_handlers,
     rows_dependency,
 )
 from pydantable.testing.fastapi import fastapi_app_with_executor, fastapi_test_client
@@ -71,6 +72,52 @@ def test_columnar_body_model_example_in_schema() -> None:
     assert schema.get("example") == {"id": [1, 2], "age": [10, None]}
 
 
+def test_columnar_dependency_422_missing_required_column() -> None:
+    app = FastAPI()
+
+    @app.post("/col")
+    def route(
+        df: Annotated[UserDF, Depends(columnar_dependency(UserDF))],
+    ) -> dict[str, list]:
+        return df.to_dict()
+
+    with fastapi_test_client(app) as client:
+        r = client.post("/col", json={"age": [1, 2]})
+        assert r.status_code == 422
+
+
+def test_columnar_dependency_strict_mode_accepts_valid_integers() -> None:
+    app = FastAPI()
+
+    @app.post("/col")
+    def route(
+        df: Annotated[
+            UserDF,
+            Depends(columnar_dependency(UserDF, trusted_mode="strict")),
+        ],
+    ) -> dict[str, list]:
+        return df.to_dict()
+
+    with fastapi_test_client(app) as client:
+        r = client.post("/col", json={"id": [1], "age": [42]})
+        assert r.status_code == 200
+        assert r.json() == {"id": [1], "age": [42]}
+
+
+def test_register_handlers_column_length_mismatch_from_direct_raise() -> None:
+    app = FastAPI()
+    register_exception_handlers(app)
+
+    @app.get("/direct")
+    def direct() -> None:
+        raise ColumnLengthMismatchError("test detail")
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        r = client.get("/direct")
+        assert r.status_code == 400
+        assert r.json()["detail"] == "test detail"
+
+
 def test_columnar_dependency_422_invalid_list_element_type() -> None:
     app = FastAPI()
 
@@ -85,8 +132,24 @@ def test_columnar_dependency_422_invalid_list_element_type() -> None:
         assert r.status_code == 422
 
 
+def test_columnar_dependency_length_mismatch_returns_400_with_handlers() -> None:
+    app = FastAPI()
+    register_exception_handlers(app)
+
+    @app.post("/col")
+    def route(
+        df: Annotated[UserDF, Depends(columnar_dependency(UserDF))],
+    ) -> dict[str, list]:
+        return df.to_dict()
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        r = client.post("/col", json={"id": [1, 2], "age": [3]})
+        assert r.status_code == 400
+        assert "same length" in r.json()["detail"]
+
+
 def test_columnar_dependency_length_mismatch_is_500_when_unhandled() -> None:
-    """Engine shape checks run after Pydantic; uncaught ``ValueError`` → **500**."""
+    """Without handlers, :exc:`ColumnLengthMismatchError` surfaces as **500**."""
     app = FastAPI()
 
     @app.post("/col")
@@ -98,6 +161,18 @@ def test_columnar_dependency_length_mismatch_is_500_when_unhandled() -> None:
     with TestClient(app, raise_server_exceptions=False) as client:
         r = client.post("/col", json={"id": [1, 2], "age": [3]})
         assert r.status_code == 500
+
+
+def test_register_handlers_does_not_catch_generic_valueerror() -> None:
+    app = FastAPI()
+    register_exception_handlers(app)
+
+    @app.get("/boom")
+    def boom() -> None:
+        raise ValueError("generic engine error")
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        assert client.get("/boom").status_code == 500
 
 
 def test_nested_columnar_round_trip() -> None:

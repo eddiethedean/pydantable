@@ -29,6 +29,8 @@ from typing import (
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError, create_model
 from pydantic_core import PydanticUndefined
 
+from pydantable.errors import ColumnLengthMismatchError
+
 _NoneType = type(None)
 
 # ``get_type_hints`` / nested model introspection failures → unsupported annotation.
@@ -929,7 +931,7 @@ def validate_columns_strict(
         raise ValueError(f"Missing required columns: {sorted(missing_required)}")
 
     if len(lengths) != 1:
-        raise ValueError(
+        raise ColumnLengthMismatchError(
             f"All columns must have the same length; got {sorted(lengths)}"
         )
 

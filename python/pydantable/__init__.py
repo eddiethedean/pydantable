@@ -14,6 +14,7 @@ from . import pandas as pandas
 from . import plugins as plugins
 from . import pyspark as pyspark
 from ._extension import MissingRustExtensionError
+from .errors import ColumnLengthMismatchError, PydantableUserError
 from .awaitable_dataframe_model import AwaitableDataFrameModel
 from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
@@ -64,11 +65,13 @@ from .types import WKB
 __all__ = [
     "AwaitableDataFrameModel",
     "WKB",
+    "ColumnLengthMismatchError",
     "DataFrame",
     "DataFrameModel",
     "DtypeDriftWarning",
     "Expr",
     "MissingRustExtensionError",
+    "PydantableUserError",
     "PlanMaterialization",
     "Schema",
     "afetch_sql",

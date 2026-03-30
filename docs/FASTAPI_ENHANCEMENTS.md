@@ -64,7 +64,7 @@ responses. Install **`pip install 'pydantable[fastapi]'`**.
 | Empty stream body | **`astream()`** produced no chunks (empty frame or zero batches); NDJSON is still valid with an empty body. |
 | High latency under concurrent requests | Raise **`executor_lifespan(..., max_workers=...)`** or reduce competing work on the default thread pool ({doc}`/EXECUTION`). |
 | Client disconnect does not stop engine work | Documented limitation: cancelling **`await acollect()`** does not cancel in-flight Rust work ({doc}`/EXECUTION`). |
-| **500** after **422**-valid columnar JSON | **`DataFrameModel`** construction in **`columnar_dependency`** / **`rows_dependency`** can raise **`ValueError`** (e.g. column length mismatch). Map in the route or with an exception handler; not a **`RequestValidationError`**. |
+| **500** after **422**-valid columnar JSON (no handlers) | **`ColumnLengthMismatchError`** when column lengths differ. Call **`register_exception_handlers`** for **400** with a **`detail`** string; or catch in-route. |
 | OpenAPI shows **`list`** but clients send wrong element type | FastAPI returns **422** from Pydantic; fix payload types. |
 
 ## Phased roadmap
@@ -85,30 +85,32 @@ responses. Install **`pip install 'pydantable[fastapi]'`**.
 - **`columnar_dependency`** / **`rows_dependency`** build a **`DataFrameModel`** from validated bodies; see {doc}`/FASTAPI` **Columnar OpenAPI and Depends** and {doc}`/cookbook/fastapi_columnar_bodies`.
 - Optional **named executors** (e.g. **`app.state.executors["io"]`**) for separate pools — not packaged; pattern only.
 
-### Phase 4 — Errors
+### Phase 4 — Errors (shipped)
 
-- Narrow **pydantable-specific** exception types (subclasses) mappable to **4xx** in **`register_exception_handlers`**, instead of blanket **`ValueError`** mapping.
+- **`PydantableUserError`**, **`ColumnLengthMismatchError`** in **`pydantable.errors`** (subclass **`ValueError`**). **`register_exception_handlers`** maps **`ColumnLengthMismatchError`** → **400**. Further narrow types can be added incrementally ({doc}`/FASTAPI` error table).
 
-### Phase 5 — Ops / observability
+### Phase 5 — Ops / observability (shipped as docs)
 
-- Request-ID + **`observe`** cookbook; optional OpenTelemetry span attributes aligned with **`set_observer`**.
+- {doc}`/cookbook/fastapi_observability` — request-ID middleware, **`observe.emit`** / **`span`**, optional OpenTelemetry bridge note.
 
-### Phase 6 — Long-running work
+### Phase 6 — Long-running work (shipped as docs)
 
-- Documented **`BackgroundTasks`** + **`submit`** / **`ExecutionHandle`** patterns for deferred materialization.
+- {doc}`/cookbook/fastapi_background_tasks` — **`BackgroundTasks`** + **`submit`** / **`ExecutionHandle`**, executor alignment, cancellation limits ({doc}`/EXECUTION`).
 
 ### Phase 7 — Testing (shipped)
 
 - **`pydantable.testing.fastapi`:** **`fastapi_app_with_executor`**, **`fastapi_test_client`** (lifespan-aware **`TestClient`**). See {doc}`/FASTAPI` **Columnar OpenAPI and Depends**.
 
-### Phase 8 — Templates
+### Phase 8 — Templates (shipped as layout + docs)
 
-- Cookiecutter / **`uv`** template or a checked-in **example service** layout (docs milestone unless promoted to a package).
+- Checked-in **example service** layout: **`docs/examples/fastapi/service_layout/`** (`main.py`, **`routers/`**, **`README.md`**). Not a published package—copy into your repo. Cookiecutter / **`uv`** template remains optional future work.
 
 ## See also
 
 - {doc}`/FASTAPI`
 - {doc}`/GOLDEN_PATH_FASTAPI`
+- {doc}`/cookbook/fastapi_observability`
+- {doc}`/cookbook/fastapi_background_tasks`
 - {doc}`/cookbook/fastapi_columnar_bodies`
 - {doc}`/cookbook/async_lazy_pipeline`
 - {doc}`/EXECUTION`

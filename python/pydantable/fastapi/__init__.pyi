@@ -14,6 +14,7 @@ from starlette.responses import StreamingResponse
 
 from pydantable._extension import MissingRustExtensionError
 from pydantable.dataframe_model import DataFrameModel
+from pydantable.errors import ColumnLengthMismatchError, PydantableUserError
 
 _DFM = TypeVar("_DFM", bound=DataFrameModel[Any])
 
@@ -74,7 +75,9 @@ def rows_dependency(
 ) -> Callable[..., _DFM]: ...
 
 __all__ = [
+    "ColumnLengthMismatchError",
     "MissingRustExtensionError",
+    "PydantableUserError",
     "columnar_body_model",
     "columnar_body_model_from_dataframe_model",
     "columnar_dependency",
