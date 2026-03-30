@@ -152,7 +152,11 @@ class PandasDataFrame(CoreDataFrame):
         on: str | list[str] | None = None,
         left_on: str | list[str] | None = None,
         right_on: str | list[str] | None = None,
+        left_index: bool = False,
+        right_index: bool = False,
         suffixes: tuple[str, str] = ("_x", "_y"),
+        sort: bool = False,
+        copy: bool | None = None,
         indicator: bool = False,
         validate: str | None = None,
         **kw: Any,
@@ -167,17 +171,68 @@ class PandasDataFrame(CoreDataFrame):
         left_list = _as_list_str(left_on, name="left_on")
         right_list = _as_list_str(right_on, name="right_on")
 
+        if left_index or right_index:
+            raise NotImplementedError(
+                "merge(left_index=..., right_index=...) is not supported; "
+                "pydantable has no pandas Index semantics."
+            )
+        if sort:
+            raise NotImplementedError(
+                "merge(sort=True) is not supported (no stable sort-by-keys policy yet)."
+            )
+        _ = copy  # accepted for pandas parity; logical frames are copy-free
+
         if on_list is not None and (left_list is not None or right_list is not None):
             raise TypeError(
                 "merge() use either on=... or left_on=/right_on=..., not both."
             )
+
+        if how == "cross":
+            if on_list is not None or left_list is not None or right_list is not None:
+                raise TypeError(
+                    "merge(how='cross') does not accept on/left_on/right_on."
+                )
+            if validate is not None:
+                raise TypeError("merge(how='cross') does not support validate=....")
+            out = self.join(other, how="cross", suffix=suffix)
+            if indicator:
+                if "_merge" in set(self.schema_fields()) | set(other.schema_fields()):
+                    raise ValueError(
+                        "merge(indicator=True) would overwrite existing "
+                        "'_merge' column."
+                    )
+                out = out.with_columns(_merge=Literal(value="both"))
+            return out
 
         if on_list is None and (left_list is None or right_list is None):
             raise TypeError(
                 "merge(...) requires on=... or both left_on=... and right_on=...."
             )
 
+        def _check_suffix_collisions(
+            *,
+            left_cols: set[str],
+            right_cols: list[str],
+            right_keys: set[str],
+        ) -> None:
+            produced: set[str] = set(left_cols)
+            for rc in right_cols:
+                if rc in right_keys:
+                    continue
+                out_name = rc if rc not in left_cols else f"{rc}{suffix}"
+                if out_name in produced:
+                    raise ValueError(
+                        "merge() would produce duplicate output column name "
+                        f"{out_name!r}; choose a different suffixes[1]."
+                    )
+                produced.add(out_name)
+
         if on_list is not None:
+            _check_suffix_collisions(
+                left_cols=set(self.schema_fields()),
+                right_cols=list(other.schema_fields()),
+                right_keys=set(on_list),
+            )
             if validate is not None:
                 _validate_merge_keys(
                     left=self,
@@ -255,6 +310,11 @@ class PandasDataFrame(CoreDataFrame):
         assert left_list is not None and right_list is not None
         if len(left_list) != len(right_list):
             raise ValueError("merge() left_on and right_on must have the same length.")
+        _check_suffix_collisions(
+            left_cols=set(self.schema_fields()),
+            right_cols=list(other.schema_fields()),
+            right_keys=set(right_list),
+        )
         if validate is not None:
             _validate_merge_keys(
                 left=self,
@@ -313,11 +373,28 @@ class PandasDataFrame(CoreDataFrame):
             joined = joined.with_columns(**unify)
         return joined.drop(*drop_cols) if drop_cols else joined
 
-    def query(self, expr: str, **kwargs: Any) -> CoreDataFrame:
+    def query(
+        self,
+        expr: str,
+        *,
+        local_dict: dict[str, object] | None = None,
+        global_dict: dict[str, object] | None = None,
+        engine: str = "python",
+        inplace: bool = False,
+        **kwargs: Any,
+    ) -> CoreDataFrame:
         if kwargs:
             raise TypeError(
                 f"query() got unsupported keyword arguments: {sorted(kwargs)!r}"
             )
+        if engine != "python":
+            raise NotImplementedError("query(engine!= 'python') is not supported.")
+        if inplace:
+            raise NotImplementedError("query(inplace=True) is not supported.")
+        if local_dict not in (None, {}):
+            raise NotImplementedError("query(local_dict=...) is not supported.")
+        if global_dict not in (None, {}):
+            raise NotImplementedError("query(global_dict=...) is not supported.")
         if not isinstance(expr, str) or not expr.strip():
             raise TypeError("query(expr) expects a non-empty string.")
 
@@ -341,6 +418,28 @@ class PandasDataFrame(CoreDataFrame):
                 )
             if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
                 return ~_compile(node.operand)
+            if isinstance(node, ast.UnaryOp) and isinstance(
+                node.op, (ast.UAdd, ast.USub)
+            ):
+                inner = _compile(node.operand)
+                if isinstance(node.op, ast.UAdd):
+                    return inner
+                return -inner
+            if isinstance(node, ast.BinOp):
+                left = _compile(node.left)
+                right = _compile(node.right)
+                if isinstance(node.op, ast.Add):
+                    return left + right
+                if isinstance(node.op, ast.Sub):
+                    return left - right
+                if isinstance(node.op, ast.Mult):
+                    return left * right
+                if isinstance(node.op, ast.Div):
+                    return left / right
+                raise NotImplementedError(
+                    "query(): unsupported binary operator "
+                    f"{node.op.__class__.__name__}."
+                )
             if isinstance(node, ast.Compare):
                 left = _compile(node.left)
                 # Support chained comparisons by AND-ing each segment.
@@ -362,6 +461,25 @@ class PandasDataFrame(CoreDataFrame):
                         out = part if out is None else (out & part)
                         cur = _lit(None)
                         continue
+                    if isinstance(op, (ast.In, ast.NotIn)):
+                        if isinstance(right_node, (ast.List, ast.Tuple)):
+                            vals: list[object] = []
+                            for elt in right_node.elts:
+                                if not isinstance(elt, ast.Constant):
+                                    raise NotImplementedError(
+                                        "query(): 'in'/'not in' only support literal "
+                                        "lists/tuples."
+                                    )
+                                vals.append(elt.value)
+                            part = cur.isin(vals)
+                            if isinstance(op, ast.NotIn):
+                                part = ~part
+                            out = part if out is None else (out & part)
+                            cur = _lit(vals[-1] if vals else None)
+                            continue
+                        raise NotImplementedError(
+                            "query(): 'in'/'not in' only support literal lists/tuples."
+                        )
                     right = _compile(right_node)
                     if isinstance(op, ast.Eq):
                         part = cur == right
@@ -383,6 +501,11 @@ class PandasDataFrame(CoreDataFrame):
                     cur = right
                 assert out is not None
                 return out
+            if isinstance(node, (ast.List, ast.Tuple)):
+                raise NotImplementedError(
+                    "query(): bare list/tuple literals are only supported as the "
+                    "right side of 'in'."
+                )
             if isinstance(node, ast.Name):
                 # Treat bare identifiers as columns.
                 return self.col(node.id)
@@ -398,6 +521,168 @@ class PandasDataFrame(CoreDataFrame):
             raise ValueError(f"query(): invalid expression: {e}") from e
         compiled = _compile(parsed.body)
         return self.filter(compiled)
+
+    def sort_values(
+        self,
+        by: str | list[str],
+        *,
+        ascending: bool | list[bool] = True,
+        kind: str | None = None,
+        na_position: str | None = None,
+        ignore_index: bool = False,
+        key: Any = None,
+    ) -> CoreDataFrame:
+        if kind is not None:
+            raise NotImplementedError("sort_values(kind=...) is not supported.")
+        if na_position is not None:
+            raise NotImplementedError(
+                "sort_values(na_position=...) is not supported by the engine yet."
+            )
+        if ignore_index:
+            raise NotImplementedError(
+                "sort_values(ignore_index=True) is not supported; "
+                "pydantable has no pandas Index semantics."
+            )
+        if key is not None:
+            raise NotImplementedError("sort_values(key=...) is not supported.")
+        by_list = [by] if isinstance(by, str) else list(by)
+        if not by_list:
+            raise TypeError("sort_values(by=...) requires at least one column.")
+        if isinstance(ascending, bool):
+            desc = [not ascending] * len(by_list)
+        else:
+            desc = [not bool(v) for v in list(ascending)]
+            if len(desc) != len(by_list):
+                raise ValueError("sort_values(): ascending must match len(by).")
+        return self.sort(*by_list, descending=desc)
+
+    def drop(
+        self,
+        labels: Any = None,
+        *,
+        index: Any = None,
+        columns: str | list[str] | None = None,
+        axis: Any = None,
+        inplace: bool = False,
+        level: Any = None,
+        errors: str = "raise",
+    ) -> CoreDataFrame:
+        if index is not None:
+            raise NotImplementedError("drop(index=...) is not supported.")
+        if axis is not None:
+            raise NotImplementedError("drop(axis=...) is not supported; use columns=.")
+        if inplace:
+            raise NotImplementedError("drop(inplace=True) is not supported.")
+        if level is not None:
+            raise NotImplementedError("drop(level=...) is not supported.")
+        if labels is not None and columns is not None:
+            raise TypeError("drop() specify labels or columns, not both.")
+        cols = labels if columns is None else columns
+        if cols is None:
+            raise TypeError("drop() requires columns=... (or labels positional).")
+        col_list = [cols] if isinstance(cols, str) else list(cols)
+        if not col_list:
+            raise TypeError("drop(columns=...) requires at least one column.")
+        if errors not in {"raise", "ignore"}:
+            raise ValueError("drop(errors=...) must be 'raise' or 'ignore'.")
+        missing = [c for c in col_list if c not in self.schema_fields()]
+        if missing:
+            if errors == "ignore":
+                col_list = [c for c in col_list if c in self.schema_fields()]
+            else:
+                raise KeyError(f"drop(): columns not found: {missing}")
+        return super().drop(*col_list) if col_list else self
+
+    def rename(
+        self,
+        mapper: Any = None,
+        *,
+        index: Any = None,
+        columns: dict[str, str] | None = None,
+        axis: Any = None,
+        inplace: bool = False,
+        level: Any = None,
+        errors: str = "ignore",
+    ) -> CoreDataFrame:
+        if index is not None:
+            raise NotImplementedError("rename(index=...) is not supported.")
+        if axis is not None:
+            raise NotImplementedError("rename(axis=...) is not supported.")
+        if inplace:
+            raise NotImplementedError("rename(inplace=True) is not supported.")
+        if level is not None:
+            raise NotImplementedError("rename(level=...) is not supported.")
+        if mapper is not None and columns is not None:
+            raise TypeError("rename() specify mapper or columns, not both.")
+        mapping = mapper if columns is None else columns
+        if mapping is None:
+            raise TypeError("rename() requires columns mapping.")
+        if not isinstance(mapping, dict) or not all(
+            isinstance(k, str) and isinstance(v, str) for k, v in mapping.items()
+        ):
+            raise TypeError("rename(columns=...) expects dict[str, str].")
+        if errors not in {"raise", "ignore"}:
+            raise ValueError("rename(errors=...) must be 'raise' or 'ignore'.")
+        missing = [k for k in mapping if k not in self.schema_fields()]
+        if missing and errors == "raise":
+            raise KeyError(f"rename(): columns not found: {missing}")
+        mapping2 = {k: v for k, v in mapping.items() if k in self.schema_fields()}
+        return super().rename(mapping2) if mapping2 else self
+
+    def fillna(
+        self,
+        value: Any = None,
+        *,
+        method: str | None = None,
+        axis: Any = None,
+        inplace: bool = False,
+        limit: int | None = None,
+        downcast: Any = None,
+        subset: str | list[str] | None = None,
+    ) -> CoreDataFrame:
+        if method is not None:
+            raise NotImplementedError("fillna(method=...) is not supported.")
+        if axis is not None:
+            raise NotImplementedError("fillna(axis=...) is not supported.")
+        if inplace:
+            raise NotImplementedError("fillna(inplace=True) is not supported.")
+        if limit is not None:
+            raise NotImplementedError("fillna(limit=...) is not supported.")
+        if downcast is not None:
+            raise NotImplementedError("fillna(downcast=...) is not supported.")
+        if value is None:
+            raise TypeError("fillna(value=...) requires a non-None value.")
+        cols = None
+        if subset is not None:
+            cols = [subset] if isinstance(subset, str) else list(subset)
+        return self.fill_null(value=value, subset=cols)
+
+    def astype(
+        self, dtype: Any, *, copy: bool | None = None, errors: str = "raise"
+    ) -> CoreDataFrame:
+        """
+        Pandas-like cast.
+
+        Supports:
+        - `astype(dtype)` for all columns
+        - `astype({\"col\": dtype, ...})` per-column
+        """
+        if errors != "raise":
+            raise NotImplementedError("astype(errors!='raise') is not supported.")
+        _ = copy  # accepted for parity; logical frames are copy-free
+        if isinstance(dtype, dict):
+            mapping = dtype
+        else:
+            mapping = {name: dtype for name in self.schema_fields()}
+        if not all(isinstance(k, str) for k in mapping):
+            raise TypeError("astype() mapping keys must be column names (str).")
+        missing = [k for k in mapping if k not in self.schema_fields()]
+        if missing:
+            raise KeyError(f"astype(): columns not found: {missing}")
+        casts: dict[str, Expr] = {}
+        for name, dt in mapping.items():
+            casts[name] = self.col(name).cast(dt)
+        return self.with_columns(**casts)
 
     def head(self, n: int = 5) -> CoreDataFrame:
         """
@@ -508,6 +793,67 @@ class PandasGroupedDataFrame(CoreGroupedDataFrame):
             **{f"{c}_nunique": ("n_unique", c) for c in columns},
         )
 
+    def first(self, *columns: str) -> CoreDataFrame:
+        if not columns:
+            raise TypeError("first() requires at least one column name.")
+        return self.agg(
+            streaming=None,
+            **{f"{c}_first": ("first", c) for c in columns},
+        )
+
+    def last(self, *columns: str) -> CoreDataFrame:
+        if not columns:
+            raise TypeError("last() requires at least one column name.")
+        return self.agg(
+            streaming=None,
+            **{f"{c}_last": ("last", c) for c in columns},
+        )
+
+    def median(self, *columns: str) -> CoreDataFrame:
+        if not columns:
+            raise TypeError("median() requires at least one column name.")
+        return self.agg(
+            streaming=None,
+            **{f"{c}_median": ("median", c) for c in columns},
+        )
+
+    def std(self, *columns: str) -> CoreDataFrame:
+        if not columns:
+            raise TypeError("std() requires at least one column name.")
+        return self.agg(
+            streaming=None,
+            **{f"{c}_std": ("std", c) for c in columns},
+        )
+
+    def var(self, *columns: str) -> CoreDataFrame:
+        if not columns:
+            raise TypeError("var() requires at least one column name.")
+        return self.agg(
+            streaming=None,
+            **{f"{c}_var": ("var", c) for c in columns},
+        )
+
+    def agg_multi(self, **spec: list[str]) -> CoreDataFrame:
+        """
+        Expand per-column op lists into `agg()` specs.
+
+        Example: `agg_multi(v=[\"sum\",\"mean\"])` -> `agg(v_sum=(\"sum\",\"v\"),`
+        `v_mean=(\"mean\",\"v\"))`.
+        """
+        expanded: dict[str, tuple[str, str]] = {}
+        for col, ops in spec.items():
+            if not isinstance(col, str) or not col:
+                raise TypeError("agg_multi() expects column names as keywords.")
+            if (
+                not isinstance(ops, list)
+                or not ops
+                or not all(isinstance(o, str) for o in ops)
+            ):
+                raise TypeError("agg_multi() expects list[str] ops per column.")
+            for op in ops:
+                expanded[f"{col}_{op}"] = (op, col)
+        return self.agg(streaming=None, **expanded)
+
 
 class PandasDataFrameModel(CoreDataFrameModel):
     """:class:`DataFrameModel` using :class:`PandasDataFrame` under the hood."""
@@ -528,6 +874,21 @@ class PandasDataFrameModel(CoreDataFrameModel):
 
     def tail(self, n: int = 5) -> Self:
         return type(self)._from_dataframe(self._df.tail(n))
+
+    def sort_values(self, by: str | list[str], **kwargs: Any) -> Self:
+        return type(self)._from_dataframe(self._df.sort_values(by, **kwargs))
+
+    def drop(self, *args: Any, **kwargs: Any) -> Self:
+        return type(self)._from_dataframe(self._df.drop(*args, **kwargs))
+
+    def rename(self, *args: Any, **kwargs: Any) -> Self:
+        return type(self)._from_dataframe(self._df.rename(*args, **kwargs))
+
+    def fillna(self, *args: Any, **kwargs: Any) -> Self:
+        return type(self)._from_dataframe(self._df.fillna(*args, **kwargs))
+
+    def astype(self, *args: Any, **kwargs: Any) -> Self:
+        return type(self)._from_dataframe(self._df.astype(*args, **kwargs))
 
     def __getitem__(self, key: str | list[str]) -> Any:
         return self._df[key]  # type: ignore[index]
@@ -554,6 +915,24 @@ class PandasGroupedDataFrameModel(CoreGroupedDataFrameModel):
 
     def nunique(self, *columns: str) -> CoreDataFrameModel:
         return self._model_type._from_dataframe(self._grouped_df.nunique(*columns))
+
+    def first(self, *columns: str) -> CoreDataFrameModel:
+        return self._model_type._from_dataframe(self._grouped_df.first(*columns))
+
+    def last(self, *columns: str) -> CoreDataFrameModel:
+        return self._model_type._from_dataframe(self._grouped_df.last(*columns))
+
+    def median(self, *columns: str) -> CoreDataFrameModel:
+        return self._model_type._from_dataframe(self._grouped_df.median(*columns))
+
+    def std(self, *columns: str) -> CoreDataFrameModel:
+        return self._model_type._from_dataframe(self._grouped_df.std(*columns))
+
+    def var(self, *columns: str) -> CoreDataFrameModel:
+        return self._model_type._from_dataframe(self._grouped_df.var(*columns))
+
+    def agg_multi(self, **spec: list[str]) -> CoreDataFrameModel:
+        return self._model_type._from_dataframe(self._grouped_df.agg_multi(**spec))
 
 
 class DataFrame(PandasDataFrame):

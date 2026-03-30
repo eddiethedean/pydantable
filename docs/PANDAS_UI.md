@@ -15,7 +15,11 @@ class Sales(DataFrameModel):
     amount: int
 
 df = Sales({"region": ["US", "EU"], "amount": [10, 20]})
-df2 = df.assign(doubled=df.amount * 2)
+df2 = (
+    df.assign(doubled=df.amount * 2)
+    .query("doubled >= 20 and region in ('US', 'EU')")
+    .sort_values("doubled", ascending=False)
+)
 print(df2.to_dict())
 ```
 
@@ -57,15 +61,33 @@ Maps to **`join`**: `on` is required; the **right suffix** is taken from `suffix
 
 **Supports:**
 
+- `how="cross"` (Cartesian product). Keys (`on/left_on/right_on`) are rejected for cross joins.
 - `left_on` / `right_on` (including different key names). Output uses a pandas-like policy: right key columns are dropped, and for `how="outer"` / `how="right"` the left key columns are filled from the right keys for right-only rows.
 - `validate=...` (`one_to_one`, `one_to_many`, `many_to_one`, `many_to_many` and `1:1` / `1:m` / `m:1` / `m:m` aliases).
-- `indicator=True` (adds `_merge` with values `left_only` / `right_only` / `both`).
+- `indicator=True` (adds `_merge` with values `left_only` / `right_only` / `both`). **Current limitation:** for key-only frames (no non-key columns on one side), `indicator=True` raises `NotImplementedError`.
+- `copy=...` is accepted for parity (no effect; logical plans are copy-free).
 
 **Still raises `NotImplementedError` for:**
 
 - Unsupported `query()` constructs beyond the limited grammar described below.
+- `sort=True`, `left_index=True`, `right_index=True`.
 
 Unknown keyword arguments raise **`TypeError`**.
+
+**Collision safety:** if a merge would produce duplicate output column names (e.g. because `suffixes[1]` makes a right column collide with an existing left column), `merge()` raises `ValueError` instead of silently overwriting.
+
+**Accepted parameters (summary):**
+
+| Parameter | Status |
+|----------|--------|
+| `how` | supported (including `"cross"`) |
+| `on` / `left_on` / `right_on` | supported (but not with `how="cross"`) |
+| `suffixes` | supported (right suffix is used; collisions raise `ValueError`) |
+| `validate` | supported |
+| `indicator` | supported with limitation (needs non-key cols on both sides) |
+| `copy` | accepted (no-op) |
+| `sort` | accepted, raises `NotImplementedError` when `True` |
+| `left_index` / `right_index` | accepted, raises `NotImplementedError` when `True` |
 
 ### Introspection
 
@@ -92,10 +114,20 @@ The **default** **`pydantable.DataFrame`** (and **`DataFrameModel`**) now expose
 Supports a **limited** boolean expression grammar and compiles to `filter(Expr)`:
 
 - Operators: `== != < <= > >=`, `and` / `or` / `not`, parentheses
+- Arithmetic: `+ - * /` (on expressions and literals)
+- Membership: `in` / `not in` against **literal** tuples/lists (compiled via `Expr.isin(...)`)
 - Column refs: bare identifiers (e.g. `age > 10`)
 - Literals: ints, floats, quoted strings, `None`, `True`/`False`
 
 Unsupported syntax (function calls, attribute access, subscripts, etc.) raises `NotImplementedError`.
+
+**Accepted parameters (typed-first):**
+
+- `engine`: only `"python"` is supported; other values raise `NotImplementedError`.
+- `inplace`: only `False` is supported; `True` raises `NotImplementedError`.
+- `local_dict` / `global_dict`: accepted but currently must be `None`/empty; non-empty dicts raise `NotImplementedError`.
+
+**Tip:** prefer explicit column names and literals. Example: `query("id in (1,2,3) and amount * 2 >= 10")`.
 
 ### `group_by(...)`
 
@@ -106,19 +138,52 @@ Returns **`PandasGroupedDataFrame`**, which adds:
 | `sum("c1", "c2", ...)` | `agg(c1_sum=("sum", "c1"), ...)` |
 | `mean(...)` | `agg(c_mean=("mean", c), ...)` |
 | `count(...)` | `agg(c_count=("count", c), ...)` |
+| `size()` | per-group row count (includes nulls) |
+| `nunique("c")` | `agg(c_nunique=("n_unique", "c"))` (drops nulls) |
+| `first("c")` / `last("c")` | `agg(c_first=("first","c"))` / `agg(c_last=("last","c"))` |
+| `median("c")` / `std("c")` / `var("c")` | engine-backed numeric aggregations |
+| `agg_multi(v=["sum","mean"], ...)` | expands into multiple `agg()` specs (`v_sum`, `v_mean`, ...) |
 
 At least one column name is required for each shortcut.
+
+### `sort_values(by, ascending=True, na_position=None)`
+
+Alias for `sort(...)` with pandas-shaped arguments.
+
+**Accepted parameters (typed-first):**
+
+- `ascending`: `bool` or `list[bool]` (must match `by` length).
+- `na_position`, `kind`, `key`: accepted but raise `NotImplementedError`.
+- `ignore_index`: `False` is accepted; `True` raises `NotImplementedError` (no Index semantics).
+
+**Realistic pattern:** sort then materialize:
+
+```python
+df.sort_values(["region", "amount"], ascending=[True, False]).collect(as_lists=True)
+```
+
+### `drop(...)` / `rename(...)` keyword forms
+
+- `drop(columns=..., errors="raise"|"ignore")` → core `drop(*cols)`\n- `rename(columns={"old":"new"}, errors="raise"|"ignore")` → core `rename(mapping)`
+
+Additional pandas parameters are accepted but may raise `NotImplementedError` (e.g. `drop(index=...)`, `drop(inplace=True)`, `rename(index=...)`, `rename(inplace=True)`, etc.).
+
+### `fillna(value, subset=None)` / `astype(dtype|mapping)`
+
+- `fillna(value=..., subset=...)` maps to core `fill_null(value=..., subset=...)`.\n  - `method/limit/inplace/downcast/axis` are accepted for parity but currently raise `NotImplementedError`.\n- `astype(dtype)` casts all columns; `astype({"col": dtype})` casts selected columns via `Expr.cast(...)`.\n  - `copy` is accepted (no-op); `errors!='raise'` raises `NotImplementedError`.
+
+**Caveat:** `fillna(method=...)`/`limit=...` are currently not implemented; prefer explicit expressions (`Expr.fill_null(...)`) or engine-native operations.
 
 ## `DataFrameModel` (pandas UI)
 
 Wraps the pandas UI `DataFrame` and delegates:
 
 - **`assign`**, **`merge`**, **`head`/`tail`**, **`__getitem__`**, **`group_by`** → same semantics as above on the inner frame.
-- **`query`** → same **not implemented** behavior.
+- **`query`**, **`sort_values`**, **`drop`**, **`rename`**, **`fillna`**, **`astype`** → same semantics as above on the inner frame.
 
 Properties **`columns`**, **`shape`**, **`empty`**, **`dtypes`** read from the inner frame.
 
-**`PandasGroupedDataFrameModel`** mirrors **`sum` / `mean` / `count`** on grouped models.
+**`PandasGroupedDataFrameModel`** mirrors the groupby convenience methods (`sum/mean/count/size/nunique/first/last/median/std/var/agg_multi`).
 
 ## Naming map (core ↔ pandas ↔ PySpark)
 
