@@ -59,6 +59,14 @@ pub enum PlanStep {
         /// Empty = frame-global rolling (current row order). Non-empty = `.over(...)` keys.
         partition_by: Vec<String>,
     },
+    /// Row-wise duplicate boolean mask (pandas `duplicated`); output schema is a single `bool` column.
+    DuplicateMask {
+        subset: Vec<String>,
+        /// `first` | `last` | `none` (same as pandas `keep=False` for the mask).
+        keep: String,
+    },
+    /// Drop every row that belongs to a duplicate key group (pandas `drop_duplicates(keep=False)`).
+    DropDuplicateGroups { subset: Vec<String> },
 }
 
 #[derive(Clone, Debug)]

@@ -130,6 +130,15 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
                 step_out.set_item("out_name", out_name)?;
                 step_out.set_item("partition_by", partition_by)?;
             }
+            PlanStep::DuplicateMask { subset, keep } => {
+                step_out.set_item("kind", "duplicate_mask")?;
+                step_out.set_item("subset", subset)?;
+                step_out.set_item("keep", keep)?;
+            }
+            PlanStep::DropDuplicateGroups { subset } => {
+                step_out.set_item("kind", "drop_duplicate_groups")?;
+                step_out.set_item("subset", subset)?;
+            }
         }
         steps.append(step_out)?;
     }

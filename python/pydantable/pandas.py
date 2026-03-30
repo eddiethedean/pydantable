@@ -148,6 +148,12 @@ def _rows_to_column_dict(
     return {k: [r.get(k) for r in rows] for k in columns}
 
 
+def _sanitize_dummy_level(v: Any) -> str:
+    label = "nan" if v is None else str(v)
+    s = re.sub(r"[^0-9a-zA-Z_]+", "_", label).strip("_")
+    return s if s else "x"
+
+
 def _typing_numeric_name(ann: Any) -> bool:
     """Best-effort: treat int/float and Optional variants as numeric for corr/sample."""
     if ann in (int, float):
@@ -1434,12 +1440,24 @@ class PandasDataFrame(CoreDataFrame):
                 "drop_duplicates(ignore_index=True) is not supported."
             )
         if keep is False:
-            raise NotImplementedError(
-                "drop_duplicates(keep=False) is not supported (requires dropping all "
-                "duplicate groups)."
-            )
+            if subset is None:
+                subset_cols = None
+            elif isinstance(subset, str):
+                subset_cols = [subset]
+            elif (
+                isinstance(subset, list)
+                and subset
+                and all(isinstance(c, str) for c in subset)
+            ):
+                subset_cols = subset
+            else:
+                raise TypeError(
+                    "drop_duplicates(subset=...) must be a column name, "
+                    "non-empty list[str], or None."
+                )
+            return self.drop_duplicate_groups(subset=subset_cols)
         if keep not in ("first", "last"):
-            raise ValueError("drop_duplicates(keep=...) must be 'first' or 'last'.")
+            raise ValueError("drop_duplicates(keep=...) must be 'first', 'last', or False.")
         if subset is None:
             subset_cols = None
         elif isinstance(subset, str):
@@ -1463,12 +1481,22 @@ class PandasDataFrame(CoreDataFrame):
         *,
         keep: str | bool = "first",
     ) -> CoreDataFrame:
-        _ = subset
-        _ = keep
-        raise NotImplementedError(
-            "duplicated() is not implemented yet. Row-wise duplicate masks need an "
-            "engine-level multi-column is_duplicated expression."
-        )
+        if subset is None:
+            subset_cols = None
+        elif isinstance(subset, str):
+            subset_cols = [subset]
+        elif (
+            isinstance(subset, list)
+            and subset
+            and all(isinstance(c, str) for c in subset)
+        ):
+            subset_cols = subset
+        else:
+            raise TypeError(
+                "duplicated(subset=...) must be a column name, "
+                "non-empty list[str], or None."
+            )
+        return super().duplicated(subset=subset_cols, keep=keep)
 
     def isna(self) -> CoreDataFrame:
         cols = list(self.schema_fields().keys())
@@ -1525,6 +1553,167 @@ class PandasDataFrame(CoreDataFrame):
         if cond is None:
             return self
         return self.filter(cond)
+
+    def get_dummies(
+        self,
+        columns: list[str],
+        *,
+        prefix: str | Mapping[str, str] | None = None,
+        prefix_sep: str = "_",
+        drop_first: bool = False,
+        dummy_na: bool = False,
+        dtype: str = "bool",
+        max_categories: int = 512,
+    ) -> CoreDataFrame:
+        """One-hot encode named columns; other columns are kept. Eager category scan."""
+        if not columns or not all(isinstance(c, str) for c in columns):
+            raise TypeError("get_dummies(columns=...) expects a non-empty list[str].")
+        if dtype not in ("bool", "int"):
+            raise ValueError("get_dummies(dtype=...) must be 'bool' or 'int'.")
+        fields = list(self.schema_fields().keys())
+        for c in columns:
+            if c not in fields:
+                raise KeyError(c)
+        if isinstance(prefix, str):
+            prefixes = {c: prefix for c in columns}
+        elif prefix is None:
+            prefixes = {c: c for c in columns}
+        else:
+            prefixes = {c: prefix.get(c, c) for c in columns}
+        keep = [c for c in fields if c not in columns]
+        sample = self.select(*columns).collect(as_lists=True)
+        updates: dict[str, Any] = {}
+        for c in columns:
+            series = sample[c]
+            raw_vals = list(series)
+            distinct: list[Any] = []
+            seen: set[Any] = set()
+            for v in raw_vals:
+                if v is None and not dummy_na:
+                    continue
+                key = v
+                if key in seen:
+                    continue
+                seen.add(key)
+                distinct.append(v)
+            distinct.sort(key=lambda v: (str(type(v).__name__), str(v)))
+            if len(distinct) > max_categories:
+                raise ValueError(
+                    f"get_dummies: column {c!r} has {len(distinct)} distinct values "
+                    f"(max_categories={max_categories})."
+                )
+            to_encode = distinct[1:] if drop_first else distinct
+            p = prefixes[c]
+            for v in to_encode:
+                safe = _sanitize_dummy_level(v)
+                out_name = f"{p}{prefix_sep}{safe}"
+                if out_name in keep or out_name in updates:
+                    raise ValueError(
+                        f"get_dummies: output column name {out_name!r} collides with an "
+                        "existing or other dummy column."
+                    )
+                if v is None:
+                    expr: Expr = self.col(c).is_null()
+                else:
+                    expr = self.col(c) == Literal(value=v)
+                if dtype == "int":
+                    expr = when(expr, Literal(value=1)).otherwise(Literal(value=0))
+                updates[out_name] = expr
+        out = self.with_columns(**updates).drop(*columns)
+        return out
+
+    def pivot(
+        self,
+        *,
+        index: str | list[str],
+        columns: str | Any,
+        values: str | list[str],
+        aggregate_function: str = "first",
+        streaming: bool | None = None,
+    ) -> CoreDataFrame:
+        """Typed :meth:`~pydantable.dataframe.DataFrame.pivot` (not pandas' unconstrained pivot)."""
+        return super().pivot(
+            index=index,
+            columns=columns,
+            values=values,
+            aggregate_function=aggregate_function,
+            streaming=streaming,
+        )
+
+    def factorize_column(self, column: str) -> tuple[list[int], list[Any]]:
+        """Eager (codes, categories) for one column; uses pandas :func:`factorize` semantics."""
+        pd = __import__("pandas")
+        data = self.collect(as_lists=True)
+        if column not in data:
+            raise KeyError(column)
+        codes, uniques = pd.factorize(pd.Series(data[column]), use_na_sentinel=True)
+        return list(codes), list(uniques)
+
+    def cut(
+        self,
+        column: str,
+        bins: Any,
+        *,
+        new_column: str | None = None,
+        labels: Any = None,
+        right: bool = True,
+        include_lowest: bool = False,
+        duplicates: str = "raise",
+    ) -> CoreDataFrame:
+        """Eager binning via pandas :func:`cut`; adds a string interval column."""
+        pd = __import__("pandas")
+        data = self.collect(as_lists=True)
+        if column not in data:
+            raise KeyError(column)
+        ser = pd.Series(data[column])
+        cats = pd.cut(
+            ser,
+            bins,
+            labels=labels,
+            right=right,
+            include_lowest=include_lowest,
+            duplicates=duplicates,
+        )
+        nc = new_column or f"{column}_cut"
+
+        def _cell(x: Any) -> str | None:
+            if x is None or (isinstance(x, float) and pd.isna(x)):
+                return None
+            return str(x)
+
+        merged = {**data, nc: [_cell(x) for x in cats]}
+        ft = dict(self._current_field_types)
+        ft[nc] = str | None
+        dyn = make_derived_schema_type(self._current_schema_type, ft)
+        return DataFrame[dyn](merged)
+
+    def qcut(
+        self,
+        column: str,
+        q: Any,
+        *,
+        new_column: str | None = None,
+        duplicates: str = "raise",
+    ) -> CoreDataFrame:
+        """Eager quantile bins via pandas :func:`qcut`."""
+        pd = __import__("pandas")
+        data = self.collect(as_lists=True)
+        if column not in data:
+            raise KeyError(column)
+        ser = pd.Series(data[column])
+        cats = pd.qcut(ser, q, duplicates=duplicates)
+        nc = new_column or f"{column}_qcut"
+
+        def _cell(x: Any) -> str | None:
+            if x is None or (isinstance(x, float) and pd.isna(x)):
+                return None
+            return str(x)
+
+        merged = {**data, nc: [_cell(x) for x in cats]}
+        ft = dict(self._current_field_types)
+        ft[nc] = str | None
+        dyn = make_derived_schema_type(self._current_schema_type, ft)
+        return DataFrame[dyn](merged)
 
     def melt(
         self,
@@ -2162,6 +2351,51 @@ class PandasDataFrame(CoreDataFrame):
         _ = limit_direction
         return self.fill_null(strategy=strat)
 
+    class _Ewm:
+        __slots__ = ("_df", "_com", "_span", "_alpha", "_adjust", "_min_periods")
+
+        def __init__(
+            self,
+            df: PandasDataFrame,
+            *,
+            com: float | None,
+            span: float | None,
+            alpha: float | None,
+            adjust: bool,
+            min_periods: int,
+        ) -> None:
+            self._df = df
+            self._com = com
+            self._span = span
+            self._alpha = alpha
+            self._adjust = adjust
+            self._min_periods = min_periods
+
+        def mean(self, column: str, *, out_name: str | None = None) -> CoreDataFrame:
+            pd = __import__("pandas")
+            data = self._df.collect(as_lists=True)
+            if column not in data:
+                raise KeyError(column)
+            s = pd.Series(data[column])
+            kw: dict[str, Any] = {}
+            if self._com is not None:
+                kw["com"] = self._com
+            elif self._span is not None:
+                kw["span"] = self._span
+            else:
+                kw["alpha"] = self._alpha
+            out = s.ewm(
+                adjust=self._adjust,
+                min_periods=self._min_periods,
+                **kw,
+            ).mean()
+            name = out_name or f"{column}_ewm_mean"
+            merged = {**data, name: out.tolist()}
+            ft = dict(self._df._current_field_types)
+            ft[name] = float | None
+            dyn = make_derived_schema_type(self._df._current_schema_type, ft)
+            return DataFrame[dyn](merged)
+
     class _Expanding:
         __slots__ = ("_df",)
 
@@ -2191,9 +2425,25 @@ class PandasDataFrame(CoreDataFrame):
         _ = min_periods
         return PandasDataFrame._Expanding(self)
 
-    def ewm(self, *args: Any, **kwargs: Any) -> Any:
-        raise NotImplementedError(
-            "ewm() is not implemented; use rolling(...) for fixed-size windows."
+    def ewm(
+        self,
+        *,
+        com: float | None = None,
+        span: float | None = None,
+        alpha: float | None = None,
+        adjust: bool = True,
+        min_periods: int = 0,
+    ) -> PandasDataFrame._Ewm:
+        n = sum(1 for x in (com, span, alpha) if x is not None)
+        if n != 1:
+            raise TypeError("ewm() requires exactly one of com=, span=, or alpha=.")
+        return PandasDataFrame._Ewm(
+            self,
+            com=com,
+            span=span,
+            alpha=alpha,
+            adjust=adjust,
+            min_periods=min_periods,
         )
 
     def nlargest(

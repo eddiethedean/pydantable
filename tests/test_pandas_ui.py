@@ -93,15 +93,25 @@ def test_pandas_ui_drop_duplicates_maps_to_unique() -> None:
     assert out2 == {"a": [1, 2], "b": [20, 30]}
 
 
-def test_pandas_ui_duplicated_not_implemented() -> None:
+def test_pandas_ui_duplicated_and_drop_false() -> None:
+    pd = pytest.importorskip("pandas")
     from pydantable.pandas import DataFrame
 
     class Row(Schema):
         a: int
+        b: int
 
-    df = DataFrame[Row]({"a": [1, 1]})
-    with pytest.raises(NotImplementedError, match="duplicated"):
-        _ = df.duplicated()
+    pdf = pd.DataFrame({"a": [1, 1, 2], "b": [3, 3, 4]})
+    df = DataFrame[Row]({"a": [1, 1, 2], "b": [3, 3, 4]})
+    d1 = df.duplicated(keep="first").collect(as_lists=True)["duplicated"]
+    assert d1 == list(pdf.duplicated(keep="first"))
+    d2 = df.duplicated(keep="last").collect(as_lists=True)["duplicated"]
+    assert d2 == list(pdf.duplicated(keep="last"))
+    d3 = df.duplicated(keep=False).collect(as_lists=True)["duplicated"]
+    assert d3 == list(pdf.duplicated(keep=False))
+
+    out = df.drop_duplicates(keep=False).collect(as_lists=True)
+    assert out == {"a": [2], "b": [4]}
 
 
 def test_pandas_ui_nlargest_nsmallest_sort_and_slice() -> None:
@@ -2008,3 +2018,46 @@ def test_pandas_ui_insert_pop_and_eval_alias() -> None:
     q = DataFrame[ACol]({"a": [1, 5]}).eval("a > 1")
     direct = DataFrame[ACol]({"a": [1, 5]}).query("a > 1")
     assert q.collect(as_lists=True) == direct.collect(as_lists=True)
+
+
+def test_pandas_ui_get_dummies_qcut_cut_factorize_ewm_pivot() -> None:
+    pd = pytest.importorskip("pandas")
+    np = pytest.importorskip("numpy")
+    from pydantable.pandas import DataFrame
+
+    class S(Schema):
+        id: int
+        color: str
+        v: float
+
+    df = DataFrame[S](
+        {"id": [1, 2, 3], "color": ["a", "b", "a"], "v": [1.0, 2.0, 3.0]}
+    )
+    dumb = df.get_dummies(["color"], dtype="int").collect(as_lists=True)
+    assert dumb["id"] == [1, 2, 3]
+    assert dumb["v"] == [1.0, 2.0, 3.0]
+    assert dumb["color_a"] == [1, 0, 1]
+    assert dumb["color_b"] == [0, 1, 0]
+
+    codes, cats = df.factorize_column("color")
+    exp_c, exp_u = pd.factorize(pd.Series(["a", "b", "a"]), use_na_sentinel=True)
+    assert codes == list(exp_c)
+    assert cats == list(exp_u)
+
+    cut_df = df.cut("v", bins=[0.0, 2.0, 4.0]).collect(as_lists=True)
+    assert "v_cut" in cut_df
+    q_df = df.qcut("v", q=2, new_column="vq").collect(as_lists=True)
+    assert "vq" in q_df
+
+    ewm = df.ewm(span=2).mean("v", out_name="m").collect(as_lists=True)
+    assert len(ewm["m"]) == 3
+    assert np.allclose(ewm["m"], pd.Series([1.0, 2.0, 3.0]).ewm(span=2).mean(), equal_nan=True)
+
+    class P(Schema):
+        i: int
+        k: str
+        val: int
+
+    psrc = DataFrame[P]({"i": [1, 1], "k": ["A", "B"], "val": [10, 20]})
+    pv = psrc.pivot(index="i", columns="k", values="val", aggregate_function="first")
+    assert pv.collect(as_lists=True)["i"] == [1]

@@ -7,11 +7,13 @@ use crate::dtype::{py_annotation_to_dtype, DTypeDesc};
 use crate::expr::ExprNode;
 use crate::plan::{
     make_plan as make_plan_inner, plan_drop as plan_drop_inner,
-    plan_drop_nulls as plan_drop_nulls_inner, plan_fill_null as plan_fill_null_inner,
-    plan_filter as plan_filter_inner, plan_global_select as build_plan_global_select,
-    plan_melt as plan_melt_inner, plan_rename as plan_rename_inner,
-    plan_rolling_agg as plan_rolling_agg_inner, plan_select as plan_select_inner,
-    plan_slice as plan_slice_inner, plan_sort as plan_sort_inner, plan_unique as plan_unique_inner,
+    plan_drop_duplicate_groups as plan_drop_duplicate_groups_inner,
+    plan_drop_nulls as plan_drop_nulls_inner, plan_duplicate_mask as plan_duplicate_mask_inner,
+    plan_fill_null as plan_fill_null_inner, plan_filter as plan_filter_inner,
+    plan_global_select as build_plan_global_select, plan_melt as plan_melt_inner,
+    plan_rename as plan_rename_inner, plan_rolling_agg as plan_rolling_agg_inner,
+    plan_select as plan_select_inner, plan_slice as plan_slice_inner,
+    plan_sort as plan_sort_inner, plan_unique as plan_unique_inner,
     plan_with_columns as plan_with_columns_inner,
 };
 
@@ -91,6 +93,27 @@ fn plan_sort(
 fn plan_unique(plan: &PyPlan, subset: Option<Vec<String>>, keep: String) -> PyResult<PyPlan> {
     Ok(PyPlan {
         inner: plan_unique_inner(&plan.inner, subset, keep)?,
+    })
+}
+
+#[pyfunction]
+fn plan_duplicate_mask(
+    plan: &PyPlan,
+    subset: Option<Vec<String>>,
+    keep: String,
+) -> PyResult<PyPlan> {
+    Ok(PyPlan {
+        inner: plan_duplicate_mask_inner(&plan.inner, subset, keep)?,
+    })
+}
+
+#[pyfunction]
+fn plan_drop_duplicate_groups(
+    plan: &PyPlan,
+    subset: Option<Vec<String>>,
+) -> PyResult<PyPlan> {
+    Ok(PyPlan {
+        inner: plan_drop_duplicate_groups_inner(&plan.inner, subset)?,
     })
 }
 
@@ -251,6 +274,8 @@ pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(plan_filter, m)?)?;
     m.add_function(wrap_pyfunction!(plan_sort, m)?)?;
     m.add_function(wrap_pyfunction!(plan_unique, m)?)?;
+    m.add_function(wrap_pyfunction!(plan_duplicate_mask, m)?)?;
+    m.add_function(wrap_pyfunction!(plan_drop_duplicate_groups, m)?)?;
     m.add_function(wrap_pyfunction!(plan_drop, m)?)?;
     m.add_function(wrap_pyfunction!(plan_rename, m)?)?;
     m.add_function(wrap_pyfunction!(plan_slice, m)?)?;

@@ -149,6 +149,46 @@ class PandasDataFrame(CoreDataFrame):
         inplace: Any = None,
         thresh: Any = None,
     ) -> CoreDataFrame: ...
+    def get_dummies(
+        self,
+        columns: list[str],
+        *,
+        prefix: str | Mapping[str, str] | None = None,
+        prefix_sep: str = "_",
+        drop_first: bool = False,
+        dummy_na: bool = False,
+        dtype: str = "bool",
+        max_categories: int = 512,
+    ) -> CoreDataFrame: ...
+    def pivot(
+        self,
+        *,
+        index: str | list[str],
+        columns: str | Any,
+        values: str | list[str],
+        aggregate_function: str = "first",
+        streaming: bool | None = None,
+    ) -> CoreDataFrame: ...
+    def factorize_column(self, column: str) -> tuple[list[int], list[Any]]: ...
+    def cut(
+        self,
+        column: str,
+        bins: Any,
+        *,
+        new_column: str | None = None,
+        labels: Any = None,
+        right: bool = True,
+        include_lowest: bool = False,
+        duplicates: str = "raise",
+    ) -> CoreDataFrame: ...
+    def qcut(
+        self,
+        column: str,
+        q: Any,
+        *,
+        new_column: str | None = None,
+        duplicates: str = "raise",
+    ) -> CoreDataFrame: ...
     def melt(
         self,
         *,
@@ -261,6 +301,23 @@ class PandasDataFrame(CoreDataFrame):
         **kwargs: Any,
     ) -> CoreDataFrame: ...
 
+    class _Ewm:
+        __slots__ = ("_adjust", "_alpha", "_com", "_df", "_min_periods", "_span")
+
+        def __init__(
+            self,
+            df: PandasDataFrame,
+            *,
+            com: float | None,
+            span: float | None,
+            alpha: float | None,
+            adjust: bool,
+            min_periods: int,
+        ) -> None: ...
+        def mean(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrame: ...
+
     class _Expanding:
         __slots__ = ("_df",)
 
@@ -274,7 +331,15 @@ class PandasDataFrame(CoreDataFrame):
         ) -> CoreDataFrame: ...
 
     def expanding(self, min_periods: int = 1) -> _Expanding: ...
-    def ewm(self, *args: Any, **kwargs: Any) -> Any: ...
+    def ewm(
+        self,
+        *,
+        com: float | None = None,
+        span: float | None = None,
+        alpha: float | None = None,
+        adjust: bool = True,
+        min_periods: int = 0,
+    ) -> PandasDataFrame._Ewm: ...
     def nlargest(
         self, n: int, columns: str | list[str], *, keep: str = "all"
     ) -> CoreDataFrame: ...

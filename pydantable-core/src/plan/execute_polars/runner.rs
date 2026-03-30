@@ -18,7 +18,7 @@ use crate::plan::ir::{PlanInner, PlanStep};
 use crate::plan::schema_py::schema_descriptors_as_py;
 
 use polars::chunked_array::builder::get_list_builder;
-use polars::lazy::dsl::{by_name, col, cols, lit, when, Expr as PolarsExpr};
+use polars::lazy::dsl::{as_struct, by_name, col, cols, lit, when, Expr as PolarsExpr};
 use polars::prelude::{
     AnyValue, BooleanChunked, CrossJoin, DataFrame, DataType, ExplodeOptions, Field,
     FillNullStrategy, Float64Chunked, Int128Chunked, Int32Chunked, Int64Chunked, IntoColumn,
@@ -735,6 +735,34 @@ impl PolarsPlanRunner {
                 }
                 let e = e.alias(out_name);
                 lf = lf.with_columns([e]);
+            }
+            PlanStep::DuplicateMask { subset, keep } => {
+                let key = if subset.len() == 1 {
+                    col(subset[0].as_str())
+                } else {
+                    let parts: Vec<PolarsExpr> = subset.iter().map(|s| col(s.as_str())).collect();
+                    as_struct(parts)
+                };
+                let mask = match keep.as_str() {
+                    "first" => key.is_first_distinct().not(),
+                    "last" => key.is_last_distinct().not(),
+                    "none" => key.is_duplicated(),
+                    other => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                            "internal: duplicate_mask keep={other:?}"
+                        )));
+                    }
+                };
+                lf = lf.select([mask.alias("duplicated")]);
+            }
+            PlanStep::DropDuplicateGroups { subset } => {
+                let key = if subset.len() == 1 {
+                    col(subset[0].as_str())
+                } else {
+                    let parts: Vec<PolarsExpr> = subset.iter().map(|s| col(s.as_str())).collect();
+                    as_struct(parts)
+                };
+                lf = lf.filter(key.is_duplicated().not());
             }
         }
         Ok(lf)

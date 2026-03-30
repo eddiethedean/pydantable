@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use pyo3::prelude::*;
 
-use crate::dtype::DTypeDesc;
+use crate::dtype::{BaseType, DTypeDesc};
 use crate::expr::{ExprNode, LiteralValue};
 
 use super::ir::{PlanInner, PlanStep};
@@ -242,6 +242,80 @@ pub fn plan_unique(
     }
     let mut new_steps = plan.steps.clone();
     new_steps.push(PlanStep::Unique { subset, keep });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: plan.schema.clone(),
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+fn resolve_duplicate_subset(plan: &PlanInner, subset: Option<Vec<String>>) -> PyResult<Vec<String>> {
+    match subset {
+        None => {
+            let mut keys: Vec<String> = plan.schema.keys().cloned().collect();
+            if keys.is_empty() {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "duplicated() requires at least one column in the schema.",
+                ));
+            }
+            keys.sort();
+            Ok(keys)
+        }
+        Some(keys) => {
+            if keys.is_empty() {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "duplicated(subset=...) cannot be empty.",
+                ));
+            }
+            for key in keys.iter() {
+                if !plan.schema.contains_key(key) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                        "duplicated() unknown subset column '{key}'.",
+                    )));
+                }
+            }
+            Ok(keys)
+        }
+    }
+}
+
+/// Output: single column `duplicated` (bool), same length as input rows.
+pub fn plan_duplicate_mask(
+    plan: &PlanInner,
+    subset: Option<Vec<String>>,
+    keep: String,
+) -> PyResult<PlanInner> {
+    match keep.as_str() {
+        "first" | "last" | "none" => {}
+        other => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "duplicated(keep=...) unsupported value {other:?}. Use 'first', 'last', or False (internal: 'none').",
+            )));
+        }
+    }
+    let subset = resolve_duplicate_subset(plan, subset)?;
+    let mut new_schema = HashMap::new();
+    new_schema.insert(
+        "duplicated".to_string(),
+        DTypeDesc::non_nullable(BaseType::Bool),
+    );
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::DuplicateMask {
+        subset,
+        keep: keep.clone(),
+    });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: new_schema,
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+/// Drop all rows that appear in a duplicate group (pandas `drop_duplicates(keep=False)`).
+pub fn plan_drop_duplicate_groups(plan: &PlanInner, subset: Option<Vec<String>>) -> PyResult<PlanInner> {
+    let subset = resolve_duplicate_subset(plan, subset)?;
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::DropDuplicateGroups { subset: subset.clone() });
     Ok(PlanInner {
         steps: new_steps,
         schema: plan.schema.clone(),

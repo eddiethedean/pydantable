@@ -1740,6 +1740,55 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
+    def duplicated(
+        self,
+        subset: Sequence[str] | None = None,
+        *,
+        keep: str | bool = "first",
+    ) -> DataFrame[Any]:
+        """Return a single-column boolean frame ``duplicated`` (row-wise duplicate mask)."""
+        rust = _require_rust_core()
+        if keep is True:
+            raise ValueError("duplicated(keep=True) is invalid; use 'first' or 'last'.")
+        keep_s = "none" if keep is False else str(keep)
+        if keep_s not in ("first", "last", "none"):
+            raise ValueError(
+                "duplicated(keep=...) must be 'first', 'last', or False (pandas parity)."
+            )
+        rust_plan = rust.plan_duplicate_mask(
+            self._rust_plan,
+            None if subset is None else list(subset),
+            keep_s,
+        )
+        desc = rust_plan.schema_descriptors()
+        derived_fields = self._field_types_from_descriptors(desc)
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def drop_duplicate_groups(
+        self,
+        subset: Sequence[str] | None = None,
+    ) -> DataFrame[Any]:
+        """Drop rows whose key (``subset`` or all columns) appears more than once (``drop_duplicates(keep=False)``)."""
+        rust = _require_rust_core()
+        rust_plan = rust.plan_drop_duplicate_groups(
+            self._rust_plan,
+            None if subset is None else list(subset),
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=rust_plan,
+        )
+
     def distinct(
         self,
         subset: Sequence[str] | None = None,

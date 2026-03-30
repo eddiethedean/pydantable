@@ -9,8 +9,8 @@ pydantable is **schema-first** and does not implement a pandas **`Index`** objec
 - **“Index” operations** (`sort_index`, `set_index`, `reset_index`, `reindex`, `align`, …) use **named key column(s)** that you pass explicitly—there is no hidden row index and no **`MultiIndex`** unless you model it with normal columns (e.g. string keys) or future structured types.
 - Some helpers match **pandas names** but are **narrow**: reshape (`stack` / `unstack` / `wide_to_long`), `combine_first` / `update` (join keys required), and `compare` (subset of pandas). See each method’s docstring.
 - **Lazy-safe** methods stay on the logical plan (filters, joins, many `with_columns` / **`assign`** paths, windowed **`rank`** when built from expressions, rolling steps executed in Polars).
-- **Eager** methods materialize like **`head`** / **`tail`** / **`describe`** / core **`rolling_agg(..., on=..., by=...)`**: they **`collect`/`to_dict`** (or similar) before continuing. Examples: **`sample`**, **`take`**, **`corr`/`cov`** (numeric; NumPy), **`dot`** (numeric; NumPy), **`compare`**, and **`transpose`/`T`** on square, single-dtype tables. *Not yet implemented on the pandas UI:* **`get_dummies`**, **`cut`/`qcut`**, **`factorize`** (use core/groupBy or materialize + pandas when needed).
-- **Dynamic column pivot / transpose**: core **`pivot`** is typed; the pandas UI still omits open-ended **`pivot`** where output columns would be arbitrary value-derived names. Reshape helpers should not pretend to infer a **Pydantic** schema without materialization or an explicit result type.
+- **Eager** methods materialize like **`head`** / **`tail`** / **`describe`** / core **`rolling_agg(..., on=..., by=...)`**: they **`collect`/`to_dict`** (or similar) before continuing. Examples: **`sample`**, **`take`**, **`corr`/`cov`** (numeric; NumPy), **`dot`** (numeric; NumPy), **`compare`**, **`transpose`/`T`**, **`get_dummies`** / **`cut`** / **`qcut`** / **`factorize_column`** (scan + **pandas**), **`ewm().mean()`** (via pandas), and half-eager paths noted in the tables below.
+- **Typed `pivot` on this façade**: **`pivot(...)`** delegates to the core API (explicit index / columns / values / aggregate)—not pandas’ unconstrained dynamic pivot.
 
 ## When to use it
 
@@ -328,7 +328,7 @@ These names match pandas where possible but are **typed** and sometimes **strict
 - **`rank(method="average"\|"dense", ...)`** — per-column window rank over that column as the sole sort key; **`min`/`max`/`first`** methods not implemented on the façade.
 - **`interpolate(method="ffill"\|"bfill")`** — maps to `fill_null(strategy=...)`. **`method="linear"`** raises `NotImplementedError` until a dedicated engine path exists.
 - **`expanding()`** — **`sum`/`count`** via `cumsum`; **`mean`** not implemented.
-- **`ewm(...)`** — not implemented (use fixed **`rolling`**).
+- **`ewm(com=... | span=... | alpha=...)`** — narrow helper; **`.mean(column, out_name=...)`** only, **eager** (pandas `Series.ewm`); requires **pandas** at runtime.
 - **`eval(expr, ...)`** — alias for **`query`** (same grammar and dict rules).
 
 **On `Expr` (also usable in `assign` / `with_columns`):**
@@ -365,7 +365,21 @@ Additional pandas parameters are accepted but may raise `NotImplementedError` (e
 ### `drop_duplicates(...)` / `duplicated(...)`
 
 - `drop_duplicates(subset=..., keep="first"|"last")` maps to core `unique(subset=..., keep=...)`.
-- `duplicated(...)` is not implemented yet (it needs an engine-level row-wise duplicate mask).
+- `drop_duplicates(..., keep=False)` drops **every** row whose key appears in a duplicate group (engine: **Polars** `is_duplicated` filter when enabled; row-wise fallback otherwise).
+- `duplicated(subset=..., keep="first"|"last"|False)` returns a **single-column** frame **`duplicated: bool`** (pandas-aligned semantics). Core **`DataFrame`** also exposes **`drop_duplicate_groups(...)`** for the same filter without building the mask.
+
+### `get_dummies` / `cut` / `qcut` / `factorize_column`
+
+| Method | Notes |
+|--------|-------|
+| `get_dummies(columns=[...], prefix=..., prefix_sep=..., drop_first=..., dtype="bool"\|"int", max_categories=512, dummy_na=False)` | **Eager** category scan; **requires explicit `columns`**; keeps other columns; raises if dummy names collide or cardinality exceeds **`max_categories`**. |
+| `cut(column, bins, new_column=..., labels=..., ...)` | **Eager**; uses **pandas `cut`**; adds a **nullable string** interval column. |
+| `qcut(column, q, new_column=..., duplicates=...)` | **Eager**; **pandas `qcut`**. |
+| `factorize_column(column)` | **Eager** `(codes, uniques)` tuple; **pandas `factorize`** on a `Series`. |
+
+### Core `value_counts` (dict return)
+
+The typed **`DataFrame.value_counts(column, ...)`** returns a **`dict`** (count per key), not a pandas **`Series`**—see [Interface contract](INTERFACE_CONTRACT.md) and core docstrings.
 
 ### `nlargest(n, columns, keep="all")` / `nsmallest(n, columns, keep="all")`
 

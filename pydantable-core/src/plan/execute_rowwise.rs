@@ -1,5 +1,7 @@
 //! Row-wise plan execution when the Polars engine is disabled.
 
+use std::collections::{HashMap, HashSet};
+
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
 
@@ -29,6 +31,18 @@ fn micros_to_py_timedelta(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
     let dt_mod = py.import_bound("datetime")?;
     let td = dt_mod.getattr("timedelta")?;
     Ok(td.call1((0, 0, micros))?.into_py(py))
+}
+
+fn row_key_for_subset(
+    ctx: &HashMap<String, Vec<Option<LiteralValue>>>,
+    subset: &[String],
+    i: usize,
+) -> String {
+    let mut sig = String::new();
+    for key in subset {
+        sig.push_str(&format!("{:?}|", ctx[key][i]));
+    }
+    sig
 }
 
 fn nanos_to_py_time(py: Python<'_>, ns: i64) -> PyResult<PyObject> {
@@ -303,6 +317,70 @@ pub(crate) fn execute_plan_rowwise(
                 return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
                     "rolling requires pydantable-core built with the Polars engine.",
                 ));
+            }
+            PlanStep::DuplicateMask { subset, keep } => {
+                let mut mask = vec![false; n];
+                match keep.as_str() {
+                    "first" => {
+                        let mut seen = HashSet::new();
+                        for i in 0..n {
+                            let k = row_key_for_subset(&ctx, subset, i);
+                            if seen.contains(&k) {
+                                mask[i] = true;
+                            } else {
+                                seen.insert(k);
+                            }
+                        }
+                    }
+                    "last" => {
+                        let mut seen = HashSet::new();
+                        for i in (0..n).rev() {
+                            let k = row_key_for_subset(&ctx, subset, i);
+                            if seen.contains(&k) {
+                                mask[i] = true;
+                            } else {
+                                seen.insert(k);
+                            }
+                        }
+                    }
+                    "none" => {
+                        let mut counts: HashMap<String, usize> = HashMap::new();
+                        for i in 0..n {
+                            let k = row_key_for_subset(&ctx, subset, i);
+                            *counts.entry(k).or_insert(0) += 1;
+                        }
+                        for i in 0..n {
+                            let k = row_key_for_subset(&ctx, subset, i);
+                            mask[i] = counts[&k] > 1;
+                        }
+                    }
+                    _ => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                            "internal: duplicate_mask keep",
+                        ));
+                    }
+                }
+                let dup_col: Vec<Option<LiteralValue>> = mask
+                    .into_iter()
+                    .map(|b| Some(LiteralValue::Bool(b)))
+                    .collect();
+                ctx.clear();
+                ctx.insert("duplicated".to_string(), dup_col);
+                n = ctx_len(&ctx)?;
+            }
+            PlanStep::DropDuplicateGroups { subset } => {
+                let mut counts: HashMap<String, usize> = HashMap::new();
+                for i in 0..n {
+                    let k = row_key_for_subset(&ctx, subset, i);
+                    *counts.entry(k).or_insert(0) += 1;
+                }
+                let keep_idx: Vec<usize> = (0..n)
+                    .filter(|i| counts[&row_key_for_subset(&ctx, subset, *i)] == 1)
+                    .collect();
+                for (_, col) in ctx.iter_mut() {
+                    *col = keep_idx.iter().map(|&i| col[i].clone()).collect();
+                }
+                n = ctx_len(&ctx)?;
             }
         }
     }
