@@ -27,11 +27,9 @@ result matches its own frame/source (no cross-talk). This is distinct from
 native ``execute_plan`` binary; ``ScanFileRoot`` integration is optional (skipped when
 unavailable).
 
-**Wall-clock overlap:** ``gather`` alone does not prove two operations ran at the same
-*wall-clock* time (only that results are correct). Tests named
-``test_concurrent_*_wall_clock_overlap`` add fixed per-call blocking work: if total time
-is well below twice that work, the two ``acollect`` paths overlapped (thread pool
-``asyncio.to_thread`` for the sync engine path).
+**Concurrency (deterministic):** avoid wall-clock overlap assertions, which are
+flaky on CI due to OS scheduling jitter. Prefer event-based synchronization
+tests that prove two operations can be in-flight at once.
 """
 
 from __future__ import annotations
@@ -39,6 +37,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import importlib
+import threading
 import time
 import warnings
 from contextlib import contextmanager
@@ -1015,14 +1014,19 @@ def _astream_collect_batches_mock_for_concurrent_tests() -> Any:
 
 
 @pytest.mark.asyncio
-async def test_concurrent_acollect_wall_clock_overlap_proves_parallel_threads() -> None:
-    """Two ``acollect`` calls must overlap in wall time when engine work is blocking.
+async def test_concurrent_acollect_runs_engine_work_in_parallel_threads() -> None:
+    """Avoid wall-clock assertions: prove concurrency with synchronization.
 
-    Each ``execute_plan`` sleeps in a worker thread (~80ms). Sequential work would
-    take ~160ms; overlapping threads finish closer to ~80ms (plus overhead).
+    When native async execution is unavailable, `acollect()` offloads blocking work
+    to threads. Two concurrent `acollect()` calls should be able to enter the
+    patched engine function before either returns (subject to executor capacity).
     """
     impl = importlib.import_module("pydantable.dataframe._impl")
-    _block_s = 0.08
+    started = threading.Event()
+    both_started = threading.Event()
+    release = threading.Event()
+    lock = threading.Lock()
+    n_started = 0
 
     def slow_execute(
         plan: object,
@@ -1032,9 +1036,17 @@ async def test_concurrent_acollect_wall_clock_overlap_proves_parallel_threads() 
         streaming: bool = False,
         error_context: str | None = None,
     ) -> dict[str, list[Any]]:
+        nonlocal n_started
         if not isinstance(data, dict):
             raise AssertionError("expected in-memory dict root")
-        time.sleep(_block_s)
+        with lock:
+            n_started += 1
+            started.set()
+            if n_started >= 2:
+                both_started.set()
+        # Block until the test releases both calls; this makes overlap detectable
+        # without relying on wall-clock ratios.
+        release.wait(timeout=5.0)
         return {str(k): list(v) for k, v in data.items()}
 
     d1 = Tiny({"x": [1]})
@@ -1043,40 +1055,30 @@ async def test_concurrent_acollect_wall_clock_overlap_proves_parallel_threads() 
         mock.patch.object(impl, "rust_has_async_execute_plan", return_value=False),
         mock.patch.object(impl, "execute_plan", slow_execute),
     ):
-        # Establish a baseline for sequential execution under the same patch.
-        t0 = time.perf_counter()
-        s1 = await d1.acollect(as_lists=True)
-        s2 = await d2.acollect(as_lists=True)
-        sequential = time.perf_counter() - t0
-
-        t0 = time.perf_counter()
-        c1, c2 = await asyncio.gather(
-            d1.acollect(as_lists=True),
-            d2.acollect(as_lists=True),
-        )
-        elapsed = time.perf_counter() - t0
-
-    assert s1 == {"x": [1]} and s2 == {"x": [2]}
+        t = asyncio.gather(d1.acollect(as_lists=True), d2.acollect(as_lists=True))
+        try:
+            # Wait until at least one call entered, then until both entered.
+            await asyncio.wait_for(asyncio.to_thread(started.wait), timeout=2.0)
+            await asyncio.wait_for(asyncio.to_thread(both_started.wait), timeout=2.0)
+        finally:
+            release.set()
+        c1, c2 = await asyncio.wait_for(t, timeout=5.0)
     assert c1 == {"x": [1]} and c2 == {"x": [2]}
-    # CI runners can have significant scheduling jitter. Compare against the measured
-    # sequential baseline instead of an absolute threshold.
-    assert elapsed < 0.8 * sequential, (
-        f"expected overlap vs sequential; parallel={elapsed:.3f}s, "
-        f"sequential={sequential:.3f}s"
-    )
 
 
 @pytest.mark.asyncio
-async def test_concurrent_native_async_execute_plan_wall_clock_overlap() -> None:
-    """When Tokio ``async_execute_plan`` is used, two ``acollect`` sleeps overlap."""
+async def test_concurrent_native_async_execute_plan_overlaps() -> None:
+    """Keep a small overlap check for native async, but avoid strict wall ratios."""
     impl = importlib.import_module("pydantable.dataframe._impl")
     if not impl.rust_has_async_execute_plan():
         pytest.skip("Rust extension has no async_execute_plan (Tokio bridge)")
 
     real = impl.async_execute_plan
-    _sleep_s = 0.06
+    gate = asyncio.Event()
+    entered = 0
+    lock = asyncio.Lock()
 
-    async def delayed_async_execute_plan(
+    async def gated_async_execute_plan(
         plan: object,
         data: object,
         *,
@@ -1084,7 +1086,13 @@ async def test_concurrent_native_async_execute_plan_wall_clock_overlap() -> None
         streaming: bool = False,
         error_context: str | None = None,
     ) -> object:
-        await asyncio.sleep(_sleep_s)
+        nonlocal entered
+        async with lock:
+            entered += 1
+            if entered >= 2:
+                gate.set()
+        # ensure both coroutines can reach this point before proceeding
+        await gate.wait()
         return await real(
             plan,
             data,
@@ -1095,15 +1103,23 @@ async def test_concurrent_native_async_execute_plan_wall_clock_overlap() -> None
 
     d1 = Tiny({"x": [1]})
     d2 = Tiny({"x": [2]})
-    with mock.patch.object(impl, "async_execute_plan", delayed_async_execute_plan):
-        t0 = time.perf_counter()
-        await asyncio.gather(d1.acollect(as_lists=True), d2.acollect(as_lists=True))
-        elapsed = time.perf_counter() - t0
+    with mock.patch.object(impl, "async_execute_plan", gated_async_execute_plan):
+        c1, c2 = await asyncio.wait_for(
+            asyncio.gather(d1.acollect(as_lists=True), d2.acollect(as_lists=True)),
+            timeout=10.0,
+        )
+    assert c1 == {"x": [1]} and c2 == {"x": [2]}
 
-    # Two sequential awaits would be ~2 * _sleep_s; cooperative overlap ~_sleep_s.
-    assert elapsed < 1.45 * _sleep_s, (
-        f"expected overlapping native async work (~{_sleep_s}s); got {elapsed:.3f}s"
-    )
+
+@pytest.mark.asyncio
+async def test_concurrent_native_async_execute_plan_wall_clock_overlap() -> None:
+    """Deprecated: timing-based overlap tests are intentionally removed."""
+    pytest.skip("Removed: wall-clock overlap assertions are too flaky on CI.")
+
+#
+# NOTE: the original wall-clock overlap assertions were removed because they are
+# sensitive to OS scheduling jitter (especially on macOS runners) and cause
+# release-blocking flakes unrelated to correctness.
 
 
 @pytest.mark.asyncio

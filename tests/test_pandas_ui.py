@@ -47,28 +47,76 @@ def test_pandas_ui_assign_rejects_callable() -> None:
         id: int
 
     df = User({"id": [1]})
-    with pytest.raises(TypeError, match="callable"):
-        df.assign(bad=lambda x: x)
+    out = df.assign(ok=lambda d: d.id + 1).collect(as_lists=True)
+    assert out["ok"] == [2]
 
 
-def test_pandas_ui_query_not_implemented() -> None:
+def test_pandas_ui_assign_callable_must_return_expr_or_literal() -> None:
     class User(PandasDataFrameModel):
         id: int
 
     df = User({"id": [1]})
-    with pytest.raises(NotImplementedError, match="filter\\(Expr\\)"):
-        df.query("id > 0")
+    with pytest.raises(TypeError):
+        df.assign(bad=lambda d: object())
 
 
-def test_pandas_ui_merge_rejects_left_on() -> None:
+def test_pandas_ui_query_string_support() -> None:
+    class User(PandasDataFrameModel):
+        id: int
+
+    df = User({"id": [1]})
+    assert df.query("id > 0").collect(as_lists=True) == {"id": [1]}
+
+
+def test_pandas_ui_query_string_basic() -> None:
+    class User(PandasDataFrameModel):
+        id: int
+        age: int | None
+
+    df = User({"id": [1, 2, 3], "age": [20, None, 5]})
+    out = df.query("id > 1 and age != None").collect(as_lists=True)
+    assert_table_eq_sorted(out, {"id": [3], "age": [5]}, keys=["id"])
+
+
+def test_pandas_ui_query_rejects_unsupported_syntax() -> None:
+    class User(PandasDataFrameModel):
+        id: int
+
+    df = User({"id": [1]})
+    with pytest.raises(NotImplementedError, match="Call"):
+        df.query("max(id) > 0")
+
+
+def test_pandas_ui_merge_left_on_requires_right_on() -> None:
     class L(PandasDataFrameModel):
         a: int
 
     class R(PandasDataFrameModel):
         b: int
 
-    with pytest.raises(NotImplementedError, match="left_on"):
-        L({"a": [1]}).merge(R({"b": [1]}), on="a", left_on="a", right_on="b")
+    with pytest.raises(TypeError, match="left_on"):
+        L({"a": [1]}).merge(R({"b": [1]}), left_on="a")  # type: ignore[arg-type]
+
+
+def test_pandas_ui_merge_left_on_right_on_different_names_drops_right_keys() -> None:
+    class L(PandasDataFrameModel):
+        left_id: int
+        v: int
+
+    class R(PandasDataFrameModel):
+        right_id: int
+        w: int
+
+    left = L({"left_id": [1, 2], "v": [10, 20]})
+    right = R({"right_id": [1, 2], "w": [100, 200]})
+
+    out = left.merge(right, left_on="left_id", right_on="right_id", how="inner")
+    data = out.collect(as_lists=True)
+    assert "left_id" in data
+    assert "right_id" not in data
+    assert data["left_id"] == [1, 2]
+    assert data["v"] == [10, 20]
+    assert data["w"] == [100, 200]
 
 
 def test_pandas_ui_matches_default_for_pipeline() -> None:
@@ -134,8 +182,7 @@ def test_pandas_core_query_not_implemented() -> None:
         x: int
 
     df = PDF[Row]({"x": [1]})
-    with pytest.raises(NotImplementedError, match="filter\\(Expr\\)"):
-        df.query("x > 0")
+    assert df.query("x > 0").collect(as_lists=True) == {"x": [1]}
 
 
 def test_pandas_ui_merge_default_suffix_when_single_tuple_element() -> None:
@@ -188,18 +235,82 @@ def test_pandas_ui_merge_requires_on() -> None:
         L({"a": [1]}).merge(R({"a": [1]}))
 
 
-def test_pandas_ui_merge_rejects_indicator_and_validate() -> None:
+def test_pandas_ui_merge_indicator_outer() -> None:
     class L(PandasDataFrameModel):
         a: int
+        x: int
 
     class R(PandasDataFrameModel):
         a: int
+        y: int
 
-    base = L({"a": [1]}), R({"a": [1]})
-    with pytest.raises(NotImplementedError, match="indicator"):
-        base[0].merge(base[1], on="a", indicator=True)
-    with pytest.raises(NotImplementedError, match="validate"):
-        base[0].merge(base[1], on="a", validate="one_to_one")
+    left = L({"a": [1, 2], "x": [10, 20]})
+    right = R({"a": [2, 3], "y": [200, 300]})
+
+    out = left.merge(right, on="a", how="outer", indicator=True).collect(as_lists=True)
+    # Order is not guaranteed; sort by key.
+    rows = sorted(zip(out["a"], out["_merge"], strict=True), key=lambda t: t[0])
+    assert rows == [(1, "left_only"), (2, "both"), (3, "right_only")]
+
+
+def test_pandas_ui_merge_indicator_left_on_right_on() -> None:
+    class L(PandasDataFrameModel):
+        left_id: int
+        x: int
+
+    class R(PandasDataFrameModel):
+        right_id: int
+        y: int
+
+    left = L({"left_id": [1, 2], "x": [10, 20]})
+    right = R({"right_id": [2, 3], "y": [200, 300]})
+
+    out = left.merge(
+        right,
+        left_on="left_id",
+        right_on="right_id",
+        how="outer",
+        indicator=True,
+    ).collect(as_lists=True)
+    assert "right_id" not in out  # pandas-like policy: drop right keys
+    rows = sorted(
+        zip(out["left_id"], out["_merge"], strict=True),
+        key=lambda t: t[0],
+    )
+    assert rows == [(1, "left_only"), (2, "both"), (3, "right_only")]
+
+
+def test_pandas_ui_merge_validate_one_to_one_and_one_to_many_and_many_to_one() -> None:
+    class L(PandasDataFrameModel):
+        a: int
+        x: int
+
+    class R(PandasDataFrameModel):
+        b: int
+        y: int
+
+    left_ok = L({"a": [1, 2], "x": [10, 20]})
+    right_ok = R({"b": [1, 2], "y": [100, 200]})
+
+    _ = left_ok.merge(
+        right_ok, left_on="a", right_on="b", validate="one_to_one", how="inner"
+    )
+    _ = left_ok.merge(
+        right_ok, left_on="a", right_on="b", validate="one_to_many", how="inner"
+    )
+    _ = left_ok.merge(
+        right_ok, left_on="a", right_on="b", validate="many_to_one", how="inner"
+    )
+
+    left_dupe = L({"a": [1, 1], "x": [10, 11]})
+    right_dupe = R({"b": [2, 2], "y": [20, 21]})
+
+    with pytest.raises(ValueError, match="one_to_one"):
+        left_dupe.merge(right_ok, left_on="a", right_on="b", validate="one_to_one")
+    with pytest.raises(ValueError, match="one_to_many"):
+        left_dupe.merge(right_ok, left_on="a", right_on="b", validate="one_to_many")
+    with pytest.raises(ValueError, match="many_to_one"):
+        left_ok.merge(right_dupe, left_on="a", right_on="b", validate="many_to_one")
 
 
 def test_pandas_ui_assign_rejects_series_like() -> None:

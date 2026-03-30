@@ -45,20 +45,25 @@ Same behavior as **`with_columns`**: each value must be an **`Expr`** or a liter
 
 **Not supported:**
 
-- Callable columns (e.g. `lambda df: ...`)
 - Raw **`pandas.Series`** as a column value
 
 Use column expressions (e.g. `df.x + 1`) instead.
+
+**Supported:** pandas-style callables that return an `Expr` or literal, e.g. `assign(x2=lambda df: df.x * 2)`.
 
 ### `merge(other, *, how="inner", on=..., suffixes=("_x", "_y"), ...)`
 
 Maps to **`join`**: `on` is required; the **right suffix** is taken from `suffixes[1]` (default second element `"_y"` → passed as `suffix` to `join`).
 
-**Raises `NotImplementedError` for:**
+**Supports:**
 
-- `left_on` / `right_on` (use symmetric `on=` keys only)
-- `indicator=True`
-- `validate=...`
+- `left_on` / `right_on` (including different key names). Output uses a pandas-like policy: right key columns are dropped, and for `how="outer"` / `how="right"` the left key columns are filled from the right keys for right-only rows.
+- `validate=...` (`one_to_one`, `one_to_many`, `many_to_one`, `many_to_many` and `1:1` / `1:m` / `m:1` / `m:m` aliases).
+- `indicator=True` (adds `_merge` with values `left_only` / `right_only` / `both`).
+
+**Still raises `NotImplementedError` for:**
+
+- Unsupported `query()` constructs beyond the limited grammar described below.
 
 Unknown keyword arguments raise **`TypeError`**.
 
@@ -84,7 +89,13 @@ The **default** **`pydantable.DataFrame`** (and **`DataFrameModel`**) now expose
 
 ### `query(str)`
 
-Always raises **`NotImplementedError`**. Use **`filter(Expr)`** with typed comparisons.
+Supports a **limited** boolean expression grammar and compiles to `filter(Expr)`:
+
+- Operators: `== != < <= > >=`, `and` / `or` / `not`, parentheses
+- Column refs: bare identifiers (e.g. `age > 10`)
+- Literals: ints, floats, quoted strings, `None`, `True`/`False`
+
+Unsupported syntax (function calls, attribute access, subscripts, etc.) raises `NotImplementedError`.
 
 ### `group_by(...)`
 
