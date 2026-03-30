@@ -1,4 +1,4 @@
-"""Extra coverage for pandas UI helpers: duplicates, dummies, binning, factorize, ewm, pivot."""
+"""Extra pandas UI tests: duplicates, dummies, binning, factorize, ewm, pivot."""
 
 from __future__ import annotations
 
@@ -48,8 +48,10 @@ def test_pandas_ui_drop_duplicates_false_with_subset_matches_pandas() -> None:
     pdf = pd.DataFrame(payload)
     df = DataFrame[Row](payload)
 
-    sub_pdf = pdf.drop_duplicates(subset=["k"], keep=False).sort_values("k").reset_index(
-        drop=True
+    sub_pdf = (
+        pdf.drop_duplicates(subset=["k"], keep=False)
+        .sort_values("k")
+        .reset_index(drop=True)
     )
     sub = (
         df.drop_duplicates(subset=["k"], keep=False)
@@ -113,7 +115,7 @@ def test_pandas_ui_get_dummies_prefix_sep_drop_first_and_dummy_na() -> None:
     d_first = df.get_dummies(["tag"], drop_first=True, dtype="int").collect(
         as_lists=True
     )
-    # Sorted distinct: None, x, y — drop_first removes None from dummies when dummy_na default False
+    # Sorted distinct None, x, y; with default dummy_na, None is not a dummy level.
     df_pd = pd.DataFrame({"id": [1, 2, 3, 4], "tag": ["y", None, "x", "y"]})
     exp = pd.get_dummies(df_pd, columns=["tag"], drop_first=True, dtype=int)
     assert set(d_first.keys()) == set(exp.columns)
@@ -133,9 +135,7 @@ def test_pandas_ui_get_dummies_two_columns_and_mapping_prefix() -> None:
         v: str
 
     df = DataFrame[Row]({"u": ["a", "b"], "v": ["c", "d"]})
-    out = df.get_dummies(["u", "v"], prefix={"u": "U", "v": "V"}).collect(
-        as_lists=True
-    )
+    out = df.get_dummies(["u", "v"], prefix={"u": "U", "v": "V"}).collect(as_lists=True)
     assert out["U_a"] == [True, False]
     assert out["U_b"] == [False, True]
     assert out["V_c"] == [True, False]
@@ -160,7 +160,9 @@ def test_pandas_ui_get_dummies_errors() -> None:
     with pytest.raises(ValueError, match="collides"):
         df.get_dummies(["region"])
 
-    df2 = DataFrame[Row]({"a": [1, 2], "region": ["x", "y"], "region_extra": ["p", "q"]})
+    df2 = DataFrame[Row](
+        {"a": [1, 2], "region": ["x", "y"], "region_extra": ["p", "q"]}
+    )
     with pytest.raises(ValueError, match="max_categories"):
         df2.get_dummies(["region"], max_categories=1)
 
@@ -193,7 +195,6 @@ def test_pandas_ui_factorize_nulls_and_keyerror() -> None:
 
 def test_pandas_ui_cut_qcut_interval_strings_match_pandas() -> None:
     pd = pytest.importorskip("pandas")
-    np = pytest.importorskip("numpy")
     from pydantable.pandas import DataFrame
 
     class Row(Schema):

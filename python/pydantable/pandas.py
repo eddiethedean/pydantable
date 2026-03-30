@@ -10,14 +10,10 @@ from __future__ import annotations
 import ast
 import random
 import re
-from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from pydantic import create_model
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
 from typing_extensions import Self
 
 from .dataframe import DataFrame as CoreDataFrame
@@ -1457,7 +1453,9 @@ class PandasDataFrame(CoreDataFrame):
                 )
             return self.drop_duplicate_groups(subset=subset_cols)
         if keep not in ("first", "last"):
-            raise ValueError("drop_duplicates(keep=...) must be 'first', 'last', or False.")
+            raise ValueError(
+                "drop_duplicates(keep=...) must be 'first', 'last', or False."
+            )
         if subset is None:
             subset_cols = None
         elif isinstance(subset, str):
@@ -1477,7 +1475,7 @@ class PandasDataFrame(CoreDataFrame):
 
     def duplicated(
         self,
-        subset: str | list[str] | None = None,
+        subset: Sequence[str] | None = None,
         *,
         keep: str | bool = "first",
     ) -> CoreDataFrame:
@@ -1486,11 +1484,12 @@ class PandasDataFrame(CoreDataFrame):
         elif isinstance(subset, str):
             subset_cols = [subset]
         elif (
-            isinstance(subset, list)
-            and subset
+            isinstance(subset, Sequence)
+            and not isinstance(subset, (str, bytes))
+            and len(subset) > 0
             and all(isinstance(c, str) for c in subset)
         ):
-            subset_cols = subset
+            subset_cols = list(subset)
         else:
             raise TypeError(
                 "duplicated(subset=...) must be a column name, "
@@ -1609,8 +1608,8 @@ class PandasDataFrame(CoreDataFrame):
                 out_name = f"{p}{prefix_sep}{safe}"
                 if out_name in keep or out_name in updates:
                     raise ValueError(
-                        f"get_dummies: output column name {out_name!r} collides with an "
-                        "existing or other dummy column."
+                        f"get_dummies: output column name {out_name!r} "
+                        "collides with an existing or other dummy column."
                     )
                 if v is None:
                     expr: Expr = self.col(c).is_null()
@@ -1625,13 +1624,16 @@ class PandasDataFrame(CoreDataFrame):
     def pivot(
         self,
         *,
-        index: str | list[str],
-        columns: str | Any,
-        values: str | list[str],
+        index: str | Sequence[str],
+        columns: str | Expr,
+        values: str | Sequence[str],
         aggregate_function: str = "first",
         streaming: bool | None = None,
     ) -> CoreDataFrame:
-        """Typed :meth:`~pydantable.dataframe.DataFrame.pivot` (not pandas' unconstrained pivot)."""
+        """Typed :meth:`~pydantable.dataframe.DataFrame.pivot`.
+
+        Not pandas' unconstrained dynamic pivot.
+        """
         return super().pivot(
             index=index,
             columns=columns,
@@ -1641,7 +1643,7 @@ class PandasDataFrame(CoreDataFrame):
         )
 
     def factorize_column(self, column: str) -> tuple[list[int], list[Any]]:
-        """Eager (codes, categories) for one column; uses pandas :func:`factorize` semantics."""
+        """Eager ``(codes, categories)`` using pandas :func:`factorize` semantics."""
         pd = __import__("pandas")
         data = self.collect(as_lists=True)
         if column not in data:
@@ -1718,57 +1720,57 @@ class PandasDataFrame(CoreDataFrame):
     def melt(
         self,
         *,
-        id_vars: str | list[str],
-        value_vars: str | list[str] | None = None,
-        var_name: str = "variable",
+        id_vars: Sequence[str] | None = None,
+        value_vars: Sequence[str] | None = None,
+        variable_name: str = "variable",
         value_name: str = "value",
+        streaming: bool | None = None,
+        var_name: str | None = None,
     ) -> CoreDataFrame:
-        if isinstance(id_vars, str):
-            id_list = [id_vars]
-        elif (
-            isinstance(id_vars, list)
-            and id_vars
-            and all(isinstance(c, str) for c in id_vars)
-        ):
-            id_list = id_vars
+        if var_name is not None and variable_name != "variable":
+            raise TypeError("melt(): pass only one of variable_name and var_name.")
+        eff_variable = variable_name if var_name is None else var_name
+
+        if id_vars is not None:
+            if isinstance(id_vars, str):
+                id_norm = [id_vars]
+            elif (
+                isinstance(id_vars, Sequence)
+                and not isinstance(id_vars, (str, bytes))
+                and len(id_vars) > 0
+                and all(isinstance(c, str) for c in id_vars)
+            ):
+                id_norm = list(id_vars)
+            else:
+                raise TypeError(
+                    "melt(id_vars=...) must be a column name or non-empty list[str]."
+                )
         else:
-            raise TypeError(
-                "melt(id_vars=...) must be a column name or non-empty list[str]."
-            )
+            id_norm = None
+
         if value_vars is None:
-            value_list: list[str] | None = None
+            val_norm = None
         elif isinstance(value_vars, str):
-            value_list = [value_vars]
+            val_norm = [value_vars]
         elif (
-            isinstance(value_vars, list)
-            and value_vars
+            isinstance(value_vars, Sequence)
+            and not isinstance(value_vars, (str, bytes))
+            and len(value_vars) > 0
             and all(isinstance(c, str) for c in value_vars)
         ):
-            value_list = value_vars
+            val_norm = list(value_vars)
         else:
             raise TypeError(
                 "melt(value_vars=...) must be a column name, non-empty list[str], or "
                 "None."
             )
 
-        rust = _require_rust_core()
-        rust_plan = rust.plan_melt(
-            self._rust_plan,
-            id_list,
-            value_list,
-            var_name,
-            value_name,
-        )
-        desc = rust_plan.schema_descriptors()
-        derived_fields = self._field_types_from_descriptors(desc)
-        derived_schema_type = make_derived_schema_type(
-            self._current_schema_type, derived_fields
-        )
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=derived_schema_type,
-            rust_plan=rust_plan,
+        return super().melt(
+            id_vars=id_norm,
+            value_vars=val_norm,
+            variable_name=eff_variable,
+            value_name=value_name,
+            streaming=streaming,
         )
 
     @classmethod
@@ -1944,11 +1946,7 @@ class PandasDataFrame(CoreDataFrame):
         if nrow == 0:
             return self
         rng = random.Random(random_state)
-        k = (
-            round(float(frac) * nrow)
-            if frac is not None
-            else int(n or 0)
-        )
+        k = round(float(frac) * nrow) if frac is not None else int(n or 0)
         k = max(0, min(int(k), nrow))
         idx = rng.sample(range(nrow), k=k)
         sub = _row_subset_from_lists(data, idx)
@@ -2084,9 +2082,7 @@ class PandasDataFrame(CoreDataFrame):
         if method != "pearson":
             raise NotImplementedError("corr(method=...) only supports 'pearson'.")
         cols = [
-            n
-            for n, a in self._current_field_types.items()
-            if _typing_numeric_name(a)
+            n for n, a in self._current_field_types.items() if _typing_numeric_name(a)
         ]
         if len(cols) < 2:
             raise ValueError("corr() needs at least two numeric columns in the schema.")
@@ -2108,16 +2104,15 @@ class PandasDataFrame(CoreDataFrame):
             for i in range(len(cols))
         }
         dyn = create_model(
-            "_CorrOut", **{c: (float | None, None) for c in cols}  # type: ignore[misc]
+            "_CorrOut",
+            **{c: (float | None, None) for c in cols},  # type: ignore[misc]
         )
         return DataFrame[dyn](out)
 
     def cov(self, min_periods: int = 1):  # type: ignore[no-untyped-def]
         _ = min_periods
         cols = [
-            n
-            for n, a in self._current_field_types.items()
-            if _typing_numeric_name(a)
+            n for n, a in self._current_field_types.items() if _typing_numeric_name(a)
         ]
         if len(cols) < 2:
             raise ValueError("cov() needs at least two numeric columns in the schema.")
@@ -2293,7 +2288,8 @@ class PandasDataFrame(CoreDataFrame):
             oc[j]: [float(out_mat[i, j]) for i in range(n_self)] for j in range(len(oc))
         }
         dyn = create_model(
-            "_DotOut", **{c: (float | None, None) for c in oc}  # type: ignore[misc]
+            "_DotOut",
+            **{c: (float | None, None) for c in oc},  # type: ignore[misc]
         )
         return DataFrame[dyn](out_dict)
 
@@ -2352,7 +2348,7 @@ class PandasDataFrame(CoreDataFrame):
         return self.fill_null(strategy=strat)
 
     class _Ewm:
-        __slots__ = ("_df", "_com", "_span", "_alpha", "_adjust", "_min_periods")
+        __slots__ = ("_adjust", "_alpha", "_com", "_df", "_min_periods", "_span")
 
         def __init__(
             self,
@@ -3054,30 +3050,22 @@ class PandasGroupedDataFrameModel(CoreGroupedDataFrameModel):
         def sum(
             self, column: str, *, out_name: str | None = None
         ) -> CoreDataFrameModel:
-            return self._mt._from_dataframe(
-                self._inner.sum(column, out_name=out_name)
-            )
+            return self._mt._from_dataframe(self._inner.sum(column, out_name=out_name))
 
         def mean(
             self, column: str, *, out_name: str | None = None
         ) -> CoreDataFrameModel:
-            return self._mt._from_dataframe(
-                self._inner.mean(column, out_name=out_name)
-            )
+            return self._mt._from_dataframe(self._inner.mean(column, out_name=out_name))
 
         def min(
             self, column: str, *, out_name: str | None = None
         ) -> CoreDataFrameModel:
-            return self._mt._from_dataframe(
-                self._inner.min(column, out_name=out_name)
-            )
+            return self._mt._from_dataframe(self._inner.min(column, out_name=out_name))
 
         def max(
             self, column: str, *, out_name: str | None = None
         ) -> CoreDataFrameModel:
-            return self._mt._from_dataframe(
-                self._inner.max(column, out_name=out_name)
-            )
+            return self._mt._from_dataframe(self._inner.max(column, out_name=out_name))
 
         def count(
             self, column: str, *, out_name: str | None = None

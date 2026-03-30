@@ -12,9 +12,8 @@ use crate::plan::{
     plan_fill_null as plan_fill_null_inner, plan_filter as plan_filter_inner,
     plan_global_select as build_plan_global_select, plan_melt as plan_melt_inner,
     plan_rename as plan_rename_inner, plan_rolling_agg as plan_rolling_agg_inner,
-    plan_select as plan_select_inner, plan_slice as plan_slice_inner,
-    plan_sort as plan_sort_inner, plan_unique as plan_unique_inner,
-    plan_with_columns as plan_with_columns_inner,
+    plan_select as plan_select_inner, plan_slice as plan_slice_inner, plan_sort as plan_sort_inner,
+    plan_unique as plan_unique_inner, plan_with_columns as plan_with_columns_inner,
 };
 
 use super::types::{PyExpr, PyPlan};
@@ -108,10 +107,7 @@ fn plan_duplicate_mask(
 }
 
 #[pyfunction]
-fn plan_drop_duplicate_groups(
-    plan: &PyPlan,
-    subset: Option<Vec<String>>,
-) -> PyResult<PyPlan> {
+fn plan_drop_duplicate_groups(plan: &PyPlan, subset: Option<Vec<String>>) -> PyResult<PyPlan> {
     Ok(PyPlan {
         inner: plan_drop_duplicate_groups_inner(&plan.inner, subset)?,
     })

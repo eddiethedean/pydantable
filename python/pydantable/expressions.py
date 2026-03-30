@@ -246,9 +246,7 @@ class Expr:  # type: ignore[override]
 
     def diff(self, periods: int = 1) -> Expr:
         rust = _require_rust_core()
-        return Expr(
-            rust_expr=rust.expr_row_accum_diff(self._rust_expr, int(periods))
-        )
+        return Expr(rust_expr=rust.expr_row_accum_diff(self._rust_expr, int(periods)))
 
     def pct_change(self, periods: int = 1) -> Expr:
         rust = _require_rust_core()
@@ -272,9 +270,7 @@ class Expr:  # type: ignore[override]
             return self
         if len(items) > 64:
             raise ValueError("replace() supports at most 64 mappings.")
-        chain = when(
-            self == Literal(value=items[0][0]), Literal(value=items[0][1])
-        )
+        chain = when(self == Literal(value=items[0][0]), Literal(value=items[0][1]))
         for old, new in items[1:]:
             chain = chain.when(self == Literal(value=old), Literal(value=new))
         return chain.otherwise(self)

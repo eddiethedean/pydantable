@@ -66,7 +66,9 @@ pub enum PlanStep {
         keep: String,
     },
     /// Drop every row that belongs to a duplicate key group (pandas `drop_duplicates(keep=False)`).
-    DropDuplicateGroups { subset: Vec<String> },
+    DropDuplicateGroups {
+        subset: Vec<String>,
+    },
 }
 
 #[derive(Clone, Debug)]

@@ -783,10 +783,7 @@ fn expr_row_accum_cum_max(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
 #[pyfunction]
 fn expr_row_accum_diff(inner: Bound<'_, PyExpr>, periods: i64) -> PyResult<PyExpr> {
     Ok(PyExpr {
-        node: ExprNode::make_row_accum(
-            inner.borrow().node.clone(),
-            RowAccumOp::Diff { periods },
-        )?,
+        node: ExprNode::make_row_accum(inner.borrow().node.clone(), RowAccumOp::Diff { periods })?,
     })
 }
 

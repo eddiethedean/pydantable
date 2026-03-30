@@ -249,7 +249,10 @@ pub fn plan_unique(
     })
 }
 
-fn resolve_duplicate_subset(plan: &PlanInner, subset: Option<Vec<String>>) -> PyResult<Vec<String>> {
+fn resolve_duplicate_subset(
+    plan: &PlanInner,
+    subset: Option<Vec<String>>,
+) -> PyResult<Vec<String>> {
     match subset {
         None => {
             let mut keys: Vec<String> = plan.schema.keys().cloned().collect();
@@ -312,10 +315,15 @@ pub fn plan_duplicate_mask(
 }
 
 /// Drop all rows that appear in a duplicate group (pandas `drop_duplicates(keep=False)`).
-pub fn plan_drop_duplicate_groups(plan: &PlanInner, subset: Option<Vec<String>>) -> PyResult<PlanInner> {
+pub fn plan_drop_duplicate_groups(
+    plan: &PlanInner,
+    subset: Option<Vec<String>>,
+) -> PyResult<PlanInner> {
     let subset = resolve_duplicate_subset(plan, subset)?;
     let mut new_steps = plan.steps.clone();
-    new_steps.push(PlanStep::DropDuplicateGroups { subset: subset.clone() });
+    new_steps.push(PlanStep::DropDuplicateGroups {
+        subset: subset.clone(),
+    });
     Ok(PlanInner {
         steps: new_steps,
         schema: plan.schema.clone(),

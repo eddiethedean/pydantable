@@ -1348,7 +1348,8 @@ class DataFrame(Generic[SchemaT]):
                             kurt_v = float(np.mean(((arr - m) / s) ** 4) - 3.0)
                             sem_v = s / (c**0.5)
                             extra = (
-                                f" skew={skew_v:.6g} kurtosis={kurt_v:.6g} sem={sem_v:.6g}"
+                                f" skew={skew_v:.6g} kurtosis={kurt_v:.6g} "
+                                f"sem={sem_v:.6g}"
                             )
                     except ImportError:
                         pass
@@ -1746,14 +1747,15 @@ class DataFrame(Generic[SchemaT]):
         *,
         keep: str | bool = "first",
     ) -> DataFrame[Any]:
-        """Return a single-column boolean frame ``duplicated`` (row-wise duplicate mask)."""
+        """Single-column boolean frame ``duplicated`` (row-wise duplicate mask)."""
         rust = _require_rust_core()
         if keep is True:
             raise ValueError("duplicated(keep=True) is invalid; use 'first' or 'last'.")
         keep_s = "none" if keep is False else str(keep)
         if keep_s not in ("first", "last", "none"):
             raise ValueError(
-                "duplicated(keep=...) must be 'first', 'last', or False (pandas parity)."
+                "duplicated(keep=...) must be 'first', 'last', or False "
+                "(pandas parity)."
             )
         rust_plan = rust.plan_duplicate_mask(
             self._rust_plan,
@@ -1776,7 +1778,11 @@ class DataFrame(Generic[SchemaT]):
         self,
         subset: Sequence[str] | None = None,
     ) -> DataFrame[Any]:
-        """Drop rows whose key (``subset`` or all columns) appears more than once (``drop_duplicates(keep=False)``)."""
+        """Drop rows whose key appears in a duplicate group.
+
+        ``subset`` selects key columns; if omitted, all columns participate.
+        Same filter as pandas ``drop_duplicates(keep=False)``.
+        """
         rust = _require_rust_core()
         rust_plan = rust.plan_drop_duplicate_groups(
             self._rust_plan,

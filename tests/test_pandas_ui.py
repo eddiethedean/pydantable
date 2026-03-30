@@ -1172,7 +1172,7 @@ def test_pandas_ui_melt_rejects_mixed_value_dtypes() -> None:
         y: str
 
     df = DataFrame[Row]({"id": [1], "x": [1], "y": ["z"]})
-    with pytest.raises(TypeError, match="compatible"):
+    with pytest.raises(TypeError, match=r"compatible|base dtype"):
         df.melt(id_vars=["id"], value_vars=["x", "y"])
 
 
@@ -1758,9 +1758,7 @@ def test_pandas_ui_wide_to_long_single_stub() -> None:
         sales_2020: int
         sales_2021: int
 
-    df = DataFrame[T](
-        {"id": [1, 2], "sales_2020": [10, 20], "sales_2021": [11, 21]}
-    )
+    df = DataFrame[T]({"id": [1, 2], "sales_2020": [10, 20], "sales_2021": [11, 21]})
     long = df.wide_to_long("sales", i="id", j="year", sep="_")
     got = long.collect(as_lists=True)
     assert got["id"] == [1, 2, 1, 2]
@@ -1974,7 +1972,7 @@ def test_pandas_ui_reindex_align_keys() -> None:
 
     left = DataFrame[V]({"k": [1, 2], "v": [1, 2]})
     right = DataFrame[V]({"k": [2, 3], "v": [20, 30]})
-    a_l, a_r = left.align(right, on=["k"], join="outer")
+    a_l, _a_r = left.align(right, on=["k"], join="outer")
     assert set(a_l.collect(as_lists=True)["k"]) == {1, 2, 3}
 
 
@@ -1993,7 +1991,9 @@ def test_pandas_ui_transpose_and_dot() -> None:
 
     coef = DataFrame[M]({"a": [1, 0], "b": [0, 1]})
     dst = df.dot(coef).collect(as_lists=True)
-    m = np.array([[1, 3], [2, 4]], dtype=float) @ np.array([[1, 0], [0, 1]], dtype=float)
+    m = np.array([[1, 3], [2, 4]], dtype=float) @ np.array(
+        [[1, 0], [0, 1]], dtype=float
+    )
     assert np.allclose([[dst["a"][0], dst["b"][0]], [dst["a"][1], dst["b"][1]]], m)
 
 
@@ -2030,9 +2030,7 @@ def test_pandas_ui_get_dummies_qcut_cut_factorize_ewm_pivot() -> None:
         color: str
         v: float
 
-    df = DataFrame[S](
-        {"id": [1, 2, 3], "color": ["a", "b", "a"], "v": [1.0, 2.0, 3.0]}
-    )
+    df = DataFrame[S]({"id": [1, 2, 3], "color": ["a", "b", "a"], "v": [1.0, 2.0, 3.0]})
     dumb = df.get_dummies(["color"], dtype="int").collect(as_lists=True)
     assert dumb["id"] == [1, 2, 3]
     assert dumb["v"] == [1.0, 2.0, 3.0]
@@ -2051,7 +2049,9 @@ def test_pandas_ui_get_dummies_qcut_cut_factorize_ewm_pivot() -> None:
 
     ewm = df.ewm(span=2).mean("v", out_name="m").collect(as_lists=True)
     assert len(ewm["m"]) == 3
-    assert np.allclose(ewm["m"], pd.Series([1.0, 2.0, 3.0]).ewm(span=2).mean(), equal_nan=True)
+    assert np.allclose(
+        ewm["m"], pd.Series([1.0, 2.0, 3.0]).ewm(span=2).mean(), equal_nan=True
+    )
 
     class P(Schema):
         i: int

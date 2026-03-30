@@ -415,12 +415,8 @@ pub enum RowAccumOp {
     CumProd,
     CumMin,
     CumMax,
-    Diff {
-        periods: i64,
-    },
-    PctChange {
-        periods: i64,
-    },
+    Diff { periods: i64 },
+    PctChange { periods: i64 },
 }
 
 /// Built-in window operations lowered to Polars window expressions.

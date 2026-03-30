@@ -134,7 +134,7 @@ class PandasDataFrame(CoreDataFrame):
         ignore_index: bool = False,
     ) -> CoreDataFrame: ...
     def duplicated(
-        self, subset: str | list[str] | None = None, *, keep: str | bool = "first"
+        self, subset: Sequence[str] | None = None, *, keep: str | bool = "first"
     ) -> CoreDataFrame: ...
     def isna(self) -> CoreDataFrame: ...
     def isnull(self) -> CoreDataFrame: ...
@@ -163,9 +163,9 @@ class PandasDataFrame(CoreDataFrame):
     def pivot(
         self,
         *,
-        index: str | list[str],
-        columns: str | Any,
-        values: str | list[str],
+        index: str | Sequence[str],
+        columns: str | Expr,
+        values: str | Sequence[str],
         aggregate_function: str = "first",
         streaming: bool | None = None,
     ) -> CoreDataFrame: ...
@@ -192,10 +192,12 @@ class PandasDataFrame(CoreDataFrame):
     def melt(
         self,
         *,
-        id_vars: str | list[str],
-        value_vars: str | list[str] | None = None,
-        var_name: str = "variable",
+        id_vars: Sequence[str] | None = None,
+        value_vars: Sequence[str] | None = None,
+        variable_name: str = "variable",
         value_name: str = "value",
+        streaming: bool | None = None,
+        var_name: str | None = None,
     ) -> CoreDataFrame: ...
     @classmethod
     def from_dict(
