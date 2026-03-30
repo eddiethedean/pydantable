@@ -4,6 +4,8 @@ This page is the **mental model** for how pydantable works in production.
 
 ## Core execution flow
 
+Terminal work on a lazy plan can follow **four** materialization modes (blocking, async, deferred **`submit`**, chunked **`stream`** / **`astream`**); see {doc}`MATERIALIZATION`.
+
 ```
 flowchart LR
   userCode[UserCode] --> pythonApi[PythonAPI_DataFrame_DataFrameModel]

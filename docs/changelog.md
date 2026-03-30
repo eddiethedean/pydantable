@@ -4,15 +4,26 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+### Removed
+
+- **`DataFrameModel`** eager I/O shims: **`materialize_*`**, **`amaterialize_*`**, **`fetch_sql`**, **`afetch_sql`**, **`iter_sql`**, **`aiter_sql`**, **`from_sql`**, **`afrom_sql`**. Use **`pydantable.io`** for eager **`dict[str, list]`** loads and **`SQL`** streaming, then **`MyModel(cols, ...)`**; keep lazy scans on **`read_*`** / **`aread_*`**.
+
 ### Added
 
+- **`pydantable.typing.SupportsLazyAsyncMaterialize`:** structural ``Protocol`` for objects with async terminal materialization via **`acollect`** (``DataFrameModel`` and ``AwaitableDataFrameModel``).
+- **`AwaitableDataFrameModel`:** **`aread_parquet`**, **`aread_ipc`**, **`aread_csv`**, **`aread_ndjson`**, and **`aread_json`** return a chainable awaitable (``select`` / ``filter`` / … then ``await …acollect()``) so async routes avoid nested ``await`` on the read. **Lazy metadata:** ``await …columns`` / ``shape`` / ``empty`` / ``dtypes``; **`then`** for custom sync/async steps; **`concat`** to merge multiple pending chains or concrete models. **Async-first names:** unprefixed terminals on the chain — **`collect`**, **`to_dict`**, **`to_polars`**, **`to_arrow`**, **`rows`**, **`to_dicts`**, **`stream`** (aliases of the ``a*`` methods); **`DataFrameModel.Async.read_*`** / **`Async.write_sql`** / **`Async.export_*`** mirror **`aread_*`** / **`awrite_sql`** / **`aexport_*`** without the ``a`` prefix (``read_parquet`` cannot replace **`aread_parquet`** on the class itself because **`read_parquet`** is the sync lazy reader). Pending chains show a **descriptive ``repr``** (read path + chained transforms).
+- **`DataFrameModel.aexport_parquet`**, **`aexport_csv`**, **`aexport_ndjson`**, **`aexport_ipc`**, **`aexport_json`**: async eager exports via **`pydantable.io`** **`aexport_*`**.
 - **Rust async bridge:** **`async_execute_plan`** and **`async_collect_plan_batches`** on **`pydantable._core`** (Tokio + **`pyo3-async-runtimes`**); **`acollect`** / **`ato_*`** prefer this awaitable when present.
 - **`DataFrame.submit`** / **`DataFrameModel.submit`** and **`ExecutionHandle`** (**`result`**, **`done`**, **`cancel`**) for background **`collect`**.
 - **`DataFrame.astream`** / **`DataFrameModel.astream`**: async iteration of column **`dict`** chunks after one engine collect (see {doc}`EXECUTION`).
+- **`DataFrame.stream`** / **`DataFrameModel.stream`**: synchronous **`dict[str, list]`** chunk iterator (same semantics as **`astream`**); **`PlanMaterialization`** and **`plan_materialization_summary()`** label the four terminal modes (blocking, async, deferred, chunked).
 
 ### Docs
 
-- {doc}`EXECUTION`, {doc}`INTERFACE_CONTRACT`, {doc}`ROADMAP`, {doc}`DATA_IO_SOURCES`, and **`docs/async_ideas/`** aligned with the above.
+- {doc}`TYPING`: expanded **`SupportsLazyAsyncMaterialize`** (when to use vs **`DataFrameModelWithRow`**, runtime **`isinstance`** caveats, examples); {doc}`DATAFRAMEMODEL` cross-link from async lazy I/O.
+- New {doc}`MATERIALIZATION` page; {doc}`EXECUTION`, {doc}`INTERFACE_CONTRACT`, {doc}`DATAFRAMEMODEL`, {doc}`DOCS_MAP` cross-links.
+- {doc}`/DATAFRAMEMODEL` **Three layers** (ASCII diagram + rule of thumb + lazy-shape warning); {doc}`/cookbook/async_lazy_pipeline`; {doc}`/cookbook/fastapi_async_materialization` prefers **`collect`** / **`to_dict`**.
+- {doc}`ROADMAP`, {doc}`DATA_IO_SOURCES`, and **`docs/async_ideas/`** aligned with async/submit/stream work where applicable.
 
 ## [1.5.0] — 2026-03-29
 

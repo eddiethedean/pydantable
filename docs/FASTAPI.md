@@ -15,9 +15,8 @@ For FastAPI services, `pydantable` gives you:
 - **`acollect()`**, **`ato_dict()`**, **`ato_polars()`**, **`ato_arrow()`** — same semantics off the event loop (Rust/Tokio awaitable when available; see below)
 - **`submit()`** + **`await handle.result()`** — background **`collect()`**
 - **`stream()`** / **`astream()`** — sync / async iteration of **`dict[str, list]`** column chunks after one engine collect (for streaming HTTP bodies; see {doc}`EXECUTION`). Use **`stream()`** in **`def`** routes with **`StreamingResponse`**; use **`async for`** over **`astream()`** in **`async def`** routes.
-- **`pydantable.io`** — **`read_*` / `materialize_*` / `export_*`** for **Parquet**, **Arrow IPC**, **CSV**, **NDJSON**, **JSON** (array of objects; {doc}`IO_JSON`) (Rust-first on local paths where the wheel supports it; **PyArrow** for buffers, column subsets, streaming IPC). For **out-of-core** pipelines use **`read_*`** + transforms + **`DataFrame.write_*`**. **HTTP Parquet:** prefer **`read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** so temp files are removed after the handler ({doc}`IO_HTTP`). Extras: **`[sql]`** (SQLAlchemy **`fetch_sql`** / **`write_sql`**), **`[cloud]`** (**`fsspec`** URLs), **`[rap]`** (true-async CSV via **`aread_csv_rap`**). See **`pip install 'pydantable[io]'`** for **PyArrow + Polars** together.
-- **`amaterialize_parquet`**, **`amaterialize_ipc`**, **`amaterialize_csv`**, **`amaterialize_ndjson`**, **`amaterialize_json`** and **`aexport_*`** mirrors — eager file I/O **off the event loop** (**`asyncio.to_thread`** by default, or your **`executor=`**). Use inside **`async def`** when you need a full **`dict[str, list]`** (e.g. to pass into **`DataFrameModel`**), or to **export** columns to a path.
-- **`afetch_sql`** / **`awrite_sql`** — SQLAlchemy-backed table I/O without blocking the loop (same threading model).
+- **`DataFrameModel`** / **`DataFrame[Schema]`** **classmethods** — lazy **`read_*`**, **`aread_*`**, **`export_*`**, **`write_sql`**, **`awrite_sql`**, and lazy **`write_*`** ({doc}`IO_OVERVIEW`). **Eager** column loads (**`materialize_*`**, **`fetch_sql`**, **`iter_sql`**, …) live on **`pydantable.io`**; pass **`dict[str, list]`** into **`MyModel(...)`** / **`DataFrame[Schema](...)`** for typed frames. **Parquet / CSV / NDJSON / IPC / JSON:** Rust-first on local paths where the wheel supports it; **PyArrow** for buffers and column subsets. **Out-of-core:** **`read_*`** + transforms + **`DataFrame.write_*`**. **HTTP Parquet:** **`read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** ({doc}`IO_HTTP`). Extras: **`[sql]`**, **`[cloud]`**, **`[rap]`**. **`pip install 'pydantable[io]'`** pulls **PyArrow + Polars** for columnar paths.
+- **`await amaterialize_*`** / **`await afetch_sql`** from **`pydantable.io`** — same threading model as other async I/O helpers (**`asyncio.to_thread`** / **`executor=`**).
 - **`to_arrow()`** — materialize a PyArrow **`Table`** after the same engine path as **`to_dict()`** (not zero-copy; see [`EXECUTION.md`](EXECUTION.md))
 
 **Synchronous materialization** (`collect()`, `to_dict()`, `collect(as_lists=True)`, optional `to_polars()`) runs **blocking** Rust + Polars work on the **current thread**.
@@ -39,6 +38,189 @@ From a git checkout, build the extension (for example with [Maturin](https://www
 ```bash
 pip install .
 ```
+
+(four-materialization-modes-fastapi)=
+## Four materialization modes (FastAPI)
+
+The same lazy plan can be materialized in **four** ways; see {doc}`MATERIALIZATION` for the full table and **`PlanMaterialization`**.
+
+Below, routes read **Parquet** from a **server-local path** (shared volume, artifact from an upstream job, or a temp file you wrote after **`await upload.read()`**). In production, **validate and sandbox** paths (allowlist directories, reject `..`, etc.). **`trusted_mode="shape_only"`** matches typical “file already matches our schema” pipelines; use default **`trusted_mode`** when you need full cell validation.
+
+Row-list JSON bodies are covered in [Column-shaped JSON request bodies](#column-shaped-json-request-bodies) below; **async file routes** should **`await MyModel.aread_*`** (lazy scan, blocking open/read off the event loop) rather than **`await amaterialize_*`**, which builds a full **`dict[str, list]`** first. SQL: **`await afetch_sql`** / **`aiter_sql`** from **`pydantable.io`** ({doc}`IO_OVERVIEW`).
+
+### 1. Blocking — sync `def` + `collect()` / `to_dict()`
+
+**Sync** **`pydantable.io.materialize_parquet`** blocks the worker thread while Rust/PyArrow read the file; **`UserDF(cols)`** then **`collect()`** / **`to_dict()`** run the lazy plan (often trivial if the “plan” is just the scan root).
+
+```python
+from fastapi import FastAPI, Query
+from pydantic import BaseModel
+
+from pydantable import DataFrameModel
+from pydantable.io import materialize_parquet
+
+app = FastAPI()
+
+
+class UserDF(DataFrameModel):
+    id: int
+    age: int | None
+
+
+class UserRow(BaseModel):
+    id: int
+    age: int | None
+
+
+@app.get("/users-blocking", response_model=list[UserRow])
+def report_from_parquet_blocking(path: str = Query(..., description="Readable Parquet path on server")):
+    df = UserDF(materialize_parquet(path), trusted_mode="shape_only").select("id", "age")
+    return df.collect()
+
+
+@app.get("/users-columnar-blocking")
+def columnar_from_parquet_blocking(path: str = Query(...)):
+    df = UserDF(materialize_parquet(path), trusted_mode="shape_only")
+    return df.to_dict()
+```
+
+### 2. Async — `async def` + `await collect()` / `await to_dict()` (or `acollect` / `ato_dict`)
+
+**`aread_*`** (or **`UserDF.Async.read_parquet`**, …) returns **`AwaitableDataFrameModel`**: chain lazy transforms (**`select`**, **`filter`**, …) and use **one** leading **`await`** on **`collect()`** / **`to_dict()`** — unprefixed aliases of **`acollect()`** / **`ato_dict()`** — (e.g. **`return await UserDF.Async.read_parquet(...).select(...).collect()`**). Sync lazy **`read_parquet`** stays on **`DataFrameModel`**; the **`Async`** namespace holds the async readers so names match without an **`a`** prefix. File open + scan setup run in **`asyncio.to_thread`** (or **`executor=`**); the plan stays lazy until terminal materialization. You can still **`df = await UserDF.aread_parquet(...)`** for a concrete model in two steps. For eager columns first, **`await amaterialize_parquet(path)`** from **`pydantable.io`** + **`UserDF(cols)`** ({doc}`IO_OVERVIEW`).
+
+```python
+from fastapi import FastAPI, Query
+from pydantic import BaseModel
+
+from pydantable import DataFrameModel
+
+app = FastAPI()
+
+
+class UserDF(DataFrameModel):
+    id: int
+    age: int | None
+
+
+class UserRow(BaseModel):
+    id: int
+    age: int | None
+
+
+@app.get("/users-async", response_model=list[UserRow])
+async def report_from_parquet(path: str = Query(...)):
+    return await UserDF.Async.read_parquet(path, trusted_mode="shape_only").select(
+        "id", "age"
+    ).collect()
+
+
+@app.get("/users-columnar-async")
+async def columnar_async(path: str = Query(...)):
+    return await UserDF.Async.read_parquet(path, trusted_mode="shape_only").to_dict()
+```
+
+(chained-await-fastapi)=
+#### Nested `await` on the read (optional)
+
+If you prefer the older style, **`await (await UserDF.aread_parquet(...)).select(...).acollect()`** still works: the inner **`await`** resolves the **`AwaitableDataFrameModel`** to a concrete model (same as assigning **`df = await UserDF.aread_parquet(...)`**). Parentheses around the inner **`await`** are required because **`await`** binds less tightly than method calls.
+
+### 3. Deferred — `submit()` + `await handle.result()`
+
+**`asyncio.gather`** loads two Parquet paths concurrently (**`await UserDF.aread_parquet`**), then **`submit()`** overlaps **`collect()`** work (still useful when CPU-heavy transforms follow the scan).
+
+```python
+import asyncio
+
+from fastapi import FastAPI, Query
+from pydantic import BaseModel
+
+from pydantable import DataFrameModel
+
+app = FastAPI()
+
+
+class UserDF(DataFrameModel):
+    id: int
+    age: int | None
+
+
+class UserRow(BaseModel):
+    id: int
+    age: int | None
+
+
+@app.get("/users-deferred", response_model=list[UserRow])
+async def report_deferred(path: str = Query(...)):
+    df = await UserDF.aread_parquet(path, trusted_mode="shape_only")
+    handle = df.select("id", "age").submit()
+    return await handle.result()
+
+
+@app.get("/users-two-deferred")
+async def two_cohorts_deferred(
+    path_a: str = Query(...),
+    path_b: str = Query(...),
+):
+    df_a, df_b = await asyncio.gather(
+        UserDF.aread_parquet(path_a, trusted_mode="shape_only"),
+        UserDF.aread_parquet(path_b, trusted_mode="shape_only"),
+    )
+    h_a = df_a.select("id", "age").submit()
+    h_b = df_b.select("id", "age").submit()
+    out_a, out_b = await asyncio.gather(h_a.result(), h_b.result())
+    return {"cohort_a": out_a, "cohort_b": out_b}
+```
+
+### 4. Chunked — `stream()` / `astream()` + streaming body
+
+Lazy **`read_parquet`** / **`aread_parquet`** build the same **`DataFrame`** you **`stream`** or **`astream`** after one engine collect. Install **`pydantable[polars]`**. **NDJSON**-style response: one JSON object per batch.
+
+```python
+import json
+
+from fastapi import FastAPI, Query
+from fastapi.responses import StreamingResponse
+
+from pydantable import DataFrameModel
+
+app = FastAPI()
+
+
+class UserDF(DataFrameModel):
+    id: int
+    age: int | None
+
+
+def ndjson_sync(df):
+    for batch in df.stream(batch_size=1_000):
+        yield (json.dumps(batch, default=str) + "\n").encode()
+
+
+@app.get("/users-stream-sync")
+def users_stream_sync(path: str = Query(...)):
+    df = UserDF.read_parquet(path, trusted_mode="shape_only").select("id", "age")
+    return StreamingResponse(
+        ndjson_sync(df),
+        media_type="application/x-ndjson",
+    )
+
+
+async def ndjson_async(df):
+    async for batch in df.astream(batch_size=1_000):
+        yield (json.dumps(batch, default=str) + "\n").encode()
+
+
+@app.get("/users-stream-async")
+async def users_stream_async(path: str = Query(...)):
+    df = await UserDF.aread_parquet(path, trusted_mode="shape_only")
+    df = df.select("id", "age")
+    return StreamingResponse(
+        ndjson_async(df),
+        media_type="application/x-ndjson",
+    )
+```
+
+These are **chunked replay** responses, not out-of-core Polars streaming; very large tables may need pagination or writing to object storage instead ({doc}`EXECUTION`).
 
 ## Trusted ingest (`trusted_mode`)
 
@@ -68,6 +250,7 @@ df = UserDF(
 )
 ```
 
+(column-shaped-json-request-bodies)=
 ## Column-shaped JSON request bodies
 
 Row lists are natural for OpenAPI (`list[YourRowModel]`). Some clients send **columnar** JSON (`parallel arrays`). Model that with a Pydantic body whose fields are lists, then pass a **`dict[str, list]`** into **`DataFrameModel`**:
@@ -99,7 +282,7 @@ Same schema rules apply as for columnar constructors in [`DATAFRAMEMODEL.md`](DA
 
 ## Parquet and Arrow IPC uploads (multipart)
 
-For **file** bodies, read bytes in the handler and use **`materialize_parquet`** / **`materialize_ipc`** from **`pydantable.io`** ( **`as_stream=True`** for streaming IPC); reads from **bytes** require **`pyarrow`** (**`pip install 'pydantable[arrow]'`** or **`[io]`**). That **`materialize_*`** call is still **blocking** while PyArrow decodes—either keep uploads small or offload with **`asyncio.to_thread(materialize_parquet, raw, …)`** / **`run_in_executor`**. For **paths on disk** (shared volume, temp file after **`await file.read()`**), prefer **`await amaterialize_parquet(path)`** so the pattern is consistent with other async routes. FastAPI file routes require **`python-multipart`** (`pip install python-multipart`).
+For **file** bodies, read bytes and use **`pydantable.io.materialize_parquet`** / **`materialize_ipc`** (**bytes** need **PyArrow** — **`pip install 'pydantable[arrow]'`** or **`[io]`**). That path is **blocking** while PyArrow decodes. In **`async def`** handlers, prefer writing to a temp path and **`await MyModel.aread_parquet(path)`** so the blocking work is offloaded like other async readers ({doc}`IO_HTTP`). FastAPI file routes require **`python-multipart`** (`pip install python-multipart`).
 
 Use **`trusted_mode="shape_only"`** or **`strict`** for internal uploads where the file is already schema-shaped; use default validation for untrusted clients.
 
@@ -121,14 +304,13 @@ app = FastAPI()
 @app.post("/upload-parquet")
 async def upload_parquet(file: UploadFile):
     raw = await file.read()
-    cols = materialize_parquet(raw)
-    df = UserDF(cols, trusted_mode="shape_only")
+    df = UserDF(materialize_parquet(raw), trusted_mode="shape_only")
     return df.to_dict()
 ```
 
-## `pydantable.io` async I/O in `async def` routes
+## `DataFrameModel` I/O in `async def` routes
 
-For **FastAPI**, the **`amaterialize_*`**, **`aread_*`**, **`afetch_sql`**, **`aexport_*`**, and **`awrite_sql`** helpers in **`pydantable.io`** mirror the sync API but run work in **`asyncio.to_thread`** (or in a **`ThreadPoolExecutor`** you pass as **`executor=`**). That keeps the ASGI event loop responsive while **Rust**, **PyArrow**, **stdlib CSV**, or **SQLAlchemy** does blocking I/O.
+Prefer **`await MyModel.aread_*`**, **`await amaterialize_*`** / **`await afetch_sql`** from **`pydantable.io`** (then **`MyModel(cols)`**), **`await MyModel.aexport_*`**, and **`await MyModel.awrite_sql`**. **`pydantable.io`** **`materialize_*`** / **`fetch_sql`** return **`dict[str, list]`** — wrap with **`MyModel(...)`** when you want a typed frame.
 
 **Install** what you need:
 
@@ -141,17 +323,17 @@ pip install 'pydantable[rap]'     # optional: aread_csv_rap (rapcsv + rapfiles)
 
 | Sync | Async | Typical use in a route |
 |------|-------|-------------------------|
-| **`read_parquet`** (lazy root) | **`aread_parquet`** | Large local Parquet without full Python dict |
-| **`materialize_parquet`** | **`amaterialize_parquet`** | Eager columns from path or bytes |
-| **`materialize_ipc`** | **`amaterialize_ipc`** | Arrow IPC / Feather file |
-| **`materialize_csv`** | **`amaterialize_csv`** | CSV path |
-| **`materialize_ndjson`** | **`amaterialize_ndjson`** | NDJSON / JSON-lines file |
-| **`export_parquet`** | **`aexport_parquet`** | Persist column dict to Parquet |
-| **`export_ipc`** / **`export_csv`** / **`export_ndjson`** | **`aexport_*`** | Same for other formats |
-| **`fetch_sql`** | **`afetch_sql`** | Parameterized **`SELECT`** → **`dict[str, list]`** |
-| **`write_sql`** | **`awrite_sql`** | Append or replace table from column dict |
+| **`MyModel.read_parquet`** | **`await MyModel.Async.read_parquet`** (or **`aread_parquet`**) | Large local Parquet without full Python dict |
+| **`materialize_parquet`** | **`await amaterialize_parquet`** | Eager columns from path or bytes (**`pydantable.io`**) → **`MyModel(cols)`** |
+| **`materialize_ipc`** | **`await amaterialize_ipc`** | Arrow IPC / Feather file (**`pydantable.io`**) |
+| **`materialize_csv`** | **`await amaterialize_csv`** | CSV path (**`pydantable.io`**) |
+| **`materialize_ndjson`** | **`await amaterialize_ndjson`** | NDJSON / JSON-lines file (**`pydantable.io`**) |
+| **`MyModel.export_parquet`** | **`await MyModel.aexport_parquet`** | Persist to Parquet |
+| **`MyModel.export_*`** | **`await MyModel.aexport_*`** | Other formats |
+| **`fetch_sql`** | **`await afetch_sql`** | Parameterized **`SELECT`** → **`dict[str, list]`** → **`MyModel(cols)`** |
+| **`MyModel.write_sql`** | **`await MyModel.Async.write_sql`** (or **`awrite_sql`**) | Append or replace table from column dict |
 
-**`DataFrame.write_parquet`** (and siblings) are synchronous (Rust); call them from a thread pool inside **`async def`** if the write can be large. All **`amaterialize_*`** / **`aread_*`** / **`afetch_*`** / **`aexport_*`** / **`awrite_sql`** accept **`executor=`** (same semantics as **`df.acollect(executor=…)`**). Reuse one bounded **`ThreadPoolExecutor`** from **`app.state`** or **`Depends`** for dataframe materialization **and** file/SQL I/O so load is predictable under concurrency.
+**`DataFrame.write_parquet`** (and siblings) are synchronous (Rust); call them from a thread pool inside **`async def`** if the write can be large. All **`amaterialize_*`** / **`aread_*`** / **`afetch_sql`** / **`aexport_*`** / **`awrite_sql`** accept **`executor=`** (same semantics as **`df.acollect(executor=…)`**). Reuse one bounded **`ThreadPoolExecutor`** from **`app.state`** or **`Depends`** for dataframe materialization **and** file/SQL I/O so load is predictable under concurrency.
 
 ### Example: read a Parquet path without blocking the loop
 
@@ -159,7 +341,6 @@ pip install 'pydantable[rap]'     # optional: aread_csv_rap (rapcsv + rapfiles)
 from fastapi import FastAPI
 
 from pydantable import DataFrameModel
-from pydantable.io import amaterialize_parquet
 
 
 class RowDF(DataFrameModel):
@@ -172,14 +353,12 @@ app = FastAPI()
 
 @app.get("/from-parquet-path")
 async def from_parquet_path(path: str):
-    cols = await amaterialize_parquet(path)
-    df = RowDF(cols, trusted_mode="shape_only")
-    return await df.ato_dict()
+    return await RowDF.aread_parquet(path, trusted_mode="shape_only").ato_dict()
 ```
 
 ### Example: upload → temp file → async read
 
-For large uploads, avoid holding **`bytes`** longer than necessary: write to a temp path, **`amaterialize_*`**, then delete.
+For large uploads, avoid holding **`bytes`** longer than necessary: write to a temp path, **`await MyModel.aread_parquet(path)`** (lazy scan), then delete. Same pattern works for IPC/CSV/NDJSON with **`aread_ipc`**, **`aread_csv`**, etc.
 
 ```python
 import tempfile
@@ -187,7 +366,12 @@ from pathlib import Path
 
 from fastapi import FastAPI, UploadFile
 
-from pydantable.io import amaterialize_parquet
+from pydantable import DataFrameModel
+
+
+class UserDF(DataFrameModel):
+    id: int
+    age: int | None
 
 
 app = FastAPI()
@@ -201,21 +385,27 @@ async def upload_parquet_async(file: UploadFile):
         tmp.write(data)
         path = tmp.name
     try:
-        return await amaterialize_parquet(path)
+        return await (await UserDF.aread_parquet(path, trusted_mode="shape_only")).ato_dict()
     finally:
         Path(path).unlink(missing_ok=True)
 ```
 
 ### Async SQL (`afetch_sql` / `awrite_sql` / `aiter_sql`)
 
-**SQLAlchemy 2.x** (**`pip install 'pydantable[sql]'`** plus your **DBAPI** driver): **`fetch_sql`** / **`write_sql`** support any SQLAlchemy URL (**PostgreSQL**, **MySQL**, **SQLite**, **SQL Server**, …). In **`async def`** handlers, use **`afetch_sql`** / **`awrite_sql`**. Keep **`SELECT`** parameterized; never build SQL from untrusted request fields without binds.
+**SQLAlchemy 2.x** (**`pip install 'pydantable[sql]'`** plus your **DBAPI** driver): use **`await afetch_sql`** from **`pydantable.io`** and **`RowDF(cols, ...)`**; **`MyModel.write_sql`** / **`await MyModel.awrite_sql`** for sinks. **`aiter_sql`** yields **`dict[str, list]`** batches — wrap each with **`RowDF(batch, ...)`**. Keep **`SELECT`** parameterized; never build SQL from untrusted request fields without binds.
 
 ```python
 from typing import Annotated, Any
 
 from fastapi import Body
 
-from pydantable.io import afetch_sql, aiter_sql, awrite_sql
+from pydantable import DataFrameModel
+from pydantable.io import afetch_sql, aiter_sql
+
+
+class RowDF(DataFrameModel):
+    id: int
+    name: str
 
 
 @app.get("/rows")
@@ -225,20 +415,33 @@ async def rows(database_url: str):
         database_url,
         parameters={"a": True},
     )
-    return cols
+    df = RowDF(cols, trusted_mode="shape_only")
+    return await df.ato_dict()
+
+
+@app.get("/rows-chained")
+async def rows_chained(database_url: str):
+    return await RowDF(
+        await afetch_sql(
+            "SELECT id, name FROM t WHERE active = :a",
+            database_url,
+            parameters={"a": True},
+        ),
+        trusted_mode="shape_only",
+    ).ato_dict()
 
 
 @app.get("/rows-streaming")
 async def rows_streaming(database_url: str):
     # Stream batches to keep peak memory bounded.
-    out: list[dict[str, list[Any]]] = []
-    async for batch in aiter_sql(
+    out: list[RowDF] = []
+    async for batch_cols in aiter_sql(
         "SELECT id, name FROM t WHERE active = :a",
         database_url,
         parameters={"a": True},
         batch_size=10_000,
     ):
-        out.append(batch)
+        out.append(RowDF(batch_cols, trusted_mode="shape_only"))
     return {"batches": len(out)}
 
 
@@ -247,7 +450,7 @@ async def bulk_insert(
     database_url: str,
     cols: Annotated[dict[str, list[Any]], Body(...)],
 ):
-    await awrite_sql(cols, "staging_events", database_url, if_exists="append")
+    await RowDF.awrite_sql(cols, "staging_events", database_url, if_exists="append")
     return {"ok": True}
 ```
 
@@ -302,7 +505,7 @@ async def create_users_async(
 
 Pass **`executor=None`** (omit **`Depends`**) to keep **`asyncio.to_thread`** as in the [Async routes](#async-routes-executors-and-lifespan) example.
 
-Use the **same** injected executor for **`await amaterialize_parquet(..., executor=ex)`** / **`await afetch_sql(..., executor=ex)`** when you want file and SQL I/O to share the pool with **`await df.acollect(executor=ex)`**.
+Use the **same** injected executor for **`await MyModel.aread_parquet(..., executor=ex)`** / **`await afetch_sql(..., executor=ex)`** when you want file and SQL I/O to share the pool with **`await df.acollect(executor=ex)`**.
 
 **When to use the default thread pool vs a shared `ThreadPoolExecutor`:** The default (**`executor=None`**) uses **`asyncio.to_thread`**, which schedules work on the interpreter’s default executor—fine for light or sporadic I/O. Prefer a **dedicated bounded** **`ThreadPoolExecutor`** (injected via **`Depends`** or **`app.state`**) when you need predictable concurrency limits, shared naming for observability, coordinated shutdown in **`lifespan`**, or to avoid competing with other libraries for the default pool under load. Neither choice makes Rust execution “more async”; both offload blocking work from the event loop.
 
@@ -366,12 +569,9 @@ Without a custom executor, **`await df.acollect()`** is enough: pydantable uses 
 
 ### Chunked column dicts (`stream` / `astream`)
 
-**`DataFrame.stream()`** and **`DataFrame.astream()`** yield **`dict[str, list]`** batches after **one** engine collect (same contract as **`collect_batches`**; see {doc}`EXECUTION`). They do **not** avoid holding the full materialized result in memory before chunking—use **pagination** or **external storage** when the table is too large for one collect.
+Full **`StreamingResponse`** examples (sync **`def`** + **`stream`**, **`async def`** + **`astream`**) are in [**Four materialization modes**](#four-materialization-modes-fastapi) above.
 
-- **Sync route + `StreamingResponse`:** iterate **`for batch in df.stream(batch_size=...)`** and serialize each batch (for example **NDJSON** lines).
-- **`async def` route:** **`async for batch in df.astream(batch_size=..., executor=...)`** so **`to_dict`** per chunk can run off the event loop when configured.
-
-If you need **one** blob first, **`await df.ato_dict()`** / **`await df.arows()`** and then build your own response shape is still valid.
+**`DataFrame.stream()`** and **`DataFrame.astream()`** yield **`dict[str, list]`** batches after **one** engine collect (same contract as **`collect_batches`**; see {doc}`EXECUTION`). They do **not** avoid holding the full materialized result in memory before chunking—use **pagination** or **external storage** when the table is too large for one collect. If you need **one** blob first, **`await df.ato_dict()`** / **`await df.arows()`** and then build your own response shape is still valid.
 
 ## Large tables, Polars, Arrow, and trust boundaries
 

@@ -1,23 +1,25 @@
 # SQL I/O (SQLAlchemy)
 
-**Primary:** **`DataFrameModel.fetch_sql`**, **`afetch_sql`** on a concrete subclass (typed rows from **`SELECT`**). **Secondary:** **`pydantable.io.fetch_sql`**, **`write_sql`** (and async mirrors) — raw **`dict[str, list]`** without a model.
+**Primary:** **`pydantable.io.fetch_sql`**, **`afetch_sql`**, **`iter_sql`**, **`aiter_sql`** — they return **`dict[str, list]`** batches (or streaming containers). Wrap results in **`MyModel(cols, ...)`** for a typed **`DataFrameModel`**. **`DataFrameModel`** no longer exposes eager SQL loaders; use **`pydantable.io`** and the constructor (or **`collect`** / **`to_dict`** only after you have a frame).
+
+**Write path:** **`MyModel.write_sql`** / **`await MyModel.awrite_sql`** (same as **`pydantable.io.write_sql`** with a concrete model class for ergonomics).
 
 Install **`pydantable[sql]`** plus the **DB-API driver** your URL needs. SQLAlchemy supports many dialects; pydantable does not bundle drivers.
 
 ## `DataFrameModel`
 
-**Read**
+**Read (typed)**
 
-- **`MyModel.fetch_sql(sql, bind, *, parameters=None, batch_size=None, auto_stream=True, auto_stream_threshold_rows=None)`**
-- **`await MyModel.afetch_sql(..., batch_size=None, auto_stream=True, auto_stream_threshold_rows=None, executor=None)`**
-- **`MyModel.iter_sql(..., batch_size=None)`** → iterator of **typed** `DataFrameModel` batches
-- **`async for b in MyModel.aiter_sql(..., batch_size=None, executor=None)`** → async iterator of **typed** batches
+- Call **`fetch_sql`** / **`await afetch_sql`** / **`iter_sql`** / **`aiter_sql`** from **`pydantable.io`**, then **`MyModel(cols, trusted_mode=...)`** (or **`MyModel(batch, ...)`** per batch from **`iter_sql`** / **`aiter_sql`**).
 
 **`bind`** may be a SQLAlchemy **URL string**, **`Engine`**, or **`Connection`**. Use **bound parameters** only; never interpolate untrusted input into **`sql`**.
 
 **Write to a database**
 
-There is **no** **`DataFrameModel.write_sql`**. Call **`write_sql`** / **`awrite_sql`** from **`pydantable.io`** with a column dict (e.g. **`model.to_dict()`** or **`materialize_*`** output).
+- **`MyModel.write_sql(data, table_name, bind, *, schema=None, if_exists="append")`**
+- **`await MyModel.awrite_sql(..., executor=None)`**
+
+**`data`** is **`dict[str, list]`** — typically **`model.to_dict()`** or the column dict from **`pydantable.io.fetch_sql`**. Raw **`pydantable.io.write_sql`** is the same operation without a model class.
 
 ## `pydantable.io`
 
@@ -49,7 +51,7 @@ For small results, **`fetch_sql`** returns a plain **`dict`** (including multi-b
 
 Set these before importing callers if you want process-wide defaults (invalid values raise **`ValueError`** at read time):
 
-- **`PYDANTABLE_SQL_FETCH_BATCH_SIZE`**: default **`batch_size`** for **`iter_sql`** / **`fetch_sql`** / **`DataFrameModel.iter_sql`** when **`batch_size`** is omitted.
+- **`PYDANTABLE_SQL_FETCH_BATCH_SIZE`**: default **`batch_size`** for **`iter_sql`** / **`fetch_sql`** when **`batch_size`** is omitted.
 - **`PYDANTABLE_SQL_WRITE_CHUNK_SIZE`**: default **`chunk_size`** for **`write_sql`** / **`write_sql_batches`** when **`chunk_size`** is omitted.
 - **`PYDANTABLE_SQL_AUTO_STREAM_THRESHOLD_ROWS`**: row count above which **`fetch_sql`** returns **`StreamingColumns`** when **`auto_stream=True`** (default).
 

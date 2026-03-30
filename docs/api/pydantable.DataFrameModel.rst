@@ -15,14 +15,11 @@
    
       ~DataFrameModel.__init__
       ~DataFrameModel.acollect
-      ~DataFrameModel.afetch_sql
-      ~DataFrameModel.afrom_sql
-      ~DataFrameModel.aiter_sql
-      ~DataFrameModel.amaterialize_csv
-      ~DataFrameModel.amaterialize_ipc
-      ~DataFrameModel.amaterialize_json
-      ~DataFrameModel.amaterialize_ndjson
-      ~DataFrameModel.amaterialize_parquet
+      ~DataFrameModel.aexport_csv
+      ~DataFrameModel.aexport_ipc
+      ~DataFrameModel.aexport_json
+      ~DataFrameModel.aexport_ndjson
+      ~DataFrameModel.aexport_parquet
       ~DataFrameModel.aread_csv
       ~DataFrameModel.aread_ipc
       ~DataFrameModel.aread_json
@@ -32,6 +29,7 @@
       ~DataFrameModel.arows
       ~DataFrameModel.as_model
       ~DataFrameModel.assert_model
+      ~DataFrameModel.astream
       ~DataFrameModel.ato_arrow
       ~DataFrameModel.ato_dict
       ~DataFrameModel.ato_dicts
@@ -51,10 +49,8 @@
       ~DataFrameModel.export_json
       ~DataFrameModel.export_ndjson
       ~DataFrameModel.export_parquet
-      ~DataFrameModel.fetch_sql
       ~DataFrameModel.fill_null
       ~DataFrameModel.filter
-      ~DataFrameModel.from_sql
       ~DataFrameModel.group_by
       ~DataFrameModel.group_by_dynamic
       ~DataFrameModel.head
@@ -63,13 +59,7 @@
       ~DataFrameModel.iter_ipc
       ~DataFrameModel.iter_ndjson
       ~DataFrameModel.iter_parquet
-      ~DataFrameModel.iter_sql
       ~DataFrameModel.join
-      ~DataFrameModel.materialize_csv
-      ~DataFrameModel.materialize_ipc
-      ~DataFrameModel.materialize_json
-      ~DataFrameModel.materialize_ndjson
-      ~DataFrameModel.materialize_parquet
       ~DataFrameModel.melt
       ~DataFrameModel.pivot
       ~DataFrameModel.read_csv
@@ -88,6 +78,8 @@
       ~DataFrameModel.select
       ~DataFrameModel.slice
       ~DataFrameModel.sort
+      ~DataFrameModel.stream
+      ~DataFrameModel.submit
       ~DataFrameModel.tail
       ~DataFrameModel.to_arrow
       ~DataFrameModel.to_dict
@@ -117,6 +109,7 @@
 
    .. autosummary::
    
+      ~DataFrameModel.Async
       ~DataFrameModel.columns
       ~DataFrameModel.dtypes
       ~DataFrameModel.empty

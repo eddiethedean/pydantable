@@ -21,6 +21,7 @@
       ~DataFrame.aread_ndjson
       ~DataFrame.aread_parquet
       ~DataFrame.aread_parquet_url
+      ~DataFrame.astream
       ~DataFrame.ato_arrow
       ~DataFrame.ato_dict
       ~DataFrame.ato_polars
@@ -60,6 +61,8 @@
       ~DataFrame.select
       ~DataFrame.slice
       ~DataFrame.sort
+      ~DataFrame.stream
+      ~DataFrame.submit
       ~DataFrame.tail
       ~DataFrame.to_arrow
       ~DataFrame.to_dict

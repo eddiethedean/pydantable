@@ -24,6 +24,43 @@ def materialize_rows(m: DataFrameModelWithRow[RowT]) -> list[RowT]:
     return m.rows()
 ```
 
+### `SupportsLazyAsyncMaterialize` (async `acollect`)
+
+- **Use `DataFrameModelWithRow[RowT]`** when the helper needs **sync** row APIs (`rows`, `collect`, …) tied to a known `RowModel`.
+- **Use `SupportsLazyAsyncMaterialize[Any]`** (or parameterize `RowT` if you do) when the helper only **awaits** **`acollect`** and must accept **both** a concrete `DataFrameModel` **and** a lazy `AwaitableDataFrameModel` (for example after **`aread_*`** or chained **`select`** / **`filter`** / …).
+
+`SupportsLazyAsyncMaterialize` describes the **`acollect`** contract. It does **not** include sync **`collect`**: synchronous APIs should take `DataFrameModel` (or a subclass) instead.
+
+The core **`DataFrame`** type also implements a compatible **`acollect`**; static typing treats the protocol as structural, so anything with a matching **`acollect`** is a candidate.
+
+**Example — shared async materialization**
+
+```python
+from typing import Any
+
+from pydantable.typing import SupportsLazyAsyncMaterialize
+
+
+async def materialize_async(m: SupportsLazyAsyncMaterialize[Any]) -> Any:
+    return await m.acollect()
+```
+
+**Example — endpoint or callback** (caller passes either `UserDF(...)` or `UserDF.aread_parquet(...)` then transforms)
+
+```python
+from typing import Any
+
+from pydantable.typing import SupportsLazyAsyncMaterialize
+
+
+async def handle(m: SupportsLazyAsyncMaterialize[Any]) -> Any:
+    return await m.acollect()
+```
+
+At **runtime**, `SupportsLazyAsyncMaterialize` is `@runtime_checkable`, so `isinstance(x, SupportsLazyAsyncMaterialize)` succeeds when `x` has a callable **`acollect`** (duck typing). That check does **not** validate coroutine return types or argument kinds; use mypy/pyright for that.
+
+**Static checkers:** Stubs may not list every lazy **`aread_*`** classmethod on each `DataFrameModel` subclass. If mypy/pyright complains on **`MyModel.aread_parquet(...)`**, assign via **`typing.cast(SupportsLazyAsyncMaterialize[Any], MyModel.aread_parquet(...))`**, bind **`_aread = MyModel.aread_parquet  # type: ignore[attr-defined]`**, or enable the pydantable **mypy plugin** where applicable.
+
 ## pyright/Pylance workflow (explicit after-model)
 
 Pyright cannot express dependent “schema evolution” from transform chains, so the ergonomic pattern is:

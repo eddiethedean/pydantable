@@ -50,7 +50,25 @@ In **Jupyter** / **VS Code** notebooks, **`user_df`** (or the last expression in
 
 ## Classmethod I/O (`0.23.0+`)
 
-**`DataFrameModel`** mirrors **`pydantable.io`** for the common paths: lazy **`read_*` / `aread_*`**, eager **`materialize_*` / **`fetch_sql`** / **`afetch_sql`** / **`from_sql`**, **streaming** **`iter_sql`** / **`aiter_sql`** (typed batch models for large **`SELECT`** results), lazy **`read_parquet_url`** and context **`read_parquet_url_ctx` / `aread_parquet_url_ctx`**, eager **`export_*`**, and writes via **`pydantable.io.write_sql`** / **`awrite_sql`** (and batch sinks **`write_sql_batches`** / **`awrite_sql_batches`**). Same arguments and semantics as the module functions where applicable; see {doc}`IO_OVERVIEW`, {doc}`IO_SQL`, and per-format guides under **Data I/O** in the toctree.
+### Three layers (sync lazy, async lazy, eager)
+
+```{note}
+**Rule of thumb:** In **`async def`** code, prefer **`MyModel.Async.read_*`** (or **`aread_*`**) → transforms → **`await …collect()`** / **`to_dict()`**. In **sync** code, use **`read_*`** → **`collect()`** / **`to_dict()`**. When you need a full Python **`dict[str, list]`** before **`MyModel`**, use **`pydantable.io`** (**`materialize_*`**, **`fetch_sql`**, **`iter_sql`**, …) and pass the result to **`MyModel(...)`**.
+```
+
+```text
+sync_lazy:   read_*  →  collect / to_dict
+async_lazy:  Async.read_* / aread_*  →  await collect / to_dict
+eager:       pydantable.io materialize_* / fetch_sql  →  MyModel(dict)
+```
+
+```{warning}
+On **lazy file scans**, **`shape`**, **`empty`**, and related introspection may reflect **plan/root metadata** (e.g. zero rows until materialization), not the row count after **`collect()`**. Treat **`collect()`** / **`to_dict()`** as ground truth for row data; see {doc}`/EXECUTION` (async reads and **`info()`** / **`describe()`**).
+```
+
+**Default I/O:** use **`DataFrameModel`** classmethods for lazy **`read_*` / `aread_*`**, lazy **`read_parquet_url`** and **`read_parquet_url_ctx` / `aread_parquet_url_ctx`**, eager **`export_*` / `aexport_*`**, and **`write_sql` / `awrite_sql`** (and batch sinks **`write_sql_batches`** / **`awrite_sql_batches`**). **`aread_*`** returns **`AwaitableDataFrameModel`**: chain transforms, then **`await …acollect()`** / **`ato_dict()`** (or unprefixed **`await …collect()`** / **`to_dict()`**) (or **`await`** the chain alone for a concrete model). **`MyModel.Async.read_parquet`** (and **`read_csv`**, …) is the same as **`aread_parquet`**; **`MyModel.Async.write_sql`** / **`Async.export_*`** match **`awrite_sql`** / **`aexport_*`** — the **`Async`** namespace avoids clashing with sync **`read_*`**, sync **`write_sql`**, and sync **`export_*`**. You can **`await …columns`** / **`shape`** / **`empty`** / **`dtypes`** for lazy metadata, add **`.then(fn)`** for a custom step, or **`AwaitableDataFrameModel.concat(...)`** to merge frames. For eager **`dict[str, list]`** loads (**`materialize_*`**, **`fetch_sql`**, **`iter_sql`**, …), call **`pydantable.io`** and pass the result to **`MyModel(...)`** — see {doc}`IO_OVERVIEW`, {doc}`IO_SQL`, and per-format guides under **Data I/O** in the toctree.
+
+**Typing:** To annotate helpers that accept **either** a concrete **`DataFrameModel`** **or** a lazy **`AwaitableDataFrameModel`** chain and only need **`await …acollect()`**, use **`SupportsLazyAsyncMaterialize`** ({doc}`TYPING`). It models **`acollect`**, not sync **`collect`**.
 
 ### Lazy reads and ingest validation
 
@@ -440,6 +458,8 @@ as precise as the query’s projected schema. For a **JSON array of objects**, r
 and filters the response to that schema (see `docs/FASTAPI.md`).
 
 ## Materializing row models
+
+For how these APIs fit the **four** terminal materialization modes (blocking, async, **`submit`**, **`stream`** / **`astream`**), see {doc}`MATERIALIZATION`.
 
 When you need row-wise output (e.g. for response serialization), the DataFrameModel
 produces:

@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 from pydantable import DataFrameModel
+from pydantable.io import materialize_ipc
 
 
 class SensorReading(DataFrameModel):
@@ -31,7 +32,7 @@ def main() -> None:
         df = SensorReading.read_ipc(str(from_worker))
         df.write_ipc(str(to_consumer))
 
-        got = SensorReading.materialize_ipc(to_consumer)
+        got = SensorReading(materialize_ipc(to_consumer))
         assert [int(x) for x in got.to_dict()["sensor_id"]] == [1, 2]
         assert [int(x) for x in got.to_dict()["celsius"]] == [21, 22]
 

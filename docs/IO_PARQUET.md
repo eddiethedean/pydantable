@@ -20,7 +20,7 @@
 
 **Eager — column dict in memory**
 
-- **`MyModel.materialize_parquet(source, *, columns=..., engine=...)`**, **`await MyModel.amaterialize_parquet`**
+- **`materialize_parquet`** / **`await amaterialize_parquet`** from **`pydantable.io`**, then **`MyModel(cols, ...)`**
 - **`DataFrame[Schema](cols)`** from any **`dict[str, list]`** (including **`materialize_parquet`** from **`pydantable.io`**).
 
 The temp file for **`read_parquet_url`** is **not** deleted automatically; see {doc}`DATA_IO_SOURCES` (**`read_parquet_url` temp-file lifecycle**).

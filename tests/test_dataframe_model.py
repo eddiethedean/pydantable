@@ -3,8 +3,22 @@ from __future__ import annotations
 import warnings
 
 import pytest
-from pydantable import DataFrame, DataFrameModel, Schema
-from pydantable.io import export_ipc, export_json, export_ndjson, export_parquet
+from pydantable import AwaitableDataFrameModel, DataFrame, DataFrameModel, Schema
+from pydantable.io import (
+    aiter_sql,
+    amaterialize_parquet,
+    export_ipc,
+    export_json,
+    export_ndjson,
+    export_parquet,
+    fetch_sql,
+    iter_sql,
+    materialize_csv,
+    materialize_ipc,
+    materialize_json,
+    materialize_ndjson,
+    materialize_parquet,
+)
 from pydantable.schema import DtypeDriftWarning, is_supported_scalar_column_annotation
 from pydantic import ValidationError
 
@@ -127,42 +141,160 @@ def test_dataframe_model_rejects_bytes_as_row_sequence() -> None:
         UserDF(b"not-rows")  # type: ignore[arg-type]
 
 
-def test_dataframe_model_materialize_parquet_classmethod(tmp_path) -> None:
+def test_dataframe_model_constructor_from_io_materialize_parquet(tmp_path) -> None:
     path = tmp_path / "m.pq"
     export_parquet(path, {"id": [1, 2], "age": [10, None]})
-    df = UserDF.materialize_parquet(path, trusted_mode="shape_only")
+    cols = materialize_parquet(path)
+    df = UserDF(cols, trusted_mode="shape_only")
     assert df.collect(as_lists=True) == {"id": [1, 2], "age": [10, None]}
 
 
-def test_dataframe_model_materialize_ndjson_classmethod(tmp_path) -> None:
+def test_dataframe_model_read_parquet_lazy_matches_materialize(tmp_path) -> None:
+    path = tmp_path / "lazy.pq"
+    export_parquet(path, {"id": [1, 2], "age": [10, None]})
+    lazy_df = UserDF.read_parquet(path, trusted_mode="shape_only")
+    assert lazy_df.collect(as_lists=True) == {"id": [1, 2], "age": [10, None]}
+
+
+@pytest.mark.asyncio
+async def test_aread_parquet_chain_acollect(tmp_path) -> None:
+    path = tmp_path / "chain.pq"
+    export_parquet(path, {"id": [1, 2], "age": [10, None]})
+    rows = await UserDF.aread_parquet(path, trusted_mode="shape_only").select(
+        "id", "age"
+    ).acollect()
+    assert [r.id for r in rows] == [1, 2]
+    assert [r.age for r in rows] == [10, None]
+
+
+@pytest.mark.asyncio
+async def test_async_namespace_read_parquet_collect_aliases(tmp_path) -> None:
+    path = tmp_path / "async_ns.pq"
+    export_parquet(path, {"id": [1], "age": [2]})
+    rows = await UserDF.Async.read_parquet(path, trusted_mode="shape_only").collect()
+    assert [r.id for r in rows] == [1]
+    d = await UserDF.Async.read_parquet(path, trusted_mode="shape_only").to_dict()
+    assert d == {"id": [1], "age": [2]}
+
+
+@pytest.mark.asyncio
+async def test_async_namespace_export_parquet_and_aexport(
+    tmp_path,
+) -> None:
+    data = {"id": [1], "age": [2]}
+    path = tmp_path / "async_export.pq"
+    await UserDF.Async.export_parquet(path, data)
+    assert materialize_parquet(path) == data
+    path2 = tmp_path / "aexport.pq"
+    await UserDF.aexport_parquet(path2, data)
+    assert materialize_parquet(path2) == data
+
+
+@pytest.mark.asyncio
+async def test_aread_parquet_await_alone_still_works(tmp_path) -> None:
+    path = tmp_path / "one.pq"
+    export_parquet(path, {"id": [3], "age": [4]})
+    df = await UserDF.aread_parquet(path, trusted_mode="shape_only")
+    assert df.collect(as_lists=True) == {"id": [3], "age": [4]}
+
+
+def test_awaitable_dataframe_model_repr_includes_chain(tmp_path) -> None:
+    path = tmp_path / "repr.pq"
+    export_parquet(path, {"id": [1], "age": [2]})
+    adf = UserDF.aread_parquet(path, trusted_mode="shape_only")
+    r = repr(adf)
+    assert "UserDF.aread_parquet" in r
+    chained = adf.select("id")
+    assert ".select(...)" in repr(chained)
+
+
+@pytest.mark.asyncio
+async def test_aread_parquet_await_lazy_metadata_properties(tmp_path) -> None:
+    """``await adf.columns`` / ``dtypes`` work (lazy scan: shape row count is 0)."""
+    path = tmp_path / "meta.pq"
+    export_parquet(path, {"id": [1, 2], "age": [10, None]})
+    adf = UserDF.aread_parquet(path, trusted_mode="shape_only")
+    assert await adf.columns == ["id", "age"]
+    assert set((await adf.dtypes).keys()) == {"id", "age"}
+    assert await adf.shape == (0, 2)
+    assert await adf.empty is True
+
+
+@pytest.mark.asyncio
+async def test_aread_parquet_then_acollect(tmp_path) -> None:
+    path = tmp_path / "then.pq"
+    export_parquet(path, {"id": [1], "age": [5]})
+    rows = await UserDF.aread_parquet(path, trusted_mode="shape_only").then(
+        lambda df: df.select("id")
+    ).acollect()
+    assert [r.id for r in rows] == [1]
+
+
+@pytest.mark.asyncio
+async def test_aread_parquet_then_async_fn(tmp_path) -> None:
+    path = tmp_path / "then_async.pq"
+    export_parquet(path, {"id": [2], "age": [6]})
+
+    async def pick_id(df: UserDF) -> UserDF:
+        return df.select("id")
+
+    rows = await UserDF.aread_parquet(path, trusted_mode="shape_only").then(
+        pick_id
+    ).acollect()
+    assert [r.id for r in rows] == [2]
+
+
+@pytest.mark.asyncio
+async def test_awaitable_concat_vertical(tmp_path) -> None:
+    p1 = tmp_path / "a.pq"
+    p2 = tmp_path / "b.pq"
+    export_parquet(p1, {"id": [1], "age": [2]})
+    export_parquet(p2, {"id": [3], "age": [4]})
+    a = UserDF.aread_parquet(p1, trusted_mode="shape_only")
+    b = UserDF.aread_parquet(p2, trusted_mode="shape_only")
+    merged = await AwaitableDataFrameModel.concat(a, b)
+    assert merged.collect(as_lists=True) == {"id": [1, 3], "age": [2, 4]}
+
+
+@pytest.mark.asyncio
+async def test_awaitable_concat_requires_two_frames() -> None:
+    with pytest.raises(ValueError, match="at least two"):
+        await AwaitableDataFrameModel.concat(UserDF({"id": [1], "age": [2]}))
+
+
+def test_dataframe_model_constructor_from_io_materialize_ndjson(tmp_path) -> None:
     path = tmp_path / "m.ndjson"
     export_ndjson(path, {"id": [3], "age": [None]})
-    df = UserDF.materialize_ndjson(path, trusted_mode="shape_only")
+    cols = materialize_ndjson(path)
+    df = UserDF(cols, trusted_mode="shape_only")
     assert df.collect(as_lists=True) == {"id": [3], "age": [None]}
 
 
-def test_dataframe_model_materialize_ipc_classmethod(tmp_path) -> None:
+def test_dataframe_model_constructor_from_io_materialize_ipc(tmp_path) -> None:
     path = tmp_path / "m.arrow"
     export_ipc(path, {"id": [4], "age": [12]})
-    df = UserDF.materialize_ipc(path, trusted_mode="shape_only")
+    cols = materialize_ipc(path)
+    df = UserDF(cols, trusted_mode="shape_only")
     assert df.collect(as_lists=True) == {"id": [4], "age": [12]}
 
 
-def test_dataframe_model_materialize_csv_classmethod(tmp_path) -> None:
+def test_dataframe_model_constructor_from_io_materialize_csv(tmp_path) -> None:
     path = tmp_path / "m.csv"
     path.write_text("id,age\n5,7\n6,\n", encoding="utf-8")
-    df = UserDF.materialize_csv(path, trusted_mode="shape_only")
+    cols = materialize_csv(path)
+    df = UserDF(cols, trusted_mode="shape_only")
     assert df.collect(as_lists=True) == {"id": [5, 6], "age": [7, None]}
 
 
-def test_dataframe_model_materialize_json_classmethod(tmp_path) -> None:
+def test_dataframe_model_constructor_from_io_materialize_json(tmp_path) -> None:
     path = tmp_path / "rows.json"
     export_json(path, {"id": [10, 11], "age": [3, None]})
-    df = UserDF.materialize_json(path, trusted_mode="shape_only")
+    cols = materialize_json(path)
+    df = UserDF(cols, trusted_mode="shape_only")
     assert df.collect(as_lists=True) == {"id": [10, 11], "age": [3, None]}
 
 
-def test_dataframe_model_fetch_sql_classmethod(tmp_path) -> None:
+def test_dataframe_model_constructor_from_fetch_sql(tmp_path) -> None:
     pytest.importorskip("sqlalchemy")
     from sqlalchemy import create_engine, text
 
@@ -171,11 +303,12 @@ def test_dataframe_model_fetch_sql_classmethod(tmp_path) -> None:
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE t (id INTEGER, age INTEGER)"))
         conn.execute(text("INSERT INTO t VALUES (7, 8)"))
-    df = UserDF.fetch_sql("SELECT id, age FROM t", eng, trusted_mode="shape_only")
+    cols = fetch_sql("SELECT id, age FROM t", eng)
+    df = UserDF(cols, trusted_mode="shape_only")
     assert df.collect(as_lists=True) == {"id": [7], "age": [8]}
 
 
-def test_dataframe_model_iter_sql_yields_typed_batches(tmp_path) -> None:
+def test_dataframe_model_iter_sql_batches_via_io_and_constructor(tmp_path) -> None:
     pytest.importorskip("sqlalchemy")
     from sqlalchemy import create_engine, text
 
@@ -185,14 +318,14 @@ def test_dataframe_model_iter_sql_yields_typed_batches(tmp_path) -> None:
         conn.execute(text("CREATE TABLE t (id INTEGER, age INTEGER)"))
         conn.execute(text("INSERT INTO t VALUES (1, 10), (2, 20)"))
 
-    batches = list(
-        UserDF.iter_sql(
+    batches = [
+        UserDF(cols, trusted_mode="shape_only")
+        for cols in iter_sql(
             "SELECT id, age FROM t ORDER BY id",
             eng,
             batch_size=1,
-            trusted_mode="shape_only",
         )
-    )
+    ]
     assert len(batches) == 2
     assert all(type(b) is UserDF for b in batches)
     flat = {
@@ -203,7 +336,7 @@ def test_dataframe_model_iter_sql_yields_typed_batches(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_dataframe_model_aiter_sql_yields_typed_batches(tmp_path) -> None:
+async def test_dataframe_model_aiter_sql_batches_via_io(tmp_path) -> None:
     pytest.importorskip("sqlalchemy")
     from sqlalchemy import create_engine, text
 
@@ -214,60 +347,30 @@ async def test_dataframe_model_aiter_sql_yields_typed_batches(tmp_path) -> None:
         conn.execute(text("INSERT INTO t VALUES (3, 30), (4, 40)"))
 
     out: list[UserDF] = []
-    async for b in UserDF.aiter_sql(
+    async for cols in aiter_sql(
         "SELECT id, age FROM t ORDER BY id",
         eng,
         batch_size=2,
-        trusted_mode="shape_only",
     ):
-        out.append(b)
+        out.append(UserDF(cols, trusted_mode="shape_only"))
     assert len(out) == 1
     assert out[0].collect(as_lists=True) == {"id": [3, 4], "age": [30, 40]}
 
 
 @pytest.mark.asyncio
-async def test_dataframe_model_amaterialize_parquet_classmethod(tmp_path) -> None:
+async def test_dataframe_model_amaterialize_parquet_via_io(tmp_path) -> None:
     path = tmp_path / "a.pq"
     export_parquet(path, {"id": [9], "age": [11]})
-    df = await UserDF.amaterialize_parquet(path, trusted_mode="shape_only")
+    cols = await amaterialize_parquet(path)
+    df = UserDF(cols, trusted_mode="shape_only")
     assert df.collect(as_lists=True) == {"id": [9], "age": [11]}
 
 
-@pytest.mark.asyncio
-async def test_dataframe_model_amaterialize_ipc_classmethod(tmp_path) -> None:
-    path = tmp_path / "am.arrow"
-    export_ipc(path, {"id": [8], "age": [3]})
-    df = await UserDF.amaterialize_ipc(path, trusted_mode="shape_only")
-    assert df.collect(as_lists=True) == {"id": [8], "age": [3]}
-
-
-@pytest.mark.asyncio
-async def test_dataframe_model_amaterialize_json_classmethod(tmp_path) -> None:
-    path = tmp_path / "aj.json"
-    export_json(path, {"id": [20], "age": [99]})
-    df = await UserDF.amaterialize_json(path, trusted_mode="shape_only")
-    assert df.collect(as_lists=True) == {"id": [20], "age": [99]}
-
-
-@pytest.mark.asyncio
-async def test_dataframe_model_amaterialize_csv_classmethod(tmp_path) -> None:
-    path = tmp_path / "ac.csv"
-    path.write_text("id,age\n30,40\n", encoding="utf-8")
-    df = await UserDF.amaterialize_csv(path, trusted_mode="shape_only")
-    assert df.collect(as_lists=True) == {"id": [30], "age": [40]}
-
-
-@pytest.mark.asyncio
-async def test_dataframe_model_amaterialize_ndjson_classmethod(tmp_path) -> None:
-    path = tmp_path / "an.ndjson"
-    export_ndjson(path, {"id": [21], "age": [None]})
-    df = await UserDF.amaterialize_ndjson(path, trusted_mode="shape_only")
-    assert df.collect(as_lists=True) == {"id": [21], "age": [None]}
-
-
-def test_dataframe_model_io_classmethod_rejects_bridge_base() -> None:
+def test_dataframe_model_io_classmethod_rejects_bridge_base(tmp_path) -> None:
+    path = tmp_path / "nope.pq"
+    path.write_bytes(b"")
     with pytest.raises(TypeError, match="concrete"):
-        DataFrameModel.materialize_parquet("x.parquet")  # type: ignore[attr-defined]
+        DataFrameModel.read_parquet(str(path))  # type: ignore[attr-defined]
 
 
 def test_dataframe_model_row_input_strict_mode_still_raises() -> None:

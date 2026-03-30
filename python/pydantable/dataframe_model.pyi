@@ -7,15 +7,35 @@ from typing import Any, Generic, Literal, TypeVar
 from pydantic import BaseModel
 from typing_extensions import Self
 
+from pydantable.awaitable_dataframe_model import AwaitableDataFrameModel
 from pydantable.dataframe import ExecutionHandle
 
 RowT = TypeVar("RowT", bound=BaseModel)
 AfterModelT = TypeVar("AfterModelT", bound="DataFrameModel[Any]")
 GroupedModelT = TypeVar("GroupedModelT", bound="DataFrameModel[Any]")
 
+class DataFrameModelAsyncIO(Generic[RowT]):
+    def read_parquet(
+        self, *args: Any, **kwargs: Any
+    ) -> AwaitableDataFrameModel[RowT]: ...
+    def read_ipc(self, *args: Any, **kwargs: Any) -> AwaitableDataFrameModel[RowT]: ...
+    def read_csv(self, *args: Any, **kwargs: Any) -> AwaitableDataFrameModel[RowT]: ...
+    def read_ndjson(
+        self, *args: Any, **kwargs: Any
+    ) -> AwaitableDataFrameModel[RowT]: ...
+    def read_json(self, *args: Any, **kwargs: Any) -> AwaitableDataFrameModel[RowT]: ...
+    def read_parquet_url_ctx(self, *args: Any, **kwargs: Any) -> Any: ...
+    def write_sql(self, *args: Any, **kwargs: Any) -> Any: ...
+    def export_parquet(self, *args: Any, **kwargs: Any) -> Any: ...
+    def export_csv(self, *args: Any, **kwargs: Any) -> Any: ...
+    def export_ndjson(self, *args: Any, **kwargs: Any) -> Any: ...
+    def export_ipc(self, *args: Any, **kwargs: Any) -> Any: ...
+    def export_json(self, *args: Any, **kwargs: Any) -> Any: ...
+
 class DataFrameModel(Generic[RowT]):
     _df: Any
     RowModel: type[RowT]
+    Async: DataFrameModelAsyncIO[RowT]
 
     @classmethod
     def _from_dataframe(cls, df: Any) -> Self: ...
@@ -29,6 +49,51 @@ class DataFrameModel(Generic[RowT]):
         on_validation_errors: Any | None = None,
     ) -> None: ...
     def schema_fields(self) -> dict[str, Any]: ...
+    @classmethod
+    async def aexport_parquet(
+        cls,
+        path: Any,
+        data: dict[str, list[Any]],
+        *,
+        engine: str | None = None,
+        executor: Executor | None = None,
+    ) -> None: ...
+    @classmethod
+    async def aexport_csv(
+        cls,
+        path: Any,
+        data: dict[str, list[Any]],
+        *,
+        engine: str | None = None,
+        executor: Executor | None = None,
+    ) -> None: ...
+    @classmethod
+    async def aexport_ndjson(
+        cls,
+        path: Any,
+        data: dict[str, list[Any]],
+        *,
+        engine: str | None = None,
+        executor: Executor | None = None,
+    ) -> None: ...
+    @classmethod
+    async def aexport_ipc(
+        cls,
+        path: Any,
+        data: dict[str, list[Any]],
+        *,
+        engine: str | None = None,
+        executor: Executor | None = None,
+    ) -> None: ...
+    @classmethod
+    async def aexport_json(
+        cls,
+        path: Any,
+        data: dict[str, list[Any]],
+        *,
+        indent: int | None = None,
+        executor: Executor | None = None,
+    ) -> None: ...
     def as_model(
         self,
         model: type[AfterModelT],

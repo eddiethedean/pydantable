@@ -10,6 +10,7 @@ Opinionated, end-to-end recipes built for production usage. Every recipe aims to
 :titlesonly:
 :maxdepth: 2
 
+async_lazy_pipeline
 fastapi_columnar_bodies
 fastapi_async_materialization
 io_lazy_pipeline_write

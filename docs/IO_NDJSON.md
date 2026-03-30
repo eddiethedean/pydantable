@@ -10,7 +10,7 @@ Each line of the file is one JSON object; the scanner infers or aligns columns a
 
 - **`DataFrame[Schema].read_ndjson(path, *, columns=None, **scan_kwargs)`**
 - **`MyModel.read_ndjson(...)`**, **`await MyModel.aread_ndjson(..., executor=None)`**
-- **`MyModel.materialize_ndjson`**, **`await MyModel.amaterialize_ndjson`**
+- **`materialize_ndjson`**, **`await amaterialize_ndjson`** from **`pydantable.io`**, then **`MyModel(cols)`**
 
 ### `pydantable.io`
 

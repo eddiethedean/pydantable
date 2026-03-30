@@ -8,7 +8,7 @@ This **documentation site** is the detailed manual. The repository **README** on
 
 ## Choose your path
 
-- **Services (FastAPI)**: start with {doc}`FASTAPI`, then {doc}`DATAFRAMEMODEL` and {doc}`EXECUTION`.
+- **Services (FastAPI)**: start with {doc}`FASTAPI`, then {doc}`DATAFRAMEMODEL` and {doc}`EXECUTION`; async lazy reads → {doc}`/cookbook/async_lazy_pipeline`.
 - **Data workflows**: start with {doc}`DATAFRAMEMODEL`, then {doc}`IO_DECISION_TREE` and {doc}`IO_OVERVIEW`.
 - **Library/interop**: start with {doc}`INTERFACE_CONTRACT` and {doc}`VERSIONING`, then {doc}`PLAN_AND_PLUGINS`.
 - `DataFrameModel` transform chains can return typed after-schema models directly (no `to_dict()` materialization step). For pyright/Pylance, use `as_model(...)` (see {doc}`DATAFRAMEMODEL`).
@@ -27,6 +27,7 @@ DATAFRAMEMODEL
 SUPPORTED_TYPES
 FASTAPI
 EXECUTION
+MATERIALIZATION
 DATA_IO_SOURCES
 STREAMLIT
 DOCS_MAP

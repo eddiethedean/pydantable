@@ -1,13 +1,15 @@
 # Data I/O by format (overview)
 
-**Primary API:** **`DataFrame[Schema]`** and **`DataFrameModel`** — instance and classmethods for lazy reads, eager materialization, and lazy writes (Rust-backed where documented). **Secondary:** **`pydantable.io`** module functions — same operations without a typed frame (return **`ScanFileRoot`**, **`dict[str, list]`**, or write from raw column dicts).
+**Default (application code):** use **`DataFrame[Schema]`** and **`DataFrameModel`** for **lazy** **`read_*`** / **`aread_*`**, **`export_*`**, **`write_sql`** / **`awrite_sql`**, and lazy **`write_*`** (Rust-backed where documented). For **eager** column dicts, call **`pydantable.io`** (**`materialize_*`**, **`fetch_sql`**, **`iter_sql`**, …) and pass **`dict[str, list]`** into **`MyModel(...)`** / **`DataFrame[Schema](...)`** — **`DataFrameModel`** does not wrap eager loaders anymore.
+
+**Utilities (`pydantable.io`):** **`materialize_*`**, **`fetch_sql`**, **`iter_sql`**, URL helpers, and format-specific readers that return **`dict[str, list]`** or **`ScanFileRoot`** for **`DataFrame`** construction.
 
 For **execution semantics** (lazy vs collect, Rust engine), see {doc}`EXECUTION`. For **roadmap-style** “what to support next,” see {doc}`DATA_IO_SOURCES`. **Which API should I call?** See {doc}`IO_DECISION_TREE`.
 
 (full-api-in-pydantableio)=
-## Full API in `pydantable.io`
+## Module reference: `pydantable.io`
 
-The **`pydantable`** package re-exports a small subset of I/O (Parquet-focused lazy reads and common helpers). **Every** public I/O function lives under **`pydantable.io`** — use **`from pydantable.io import …`** for CSV/NDJSON/IPC **`materialize_*`**, **`export_*`**, **`fetch_*_url`**, **`write_sql`**, **`extras`**, and async mirrors.
+All public I/O **symbols** are defined under **`pydantable.io`** (and re-exported in small subsets from **`pydantable`** for Parquet-focused quick scripts). Import **`from pydantable.io import …`** when you need **`ScanFileRoot`**, untyped **`dict[str, list]`**, **`fetch_*_url`**, **`pydantable.io.extras`**, or names not mirrored on **`DataFrameModel`**.
 
 ## Primary API: `DataFrame` and `DataFrameModel`
 
@@ -16,8 +18,8 @@ The **`pydantable`** package re-exports a small subset of I/O (Parquet-focused l
 | **Lazy local file** | **`read_parquet`**, **`read_csv`**, **`read_ndjson`**, **`read_ipc`**, **`read_json`** | **`MyModel.read_*`** — classmethods; same **`**scan_kwargs`** |
 | **Lazy Parquet URL** | **`read_parquet_url`** | **`MyModel.read_parquet_url`** — **`**kwargs`** for **`fetch_bytes`** only |
 | **Temp Parquet URL cleanup** | Build frame inside **`read_parquet_url_ctx`** ( **`io`** ) or use **`DataFrameModel.read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** | Same — context managers unlink the download when the block exits ({doc}`IO_HTTP`) |
-| **Async lazy reads** | **`DataFrame[Schema].aread_*`** (mirrors `DataFrameModel.aread_*`), or `await pydantable.io.aread_*` and build from `ScanFileRoot`. | **`aread_parquet`**, **`aread_csv`**, **`aread_ndjson`**, **`aread_ipc`**, **`aread_json`**, optional **`executor=`**; URL temp file without ctx: **`io.aread_parquet_url`**. |
-| **Eager reads** | Constructor **`DataFrame[Schema](cols)`** from **`dict[str, list]`** | **`materialize_*`**, **`fetch_sql`**, **`amaterialize_*`**, **`afetch_sql`** classmethods |
+| **Async lazy reads** | **`DataFrame[Schema].aread_*`** (mirrors **`MyModel.aread_*`**) | **`await MyModel.aread_parquet(...)`**, **`aread_csv`**, …, optional **`executor=`**; URL without ctx: **`aread_parquet_url`** (prefer **`aread_parquet_url_ctx`**) |
+| **Eager reads** | Constructor **`DataFrame[Schema](cols)`** from **`dict[str, list]`** | Use **`pydantable.io`** (**`materialize_*`**, **`fetch_sql`**, …) then **`MyModel(cols)`** |
 | **Lazy writes** | **`write_parquet`**, **`write_csv`**, **`write_ipc`**, **`write_ndjson`** | Same **instance** methods on **`model`** — **`streaming`**, **`write_kwargs`**, etc. |
 
 **Ingest validation options:** `trusted_mode`, `fill_missing_optional`, `ignore_errors`, `on_validation_errors` apply on **constructors** and on **typed lazy reads** (`DataFrame[Schema].read_*` / `aread_*`, `DataFrameModel.read_*` / `aread_*`) at **materialization time** (`to_dict()` / `collect()` / `to_arrow()` / `to_polars()`).
@@ -30,7 +32,7 @@ The **`pydantable`** package re-exports a small subset of I/O (Parquet-focused l
 
 See {doc}`DATAFRAMEMODEL` for the detailed ingest contract.
 
-**Glue I/O on `DataFrameModel`:** classmethods **`export_*`**, **`write_sql`** / **`awrite_sql`**, **`from_sql`** / **`afrom_sql`** delegate to **`pydantable.io`** (same signatures as the module functions). **`pydantable.io.extras`** remains module-only.
+**`DataFrameModel`** classmethods call into **`pydantable.io`** internally; signatures match the module where applicable. **`pydantable.io.extras`** is module-only (no **`DataFrameModel`** wrappers).
 
 ## Engine matrix (`materialize_*`)
 
@@ -47,7 +49,7 @@ Details: {doc}`IO_DECISION_TREE` (**Engine selection**).
 
 ## Module functions (`pydantable.io`)
 
-Use these when you want **`ScanFileRoot`**, raw column dicts, or file I/O without constructing **`DataFrame[Schema]`** first (e.g. scripts, tests, or glue code).
+Use **`pydantable.io`** when you need **`ScanFileRoot`**, raw column dicts, eager **`materialize_*`**, or **`fetch_sql`** / **`iter_sql`**. **Application code** typically uses **`MyModel.read_*`** / **`aread_*`** for lazy files and **`pydantable.io` + constructor** when an eager **`dict[str, list]`** is required.
 
 | Layer | Role |
 |-------|------|

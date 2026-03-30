@@ -8,7 +8,7 @@
 
 - **`DataFrame[Schema].read_csv(path, *, columns=None, **scan_kwargs)`**
 - **`MyModel.read_csv(...)`**, **`await MyModel.aread_csv(..., executor=None)`**
-- **`MyModel.materialize_csv`**, **`await MyModel.amaterialize_csv`**
+- **`materialize_csv`** / **`await amaterialize_csv`** from **`pydantable.io`**, then **`MyModel(cols)`** for eager typed frames
 
 ### `pydantable.io`
 

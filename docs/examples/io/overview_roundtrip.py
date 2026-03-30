@@ -20,6 +20,7 @@ import tempfile
 from pathlib import Path
 
 from pydantable import DataFrameModel
+from pydantable.io import materialize_parquet
 
 
 class OrderLine(DataFrameModel):
@@ -47,7 +48,7 @@ def main() -> None:
         assert [r.line_id for r in rows] == [102, 103]
         assert [r.quantity for r in rows] == [4, 2]
 
-        eager = OrderLine.materialize_parquet(parquet_path)
+        eager = OrderLine(materialize_parquet(parquet_path))
         assert eager.to_dict() == {
             "line_id": [101, 102, 103],
             "quantity": [1, 4, 2],

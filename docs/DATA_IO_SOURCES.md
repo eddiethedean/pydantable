@@ -1,6 +1,6 @@
 # Data sources for read/write (planning reference)
 
-**Per-format API reference:** {doc}`IO_OVERVIEW` — **primary:** **`DataFrame` / `DataFrameModel`** methods; **secondary:** **`pydantable.io`** module functions.
+**Per-format API reference:** {doc}`IO_OVERVIEW` — **default:** **`DataFrame` / `DataFrameModel`** classmethods and instance methods; **`pydantable.io`** — low-level utilities (**`dict[str, list]`**, **`ScanFileRoot`**).
 
 This document lists **common and useful** places applications read and write tabular data. It is intended to guide **0.23.x+** I/O work in pydantable: which formats and transports to support first, and which **async** stacks pair well with **FastAPI** and typed frames.
 

@@ -13,6 +13,7 @@ Versioning expectations (0.x and 1.x policy, extension alignment) are summarized
 order of that list follows the same non-guarantee as columnar materialization unless
 documented otherwise for a specific op.
 
+(ordering)=
 ## Ordering
 
 Columnar materialization (`to_dict()`, `collect(as_lists=True)`) output order is **not a stable API guarantee**.
@@ -164,13 +165,17 @@ Rolling/dynamic contracts:
 
 ## Arrow interchange (0.16.0)
 
-- **`pydantable.materialize_parquet`** / **`materialize_ipc`** (and **`pydantable.io`**) return **`dict[str, list]`** for **`DataFrame[Schema](...)`** / **`DataFrameModel(...)`**. **`materialize_ipc(..., as_stream=True)`** selects the **streaming** IPC format; default is **file** IPC. For lazy local files use **`read_*`** + **`DataFrame.write_parquet`** ({doc}`EXECUTION`).
+- **`pydantable.io.materialize_parquet`** / **`materialize_ipc`** feed **`dict[str, list]`** into **`DataFrameModel(...)`** / **`DataFrame(...)`** constructors. **`materialize_ipc(..., as_stream=True)`** selects the **streaming** IPC format; default is **file** IPC. For lazy local files use **`read_*`** + **`DataFrame.write_parquet`** ({doc}`EXECUTION`).
 - **`DataFrame.to_arrow`** / **`DataFrame.ato_arrow`:** same logical materialization as **`to_dict`**, then build a PyArrow **`Table`** in Python (**not** a zero-copy view of internal Polars buffers). **`DataFrameModel`** exposes the same methods by delegation.
 - **Constructors:** **`pyarrow.Table`** and **`RecordBatch`** are accepted when **`pyarrow`** is installed (converted to Python lists before validation); see {doc}`SUPPORTED_TYPES`.
 
+## Four terminal materialization modes
+
+Lazy **`DataFrame`** / **`DataFrameModel`** plans are materialized through one of **four** scheduling patterns: **blocking** (**`collect`**, **`to_dict`**, …), **async** (**`acollect`**, **`ato_dict`**, …), **deferred** (**`submit`** → **`ExecutionHandle`**), or **chunked** (**`stream`** / **`astream`**). They share engine semantics; see {doc}`MATERIALIZATION` for the full table and **`PlanMaterialization`** labels.
+
 ## Async materialization, `submit`, `stream`, and `astream` (1.5.0+)
 
-- **`acollect`** / **`ato_dict`** / **`ato_polars`** / **`ato_arrow`:** same logical result as the synchronous methods. Ordering of rows in columnar output follows the same **non-guarantee** as **`to_dict()`** ({doc}`Ordering`).
+- **`acollect`** / **`ato_dict`** / **`ato_polars`** / **`ato_arrow`:** same logical result as the synchronous methods. Ordering of rows in columnar output follows the same **non-guarantee** as **`to_dict()`** ({ref}`ordering`).
 - **`submit` → `ExecutionHandle`:** **`await handle.result()`** is equivalent to **`collect()`** with the same keyword arguments. **`handle.cancel()`** only affects the wait on a **`concurrent.futures.Future`** when cancellation wins the race before work starts; it does **not** cooperatively abort an in-flight Polars **`collect`**.
 - **`stream`** / **`astream`:** perform **one** terminal engine materialization, then yield **`dict[str, list]`** batches of adjacent rows (same slicing contract as **`collect_batches`**). **`stream`** is synchronous (for **`def`** routes and **`StreamingResponse`**); **`astream`** is async. This is **chunked replay**, not a guarantee of bounded memory for unbounded scans. Batch order follows the same row-order policy as **`to_dict()`** unless the plan includes an explicit **`sort`**. Requires the **`polars`** Python package for chunk conversion.
 
@@ -184,7 +189,7 @@ The compiled extension executes with a Rust Polars **`LazyFrame`**, which is **n
 
 - **Multi-key `RANGE` window frames:** {doc}`WINDOW_SQL_SEMANTICS` (sort keys vs range axis on the first `orderBy` column).
 - **Trusted ingest (`trusted_mode`):** {doc}`DATAFRAMEMODEL`, {doc}`SUPPORTED_TYPES`.
-- **Materialization (sync + async):** {doc}`EXECUTION`, {doc}`ROADMAP`, {doc}`FASTAPI`.
+- **Materialization (sync + async + four modes):** {doc}`MATERIALIZATION`, {doc}`EXECUTION`, {doc}`ROADMAP`, {doc}`FASTAPI`.
 - **Versioning (0.x):** {doc}`VERSIONING`.
 
 ## Migration Notes (Polars -> PydanTable)

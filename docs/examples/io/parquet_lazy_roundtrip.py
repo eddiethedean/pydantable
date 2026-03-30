@@ -14,6 +14,7 @@ import tempfile
 from pathlib import Path
 
 from pydantable import DataFrameModel
+from pydantable.io import materialize_parquet
 
 
 class DailyRevenue(DataFrameModel):
@@ -32,7 +33,7 @@ def main() -> None:
         df = DailyRevenue.read_parquet(str(incoming))
         df.write_parquet(str(outgoing), write_kwargs={"compression": "snappy"})
 
-        got = DailyRevenue.materialize_parquet(outgoing)
+        got = DailyRevenue(materialize_parquet(outgoing))
         assert got.to_dict()["revenue_cents"] == [125_000_000]
 
     print("parquet_lazy_roundtrip: ok")

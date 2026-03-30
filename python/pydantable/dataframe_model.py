@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 from pydantic import BaseModel, ValidationError, create_model
 
+from .awaitable_dataframe_model import AwaitableDataFrameModel, _short_repr_label
 from .dataframe import DataFrame, ExecutionHandle
 from .schema import (
     Schema,
@@ -163,6 +164,63 @@ GroupedModelT = TypeVar("GroupedModelT", bound="DataFrameModel[Any]")
 AfterModelT = TypeVar("AfterModelT", bound="DataFrameModel[Any]")
 
 
+class _AsyncIODescriptor:
+    """Descriptor for ``MyModel.Async`` (async-first ``read_*`` entrypoints)."""
+
+    def __get__(self, obj: Any, owner: type[Any] | None) -> _AsyncIOMethods[Any]:
+        if owner is None:
+            raise AttributeError("Async")
+        return _AsyncIOMethods(owner)
+
+
+class _AsyncIOMethods(Generic[RowT]):
+    """Async-first I/O without the ``a`` prefix.
+
+    ``read_*`` → ``aread_*``, ``export_*`` → ``aexport_*``, etc.
+    """
+
+    __slots__ = ("_cls",)
+
+    def __init__(self, cls: type[Any]) -> None:
+        self._cls = cls
+
+    def read_parquet(self, *args: Any, **kwargs: Any) -> AwaitableDataFrameModel[RowT]:
+        return self._cls.aread_parquet(*args, **kwargs)
+
+    def read_ipc(self, *args: Any, **kwargs: Any) -> AwaitableDataFrameModel[RowT]:
+        return self._cls.aread_ipc(*args, **kwargs)
+
+    def read_csv(self, *args: Any, **kwargs: Any) -> AwaitableDataFrameModel[RowT]:
+        return self._cls.aread_csv(*args, **kwargs)
+
+    def read_ndjson(self, *args: Any, **kwargs: Any) -> AwaitableDataFrameModel[RowT]:
+        return self._cls.aread_ndjson(*args, **kwargs)
+
+    def read_json(self, *args: Any, **kwargs: Any) -> AwaitableDataFrameModel[RowT]:
+        return self._cls.aread_json(*args, **kwargs)
+
+    def read_parquet_url_ctx(self, *args: Any, **kwargs: Any) -> Any:
+        return self._cls.aread_parquet_url_ctx(*args, **kwargs)
+
+    def write_sql(self, *args: Any, **kwargs: Any) -> Any:
+        return self._cls.awrite_sql(*args, **kwargs)
+
+    def export_parquet(self, *args: Any, **kwargs: Any) -> Any:
+        return self._cls.aexport_parquet(*args, **kwargs)
+
+    def export_csv(self, *args: Any, **kwargs: Any) -> Any:
+        return self._cls.aexport_csv(*args, **kwargs)
+
+    def export_ndjson(self, *args: Any, **kwargs: Any) -> Any:
+        return self._cls.aexport_ndjson(*args, **kwargs)
+
+    def export_ipc(self, *args: Any, **kwargs: Any) -> Any:
+        return self._cls.aexport_ipc(*args, **kwargs)
+
+    def export_json(self, *args: Any, **kwargs: Any) -> Any:
+        return self._cls.aexport_json(*args, **kwargs)
+
+
 class DataFrameModel(Generic[RowT]):
     """Columns on a subclass → generated ``RowModel`` and DataFrame-like methods.
 
@@ -171,10 +229,15 @@ class DataFrameModel(Generic[RowT]):
     ``RecordBatch`` (requires ``pyarrow``), a Polars ``DataFrame`` in trusted
     modes, or a sequence of row dicts / models.
 
-    **I/O classmethods:** ``read_*`` / ``aread_*`` use lazy file roots (no full Python
-    column lists). ``materialize_*``, ``fetch_sql``, and ``from_sql`` load
-    ``dict[str, list]`` then wrap the same lazy :class:`~pydantable.dataframe.DataFrame`
-    plan as the constructor. **``export_*``**, **``write_sql``** / **``awrite_sql``**,
+    **I/O classmethods:** ``read_*`` / ``aread_*`` use lazy file roots (Polars plan in
+    Rust; no full Python column lists until :meth:`collect` / :meth:`to_dict` /
+    :meth:`acollect` / …). For async-first naming, use ``MyModel.Async.read_parquet``
+    (same as ``aread_parquet``) and unprefixed terminals on
+    :class:`~pydantable.awaitable_dataframe_model.AwaitableDataFrameModel` (e.g.
+    ``await …collect()``). Eager file/SQL column loads belong in
+    :mod:`pydantable.io` (``materialize_*``, ``fetch_sql``) — pass the resulting
+    ``dict[str, list]`` to the constructor if you need an in-memory table first.
+    **``export_*``** / **``aexport_*``**, **``write_sql``** / **``awrite_sql``**,
     **``read_parquet_url_ctx``** / **``aread_parquet_url_ctx``** delegate to
     :mod:`pydantable.io`.
     """
@@ -185,6 +248,8 @@ class DataFrameModel(Generic[RowT]):
     _SchemaModel: type[Schema]
     _df: DataFrame[Any]
     _dataframe_cls: type[DataFrame[Any]] = DataFrame
+
+    Async = _AsyncIODescriptor()
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
@@ -587,173 +652,6 @@ class DataFrameModel(Generic[RowT]):
         return cls._wrap_inner_df(inner)
 
     @classmethod
-    def materialize_parquet(
-        cls,
-        source: str | bytes | Any,
-        *,
-        columns: list[str] | None = None,
-        engine: str | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ) -> Self:
-        """Eager Parquet via :func:`pydantable.io.materialize_parquet` (column dict)."""
-        cls._dfm_require_subclass_with_schema()
-        from .io import materialize_parquet as _mp
-
-        cols = _mp(source, columns=columns, engine=engine)
-        return cls(
-            cols,
-            trusted_mode=trusted_mode,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
-        )
-
-    @classmethod
-    def materialize_ipc(
-        cls,
-        source: str | bytes | Any,
-        *,
-        as_stream: bool = False,
-        engine: str | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ) -> Self:
-        """Eager IPC via :func:`pydantable.io.materialize_ipc`."""
-        cls._dfm_require_subclass_with_schema()
-        from .io import materialize_ipc as _mi
-
-        cols = _mi(source, as_stream=as_stream, engine=engine)
-        return cls(
-            cols,
-            trusted_mode=trusted_mode,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
-        )
-
-    @classmethod
-    def materialize_csv(
-        cls,
-        path: str | Any,
-        *,
-        engine: str | None = None,
-        use_rap: bool = False,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ) -> Self:
-        """Eager CSV via :func:`pydantable.io.materialize_csv`."""
-        cls._dfm_require_subclass_with_schema()
-        from .io import materialize_csv as _mc
-
-        cols = _mc(path, engine=engine, use_rap=use_rap)
-        return cls(
-            cols,
-            trusted_mode=trusted_mode,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
-        )
-
-    @classmethod
-    def materialize_ndjson(
-        cls,
-        path: str | Any,
-        *,
-        engine: str | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ) -> Self:
-        """Eager NDJSON via :func:`pydantable.io.materialize_ndjson`."""
-        cls._dfm_require_subclass_with_schema()
-        from .io import materialize_ndjson as _mn
-
-        cols = _mn(path, engine=engine)
-        return cls(
-            cols,
-            trusted_mode=trusted_mode,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
-        )
-
-    @classmethod
-    def materialize_json(
-        cls,
-        path: str | Any,
-        *,
-        engine: str | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ) -> Self:
-        """Eager JSON (array or lines) via :func:`pydantable.io.materialize_json`."""
-        cls._dfm_require_subclass_with_schema()
-        from .io import materialize_json as _mj
-
-        cols = _mj(path, engine=engine)
-        return cls(
-            cols,
-            trusted_mode=trusted_mode,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
-        )
-
-    @classmethod
-    def fetch_sql(
-        cls,
-        sql: str,
-        bind: str | Engine | Connection,
-        *,
-        parameters: Mapping[str, Any] | None = None,
-        batch_size: int | None = None,
-        auto_stream: bool = True,
-        auto_stream_threshold_rows: int | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ) -> Self:
-        """SQL query → columns via :func:`pydantable.io.fetch_sql` (``[sql]`` extra)."""
-        cls._dfm_require_subclass_with_schema()
-        from .io import fetch_sql as _fetch_sql
-
-        cols = _fetch_sql(
-            sql,
-            bind,
-            parameters=parameters,
-            batch_size=batch_size,
-            auto_stream=auto_stream,
-            auto_stream_threshold_rows=auto_stream_threshold_rows,
-        )
-        return cls(
-            cols,
-            trusted_mode=trusted_mode,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
-        )
-
-    @classmethod
-    def from_sql(
-        cls,
-        sql: str,
-        bind: str | Engine | Connection,
-        *,
-        parameters: Mapping[str, Any] | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ) -> Self:
-        """Alias for :meth:`fetch_sql` — SQL query to typed frame."""
-        return cls.fetch_sql(
-            sql,
-            bind,
-            parameters=parameters,
-            trusted_mode=trusted_mode,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
-        )
-
-    @classmethod
     def export_parquet(
         cls,
         path: str | Any,
@@ -822,6 +720,81 @@ class DataFrameModel(Generic[RowT]):
         from .io import export_json as _ej
 
         _ej(path, data, indent=indent)
+
+    @classmethod
+    async def aexport_parquet(
+        cls,
+        path: str | Any,
+        data: dict[str, list[Any]],
+        *,
+        engine: str | None = None,
+        executor: Executor | None = None,
+    ) -> None:
+        """Async :func:`pydantable.io.aexport_parquet`."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import aexport_parquet as _aep
+
+        await _aep(path, data, engine=engine, executor=executor)
+
+    @classmethod
+    async def aexport_csv(
+        cls,
+        path: str | Any,
+        data: dict[str, list[Any]],
+        *,
+        engine: str | None = None,
+        executor: Executor | None = None,
+    ) -> None:
+        """Async :func:`pydantable.io.aexport_csv`."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import aexport_csv as _aec
+
+        await _aec(path, data, engine=engine, executor=executor)
+
+    @classmethod
+    async def aexport_ndjson(
+        cls,
+        path: str | Any,
+        data: dict[str, list[Any]],
+        *,
+        engine: str | None = None,
+        executor: Executor | None = None,
+    ) -> None:
+        """Async :func:`pydantable.io.aexport_ndjson`."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import aexport_ndjson as _aen
+
+        await _aen(path, data, engine=engine, executor=executor)
+
+    @classmethod
+    async def aexport_ipc(
+        cls,
+        path: str | Any,
+        data: dict[str, list[Any]],
+        *,
+        engine: str | None = None,
+        executor: Executor | None = None,
+    ) -> None:
+        """Async :func:`pydantable.io.aexport_ipc`."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import aexport_ipc as _aei
+
+        await _aei(path, data, engine=engine, executor=executor)
+
+    @classmethod
+    async def aexport_json(
+        cls,
+        path: str | Any,
+        data: dict[str, list[Any]],
+        *,
+        indent: int | None = None,
+        executor: Executor | None = None,
+    ) -> None:
+        """Async :func:`pydantable.io.aexport_json`."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import aexport_json as _aej
+
+        await _aej(path, data, indent=indent, executor=executor)
 
     @classmethod
     def write_sql(
@@ -914,7 +887,7 @@ class DataFrameModel(Generic[RowT]):
             yield cls._wrap_inner_df(inner)
 
     @classmethod
-    async def aread_parquet(
+    def aread_parquet(
         cls,
         path: str | Any,
         *,
@@ -926,24 +899,30 @@ class DataFrameModel(Generic[RowT]):
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
-    ) -> Self:
+    ) -> AwaitableDataFrameModel[RowT]:
         cls._dfm_require_subclass_with_schema()
         from .io import aread_parquet as _aread
 
-        root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
-        dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
-            root,
-            engine_streaming=engine_streaming,
-            trusted_mode=trusted_mode,
-            fill_missing_optional=fill_missing_optional,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
+        async def _load() -> Self:
+            root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
+            dataframe_cls = cast("Any", cls._dataframe_cls)
+            inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
+                root,
+                engine_streaming=engine_streaming,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+            return cls._wrap_inner_df(inner)
+
+        return AwaitableDataFrameModel(
+            _load,
+            repr_label=_short_repr_label(f"{cls.__name__}.aread_parquet({path!r})"),
         )
-        return cls._wrap_inner_df(inner)
 
     @classmethod
-    async def aread_ipc(
+    def aread_ipc(
         cls,
         path: str | Any,
         *,
@@ -955,24 +934,30 @@ class DataFrameModel(Generic[RowT]):
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
-    ) -> Self:
+    ) -> AwaitableDataFrameModel[RowT]:
         cls._dfm_require_subclass_with_schema()
         from .io import aread_ipc as _aread
 
-        root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
-        dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
-            root,
-            engine_streaming=engine_streaming,
-            trusted_mode=trusted_mode,
-            fill_missing_optional=fill_missing_optional,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
+        async def _load() -> Self:
+            root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
+            dataframe_cls = cast("Any", cls._dataframe_cls)
+            inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
+                root,
+                engine_streaming=engine_streaming,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+            return cls._wrap_inner_df(inner)
+
+        return AwaitableDataFrameModel(
+            _load,
+            repr_label=_short_repr_label(f"{cls.__name__}.aread_ipc({path!r})"),
         )
-        return cls._wrap_inner_df(inner)
 
     @classmethod
-    async def aread_csv(
+    def aread_csv(
         cls,
         path: str | Any,
         *,
@@ -984,24 +969,30 @@ class DataFrameModel(Generic[RowT]):
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
-    ) -> Self:
+    ) -> AwaitableDataFrameModel[RowT]:
         cls._dfm_require_subclass_with_schema()
         from .io import aread_csv as _aread
 
-        root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
-        dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
-            root,
-            engine_streaming=engine_streaming,
-            trusted_mode=trusted_mode,
-            fill_missing_optional=fill_missing_optional,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
+        async def _load() -> Self:
+            root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
+            dataframe_cls = cast("Any", cls._dataframe_cls)
+            inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
+                root,
+                engine_streaming=engine_streaming,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+            return cls._wrap_inner_df(inner)
+
+        return AwaitableDataFrameModel(
+            _load,
+            repr_label=_short_repr_label(f"{cls.__name__}.aread_csv({path!r})"),
         )
-        return cls._wrap_inner_df(inner)
 
     @classmethod
-    async def aread_ndjson(
+    def aread_ndjson(
         cls,
         path: str | Any,
         *,
@@ -1013,24 +1004,30 @@ class DataFrameModel(Generic[RowT]):
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
-    ) -> Self:
+    ) -> AwaitableDataFrameModel[RowT]:
         cls._dfm_require_subclass_with_schema()
         from .io import aread_ndjson as _aread
 
-        root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
-        dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
-            root,
-            engine_streaming=engine_streaming,
-            trusted_mode=trusted_mode,
-            fill_missing_optional=fill_missing_optional,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
+        async def _load() -> Self:
+            root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
+            dataframe_cls = cast("Any", cls._dataframe_cls)
+            inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
+                root,
+                engine_streaming=engine_streaming,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+            return cls._wrap_inner_df(inner)
+
+        return AwaitableDataFrameModel(
+            _load,
+            repr_label=_short_repr_label(f"{cls.__name__}.aread_ndjson({path!r})"),
         )
-        return cls._wrap_inner_df(inner)
 
     @classmethod
-    async def aread_json(
+    def aread_json(
         cls,
         path: str | Any,
         *,
@@ -1042,245 +1039,26 @@ class DataFrameModel(Generic[RowT]):
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
-    ) -> Self:
+    ) -> AwaitableDataFrameModel[RowT]:
         cls._dfm_require_subclass_with_schema()
         from .io import aread_json as _aread
 
-        root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
-        dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
-            root,
-            engine_streaming=engine_streaming,
-            trusted_mode=trusted_mode,
-            fill_missing_optional=fill_missing_optional,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
-        )
-        return cls._wrap_inner_df(inner)
-
-    @classmethod
-    async def amaterialize_parquet(
-        cls,
-        source: str | bytes | Any,
-        *,
-        columns: list[str] | None = None,
-        engine: str | None = None,
-        executor: Executor | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ) -> Self:
-        cls._dfm_require_subclass_with_schema()
-        from .io import amaterialize_parquet as _amp
-
-        cols = await _amp(source, columns=columns, engine=engine, executor=executor)
-        return cls(
-            cols,
-            trusted_mode=trusted_mode,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
-        )
-
-    @classmethod
-    async def amaterialize_ipc(
-        cls,
-        source: str | bytes | Any,
-        *,
-        as_stream: bool = False,
-        engine: str | None = None,
-        executor: Executor | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ) -> Self:
-        cls._dfm_require_subclass_with_schema()
-        from .io import amaterialize_ipc as _ami
-
-        cols = await _ami(source, as_stream=as_stream, engine=engine, executor=executor)
-        return cls(
-            cols,
-            trusted_mode=trusted_mode,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
-        )
-
-    @classmethod
-    async def amaterialize_csv(
-        cls,
-        path: str | Any,
-        *,
-        engine: str | None = None,
-        use_rap: bool = False,
-        executor: Executor | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ) -> Self:
-        cls._dfm_require_subclass_with_schema()
-        from .io import amaterialize_csv as _amc
-
-        cols = await _amc(path, engine=engine, use_rap=use_rap, executor=executor)
-        return cls(
-            cols,
-            trusted_mode=trusted_mode,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
-        )
-
-    @classmethod
-    async def amaterialize_ndjson(
-        cls,
-        path: str | Any,
-        *,
-        engine: str | None = None,
-        executor: Executor | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ) -> Self:
-        cls._dfm_require_subclass_with_schema()
-        from .io import amaterialize_ndjson as _amn
-
-        cols = await _amn(path, engine=engine, executor=executor)
-        return cls(
-            cols,
-            trusted_mode=trusted_mode,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
-        )
-
-    @classmethod
-    async def amaterialize_json(
-        cls,
-        path: str | Any,
-        *,
-        engine: str | None = None,
-        executor: Executor | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ) -> Self:
-        cls._dfm_require_subclass_with_schema()
-        from .io import amaterialize_json as _amj
-
-        cols = await _amj(path, engine=engine, executor=executor)
-        return cls(
-            cols,
-            trusted_mode=trusted_mode,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
-        )
-
-    @classmethod
-    async def afetch_sql(
-        cls,
-        sql: str,
-        bind: str | Engine | Connection,
-        *,
-        parameters: Mapping[str, Any] | None = None,
-        batch_size: int | None = None,
-        auto_stream: bool = True,
-        auto_stream_threshold_rows: int | None = None,
-        executor: Executor | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ) -> Self:
-        cls._dfm_require_subclass_with_schema()
-        from .io import afetch_sql as _afs
-
-        cols = await _afs(
-            sql,
-            bind,
-            parameters=parameters,
-            batch_size=batch_size,
-            auto_stream=auto_stream,
-            auto_stream_threshold_rows=auto_stream_threshold_rows,
-            executor=executor,
-        )
-        return cls(
-            cols,
-            trusted_mode=trusted_mode,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
-        )
-
-    @classmethod
-    def iter_sql(
-        cls,
-        sql: str,
-        bind: str | Engine | Connection,
-        *,
-        parameters: Mapping[str, Any] | None = None,
-        batch_size: int | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ):
-        """Stream SQL batches as typed :class:`DataFrameModel` instances."""
-        cls._dfm_require_subclass_with_schema()
-        from .io import iter_sql as _iter
-
-        for cols in _iter(sql, bind, parameters=parameters, batch_size=batch_size):
-            yield cls(
-                cols,
+        async def _load() -> Self:
+            root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
+            dataframe_cls = cast("Any", cls._dataframe_cls)
+            inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
+                root,
+                engine_streaming=engine_streaming,
                 trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
                 ignore_errors=ignore_errors,
                 on_validation_errors=on_validation_errors,
             )
+            return cls._wrap_inner_df(inner)
 
-    @classmethod
-    async def aiter_sql(
-        cls,
-        sql: str,
-        bind: str | Engine | Connection,
-        *,
-        parameters: Mapping[str, Any] | None = None,
-        batch_size: int | None = None,
-        executor: Executor | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ):
-        """Async stream SQL batches as typed :class:`DataFrameModel` instances."""
-        cls._dfm_require_subclass_with_schema()
-        from .io import aiter_sql as _aiter
-
-        async for cols in _aiter(
-            sql,
-            bind,
-            parameters=parameters,
-            batch_size=batch_size,
-            executor=executor,
-        ):
-            yield cls(
-                cols,
-                trusted_mode=trusted_mode,
-                ignore_errors=ignore_errors,
-                on_validation_errors=on_validation_errors,
-            )
-
-    @classmethod
-    async def afrom_sql(
-        cls,
-        sql: str,
-        bind: str | Engine | Connection,
-        *,
-        parameters: Mapping[str, Any] | None = None,
-        executor: Executor | None = None,
-        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
-        ignore_errors: bool = False,
-        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-    ) -> Self:
-        """Alias for :meth:`afetch_sql`."""
-        return await cls.afetch_sql(
-            sql,
-            bind,
-            parameters=parameters,
-            executor=executor,
-            trusted_mode=trusted_mode,
-            ignore_errors=ignore_errors,
-            on_validation_errors=on_validation_errors,
+        return AwaitableDataFrameModel(
+            _load,
+            repr_label=_short_repr_label(f"{cls.__name__}.aread_json({path!r})"),
         )
 
     def write_parquet(

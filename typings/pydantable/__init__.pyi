@@ -4,6 +4,7 @@ from . import pandas as pandas
 from . import plugins as plugins
 from . import pyspark as pyspark
 from ._extension import MissingRustExtensionError
+from .awaitable_dataframe_model import AwaitableDataFrameModel
 from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
 from .display import get_repr_html_limits, reset_display_options, set_display_options
@@ -45,6 +46,7 @@ from .io import (
     write_ndjson_batches,
     write_parquet_batches,
 )
+from .materialization import PlanMaterialization, plan_materialization_summary
 from .observe import get_observer, set_observer
 from .schema import DtypeDriftWarning, Schema
 from .types import WKB
@@ -53,11 +55,13 @@ __version__ = "1.5.0"
 
 __all__ = [
     "WKB",
+    "AwaitableDataFrameModel",
     "DataFrame",
     "DataFrameModel",
     "DtypeDriftWarning",
     "Expr",
     "MissingRustExtensionError",
+    "PlanMaterialization",
     "Schema",
     "afetch_sql",
     "aiter_csv",
@@ -91,6 +95,7 @@ __all__ = [
     "materialize_ndjson",
     "materialize_parquet",
     "pandas",
+    "plan_materialization_summary",
     "plugins",
     "pyspark",
     "read_parquet",

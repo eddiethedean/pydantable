@@ -88,3 +88,67 @@ def test_mypy_structural_model_with_row_protocol_rejects_wrong_row_model(
     proc = _run_mypy_snippet(tmp_path, code)
     assert proc.returncode != 0
     assert "Argument 1 to" in proc.stdout
+
+
+def test_mypy_supports_lazy_async_materialize_accepts_model_and_awaitable(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("mypy")
+    code = """
+    from __future__ import annotations
+
+    import asyncio
+    import tempfile
+    from pathlib import Path
+    from typing import Any
+
+    from pydantable import DataFrameModel
+    from pydantable.io import export_parquet
+    from pydantable.typing import SupportsLazyAsyncMaterialize
+
+    class Users(DataFrameModel):
+        id: int
+
+    async def run(m: SupportsLazyAsyncMaterialize[Any]) -> Any:
+        return await m.acollect()
+
+    async def main() -> None:
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "t.pq"
+            export_parquet(p, {"id": [1]})
+            df = Users({"id": [1]})
+            _aread = Users.aread_parquet  # type: ignore[attr-defined]
+            adf = _aread(p, trusted_mode="shape_only")
+            a: SupportsLazyAsyncMaterialize[Any] = df
+            b: SupportsLazyAsyncMaterialize[Any] = adf
+            await run(a)
+            await run(b)
+
+    asyncio.run(main())
+    """
+    proc = _run_mypy_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
+def test_mypy_supports_lazy_async_materialize_rejects_without_acollect(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("mypy")
+    code = """
+    from __future__ import annotations
+
+    from typing import Any
+
+    from pydantable.typing import SupportsLazyAsyncMaterialize
+
+    class NotOk:
+        pass
+
+    def f(m: SupportsLazyAsyncMaterialize[Any]) -> None:
+        pass
+
+    f(NotOk())
+    """
+    proc = _run_mypy_snippet(tmp_path, code)
+    assert proc.returncode != 0
+    assert "Argument 1 to" in proc.stdout or "NotOk" in proc.stdout

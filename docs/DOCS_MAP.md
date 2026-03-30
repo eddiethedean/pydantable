@@ -5,8 +5,8 @@ Use this page when you know **what you need to do**, but not **where it is docum
 ## Start here (by goal)
 
 - **Model a table schema and do typed transforms**: {doc}`DATAFRAMEMODEL` (primary user guide).
-- **Build an API with FastAPI**: {doc}`FASTAPI` (request bodies, responses, async patterns).
-- **Understand execution/materialization costs**: {doc}`EXECUTION`.
+- **Build an API with FastAPI**: {doc}`FASTAPI` (request bodies, responses, async patterns); lazy async scans → {doc}`/cookbook/async_lazy_pipeline`.
+- **Understand execution/materialization costs**: {doc}`EXECUTION`; **four plan materialization modes** (blocking / async / deferred / chunked): {doc}`MATERIALIZATION`.
 - **Choose an I/O entrypoint**: {doc}`IO_DECISION_TREE`, then the per-format pages under {doc}`IO_OVERVIEW`.
 - **Know what behavior is guaranteed (joins/nulls/windows/order)**: {doc}`INTERFACE_CONTRACT`.
 - **Understand versioning/semver expectations**: {doc}`VERSIONING`.

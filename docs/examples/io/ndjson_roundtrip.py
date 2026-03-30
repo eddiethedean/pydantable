@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 
 from pydantable import DataFrameModel
+from pydantable.io import materialize_ndjson
 
 
 class ApiAccessEvent(DataFrameModel):
@@ -40,7 +41,7 @@ def main() -> None:
         ApiAccessEvent({"status": [500], "path": ["/v1/checkout"]}).write_ndjson(
             str(replay)
         )
-        got = ApiAccessEvent.materialize_ndjson(replay)
+        got = ApiAccessEvent(materialize_ndjson(replay))
         assert got.to_dict() == {"status": [500], "path": ["/v1/checkout"]}
 
     print("ndjson_roundtrip: ok")

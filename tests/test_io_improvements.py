@@ -14,6 +14,7 @@ import pytest
 from pydantable import DataFrame, DataFrameModel, MissingRustExtensionError
 from pydantable.io import (
     aexport_json,
+    afetch_sql,
     amaterialize_json,
     aread_parquet_url_ctx,
     export_json,
@@ -258,7 +259,7 @@ def test_dataframe_model_export_write_sql_sqlite(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_dataframe_model_afrom_sql_awrite_sql_sqlite(tmp_path: Path) -> None:
+async def test_afetch_sql_awrite_sql_sqlite(tmp_path: Path) -> None:
     pytest.importorskip("sqlalchemy")
     from sqlalchemy import create_engine, text
 
@@ -267,13 +268,10 @@ async def test_dataframe_model_afrom_sql_awrite_sql_sqlite(tmp_path: Path) -> No
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE t_async (k INTEGER)"))
         conn.execute(text("INSERT INTO t_async VALUES (5)"))
-    m = await _Mini.afrom_sql("SELECT k FROM t_async", eng)
+    cols = await afetch_sql("SELECT k FROM t_async", eng)
+    m = _Mini(cols)
     assert m.collect()[0].k == 5
     await _Mini.awrite_sql({"k": [6]}, "t_async", eng, if_exists="append")
     with eng.connect() as c:
         rows = c.execute(text("SELECT k FROM t_async ORDER BY k")).fetchall()
     assert [r[0] for r in rows] == [5, 6]
-
-
-def test_from_sql_is_alias_docstring() -> None:
-    assert "fetch_sql" in (_Mini.from_sql.__doc__ or "")

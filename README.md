@@ -67,10 +67,9 @@ print(result.collect())   # list of Pydantic row models
 
 ## I/O at a glance
 
-- Lazy file pipelines: `read_*` / `aread_*` -> transform -> `write_*`
-- Eager reads: `materialize_*`, `fetch_sql`, `fetch_*_url`
-- Eager writes: `export_*`, `write_sql`
-- Full I/O API is in `pydantable.io`
+- Default: **`DataFrameModel`** / **`DataFrame[Schema]`** — lazy `read_*` / `aread_*`, `export_*`, `write_sql` / `awrite_sql`, …; eager `materialize_*` / `fetch_sql` / `iter_sql` live on **`pydantable.io`** → pass `dict[str, list]` into constructors for typed frames.
+- Lazy file pipelines: `MyModel.read_*` / `await MyModel.aread_*` → transform → `write_*`
+- The **`pydantable.io`** package exposes **raw** helpers (`dict[str, list]`, `ScanFileRoot`) for scripts and glue code — see **IO_OVERVIEW** in the docs.
 
 ## Validation controls
 

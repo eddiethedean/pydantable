@@ -6,16 +6,17 @@ Use this page to pick the right entry point. Execution semantics (lazy collect v
 
 | Goal | Use | Returns / effect |
 |------|-----|-------------------|
-| **Scan a local file without loading full columns into Python** | **`DataFrame[Schema].read_*`** or **`MyModel.read_*`**, or **`pydantable.io.read_*`** | **`ScanFileRoot`** → lazy plan |
-| **Run transforms on a big file, then write without a giant dict** | **`read_*`** → … → **`DataFrame.write_parquet`** (or **`write_csv`** / **`write_ipc`** / **`write_ndjson`**) | File on disk |
-| **Load everything into `dict[str, list]`** (eager) | **`materialize_*`** / **`amaterialize_*`**, **`fetch_sql`**, **`fetch_*_url`**, **`read_from_object_store`** | Column dict |
-| **Persist an in-memory column dict to a file** (eager) | **`export_*`** / **`aexport_*`** | File on disk |
-| **Query or load from a database** | **`fetch_sql`** / **`afetch_sql`**; **`write_sql`** / **`awrite_sql`** for append/replace | Column dict in / none out |
-| **HTTP(S) download** | **`fetch_bytes`**, **`fetch_parquet_url`**, **`fetch_csv_url`**, **`fetch_ndjson_url`** (eager dicts); **`read_parquet_url`** / **`aread_parquet_url`** for **lazy** Parquet (temp file — see {doc}`IO_HTTP`) | Varies |
+| **Scan a local file without loading full columns into Python** | **`MyModel.read_*`** or **`DataFrame[Schema].read_*`** (default) | **`ScanFileRoot`** → lazy plan |
+| **Run transforms on a big file, then write without a giant dict** | **`MyModel.read_*`** → … → **`DataFrame.write_parquet`** (or **`write_*`**) | File on disk |
+| **Load everything eagerly into a typed frame** | **`pydantable.io.materialize_*`**, **`fetch_sql`**, **`await afetch_sql`**, then **`MyModel(cols)`** | **`DataFrameModel`** / **`DataFrame`** |
+| **Raw `dict[str, list]` only** (utilities) | **`pydantable.io.materialize_*`**, **`fetch_sql`**, **`fetch_*_url`**, **`read_from_object_store`** | Column dict |
+| **Persist columns to a file** | **`MyModel.export_*`** / **`await MyModel.aexport_*`** | File on disk |
+| **Query or load from a database** | **`fetch_sql`** / **`await afetch_sql`** / **`iter_sql`** / **`aiter_sql`** + **`MyModel(...)`**; **`MyModel.write_sql`** / **`await MyModel.awrite_sql`** | Typed frame or none |
+| **HTTP(S) download** | **`fetch_*_url`** (eager dicts) or **`MyModel.read_parquet_url`** / **`await MyModel.aread_parquet_url`** (lazy temp file — {doc}`IO_HTTP`) | Varies |
 | **Object-store URIs (`s3://`, …)** | **`read_from_object_store`** (**`[cloud]`**) | Column dict |
 | **Tier-2 readers (Excel, Delta, …)** | **`pydantable.io.extras`** | Column dict or helpers |
 
-**Full surface:** import from **`pydantable.io`** — the top-level **`pydantable`** package re-exports only a small subset for common Parquet paths; see {doc}`IO_OVERVIEW`.
+**Module reference:** every symbol also exists on **`pydantable.io`**; see {doc}`IO_OVERVIEW` (**Module reference**).
 
 ## Engine selection (`materialize_parquet` and friends)
 
@@ -38,7 +39,7 @@ See implementation notes in **`pydantable.io`** module docstrings for edge cases
 
 ## Typed frame first vs `pydantable.io` only
 
-- Prefer **`DataFrameModel`** / **`DataFrame[Schema]`** when you want **validation** and **typed** **`Expr`** pipelines.
-- Use bare **`pydantable.io`** functions in scripts, tests, or when building a **`dict[str, list]`** before wrapping **`MyModel(cols)`**.
+- **Default:** **`DataFrameModel`** / **`DataFrame[Schema]`** classmethods (**`read_*`**, **`materialize_*`**, **`fetch_sql`**, …) for **validation** and **typed** **`Expr`** pipelines.
+- **`pydantable.io`** only when you need untyped **`dict[str, list]`**, **`ScanFileRoot`** without wrapping, or **`extras`** — scripts, tests, notebooks, internal glue.
 
-For **`DataFrameModel`** convenience wrappers around **`pydantable.io`** — **`from_sql`** / **`afrom_sql`**, **`export_*`**, **`write_sql`** / **`awrite_sql`** — see {doc}`DATAFRAMEMODEL` and {doc}`IO_OVERVIEW`.
+See {doc}`DATAFRAMEMODEL` and {doc}`IO_OVERVIEW`.

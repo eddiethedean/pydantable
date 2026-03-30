@@ -12,7 +12,7 @@ This covers **Arrow IPC file** (`.arrow` / `.feather`-style single file), not ar
 
 - **`DataFrame[Schema].read_ipc(path, *, columns=None, **scan_kwargs)`**
 - **`MyModel.read_ipc(...)`**, **`await MyModel.aread_ipc(..., executor=None)`**
-- **`MyModel.materialize_ipc`**, **`await MyModel.amaterialize_ipc`** — **`as_stream`**, **`engine`**
+- **`materialize_ipc`**, **`await amaterialize_ipc`** from **`pydantable.io`**, then **`MyModel(cols)`** — **`as_stream`**, **`engine`**
 
 ### `pydantable.io`
 
