@@ -60,6 +60,15 @@ def test_pandas_ui_assign_callable_must_return_expr_or_literal() -> None:
         df.assign(bad=lambda d: object())
 
 
+def test_pandas_ui_assign_callable_can_return_literal() -> None:
+    class User(PandasDataFrameModel):
+        id: int
+
+    df = User({"id": [1, 2]})
+    out = df.assign(one=lambda d: 1).collect(as_lists=True)
+    assert out["one"] == [1, 1]
+
+
 def test_pandas_ui_query_string_support() -> None:
     class User(PandasDataFrameModel):
         id: int
@@ -76,6 +85,44 @@ def test_pandas_ui_query_string_basic() -> None:
     df = User({"id": [1, 2, 3], "age": [20, None, 5]})
     out = df.query("id > 1 and age != None").collect(as_lists=True)
     assert_table_eq_sorted(out, {"id": [3], "age": [5]}, keys=["id"])
+
+
+def test_pandas_ui_query_string_parentheses_and_precedence() -> None:
+    class Row(PandasDataFrameModel):
+        id: int
+        age: int | None
+
+    df = Row({"id": [1, 2, 3, 4], "age": [10, None, 5, None]})
+
+    # `and` binds tighter than `or` in Python; ensure we follow that.
+    out1 = df.query("id == 1 or id == 2 and age == None").collect(as_lists=True)
+    # Should include id==1 regardless of age, plus id==2 only if age is None.
+    assert_table_eq_sorted(out1, {"id": [1, 2], "age": [10, None]}, keys=["id"])
+
+    # Parentheses should change the result.
+    out2 = df.query("(id == 1 or id == 2) and age == None").collect(as_lists=True)
+    assert_table_eq_sorted(out2, {"id": [2], "age": [None]}, keys=["id"])
+
+
+def test_pandas_ui_query_string_not_operator() -> None:
+    class Row(PandasDataFrameModel):
+        id: int
+
+    df = Row({"id": [1, 2, 3]})
+    out = df.query("not (id == 2)").collect(as_lists=True)
+    assert_table_eq_sorted(out, {"id": [1, 3]}, keys=["id"])
+
+
+def test_pandas_ui_query_string_none_is_null_and_not_null() -> None:
+    class Row(PandasDataFrameModel):
+        id: int
+        age: int | None
+
+    df = Row({"id": [1, 2, 3], "age": [None, 10, None]})
+    is_null = df.query("age == None").collect(as_lists=True)
+    is_not_null = df.query("age != None").collect(as_lists=True)
+    assert_table_eq_sorted(is_null, {"id": [1, 3], "age": [None, None]}, keys=["id"])
+    assert_table_eq_sorted(is_not_null, {"id": [2], "age": [10]}, keys=["id"])
 
 
 def test_pandas_ui_query_rejects_unsupported_syntax() -> None:
@@ -98,6 +145,40 @@ def test_pandas_ui_merge_left_on_requires_right_on() -> None:
         L({"a": [1]}).merge(R({"b": [1]}), left_on="a")  # type: ignore[arg-type]
 
 
+def test_pandas_ui_merge_rejects_on_with_left_on_right_on() -> None:
+    class L(PandasDataFrameModel):
+        a: int
+
+    class R(PandasDataFrameModel):
+        b: int
+
+    with pytest.raises(TypeError, match="either on"):
+        L({"a": [1]}).merge(R({"b": [1]}), on="a", left_on="a", right_on="b")
+
+
+def test_pandas_ui_merge_validate_rejects_unknown_value() -> None:
+    class L(PandasDataFrameModel):
+        a: int
+
+    class R(PandasDataFrameModel):
+        a: int
+
+    with pytest.raises(ValueError, match="validate"):
+        L({"a": [1]}).merge(R({"a": [1]}), on="a", validate="wat")  # type: ignore[arg-type]
+
+
+def test_pandas_ui_merge_indicator_key_only_frames_not_supported() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        a: int
+
+    left = DataFrame[Row]({"a": [1]})
+    right = DataFrame[Row]({"a": [1]})
+    with pytest.raises(NotImplementedError, match="non-key column"):
+        left.merge(right, on="a", how="inner", indicator=True)
+
+
 def test_pandas_ui_merge_left_on_right_on_different_names_drops_right_keys() -> None:
     class L(PandasDataFrameModel):
         left_id: int
@@ -117,6 +198,51 @@ def test_pandas_ui_merge_left_on_right_on_different_names_drops_right_keys() -> 
     assert data["left_id"] == [1, 2]
     assert data["v"] == [10, 20]
     assert data["w"] == [100, 200]
+
+
+def test_pandas_ui_merge_outer_left_on_right_on_coalesces_left_keys() -> None:
+    class L(PandasDataFrameModel):
+        left_id: int
+        x: int
+
+    class R(PandasDataFrameModel):
+        right_id: int
+        y: int
+
+    left = L({"left_id": [1, 2], "x": [10, 20]})
+    right = R({"right_id": [2, 3], "y": [200, 300]})
+
+    out = left.merge(right, left_on="left_id", right_on="right_id", how="outer")
+    data = out.collect(as_lists=True)
+    # Right keys dropped, and left key filled for right-only rows (id=3).
+    assert "right_id" not in data
+    rows = sorted(
+        zip(data["left_id"], data.get("x"), data.get("y"), strict=True),
+        key=lambda t: t[0],
+    )
+    assert rows == [(1, 10, None), (2, 20, 200), (3, None, 300)]
+
+
+def test_pandas_ui_merge_right_join_coalesces_left_keys() -> None:
+    class L(PandasDataFrameModel):
+        left_id: int
+        x: int
+
+    class R(PandasDataFrameModel):
+        right_id: int
+        y: int
+
+    left = L({"left_id": [1, 2], "x": [10, 20]})
+    right = R({"right_id": [2, 3], "y": [200, 300]})
+
+    out = left.merge(right, left_on="left_id", right_on="right_id", how="right")
+    data = out.collect(as_lists=True)
+    assert "right_id" not in data
+    rows = sorted(
+        zip(data["left_id"], data.get("x"), data.get("y"), strict=True),
+        key=lambda t: t[0],
+    )
+    assert rows == [(2, 20, 200), (3, None, 300)]
 
 
 def test_pandas_ui_matches_default_for_pipeline() -> None:
@@ -211,6 +337,35 @@ def test_pandas_model_group_mean_and_count() -> None:
     gc = df.group_by("k").count("v").collect(as_lists=True)
     assert gm["v_mean"] == [15]
     assert gc["v_count"] == [2]
+
+
+def test_pandas_model_group_size_and_nunique() -> None:
+    class Row(PandasDataFrameModel):
+        k: int
+        v: int | None
+
+    df = Row({"k": [1, 1, 2], "v": [10, None, 10]})
+    size = df.group_by("k").size().collect(as_lists=True)
+    assert_table_eq_sorted(size, {"k": [1, 2], "size": [2, 1]}, keys=["k"])
+
+    nu = df.group_by("k").nunique("v").collect(as_lists=True)
+    # nunique drops nulls by design (matches current engine n_unique).
+    assert_table_eq_sorted(nu, {"k": [1, 2], "v_nunique": [1, 1]}, keys=["k"])
+
+
+def test_pandas_model_group_nunique_multiple_columns() -> None:
+    class Row(PandasDataFrameModel):
+        k: int
+        a: int | None
+        b: int | None
+
+    df = Row({"k": [1, 1, 1, 2], "a": [1, 1, None, 2], "b": [5, None, 5, 6]})
+    out = df.group_by("k").nunique("a", "b").collect(as_lists=True)
+    assert_table_eq_sorted(
+        out,
+        {"k": [1, 2], "a_nunique": [1, 1], "b_nunique": [1, 1]},
+        keys=["k"],
+    )
 
 
 def test_pandas_ui_merge_rejects_extra_kwargs() -> None:

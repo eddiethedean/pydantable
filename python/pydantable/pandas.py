@@ -192,43 +192,64 @@ class PandasDataFrame(CoreDataFrame):
                 raise ValueError(
                     "merge(indicator=True) would overwrite existing '_merge' column."
                 )
-            # For outer/right joins (and indicator), we need access to the right-side
-            # key columns so we can (a) coalesce keys for right-only rows and (b)
-            # compute a reliable indicator. Use left_on/right_on even though names
-            # match; pydantable will emit a right-key duplicate column.
-            use_key_dupes = indicator or how in {"right", "outer"}
-            if use_key_dupes:
-                joined = self.join(
-                    other, left_on=on_list, right_on=on_list, how=how, suffix=suffix
-                )
-                fields = joined.schema_fields()
-                right_key_outputs: list[str] = []
-                for k in on_list:
-                    if f"{k}_right" in fields:
-                        right_key_outputs.append(f"{k}_right")
-                    elif f"{k}{suffix}" in fields:
-                        right_key_outputs.append(f"{k}{suffix}")
-                if indicator:
-                    if not right_key_outputs:
-                        raise RuntimeError(
-                            "merge(indicator=True) could not find right key columns "
-                            "in join output."
-                        )
-                    joined = joined.with_columns(
-                        _merge=_merge_indicator_expr(
-                            joined,
-                            left_keys=on_list,
-                            right_key_outputs=right_key_outputs,
-                        )
-                    )
-                if how in {"right", "outer"} and right_key_outputs:
-                    unify: dict[str, Expr] = {}
-                    for lk, rk_out in zip(on_list, right_key_outputs, strict=True):
-                        unify[lk] = coalesce(joined.col(lk), joined.col(rk_out))
-                    joined = joined.with_columns(**unify)
-                return joined.drop(*right_key_outputs) if right_key_outputs else joined
 
-            # Inner/left merges can use join(on=...) directly (no duplicate keys).
+            if indicator:
+                joined = self.join(other, on=on_list, how=how, suffix=suffix)
+                fields = set(joined.schema_fields())
+
+                def _pick_presence_col(src_cols: list[str]) -> str | None:
+                    for c in src_cols:
+                        if c in fields:
+                            return c
+                        cand = f"{c}{suffix}"
+                        if cand in fields:
+                            return cand
+                    return None
+
+                left_non_keys = [c for c in self.schema_fields() if c not in on_list]
+                right_non_keys = [c for c in other.schema_fields() if c not in on_list]
+                l_col = _pick_presence_col(left_non_keys)
+                r_col = _pick_presence_col(right_non_keys)
+                if l_col is None or r_col is None:
+                    raise NotImplementedError(
+                        "merge(indicator=True) currently requires at least one "
+                        "non-key column on each side."
+                    )
+                out = joined.with_columns(
+                    _merge=(
+                        when(
+                            joined.col(l_col).is_not_null()
+                            & joined.col(r_col).is_not_null(),
+                            Literal(value="both"),
+                        )
+                        .when(
+                            joined.col(l_col).is_not_null(), Literal(value="left_only")
+                        )
+                        .otherwise(Literal(value="right_only"))
+                    )
+                )
+                if how in {"right", "outer"}:
+                    # Some join implementations surface a duplicated/suffixed right
+                    # key (e.g. `a_right` or `a_y`) and leave the left key nullable.
+                    # Coalesce so `a` is populated for right-only rows.
+                    fields2 = set(out.schema_fields())
+                    dupes: list[str] = []
+                    unify: dict[str, Expr] = {}
+                    for k in on_list:
+                        dupe = None
+                        if f"{k}_right" in fields2:
+                            dupe = f"{k}_right"
+                        elif f"{k}{suffix}" in fields2:
+                            dupe = f"{k}{suffix}"
+                        if dupe is not None:
+                            dupes.append(dupe)
+                            unify[k] = coalesce(out.col(k), out.col(dupe))
+                    if unify:
+                        out = out.with_columns(**unify)
+                    if dupes:
+                        out = out.drop(*dupes)
+                return out
+
             return self.join(other, on=on_list, how=how, suffix=suffix)
 
         assert left_list is not None and right_list is not None
@@ -282,7 +303,13 @@ class PandasDataFrame(CoreDataFrame):
         if how in {"right", "outer"}:
             unify: dict[str, Expr] = {}
             for lk, rk_out in zip(left_list, right_key_outputs, strict=True):
-                unify[lk] = coalesce(joined.col(lk), joined.col(rk_out))
+                if lk in joined_cols:
+                    unify[lk] = coalesce(joined.col(lk), joined.col(rk_out))
+                else:
+                    # Some join shapes (notably how='right' with different left_on /
+                    # right_on names) may omit the left key column entirely from the
+                    # join output. Create it from the right key.
+                    unify[lk] = joined.col(rk_out)
             joined = joined.with_columns(**unify)
         return joined.drop(*drop_cols) if drop_cols else joined
 
@@ -436,6 +463,19 @@ class PandasDataFrame(CoreDataFrame):
 class PandasGroupedDataFrame(CoreGroupedDataFrame):
     """Grouped frame with shorthand ``sum`` / ``mean`` / ``count`` over columns."""
 
+    def size(self) -> CoreDataFrame:
+        """
+        Row count per group (pandas-style `GroupBy.size()`).
+
+        Unlike `count()`, this counts rows including nulls by summing a per-row
+        literal marker column.
+        """
+        existing = set(self._df.schema_fields())
+        tmp = _unique_tmp_name(existing, "__pd_size")
+        out = "size" if "size" not in existing else "__size"
+        marked = self._df.with_columns(**{tmp: Literal(value=1)})
+        return marked.group_by(*self._keys).agg(**{out: ("sum", tmp)})
+
     def sum(self, *columns: str) -> CoreDataFrame:
         if not columns:
             raise TypeError("sum() requires at least one column name.")
@@ -458,6 +498,14 @@ class PandasGroupedDataFrame(CoreGroupedDataFrame):
         return self.agg(
             streaming=None,
             **{f"{c}_count": ("count", c) for c in columns},
+        )
+
+    def nunique(self, *columns: str) -> CoreDataFrame:
+        if not columns:
+            raise TypeError("nunique() requires at least one column name.")
+        return self.agg(
+            streaming=None,
+            **{f"{c}_nunique": ("n_unique", c) for c in columns},
         )
 
 
@@ -500,6 +548,12 @@ class PandasGroupedDataFrameModel(CoreGroupedDataFrameModel):
 
     def count(self, *columns: str) -> CoreDataFrameModel:
         return self._model_type._from_dataframe(self._grouped_df.count(*columns))
+
+    def size(self) -> CoreDataFrameModel:
+        return self._model_type._from_dataframe(self._grouped_df.size())
+
+    def nunique(self, *columns: str) -> CoreDataFrameModel:
+        return self._model_type._from_dataframe(self._grouped_df.nunique(*columns))
 
 
 class DataFrame(PandasDataFrame):
