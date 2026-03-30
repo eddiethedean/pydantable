@@ -18,7 +18,7 @@ use crate::plan::ir::{PlanInner, PlanStep};
 use crate::plan::schema_py::schema_descriptors_as_py;
 
 use polars::chunked_array::builder::get_list_builder;
-use polars::lazy::dsl::{col, cols, lit, when, Expr as PolarsExpr};
+use polars::lazy::dsl::{by_name, col, cols, lit, when, Expr as PolarsExpr};
 use polars::prelude::{
     AnyValue, BooleanChunked, CrossJoin, DataFrame, DataType, ExplodeOptions, Field,
     FillNullStrategy, Float64Chunked, Int128Chunked, Int32Chunked, Int64Chunked, IntoColumn,
@@ -685,6 +685,50 @@ impl PolarsPlanRunner {
                     }
                     lf = lf.filter(cond);
                 }
+            }
+            PlanStep::Melt {
+                id_vars,
+                value_vars,
+                variable_name,
+                value_name,
+            } => {
+                lf = lf.unpivot(UnpivotArgsDSL {
+                    on: Some(by_name(value_vars.clone(), true, false)),
+                    index: by_name(id_vars.clone(), true, false),
+                    variable_name: Some(variable_name.clone().into()),
+                    value_name: Some(value_name.clone().into()),
+                });
+            }
+            PlanStep::RollingAgg {
+                column,
+                window_size,
+                min_periods,
+                op,
+                out_name,
+            } => {
+                use polars::prelude::{DataType, RollingOptionsFixedWindow};
+                let opts = RollingOptionsFixedWindow {
+                    window_size: *window_size,
+                    min_periods: *min_periods,
+                    weights: None,
+                    center: false,
+                    fn_params: None,
+                };
+                let base = col(column);
+                let e = match op.as_str() {
+                    "sum" => base.rolling_sum(opts),
+                    "mean" => base.rolling_mean(opts),
+                    "min" => base.rolling_min(opts),
+                    "max" => base.rolling_max(opts),
+                    "count" => base.is_not_null().cast(DataType::Int64).rolling_sum(opts),
+                    other => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                            "internal: unknown rolling op '{other}'."
+                        )));
+                    }
+                }
+                .alias(out_name);
+                lf = lf.with_columns([e]);
             }
         }
         Ok(lf)

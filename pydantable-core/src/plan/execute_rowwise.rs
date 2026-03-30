@@ -294,6 +294,16 @@ pub(crate) fn execute_plan_rowwise(
                 }
                 n = ctx_len(&ctx)?;
             }
+            PlanStep::Melt { .. } => {
+                return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                    "melt requires pydantable-core built with the Polars engine.",
+                ));
+            }
+            PlanStep::RollingAgg { .. } => {
+                return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                    "rolling requires pydantable-core built with the Polars engine.",
+                ));
+            }
         }
     }
 

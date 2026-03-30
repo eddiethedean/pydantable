@@ -1124,22 +1124,91 @@ class PandasDataFrame(CoreDataFrame):
         def __init__(self, df: PandasDataFrame):
             self._df = df
 
-        def __getitem__(self, key: slice) -> CoreDataFrame:
+        def __getitem__(self, key: int | slice) -> CoreDataFrame:
+            if isinstance(key, int):
+                n = self._nrows_or_none()
+                i = int(key)
+                if i < 0:
+                    if n is None:
+                        raise NotImplementedError(
+                            "iloc negative indices require in-memory root data."
+                        )
+                    i = n + i
+                return self._df.slice(i, 1)
             if not isinstance(key, slice):
-                raise TypeError("iloc[...] only supports slice objects.")
+                raise TypeError("iloc[...] only supports int or slice selectors.")
             if key.step not in (None, 1):
                 raise NotImplementedError("iloc slicing does not support step.")
+            n = self._nrows_or_none()
             start = 0 if key.start is None else int(key.start)
             stop = None if key.stop is None else int(key.stop)
+            if start < 0:
+                if n is None:
+                    raise NotImplementedError(
+                        "iloc negative slices require in-memory root data."
+                    )
+                start = n + start
             if stop is None:
-                raise NotImplementedError("iloc[start:] is not supported without stop.")
+                if n is None:
+                    raise NotImplementedError(
+                        "iloc open-ended slices require in-memory root data."
+                    )
+                stop = n
+            if stop < 0:
+                if n is None:
+                    raise NotImplementedError(
+                        "iloc negative slices require in-memory root data."
+                    )
+                stop = n + stop
             if stop < start:
                 return self._df.slice(0, 0)
             return self._df.slice(start, stop - start)
 
+        def _nrows_or_none(self) -> int | None:
+            data = getattr(self._df, "_root_data", None)
+            if not isinstance(data, dict) or not data:
+                return None
+            first = next(iter(data.values()))
+            return len(first)
+
     @property
     def iloc(self) -> _ILoc:
         return PandasDataFrame._ILoc(self)
+
+    class _Loc:
+        def __init__(self, df: PandasDataFrame):
+            self._df = df
+
+        def __getitem__(self, key: object) -> CoreDataFrame:
+            if not isinstance(key, tuple) or len(key) != 2:
+                raise TypeError("loc[...] expects a 2-tuple: (rows, cols).")
+            row_sel, col_sel = key
+            df: CoreDataFrame = self._df
+            if isinstance(row_sel, slice) and row_sel == slice(None, None, None):
+                pass
+            elif isinstance(row_sel, Expr):
+                df = df.filter(row_sel)
+            else:
+                raise NotImplementedError(
+                    "loc row selection supports ':' or an Expr mask only."
+                )
+            if col_sel is None or col_sel == slice(None, None, None):
+                return df
+            if isinstance(col_sel, str):
+                return df.select(col_sel)
+            if (
+                isinstance(col_sel, list)
+                and col_sel
+                and all(isinstance(c, str) for c in col_sel)
+            ):
+                return df.select(*col_sel)
+            raise NotImplementedError(
+                "loc column selection supports str or non-empty list[str] only."
+            )
+
+    @property
+    def loc(self) -> _Loc:
+        return PandasDataFrame._Loc(self)
 
     def group_by(
         self,
@@ -1159,6 +1228,171 @@ class PandasDataFrame(CoreDataFrame):
             raise NotImplementedError("group_by(observed=...) is not supported.")
         inner = super().group_by(*keys)
         return PandasGroupedDataFrame(inner._df, inner._keys)
+
+    def isna(self) -> CoreDataFrame:
+        cols = list(self.schema_fields().keys())
+        return self.with_columns(**{c: self.col(c).is_null() for c in cols})
+
+    def isnull(self) -> CoreDataFrame:
+        return self.isna()
+
+    def notna(self) -> CoreDataFrame:
+        cols = list(self.schema_fields().keys())
+        return self.with_columns(**{c: self.col(c).is_not_null() for c in cols})
+
+    def notnull(self) -> CoreDataFrame:
+        return self.notna()
+
+    def dropna(
+        self,
+        *,
+        axis: int = 0,
+        how: str = "any",
+        subset: str | list[str] | None = None,
+        inplace: Any = None,
+        thresh: Any = None,
+    ) -> CoreDataFrame:
+        if axis != 0:
+            raise NotImplementedError("dropna(axis=1) is not supported.")
+        if inplace is not None:
+            raise NotImplementedError("dropna(inplace=...) is not supported.")
+        if thresh is not None:
+            raise NotImplementedError("dropna(thresh=...) is not supported.")
+        if how not in ("any", "all"):
+            raise ValueError("dropna(how=...) must be 'any' or 'all'.")
+        if subset is None:
+            subset_cols = list(self.schema_fields().keys())
+        elif isinstance(subset, str):
+            subset_cols = [subset]
+        elif (
+            isinstance(subset, list)
+            and subset
+            and all(isinstance(c, str) for c in subset)
+        ):
+            subset_cols = subset
+        else:
+            raise TypeError(
+                "dropna(subset=...) must be a column name or non-empty list[str]."
+            )
+        if how == "any":
+            return self.drop_nulls(subset=subset_cols)
+
+        cond: Expr | None = None
+        for c in subset_cols:
+            e = self.col(c).is_not_null()
+            cond = e if cond is None else (cond | e)
+        if cond is None:
+            return self
+        return self.filter(cond)
+
+    def melt(
+        self,
+        *,
+        id_vars: str | list[str],
+        value_vars: str | list[str] | None = None,
+        var_name: str = "variable",
+        value_name: str = "value",
+    ) -> CoreDataFrame:
+        if isinstance(id_vars, str):
+            id_list = [id_vars]
+        elif (
+            isinstance(id_vars, list)
+            and id_vars
+            and all(isinstance(c, str) for c in id_vars)
+        ):
+            id_list = id_vars
+        else:
+            raise TypeError(
+                "melt(id_vars=...) must be a column name or non-empty list[str]."
+            )
+        if value_vars is None:
+            value_list: list[str] | None = None
+        elif isinstance(value_vars, str):
+            value_list = [value_vars]
+        elif (
+            isinstance(value_vars, list)
+            and value_vars
+            and all(isinstance(c, str) for c in value_vars)
+        ):
+            value_list = value_vars
+        else:
+            raise TypeError(
+                "melt(value_vars=...) must be a column name, non-empty list[str], or "
+                "None."
+            )
+
+        rust = _require_rust_core()
+        rust_plan = rust.plan_melt(
+            self._rust_plan,
+            id_list,
+            value_list,
+            var_name,
+            value_name,
+        )
+        desc = rust_plan.schema_descriptors()
+        derived_fields = self._field_types_from_descriptors(desc)
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    class _Rolling:
+        def __init__(self, df: PandasDataFrame, *, window: int, min_periods: int):
+            self._df = df
+            self._window = int(window)
+            self._min_periods = int(min_periods)
+            if self._window <= 0:
+                raise ValueError("rolling(window=...) must be >= 1.")
+            if self._min_periods < 0:
+                raise ValueError("rolling(min_periods=...) must be >= 0.")
+
+        def _apply(self, op: str, column: str, out_name: str | None) -> CoreDataFrame:
+            if not isinstance(column, str):
+                raise TypeError("rolling op requires column as str.")
+            name = out_name or f"{column}_{op}"
+            rust = _require_rust_core()
+            rust_plan = rust.plan_rolling_agg(
+                self._df._rust_plan,
+                column,
+                self._window,
+                self._min_periods,
+                op,
+                name,
+            )
+            desc = rust_plan.schema_descriptors()
+            derived_fields = self._df._field_types_from_descriptors(desc)
+            derived_schema_type = make_derived_schema_type(
+                self._df._current_schema_type, derived_fields
+            )
+            return self._df._from_plan(
+                root_data=self._df._root_data,
+                root_schema_type=self._df._root_schema_type,
+                current_schema_type=derived_schema_type,
+                rust_plan=rust_plan,
+            )
+
+        def sum(self, column: str, *, out_name: str | None = None) -> CoreDataFrame:
+            return self._apply("sum", column, out_name)
+
+        def mean(self, column: str, *, out_name: str | None = None) -> CoreDataFrame:
+            return self._apply("mean", column, out_name)
+
+        def min(self, column: str, *, out_name: str | None = None) -> CoreDataFrame:
+            return self._apply("min", column, out_name)
+
+        def max(self, column: str, *, out_name: str | None = None) -> CoreDataFrame:
+            return self._apply("max", column, out_name)
+
+        def count(self, column: str, *, out_name: str | None = None) -> CoreDataFrame:
+            return self._apply("count", column, out_name)
+
+    def rolling(self, *, window: int, min_periods: int = 1) -> _Rolling:
+        return PandasDataFrame._Rolling(self, window=window, min_periods=min_periods)
 
 
 class PandasGroupedDataFrame(CoreGroupedDataFrame):
@@ -1305,6 +1539,99 @@ class PandasDataFrameModel(CoreDataFrameModel):
 
     def astype(self, *args: Any, **kwargs: Any) -> Self:
         return type(self)._from_dataframe(self._df.astype(*args, **kwargs))
+
+    class _ModelILoc:
+        __slots__ = ("_m",)
+
+        def __init__(self, m: PandasDataFrameModel):
+            self._m = m
+
+        def __getitem__(self, key: int | slice) -> CoreDataFrameModel:
+            return type(self._m)._from_dataframe(self._m._df.iloc[key])
+
+    class _ModelLoc:
+        __slots__ = ("_m",)
+
+        def __init__(self, m: PandasDataFrameModel):
+            self._m = m
+
+        def __getitem__(self, key: object) -> CoreDataFrameModel:
+            return type(self._m)._from_dataframe(self._m._df.loc[key])
+
+    @property
+    def iloc(self) -> _ModelILoc:
+        return PandasDataFrameModel._ModelILoc(self)
+
+    @property
+    def loc(self) -> _ModelLoc:
+        return PandasDataFrameModel._ModelLoc(self)
+
+    def isna(self) -> Self:
+        return type(self)._from_dataframe(self._df.isna())
+
+    def isnull(self) -> Self:
+        return type(self)._from_dataframe(self._df.isnull())
+
+    def notna(self) -> Self:
+        return type(self)._from_dataframe(self._df.notna())
+
+    def notnull(self) -> Self:
+        return type(self)._from_dataframe(self._df.notnull())
+
+    def dropna(self, *args: Any, **kwargs: Any) -> Self:
+        return type(self)._from_dataframe(self._df.dropna(*args, **kwargs))
+
+    def melt(self, *args: Any, **kwargs: Any) -> Self:
+        return type(self)._from_dataframe(self._df.melt(*args, **kwargs))
+
+    class _ModelRolling:
+        __slots__ = ("_inner", "_m")
+
+        def __init__(self, m: PandasDataFrameModel, *, window: int, min_periods: int):
+            self._m = m
+            self._inner = PandasDataFrame._Rolling(
+                m._df, window=window, min_periods=min_periods
+            )
+
+        def sum(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrameModel:
+            return type(self._m)._from_dataframe(
+                self._inner.sum(column, out_name=out_name)
+            )
+
+        def mean(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrameModel:
+            return type(self._m)._from_dataframe(
+                self._inner.mean(column, out_name=out_name)
+            )
+
+        def min(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrameModel:
+            return type(self._m)._from_dataframe(
+                self._inner.min(column, out_name=out_name)
+            )
+
+        def max(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrameModel:
+            return type(self._m)._from_dataframe(
+                self._inner.max(column, out_name=out_name)
+            )
+
+        def count(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrameModel:
+            return type(self._m)._from_dataframe(
+                self._inner.count(column, out_name=out_name)
+            )
+
+    def rolling(self, *, window: int, min_periods: int = 1) -> _ModelRolling:
+        return PandasDataFrameModel._ModelRolling(
+            self, window=window, min_periods=min_periods
+        )
 
     def __getitem__(self, key: str | list[str]) -> Any:
         return self._df[key]  # type: ignore[index]

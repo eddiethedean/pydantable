@@ -102,6 +102,32 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
                 step_out.set_item("kind", "drop_nulls")?;
                 step_out.set_item("subset", subset)?;
             }
+            PlanStep::Melt {
+                id_vars,
+                value_vars,
+                variable_name,
+                value_name,
+            } => {
+                step_out.set_item("kind", "melt")?;
+                step_out.set_item("id_vars", id_vars)?;
+                step_out.set_item("value_vars", value_vars)?;
+                step_out.set_item("variable_name", variable_name)?;
+                step_out.set_item("value_name", value_name)?;
+            }
+            PlanStep::RollingAgg {
+                column,
+                window_size,
+                min_periods,
+                op,
+                out_name,
+            } => {
+                step_out.set_item("kind", "rolling_agg")?;
+                step_out.set_item("column", column)?;
+                step_out.set_item("window_size", window_size)?;
+                step_out.set_item("min_periods", min_periods)?;
+                step_out.set_item("op", op)?;
+                step_out.set_item("out_name", out_name)?;
+            }
         }
         steps.append(step_out)?;
     }

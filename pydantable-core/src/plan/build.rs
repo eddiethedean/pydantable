@@ -438,3 +438,211 @@ pub fn plan_drop_nulls(plan: &PlanInner, subset: Option<Vec<String>>) -> PyResul
         root_schema: plan.root_schema.clone(),
     })
 }
+
+pub fn plan_melt(
+    plan: &PlanInner,
+    id_vars: Vec<String>,
+    value_vars: Option<Vec<String>>,
+    variable_name: String,
+    value_name: String,
+) -> PyResult<PlanInner> {
+    if variable_name == value_name {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "melt(variable_name=..., value_name=...) must be different.",
+        ));
+    }
+    if plan.schema.contains_key(&variable_name) || plan.schema.contains_key(&value_name) {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "melt variable/value names must not collide with existing columns.",
+        ));
+    }
+    if id_vars.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "melt(id_vars=...) must be non-empty.",
+        ));
+    }
+    for c in id_vars.iter() {
+        if !plan.schema.contains_key(c) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "melt() unknown id_var '{}'.",
+                c
+            )));
+        }
+    }
+
+    let value_vars = if let Some(v) = value_vars {
+        if v.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "melt(value_vars=...) cannot be empty when provided.",
+            ));
+        }
+        v
+    } else {
+        let id_set: std::collections::HashSet<String> = id_vars.iter().cloned().collect();
+        let mut cols: Vec<String> = plan
+            .schema
+            .keys()
+            .filter(|c| !id_set.contains(*c))
+            .cloned()
+            .collect();
+        cols.sort();
+        cols
+    };
+    if value_vars.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "melt() requires at least one value column.",
+        ));
+    }
+    for c in value_vars.iter() {
+        if !plan.schema.contains_key(c) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "melt() unknown value_var '{}'.",
+                c
+            )));
+        }
+    }
+
+    let mut base: Option<crate::dtype::BaseType> = None;
+    let mut nullable_any = false;
+    for c in value_vars.iter() {
+        let dt = plan.schema.get(c).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "internal: plan schema missing column '{c}' after validation.",
+            ))
+        })?;
+        let Some(b) = dt.as_scalar_base_field().flatten() else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "melt only supports scalar value columns.",
+            ));
+        };
+        if let Some(prev) = base {
+            if prev != b {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "melt(value_vars=...) requires compatible scalar dtypes across value columns.",
+                ));
+            }
+        } else {
+            base = Some(b);
+        }
+        match dt {
+            DTypeDesc::Scalar { nullable, .. }
+            | DTypeDesc::Struct { nullable, .. }
+            | DTypeDesc::List { nullable, .. }
+            | DTypeDesc::Map { nullable, .. } => {
+                if *nullable {
+                    nullable_any = true;
+                }
+            }
+        }
+    }
+    let base = base.ok_or_else(|| {
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("internal: melt base dtype not computed.")
+    })?;
+
+    let mut new_schema = HashMap::new();
+    for c in id_vars.iter() {
+        let dt = plan.schema.get(c).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "internal: plan schema missing column '{c}' after validation.",
+            ))
+        })?;
+        new_schema.insert(c.clone(), dt.clone());
+    }
+    new_schema.insert(
+        variable_name.clone(),
+        DTypeDesc::Scalar {
+            base: Some(crate::dtype::BaseType::Str),
+            nullable: false,
+            literals: None,
+        },
+    );
+    new_schema.insert(
+        value_name.clone(),
+        DTypeDesc::Scalar {
+            base: Some(base),
+            nullable: nullable_any,
+            literals: None,
+        },
+    );
+
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::Melt {
+        id_vars,
+        value_vars,
+        variable_name,
+        value_name,
+    });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: new_schema,
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_rolling_agg(
+    plan: &PlanInner,
+    column: String,
+    window_size: usize,
+    min_periods: usize,
+    op: String,
+    out_name: String,
+) -> PyResult<PlanInner> {
+    if window_size == 0 {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "rolling(window_size=...) must be >= 1.",
+        ));
+    }
+    if !plan.schema.contains_key(&column) {
+        return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+            "rolling() unknown column '{}'.",
+            column
+        )));
+    }
+    if plan.schema.contains_key(&out_name) {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "rolling(out_name=...) '{}' already exists.",
+            out_name
+        )));
+    }
+    let Some(base) = plan
+        .schema
+        .get(&column)
+        .and_then(|d| d.as_scalar_base_field().flatten())
+    else {
+        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "rolling only supports scalar input columns.",
+        ));
+    };
+    let (out_base, out_nullable) = match op.as_str() {
+        "count" => (crate::dtype::BaseType::Int, true),
+        "mean" => (crate::dtype::BaseType::Float, true),
+        "sum" | "min" | "max" => (base, true),
+        _ => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "rolling op must be one of: sum, mean, min, max, count.",
+            ))
+        }
+    };
+    let mut new_schema = plan.schema.clone();
+    new_schema.insert(
+        out_name.clone(),
+        DTypeDesc::Scalar {
+            base: Some(out_base),
+            nullable: out_nullable,
+            literals: None,
+        },
+    );
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::RollingAgg {
+        column,
+        window_size,
+        min_periods,
+        op,
+        out_name,
+    });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: new_schema,
+        root_schema: plan.root_schema.clone(),
+    })
+}

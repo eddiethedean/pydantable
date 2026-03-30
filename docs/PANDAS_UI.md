@@ -174,13 +174,85 @@ Alias for `sort(...)` with pandas-shaped arguments.
 - `key`: supported only as one of the string identifiers `"lower"`, `"upper"`, `"abs"`, `"strip"`, `"length"`, `"len"` (case-insensitive). Python callables raise `NotImplementedError`.
 - `ignore_index`: `False` is accepted; `True` raises `NotImplementedError` (no Index semantics).
 
-### `.iloc[...]` (limited)
+### `.iloc[...]` (limited, plan-only)
 
-`iloc` supports a minimal, **plan-only** slice form backed by the core `slice()` operator:
+`iloc` supports a minimal, **plan-only** subset backed by the core `slice()` operator:
 
-- `df.iloc[start:stop]` (no `step`)
+- **Slices**: `df.iloc[start:stop]`
+  - `start` / `stop` may be omitted (e.g. `df.iloc[:5]`, `df.iloc[5:]`).
+  - Negative indices are supported **only when the frame has in-memory root data** (not scan roots).
+  - `step` is not supported.
+- **Scalar row**: `df.iloc[i]` returns a **single-row** `DataFrame` (still typed-first; no pandas `Series`).
 
-Not supported (raises `NotImplementedError` / `TypeError`): scalar row access, list-of-indices, or slices with `step`.
+Not supported (raises `NotImplementedError` / `TypeError`): list/array of indices, or slices with `step`.
+
+**Scan / lazy roots:** Open-ended slices (`df.iloc[3:]`) and negative indices need a known row count. If the root is a file or lazy scan and length is unknown, use `collect` / materialize first, or avoid `iloc` and use `filter` / `slice` on expressions.
+
+### `.loc[...]` (very limited)
+
+`loc` supports a strict subset of pandas-shaped selection:
+
+- **Row selector**:
+  - `:` (all rows)
+  - a boolean **`Expr`** mask (compiled to `filter(mask)` with SQL-like null-to-false semantics)
+- **Column selector**:
+  - `:` (all columns after the row filter)
+  - `str` or non-empty `list[str]` (compiled to `select(...)`)
+
+Examples:
+
+```python
+df.loc[df.col("a") > 1, ["b", "c"]]
+df.loc[df.col("flag"), :]           # all columns, filtered rows
+df.loc[:, :]                        # identity (same as the frame)
+```
+
+**Order of operations:** The row mask is applied **before** column projection, so expressions in the mask may reference any column in the current schema, even if those columns are not selected in the second argument.
+
+Not supported (raises `NotImplementedError`): label-based row indexing, alignment semantics, list-of-bools selectors, or callables.
+
+### Missing-data methods: `isna/isnull/notna/notnull` and `dropna`
+
+- `df.isna()` / `df.isnull()` returns a boolean `DataFrame` where each column is replaced with `col(c).is_null()`.
+- `df.notna()` / `df.notnull()` returns a boolean `DataFrame` where each column is replaced with `col(c).is_not_null()`.
+
+`dropna(...)` supports a limited signature:
+
+- `axis=0` only (`axis=1` raises `NotImplementedError`)
+- `subset=str|list[str]` (defaults to all columns)
+- `how="any"|"all"`
+  - `how="any"` maps to core `drop_nulls(subset=...)`
+  - `how="all"` keeps rows where **any** subset column is not null (compiled to a filter expression)
+
+### `melt(...)` (lazy)
+
+`melt` is implemented as a **plan step** (lazy; no collect fallback).
+
+Supported shape:
+
+- `id_vars`: `str` or non-empty `list[str]`
+- `value_vars`: `None`, `str`, or non-empty `list[str]` (`None` means: every column not in `id_vars`, in deterministic sorted name order)
+- `var_name` / `value_name` (default `"variable"` / `"value"`)
+
+**Validation:** `var_name` and `value_name` must differ and must not collide with existing column names. All `value_vars` must share the same **scalar** base type (e.g. melting an `int` column with a `str` column raises `TypeError`).
+
+### `pivot` (not on pandas UI)
+
+**`pivot` is intentionally omitted** from the pandas UI for now: pandas pivot produces column names from data values, which clashes with pydantable’s typed, schema-first model unless the result is materialized or the schema is synthesized dynamically. Use explicit `with_columns` / joins, or melt plus downstream typed transforms, when you need reshape.
+
+### `rolling(window=..., min_periods=...)` (lazy, row-based)
+
+Row-based fixed windows only (no time-based/index-based rolling, no `groupby().rolling()` yet).
+
+`rolling(...)` returns a small helper with:
+
+- `sum(column, out_name=...)`
+- `mean(...)`
+- `min(...)`
+- `max(...)`
+- `count(...)`
+
+**Engine:** Implemented in the Polars-backed executor; builds without the Polars engine will not be able to execute rolling plans. `min_periods` must not exceed `window` (Polars validates this at execution time).
 
 ### `to_pandas()` (eager)
 
@@ -194,15 +266,18 @@ df.sort_values(["region", "amount"], ascending=[True, False]).collect(as_lists=T
 
 ### `drop(...)` / `rename(...)` keyword forms
 
-- `drop(columns=..., errors="raise"|"ignore")` → core `drop(*cols)`\n- `rename(columns={"old":"new"}, errors="raise"|"ignore")` → core `rename(mapping)`
+- `drop(columns=..., errors="raise"|"ignore")` → core `drop(*cols)`
+- `rename(columns={"old":"new"}, errors="raise"|"ignore")` → core `rename(mapping)`
 
 Additional pandas parameters are accepted but may raise `NotImplementedError` (e.g. `drop(index=...)`, `drop(inplace=True)`, `rename(index=...)`, `rename(inplace=True)`, etc.).
 
 ### `fillna(value, subset=None)` / `astype(dtype|mapping)`
 
-- `fillna(value=..., subset=...)` maps to core `fill_null(value=..., subset=...)`.\n  - `fillna(method=\"ffill\"|\"bfill\")` is supported (maps to `fill_null(strategy=\"forward\"|\"backward\")`).\n  - `limit/inplace/downcast/axis` are accepted for parity but currently raise `NotImplementedError`.\n- `astype(dtype)` casts all columns; `astype({\"col\": dtype})` casts selected columns via `Expr.cast(...)`.\n  - `copy` is accepted (no-op); `errors=\"ignore\"` is supported as best-effort numeric widening; unsupported casts are skipped.
-
-**Caveat:** `fillna(method=...)`/`limit=...` are currently not implemented; prefer explicit expressions (`Expr.fill_null(...)`) or engine-native operations.
+- `fillna(value=..., subset=...)` maps to core `fill_null(value=..., subset=...)`.
+  - `fillna(method="ffill"|"bfill")` is supported (maps to `fill_null(strategy="forward"|"backward")`).
+  - `limit/inplace/downcast/axis` are accepted for parity but currently raise `NotImplementedError`.
+- `astype(dtype)` casts all columns; `astype({"col": dtype})` casts selected columns via `Expr.cast(...)`.
+  - `copy` is accepted (no-op); `errors="ignore"` is supported as best-effort numeric widening; unsupported casts are skipped.
 
 ## `DataFrameModel` (pandas UI)
 
@@ -210,6 +285,7 @@ Wraps the pandas UI `DataFrame` and delegates:
 
 - **`assign`**, **`merge`**, **`head`/`tail`**, **`__getitem__`**, **`group_by`** → same semantics as above on the inner frame.
 - **`query`**, **`sort_values`**, **`drop`**, **`rename`**, **`fillna`**, **`astype`** → same semantics as above on the inner frame.
+- **`iloc`**, **`loc`**, **`isna`/`isnull`/`notna`/`notnull`**, **`dropna`**, **`melt`**, **`rolling`** → same semantics; results are wrapped back in the same `DataFrameModel` subclass (like `head`/`tail`).
 
 Properties **`columns`**, **`shape`**, **`empty`**, **`dtypes`** read from the inner frame.
 

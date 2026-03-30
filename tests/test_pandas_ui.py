@@ -723,12 +723,10 @@ def test_pandas_ui_iloc_slice_plan_only() -> None:
     assert out == {"id": [2, 3]}
     out2 = df.iloc[0:0].collect(as_lists=True)
     assert out2 == {"id": []}
-    with pytest.raises(NotImplementedError, match="stop"):
-        _ = df.iloc[1:]
+    assert df.iloc[1:].collect(as_lists=True) == {"id": [2, 3, 4]}
     with pytest.raises(NotImplementedError, match="step"):
         _ = df.iloc[0:3:2]
-    with pytest.raises(TypeError, match="slice"):
-        _ = df.iloc[1]  # type: ignore[index]
+    assert df.iloc[1].collect(as_lists=True) == {"id": [2]}
 
 
 def test_pandas_ui_iloc_slice_stop_lt_start_is_empty() -> None:
@@ -751,6 +749,294 @@ def test_pandas_ui_iloc_slice_allows_none_start() -> None:
     df = DataFrame[Row]({"id": [1, 2, 3]})
     out = df.iloc[:2].collect(as_lists=True)
     assert out == {"id": [1, 2]}
+
+
+def test_pandas_ui_iloc_scalar_and_negative_indices() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        id: int
+
+    df = DataFrame[Row]({"id": [1, 2, 3]})
+    assert df.iloc[1].collect(as_lists=True) == {"id": [2]}
+    assert df.iloc[-1].collect(as_lists=True) == {"id": [3]}
+
+
+def test_pandas_ui_iloc_open_ended_stop_requires_in_memory_root() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        id: int
+
+    df = DataFrame[Row]({"id": [1, 2, 3]})
+    assert df.iloc[1:].collect(as_lists=True) == {"id": [2, 3]}
+
+
+def test_pandas_ui_loc_expr_mask_and_column_select() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        a: int
+        b: int
+
+    df = DataFrame[Row]({"a": [1, 2, 3], "b": [10, 20, 30]})
+    out = df.loc[df.col("a") > 1, ["b"]].collect(as_lists=True)
+    assert out == {"b": [20, 30]}
+    out2 = df.loc[:, "a"].collect(as_lists=True)
+    assert out2 == {"a": [1, 2, 3]}
+
+
+def test_pandas_ui_loc_rejects_unsupported_selectors() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        a: int
+
+    df = DataFrame[Row]({"a": [1]})
+    with pytest.raises(TypeError, match="2-tuple"):
+        _ = df.loc["a"]  # type: ignore[index]
+    with pytest.raises(NotImplementedError, match="row selection"):
+        _ = df.loc[0, ["a"]]  # type: ignore[index]
+    with pytest.raises(NotImplementedError, match="column selection"):
+        _ = df.loc[:, []]  # type: ignore[index]
+
+
+def test_pandas_ui_isna_notna_methods() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        a: int | None
+        b: str | None
+
+    df = DataFrame[Row]({"a": [1, None], "b": [None, "x"]})
+    assert df.isna().collect(as_lists=True) == {"a": [False, True], "b": [True, False]}
+    assert df.notna().collect(as_lists=True) == {"a": [True, False], "b": [False, True]}
+
+
+def test_pandas_ui_dropna_any_all_subset() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        a: int | None
+        b: int | None
+
+    df = DataFrame[Row]({"a": [1, None, None], "b": [None, 2, None]})
+    assert df.dropna(how="any").collect(as_lists=True) == {"a": [], "b": []}
+    assert df.dropna(how="any", subset="a").collect(as_lists=True) == {
+        "a": [1],
+        "b": [None],
+    }
+    assert df.dropna(how="all").collect(as_lists=True) == {
+        "a": [1, None],
+        "b": [None, 2],
+    }
+    assert df.dropna(how="all", subset=["b"]).collect(as_lists=True) == {
+        "a": [None],
+        "b": [2],
+    }
+
+
+def test_pandas_ui_melt_lazy_schema_and_output() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        id: int
+        x: int | None
+        y: int | None
+
+    df = DataFrame[Row]({"id": [1, 2], "x": [10, None], "y": [None, 30]})
+    out = df.melt(id_vars=["id"], value_vars=["x", "y"]).collect(as_lists=True)
+    assert out["id"] == [1, 2, 1, 2]
+    assert out["variable"] == ["x", "x", "y", "y"]
+    assert out["value"] == [10, None, None, 30]
+
+
+def test_pandas_ui_rolling_sum_mean_count_min_periods() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        x: int
+
+    df = DataFrame[Row]({"x": [1, 2, 3, 4]})
+    out_sum = (
+        df.rolling(window=3, min_periods=3)
+        .sum("x", out_name="r")
+        .collect(as_lists=True)
+    )
+    assert out_sum == {"x": [1, 2, 3, 4], "r": [None, None, 6, 9]}
+    out_mean = (
+        df.rolling(window=2, min_periods=1)
+        .mean("x", out_name="m")
+        .collect(as_lists=True)
+    )
+    assert out_mean["m"] == [1.0, 1.5, 2.5, 3.5]
+    out_cnt = (
+        df.rolling(window=2, min_periods=2)
+        .count("x", out_name="c")
+        .collect(as_lists=True)
+    )
+    assert out_cnt["c"] == [None, 2, 2, 2]
+
+
+def test_pandas_ui_iloc_rejects_list_and_step() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        id: int
+
+    df = DataFrame[Row]({"id": [1, 2, 3]})
+    with pytest.raises(TypeError, match="int or slice"):
+        _ = df.iloc[[0, 1]]  # type: ignore[index]
+
+
+def test_pandas_ui_iloc_negative_slice_stop() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        id: int
+
+    df = DataFrame[Row]({"id": [10, 20, 30, 40]})
+    assert df.iloc[1:-1].collect(as_lists=True) == {"id": [20, 30]}
+
+
+def test_pandas_ui_loc_all_columns_slice_and_full_frame() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        a: int
+        b: int
+
+    df = DataFrame[Row]({"a": [1, 2], "b": [3, 4]})
+    out = df.loc[df.col("a") > 1, :].collect(as_lists=True)
+    assert out == {"a": [2], "b": [4]}
+    full = df.loc[:, :].collect(as_lists=True)
+    assert full == {"a": [1, 2], "b": [3, 4]}
+
+
+def test_pandas_ui_isnull_notnull_aliases() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        v: int | None
+
+    df = DataFrame[Row]({"v": [1, None]})
+    assert df.isnull().collect(as_lists=True) == df.isna().collect(as_lists=True)
+    assert df.notnull().collect(as_lists=True) == df.notna().collect(as_lists=True)
+
+
+def test_pandas_ui_dropna_validation_and_bad_subset() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        a: int | None
+
+    df = DataFrame[Row]({"a": [1, None]})
+    with pytest.raises(ValueError, match="how"):
+        df.dropna(how="bogus")  # type: ignore[arg-type]
+    with pytest.raises(NotImplementedError, match="axis=1"):
+        df.dropna(axis=1)  # type: ignore[arg-type]
+    with pytest.raises(NotImplementedError, match="inplace"):
+        df.dropna(inplace=True)  # type: ignore[arg-type]
+    with pytest.raises(NotImplementedError, match="thresh"):
+        df.dropna(thresh=1)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="subset"):
+        df.dropna(subset=())  # type: ignore[arg-type]
+    with pytest.raises(KeyError):
+        df.dropna(subset=["missing"]).collect(as_lists=True)
+
+
+def test_pandas_ui_melt_id_vars_str_and_infer_value_vars() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        k: str
+        v1: int
+        v2: int
+
+    df = DataFrame[Row]({"k": ["a", "b"], "v1": [1, 2], "v2": [3, 4]})
+    out = df.melt(id_vars="k", value_vars=None).collect(as_lists=True)
+    assert set(out["variable"]) == {"v1", "v2"}
+    assert len(out["k"]) == 4
+    for i, _ in enumerate(out["k"]):
+        if out["variable"][i] == "v1":
+            assert out["value"][i] in (1, 2)
+        else:
+            assert out["value"][i] in (3, 4)
+
+
+def test_pandas_ui_melt_rejects_var_name_collision() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        id: int
+        x: int
+
+    df = DataFrame[Row]({"id": [1], "x": [1]})
+    with pytest.raises(ValueError, match=r"collide|collision"):
+        df.melt(id_vars=["id"], value_vars=["x"], var_name="id")
+
+
+def test_pandas_ui_melt_rejects_mixed_value_dtypes() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        id: int
+        x: int
+        y: str
+
+    df = DataFrame[Row]({"id": [1], "x": [1], "y": ["z"]})
+    with pytest.raises(TypeError, match="compatible"):
+        df.melt(id_vars=["id"], value_vars=["x", "y"])
+
+
+def test_pandas_ui_melt_rejects_empty_id_vars_typeerror() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        x: int
+
+    df = DataFrame[Row]({"x": [1]})
+    with pytest.raises(TypeError, match="id_vars"):
+        df.melt(id_vars=[], value_vars=["x"])  # type: ignore[arg-type]
+
+
+def test_pandas_ui_rolling_min_max_and_bad_window() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        x: int
+
+    df = DataFrame[Row]({"x": [3, 1, 4, 2]})
+    out_min = (
+        df.rolling(window=2, min_periods=1)
+        .min("x", out_name="m")
+        .collect(as_lists=True)
+    )
+    assert out_min["m"] == [3, 1, 1, 2]
+    out_max = (
+        df.rolling(window=2, min_periods=1)
+        .max("x", out_name="M")
+        .collect(as_lists=True)
+    )
+    assert out_max["M"] == [3, 3, 4, 4]
+    with pytest.raises(ValueError, match="window"):
+        df.rolling(window=0)  # type: ignore[arg-type]
+
+
+def test_pandas_ui_dataframe_model_iloc_loc_dropna_roundtrip() -> None:
+    """Pandas UI DataFrameModel delegates iloc/loc/dropna like head/tail."""
+
+    class M(PandasDataFrameModel):
+        id: int
+        v: int | None
+
+    m = M({"id": [1, 2, 3], "v": [10, None, 30]})
+    sub = m.iloc[1:3]
+    assert sub.collect(as_lists=True) == {"id": [2, 3], "v": [None, 30]}
+    filt = m.loc[m.col("id") > 1, ["v"]]
+    assert filt.collect(as_lists=True) == {"v": [None, 30]}
+    dropped = m.dropna(subset=["v"])
+    assert dropped.collect(as_lists=True) == {"id": [1, 3], "v": [10, 30]}
 
 
 def test_pandas_core_head_tail_empty_columns() -> None:

@@ -44,6 +44,19 @@ pub enum PlanStep {
     DropNulls {
         subset: Option<Vec<String>>,
     },
+    Melt {
+        id_vars: Vec<String>,
+        value_vars: Vec<String>,
+        variable_name: String,
+        value_name: String,
+    },
+    RollingAgg {
+        column: String,
+        window_size: usize,
+        min_periods: usize,
+        op: String,
+        out_name: String,
+    },
 }
 
 #[derive(Clone, Debug)]

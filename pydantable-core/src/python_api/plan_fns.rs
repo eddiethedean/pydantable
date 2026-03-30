@@ -9,7 +9,8 @@ use crate::plan::{
     make_plan as make_plan_inner, plan_drop as plan_drop_inner,
     plan_drop_nulls as plan_drop_nulls_inner, plan_fill_null as plan_fill_null_inner,
     plan_filter as plan_filter_inner, plan_global_select as build_plan_global_select,
-    plan_rename as plan_rename_inner, plan_select as plan_select_inner,
+    plan_melt as plan_melt_inner, plan_rename as plan_rename_inner,
+    plan_rolling_agg as plan_rolling_agg_inner, plan_select as plan_select_inner,
     plan_slice as plan_slice_inner, plan_sort as plan_sort_inner, plan_unique as plan_unique_inner,
     plan_with_columns as plan_with_columns_inner,
 };
@@ -204,6 +205,35 @@ fn plan_drop_nulls(plan: &PyPlan, subset: Option<Vec<String>>) -> PyResult<PyPla
     })
 }
 
+#[pyfunction]
+#[pyo3(signature = (plan, id_vars, value_vars=None, variable_name="variable".to_string(), value_name="value".to_string()))]
+fn plan_melt(
+    plan: &PyPlan,
+    id_vars: Vec<String>,
+    value_vars: Option<Vec<String>>,
+    variable_name: String,
+    value_name: String,
+) -> PyResult<PyPlan> {
+    Ok(PyPlan {
+        inner: plan_melt_inner(&plan.inner, id_vars, value_vars, variable_name, value_name)?,
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (plan, column, window_size, min_periods, op, out_name))]
+fn plan_rolling_agg(
+    plan: &PyPlan,
+    column: String,
+    window_size: usize,
+    min_periods: usize,
+    op: String,
+    out_name: String,
+) -> PyResult<PyPlan> {
+    Ok(PyPlan {
+        inner: plan_rolling_agg_inner(&plan.inner, column, window_size, min_periods, op, out_name)?,
+    })
+}
+
 pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(make_plan, m)?)?;
     m.add_function(wrap_pyfunction!(plan_select, m)?)?;
@@ -217,5 +247,7 @@ pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(plan_slice, m)?)?;
     m.add_function(wrap_pyfunction!(plan_fill_null, m)?)?;
     m.add_function(wrap_pyfunction!(plan_drop_nulls, m)?)?;
+    m.add_function(wrap_pyfunction!(plan_melt, m)?)?;
+    m.add_function(wrap_pyfunction!(plan_rolling_agg, m)?)?;
     Ok(())
 }
