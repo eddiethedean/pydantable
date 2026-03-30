@@ -1338,7 +1338,7 @@ class DataFrame(Generic[SchemaT]):
                 extra = ""
                 if c >= 4:
                     try:
-                        import numpy as np
+                        import numpy as np  # type: ignore[import-not-found]
 
                         arr = np.asarray(vals, dtype=float)
                         m = float(arr.mean())
