@@ -42,6 +42,183 @@ def test_pandas_ui_merge_matches_join() -> None:
     )
 
 
+def test_pandas_ui_concat_axis_vertical_and_horizontal() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        a: int
+        b: int
+
+    df1 = DataFrame[Row]({"a": [1], "b": [2]})
+    df2 = DataFrame[Row]({"a": [3], "b": [4]})
+    out = DataFrame.concat([df1, df2], axis=0).collect(as_lists=True)
+    assert out == {"a": [1, 3], "b": [2, 4]}
+
+    class Left(Schema):
+        a: int
+
+    class Right(Schema):
+        b: int
+
+    left_df = DataFrame[Left]({"a": [1, 2]})
+    r = DataFrame[Right]({"b": [10, 20]})
+    out2 = DataFrame.concat([left_df, r], axis=1).collect(as_lists=True)
+    assert out2 == {"a": [1, 2], "b": [10, 20]}
+
+
+def test_pandas_ui_concat_model_preserves_pandas_surface() -> None:
+    class A(PandasDataFrameModel):
+        a: int
+
+    class B(PandasDataFrameModel):
+        a: int
+
+    out = A.concat([A({"a": [1]}), B({"a": [2]})], axis=0)
+    assert isinstance(out, PandasDataFrameModel)
+    assert out.collect(as_lists=True) == {"a": [1, 2]}
+    assert out.isna().collect(as_lists=True) == {"a": [False, False]}
+
+
+def test_pandas_ui_drop_duplicates_maps_to_unique() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        a: int
+        b: int
+
+    df = DataFrame[Row]({"a": [1, 1, 2], "b": [10, 20, 30]})
+    out = df.drop_duplicates(subset="a", keep="first").collect(as_lists=True)
+    assert out == {"a": [1, 2], "b": [10, 30]}
+    out2 = df.drop_duplicates(subset=["a"], keep="last").collect(as_lists=True)
+    assert out2 == {"a": [1, 2], "b": [20, 30]}
+
+
+def test_pandas_ui_duplicated_not_implemented() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        a: int
+
+    df = DataFrame[Row]({"a": [1, 1]})
+    with pytest.raises(NotImplementedError, match="duplicated"):
+        _ = df.duplicated()
+
+
+def test_pandas_ui_nlargest_nsmallest_sort_and_slice() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        name: str
+        score: int
+
+    df = DataFrame[Row]({"name": ["a", "b", "c", "d"], "score": [10, 30, 20, 40]})
+    top = df.nlargest(2, "score").collect(as_lists=True)
+    assert top == {"name": ["d", "b"], "score": [40, 30]}
+    bot = df.nsmallest(2, "score").collect(as_lists=True)
+    assert bot == {"name": ["a", "c"], "score": [10, 20]}
+    top2 = df.nlargest(2, ["score", "name"]).collect(as_lists=True)
+    assert top2["score"] == [40, 30]
+
+
+def test_pandas_ui_nlargest_rejects_bad_keep() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        x: int
+
+    df = DataFrame[Row]({"x": [1]})
+    with pytest.raises(NotImplementedError, match="keep"):
+        df.nlargest(1, "x", keep="first")  # type: ignore[arg-type]
+
+
+def test_pandas_ui_isin_list_and_dict() -> None:
+    from pydantable.pandas import DataFrame
+
+    class RowInt(Schema):
+        a: int
+        b: int
+
+    df_i = DataFrame[RowInt]({"a": [1, 2, 3], "b": [2, 3, 4]})
+    m = df_i.isin([1, 2]).collect(as_lists=True)
+    assert m == {"a": [True, True, False], "b": [True, False, False]}
+
+    class RowMix(Schema):
+        a: int
+        b: str
+
+    df = DataFrame[RowMix]({"a": [1, 2, 3], "b": ["x", "y", "z"]})
+    m2 = df.isin({"a": [2], "b": ["z"]}).collect(as_lists=True)
+    assert m2 == {"a": [False, True, False], "b": [False, False, True]}
+
+
+def test_pandas_ui_isin_dict_unknown_column_keyerror() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        a: int
+
+    df = DataFrame[Row]({"a": [1]})
+    with pytest.raises(KeyError):
+        df.isin({"missing": [1]}).collect(as_lists=True)
+
+
+def test_pandas_ui_explode_delegates_to_core() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        id: int
+        tags: list[int]
+
+    df = DataFrame[Row]({"id": [1, 2], "tags": [[1, 2], [3]]})
+    ex = df.explode("tags").collect(as_lists=True)
+    assert ex == {"id": [1, 1, 2], "tags": [1, 2, 3]}
+
+
+def test_pandas_ui_copy_shallow_and_filter_dispatch() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        a: int
+        b_extra: int
+
+    df = DataFrame[Row]({"a": [1, 2], "b_extra": [3, 4]})
+    c = df.copy()
+    assert c.collect(as_lists=True) == df.collect(as_lists=True)
+    with pytest.raises(NotImplementedError, match="deep"):
+        df.copy(deep=True)
+
+    sub = df.filter(like="b").collect(as_lists=True)
+    assert sub == {"b_extra": [3, 4]}
+    sub2 = df.filter(regex=r"^a$").collect(as_lists=True)
+    assert sub2 == {"a": [1, 2]}
+    row_f = df.filter(df.col("a") > 1).collect(as_lists=True)
+    assert row_f == {"a": [2], "b_extra": [4]}
+
+
+def test_pandas_ui_pipe() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        x: int
+
+    df = DataFrame[Row]({"x": [1]})
+    assert df.pipe(lambda d: d.collect(as_lists=True)) == {"x": [1]}
+    out = df.pipe(lambda d: d.with_columns(y=d.col("x") * 2)).collect(as_lists=True)
+    assert out == {"x": [1], "y": [2]}
+
+
+def test_pandas_ui_concat_rejects_unsupported_join() -> None:
+    from pydantable.pandas import DataFrame
+
+    class Row(Schema):
+        a: int
+
+    df1 = DataFrame[Row]({"a": [1]})
+    df2 = DataFrame[Row]({"a": [2]})
+    with pytest.raises(NotImplementedError, match="join"):
+        DataFrame.concat([df1, df2], axis=0, join="inner")  # type: ignore[arg-type]
+
+
 def test_pandas_ui_assign_rejects_callable() -> None:
     class User(PandasDataFrameModel):
         id: int

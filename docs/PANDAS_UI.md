@@ -43,6 +43,17 @@ Implementation lives in `python/pydantable/pandas.py` (pandas-flavored helpers a
 
 Inherits the full typed API from the core `DataFrame` (`with_columns`, `filter`, `join`, `group_by().agg`, `collect`, …) and adds:
 
+### `concat([...], axis=0|1, join="outer")` / core `how=`
+
+`concat` is available as a classmethod on the pandas UI `DataFrame`:
+
+- `axis=0` stacks rows (**vertical**); both inputs must have identical columns.
+- `axis=1` stacks columns (**horizontal**); duplicate column names are rejected.
+
+For parity with the core API, you may pass **`how="vertical"`** or **`how="horizontal"`** instead of `axis` (when set, `how` selects the stacking direction).
+
+Only `join="outer"` is accepted today (typed-first; no column union/reindex semantics).
+
 ### `assign(**kwargs)`
 
 Same behavior as **`with_columns`**: each value must be an **`Expr`** or a literal compatible with expression building.
@@ -271,6 +282,39 @@ df.sort_values(["region", "amount"], ascending=[True, False]).collect(as_lists=T
 
 Additional pandas parameters are accepted but may raise `NotImplementedError` (e.g. `drop(index=...)`, `drop(inplace=True)`, `rename(index=...)`, `rename(inplace=True)`, etc.).
 
+### `drop_duplicates(...)` / `duplicated(...)`
+
+- `drop_duplicates(subset=..., keep="first"|"last")` maps to core `unique(subset=..., keep=...)`.
+- `duplicated(...)` is not implemented yet (it needs an engine-level row-wise duplicate mask).
+
+### `nlargest(n, columns, keep="all")` / `nsmallest(n, columns, keep="all")`
+
+Implemented as **`sort_values`** on `columns` (descending for `nlargest`, ascending for `nsmallest`) then **`slice(0, n)`**. Only **`keep="all"`** is accepted; other `keep` values raise **`NotImplementedError`**. **`n`** must be **`>= 0`**. Unknown column names raise **`KeyError`**.
+
+**Tie semantics:** pandas can expand ties at the rank boundary when `keep="all"`; pydantable takes the first **`n`** rows after sort only. If you need exact pandas tie behavior, materialize and use pandas, or express the selection with explicit ranking in the engine when that becomes available.
+
+### `isin(values)`
+
+Elementwise membership per column, compiled to **`with_columns`** / **`Expr.isin`**:
+
+- **`list` / `tuple` / `set`:** the same value set is applied to **every** column. Values must be compatible with each column’s dtype; mixed values that the engine cannot compare to a column type may raise **`TypeError`**.
+- **`dict`:** keys are column names (must exist in the schema); each value is an iterable of candidates for that column. Columns omitted from the dict become an all-**false** boolean column (`Literal(False)`).
+- **`pandas.Series`** or **`pandas.DataFrame`** → **`NotImplementedError`**.
+
+### `explode(column, ignore_index=False)` / `explode([...])`
+
+Delegates to the core **`explode`** (same rules as the default `DataFrame`): single column name or a list of columns, without mixing the two call styles.
+
+**Materialization:** like other list-expanding ops, executing the plan may require the engine to explode nested list data; very large or deeply nested values can be costly. Prefer narrowing rows/columns first when possible.
+
+### `copy(deep=False)` / `pipe(func, *args, **kwargs)` / `filter(...)`
+
+- **`copy(deep=False)`:** returns a new pandas UI frame that **shares** the same logical roots/plan as the original (shallow identity). **`copy(deep=True)`** raises **`NotImplementedError`**; use **`collect(as_lists=True)`** and rebuild if you need a detached data copy.
+- **`pipe`:** calls **`func(self, *args, **kwargs)`** (pandas-style).
+- **`filter`:** overloaded:
+  - **One positional `Expr`:** row filter (**`super().filter(expr)`**), same as the core API.
+  - **Exactly one of** `items=`, `like=`, or `regex=`: **column** selection by name (implemented via **`select`**). `items` must be **`list[str]`**. **`axis=1`** is not supported (**`NotImplementedError`**).
+
 ### `fillna(value, subset=None)` / `astype(dtype|mapping)`
 
 - `fillna(value=..., subset=...)` maps to core `fill_null(value=..., subset=...)`.
@@ -285,6 +329,7 @@ Wraps the pandas UI `DataFrame` and delegates:
 
 - **`assign`**, **`merge`**, **`head`/`tail`**, **`__getitem__`**, **`group_by`** → same semantics as above on the inner frame.
 - **`query`**, **`sort_values`**, **`drop`**, **`rename`**, **`fillna`**, **`astype`** → same semantics as above on the inner frame.
+- **`concat`**, **`nlargest`**, **`nsmallest`**, **`isin`**, **`explode`**, **`copy`**, **`pipe`**, **`filter`** (row `Expr` vs `items`/`like`/`regex`) → delegated to the inner pandas UI frame and re-wrapped.
 - **`iloc`**, **`loc`**, **`isna`/`isnull`/`notna`/`notnull`**, **`dropna`**, **`melt`**, **`rolling`** → same semantics; results are wrapped back in the same `DataFrameModel` subclass (like `head`/`tail`).
 
 Properties **`columns`**, **`shape`**, **`empty`**, **`dtypes`** read from the inner frame.

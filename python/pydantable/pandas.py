@@ -8,7 +8,12 @@ pandas-shaped API.
 from __future__ import annotations
 
 import ast
-from typing import Any
+import re
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 from typing_extensions import Self
 
@@ -126,6 +131,50 @@ def _unique_tmp_name(existing: set[str], base: str) -> str:
 
 class PandasDataFrame(CoreDataFrame):
     """``assign``, ``merge``, ``query``, ``columns``, ``shape``, and related."""
+
+    @classmethod
+    def concat(
+        cls,
+        objs: Sequence[CoreDataFrame],
+        /,
+        *,
+        how: str | None = None,
+        axis: int = 0,
+        join: str = "outer",
+        ignore_index: bool = False,
+        keys: Any = None,
+        levels: Any = None,
+        names: Any = None,
+        verify_integrity: Any = None,
+        sort: Any = None,
+        copy: Any = None,
+        streaming: bool | None = None,
+    ) -> CoreDataFrame:
+        if join != "outer":
+            raise NotImplementedError("concat(join=...) only supports join='outer'.")
+        if ignore_index:
+            raise NotImplementedError("concat(ignore_index=True) is not supported.")
+        if keys is not None or levels is not None or names is not None:
+            raise NotImplementedError("concat(keys/levels/names=...) is not supported.")
+        if verify_integrity is not None:
+            raise NotImplementedError("concat(verify_integrity=...) is not supported.")
+        if sort is not None:
+            raise NotImplementedError("concat(sort=...) is not supported.")
+        if copy is not None:
+            raise NotImplementedError("concat(copy=...) is not supported.")
+
+        if how is not None:
+            if how not in ("vertical", "horizontal"):
+                raise ValueError(
+                    "concat(how=...) must be 'vertical' or 'horizontal' "
+                    f"(got {how!r}). Use axis=0|1 for pandas-style stacking."
+                )
+            how_final = how
+        else:
+            if axis not in (0, 1):
+                raise ValueError("concat(axis=...) must be 0 or 1.")
+            how_final = "vertical" if axis == 0 else "horizontal"
+        return super().concat(objs, how=how_final, streaming=streaming)
 
     def assign(self, **kwargs: Any) -> CoreDataFrame:
         compiled: dict[str, Any] = {}
@@ -880,17 +929,38 @@ class PandasDataFrame(CoreDataFrame):
         sorted_df = tmp_df.sort(*tmp_cols, descending=desc, nulls_last=nl_flags)
         return CoreDataFrame.drop(sorted_df, *tmp_cols)
 
-    def drop(
-        self,
-        labels: Any = None,
-        *,
-        index: Any = None,
-        columns: str | list[str] | None = None,
-        axis: Any = None,
-        inplace: bool = False,
-        level: Any = None,
-        errors: str = "raise",
-    ) -> CoreDataFrame:
+    def drop(self, *args: Any, **kwargs: Any) -> CoreDataFrame:
+        allowed = frozenset(
+            {"index", "columns", "axis", "inplace", "level", "errors", "labels"}
+        )
+        bad = set(kwargs) - allowed
+        if bad:
+            raise TypeError(f"drop() got unexpected keyword arguments: {sorted(bad)!r}")
+        if not kwargs and args:
+            return super().drop(*args)
+
+        labels_kw = kwargs.get("labels")
+        if args:
+            if len(args) > 1:
+                raise TypeError(
+                    "drop() takes at most one positional argument when using "
+                    "keyword arguments."
+                )
+            if labels_kw is not None:
+                raise TypeError(
+                    "drop() cannot specify both a labels positional and labels=."
+                )
+            labels = args[0]
+        else:
+            labels = labels_kw
+
+        index = kwargs.get("index")
+        columns = kwargs.get("columns")
+        axis = kwargs.get("axis")
+        inplace = kwargs.get("inplace", False)
+        level = kwargs.get("level")
+        errors = kwargs.get("errors", "raise")
+
         if axis is not None:
             raise NotImplementedError("drop(axis=...) is not supported; use columns=.")
         if inplace:
@@ -930,17 +1000,40 @@ class PandasDataFrame(CoreDataFrame):
                 raise KeyError(f"drop(): columns not found: {missing}")
         return super().drop(*col_list) if col_list else self
 
-    def rename(
-        self,
-        mapper: Any = None,
-        *,
-        index: Any = None,
-        columns: dict[str, str] | None = None,
-        axis: Any = None,
-        inplace: bool = False,
-        level: Any = None,
-        errors: str = "ignore",
-    ) -> CoreDataFrame:
+    def rename(self, *args: Any, **kwargs: Any) -> CoreDataFrame:
+        allowed = frozenset(
+            {"index", "columns", "axis", "inplace", "level", "errors", "mapper"}
+        )
+        bad = set(kwargs) - allowed
+        if bad:
+            raise TypeError(
+                f"rename() got unexpected keyword arguments: {sorted(bad)!r}"
+            )
+        if not kwargs and len(args) == 1 and isinstance(args[0], Mapping):
+            return super().rename(args[0])
+
+        mapper_kw = kwargs.get("mapper")
+        if args:
+            if len(args) > 1:
+                raise TypeError(
+                    "rename() takes at most one positional argument when using "
+                    "keyword arguments."
+                )
+            if mapper_kw is not None:
+                raise TypeError(
+                    "rename() cannot specify both a mapper positional and mapper=."
+                )
+            mapper = args[0]
+        else:
+            mapper = mapper_kw
+
+        index = kwargs.get("index")
+        columns = kwargs.get("columns")
+        axis = kwargs.get("axis")
+        inplace = kwargs.get("inplace", False)
+        level = kwargs.get("level")
+        errors = kwargs.get("errors", "ignore")
+
         if index is not None:
             raise NotImplementedError("rename(index=...) is not supported.")
         if axis is not None:
@@ -1229,6 +1322,57 @@ class PandasDataFrame(CoreDataFrame):
         inner = super().group_by(*keys)
         return PandasGroupedDataFrame(inner._df, inner._keys)
 
+    def drop_duplicates(
+        self,
+        subset: str | list[str] | None = None,
+        *,
+        keep: str | bool = "first",
+        inplace: bool = False,
+        ignore_index: bool = False,
+    ) -> CoreDataFrame:
+        if inplace:
+            raise NotImplementedError("drop_duplicates(inplace=True) is not supported.")
+        if ignore_index:
+            raise NotImplementedError(
+                "drop_duplicates(ignore_index=True) is not supported."
+            )
+        if keep is False:
+            raise NotImplementedError(
+                "drop_duplicates(keep=False) is not supported (requires dropping all "
+                "duplicate groups)."
+            )
+        if keep not in ("first", "last"):
+            raise ValueError("drop_duplicates(keep=...) must be 'first' or 'last'.")
+        if subset is None:
+            subset_cols = None
+        elif isinstance(subset, str):
+            subset_cols = [subset]
+        elif (
+            isinstance(subset, list)
+            and subset
+            and all(isinstance(c, str) for c in subset)
+        ):
+            subset_cols = subset
+        else:
+            raise TypeError(
+                "drop_duplicates(subset=...) must be a column name, "
+                "non-empty list[str], or None."
+            )
+        return self.unique(subset=subset_cols, keep=keep)
+
+    def duplicated(
+        self,
+        subset: str | list[str] | None = None,
+        *,
+        keep: str | bool = "first",
+    ) -> CoreDataFrame:
+        _ = subset
+        _ = keep
+        raise NotImplementedError(
+            "duplicated() is not implemented yet. Row-wise duplicate masks need an "
+            "engine-level multi-column is_duplicated expression."
+        )
+
     def isna(self) -> CoreDataFrame:
         cols = list(self.schema_fields().keys())
         return self.with_columns(**{c: self.col(c).is_null() for c in cols})
@@ -1340,6 +1484,187 @@ class PandasDataFrame(CoreDataFrame):
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
         )
+
+    def nlargest(
+        self,
+        n: int,
+        columns: str | list[str],
+        *,
+        keep: str = "all",
+    ) -> CoreDataFrame:
+        if keep != "all":
+            raise NotImplementedError("nlargest(keep=...) only supports keep='all'.")
+        if n < 0:
+            raise ValueError("nlargest(n=...) must be >= 0.")
+        cols = [columns] if isinstance(columns, str) else list(columns)
+        if not cols:
+            raise TypeError("nlargest(columns=...) requires at least one column name.")
+        fields = self.schema_fields()
+        for c in cols:
+            if c not in fields:
+                raise KeyError(c)
+        ascending = [False] * len(cols)
+        sorted_df = self.sort_values(by=cols, ascending=ascending)
+        return sorted_df.slice(0, n)
+
+    def nsmallest(
+        self,
+        n: int,
+        columns: str | list[str],
+        *,
+        keep: str = "all",
+    ) -> CoreDataFrame:
+        if keep != "all":
+            raise NotImplementedError("nsmallest(keep=...) only supports keep='all'.")
+        if n < 0:
+            raise ValueError("nsmallest(n=...) must be >= 0.")
+        cols = [columns] if isinstance(columns, str) else list(columns)
+        if not cols:
+            raise TypeError("nsmallest(columns=...) requires at least one column name.")
+        fields = self.schema_fields()
+        for c in cols:
+            if c not in fields:
+                raise KeyError(c)
+        ascending = [True] * len(cols)
+        sorted_df = self.sort_values(by=cols, ascending=ascending)
+        return sorted_df.slice(0, n)
+
+    def isin(self, values: Any) -> CoreDataFrame:
+        if _is_pandas_series(values):
+            raise NotImplementedError(
+                "isin(values=...) does not support pandas Series."
+            )
+        name = type(values).__name__
+        mod = getattr(type(values), "__module__", "")
+        if name == "DataFrame" and mod.startswith("pandas."):
+            raise NotImplementedError(
+                "isin(values=...) does not support pandas DataFrame."
+            )
+        cols = list(self.schema_fields().keys())
+        if isinstance(values, dict):
+            unknown = [k for k in values if k not in self.schema_fields()]
+            if unknown:
+                raise KeyError(f"isin(dict) unknown columns: {unknown!r}")
+            updates: dict[str, Any] = {}
+            for c in cols:
+                if c in values:
+                    v = values[c]
+                    if isinstance(v, (str, bytes)) or not isinstance(
+                        v, (list, tuple, set)
+                    ):
+                        updates[c] = self.col(c).isin([v])
+                    else:
+                        updates[c] = self.col(c).isin(list(v))
+                else:
+                    updates[c] = Literal(value=False)
+            return self.with_columns(**updates)
+        if isinstance(values, (list, tuple, set)):
+            vlist = list(values)
+            return self.with_columns(**{c: self.col(c).isin(vlist) for c in cols})
+        raise TypeError(
+            "isin(values=...) expects a list/tuple/set or dict[str, iterable]."
+        )
+
+    def explode(self, *args: Any, **kwargs: Any) -> CoreDataFrame:
+        bad = set(kwargs) - {"streaming"}
+        if bad:
+            raise TypeError(
+                f"explode() got unexpected keyword arguments: {sorted(bad)!r}"
+            )
+        streaming = kwargs.get("streaming")
+
+        if not args:
+            raise TypeError("explode() requires at least one column name.")
+        if len(args) == 1:
+            col = args[0]
+            if isinstance(col, str):
+                return super().explode(col, streaming=streaming)
+            if isinstance(col, list):
+                if not col:
+                    raise TypeError("explode() requires at least one column name.")
+                return super().explode(col, streaming=streaming)
+            raise TypeError(
+                "explode() first argument must be str or list[str] when alone."
+            )
+        if not all(isinstance(c, str) for c in args):
+            raise TypeError("explode() column names must be str.")
+        return super().explode(list(args), streaming=streaming)
+
+    def copy(self, deep: bool = False) -> CoreDataFrame:
+        if deep:
+            raise NotImplementedError(
+                "copy(deep=True) is not supported; collect(as_lists=True) and "
+                "construct a new DataFrame if you need a data copy."
+            )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=self._rust_plan,
+        )
+
+    def pipe(
+        self,
+        func: Any,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        return func(self, *args, **kwargs)
+
+    def filter(  # type: ignore[override]
+        self,
+        *args: Any,
+        items: list[str] | None = None,
+        like: str | None = None,
+        regex: str | None = None,
+        axis: Any = 0,
+    ) -> CoreDataFrame:
+        if args:
+            if len(args) == 1 and isinstance(args[0], Expr):
+                return super().filter(args[0])
+            raise TypeError(
+                "filter() positional args only support a single Expr row condition; "
+                "use filter(items=...), filter(like=...), or filter(regex=...) "
+                "for columns."
+            )
+        if axis not in (0, "index", None):
+            if axis == 1:
+                raise NotImplementedError(
+                    "filter(axis=1) is not supported (use row filter(Expr))."
+                )
+            raise ValueError("filter(axis=...) must be 0, 'index', or None.")
+
+        n_kw = sum(x is not None for x in (items, like, regex))
+        if n_kw == 0:
+            raise TypeError(
+                "filter() requires items, like, regex, or an Expr argument."
+            )
+        if n_kw > 1:
+            raise TypeError(
+                "filter() only one of items, like, or regex can be specified."
+            )
+        names = list(self.schema_fields().keys())
+        if items is not None:
+            if not isinstance(items, list) or not all(
+                isinstance(x, str) for x in items
+            ):
+                raise TypeError("filter(items=...) must be list[str].")
+            missing = [c for c in items if c not in self.schema_fields()]
+            if missing:
+                raise KeyError(f"filter(items=...): unknown columns {missing!r}")
+            matched = items
+        elif like is not None:
+            if not isinstance(like, str):
+                raise TypeError("filter(like=...) must be str.")
+            matched = [c for c in names if like in c]
+        else:
+            if not isinstance(regex, str):
+                raise TypeError("filter(regex=...) must be str.")
+            pat = re.compile(regex)
+            matched = [c for c in names if pat.search(c) is not None]
+        if not matched:
+            raise ValueError("filter(...) matched no columns.")
+        return self.select(*matched)
 
     class _Rolling:
         def __init__(self, df: PandasDataFrame, *, window: int, min_periods: int):
@@ -1508,6 +1833,44 @@ class PandasGroupedDataFrame(CoreGroupedDataFrame):
 class PandasDataFrameModel(CoreDataFrameModel):
     """:class:`DataFrameModel` using :class:`PandasDataFrame` under the hood."""
 
+    @classmethod
+    def concat(
+        cls,
+        dfs: Sequence[CoreDataFrameModel],
+        /,
+        *,
+        how: str | None = None,
+        axis: int = 0,
+        join: str = "outer",
+        ignore_index: bool = False,
+        keys: Any = None,
+        levels: Any = None,
+        names: Any = None,
+        verify_integrity: Any = None,
+        sort: Any = None,
+        copy: Any = None,
+        streaming: bool | None = None,
+    ) -> CoreDataFrameModel:
+        if len(dfs) < 2:
+            raise ValueError("concat() requires at least two DataFrameModel inputs.")
+        if not all(isinstance(df, CoreDataFrameModel) for df in dfs):
+            raise TypeError("concat() expects a sequence of DataFrameModel objects.")
+        out = DataFrame.concat(
+            [df._df for df in dfs],
+            how=how,
+            axis=axis,
+            join=join,
+            ignore_index=ignore_index,
+            keys=keys,
+            levels=levels,
+            names=names,
+            verify_integrity=verify_integrity,
+            sort=sort,
+            copy=copy,
+            streaming=streaming,
+        )
+        return cls._from_dataframe(out)
+
     def assign(self, **kwargs: Any) -> CoreDataFrameModel:
         return type(self)._from_dataframe(self._df.assign(**kwargs))
 
@@ -1528,6 +1891,12 @@ class PandasDataFrameModel(CoreDataFrameModel):
     def sort_values(self, by: str | list[str], **kwargs: Any) -> Self:
         return type(self)._from_dataframe(self._df.sort_values(by, **kwargs))
 
+    def drop_duplicates(self, *args: Any, **kwargs: Any) -> Self:
+        return type(self)._from_dataframe(self._df.drop_duplicates(*args, **kwargs))
+
+    def duplicated(self, *args: Any, **kwargs: Any) -> Self:
+        return type(self)._from_dataframe(self._df.duplicated(*args, **kwargs))
+
     def drop(self, *args: Any, **kwargs: Any) -> Self:
         return type(self)._from_dataframe(self._df.drop(*args, **kwargs))
 
@@ -1539,6 +1908,27 @@ class PandasDataFrameModel(CoreDataFrameModel):
 
     def astype(self, *args: Any, **kwargs: Any) -> Self:
         return type(self)._from_dataframe(self._df.astype(*args, **kwargs))
+
+    def nlargest(self, *args: Any, **kwargs: Any) -> Self:
+        return type(self)._from_dataframe(self._df.nlargest(*args, **kwargs))
+
+    def nsmallest(self, *args: Any, **kwargs: Any) -> Self:
+        return type(self)._from_dataframe(self._df.nsmallest(*args, **kwargs))
+
+    def isin(self, values: Any) -> Self:
+        return type(self)._from_dataframe(self._df.isin(values))
+
+    def explode(self, *args: Any, **kwargs: Any) -> Self:
+        return type(self)._from_dataframe(self._df.explode(*args, **kwargs))
+
+    def copy(self, *args: Any, **kwargs: Any) -> Self:
+        return type(self)._from_dataframe(self._df.copy(*args, **kwargs))
+
+    def pipe(self, func: Any, *args: Any, **kwargs: Any) -> Any:
+        return func(self, *args, **kwargs)
+
+    def filter(self, *args: Any, **kwargs: Any) -> Self:
+        return type(self)._from_dataframe(self._df.filter(*args, **kwargs))
 
     class _ModelILoc:
         __slots__ = ("_m",)

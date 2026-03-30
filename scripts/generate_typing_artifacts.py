@@ -190,6 +190,10 @@ def _stubify_class(cls: ast.ClassDef) -> ast.ClassDef:
         ):
             # Drop docstring.
             continue
+        elif isinstance(node, ast.ClassDef):
+            # Nested helpers (e.g. pandas façade `_ILoc` / `_Rolling`); stubs must
+            # include them so return types like `-> _ModelRolling` resolve.
+            new_body.append(_stubify_class(node))
         else:
             # Drop complex statements; stubs focus on signatures.
             continue
