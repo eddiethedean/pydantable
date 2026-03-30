@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.6.1] — 2026-03-30
+
+### Fixed
+
+- **Async iterator bridge:** hardened `pydantable.io.aiter_sql()` and internal `_aiter_from_iter()` against deadlocks when the async consumer stops early (e.g. client disconnect / early return). Producer threads now exit cleanly and do not block forever on a bounded queue.
+- **Deferred materialization:** `ExecutionHandle.result()` now shields the underlying `concurrent.futures.Future` so cancelling the awaiting task cancels the **wait** but does not cancel the background engine work.
+- **Submit cancellation race:** `DataFrame.submit()` now avoids `InvalidStateError` when a handle is cancelled before work starts (mirrors `ThreadPoolExecutor` semantics).
+- **Lazy scan missing optional columns:** recovery for missing optional scan columns is now tolerant to error-message variants (not coupled to one brittle regex).
+
+### Docs / tooling
+
+- **Read the Docs build:** install `pydata-sphinx-theme` during RTD builds to match the configured `html_theme` (`docs/conf.py`).
+- **Versioning:** bump to **1.6.1** across Python package metadata, Rust crate, and shipped stubs; docs “current release” strings aligned.
+
 ## [1.6.0] — 2026-03-30
 
 Summary: **FastAPI** helpers (columnar OpenAPI bodies, NDJSON, **`register_exception_handlers`**), **`pydantable.errors`**, **`submit` / `stream` / `astream`**, **`PlanMaterialization`**, awaitable lazy reads (**`AwaitableDataFrameModel`**), Rust **async** plan execution when available, and docs/cookbooks for services. **Breaking:** removed legacy **`DataFrameModel`** eager SQL / **`materialize_*`** shims—use **`pydantable.io`** and **`read_*` / `aread_*`** as described under **Removed** below.
