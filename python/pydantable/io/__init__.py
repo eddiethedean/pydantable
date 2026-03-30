@@ -804,19 +804,31 @@ async def aiter_sql(
 
     q: asyncio.Queue[object] = asyncio.Queue(maxsize=2)
     sentinel = object()
+    stop = threading.Event()
 
     loop = asyncio.get_running_loop()
 
     def _put(item: object) -> None:
         # Backpressure: never drop batches if the async consumer is slow.
         # We block the producer thread until the event loop enqueues the item.
-        try:
-            fut = asyncio.run_coroutine_threadsafe(q.put(item), loop)
-            fut.result()
-        except BaseException:
-            # If the consumer task is cancelled / loop is closing, don't crash the
-            # background producer thread (pytest treats that as a warning).
+        if stop.is_set():
             return
+        fut = asyncio.run_coroutine_threadsafe(q.put(item), loop)
+        try:
+            # Avoid deadlocking the producer thread if the consumer stops early
+            # (queue fills and q.put never completes).
+            while not stop.is_set():
+                try:
+                    fut.result(timeout=0.25)
+                    return
+                except TimeoutError:
+                    continue
+        except BaseException:
+            return
+        finally:
+            if stop.is_set():
+                with suppress(BaseException):
+                    fut.cancel()
 
     def _runner() -> None:
         try:
@@ -826,6 +838,8 @@ async def aiter_sql(
                 parameters=parameters,
                 batch_size=batch_size,
             ):
+                if stop.is_set():
+                    return
                 _put(batch)
         except BaseException as e:  # propagate exceptions to async consumer
             _put(e)
@@ -837,13 +851,18 @@ async def aiter_sql(
     else:
         threading.Thread(target=_runner, daemon=True).start()
 
-    while True:
-        item = await q.get()
-        if item is sentinel:
-            return
-        if isinstance(item, BaseException):
-            raise item
-        yield item  # dict[str, list[Any]]
+    try:
+        while True:
+            item = await q.get()
+            if item is sentinel:
+                return
+            if isinstance(item, BaseException):
+                raise item
+            yield item  # dict[str, list[Any]]
+    finally:
+        stop.set()
+        with suppress(BaseException):
+            loop.call_soon_threadsafe(q.put_nowait, sentinel)
 
 
 async def _aiter_from_iter(
@@ -861,18 +880,32 @@ async def _aiter_from_iter(
 
     q: asyncio.Queue[object] = asyncio.Queue(maxsize=2)
     sentinel = object()
+    stop = threading.Event()
     loop = asyncio.get_running_loop()
 
     def _put(item: object) -> None:
+        if stop.is_set():
+            return
+        fut = asyncio.run_coroutine_threadsafe(q.put(item), loop)
         try:
-            fut = asyncio.run_coroutine_threadsafe(q.put(item), loop)
-            fut.result()
+            while not stop.is_set():
+                try:
+                    fut.result(timeout=0.25)
+                    return
+                except TimeoutError:
+                    continue
         except BaseException:
             return
+        finally:
+            if stop.is_set():
+                with suppress(BaseException):
+                    fut.cancel()
 
     def _runner() -> None:
         try:
             for batch in it:
+                if stop.is_set():
+                    return
                 _put(batch)
         except BaseException as e:
             _put(e)
@@ -884,13 +917,18 @@ async def _aiter_from_iter(
     else:
         threading.Thread(target=_runner, daemon=True).start()
 
-    while True:
-        item = await q.get()
-        if item is sentinel:
-            return
-        if isinstance(item, BaseException):
-            raise item
-        yield item
+    try:
+        while True:
+            item = await q.get()
+            if item is sentinel:
+                return
+            if isinstance(item, BaseException):
+                raise item
+            yield item
+    finally:
+        stop.set()
+        with suppress(BaseException):
+            loop.call_soon_threadsafe(q.put_nowait, sentinel)
 
 
 async def aiter_parquet(

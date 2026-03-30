@@ -119,4 +119,4 @@ __all__ = [
     "write_ndjson_batches",
     "write_parquet_batches",
 ]
-__version__ = "1.6.0"
+__version__ = "1.6.1"

@@ -149,6 +149,46 @@ def test_streaming_response_after_ato_dict() -> None:
     assert json.loads(r.content.decode()) == {"id": [1, 2], "age": [10, None]}
 
 
+def test_streaming_response_early_close_does_not_deadlock() -> None:
+    """
+    Simulate a client disconnect / early close during streaming.
+
+    The server-side generator must be closable promptly; this guards against
+    background producer deadlocks in streaming adapters.
+    """
+    app = FastAPI()
+
+    @app.get("/bulk-stream-early")
+    async def bulk_stream_early() -> StreamingResponse:
+        df = UserDF({"id": [1, 2], "age": [10, None]}, trusted_mode="shape_only")
+        chunks = df._df.astream(batch_size=1)  # yields dict[str, list] chunks
+        from pydantable.fastapi import ndjson_streaming_response
+
+        return ndjson_streaming_response(chunks)
+
+    with TestClient(app) as client, client.stream("GET", "/bulk-stream-early") as r:
+        assert r.status_code == 200
+        # Read a tiny amount then stop, like a client that disconnects.
+        _ = next(r.iter_lines())
+
+
+def test_streaming_response_close_without_reading_does_not_deadlock() -> None:
+    """Simulate a client that disconnects immediately without reading any body bytes."""
+    app = FastAPI()
+
+    @app.get("/bulk-stream-close")
+    async def bulk_stream_close() -> StreamingResponse:
+        df = UserDF({"id": [1, 2], "age": [10, None]}, trusted_mode="shape_only")
+        chunks = df._df.astream(batch_size=1)
+        from pydantable.fastapi import ndjson_streaming_response
+
+        return ndjson_streaming_response(chunks)
+
+    with TestClient(app) as client, client.stream("GET", "/bulk-stream-close") as r:
+        assert r.status_code == 200
+        # Intentionally do not read from r.iter_lines()/r.iter_bytes().
+
+
 def test_row_list_invalid_type_is_422() -> None:
     app = FastAPI()
 

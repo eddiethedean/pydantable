@@ -7,6 +7,9 @@ mod py_literal;
 mod serialize;
 mod typing;
 
+#[cfg(test)]
+mod tests;
+
 pub use ir::{
     ArithOp, CmpOp, ExprNode, LiteralValue, LogicalOp, StringPredicateKind, StringUnaryOp,
     TemporalPart, UnaryNumericOp, UnixTimestampUnit,

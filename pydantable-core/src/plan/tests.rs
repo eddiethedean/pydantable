@@ -217,6 +217,11 @@ mod polars_engine_tests {
     fn execute_plan_default_returns_polars_dataframe() {
         ensure_python_initialized();
         Python::with_gil(|py| {
+            // `polars` is an optional Python dependency; skip this IPC-shape test
+            // when it is not installed in the active interpreter.
+            let Ok(polars) = py.import_bound("polars") else {
+                return;
+            };
             let mut schema = HashMap::new();
             schema.insert("id".to_string(), DTypeDesc::non_nullable(BaseType::Int));
             schema.insert("age".to_string(), DTypeDesc::scalar_nullable(BaseType::Int));
@@ -231,7 +236,6 @@ mod polars_engine_tests {
             root.set_item("age", ages).unwrap();
 
             let out = execute_plan(py, &plan, root.as_any(), false, false).unwrap();
-            let polars = py.import_bound("polars").unwrap();
             let df_class = polars.getattr("DataFrame").unwrap();
             let builtins = py.import_bound("builtins").unwrap();
             let isinstance = builtins.getattr("isinstance").unwrap();
@@ -327,6 +331,12 @@ mod polars_engine_tests {
             vs2.append(5_i64).unwrap();
             root2.set_item("v", vs2).unwrap();
 
+            // `polars` is an optional Python dependency; skip IPC path assertions
+            // when it is not installed in the active interpreter.
+            if py.import_bound("polars").is_err() {
+                return;
+            }
+
             let (data_ipc, _) = execute_groupby_agg_polars(
                 py,
                 &plan,
@@ -338,7 +348,11 @@ mod polars_engine_tests {
             )
             .unwrap();
 
-            let polars = py.import_bound("polars").unwrap();
+            // `polars` is an optional Python dependency; skip IPC-shape assertion
+            // when it is not installed in the active interpreter.
+            let Ok(polars) = py.import_bound("polars") else {
+                return;
+            };
             let df_class = polars.getattr("DataFrame").unwrap();
             let builtins = py.import_bound("builtins").unwrap();
             let isinstance = builtins.getattr("isinstance").unwrap();

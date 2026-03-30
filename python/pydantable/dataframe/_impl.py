@@ -105,6 +105,33 @@ def _is_scan_file_root(obj: Any) -> bool:
     )
 
 
+def _extract_missing_scan_column_from_engine_error(msg: str) -> str | None:
+    """
+    Best-effort parse of engine error strings for missing columns in Polars scans.
+
+    Polars error messages vary across versions and execution paths. This parser is
+    intentionally tolerant: it only runs on scan roots and only affects recovery
+    for *optional* schema fields.
+    """
+    s = (msg or "").strip()
+    if not s:
+        return None
+    patterns = (
+        # Current/legacy Rust error string used in tests/docs.
+        r'not found: "([^"]+)" not found',
+        # Common Polars Python error variants.
+        r"ColumnNotFoundError: '([^']+)'",
+        r'ColumnNotFoundError: "([^"]+)"',
+        r"ColumnNotFoundError: ([A-Za-z_][A-Za-z0-9_]*)\b",
+        r"column ['\"]([^'\"]+)['\"] not found",
+    )
+    for pat in patterns:
+        m = re.search(pat, s)
+        if m:
+            return m.group(1)
+    return None
+
+
 # Cap column listing in :meth:`DataFrame.__repr__` for very wide schemas.
 _REPR_MAX_COLUMNS = 32
 _REPR_DTYPE_MAX_LEN = 72
@@ -398,7 +425,9 @@ class ExecutionHandle:
         return self._fut.cancel()
 
     async def result(self) -> Any:
-        return await asyncio.wrap_future(self._fut)
+        # Cancellation of the awaiting task should *not* cancel the underlying
+        # concurrent future (and therefore should not attempt to cancel engine work).
+        return await asyncio.shield(asyncio.wrap_future(self._fut))
 
 
 def _is_bool_or_nullable_bool(dtype: Any) -> bool:
@@ -1092,7 +1121,6 @@ class DataFrame(Generic[SchemaT]):
         plan = self._rust_plan
         field_types = dict(self._current_field_types)
 
-        missing_re = re.compile(r'not found: "([^"]+)" not found')
         while True:
             try:
                 return execute_plan(
@@ -1106,10 +1134,9 @@ class DataFrame(Generic[SchemaT]):
                 # Only attempt this recovery on lazy scan roots.
                 if not _is_scan_file_root(self._root_data):
                     raise
-                m = missing_re.search(str(e))
-                if not m:
+                missing_col = _extract_missing_scan_column_from_engine_error(str(e))
+                if not missing_col:
                     raise
-                missing_col = m.group(1)
                 ann = field_types.get(missing_col)
                 if ann is None:
                     raise
@@ -1146,7 +1173,6 @@ class DataFrame(Generic[SchemaT]):
         plan = self._rust_plan
         field_types = dict(self._current_field_types)
 
-        missing_re = re.compile(r'not found: "([^"]+)" not found')
         while True:
             try:
                 return await async_execute_plan(
@@ -1159,10 +1185,9 @@ class DataFrame(Generic[SchemaT]):
             except ValueError as e:
                 if not _is_scan_file_root(self._root_data):
                     raise
-                m = missing_re.search(str(e))
-                if not m:
+                missing_col = _extract_missing_scan_column_from_engine_error(str(e))
+                if not missing_col:
                     raise
-                missing_col = m.group(1)
                 ann = field_types.get(missing_col)
                 if ann is None:
                     raise
@@ -2708,9 +2733,18 @@ class DataFrame(Generic[SchemaT]):
             fut = concurrent.futures.Future[Any]()
 
             def _bg() -> None:
+                # Mirror ThreadPoolExecutor semantics: if the user cancels the
+                # handle before work starts, do not execute or attempt to set
+                # results on a cancelled future.
+                if not fut.set_running_or_notify_cancel():
+                    return
                 try:
                     fut.set_result(_run())
                 except Exception as e:
+                    # If the future was cancelled mid-flight, avoid raising
+                    # InvalidStateError from set_exception on a cancelled future.
+                    if fut.cancelled():
+                        return
                     fut.set_exception(e)
 
             threading.Thread(target=_bg, daemon=True).start()

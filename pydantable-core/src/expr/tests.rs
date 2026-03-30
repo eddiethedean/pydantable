@@ -86,16 +86,30 @@ fn binary_op_dtype_matches_arithmetic_rules() {
     )
     .expect("1");
     let sum = ExprNode::make_binary_op(ArithOp::Add, left, right).expect("x + 1");
-    assert_eq!(sum.dtype().base, Some(BaseType::Int));
+    assert_eq!(
+        sum.dtype().as_scalar_base_field().flatten(),
+        Some(BaseType::Int)
+    );
+}
+
+#[test]
+fn map_get_rejects_non_map_and_never_panics() {
+    ensure_python_initialized();
+    let inner = ExprNode::make_column_ref("x".to_string(), DTypeDesc::non_nullable(BaseType::Int))
+        .expect("x");
+    let err = ExprNode::make_map_get(inner, "k".to_string()).unwrap_err();
+    assert!(err.to_string().contains("map_get() requires a map column"));
 }
 
 #[test]
 fn exprnode_to_serializable_column_ref_roundtrip_shape() {
     ensure_python_initialized();
     Python::with_gil(|py| {
-        let node =
-            ExprNode::make_column_ref("amount".to_string(), DTypeDesc::scalar_nullable(BaseType::Float))
-                .expect("amount");
+        let node = ExprNode::make_column_ref(
+            "amount".to_string(),
+            DTypeDesc::scalar_nullable(BaseType::Float),
+        )
+        .expect("amount");
         let obj = exprnode_to_serializable(py, &node).expect("serialize");
         let d: &Bound<'_, PyDict> = obj.downcast_bound(py).expect("dict");
         assert_eq!(
@@ -121,11 +135,9 @@ fn exprnode_to_serializable_column_ref_roundtrip_shape() {
 fn window_range_frame_serializes_with_kind_and_bounds() {
     ensure_python_initialized();
     Python::with_gil(|py| {
-        let inner = ExprNode::make_column_ref(
-            "v".to_string(),
-            DTypeDesc::non_nullable(BaseType::Int),
-        )
-        .expect("column");
+        let inner =
+            ExprNode::make_column_ref("v".to_string(), DTypeDesc::non_nullable(BaseType::Int))
+                .expect("column");
         let node = ExprNode::make_window_sum(
             inner,
             vec!["g".to_string()],

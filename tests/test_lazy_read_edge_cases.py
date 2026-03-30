@@ -116,3 +116,31 @@ def test_lazy_read_missing_optional_column_with_default_allows_fill_false_strict
         str(path), trusted_mode="strict", fill_missing_optional=False
     )
     assert df.to_dict() == {"id": [1, 2], "note": ["n/a", "n/a"]}
+
+
+def test_lazy_read_missing_optional_column_error_message_variants_are_parsed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    The missing-optional recovery for scan roots should not depend on a single
+    brittle engine error string.
+    """
+    pytest.importorskip("pydantable._core")
+    from pydantable.dataframe import _impl as impl
+
+    class ScanFileRoot:
+        __module__ = "pydantable._core"
+
+    root = ScanFileRoot()
+    df = DataFrame[_OptionalCol]._from_scan_root(root)
+
+    calls = {"n": 0}
+
+    def fake_execute_plan(*_args: object, **_kwargs: object) -> dict[str, list[object]]:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ValueError("ColumnNotFoundError: 'note'")
+        return {"id": [1, 2]}
+
+    monkeypatch.setattr(impl, "execute_plan", fake_execute_plan)
+    assert df.to_dict() == {"id": [1, 2], "note": [None, None]}
