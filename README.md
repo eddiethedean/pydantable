@@ -29,6 +29,7 @@ pip install "pydantable[polars]"  # to_polars
 pip install "pydantable[arrow]"   # to_arrow / Arrow constructors
 pip install "pydantable[io]"      # full file I/O convenience (arrow + polars)
 pip install "pydantable[sql]"     # fetch_sql / write_sql helpers
+pip install "pydantable[fastapi]" # FastAPI integration helpers (pydantable.fastapi)
 ```
 
 ## Quick start
@@ -81,6 +82,7 @@ print(result.collect())   # list of Pydantic row models
 
 - Docs home: [pydantable.readthedocs.io](https://pydantable.readthedocs.io/en/latest/)
 - Quickstart: [QUICKSTART](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html)
+- FastAPI golden path: [GOLDEN_PATH_FASTAPI](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html)
 - DataFrameModel guide: [DATAFRAMEMODEL](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html)
 - I/O overview: [IO_OVERVIEW](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html)
 - FastAPI patterns: [FASTAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html)

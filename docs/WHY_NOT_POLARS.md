@@ -69,6 +69,19 @@ Compared to using Polars directly, `pydantable` currently trades:
 
 Those trade-offs are intentional if your team values API contract reliability.
 
+## Async and services
+
+The **Python** `polars` package exposes a small async-oriented surface (for example
+`LazyFrame.collect_async` and `collect_all_async`): they schedule **`collect`** work on a
+**thread pool** so asyncio can keep running — similar in spirit to wrapping
+`collect()` in **`asyncio.to_thread`**. Polars does not replace **Pydantic-typed** API
+contracts or **`DataFrameModel`**-centric I/O.
+
+`pydantable` focuses on **service-shaped** workflows: **typed** scan roots (**`aread_*`**),
+schema evolution through transforms, **`acollect` / `ato_dict`**, and docs aimed at
+**FastAPI** ({doc}`GOLDEN_PATH_FASTAPI`, {doc}`FASTAPI`). You can use Polars as an engine
+under the hood without exposing Polars APIs at your HTTP boundary.
+
 ## Decision guide
 
 Use **Polars directly** when:

@@ -4,6 +4,36 @@ This guide shows FastAPI-oriented patterns using `DataFrameModel` as the
 primary API: validated request bodies, typed transforms, and **`collect()`** to
 materialize **row lists** for JSON responses.
 
+**Start here:** {doc}`GOLDEN_PATH_FASTAPI` (one runnable async app: lifespan, `Depends`, `acollect`, streaming).
+
+**Related recipes:** {doc}`/cookbook/fastapi_columnar_bodies` (column-shaped JSON bodies), {doc}`/cookbook/fastapi_async_materialization`, {doc}`/cookbook/async_lazy_pipeline` (lazy `aread_*` → transforms → materialize).
+
+## Optional `pydantable.fastapi` helpers
+
+Install the extra:
+
+```bash
+pip install "pydantable[fastapi]"
+```
+
+Then import `pydantable.fastapi` (not required for basic FastAPI usage):
+
+- **`executor_lifespan(app, max_workers=..., thread_name_prefix=...)`** — async context manager that attaches a `ThreadPoolExecutor` to **`app.state.executor`** for **`acollect(executor=...)`** and **`pydantable.io`** helpers.
+- **`get_executor(request)`** — for **`Depends(get_executor)`**, returning **`request.app.state.executor`** (or **`None`** if unset).
+- **`register_exception_handlers(app)`** — registers HTTP handlers for **`MissingRustExtensionError`** (**503**) and in-handler **`pydantic.ValidationError`** (**422**); see {ref}`fastapi-errors`.
+
+Inbound request validation is still FastAPI’s default **`RequestValidationError`** (**422**) when the *request body* fails to parse.
+
+(fastapi-errors)=
+## HTTP errors and exception handlers
+
+| Situation | Typical exception | HTTP status | Notes |
+|-----------|-------------------|-------------|--------|
+| Invalid JSON body shape / types at the boundary | `fastapi.exceptions.RequestValidationError` | **422** | FastAPI’s default handler (before your route runs). |
+| Manual validation inside a route (e.g. `model_validate`) | `pydantic.ValidationError` | **422** | Use **`register_exception_handlers`** from **`pydantable.fastapi`**, or map yourself. |
+| Native extension missing | `MissingRustExtensionError` | **503** | **`register_exception_handlers`** returns a JSON **`detail`** string. |
+| Engine / plan / transform errors | Often `ValueError` | **400** / **422** / **500** | **Do not** map all `ValueError`s globally; handle per route or use `HTTPException`. |
+
 ## Why this matters
 
 For FastAPI services, `pydantable` gives you:
@@ -31,6 +61,12 @@ From PyPI (prebuilt wheels include the native extension on supported platforms):
 
 ```bash
 pip install pydantable
+```
+
+For **`pydantable.fastapi`** helpers (lifespan executor, `Depends`, shared exception handlers):
+
+```bash
+pip install "pydantable[fastapi]"
 ```
 
 From a git checkout, build the extension (for example with [Maturin](https://www.maturin.rs/)):

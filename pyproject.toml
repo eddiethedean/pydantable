@@ -34,6 +34,8 @@ kafka = ["kafka-python>=2.0"]
 bq = ["google-cloud-bigquery>=3.0"]
 snowflake = ["snowflake-connector-python>=3.0"]
 rap = ["rapcsv>=0.2", "rapfiles>=0.1", "rapsqlite>=0.1"]
+# FastAPI integration helpers (pydantable.fastapi); optional at runtime.
+fastapi = ["fastapi>=0.100"]
 dev = [
     "fastapi>=0.100",
     "httpx>=0.24",
@@ -103,6 +105,7 @@ include = [
     "python/pydantable/pyspark/sql/column.pyi",
     "python/pydantable/pyspark/sql/functions.pyi",
     "python/pydantable/pyspark/sql/window.pyi",
+    "python/pydantable/fastapi/__init__.pyi",
 ]
 features = ["pyo3/extension-module", "polars_engine"]
 exclude = [
