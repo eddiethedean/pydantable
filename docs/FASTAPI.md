@@ -1,12 +1,58 @@
 # FastAPI Integration Guide
 
-This guide shows FastAPI-oriented patterns using `DataFrameModel` as the
-primary API: validated request bodies, typed transforms, and **`collect()`** to
-materialize **row lists** for JSON responses.
+This guide is the **navigation + reference** for using pydantable inside FastAPI:
+validated request bodies, typed transforms, async materialization, and streaming.
+
+If you want the shortest runnable service first, start with {doc}`GOLDEN_PATH_FASTAPI`.
 
 **Start here:** {doc}`GOLDEN_PATH_FASTAPI` (one runnable async app: lifespan, `Depends`, `acollect`, streaming).
 
 **Related recipes:** {doc}`/cookbook/fastapi_columnar_bodies` (column-shaped JSON bodies), {doc}`/cookbook/fastapi_async_materialization`, {doc}`/cookbook/fastapi_observability` (request IDs + **`observe`**), {doc}`/cookbook/fastapi_background_tasks` (**`BackgroundTasks`** + **`submit`**), {doc}`/cookbook/async_lazy_pipeline` (lazy `aread_*` → transforms → materialize). Example **service layout** (routers + lifespan): `docs/examples/fastapi/service_layout/` in the repo. **Roadmap / “when to use what”:** {doc}`/FASTAPI_ENHANCEMENTS`.
+
+## How to read this page (quick map)
+
+- If you’re building a service **today**, read:
+  - {ref}`fastapi-install`
+  - {ref}`fastapi-fast-path` (the “golden path” + cookbooks)
+  - {ref}`fastapi-errors` (422 vs 400 vs 503)
+  - {ref}`fastapi-testing` (lifespan-aware `TestClient`)
+- If you’re deciding **row vs column** payloads, jump to:
+  - {ref}`columnar-openapi-fastapi` (OpenAPI columnar models + `Depends`)
+  - {ref}`column-shaped-json-request-bodies` (columnar bodies without helpers)
+- If you’re tuning **async / executors / streaming**, jump to:
+  - {ref}`four-materialization-modes-fastapi`
+  - {doc}`EXECUTION` and {doc}`MATERIALIZATION` (deep dive)
+
+(fastapi-install)=
+## Install (what to `pip install`)
+
+```bash
+pip install pydantable
+```
+
+Optional helpers used throughout the FastAPI docs:
+
+```bash
+pip install "pydantable[fastapi]"
+```
+
+For I/O-heavy service routes (Arrow buffers, Parquet/IPC helpers, streaming writers), you’ll often also want:
+
+```bash
+pip install "pydantable[io]"
+```
+
+(fastapi-fast-path)=
+## Fast path for services (recommended order)
+
+1. Run {doc}`GOLDEN_PATH_FASTAPI` end-to-end.
+2. Pick your payload shape:
+   - **Row list**: `list[YourDF.RowModel]` in requests + `response_model=list[YourDTO]` in responses.
+   - **Columnar JSON**: `dict[str, list]` shapes; see {doc}`/cookbook/fastapi_columnar_bodies`.
+3. Decide response size:
+   - Small/medium: `collect()` / `to_dict()`
+   - Large: `astream()` + `ndjson_streaming_response` ({doc}`FASTAPI_ENHANCEMENTS`)
+4. Lock down your error mapping: {ref}`fastapi-errors`.
 
 ## Optional `pydantable.fastapi` helpers
 
@@ -55,6 +101,11 @@ For **row-array** JSON bodies, use **`rows_dependency(User)`**; OpenAPI document
 **NDJSON** streaming responses do not get a per-chunk OpenAPI schema (same as any streaming body); columnar **`response_model`** applies to single JSON **`to_dict()`** responses only.
 
 **Testing:** **`pydantable.testing.fastapi`** provides **`fastapi_app_with_executor()`** and **`fastapi_test_client(app)`** (context manager) so **`executor_lifespan`** runs under **`TestClient`** and **`get_executor`** works. Use **`TestClient(..., raise_server_exceptions=False)`** when asserting **500** responses from dependencies. See **`tests/test_pydantable_fastapi_columnar.py`**.
+
+(fastapi-testing)=
+### Testing note (lifespan and `TestClient`)
+
+FastAPI’s `TestClient` is synchronous; if your app uses a lifespan function (including `executor_lifespan`), prefer `pydantable.testing.fastapi.fastapi_test_client(app)` so the lifespan runs and `Depends(get_executor)` works. See {doc}`FASTAPI_ENHANCEMENTS` (Phase 7).
 
 (fastapi-errors)=
 ## HTTP errors and exception handlers
