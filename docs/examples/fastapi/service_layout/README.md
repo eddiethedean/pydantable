@@ -1,4 +1,8 @@
-:orphan:
+---
+orphan: true
+---
+
+# NOTE: This file is rendered for realism but not linked from toctrees.
 
 # Example FastAPI service layout
 
