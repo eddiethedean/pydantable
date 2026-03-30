@@ -4,13 +4,20 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-03-30
+
 ### Added
 
 - **Pandas UI (schema-first):** `duplicated` / `drop_duplicates(keep=False)` backed by engine plan steps where Polars is enabled; typed **`get_dummies`** with cardinality guard; eager **`cut`** / **`qcut`**, **`factorize_column`**, narrow **`ewm(...).mean()`** (may require pandas at runtime); façade **`pivot`** delegating to core. See {doc}`/PANDAS_UI` and {doc}`/PARITY_SCORECARD`.
+- **Tests:** `tests/test_pandas_ui_popular_features.py` — extended coverage for duplicates, dummies, binning, factorize, ewm, and pivot.
 
 ### Docs
 
 - Refreshed **PANDAS_UI** (correct **`pivot`** façade, **`get_dummies`** null/boolean behavior, naming map, test links), **INTERFACE_CONTRACT** (duplicate detection, **`value_counts`** `dict` note), **DOCS_MAP**, **QUICKSTART**, **TROUBLESHOOTING** (optional **pandas** for eager helpers), **EXECUTION**, **DEVELOPER**, **DATAFRAMEMODEL**, **POLARS_TRANSFORMATIONS_ROADMAP**, **PARITY_SCORECARD**, and root **README** cross-links.
+
+### Docs / tooling
+
+- **Versioning:** bump to **1.7.0** across Python package metadata, Rust crate, and shipped stubs; docs “current release” strings aligned.
 
 ## [1.6.1] — 2026-03-30
 
