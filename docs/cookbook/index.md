@@ -13,6 +13,7 @@ Opinionated, end-to-end recipes built for production usage. Every recipe aims to
 async_lazy_pipeline
 fastapi_columnar_bodies
 fastapi_async_materialization
+fastapi_end_to_end_examples
 fastapi_background_tasks
 fastapi_observability
 fastapi_settings
