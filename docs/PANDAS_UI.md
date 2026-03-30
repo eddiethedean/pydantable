@@ -71,6 +71,8 @@ Maps to **`join`**: `on` is required; the **right suffix** is taken from `suffix
 
 - Unsupported `query()` constructs beyond the limited grammar described below.
 - `sort=True`, `left_index=True`, `right_index=True`.
+  - `sort=True` is now supported for key-based merges (sorts by the join keys). For `how=\"cross\"` and index-merges, `sort=True` still raises `NotImplementedError`.
+  - `left_index=True, right_index=True` is supported in a limited way: it materializes both frames to lists, synthesizes a positional index, joins on that, then drops the synthetic index columns.
 
 Unknown keyword arguments raise **`TypeError`**.
 
@@ -126,6 +128,7 @@ Unsupported syntax (function calls, attribute access, subscripts, etc.) raises `
 - `engine`: only `"python"` is supported; other values raise `NotImplementedError`.
 - `inplace`: only `False` is supported; `True` raises `NotImplementedError`.
 - `local_dict` / `global_dict`: accepted but currently must be `None`/empty; non-empty dicts raise `NotImplementedError`.
+  - `local_dict`/`global_dict` now support **literal constant substitution** for names that are not schema columns (ints/floats/strings/bools/None and list/tuple of those).
 
 **Tip:** prefer explicit column names and literals. Example: `query("id in (1,2,3) and amount * 2 >= 10")`.
 
@@ -170,7 +173,7 @@ Additional pandas parameters are accepted but may raise `NotImplementedError` (e
 
 ### `fillna(value, subset=None)` / `astype(dtype|mapping)`
 
-- `fillna(value=..., subset=...)` maps to core `fill_null(value=..., subset=...)`.\n  - `method/limit/inplace/downcast/axis` are accepted for parity but currently raise `NotImplementedError`.\n- `astype(dtype)` casts all columns; `astype({"col": dtype})` casts selected columns via `Expr.cast(...)`.\n  - `copy` is accepted (no-op); `errors!='raise'` raises `NotImplementedError`.
+- `fillna(value=..., subset=...)` maps to core `fill_null(value=..., subset=...)`.\n  - `fillna(method=\"ffill\"|\"bfill\")` is supported (maps to `fill_null(strategy=\"forward\"|\"backward\")`).\n  - `limit/inplace/downcast/axis` are accepted for parity but currently raise `NotImplementedError`.\n- `astype(dtype)` casts all columns; `astype({\"col\": dtype})` casts selected columns via `Expr.cast(...)`.\n  - `copy` is accepted (no-op); `errors=\"ignore\"` is supported as best-effort numeric widening; unsupported casts are skipped.
 
 **Caveat:** `fillna(method=...)`/`limit=...` are currently not implemented; prefer explicit expressions (`Expr.fill_null(...)`) or engine-native operations.
 

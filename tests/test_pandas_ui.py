@@ -148,7 +148,7 @@ def test_pandas_ui_query_rejects_non_literal_in_list() -> None:
         id: int
 
     df = Row({"id": [1, 2, 3]})
-    with pytest.raises(NotImplementedError, match="literal"):
+    with pytest.raises(NotImplementedError, match=r"local_dict|literal"):
         df.query("id in (id, 2)")
 
 
@@ -171,10 +171,10 @@ def test_pandas_ui_query_accepts_engine_and_dict_params_but_raises_when_used() -
         df.query("id > 0", engine="numexpr")  # type: ignore[arg-type]
     with pytest.raises(NotImplementedError, match="inplace"):
         df.query("id > 0", inplace=True)
-    with pytest.raises(NotImplementedError, match="local_dict"):
-        df.query("id > 0", local_dict={"x": 1})
-    with pytest.raises(NotImplementedError, match="global_dict"):
-        df.query("id > 0", global_dict={"x": 1})
+    assert df.query("id > 0", local_dict={"x": 1}).collect(as_lists=True) == {"id": [1]}
+    assert df.query("id > 0", global_dict={"x": 1}).collect(as_lists=True) == {
+        "id": [1]
+    }
 
 
 def test_pandas_ui_merge_left_on_requires_right_on() -> None:
@@ -252,8 +252,7 @@ def test_pandas_ui_merge_accepts_copy_and_rejects_sort_and_index_joins() -> None
     left = L({"a": [1]})
     right = R({"a": [1]})
     _ = left.merge(right, on="a", copy=True)
-    with pytest.raises(NotImplementedError, match="sort"):
-        left.merge(right, on="a", sort=True)
+    _ = left.merge(right, on="a", sort=True)
     with pytest.raises(NotImplementedError, match="left_index"):
         left.merge(right, on="a", left_index=True)
 
@@ -298,8 +297,68 @@ def test_pandas_ui_merge_indicator_key_only_frames_not_supported() -> None:
 
     left = DataFrame[Row]({"a": [1]})
     right = DataFrame[Row]({"a": [1]})
-    with pytest.raises(NotImplementedError, match="non-key column"):
-        left.merge(right, on="a", how="inner", indicator=True)
+    out = left.merge(right, on="a", how="inner", indicator=True).collect(as_lists=True)
+    assert out["_merge"] == ["both"]
+
+
+def test_pandas_ui_merge_sort_true_sorts_by_keys() -> None:
+    class L(PandasDataFrameModel):
+        a: int
+        v: int
+
+    class R(PandasDataFrameModel):
+        a: int
+        w: int
+
+    left = L({"a": [2, 1], "v": [20, 10]})
+    right = R({"a": [1, 2], "w": [100, 200]})
+    out = left.merge(right, on="a", how="inner", sort=True).collect(as_lists=True)
+    assert out["a"] == [1, 2]
+
+
+def test_pandas_ui_merge_left_index_right_index_smoke() -> None:
+    class L(PandasDataFrameModel):
+        v: int
+
+    class R(PandasDataFrameModel):
+        w: int
+
+    left = L({"v": [10, 20]})
+    right = R({"w": [100, 200]})
+    out = left.merge(right, how="inner", left_index=True, right_index=True).collect(
+        as_lists=True
+    )
+    assert out == {"v": [10, 20], "w": [100, 200]}
+
+
+def test_pandas_ui_query_local_dict_constant_substitution() -> None:
+    class Row(PandasDataFrameModel):
+        id: int
+
+    df = Row({"id": [1, 2, 3]})
+    out = df.query("id > thresh", local_dict={"thresh": 1}).collect(as_lists=True)
+    assert_table_eq_sorted(out, {"id": [2, 3]}, keys=["id"])
+
+
+def test_pandas_ui_fillna_method_ffill_bfill() -> None:
+    class Row(PandasDataFrameModel):
+        k: int
+        v: int | None
+
+    df = Row({"k": [1, 2, 3], "v": [None, 10, None]})
+    out = df.fillna(method="ffill").collect(as_lists=True)
+    assert out["v"] == [None, 10, 10]
+    out2 = df.fillna(method="bfill").collect(as_lists=True)
+    assert out2["v"] == [10, 10, None]
+
+
+def test_pandas_ui_astype_errors_ignore_skips_unsupported_casts() -> None:
+    class Row(PandasDataFrameModel):
+        a: int
+
+    df = Row({"a": [1]})
+    out = df.astype({"a": str}, errors="ignore").collect(as_lists=True)
+    assert out == {"a": [1]}
 
 
 def test_pandas_ui_merge_left_on_right_on_different_names_drops_right_keys() -> None:
@@ -590,8 +649,8 @@ def test_pandas_ui_drop_errors_ignore_and_raise() -> None:
     assert out == {"a": [1]}
     with pytest.raises(KeyError, match="not found"):
         df.drop(columns=["missing"], errors="raise")
-    with pytest.raises(NotImplementedError, match="index"):
-        df.drop(index=[0])
+    out2 = df.drop(index=[0], errors="ignore").collect(as_lists=True)
+    assert out2 == {"a": []}
     with pytest.raises(NotImplementedError, match="inplace"):
         df.drop(columns=["a"], inplace=True)
     with pytest.raises(NotImplementedError, match="level"):
@@ -624,8 +683,8 @@ def test_pandas_ui_fillna_requires_value() -> None:
     df = Row({"a": [None]})
     with pytest.raises(TypeError, match="non-None"):
         df.fillna(None)
-    with pytest.raises(NotImplementedError, match="method"):
-        df.fillna(method="ffill")  # type: ignore[call-arg]
+    out = df.fillna(method="ffill").collect(as_lists=True)  # type: ignore[call-arg]
+    assert out["a"] == [None]
     with pytest.raises(NotImplementedError, match="limit"):
         df.fillna(0, limit=1)
     with pytest.raises(NotImplementedError, match="downcast"):
@@ -649,8 +708,8 @@ def test_pandas_ui_astype_copy_and_errors_params() -> None:
 
     df = Row({"a": [1]})
     _ = df.astype(int, copy=True)
-    with pytest.raises(NotImplementedError, match="errors"):
-        df.astype(int, errors="ignore")  # type: ignore[arg-type]
+    out = df.astype(int, errors="ignore").collect(as_lists=True)  # type: ignore[arg-type]
+    assert out == {"a": [1]}
 
 
 def test_pandas_core_dataframe_query_sort_drop_rename_fillna_astype_smoke() -> None:

@@ -19,6 +19,7 @@ from .dataframe_model import GroupedDataFrameModel as CoreGroupedDataFrameModel
 from .expressions import Expr, Literal, coalesce, when
 from .rust_engine import _require_rust_core
 from .schema import Schema
+from .schema._impl import make_derived_schema_type
 
 
 def _is_pandas_series(value: object) -> bool:
@@ -172,14 +173,92 @@ class PandasDataFrame(CoreDataFrame):
         right_list = _as_list_str(right_on, name="right_on")
 
         if left_index or right_index:
-            raise NotImplementedError(
-                "merge(left_index=..., right_index=...) is not supported; "
-                "pydantable has no pandas Index semantics."
+            if on_list is not None or left_list is not None or right_list is not None:
+                raise NotImplementedError(
+                    "merge(left_index/right_index=True) is only supported when no "
+                    "on/left_on/right_on keys are provided."
+                )
+            if not (left_index and right_index):
+                raise NotImplementedError(
+                    "merge(left_index=True, right_index=False) (or vice versa) is not "
+                    "supported yet."
+                )
+            if how == "cross":
+                raise NotImplementedError(
+                    "merge(..., how='cross') does not use index keys."
+                )
+
+            left_data = self.collect(as_lists=True)
+            right_data = other.collect(as_lists=True)
+            left_n = len(next(iter(left_data.values()))) if left_data else 0
+            right_n = len(next(iter(right_data.values()))) if right_data else 0
+            left_idx = list(range(left_n))
+            right_idx = list(range(right_n))
+
+            left_idx_name = _unique_tmp_name(set(left_data), "__pd_left_index")
+            right_idx_name = _unique_tmp_name(set(right_data), "__pd_right_index")
+
+            left_data2 = dict(left_data)
+            right_data2 = dict(right_data)
+            left_data2[left_idx_name] = left_idx
+            right_data2[right_idx_name] = right_idx
+
+            left_fields = {**dict(self.schema_fields()), left_idx_name: int}
+            right_fields = {**dict(other.schema_fields()), right_idx_name: int}
+            left_schema = make_derived_schema_type(
+                self._current_schema_type, left_fields
             )
-        if sort:
-            raise NotImplementedError(
-                "merge(sort=True) is not supported (no stable sort-by-keys policy yet)."
+            right_schema = make_derived_schema_type(
+                other._current_schema_type, right_fields
             )
+
+            left_df = self._from_plan(
+                root_data=left_data2,
+                root_schema_type=left_schema,
+                current_schema_type=left_schema,
+                rust_plan=_require_rust_core().make_plan(left_fields),
+            )
+            right_df = other._from_plan(
+                root_data=right_data2,
+                root_schema_type=right_schema,
+                current_schema_type=right_schema,
+                rust_plan=_require_rust_core().make_plan(right_fields),
+            )
+
+            joined = left_df.join(
+                right_df,
+                left_on=left_idx_name,
+                right_on=right_idx_name,
+                how=how,
+                suffix=suffix,
+            )
+            out_data = joined.collect(as_lists=True)
+            out_data.pop(left_idx_name, None)
+            out_data.pop(right_idx_name, None)
+            out_fields = {
+                k: v for k, v in joined.schema_fields().items() if k in out_data
+            }
+            out_schema = make_derived_schema_type(
+                joined._current_schema_type, out_fields
+            )
+            out = joined._from_plan(
+                root_data=out_data,
+                root_schema_type=out_schema,
+                current_schema_type=out_schema,
+                rust_plan=_require_rust_core().make_plan(out_fields),
+            )
+            if indicator:
+                if "_merge" in set(self.schema_fields()) | set(other.schema_fields()):
+                    raise ValueError(
+                        "merge(indicator=True) would overwrite existing "
+                        "'_merge' column."
+                    )
+                out = out.with_columns(_merge=Literal(value="both"))
+            if sort:
+                raise NotImplementedError(
+                    "merge(sort=True) is not supported for index merges."
+                )
+            return out
         _ = copy  # accepted for pandas parity; logical frames are copy-free
 
         if on_list is not None and (left_list is not None or right_list is not None):
@@ -202,6 +281,10 @@ class PandasDataFrame(CoreDataFrame):
                         "'_merge' column."
                     )
                 out = out.with_columns(_merge=Literal(value="both"))
+            if sort:
+                raise NotImplementedError(
+                    "merge(sort=True) is not supported for cross joins."
+                )
             return out
 
         if on_list is None and (left_list is None or right_list is None):
@@ -266,9 +349,41 @@ class PandasDataFrame(CoreDataFrame):
                 l_col = _pick_presence_col(left_non_keys)
                 r_col = _pick_presence_col(right_non_keys)
                 if l_col is None or r_col is None:
-                    raise NotImplementedError(
-                        "merge(indicator=True) currently requires at least one "
-                        "non-key column on each side."
+                    # Key-only frames: compute indicator eagerly from key membership.
+                    joined2 = self.join(other, on=on_list, how=how, suffix=suffix)
+                    out_data = joined2.collect(as_lists=True)
+                    left_keys = self.select(*on_list).collect(as_lists=True)
+                    right_keys = other.select(*on_list).collect(as_lists=True)
+                    ln = len(next(iter(left_keys.values()))) if left_keys else 0
+                    rn = len(next(iter(right_keys.values()))) if right_keys else 0
+                    left_set = {
+                        tuple(left_keys[k][i] for k in on_list) for i in range(ln)
+                    }
+                    right_set = {
+                        tuple(right_keys[k][i] for k in on_list) for i in range(rn)
+                    }
+                    on_n = len(next(iter(out_data.values()))) if out_data else 0
+                    merge_col: list[str] = []
+                    for i in range(on_n):
+                        key = tuple(out_data[k][i] for k in on_list)
+                        l_present = key in left_set
+                        r_present = key in right_set
+                        if l_present and r_present:
+                            merge_col.append("both")
+                        elif l_present:
+                            merge_col.append("left_only")
+                        else:
+                            merge_col.append("right_only")
+                    out_data["_merge"] = merge_col
+                    out_fields = {**dict(joined2.schema_fields()), "_merge": str}
+                    out_schema = make_derived_schema_type(
+                        joined2._current_schema_type, out_fields
+                    )
+                    return joined2._from_plan(
+                        root_data=out_data,
+                        root_schema_type=out_schema,
+                        current_schema_type=out_schema,
+                        rust_plan=_require_rust_core().make_plan(out_fields),
                     )
                 out = joined.with_columns(
                     _merge=(
@@ -304,8 +419,10 @@ class PandasDataFrame(CoreDataFrame):
                     if dupes:
                         out = out.drop(*dupes)
                 return out
-
-            return self.join(other, on=on_list, how=how, suffix=suffix)
+            out = self.join(other, on=on_list, how=how, suffix=suffix)
+            if sort:
+                out = out.sort(*on_list, descending=False)
+            return out
 
         assert left_list is not None and right_list is not None
         if len(left_list) != len(right_list):
@@ -371,7 +488,10 @@ class PandasDataFrame(CoreDataFrame):
                     # join output. Create it from the right key.
                     unify[lk] = joined.col(rk_out)
             joined = joined.with_columns(**unify)
-        return joined.drop(*drop_cols) if drop_cols else joined
+        out = joined.drop(*drop_cols) if drop_cols else joined
+        if sort:
+            out = out.sort(*left_list, descending=False)
+        return out
 
     def query(
         self,
@@ -391,15 +511,26 @@ class PandasDataFrame(CoreDataFrame):
             raise NotImplementedError("query(engine!= 'python') is not supported.")
         if inplace:
             raise NotImplementedError("query(inplace=True) is not supported.")
-        if local_dict not in (None, {}):
-            raise NotImplementedError("query(local_dict=...) is not supported.")
-        if global_dict not in (None, {}):
-            raise NotImplementedError("query(global_dict=...) is not supported.")
         if not isinstance(expr, str) or not expr.strip():
             raise TypeError("query(expr) expects a non-empty string.")
 
         def _lit(v: object) -> Expr:
             return Literal(value=v)
+
+        def _resolve_external(name: str) -> object:
+            if local_dict and name in local_dict:
+                return local_dict[name]
+            if global_dict and name in global_dict:
+                return global_dict[name]
+            raise KeyError(name)
+
+        def _external_to_expr(value: object) -> Expr:
+            if isinstance(value, (int, float, str, bool)) or value is None:
+                return _lit(value)
+            raise NotImplementedError(
+                "query(local_dict/global_dict) only support literal constants "
+                "(int/float/str/bool/None) and literal lists/tuples of those."
+            )
 
         def _compile(node: ast.AST) -> Expr:
             if isinstance(node, ast.BoolOp):
@@ -436,6 +567,12 @@ class PandasDataFrame(CoreDataFrame):
                     return left * right
                 if isinstance(node.op, ast.Div):
                     return left / right
+                if isinstance(node.op, ast.Mod):
+                    raise NotImplementedError("query(): '%' is not supported.")
+                if isinstance(node.op, ast.FloorDiv):
+                    raise NotImplementedError("query(): '//' is not supported.")
+                if isinstance(node.op, ast.Pow):
+                    raise NotImplementedError("query(): '**' is not supported.")
                 raise NotImplementedError(
                     "query(): unsupported binary operator "
                     f"{node.op.__class__.__name__}."
@@ -465,12 +602,40 @@ class PandasDataFrame(CoreDataFrame):
                         if isinstance(right_node, (ast.List, ast.Tuple)):
                             vals: list[object] = []
                             for elt in right_node.elts:
-                                if not isinstance(elt, ast.Constant):
+                                if isinstance(elt, ast.Constant):
+                                    vals.append(elt.value)
+                                elif isinstance(elt, ast.Name):
+                                    try:
+                                        vals.append(_resolve_external(elt.id))
+                                    except KeyError as e:
+                                        raise NotImplementedError(
+                                            "query(): 'in' list names must come from "
+                                            "local_dict/global_dict."
+                                        ) from e
+                                else:
                                     raise NotImplementedError(
                                         "query(): 'in'/'not in' only support literal "
                                         "lists/tuples."
                                     )
-                                vals.append(elt.value)
+                            part = cur.isin(vals)
+                            if isinstance(op, ast.NotIn):
+                                part = ~part
+                            out = part if out is None else (out & part)
+                            cur = _lit(vals[-1] if vals else None)
+                            continue
+                        if isinstance(right_node, ast.Name):
+                            try:
+                                v = _resolve_external(right_node.id)
+                            except KeyError as e:
+                                raise NotImplementedError(
+                                    "query(): 'in' name must come from "
+                                    "local_dict/global_dict."
+                                ) from e
+                            if not isinstance(v, (list, tuple)):
+                                raise NotImplementedError(
+                                    "query(): 'in' name must be a list/tuple literal."
+                                )
+                            vals = list(v)
                             part = cur.isin(vals)
                             if isinstance(op, ast.NotIn):
                                 part = ~part
@@ -508,7 +673,16 @@ class PandasDataFrame(CoreDataFrame):
                 )
             if isinstance(node, ast.Name):
                 # Treat bare identifiers as columns.
-                return self.col(node.id)
+                if node.id in self.schema_fields():
+                    return self.col(node.id)
+                try:
+                    v = _resolve_external(node.id)
+                except KeyError as e:
+                    raise NotImplementedError(
+                        f"query(): unknown name {node.id!r} (not a column and not in "
+                        "local_dict/global_dict)."
+                    ) from e
+                return _external_to_expr(v)
             if isinstance(node, ast.Constant):
                 return _lit(node.value)
             raise NotImplementedError(
@@ -567,8 +741,6 @@ class PandasDataFrame(CoreDataFrame):
         level: Any = None,
         errors: str = "raise",
     ) -> CoreDataFrame:
-        if index is not None:
-            raise NotImplementedError("drop(index=...) is not supported.")
         if axis is not None:
             raise NotImplementedError("drop(axis=...) is not supported; use columns=.")
         if inplace:
@@ -577,6 +749,21 @@ class PandasDataFrame(CoreDataFrame):
             raise NotImplementedError("drop(level=...) is not supported.")
         if labels is not None and columns is not None:
             raise TypeError("drop() specify labels or columns, not both.")
+        if index is not None:
+            if labels is not None or columns is not None:
+                raise TypeError("drop() cannot combine index= with columns/labels.")
+            if errors not in {"raise", "ignore"}:
+                raise ValueError("drop(errors=...) must be 'raise' or 'ignore'.")
+            idx_list = [index] if isinstance(index, int) else list(index)
+            data = self.collect(as_lists=True)
+            n = len(next(iter(data.values()))) if data else 0
+            bad = [i for i in idx_list if not isinstance(i, int) or i < 0 or i >= n]
+            if bad and errors == "raise":
+                raise IndexError(f"drop(index=...): indices out of range: {bad}")
+            drop_set = {i for i in idx_list if isinstance(i, int) and 0 <= i < n}
+            kept = [i for i in range(n) if i not in drop_set]
+            new_data = {k: [v[i] for i in kept] for k, v in data.items()}
+            return type(self)[self._current_schema_type](new_data)
         cols = labels if columns is None else columns
         if cols is None:
             raise TypeError("drop() requires columns=... (or labels positional).")
@@ -640,8 +827,8 @@ class PandasDataFrame(CoreDataFrame):
         downcast: Any = None,
         subset: str | list[str] | None = None,
     ) -> CoreDataFrame:
-        if method is not None:
-            raise NotImplementedError("fillna(method=...) is not supported.")
+        if method is not None and value is not None:
+            raise TypeError("fillna() accepts value or method, not both.")
         if axis is not None:
             raise NotImplementedError("fillna(axis=...) is not supported.")
         if inplace:
@@ -650,11 +837,20 @@ class PandasDataFrame(CoreDataFrame):
             raise NotImplementedError("fillna(limit=...) is not supported.")
         if downcast is not None:
             raise NotImplementedError("fillna(downcast=...) is not supported.")
-        if value is None:
-            raise TypeError("fillna(value=...) requires a non-None value.")
         cols = None
         if subset is not None:
             cols = [subset] if isinstance(subset, str) else list(subset)
+        if method is not None:
+            m = str(method).lower()
+            if m == "ffill":
+                return self.fill_null(strategy="forward", subset=cols)
+            if m == "bfill":
+                return self.fill_null(strategy="backward", subset=cols)
+            raise NotImplementedError(
+                "fillna(method=...) supports only 'ffill'/'bfill'."
+            )
+        if value is None:
+            raise TypeError("fillna(value=...) requires a non-None value.")
         return self.fill_null(value=value, subset=cols)
 
     def astype(
@@ -667,8 +863,8 @@ class PandasDataFrame(CoreDataFrame):
         - `astype(dtype)` for all columns
         - `astype({\"col\": dtype, ...})` per-column
         """
-        if errors != "raise":
-            raise NotImplementedError("astype(errors!='raise') is not supported.")
+        if errors not in {"raise", "ignore"}:
+            raise ValueError("astype(errors=...) must be 'raise' or 'ignore'.")
         _ = copy  # accepted for parity; logical frames are copy-free
         if isinstance(dtype, dict):
             mapping = dtype
@@ -680,9 +876,27 @@ class PandasDataFrame(CoreDataFrame):
         if missing:
             raise KeyError(f"astype(): columns not found: {missing}")
         casts: dict[str, Expr] = {}
-        for name, dt in mapping.items():
-            casts[name] = self.col(name).cast(dt)
-        return self.with_columns(**casts)
+        if errors == "ignore":
+            # Typed-first, best-effort: only apply casts we can deem safe without
+            # risking engine errors (primarily numeric widening). Others are skipped.
+            for name, dt in mapping.items():
+                cur = self.schema_fields().get(name)
+                if (
+                    dt in (float, int)
+                    and (
+                        cur in (int, float)
+                        or str(cur).startswith("int |")
+                        or str(cur).startswith("float |")
+                    )
+                ) or (dt is bool and (cur is bool or str(cur).startswith("bool |"))):
+                    casts[name] = self.col(name).cast(dt)
+                else:
+                    # Skip cast (keep original) for ignore-mode.
+                    continue
+        else:
+            for name, dt in mapping.items():
+                casts[name] = self.col(name).cast(dt)
+        return self.with_columns(**casts) if casts else self
 
     def head(self, n: int = 5) -> CoreDataFrame:
         """
