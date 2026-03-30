@@ -20,6 +20,12 @@
       ~Expr.cast
       ~Expr.ceil
       ~Expr.char_length
+      ~Expr.clip
+      ~Expr.cummax
+      ~Expr.cummin
+      ~Expr.cumprod
+      ~Expr.cumsum
+      ~Expr.diff
       ~Expr.dt_date
       ~Expr.dt_day
       ~Expr.dt_hour
@@ -56,7 +62,9 @@
       ~Expr.map_len
       ~Expr.map_values
       ~Expr.over
+      ~Expr.pct_change
       ~Expr.referenced_columns
+      ~Expr.replace
       ~Expr.round
       ~Expr.starts_with
       ~Expr.str_contains

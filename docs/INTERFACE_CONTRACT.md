@@ -28,7 +28,7 @@ row position. The project test-suite uses sorted comparisons to enforce this.
 - **`shape`** and **`empty`** are derived from the **root** ingested column buffers when present (same idea as the pandas UI table in {doc}`PANDAS_UI`). When the logical plan applies filters or other transforms **without** replacing that root buffer, **`shape[0]`** may **not** equal the number of rows returned by **`to_dict()`**, **`collect()`**, or **`head()`** after execution. Use materialized output for an accurate row count.
 - **`info()`** returns a multi-line **string** summarizing column names, dtypes, and row count consistent with the **`shape`** policy above (not a full **`collect()`** unless documented elsewhere).
 - **`describe()`** (**0.20.0+**) returns a multi-line **string** after one **`to_dict()`** pass: **int** / **float** (mean, min, max, std where applicable), **bool** (true/false/null counts), **str** (counts, **`n_unique`**, min/max string length, nulls). Other dtypes are omitted.
-- **`value_counts(column)`** (**0.20.0+**) returns per-value counts via group-by aggregation (engine path); optional **`normalize=True`** returns fractions.
+- **`value_counts(column)`** (**0.20.0+**) returns per-value counts via group-by aggregation (engine path) as a Python **`dict`** (value → count), not a pandas **`Series`**; optional **`normalize=True`** returns fractions. The pandas UI does not change this core return type—see {doc}`PANDAS_UI` (**Core `value_counts`**).
 
 ## Join semantics (collision + keys)
 
@@ -103,6 +103,14 @@ The output field nullability is preserved/derived accordingly:
 - `count` and `n_unique` outputs remain non-optional integers
 
 **Polars runtime errors (0.18.0+):** On **`collect()`** failure during **`group_by().agg()`**, the raised **`ValueError`** may include **`(group_by().agg())`** in the message (Rust **`polars_err_ctx`**) so the error is attributable to grouped aggregation. This does not change the aggregation rules above; see {doc}`EXECUTION`.
+
+## Duplicate row detection
+
+- **`unique(subset=..., keep="first"|"last")`**: deduplicates to one row per distinct key (all columns participate when **`subset`** is omitted); pandas UI **`drop_duplicates(..., keep="first"|"last")`** maps here.
+- **`duplicated(subset=..., keep="first"|"last"|False)`**: returns a single-column boolean frame **`duplicated`** with pandas-aligned semantics (**`keep=False`** marks every row that belongs to a non-unique group).
+- **`drop_duplicate_groups(subset=...)`**: removes **all** rows whose key appears in a duplicate group (equivalent to pandas **`drop_duplicates(keep=False)`** on the pandas UI).
+
+These compile to Rust plan steps when the Polars engine is enabled; the row-wise executor implements the same semantics when Polars is disabled. See {doc}`PANDAS_UI` (**`drop_duplicates` / `duplicated`**) and tests **`tests/test_pandas_ui.py`**, **`tests/test_pandas_ui_popular_features.py`**.
 
 ## Reshaping semantics
 

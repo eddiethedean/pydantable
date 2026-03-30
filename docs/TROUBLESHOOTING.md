@@ -28,6 +28,14 @@ pip install pydantable
 
 See {doc}`DEVELOPER` for contributor setup.
 
+## Pandas UI: `ImportError` / `ModuleNotFoundError` for **`pandas`**
+
+**Symptom:** calling **`get_dummies`**, **`cut`**, **`qcut`**, **`factorize_column`**, or **`ewm().mean()`** on **`pydantable.pandas.DataFrame`** fails because **`pandas`** is not installed.
+
+**Meaning:** those helpers are **eager** and delegate to **pandas** (or NumPy via the same stack) for binning / factorize / exponential weighted mean after one materialization.
+
+**Fix:** `pip install pandas` (not required for the default Polars-style export). Duplicate detection (**`duplicated`**, **`drop_duplicates(keep=False)`**) uses the Rust plan and does **not** need pandas. See {doc}`PANDAS_UI`.
+
 ## Why does `df.shape[0]` not match the number of materialized rows?
 
 `shape` follows **root-buffer semantics** and can be out of sync after lazy transforms (e.g. `filter`).

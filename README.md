@@ -82,6 +82,7 @@ print(result.collect())   # list of Pydantic row models
 ## Documentation
 
 - Docs home: [pydantable.readthedocs.io](https://pydantable.readthedocs.io/en/latest/)
+- **Pandas-flavored API** (`assign`, `merge`, duplicates, `get_dummies`, …): [PANDAS_UI](https://pydantable.readthedocs.io/en/latest/PANDAS_UI.html)
 - **Where to read what:** [DOCS_MAP](https://pydantable.readthedocs.io/en/latest/DOCS_MAP.html)
 - Quickstart: [QUICKSTART](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html)
 - DataFrameModel guide: [DATAFRAMEMODEL](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html)

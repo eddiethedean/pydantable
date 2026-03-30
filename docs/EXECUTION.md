@@ -83,7 +83,7 @@ All three use the **same** Rust engine; only **names** and **import paths** diff
 | Style | Import | Method flavor | When it helps |
 |-------|--------|---------------|---------------|
 | **Default (Polars-shaped)** | **`from pydantable import DataFrame`** | **`with_columns`**, **`filter`**, **`select`** | New code and docs; matches {doc}`INTERFACE_CONTRACT` vocabulary. |
-| **Pandas-shaped** | **`from pydantable.pandas import DataFrame`** | **`assign`**, **`merge`**, pandas-like **`head`** | Porting pandas tutorials or muscle memory. |
+| **Pandas-shaped** | **`from pydantable.pandas import DataFrame`** | **`assign`**, **`merge`**, pandas-like **`head`**, duplicate masks / **`get_dummies`** / **`cut`/`qcut`** / **`ewm().mean()`** (see {doc}`PANDAS_UI`) | Porting pandas tutorials or muscle memory. |
 | **PySpark-shaped** | **`from pydantable.pyspark import DataFrame`** | **`withColumn`**, **`where`**, **`show`** | Spark mental model; still in-process (not a Spark cluster). |
 
 See {doc}`PANDAS_UI`, {doc}`PYSPARK_UI`, and **Naming map (core ↔ pandas ↔ PySpark)** there.

@@ -7,6 +7,8 @@ Notes that say **Implemented on branch `v0.5.0`** refer to historical work lande
 The current release is **1.6.1** (see `docs/changelog.md`). Older bullets below still record the 0.5.x baseline plus later additions.
 
 **Post–P7 (0.18.0+):** Phases **P1–P7** below are **complete**. Further Polars-style parity is **additive** (new `Expr` methods, transforms, or façade wrappers) and is tracked in [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md), [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md), and [`ROADMAP.md`](ROADMAP.md)—not as a new “P8” checklist unless maintainers add one explicitly.
+
+**Row duplicate plans:** core **`plan_duplicate_mask`** / **`plan_drop_duplicate_groups`** (pandas UI **`duplicated`** / **`drop_duplicates(keep=False)`**) are Polars-backed plan steps; they are **not** part of the historical P1–P7 Expr checklist—see [`PANDAS_UI.md`](PANDAS_UI.md) and [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md).
 For execution details (Pydantic-first `collect()`, optional Python `polars`), see `docs/EXECUTION.md`.
 
 ## Current baseline (implemented)

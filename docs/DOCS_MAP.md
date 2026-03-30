@@ -31,7 +31,7 @@ Use this page when you know **what you need to do**, but not **where it is docum
 
 ### Alternate import surfaces
 
-- **Pandas-shaped names**: {doc}`PANDAS_UI`
+- **Pandas-shaped names**: {doc}`PANDAS_UI` (includes **`assign`/`merge`**, duplicate masks, **`get_dummies`**, **`cut`/`qcut`**, **`factorize_column`**, **`ewm().mean()`**, typed **`pivot`**). Integration tests: **`tests/test_pandas_ui.py`**, **`tests/test_pandas_ui_popular_features.py`**.
 - **PySpark-shaped names**: {doc}`PYSPARK_UI`, {doc}`PYSPARK_INTERFACE`, {doc}`PYSPARK_PARITY`
 
 ### Project & contribution

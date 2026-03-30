@@ -257,9 +257,9 @@ Supported shape:
 
 **Validation:** `var_name` and `value_name` must differ and must not collide with existing column names. All `value_vars` must share the same **scalar** base type (e.g. melting an `int` column with a `str` column raises `TypeError`).
 
-### `pivot` (not on pandas UI)
+### `pivot(...)` (lazy; core contract)
 
-**`pivot` is intentionally omitted** from the pandas UI for now: pandas pivot produces column names from data values, which clashes with pydantable’s typed, schema-first model unless the result is materialized or the schema is synthesized dynamically. Use explicit `with_columns` / joins, or melt plus downstream typed transforms, when you need reshape.
+**`pivot`** on this façade is a thin wrapper around the **typed core** `pivot` (explicit **`index`**, **`columns`**, **`values`**, **`aggregate_function`**). Output column names follow the deterministic rules in {doc}`INTERFACE_CONTRACT` (e.g. `<pivot_value>_<agg>` such as **`A_first`**, **`B_first`** when **`aggregate_function="first"`**). This is **not** pandas’ unconstrained dynamic pivot; use **`to_pandas()`** if you need full pandas reshape semantics.
 
 ### `rolling(window=..., min_periods=...)` (lazy, row-based)
 
@@ -372,7 +372,7 @@ Additional pandas parameters are accepted but may raise `NotImplementedError` (e
 
 | Method | Notes |
 |--------|-------|
-| `get_dummies(columns=[...], prefix=..., prefix_sep=..., drop_first=..., dtype="bool"\|"int", max_categories=512, dummy_na=False)` | **Eager** category scan; **requires explicit `columns`**; keeps other columns; raises if dummy names collide or cardinality exceeds **`max_categories`**. |
+| `get_dummies(columns=[...], prefix=..., prefix_sep=..., drop_first=..., dtype="bool"\|"int", max_categories=512, dummy_na=False)` | **Eager** category scan; **requires explicit `columns`**; keeps other columns; raises if dummy names collide or cardinality exceeds **`max_categories`**. With **`dtype="bool"`**, rows where the source cell is null produce **`None`** in dummy columns (three-valued logic from **`Expr`**, not pandas’ all-**`False`**). Use **`dummy_na=True`** to materialize a dedicated null level. |
 | `cut(column, bins, new_column=..., labels=..., ...)` | **Eager**; uses **pandas `cut`**; adds a **nullable string** interval column. |
 | `qcut(column, q, new_column=..., duplicates=...)` | **Eager**; **pandas `qcut`**. |
 | `factorize_column(column)` | **Eager** `(codes, uniques)` tuple; **pandas `factorize`** on a `Series`. |
@@ -424,7 +424,7 @@ Wraps the pandas UI `DataFrame` and delegates:
 - **`assign`**, **`merge`**, **`head`/`tail`**, **`__getitem__`**, **`group_by`** → same semantics as above on the inner frame.
 - **`query`**, **`sort_values`**, **`drop`**, **`rename`**, **`fillna`**, **`astype`** → same semantics as above on the inner frame.
 - **`concat`**, **`nlargest`**, **`nsmallest`**, **`isin`**, **`explode`**, **`copy`**, **`pipe`**, **`filter`** (row `Expr` vs `items`/`like`/`regex`) → delegated to the inner pandas UI frame and re-wrapped.
-- **`iloc`**, **`loc`**, **`isna`/`isnull`/`notna`/`notnull`**, **`dropna`**, **`melt`**, **`rolling`**, **`group_by` → `.rolling(...)`**, and other pandas UI helpers documented above (**`wide_to_long`**, **`from_dict`**, **`where`/`mask`**, **`rank`**, **`sample`/`take`**, **`corr`/`cov`**, **`combine_first`/`update`/`compare`**, **`reindex`/`align`**, **`dot`/`transpose`/`insert`/`pop`**, …) → delegated to the inner **`PandasDataFrame`** via **`__getattr__`**. Methods that return a plain **`DataFrame`** (e.g. **`pop`**) are **not** auto-wrapped into a **`DataFrameModel`** unless you add explicit façade methods; call **`type(self)._from_dataframe(...)`** when you need a model instance.
+- **`iloc`**, **`loc`**, **`isna`/`isnull`/`notna`/`notnull`**, **`dropna`**, **`melt`**, **`pivot`**, **`rolling`**, **`group_by` → `.rolling(...)`**, and other pandas UI helpers documented above (**`get_dummies`**, **`cut`/`qcut`**, **`factorize_column`**, **`ewm`**, **`duplicated`**, **`wide_to_long`**, **`from_dict`**, **`where`/`mask`**, **`rank`**, **`sample`/`take`**, **`corr`/`cov`**, **`combine_first`/`update`/`compare`**, **`reindex`/`align`**, **`dot`/`transpose`/`insert`/`pop`**, …) → delegated to the inner **`PandasDataFrame`** via **`__getattr__`** (or explicit façade methods where listed earlier). Methods that return a plain **`DataFrame`** (e.g. **`pop`**) are **not** auto-wrapped into a **`DataFrameModel`** unless you add explicit façade methods; call **`type(self)._from_dataframe(...)`** when you need a model instance.
 
 Properties **`columns`**, **`shape`**, **`empty`**, **`dtypes`** read from the inner frame.
 
@@ -441,6 +441,7 @@ Same engine; different method names. PySpark column is in {doc}`PYSPARK_UI`.
 | Join | `join` | `merge` | `join` |
 | Sort | `sort` / `order_by` | `sort` | `orderBy` |
 | Rename | `rename` | `rename` | `withColumnRenamed` |
+| Pivot (typed) | `pivot` | `pivot` | — |
 
 ## Relationship to the default export
 
@@ -448,5 +449,6 @@ Same engine; different method names. PySpark column is in {doc}`PYSPARK_UI`.
 
 ## Further reading
 
-- [Interface contract](INTERFACE_CONTRACT.md) — null semantics and join rules.
+- [Interface contract](INTERFACE_CONTRACT.md) — null semantics, join rules, duplicate detection, pivot naming.
 - [Execution](EXECUTION.md) — Rust engine overview.
+- Tests: **`tests/test_pandas_ui.py`**, **`tests/test_pandas_ui_popular_features.py`** (duplicates, dummies, binning, factorize, ewm, pivot).

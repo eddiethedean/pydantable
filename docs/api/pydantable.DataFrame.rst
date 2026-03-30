@@ -32,7 +32,9 @@
       ~DataFrame.describe
       ~DataFrame.distinct
       ~DataFrame.drop
+      ~DataFrame.drop_duplicate_groups
       ~DataFrame.drop_nulls
+      ~DataFrame.duplicated
       ~DataFrame.explain
       ~DataFrame.explode
       ~DataFrame.fill_null

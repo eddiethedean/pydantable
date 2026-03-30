@@ -8,6 +8,8 @@ The goal is to keep the query-building/typing story (`select`, `with_columns`,
 `filter`) while making DataFrames feel native in typical Pydantic/FastAPI
 workflows.
 
+For pandas-style method names (**`assign`**, **`merge`**, **`duplicated`**, **`get_dummies`**, …) import **`DataFrameModel`** from **`pydantable.pandas`**; execution remains the same Rust core ({doc}`PANDAS_UI`).
+
 ## Terms
 
 - **Row model**: A normal Pydantic `BaseModel` describing a single row (e.g. `UserRow`).

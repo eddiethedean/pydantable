@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format is inspired 
 
 - **Pandas UI (schema-first):** `duplicated` / `drop_duplicates(keep=False)` backed by engine plan steps where Polars is enabled; typed **`get_dummies`** with cardinality guard; eager **`cut`** / **`qcut`**, **`factorize_column`**, narrow **`ewm(...).mean()`** (may require pandas at runtime); façade **`pivot`** delegating to core. See {doc}`/PANDAS_UI` and {doc}`/PARITY_SCORECARD`.
 
+### Docs
+
+- Refreshed **PANDAS_UI** (correct **`pivot`** façade, **`get_dummies`** null/boolean behavior, naming map, test links), **INTERFACE_CONTRACT** (duplicate detection, **`value_counts`** `dict` note), **DOCS_MAP**, **QUICKSTART**, **TROUBLESHOOTING** (optional **pandas** for eager helpers), **EXECUTION**, **DEVELOPER**, **DATAFRAMEMODEL**, **POLARS_TRANSFORMATIONS_ROADMAP**, **PARITY_SCORECARD**, and root **README** cross-links.
+
 ## [1.6.1] — 2026-03-30
 
 ### Fixed

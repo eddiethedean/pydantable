@@ -20,6 +20,12 @@
       ~ColumnRef.cast
       ~ColumnRef.ceil
       ~ColumnRef.char_length
+      ~ColumnRef.clip
+      ~ColumnRef.cummax
+      ~ColumnRef.cummin
+      ~ColumnRef.cumprod
+      ~ColumnRef.cumsum
+      ~ColumnRef.diff
       ~ColumnRef.dt_date
       ~ColumnRef.dt_day
       ~ColumnRef.dt_hour
@@ -56,7 +62,9 @@
       ~ColumnRef.map_len
       ~ColumnRef.map_values
       ~ColumnRef.over
+      ~ColumnRef.pct_change
       ~ColumnRef.referenced_columns
+      ~ColumnRef.replace
       ~ColumnRef.round
       ~ColumnRef.starts_with
       ~ColumnRef.str_contains
