@@ -16,7 +16,7 @@ build:
         "myst-parser>=3"
         sphinx-autodoc-typehints
         sphinx-copybutton
-        sphinx-rtd-theme
+        pydata-sphinx-theme
         "pydantic>=2,<3"
         "typing-extensions>=4.7"
         "sqlalchemy>=2,<3"
