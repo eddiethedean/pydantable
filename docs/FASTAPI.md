@@ -107,6 +107,45 @@ For **row-array** JSON bodies, use **`rows_dependency(User)`**; OpenAPI document
 
 FastAPI’s `TestClient` is synchronous; if your app uses a lifespan function (including `executor_lifespan`), prefer `pydantable.testing.fastapi.fastapi_test_client(app)` so the lifespan runs and `Depends(get_executor)` works. See {doc}`FASTAPI_ENHANCEMENTS` (Phase 7).
 
+## Testing routes (`TestClient`)
+
+Use FastAPI’s **`TestClient`** (synchronous) to exercise handlers without a live server. Install **`fastapi`** and **`httpx`** (included in the **`[dev]`** extra).
+
+```python
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from pydantic import BaseModel
+
+from pydantable import DataFrameModel
+
+
+class UserDF(DataFrameModel):
+    id: int
+    age: int | None
+
+
+class UserRow(BaseModel):
+    id: int
+    age: int | None
+
+
+app = FastAPI()
+
+
+@app.post("/users", response_model=list[UserRow])
+def create_users(rows: list[UserDF.RowModel]):
+    df = UserDF(rows)
+    return df.collect()
+
+
+client = TestClient(app)
+r = client.post("/users", json=[{"id": 1, "age": 20}])
+assert r.status_code == 200
+assert r.json() == [{"id": 1, "age": 20}]
+```
+
+**Column-shaped bodies** are plain **`dict[str, list]`** JSON; use a **`dict`** parameter (or a Pydantic model wrapping that shape) and construct **`DataFrameModel(..., trusted_mode="shape_only")`** when the payload is trusted.
+
 (fastapi-errors)=
 ## HTTP errors and exception handlers
 
@@ -129,6 +168,13 @@ FastAPI’s `TestClient` is synchronous; if your app uses a lifespan function (i
 - **Testing**: use `pydantable.testing.fastapi.fastapi_test_client(app)` so lifespan runs.
 
 If you need deeper I/O/materialization patterns, see {doc}`FASTAPI_ADVANCED` and the cookbook index ({doc}`/cookbook/index`).
+
+## Responses: columnar vs row-shaped
+
+- **`to_dict()`** / **`await ato_dict()`** — `dict[str, list]`; one JSON object with parallel arrays.
+- **`collect()`** / **`await acollect()`** — `list` of Pydantic models for the **current** schema; return it from the handler and let **`response_model`** define OpenAPI and validate the serialized response.
+- **`to_dicts()`** / **`await ato_dicts()`** — `list[dict]` from row models when you want plain dicts without a separate DTO class.
+- **`await ato_polars()`** — optional Polars **`DataFrame`** when the **`[polars]`** extra is installed (same semantics as **`to_polars()`**).
 
 (fastapi-advanced)=
 ## Advanced topics
@@ -333,13 +379,6 @@ Full **`StreamingResponse`** examples (sync **`def`** + **`stream`**, **`async d
 The longer “Example 1/2/3” service patterns live in the cookbook now:
 {doc}`/cookbook/fastapi_end_to_end_examples`.
 
-## Columnar vs row-shaped responses
-
-- **`to_dict()`** / **`await ato_dict()`** — `dict[str, list]`; one JSON object with parallel arrays.
-- **`collect()`** / **`await acollect()`** — `list` of Pydantic models for the **current** schema; return it from the handler and let **`response_model`** define OpenAPI and validate the serialized response.
-- **`to_dicts()`** / **`await ato_dicts()`** — `list[dict]` from row models when you want plain dicts without a separate DTO class.
-- **`await ato_polars()`** — optional Polars **`DataFrame`** when the **`[polars]`** extra is installed (same semantics as **`to_polars()`**).
-
 ## Error timing and API safety
 
 In the current Rust-first design:
@@ -358,44 +397,5 @@ That keeps handlers predictable: many errors surface before **`collect()`** runs
 - **Adapters**: load/save column dicts or row lists from databases, queues, or object storage.
 
 This keeps schema and transformation contracts in one typed layer.
-
-## Testing routes (`TestClient`)
-
-Use FastAPI’s **`TestClient`** (synchronous) to exercise handlers without a live server. Install **`fastapi`** and **`httpx`** (included in the **`[dev]`** extra).
-
-```python
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from pydantic import BaseModel
-
-from pydantable import DataFrameModel
-
-
-class UserDF(DataFrameModel):
-    id: int
-    age: int | None
-
-
-class UserRow(BaseModel):
-    id: int
-    age: int | None
-
-
-app = FastAPI()
-
-
-@app.post("/users", response_model=list[UserRow])
-def create_users(rows: list[UserDF.RowModel]):
-    df = UserDF(rows)
-    return df.collect()
-
-
-client = TestClient(app)
-r = client.post("/users", json=[{"id": 1, "age": 20}])
-assert r.status_code == 200
-assert r.json() == [{"id": 1, "age": 20}]
-```
-
-**Column-shaped bodies** are plain **`dict[str, list]`** JSON; use a **`dict`** parameter (or a Pydantic model wrapping that shape) and construct **`DataFrameModel(..., trusted_mode="shape_only")`** when the payload is trusted.
 
 **OpenAPI:** `list[YourDF.RowModel]` and nested Pydantic fields follow **Pydantic v2** JSON Schema generation; there is nothing pydantable-specific beyond the generated `RowModel` types. Inspect **`GET /openapi.json`** in tests when you need stable schema snapshots.

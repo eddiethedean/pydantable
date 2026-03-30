@@ -1,0 +1,57 @@
+/* Small style nudges toward a FastAPI-like “modern docs” feel.
+   Keep this file minimal and theme-agnostic; prefer theme options first. */
+
+/* Typography */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-feature-settings: "kern";
+}
+
+/* Content width and rhythm */
+.bd-main .bd-content .bd-article-container {
+  max-width: 1000px;
+}
+
+.bd-main .bd-content .bd-article {
+  line-height: 1.65;
+}
+
+/* Headings: slightly tighter + clearer hierarchy */
+.bd-content h1,
+.bd-content h2,
+.bd-content h3 {
+  letter-spacing: -0.01em;
+}
+
+.bd-content h2 {
+  margin-top: 2.25rem;
+}
+
+/* Inline code */
+.bd-content p code,
+.bd-content li code,
+.bd-content td code {
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.25rem;
+}
+
+/* Code blocks */
+div.highlight pre,
+pre {
+  border-radius: 0.6rem;
+}
+
+/* Admonitions: softer corners */
+.admonition {
+  border-radius: 0.6rem;
+}
+
+/* Sidebar: a touch more breathing room */
+.bd-sidebar-primary .sidebar-primary-item {
+  padding-top: 0.15rem;
+  padding-bottom: 0.15rem;
+}
+

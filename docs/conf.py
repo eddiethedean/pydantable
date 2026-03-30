@@ -75,17 +75,39 @@ myst_enable_extensions = [
 
 master_doc = "index"
 
-html_theme = "sphinx_rtd_theme"
+html_theme = "pydata_sphinx_theme"
 html_static_path = ["_static"]
 
 html_theme_options = {
+    # Keep navigation discoverable by default (closer to FastAPI docs behavior).
     "collapse_navigation": False,
-    "navigation_depth": 4,
-    "titles_only": False,
-    "prev_next_buttons_location": "bottom",
+    # Show an on-page right-hand TOC when headings exist.
+    "show_toc_level": 2,
+    # Use icon links in the navbar (GitHub + PyPI).
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/eddiethedean/pydantable",
+            "icon": "fa-brands fa-github",
+        },
+        {
+            "name": "PyPI",
+            "url": "https://pypi.org/project/pydantable/",
+            "icon": "fa-solid fa-box",
+        },
+    ],
+    # Improve header and sidebar UX on mobile/desktop.
+    "navbar_start": ["navbar-logo"],
+    "navbar_center": ["navbar-nav"],
+    "navbar_end": ["search-field", "theme-switcher", "navbar-icon-links"],
+    "secondary_sidebar_items": ["page-toc", "edit-this-page", "sourcelink"],
+    # Prefer section-style navigation in the sidebar.
+    "navigation_with_keys": True,
 }
 
 html_title = f"{project} {release} documentation"
+
+html_css_files = ["custom.css"]
 
 copybutton_prompt_text = r">>> |\.\.\. |\$ "
 copybutton_prompt_is_regexp = True
