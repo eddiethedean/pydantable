@@ -586,6 +586,7 @@ pub fn plan_rolling_agg(
     min_periods: usize,
     op: String,
     out_name: String,
+    partition_by: Vec<String>,
 ) -> PyResult<PlanInner> {
     if window_size == 0 {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -633,12 +634,38 @@ pub fn plan_rolling_agg(
         },
     );
     let mut new_steps = plan.steps.clone();
+    for p in partition_by.iter() {
+        if !plan.schema.contains_key(p) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "rolling() partition column '{}' not in schema.",
+                p
+            )));
+        }
+    }
+    if !partition_by.is_empty() {
+        let mut sort_by = partition_by.clone();
+        let mut rest: Vec<String> = plan
+            .schema
+            .keys()
+            .filter(|k| !partition_by.iter().any(|p| p == *k))
+            .cloned()
+            .collect();
+        rest.sort();
+        sort_by.extend(rest);
+        let n = sort_by.len();
+        new_steps.push(PlanStep::Sort {
+            by: sort_by,
+            descending: vec![false; n],
+            nulls_last: vec![false; n],
+        });
+    }
     new_steps.push(PlanStep::RollingAgg {
         column,
         window_size,
         min_periods,
         op,
         out_name,
+        partition_by,
     });
     Ok(PlanInner {
         steps: new_steps,

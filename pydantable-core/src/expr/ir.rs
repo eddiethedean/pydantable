@@ -376,6 +376,12 @@ pub enum ExprNode {
         inner: Box<ExprNode>,
         dtype: DTypeDesc,
     },
+    /// Cumulative / diff / pct_change down physical row order (no partition).
+    RowAccum {
+        op: RowAccumOp,
+        inner: Box<ExprNode>,
+        dtype: DTypeDesc,
+    },
     /// Windowed aggregate or ranking function (Polars `.over(...)`).
     Window {
         op: WindowOp,
@@ -401,6 +407,21 @@ pub enum ExprNode {
 /// Window `orderBy` key: column name, ascending, **`nulls_last`** (Polars `SortOptions`).
 /// `nulls_last == false` places nulls before non-nulls for that key (**NULLS FIRST**).
 pub type WindowOrderKey = (String, bool, bool);
+
+/// Row-ordered scan operations (Polars `cum_*`, `diff`, `pct_change` on the expression).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RowAccumOp {
+    CumSum,
+    CumProd,
+    CumMin,
+    CumMax,
+    Diff {
+        periods: i64,
+    },
+    PctChange {
+        periods: i64,
+    },
+}
 
 /// Built-in window operations lowered to Polars window expressions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -228,6 +228,57 @@ class Expr:  # type: ignore[override]
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_ceil(self._rust_expr))
 
+    def cumsum(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_row_accum_cum_sum(self._rust_expr))
+
+    def cumprod(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_row_accum_cum_prod(self._rust_expr))
+
+    def cummin(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_row_accum_cum_min(self._rust_expr))
+
+    def cummax(self) -> Expr:
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_row_accum_cum_max(self._rust_expr))
+
+    def diff(self, periods: int = 1) -> Expr:
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_row_accum_diff(self._rust_expr, int(periods))
+        )
+
+    def pct_change(self, periods: int = 1) -> Expr:
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_row_accum_pct_change(self._rust_expr, int(periods))
+        )
+
+    def clip(self, lower: Any = None, upper: Any = None) -> Expr:
+        e: Expr = self
+        if lower is not None:
+            lo = self._coerce_other(lower)
+            e = when(self < lo, lo).otherwise(e)
+        if upper is not None:
+            hi = self._coerce_other(upper)
+            e = when(e > hi, hi).otherwise(e)
+        return e
+
+    def replace(self, to_replace: dict[Any, Any]) -> Expr:
+        items = list(to_replace.items())
+        if not items:
+            return self
+        if len(items) > 64:
+            raise ValueError("replace() supports at most 64 mappings.")
+        chain = when(
+            self == Literal(value=items[0][0]), Literal(value=items[0][1])
+        )
+        for old, new in items[1:]:
+            chain = chain.when(self == Literal(value=old), Literal(value=new))
+        return chain.otherwise(self)
+
     # Strings
     def strip(self) -> Expr:
         rust = _require_rust_core()

@@ -11,9 +11,9 @@ use crate::dtype::{
 };
 
 use super::ir::{
-    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringPredicateKind,
-    StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit, WindowFrame, WindowOp,
-    WindowOrderKey,
+    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, RowAccumOp,
+    StringPredicateKind, StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit,
+    WindowFrame, WindowOp, WindowOrderKey,
 };
 
 enum ListAggKind {
@@ -251,6 +251,7 @@ impl ExprNode {
             | ExprNode::MapEntries { dtype, .. }
             | ExprNode::MapFromEntries { dtype, .. }
             | ExprNode::Window { dtype, .. }
+            | ExprNode::RowAccum { dtype, .. }
             | ExprNode::GlobalAgg { dtype, .. }
             | ExprNode::GlobalRowCount { dtype, .. } => dtype.clone(),
         }
@@ -347,7 +348,8 @@ impl ExprNode {
             | ExprNode::MapKeys { inner, .. }
             | ExprNode::MapValues { inner, .. }
             | ExprNode::MapEntries { inner, .. }
-            | ExprNode::MapFromEntries { inner, .. } => inner.referenced_columns(),
+            | ExprNode::MapFromEntries { inner, .. }
+            | ExprNode::RowAccum { inner, .. } => inner.referenced_columns(),
             ExprNode::ListGet { inner, index, .. } => {
                 let mut out = inner.referenced_columns();
                 out.extend(index.referenced_columns());
@@ -2189,6 +2191,54 @@ impl ExprNode {
         }
     }
 
+    fn assert_row_accum_numeric_inner(inner: &ExprNode) -> PyResult<()> {
+        let d = inner.dtype();
+        if d.is_struct() || d.is_list() || d.is_map() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "row accumulations expect a numeric scalar expression.",
+            ));
+        }
+        let b = d.as_scalar_base_field().flatten().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "row accumulations require a column or expression with known scalar dtype.",
+            )
+        })?;
+        match b {
+            BaseType::Int | BaseType::Float | BaseType::Decimal => Ok(()),
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "row accumulations require int, float, or decimal values.",
+            )),
+        }
+    }
+
+    /// Cumulative / `diff` / `pct_change` along scan order (no partition).
+    pub fn make_row_accum(inner: ExprNode, op: RowAccumOp) -> PyResult<Self> {
+        Self::assert_row_accum_numeric_inner(&inner)?;
+        let dtype = match op {
+            RowAccumOp::CumSum | RowAccumOp::CumProd => {
+                Self::infer_window_sum_mean_dtype(&inner, false)?
+            }
+            RowAccumOp::CumMin | RowAccumOp::CumMax => Self::infer_global_min_max_dtype(&inner)?,
+            RowAccumOp::Diff { periods } | RowAccumOp::PctChange { periods } => {
+                if periods <= 0 {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "diff and pct_change require a positive periods value.",
+                    ));
+                }
+                DTypeDesc::Scalar {
+                    base: Some(BaseType::Float),
+                    nullable: true,
+                    literals: None,
+                }
+            }
+        };
+        Ok(ExprNode::RowAccum {
+            op,
+            inner: Box::new(inner),
+            dtype,
+        })
+    }
+
     pub fn make_strptime(inner: ExprNode, format: String, to_datetime: bool) -> PyResult<Self> {
         if format.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -3749,6 +3799,12 @@ impl ExprNode {
                 _,
             >(
                 "Global aggregate expressions are only supported with the Polars execution engine.",
+            )),
+            ExprNode::RowAccum { .. } => Err(PyErr::new::<
+                pyo3::exceptions::PyNotImplementedError,
+                _,
+            >(
+                "Row accumulation expressions are only supported with the Polars execution engine.",
             )),
         }
     }

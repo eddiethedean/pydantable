@@ -89,7 +89,8 @@ impl PolarsPlanRunner {
             | ExprNode::UnaryNumeric { inner, .. }
             | ExprNode::StringUnary { inner, .. }
             | ExprNode::TemporalPart { inner, .. }
-            | ExprNode::GlobalAgg { inner, .. } => Self::expr_has_framed_window(inner),
+            | ExprNode::GlobalAgg { inner, .. }
+            | ExprNode::RowAccum { inner, .. } => Self::expr_has_framed_window(inner),
             ExprNode::Between {
                 inner, low, high, ..
             } => {
@@ -705,6 +706,7 @@ impl PolarsPlanRunner {
                 min_periods,
                 op,
                 out_name,
+                partition_by,
             } => {
                 use polars::prelude::{DataType, RollingOptionsFixedWindow};
                 let opts = RollingOptionsFixedWindow {
@@ -715,7 +717,7 @@ impl PolarsPlanRunner {
                     fn_params: None,
                 };
                 let base = col(column);
-                let e = match op.as_str() {
+                let mut e = match op.as_str() {
                     "sum" => base.rolling_sum(opts),
                     "mean" => base.rolling_mean(opts),
                     "min" => base.rolling_min(opts),
@@ -726,8 +728,12 @@ impl PolarsPlanRunner {
                             "internal: unknown rolling op '{other}'."
                         )));
                     }
+                };
+                if !partition_by.is_empty() {
+                    let parts: Vec<_> = partition_by.iter().map(|n| col(n.as_str())).collect();
+                    e = e.over(parts);
                 }
-                .alias(out_name);
+                let e = e.alias(out_name);
                 lf = lf.with_columns([e]);
             }
         }

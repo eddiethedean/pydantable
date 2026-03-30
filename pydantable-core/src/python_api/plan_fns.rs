@@ -220,7 +220,7 @@ fn plan_melt(
 }
 
 #[pyfunction]
-#[pyo3(signature = (plan, column, window_size, min_periods, op, out_name))]
+#[pyo3(signature = (plan, column, window_size, min_periods, op, out_name, partition_by=None))]
 fn plan_rolling_agg(
     plan: &PyPlan,
     column: String,
@@ -228,9 +228,18 @@ fn plan_rolling_agg(
     min_periods: usize,
     op: String,
     out_name: String,
+    partition_by: Option<Vec<String>>,
 ) -> PyResult<PyPlan> {
     Ok(PyPlan {
-        inner: plan_rolling_agg_inner(&plan.inner, column, window_size, min_periods, op, out_name)?,
+        inner: plan_rolling_agg_inner(
+            &plan.inner,
+            column,
+            window_size,
+            min_periods,
+            op,
+            out_name,
+            partition_by.unwrap_or_default(),
+        )?,
     })
 }
 

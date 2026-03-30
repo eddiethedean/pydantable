@@ -1107,6 +1107,25 @@ class DataFrame(Generic[SchemaT]):
             on_validation_errors=self._io_validation_on_validation_errors,
         )
 
+    def _column_dict_in_schema_order(
+        self, column_dict: dict[str, list[Any]]
+    ) -> dict[str, list[Any]]:
+        """Materialized dicts may follow engine hash order; align to schema key order.
+
+        Columns present in the materialized output but not in the current schema
+        (e.g. ``_merge`` from ``merge(indicator=True)``) are appended after, stable
+        by insertion order from the engine dict.
+        """
+        order = list(self._current_field_types.keys())
+        out: dict[str, list[Any]] = {}
+        for k in order:
+            if k in column_dict:
+                out[k] = column_dict[k]
+        for k, v in column_dict.items():
+            if k not in out:
+                out[k] = v
+        return out
+
     def _materialize_columns_with_missing_optional_fallback(
         self, *, streaming: bool
     ) -> dict[str, list[Any]]:
@@ -1316,9 +1335,26 @@ class DataFrame(Generic[SchemaT]):
             mn, mx = min(vals), max(vals)
             if c >= 2:
                 std_v = statistics.stdev(vals)
+                extra = ""
+                if c >= 4:
+                    try:
+                        import numpy as np
+
+                        arr = np.asarray(vals, dtype=float)
+                        m = float(arr.mean())
+                        s = float(arr.std(ddof=1))
+                        if s > 0:
+                            skew_v = float(np.mean(((arr - m) / s) ** 3))
+                            kurt_v = float(np.mean(((arr - m) / s) ** 4) - 3.0)
+                            sem_v = s / (c**0.5)
+                            extra = (
+                                f" skew={skew_v:.6g} kurtosis={kurt_v:.6g} sem={sem_v:.6g}"
+                            )
+                    except ImportError:
+                        pass
                 lines.append(
                     f"{name}: count={c} mean={mean_v:.6g} std={std_v:.6g} "
-                    f"min={mn} max={mx}"
+                    f"min={mn} max={mx}{extra}"
                 )
             else:
                 lines.append(f"{name}: count={c} mean={mean_v:.6g} min={mn} max={mx}")
@@ -2289,12 +2325,14 @@ class DataFrame(Generic[SchemaT]):
         column_dict = _coerce_enum_columns(column_dict, self._current_field_types)
         column_dict = self._apply_io_validation_if_configured(column_dict)
         if as_lists:
-            return column_dict
+            return self._column_dict_in_schema_order(column_dict)
         if as_numpy:
             import numpy as np  # type: ignore[import-not-found]
 
-            return {k: np.asarray(v) for k, v in column_dict.items()}
-        return _rows_from_column_dict(column_dict, self._current_schema_type)
+            ordered = self._column_dict_in_schema_order(column_dict)
+            return {k: np.asarray(v) for k, v in ordered.items()}
+        ordered = self._column_dict_in_schema_order(column_dict)
+        return _rows_from_column_dict(ordered, self._current_schema_type)
 
     def to_dict(
         self,
@@ -2316,7 +2354,8 @@ class DataFrame(Generic[SchemaT]):
             streaming=use_streaming
         )
         raw = _coerce_enum_columns(raw, self._current_field_types)
-        return self._apply_io_validation_if_configured(raw)
+        raw = self._apply_io_validation_if_configured(raw)
+        return self._column_dict_in_schema_order(raw)
 
     def write_parquet(
         self,
@@ -2631,6 +2670,7 @@ class DataFrame(Generic[SchemaT]):
         column_dict = await self._materialize_columns_async(
             streaming=use_streaming, executor=executor
         )
+        column_dict = self._column_dict_in_schema_order(column_dict)
         if as_lists:
             return column_dict
         if as_numpy:
@@ -2652,9 +2692,10 @@ class DataFrame(Generic[SchemaT]):
             engine_streaming=engine_streaming,
             default=self._engine_streaming_default,
         )
-        return await self._materialize_columns_async(
+        raw = await self._materialize_columns_async(
             streaming=use_streaming, executor=executor
         )
+        return self._column_dict_in_schema_order(raw)
 
     async def ato_polars(
         self,

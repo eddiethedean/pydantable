@@ -5,8 +5,8 @@ use pyo3::prelude::*;
 use crate::dtype::{BaseType, DECIMAL_PRECISION, DECIMAL_SCALE};
 
 use super::ir::{
-    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringPredicateKind,
-    StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit, WindowOp,
+    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, RowAccumOp,
+    StringPredicateKind, StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit, WindowOp,
 };
 
 use polars::lazy::dsl::{
@@ -17,6 +17,7 @@ use polars::prelude::{
     RankMethod, RankOptions, RoundMode, Scalar, Series, SortOptions, StrptimeOptions, TimeUnit,
     WindowMapping,
 };
+use polars_core::series::ops::NullBehavior; // direct dep for diff(null_behavior); polars re-export is incomplete
 
 /// Polars lowering hook (dependency inversion / extension point for new variants).
 #[allow(dead_code)]
@@ -652,6 +653,17 @@ impl ExprNode {
             }
             ExprNode::MapEntries { inner, .. } => Ok(inner.to_polars_expr()?),
             ExprNode::MapFromEntries { inner, .. } => Ok(inner.to_polars_expr()?),
+            ExprNode::RowAccum { op, inner, .. } => {
+                let e = inner.to_polars_expr()?;
+                Ok(match *op {
+                    RowAccumOp::CumSum => e.cum_sum(false),
+                    RowAccumOp::CumProd => e.cum_prod(false),
+                    RowAccumOp::CumMin => e.cum_min(false),
+                    RowAccumOp::CumMax => e.cum_max(false),
+                    RowAccumOp::Diff { periods } => e.diff(lit(periods), NullBehavior::Ignore),
+                    RowAccumOp::PctChange { periods } => e.pct_change(lit(periods)),
+                })
+            }
             ExprNode::Window {
                 op,
                 operand,

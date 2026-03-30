@@ -6,7 +6,8 @@ use pyo3::types::PyAny;
 use crate::dtype::{py_annotation_to_dtype, DTypeDesc};
 use crate::expr::{
     op_symbol_to_arith, op_symbol_to_cmp, ArithOp, CmpOp, ExprHandle, ExprNode, LogicalOp,
-    StringPredicateKind, StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit,
+    RowAccumOp, StringPredicateKind, StringUnaryOp, TemporalPart, UnaryNumericOp,
+    UnixTimestampUnit,
 };
 
 use super::types::PyExpr;
@@ -752,6 +753,54 @@ fn expr_global_max(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
 }
 
 #[pyfunction]
+fn expr_row_accum_cum_sum(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_row_accum(inner.borrow().node.clone(), RowAccumOp::CumSum)?,
+    })
+}
+
+#[pyfunction]
+fn expr_row_accum_cum_prod(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_row_accum(inner.borrow().node.clone(), RowAccumOp::CumProd)?,
+    })
+}
+
+#[pyfunction]
+fn expr_row_accum_cum_min(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_row_accum(inner.borrow().node.clone(), RowAccumOp::CumMin)?,
+    })
+}
+
+#[pyfunction]
+fn expr_row_accum_cum_max(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_row_accum(inner.borrow().node.clone(), RowAccumOp::CumMax)?,
+    })
+}
+
+#[pyfunction]
+fn expr_row_accum_diff(inner: Bound<'_, PyExpr>, periods: i64) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_row_accum(
+            inner.borrow().node.clone(),
+            RowAccumOp::Diff { periods },
+        )?,
+    })
+}
+
+#[pyfunction]
+fn expr_row_accum_pct_change(inner: Bound<'_, PyExpr>, periods: i64) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_row_accum(
+            inner.borrow().node.clone(),
+            RowAccumOp::PctChange { periods },
+        )?,
+    })
+}
+
+#[pyfunction]
 fn expr_window_lag(
     inner: Bound<'_, PyExpr>,
     n: u32,
@@ -884,6 +933,12 @@ pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr_global_count, m)?)?;
     m.add_function(wrap_pyfunction!(expr_global_min, m)?)?;
     m.add_function(wrap_pyfunction!(expr_global_max, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_row_accum_cum_sum, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_row_accum_cum_prod, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_row_accum_cum_min, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_row_accum_cum_max, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_row_accum_diff, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_row_accum_pct_change, m)?)?;
     m.add_function(wrap_pyfunction!(expr_global_row_count, m)?)?;
     m.add_function(wrap_pyfunction!(expr_window_lag, m)?)?;
     m.add_function(wrap_pyfunction!(expr_window_lead, m)?)?;

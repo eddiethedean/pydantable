@@ -6,8 +6,9 @@ use pyo3::types::{PyBytes, PyDict, PyList};
 use crate::dtype::{dtype_to_descriptor_py, BaseType};
 
 use super::ir::{
-    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, StringPredicateKind,
-    StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit, WindowFrame, WindowOp,
+    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, RowAccumOp,
+    StringPredicateKind, StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit,
+    WindowFrame, WindowOp,
 };
 
 fn base_type_json(b: BaseType) -> &'static str {
@@ -467,6 +468,27 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
         }
         ExprNode::MapFromEntries { inner, .. } => {
             dict.set_item("kind", "map_from_entries")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+        }
+        ExprNode::RowAccum { op, inner, .. } => {
+            dict.set_item("kind", "row_accum")?;
+            dict.set_item(
+                "op",
+                match op {
+                    RowAccumOp::CumSum => "cum_sum",
+                    RowAccumOp::CumProd => "cum_prod",
+                    RowAccumOp::CumMin => "cum_min",
+                    RowAccumOp::CumMax => "cum_max",
+                    RowAccumOp::Diff { periods } => {
+                        dict.set_item("periods", periods)?;
+                        "diff"
+                    }
+                    RowAccumOp::PctChange { periods } => {
+                        dict.set_item("periods", periods)?;
+                        "pct_change"
+                    }
+                },
+            )?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
         }
         ExprNode::Window {

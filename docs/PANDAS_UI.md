@@ -2,6 +2,16 @@
 
 The **pandas UI** is an optional import surface that layers **pandas-like method and property names** on top of pydantable’s typed logical DataFrame. It does **not** wrap a `pandas.DataFrame` for the schema-driven `DataFrame` / `DataFrameModel` types; execution uses the same **Rust engine** as the default export (see [Execution](EXECUTION.md)).
 
+## Index-light model and lazy vs eager
+
+pydantable is **schema-first** and does not implement a pandas **`Index`** object on the logical frame. For the pandas UI:
+
+- **“Index” operations** (`sort_index`, `set_index`, `reset_index`, `reindex`, `align`, …) use **named key column(s)** that you pass explicitly—there is no hidden row index and no **`MultiIndex`** unless you model it with normal columns (e.g. string keys) or future structured types.
+- Some helpers match **pandas names** but are **narrow**: reshape (`stack` / `unstack` / `wide_to_long`), `combine_first` / `update` (join keys required), and `compare` (subset of pandas). See each method’s docstring.
+- **Lazy-safe** methods stay on the logical plan (filters, joins, many `with_columns` / **`assign`** paths, windowed **`rank`** when built from expressions, rolling steps executed in Polars).
+- **Eager** methods materialize like **`head`** / **`tail`** / **`describe`** / core **`rolling_agg(..., on=..., by=...)`**: they **`collect`/`to_dict`** (or similar) before continuing. Examples: **`sample`**, **`take`**, **`corr`/`cov`** (numeric; NumPy), **`dot`** (numeric; NumPy), **`compare`**, and **`transpose`/`T`** on square, single-dtype tables. *Not yet implemented on the pandas UI:* **`get_dummies`**, **`cut`/`qcut`**, **`factorize`** (use core/groupBy or materialize + pandas when needed).
+- **Dynamic column pivot / transpose**: core **`pivot`** is typed; the pandas UI still omits open-ended **`pivot`** where output columns would be arbitrary value-derived names. Reshape helpers should not pretend to infer a **Pydantic** schema without materialization or an explicit result type.
+
 ## When to use it
 
 - You prefer **`assign`**, **`merge`**, **`head`/`tail`**, and **`group_by().sum(...)`**-style ergonomics while keeping **Pydantic `DataFrameModel`** typing.
@@ -68,7 +78,7 @@ Use column expressions (e.g. `df.x + 1`) instead.
 
 ### `merge(other, *, how="inner", on=..., suffixes=("_x", "_y"), ...)`
 
-Maps to **`join`**: `on` is required; the **right suffix** is taken from `suffixes[1]` (default second element `"_y"` → passed as `suffix` to `join`).
+Maps to **`join`**: `on` is required; the **right suffix** is taken from `suffixes[1]` (default second element `"_y"` → passed as `suffix` to `join`). For **`on=...`** merges with **`how="outer"`**, **`"right"`**, or **`"full"`**, a suffixed duplicate of a join key from the engine (often **`k_right`**) is **coalesced** into the primary key column and dropped.
 
 **Supports:**
 
@@ -253,7 +263,9 @@ Supported shape:
 
 ### `rolling(window=..., min_periods=...)` (lazy, row-based)
 
-Row-based fixed windows only (no time-based/index-based rolling, no `groupby().rolling()` yet).
+**On a plain `DataFrame`:** rolling is **global** (scan order): each window runs over the whole table in row order.
+
+**On `group_by(...).rolling(...)`:** the window is **partitioned by the group key columns** (Polars `.over(...)`). The planner inserts a **stable multi-key sort** (partition columns first, then remaining columns) before the rolling step so behavior is deterministic—if you need a custom order within groups, **sort before `group_by`** when your workflow allows it.
 
 `rolling(...)` returns a small helper with:
 
@@ -263,7 +275,75 @@ Row-based fixed windows only (no time-based/index-based rolling, no `groupby().r
 - `max(...)`
 - `count(...)`
 
+**Not on this façade yet:** time/index-based rolling matching pandas `rolling(on=...)` for datetime columns; use core **`rolling_agg`** (see {doc}`EXECUTION`) where the typed API exposes it.
+
 **Engine:** Implemented in the Polars-backed executor; builds without the Polars engine will not be able to execute rolling plans. `min_periods` must not exceed `window` (Polars validates this at execution time).
+
+### Reshape helpers (narrow vs pandas)
+
+These names match pandas where possible but are **typed** and sometimes **stricter**:
+
+| Method | Notes |
+|--------|--------|
+| `wide_to_long(stubnames, i, j, sep="_", suffix=r"\d+", value_name=...)` | **Single stub** only (`str` or length-1 list); same as `melt` plus **`j` = captured suffix** (regex group 1), so `sales_2020` → stub `sales`, `j` value `2020`, not the full column name. |
+| `stack(id_vars=..., value_vars=..., var_name=..., value_name=...)` | Alias for `melt` (no MultiIndex `stack`). |
+| `unstack(index=..., columns=..., values=..., aggregate_function=...)` | Thin wrapper over core **`pivot`** (explicit index/columns/values). |
+| `from_dict(data, orient="columns"\|"list"\|"index"\|"records", columns=...)` | Classmethod on **`DataFrame[Schema]`** only; **`records`** and **`index`** are converted to **`dict[str, list]`** in **schema field order** (empty **`records`** yields empty columns per schema). |
+
+### Row and index-light helpers
+
+| Method | Notes |
+|--------|--------|
+| `sort_index(by=...)` or `sort_index(level=...)` | **`by`/`level` required**: list of key column names. Delegates to `sort_values`. No pandas `Index` object. |
+| `set_index(keys, drop=True, append=False)` | Reorders columns so `keys` are **first**; `drop`/`append` mostly parity flags (see implementation). |
+| `reset_index(...)` | No-op aside from rejecting unsupported pandas-only parameters (no stored Index). |
+| `reindex(other, on=..., how=..., suffix=...)` | Join **`other`’s key projection** to `self` on **`on`** (index-light). |
+| `reindex_like(other, ...)` | Uses **all columns of `other`** as join keys; tends to be strict—prefer **`reindex(..., on=[...])`** for clarity. |
+| `align(other, on=[...], join="outer"\|...)` | Returns **two** frames on the union/intersection of keys (unique key rows), then left-joins each side. |
+| `sample(n=..., frac=..., random_state=..., replace=False)` | **Eager**; `replace=True` not supported. |
+| `take(indices)` | **Eager** positional row pick; negative indices allowed like Python. |
+
+### Two-frame and compare/update
+
+| Method | Notes |
+|--------|--------|
+| `combine_first(other, on=[...])` | **Outer** merge on keys; overlapping value columns **`coalesce(left, right)`**; drops `*_other` join columns. |
+| `update(other, on=[...])` | **Left** merge; for overlaps, **`coalesce(right, left)`** (other wins when non-null). |
+| `compare(other)` | **Eager** cell-wise inequality; returns a **new** boolean frame (`*_diff` columns). Same columns and row count required. |
+
+### Whole-frame numeric summaries
+
+| Method | Notes |
+|--------|--------|
+| `corr(method="pearson")` | **Eager**; needs **NumPy**; at least two numeric columns; returns a correlation **matrix** as a typed `DataFrame` (dynamic schema). |
+| `cov()` | Same pattern for sample covariance matrix. |
+
+**`describe()`** on the core frame may append **skew / kurtosis / sem** (when NumPy is available and \(n \ge 4\)) for numeric columns—see implementation in `dataframe/_impl.py`.
+
+### Transforms (facade and `Expr`)
+
+**DataFrame / lazy where Polars lowers the expression:**
+
+- **`where(cond, other=None)` / `mask(cond, other=None)`** — row-wise `CASE` over **every** column: the same boolean `cond` is applied to each column, and a **scalar** `other` **broadcasts** to all columns (pandas parity). Use per-column expressions if you need column-specific replacement.
+- **`rank(method="average"\|"dense", ...)`** — per-column window rank over that column as the sole sort key; **`min`/`max`/`first`** methods not implemented on the façade.
+- **`interpolate(method="ffill"\|"bfill")`** — maps to `fill_null(strategy=...)`. **`method="linear"`** raises `NotImplementedError` until a dedicated engine path exists.
+- **`expanding()`** — **`sum`/`count`** via `cumsum`; **`mean`** not implemented.
+- **`ewm(...)`** — not implemented (use fixed **`rolling`**).
+- **`eval(expr, ...)`** — alias for **`query`** (same grammar and dict rules).
+
+**On `Expr` (also usable in `assign` / `with_columns`):**
+
+- **`cumsum`**, **`cumprod`**, **`cummin`**, **`cummax`**, **`diff`**, **`pct_change`**
+- **`clip(lower=..., upper=...)`**, **`replace({old: new, ...})`** (bounded mapping size)
+
+### Utilities
+
+| Method | Notes |
+|--------|--------|
+| `dot(other)` | **Eager** matmul; **`other.shape[0]`** must equal **`self.shape[1]`**; numeric columns only; NumPy. **`@`** is not overloaded; use **`dot`**. |
+| `transpose()` / `T` | **Square** table only; **single shared dtype** across columns; materializes then permutes columns by row index. |
+| `insert(loc, column, value, ...)` | Returns **new** frame with column order **`[... before loc, new col, ... after]`** (not pandas in-place). |
+| `pop(column)` | Returns **`(Expr, DataFrame)`** — immutable style, unlike pandas. |
 
 ### `to_pandas()` (eager)
 
@@ -330,7 +410,7 @@ Wraps the pandas UI `DataFrame` and delegates:
 - **`assign`**, **`merge`**, **`head`/`tail`**, **`__getitem__`**, **`group_by`** → same semantics as above on the inner frame.
 - **`query`**, **`sort_values`**, **`drop`**, **`rename`**, **`fillna`**, **`astype`** → same semantics as above on the inner frame.
 - **`concat`**, **`nlargest`**, **`nsmallest`**, **`isin`**, **`explode`**, **`copy`**, **`pipe`**, **`filter`** (row `Expr` vs `items`/`like`/`regex`) → delegated to the inner pandas UI frame and re-wrapped.
-- **`iloc`**, **`loc`**, **`isna`/`isnull`/`notna`/`notnull`**, **`dropna`**, **`melt`**, **`rolling`** → same semantics; results are wrapped back in the same `DataFrameModel` subclass (like `head`/`tail`).
+- **`iloc`**, **`loc`**, **`isna`/`isnull`/`notna`/`notnull`**, **`dropna`**, **`melt`**, **`rolling`**, **`group_by` → `.rolling(...)`**, and other pandas UI helpers documented above (**`wide_to_long`**, **`from_dict`**, **`where`/`mask`**, **`rank`**, **`sample`/`take`**, **`corr`/`cov`**, **`combine_first`/`update`/`compare`**, **`reindex`/`align`**, **`dot`/`transpose`/`insert`/`pop`**, …) → delegated to the inner **`PandasDataFrame`** via **`__getattr__`**. Methods that return a plain **`DataFrame`** (e.g. **`pop`**) are **not** auto-wrapped into a **`DataFrameModel`** unless you add explicit façade methods; call **`type(self)._from_dataframe(...)`** when you need a model instance.
 
 Properties **`columns`**, **`shape`**, **`empty`**, **`dtypes`** read from the inner frame.
 

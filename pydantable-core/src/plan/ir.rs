@@ -56,6 +56,8 @@ pub enum PlanStep {
         min_periods: usize,
         op: String,
         out_name: String,
+        /// Empty = frame-global rolling (current row order). Non-empty = `.over(...)` keys.
+        partition_by: Vec<String>,
     },
 }
 

@@ -1738,3 +1738,273 @@ def test_pandas_ui_groupby_sum_alias() -> None:
     assert_table_eq_sorted(
         a.collect(as_lists=True), b.collect(as_lists=True), keys=["k"]
     )
+
+
+def test_pandas_ui_wide_to_long_single_stub() -> None:
+    from pydantable.pandas import DataFrame
+
+    class T(Schema):
+        id: int
+        sales_2020: int
+        sales_2021: int
+
+    df = DataFrame[T](
+        {"id": [1, 2], "sales_2020": [10, 20], "sales_2021": [11, 21]}
+    )
+    long = df.wide_to_long("sales", i="id", j="year", sep="_")
+    got = long.collect(as_lists=True)
+    assert got["id"] == [1, 2, 1, 2]
+    assert set(got["year"]) == {"2020", "2021"}
+    assert sorted(zip(got["id"], got["year"], got["sales"], strict=True)) == [
+        (1, "2020", 10),
+        (1, "2021", 11),
+        (2, "2020", 20),
+        (2, "2021", 21),
+    ]
+
+
+def test_pandas_ui_from_dict_orients() -> None:
+    from pydantable.pandas import DataFrame
+
+    class R(Schema):
+        a: int
+        b: int
+
+    d1 = DataFrame[R].from_dict({"a": [1, 2], "b": [3, 4]})
+    assert d1.collect(as_lists=True) == {"a": [1, 2], "b": [3, 4]}
+
+    d2 = DataFrame[R].from_dict([{"a": 1, "b": 2}, {"a": 3, "b": 4}], orient="records")
+    assert d2.collect(as_lists=True) == {"a": [1, 3], "b": [2, 4]}
+
+    d3 = DataFrame[R].from_dict(
+        {10: {"a": 1, "b": 2}, 20: {"a": 3, "b": 4}}, orient="index"
+    )
+    assert d3.collect(as_lists=True) == {"a": [1, 3], "b": [2, 4]}
+
+
+def test_pandas_ui_stack_matches_melt() -> None:
+    from pydantable.pandas import DataFrame
+
+    class R(Schema):
+        id: int
+        x: int
+        y: int
+
+    df = DataFrame[R]({"id": [1], "x": [10], "y": [20]})
+    a = df.stack(id_vars="id", value_vars=["x", "y"], var_name="k", value_name="v")
+    b = df.melt(id_vars="id", value_vars=["x", "y"], var_name="k", value_name="v")
+    assert a.collect(as_lists=True) == b.collect(as_lists=True)
+
+
+def test_pandas_ui_where_and_mask() -> None:
+    from pydantable.pandas import DataFrame
+
+    class R(Schema):
+        a: int
+        b: int
+
+    df = DataFrame[R]({"a": [1, 2], "b": [30, 40]})
+    w = df.where(df.col("a") > 1, 0).collect(as_lists=True)
+    # Scalar `other` broadcasts like pandas: every column uses the same row mask.
+    assert w["a"] == [0, 2]
+    assert w["b"] == [0, 40]
+    m = df.mask(df.col("a") > 1, 0).collect(as_lists=True)
+    assert m["a"] == [1, 0]
+    assert m["b"] == [30, 0]
+
+
+def test_pandas_ui_rank_orders_within_column() -> None:
+    from pydantable.pandas import DataFrame
+
+    class R(Schema):
+        v: int
+
+    df = DataFrame[R]({"v": [3, 1, 2]})
+    ra = df.rank(method="average").collect(as_lists=True)
+    rd = df.rank(method="dense").collect(as_lists=True)
+    assert ra["v"] == [3, 1, 2]
+    assert rd["v"] == [3, 1, 2]
+
+
+def test_pandas_ui_sample_and_take() -> None:
+    from pydantable.pandas import DataFrame
+
+    class R(Schema):
+        i: int
+
+    df = DataFrame[R]({"i": list(range(10))})
+    s1 = df.sample(n=3, random_state=42).collect(as_lists=True)
+    s2 = df.sample(n=3, random_state=42).collect(as_lists=True)
+    assert len(s1["i"]) == 3
+    assert s1 == s2
+    t = df.take([2, 0, 2]).collect(as_lists=True)
+    assert t["i"] == [2, 0, 2]
+    tn = df.take([-1]).collect(as_lists=True)
+    assert tn["i"] == [9]
+
+
+def test_pandas_ui_sort_index_keyword() -> None:
+    from pydantable.pandas import DataFrame
+
+    class R(Schema):
+        k: int
+        v: int
+
+    df = DataFrame[R]({"k": [2, 1], "v": [20, 10]})
+    out = df.sort_index(by=["k"]).collect(as_lists=True)
+    assert out["k"] == [1, 2]
+    assert out["v"] == [10, 20]
+
+
+def test_pandas_ui_combine_first_and_update() -> None:
+    from pydantable.pandas import DataFrame
+
+    class R(Schema):
+        k: int
+        v: int | None
+
+    left = DataFrame[R]({"k": [1, 2], "v": [None, 20]})
+    right = DataFrame[R]({"k": [1, 2], "v": [10, None]})
+    cf = left.combine_first(right, on=["k"]).collect(as_lists=True)
+    assert_table_eq_sorted(cf, {"k": [1, 2], "v": [10, 20]}, keys=["k"])
+
+    left2 = DataFrame[R]({"k": [1, 2], "v": [1, 2]})
+    right2 = DataFrame[R]({"k": [1, 2], "v": [99, None]})
+    up = left2.update(right2, on=["k"]).collect(as_lists=True)
+    assert_table_eq_sorted(up, {"k": [1, 2], "v": [99, 2]}, keys=["k"])
+
+
+def test_pandas_ui_compare_flags_diffs() -> None:
+    from pydantable.pandas import DataFrame
+
+    class R(Schema):
+        a: int
+        b: int
+
+    x = DataFrame[R]({"a": [1, 2], "b": [3, 4]})
+    y = DataFrame[R]({"a": [1, 9], "b": [3, 4]})
+    cmp = x.compare(y).collect(as_lists=True)
+    assert cmp["a_diff"] == [False, True]
+    assert cmp["b_diff"] == [False, False]
+
+
+def test_pandas_ui_corr_and_cov() -> None:
+    np = pytest.importorskip("numpy")
+    from pydantable.pandas import DataFrame
+
+    class R(Schema):
+        a: int
+        b: int
+        c: int
+
+    df = DataFrame[R]({"a": [1, 2, 3], "b": [2, 4, 6], "c": [1, 0, 1]})
+    cm = df.corr().collect(as_lists=True)
+    assert set(cm.keys()) == {"a", "b", "c"}
+    m = np.array([[cm["a"][i], cm["b"][i], cm["c"][i]] for i in range(3)])
+    assert np.allclose(m, np.corrcoef([[1, 2, 3], [2, 4, 6], [1, 0, 1]], rowvar=True))
+
+    cv = df.cov().collect(as_lists=True)
+    m2 = np.array([[cv["a"][i], cv["b"][i], cv["c"][i]] for i in range(3)])
+    exp = np.cov(np.array([[1, 2, 3], [2, 4, 6], [1, 0, 1]], dtype=float), rowvar=True)
+    assert m2.shape == exp.shape
+    assert np.allclose(m2, exp, rtol=1e-5, atol=1e-5)
+
+
+def test_pandas_ui_groupby_rolling_partitioned() -> None:
+    from pydantable.pandas import DataFrame
+
+    class R(Schema):
+        g: int
+        x: int
+
+    df = DataFrame[R]({"g": [1, 1, 2, 2], "x": [1, 3, 10, 30]})
+    out = df.group_by("g").rolling(window=2, min_periods=1).sum("x", out_name="s")
+    got = out.collect(as_lists=True)
+    assert_table_eq_sorted(
+        {k: got[k] for k in ("g", "s")},
+        {"g": [1, 1, 2, 2], "s": [1, 4, 10, 40]},
+        keys=["g", "s"],
+    )
+
+
+def test_pandas_ui_expr_row_accum_and_clip_replace() -> None:
+    from pydantable.pandas import DataFrame
+
+    class R(Schema):
+        x: int
+
+    df = DataFrame[R]({"x": [1, 2, 3]})
+    w = df.with_columns(
+        cs=df.col("x").cumsum(),
+        d=df.col("x").diff(),
+        clipped=df.col("x").clip(lower=2, upper=2),
+        rep=df.col("x").replace({1: 99}),
+    ).collect(as_lists=True)
+    assert w["cs"] == [1, 3, 6]
+    assert w["d"][0] is None or w["d"][0] != w["d"][0]  # nan-like first row
+    assert w["clipped"] == [2, 2, 2]
+    assert w["rep"][0] == 99
+    assert w["rep"][1] == 2
+
+
+def test_pandas_ui_reindex_align_keys() -> None:
+    from pydantable.pandas import DataFrame
+
+    class K(Schema):
+        k: int
+
+    class V(Schema):
+        k: int
+        v: int | None
+
+    keys = DataFrame[K]({"k": [1, 3]})
+    body = DataFrame[V]({"k": [1, 2], "v": [10, 20]})
+    ri = body.reindex(keys, on="k").collect(as_lists=True)
+    assert_table_eq_sorted(ri, {"k": [1, 3], "v": [10, None]}, keys=["k"])
+
+    left = DataFrame[V]({"k": [1, 2], "v": [1, 2]})
+    right = DataFrame[V]({"k": [2, 3], "v": [20, 30]})
+    a_l, a_r = left.align(right, on=["k"], join="outer")
+    assert set(a_l.collect(as_lists=True)["k"]) == {1, 2, 3}
+
+
+def test_pandas_ui_transpose_and_dot() -> None:
+    np = pytest.importorskip("numpy")
+    from pydantable.pandas import DataFrame
+
+    class M(Schema):
+        a: int
+        b: int
+
+    df = DataFrame[M]({"a": [1, 2], "b": [3, 4]})
+    t = df.T.collect(as_lists=True)
+    assert t["a"] == [1, 3]
+    assert t["b"] == [2, 4]
+
+    coef = DataFrame[M]({"a": [1, 0], "b": [0, 1]})
+    dst = df.dot(coef).collect(as_lists=True)
+    m = np.array([[1, 3], [2, 4]], dtype=float) @ np.array([[1, 0], [0, 1]], dtype=float)
+    assert np.allclose([[dst["a"][0], dst["b"][0]], [dst["a"][1], dst["b"][1]]], m)
+
+
+def test_pandas_ui_insert_pop_and_eval_alias() -> None:
+    from pydantable.pandas import DataFrame
+
+    class R(Schema):
+        a: int
+        b: int
+
+    df = DataFrame[R]({"a": [1], "b": [2]})
+    ins = df.insert(1, "m", 99).collect(as_lists=True)
+    assert list(ins.keys()) == ["a", "m", "b"]
+    assert ins["m"] == [99]
+    expr, rest = df.pop("b")
+    assert expr.referenced_columns() == {"b"}
+    assert rest.collect(as_lists=True) == {"a": [1]}
+
+    class ACol(Schema):
+        a: int
+
+    q = DataFrame[ACol]({"a": [1, 5]}).eval("a > 1")
+    direct = DataFrame[ACol]({"a": [1, 5]}).query("a > 1")
+    assert q.collect(as_lists=True) == direct.collect(as_lists=True)

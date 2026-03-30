@@ -8,9 +8,12 @@ pandas-shaped API.
 from __future__ import annotations
 
 import ast
+import random
 import re
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
+
+from pydantic import create_model
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -21,10 +24,11 @@ from .dataframe import DataFrame as CoreDataFrame
 from .dataframe import GroupedDataFrame as CoreGroupedDataFrame
 from .dataframe_model import DataFrameModel as CoreDataFrameModel
 from .dataframe_model import GroupedDataFrameModel as CoreGroupedDataFrameModel
-from .expressions import Expr, Literal, coalesce, when
+from .expressions import Expr, Literal, coalesce, dense_rank, rank, when
 from .rust_engine import _require_rust_core
 from .schema import Schema
-from .schema._impl import make_derived_schema_type
+from .schema._impl import make_derived_schema_type, schema_field_types
+from .window_spec import WindowSpec
 
 
 def _is_pandas_series(value: object) -> bool:
@@ -127,6 +131,82 @@ def _unique_tmp_name(existing: set[str], base: str) -> str:
     while f"{base}_{i}" in existing:
         i += 1
     return f"{base}_{i}"
+
+
+def _row_subset_from_lists(
+    data: dict[str, list[Any]], indices: list[int]
+) -> dict[str, list[Any]]:
+    return {c: [data[c][i] for i in indices] for c in data}
+
+
+def _rows_to_column_dict(
+    rows: list[dict[str, Any]], *, columns: list[str]
+) -> dict[str, list[Any]]:
+    """Build columnar buffers from row dicts in a fixed column order."""
+    if not rows:
+        return {c: [] for c in columns}
+    return {k: [r.get(k) for r in rows] for k in columns}
+
+
+def _typing_numeric_name(ann: Any) -> bool:
+    """Best-effort: treat int/float and Optional variants as numeric for corr/sample."""
+    if ann in (int, float):
+        return True
+    origin = getattr(ann, "__origin__", None)
+    args = getattr(ann, "__args__", ())
+    if origin is type(None):
+        return False
+    if origin is not None and str(origin).endswith("Union"):
+        non_none = [a for a in args if a is not type(None)]
+        return len(non_none) == 1 and _typing_numeric_name(non_none[0])
+    return False
+
+
+def wide_to_long(
+    df: CoreDataFrame,
+    stubnames: str | list[str],
+    i: str | list[str],
+    j: str,
+    *,
+    sep: str = "_",
+    suffix: str = r"\d+",
+    value_name: str | None = None,
+) -> CoreDataFrame:
+    """Narrow ``wide_to_long`` for a **single** stub (see ``docs/PANDAS_UI.md``).
+
+    Columns must match ``stub`` + ``sep`` + ``suffix`` (regex). Extra columns
+    are treated as ``id_vars`` alongside ``i``.
+    """
+    stub_list = [stubnames] if isinstance(stubnames, str) else list(stubnames)
+    if len(stub_list) != 1:
+        raise NotImplementedError(
+            "wide_to_long supports a single stub name (str or len-1 list); "
+            "use melt() for other layouts."
+        )
+    stub = stub_list[0]
+    id_cols = [i] if isinstance(i, str) else list(i)
+    pat = re.compile(rf"^{re.escape(stub)}{re.escape(sep)}({suffix})$")
+    matched: list[str] = []
+    for c in df.schema_fields():
+        if c in id_cols:
+            continue
+        if pat.match(c):
+            matched.append(c)
+    if not matched:
+        raise ValueError(
+            f"wide_to_long: no columns matched stub={stub!r} "
+            f"sep={sep!r} suffix={suffix!r}."
+        )
+    vn = value_name if value_name is not None else stub
+    melted = df.melt(
+        id_vars=id_cols,
+        value_vars=matched,
+        var_name=j,
+        value_name=vn,
+    )
+    pat_extract = rf"^{re.escape(stub)}{re.escape(sep)}({suffix})$"
+    vj = melted.col(j)
+    return melted.with_columns(**{j: vj.str_extract_regex(pat_extract, 1)})
 
 
 class PandasDataFrame(CoreDataFrame):
@@ -483,6 +563,23 @@ class PandasDataFrame(CoreDataFrame):
                         out = out.drop(*dupes)
                 return out
             out = self.join(other, on=on_list, how=how, suffix=suffix)
+            if how in {"right", "outer", "full"}:
+                fields2 = set(out.schema_fields())
+                dupes: list[str] = []
+                unify_keys: dict[str, Expr] = {}
+                for k in on_list:
+                    dupe = None
+                    if f"{k}_right" in fields2:
+                        dupe = f"{k}_right"
+                    elif f"{k}{suffix}" in fields2:
+                        dupe = f"{k}{suffix}"
+                    if dupe is not None:
+                        dupes.append(dupe)
+                        unify_keys[k] = coalesce(out.col(k), out.col(dupe))
+                if unify_keys:
+                    out = out.with_columns(**unify_keys)
+                if dupes:
+                    out = out.drop(*dupes)  # type: ignore[arg-type]
             if sort:
                 out = out.sort(*on_list, descending=False)
             return out
@@ -1485,6 +1582,620 @@ class PandasDataFrame(CoreDataFrame):
             rust_plan=rust_plan,
         )
 
+    @classmethod
+    def from_dict(
+        cls,
+        data: Mapping[str, Any] | list[dict[str, Any]],
+        orient: str = "columns",
+        *,
+        columns: list[str] | None = None,
+    ) -> Any:
+        if cls._schema_type is None:
+            raise TypeError(
+                "from_dict() requires a typed frame class such as "
+                "DataFrame[MySchema].from_dict(...)."
+            )
+        o = orient.lower().strip()
+        if o in ("columns", "list"):
+            if not isinstance(data, Mapping):
+                raise TypeError(
+                    "from_dict(orient='columns') expects a mapping of column -> values."
+                )
+            return cls({str(k): v for k, v in data.items()})
+        field_cols = list(schema_field_types(cls._schema_type).keys())
+        if o == "index":
+            if not isinstance(data, Mapping):
+                raise TypeError(
+                    "from_dict(orient='index') expects dict[row_key, dict[col, val]]."
+                )
+            rows: list[dict[str, Any]] = []
+            for row in data.values():
+                if not isinstance(row, Mapping):
+                    raise TypeError(
+                        "from_dict(orient='index') values must be column dicts."
+                    )
+                rows.append({str(k): v for k, v in row.items()})
+            use_cols = list(columns) if columns is not None else field_cols
+            if columns is not None:
+                rows = [{k: r.get(k) for k in use_cols} for r in rows]
+            return cls(_rows_to_column_dict(rows, columns=use_cols))
+        if o == "records":
+            if not isinstance(data, list):
+                raise TypeError("from_dict(orient='records') expects a list[dict].")
+            rows_rec = [dict(r) for r in data]
+            return cls(_rows_to_column_dict(rows_rec, columns=field_cols))
+        raise ValueError(f"from_dict(orient=...) got unsupported value {orient!r}.")
+
+    def wide_to_long(
+        self,
+        stubnames: str | list[str],
+        i: str | list[str],
+        j: str,
+        *,
+        sep: str = "_",
+        suffix: str = r"\d+",
+        value_name: str | None = None,
+    ) -> CoreDataFrame:
+        return wide_to_long(
+            self,
+            stubnames,
+            i,
+            j,
+            sep=sep,
+            suffix=suffix,
+            value_name=value_name,
+        )
+
+    def stack(
+        self,
+        *,
+        id_vars: str | list[str],
+        value_vars: str | list[str] | None = None,
+        var_name: str = "variable",
+        value_name: str = "value",
+    ) -> CoreDataFrame:
+        """Narrow stack: typed :meth:`melt` alias (no pandas MultiIndex)."""
+        return self.melt(
+            id_vars=id_vars,
+            value_vars=value_vars,
+            var_name=var_name,
+            value_name=value_name,
+        )
+
+    def unstack(
+        self,
+        *,
+        index: str | list[str],
+        columns: str,
+        values: str | list[str],
+        aggregate_function: str = "first",
+        streaming: bool | None = None,
+    ) -> CoreDataFrame:
+        """Narrow unstack to typed :meth:`~pydantable.dataframe.DataFrame.pivot`."""
+        return super().pivot(
+            index=index,
+            columns=columns,
+            values=values,
+            aggregate_function=aggregate_function,
+            streaming=streaming,
+        )
+
+    def where(self, cond: Expr, other: Any | None = None) -> CoreDataFrame:
+        if not isinstance(cond, Expr):
+            raise TypeError("where(cond=...) expects an Expr boolean condition.")
+        if other is None:
+            oth: Expr = Literal(value=None)
+        elif isinstance(other, Expr):
+            oth = other
+        else:
+            oth = Literal(value=other)
+        cols = list(self.schema_fields().keys())
+        return self.with_columns(
+            **{c: when(cond, self.col(c)).otherwise(oth) for c in cols}
+        )
+
+    def mask(self, cond: Expr, other: Any | None = None) -> CoreDataFrame:
+        if not isinstance(cond, Expr):
+            raise TypeError("mask(cond=...) expects an Expr boolean condition.")
+        return self.where(~cond, other)
+
+    def rank(
+        self,
+        *,
+        axis: int = 0,
+        method: str = "average",
+        ascending: bool = True,
+        na_option: str = "keep",
+        pct: bool = False,
+    ) -> CoreDataFrame:
+        if axis != 0:
+            raise NotImplementedError("rank(axis=1) is not supported.")
+        if na_option != "keep":
+            raise NotImplementedError("rank(na_option=...) only supports 'keep'.")
+        if pct:
+            raise NotImplementedError("rank(pct=True) is not supported.")
+        m = method.lower().strip()
+        if m not in ("average", "min", "max", "dense", "first"):
+            raise ValueError(
+                "rank(method=...) supports 'average', 'min', 'max', 'dense', 'first'."
+            )
+        if m in ("min", "max", "first"):
+            raise NotImplementedError(
+                f"rank(method={method!r}) is not implemented; use 'average' or 'dense'."
+            )
+        fn = dense_rank() if m == "dense" else rank()
+        updates: dict[str, Any] = {}
+        for c in self.schema_fields():
+            spec = WindowSpec(
+                partition_by=tuple(),
+                order_by=((c, ascending, False),),
+            )
+            updates[c] = fn.over(spec)
+        return self.with_columns(**updates)
+
+    def sample(
+        self,
+        n: int | None = None,
+        frac: float | None = None,
+        *,
+        replace: bool = False,
+        random_state: int | None = None,
+        axis: Any = 0,
+    ) -> CoreDataFrame:
+        if axis not in (0, "index", None):
+            if axis == 1:
+                raise NotImplementedError("sample(axis=1) is not supported.")
+            raise ValueError("sample(axis=...) must be 0 or 'index'.")
+        if replace:
+            raise NotImplementedError("sample(replace=True) is not supported.")
+        if n is None and frac is None:
+            raise TypeError("sample requires n=... or frac=....")
+        data = self.collect(as_lists=True)
+        nrow = len(next(iter(data.values()))) if data else 0
+        if nrow == 0:
+            return self
+        rng = random.Random(random_state)
+        k = (
+            round(float(frac) * nrow)
+            if frac is not None
+            else int(n or 0)
+        )
+        k = max(0, min(int(k), nrow))
+        idx = rng.sample(range(nrow), k=k)
+        sub = _row_subset_from_lists(data, idx)
+        fields = self.schema_fields()
+        return self._from_plan(
+            root_data=sub,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=_require_rust_core().make_plan(fields),
+        )
+
+    def take(self, indices):  # type: ignore[no-untyped-def]
+        if not isinstance(indices, (list, tuple)):
+            raise TypeError("take(indices=...) expects a list or tuple of ints.")
+        idx = [int(i) for i in indices]
+        data = self.collect(as_lists=True)
+        nrow = len(next(iter(data.values()))) if data else 0
+        norm: list[int] = []
+        for i in idx:
+            j = i + nrow if i < 0 else i
+            if j < 0 or j >= nrow:
+                raise IndexError(f"take(): index {i} out of range for {nrow} rows.")
+            norm.append(j)
+        sub = _row_subset_from_lists(data, norm)
+        fields = self.schema_fields()
+        return self._from_plan(
+            root_data=sub,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=_require_rust_core().make_plan(fields),
+        )
+
+    def sort_index(self, *args: Any, **kwargs: Any) -> CoreDataFrame:
+        if args:
+            raise TypeError("sort_index() keyword-only (by=...) for index columns.")
+        by = kwargs.pop("by", None)
+        level = kwargs.pop("level", None)
+        ascending = kwargs.pop("ascending", True)
+        axis = kwargs.pop("axis", 0)
+        kind = kwargs.pop("kind", None)
+        na_position = kwargs.pop("na_position", None)
+        ignore_index = kwargs.pop("ignore_index", None)
+        key = kwargs.pop("key", None)
+        if kwargs:
+            raise TypeError(
+                f"sort_index() got unexpected keyword arguments: {sorted(kwargs)!r}"
+            )
+        if by is not None and level is not None:
+            raise TypeError("sort_index(): pass only one of by=... or level=....")
+        if axis not in (0, "index"):
+            raise NotImplementedError(
+                "sort_index(axis=1) is not supported; use column names as key fields."
+            )
+        if kind is not None:
+            raise NotImplementedError("sort_index(kind=...) is not supported.")
+        if ignore_index:
+            raise NotImplementedError("sort_index(ignore_index=...) is not supported.")
+        cols = by if by is not None else level
+        if cols is None:
+            raise NotImplementedError(
+                "sort_index requires by=[...] or level=[...] naming key column(s); "
+                "pydantable does not store a pandas Index."
+            )
+        return self.sort_values(
+            by=cols,
+            ascending=ascending,
+            na_position=na_position,
+            key=key,
+        )
+
+    def combine_first(self, other: CoreDataFrame, *, on: list[str]) -> CoreDataFrame:
+        keys = list(on)
+        merged = self.merge(other, on=keys, how="outer", suffixes=("", "_other"))
+        others = [n for n in merged.schema_fields() if n.endswith("_other")]
+        updates: dict[str, Any] = {}
+        for c in self.schema_fields():
+            if c in keys:
+                continue
+            oc = f"{c}_other"
+            if oc in merged.schema_fields():
+                updates[c] = coalesce(merged.col(c), merged.col(oc))
+        out = merged
+        if updates:
+            out = out.with_columns(**updates)
+        if others:
+            out = out.drop(*others)  # type: ignore[arg-type]
+        return out
+
+    def update(self, other: CoreDataFrame, *, on: list[str]) -> CoreDataFrame:
+        keys = list(on)
+        merged = self.merge(other, on=keys, how="left", suffixes=("", "_upd"))
+        upd_cols = [n for n in merged.schema_fields() if n.endswith("_upd")]
+        updates: dict[str, Any] = {}
+        for c in self.schema_fields():
+            if c in keys:
+                continue
+            uc = f"{c}_upd"
+            if uc in merged.schema_fields():
+                updates[c] = coalesce(merged.col(uc), merged.col(c))
+        out = merged
+        if updates:
+            out = out.with_columns(**updates)
+        if upd_cols:
+            out = out.drop(*upd_cols)  # type: ignore[arg-type]
+        return out
+
+    def compare(
+        self, other: CoreDataFrame, *, rtol: float = 1e-5, atol: float = 0.0
+    ) -> CoreDataFrame:
+        _ = rtol, atol
+        if set(self.schema_fields()) != set(other.schema_fields()):
+            raise ValueError(
+                "compare() requires both frames to share the same columns."
+            )
+        a = self.collect(as_lists=True)
+        b = other.collect(as_lists=True)
+        n = len(next(iter(a.values()))) if a else 0
+        m = len(next(iter(b.values()))) if b else 0
+        if n != m:
+            raise ValueError("compare() requires the same row count after collect().")
+        cols = list(self.schema_fields().keys())
+        diff_cols: dict[str, list[bool]] = {}
+        for c in cols:
+            diff_cols[f"{c}_diff"] = []
+            for i in range(n):
+                va, vb = a[c][i], b[c][i]
+                diff_cols[f"{c}_diff"].append(va != vb)
+        dyn = create_model("_CompareOut", **{k: (bool, ...) for k in diff_cols})
+        return DataFrame[dyn](diff_cols)
+
+    def corr(self, method: str = "pearson", min_periods: int = 1):  # type: ignore[no-untyped-def]
+        _ = min_periods
+        if method != "pearson":
+            raise NotImplementedError("corr(method=...) only supports 'pearson'.")
+        cols = [
+            n
+            for n, a in self._current_field_types.items()
+            if _typing_numeric_name(a)
+        ]
+        if len(cols) < 2:
+            raise ValueError("corr() needs at least two numeric columns in the schema.")
+        import numpy as np
+
+        data = self.select(*cols).collect(as_lists=True)
+        n = len(next(iter(data.values())))
+        rows: list[list[float]] = []
+        for i in range(n):
+            row: list[float] = []
+            for c in cols:
+                v = data[c][i]
+                row.append(float(v) if v is not None else float("nan"))
+            rows.append(row)
+        arr = np.asarray(rows, dtype=float)
+        cm = np.corrcoef(arr, rowvar=False)
+        out = {
+            cols[i]: [float(x) if np.isfinite(x) else None for x in cm[i]]
+            for i in range(len(cols))
+        }
+        dyn = create_model(
+            "_CorrOut", **{c: (float | None, None) for c in cols}  # type: ignore[misc]
+        )
+        return DataFrame[dyn](out)
+
+    def cov(self, min_periods: int = 1):  # type: ignore[no-untyped-def]
+        _ = min_periods
+        cols = [
+            n
+            for n, a in self._current_field_types.items()
+            if _typing_numeric_name(a)
+        ]
+        if len(cols) < 2:
+            raise ValueError("cov() needs at least two numeric columns in the schema.")
+        import numpy as np
+
+        data = self.select(*cols).collect(as_lists=True)
+        n = len(next(iter(data.values())))
+        rows: list[list[float]] = []
+        for i in range(n):
+            row = [
+                float(data[c][i]) if data[c][i] is not None else float("nan")
+                for c in cols
+            ]
+            rows.append(row)
+        arr = np.asarray(rows, dtype=float)
+        cov_m = np.cov(arr, rowvar=False)
+        out = {
+            cols[i]: [float(x) if np.isfinite(x) else None for x in cov_m[i]]
+            for i in range(len(cols))
+        }
+        dyn = create_model("_CovOut", **{c: (float | None, None) for c in cols})  # type: ignore[misc]
+        return DataFrame[dyn](out)
+
+    def reindex(
+        self, other: CoreDataFrame, *, on: str | list[str], **join_kw: Any
+    ) -> CoreDataFrame:
+        keys = [on] if isinstance(on, str) else list(on)
+        bad = set(join_kw) - {"how", "suffix", "streaming"}
+        if bad:
+            raise TypeError(
+                f"reindex() got unexpected keyword arguments: {sorted(bad)!r}"
+            )
+        return other.select(*keys).join(
+            self,
+            on=keys,
+            how=str(join_kw.get("how", "left")),
+            suffix=str(join_kw.get("suffix", "_right")),
+            streaming=join_kw.get("streaming"),
+        )
+
+    def reindex_like(self, other: CoreDataFrame, **join_kw: Any) -> CoreDataFrame:
+        keys = list(other.schema_fields().keys())
+        if not keys:
+            raise ValueError("reindex_like(other): other has no columns.")
+        return self.reindex(other, on=keys, **join_kw)
+
+    def align(
+        self, other: CoreDataFrame, *, on: list[str], join: str = "outer"
+    ) -> tuple[CoreDataFrame, CoreDataFrame]:
+        if join not in ("outer", "inner", "left", "right"):
+            raise ValueError("align(join=...) must be outer, inner, left, or right.")
+        keys_l = self.select(*on).unique(subset=list(on))
+        keys_r = other.select(*on).unique(subset=list(on))
+        all_keys = keys_l.merge(keys_r, on=on, how=join)
+        left = all_keys.join(self, on=on, how="left")
+        right = all_keys.join(other, on=on, how="left")
+        return left, right
+
+    def set_index(
+        self,
+        keys: str | list[str],
+        *,
+        drop: bool = True,
+        append: bool = False,
+        inplace: bool = False,
+    ) -> CoreDataFrame:
+        if inplace:
+            raise NotImplementedError("set_index(inplace=True) is not supported.")
+        if append:
+            raise NotImplementedError("set_index(append=True) is not supported.")
+        ks = [keys] if isinstance(keys, str) else list(keys)
+        for c in ks:
+            if c not in self.schema_fields():
+                raise KeyError(c)
+        rest = [c for c in self.schema_fields() if c not in ks]
+        _ = drop
+        return self.select(*(ks + rest))
+
+    def reset_index(
+        self,
+        level: Any = None,
+        *,
+        drop: bool = False,
+        inplace: bool = False,
+    ) -> CoreDataFrame:
+        if inplace or level is not None:
+            raise NotImplementedError(
+                "reset_index(inplace=...) / level=... are not supported; "
+                "there is no row Index object to drop."
+            )
+        _ = drop
+        return self
+
+    def eval(
+        self, expr: str, *, local_dict: Any = None, global_dict: Any = None, **kw: Any
+    ) -> CoreDataFrame:
+        if kw:
+            raise TypeError(f"eval() got unexpected keyword arguments: {sorted(kw)!r}")
+        return self.query(expr, local_dict=local_dict, global_dict=global_dict)
+
+    @property
+    def T(self) -> CoreDataFrame:
+        return self.transpose()
+
+    def transpose(self, *args: Any, **kwargs: Any) -> CoreDataFrame:
+        if args or kwargs:
+            raise NotImplementedError(
+                "transpose() does not accept arguments in this narrowed API."
+            )
+        fields = self.schema_fields()
+        n, m = self.shape
+        if n != m:
+            raise NotImplementedError(
+                f"transpose only supports square tables (rows==columns); got {n}x{m}."
+            )
+        dtypes = {fields[k] for k in fields}
+        if len(dtypes) != 1:
+            raise NotImplementedError(
+                "transpose requires every column to share the same dtype."
+            )
+        data = self.collect(as_lists=True)
+        names = list(self.schema_fields().keys())
+        mat = list(zip(*[data[c] for c in names], strict=True))
+        out = {names[i]: list(mat[i]) for i in range(n)}
+        return self._from_plan(
+            root_data=out,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=_require_rust_core().make_plan(self.schema_fields()),
+        )
+
+    def dot(self, other: CoreDataFrame) -> CoreDataFrame:  # type: ignore[override]
+        import numpy as np
+
+        sc = list(self.schema_fields().keys())
+        oc = list(other.schema_fields().keys())
+        n_self, m_self = self.shape
+        m_o, _ = other.shape
+        if m_self != m_o:
+            raise ValueError(
+                "dot(other): other row count must match self column count "
+                f"({m_self}), got {m_o}."
+            )
+        for a in list(self._current_field_types.values()) + list(
+            other._current_field_types.values()
+        ):
+            if not _typing_numeric_name(a):
+                raise TypeError("dot() requires numeric dtypes only.")
+        d_self = self.collect(as_lists=True)
+        d_other = other.collect(as_lists=True)
+        A = np.asarray(
+            [
+                [
+                    float(d_self[c][i]) if d_self[c][i] is not None else float("nan")
+                    for c in sc
+                ]
+                for i in range(n_self)
+            ],
+            dtype=float,
+        )
+        B = np.asarray(
+            [
+                [
+                    float(d_other[c][j]) if d_other[c][j] is not None else float("nan")
+                    for c in oc
+                ]
+                for j in range(m_o)
+            ],
+            dtype=float,
+        )
+        out_mat = A @ B
+        out_dict = {
+            oc[j]: [float(out_mat[i, j]) for i in range(n_self)] for j in range(len(oc))
+        }
+        dyn = create_model(
+            "_DotOut", **{c: (float | None, None) for c in oc}  # type: ignore[misc]
+        )
+        return DataFrame[dyn](out_dict)
+
+    def insert(
+        self,
+        loc: int,
+        column: str,
+        value: Any,
+        allow_duplicates: bool = False,
+    ) -> CoreDataFrame:
+        if allow_duplicates:
+            raise NotImplementedError("insert(allow_duplicates=True) is not supported.")
+        names = list(self.schema_fields().keys())
+        if column in names:
+            raise ValueError(f"cannot insert {column!r}, already exists")
+        if loc < 0 or loc > len(names):
+            raise IndexError("insert(loc=...) out of range.")
+        expr: Expr | Any = value if isinstance(value, Expr) else Literal(value=value)
+        new_order = [*names[:loc], column, *names[loc:]]
+        return self.with_columns(**{column: expr}).select(*new_order)
+
+    def pop(self, item: str) -> tuple[Expr, CoreDataFrame]:
+        if item not in self.schema_fields():
+            raise KeyError(item)
+        return self.col(item), self.drop(item)
+
+    def interpolate(
+        self,
+        *,
+        method: str = "linear",
+        axis: int = 0,
+        limit_direction: str = "forward",
+        **kwargs: Any,
+    ) -> CoreDataFrame:
+        if kwargs:
+            raise TypeError(
+                f"interpolate() got unexpected keyword arguments: {sorted(kwargs)!r}"
+            )
+        if axis != 0:
+            raise NotImplementedError("interpolate(axis=1) is not supported.")
+        m = method.lower().strip()
+        if m == "linear":
+            raise NotImplementedError(
+                "interpolate(method='linear') is not implemented; use fill_null "
+                "with forward/backward strategy after engine support lands."
+            )
+        if m in ("ffill", "pad"):
+            strat = "forward"
+        elif m in ("bfill", "backfill"):
+            strat = "backward"
+        else:
+            raise NotImplementedError(
+                f"interpolate(method={method!r}) supports 'ffill'/'bfill' only."
+            )
+        _ = limit_direction
+        return self.fill_null(strategy=strat)
+
+    class _Expanding:
+        __slots__ = ("_df",)
+
+        def __init__(self, df: PandasDataFrame):
+            self._df = df
+
+        def sum(self, column: str, *, out_name: str | None = None) -> CoreDataFrame:
+            name = out_name or f"{column}_expanding_sum"
+            return self._df.with_columns(**{name: self._df.col(column).cumsum()})
+
+        def mean(self, column: str, *, out_name: str | None = None) -> CoreDataFrame:
+            raise NotImplementedError(
+                "expanding().mean() is not implemented without an explicit "
+                "row order key; use window mean over row_number().over(...) "
+                "if applicable."
+            )
+
+        def count(self, column: str, *, out_name: str | None = None) -> CoreDataFrame:
+            name = out_name or f"{column}_expanding_count"
+            mark = when(
+                self._df.col(column).is_not_null(),
+                Literal(value=1),
+            ).otherwise(Literal(value=0))
+            return self._df.with_columns(**{name: mark.cumsum()})
+
+    def expanding(self, min_periods: int = 1) -> _Expanding:
+        _ = min_periods
+        return PandasDataFrame._Expanding(self)
+
+    def ewm(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError(
+            "ewm() is not implemented; use rolling(...) for fixed-size windows."
+        )
+
     def nlargest(
         self,
         n: int,
@@ -1667,10 +2378,18 @@ class PandasDataFrame(CoreDataFrame):
         return self.select(*matched)
 
     class _Rolling:
-        def __init__(self, df: PandasDataFrame, *, window: int, min_periods: int):
+        def __init__(
+            self,
+            df: PandasDataFrame,
+            *,
+            window: int,
+            min_periods: int,
+            partition_by: list[str] | None = None,
+        ):
             self._df = df
             self._window = int(window)
             self._min_periods = int(min_periods)
+            self._partition_by = list(partition_by or ())
             if self._window <= 0:
                 raise ValueError("rolling(window=...) must be >= 1.")
             if self._min_periods < 0:
@@ -1681,6 +2400,7 @@ class PandasDataFrame(CoreDataFrame):
                 raise TypeError("rolling op requires column as str.")
             name = out_name or f"{column}_{op}"
             rust = _require_rust_core()
+            part = self._partition_by if self._partition_by else None
             rust_plan = rust.plan_rolling_agg(
                 self._df._rust_plan,
                 column,
@@ -1688,6 +2408,7 @@ class PandasDataFrame(CoreDataFrame):
                 self._min_periods,
                 op,
                 name,
+                part,
             )
             desc = rust_plan.schema_descriptors()
             derived_fields = self._df._field_types_from_descriptors(desc)
@@ -1722,6 +2443,45 @@ class PandasDataFrame(CoreDataFrame):
 
 class PandasGroupedDataFrame(CoreGroupedDataFrame):
     """Grouped frame with shorthand ``sum`` / ``mean`` / ``count`` over columns."""
+
+    class _Rolling:
+        __slots__ = ("_inner",)
+
+        def __init__(
+            self,
+            gdf: PandasGroupedDataFrame,
+            *,
+            window: int,
+            min_periods: int,
+        ):
+            self._inner = PandasDataFrame._Rolling(
+                gdf._df,
+                window=window,
+                min_periods=min_periods,
+                partition_by=list(gdf._keys),
+            )
+
+        def sum(self, column: str, *, out_name: str | None = None) -> CoreDataFrame:
+            return self._inner.sum(column, out_name=out_name)
+
+        def mean(self, column: str, *, out_name: str | None = None) -> CoreDataFrame:
+            return self._inner.mean(column, out_name=out_name)
+
+        def min(self, column: str, *, out_name: str | None = None) -> CoreDataFrame:
+            return self._inner.min(column, out_name=out_name)
+
+        def max(self, column: str, *, out_name: str | None = None) -> CoreDataFrame:
+            return self._inner.max(column, out_name=out_name)
+
+        def count(self, column: str, *, out_name: str | None = None) -> CoreDataFrame:
+            return self._inner.count(column, out_name=out_name)
+
+    def rolling(self, *, window: int, min_periods: int = 1) -> _Rolling:
+        return PandasGroupedDataFrame._Rolling(
+            self,
+            window=window,
+            min_periods=min_periods,
+        )
 
     def size(self) -> CoreDataFrame:
         """
@@ -2033,6 +2793,52 @@ class PandasDataFrameModel(CoreDataFrameModel):
 
 class PandasGroupedDataFrameModel(CoreGroupedDataFrameModel):
     """Model-level grouped aggregations with pandas naming."""
+
+    class _ModelGroupedRolling:
+        __slots__ = ("_inner", "_mt")
+
+        def __init__(self, mt: type, inner: Any):
+            self._mt = mt
+            self._inner = inner
+
+        def sum(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrameModel:
+            return self._mt._from_dataframe(
+                self._inner.sum(column, out_name=out_name)
+            )
+
+        def mean(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrameModel:
+            return self._mt._from_dataframe(
+                self._inner.mean(column, out_name=out_name)
+            )
+
+        def min(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrameModel:
+            return self._mt._from_dataframe(
+                self._inner.min(column, out_name=out_name)
+            )
+
+        def max(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrameModel:
+            return self._mt._from_dataframe(
+                self._inner.max(column, out_name=out_name)
+            )
+
+        def count(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrameModel:
+            return self._mt._from_dataframe(
+                self._inner.count(column, out_name=out_name)
+            )
+
+    def rolling(self, *, window: int, min_periods: int = 1) -> _ModelGroupedRolling:
+        r = self._grouped_df.rolling(window=window, min_periods=min_periods)
+        return PandasGroupedDataFrameModel._ModelGroupedRolling(type(self), r)
 
     def sum(self, *columns: str) -> CoreDataFrameModel:
         return self._model_type._from_dataframe(self._grouped_df.sum(*columns))

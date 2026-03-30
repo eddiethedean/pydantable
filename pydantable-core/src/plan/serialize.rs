@@ -120,6 +120,7 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
                 min_periods,
                 op,
                 out_name,
+                partition_by,
             } => {
                 step_out.set_item("kind", "rolling_agg")?;
                 step_out.set_item("column", column)?;
@@ -127,6 +128,7 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
                 step_out.set_item("min_periods", min_periods)?;
                 step_out.set_item("op", op)?;
                 step_out.set_item("out_name", out_name)?;
+                step_out.set_item("partition_by", partition_by)?;
             }
         }
         steps.append(step_out)?;

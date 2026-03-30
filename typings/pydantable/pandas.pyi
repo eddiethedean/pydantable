@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from typing_extensions import Self
@@ -11,6 +11,17 @@ from .dataframe_model import DataFrameModel as CoreDataFrameModel
 from .dataframe_model import GroupedDataFrameModel as CoreGroupedDataFrameModel
 from .expressions import Expr
 from .schema import Schema
+
+def wide_to_long(
+    df: CoreDataFrame,
+    stubnames: str | list[str],
+    i: str | list[str],
+    j: str,
+    *,
+    sep: str = "_",
+    suffix: str = "\\d+",
+    value_name: str | None = None,
+) -> CoreDataFrame: ...
 
 class PandasDataFrame(CoreDataFrame):
     @classmethod
@@ -146,6 +157,124 @@ class PandasDataFrame(CoreDataFrame):
         var_name: str = "variable",
         value_name: str = "value",
     ) -> CoreDataFrame: ...
+    @classmethod
+    def from_dict(
+        cls,
+        data: Mapping[str, Any] | list[dict[str, Any]],
+        orient: str = "columns",
+        *,
+        columns: list[str] | None = None,
+    ) -> Any: ...
+    def wide_to_long(
+        self,
+        stubnames: str | list[str],
+        i: str | list[str],
+        j: str,
+        *,
+        sep: str = "_",
+        suffix: str = "\\d+",
+        value_name: str | None = None,
+    ) -> CoreDataFrame: ...
+    def stack(
+        self,
+        *,
+        id_vars: str | list[str],
+        value_vars: str | list[str] | None = None,
+        var_name: str = "variable",
+        value_name: str = "value",
+    ) -> CoreDataFrame: ...
+    def unstack(
+        self,
+        *,
+        index: str | list[str],
+        columns: str,
+        values: str | list[str],
+        aggregate_function: str = "first",
+        streaming: bool | None = None,
+    ) -> CoreDataFrame: ...
+    def where(self, cond: Expr, other: Any | None = None) -> CoreDataFrame: ...
+    def mask(self, cond: Expr, other: Any | None = None) -> CoreDataFrame: ...
+    def rank(
+        self,
+        *,
+        axis: int = 0,
+        method: str = "average",
+        ascending: bool = True,
+        na_option: str = "keep",
+        pct: bool = False,
+    ) -> CoreDataFrame: ...
+    def sample(
+        self,
+        n: int | None = None,
+        frac: float | None = None,
+        *,
+        replace: bool = False,
+        random_state: int | None = None,
+        axis: Any = 0,
+    ) -> CoreDataFrame: ...
+    def take(self, indices): ...
+    def sort_index(self, *args: Any, **kwargs: Any) -> CoreDataFrame: ...
+    def combine_first(
+        self, other: CoreDataFrame, *, on: list[str]
+    ) -> CoreDataFrame: ...
+    def update(self, other: CoreDataFrame, *, on: list[str]) -> CoreDataFrame: ...
+    def compare(
+        self, other: CoreDataFrame, *, rtol: float = 1e-05, atol: float = 0.0
+    ) -> CoreDataFrame: ...
+    def corr(self, method: str = "pearson", min_periods: int = 1): ...
+    def cov(self, min_periods: int = 1): ...
+    def reindex(
+        self, other: CoreDataFrame, *, on: str | list[str], **join_kw: Any
+    ) -> CoreDataFrame: ...
+    def reindex_like(self, other: CoreDataFrame, **join_kw: Any) -> CoreDataFrame: ...
+    def align(
+        self, other: CoreDataFrame, *, on: list[str], join: str = "outer"
+    ) -> tuple[CoreDataFrame, CoreDataFrame]: ...
+    def set_index(
+        self,
+        keys: str | list[str],
+        *,
+        drop: bool = True,
+        append: bool = False,
+        inplace: bool = False,
+    ) -> CoreDataFrame: ...
+    def reset_index(
+        self, level: Any = None, *, drop: bool = False, inplace: bool = False
+    ) -> CoreDataFrame: ...
+    def eval(
+        self, expr: str, *, local_dict: Any = None, global_dict: Any = None, **kw: Any
+    ) -> CoreDataFrame: ...
+    @property
+    def T(self) -> CoreDataFrame: ...
+    def transpose(self, *args: Any, **kwargs: Any) -> CoreDataFrame: ...
+    def dot(self, other: CoreDataFrame) -> CoreDataFrame: ...
+    def insert(
+        self, loc: int, column: str, value: Any, allow_duplicates: bool = False
+    ) -> CoreDataFrame: ...
+    def pop(self, item: str) -> tuple[Expr, CoreDataFrame]: ...
+    def interpolate(
+        self,
+        *,
+        method: str = "linear",
+        axis: int = 0,
+        limit_direction: str = "forward",
+        **kwargs: Any,
+    ) -> CoreDataFrame: ...
+
+    class _Expanding:
+        __slots__ = ("_df",)
+
+        def __init__(self, df: PandasDataFrame): ...
+        def sum(self, column: str, *, out_name: str | None = None) -> CoreDataFrame: ...
+        def mean(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrame: ...
+        def count(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrame: ...
+
+    def expanding(self, min_periods: int = 1) -> _Expanding: ...
+    def ewm(self, *args: Any, **kwargs: Any) -> Any: ...
     def nlargest(
         self, n: int, columns: str | list[str], *, keep: str = "all"
     ) -> CoreDataFrame: ...
@@ -166,7 +295,14 @@ class PandasDataFrame(CoreDataFrame):
     ) -> CoreDataFrame: ...
 
     class _Rolling:
-        def __init__(self, df: PandasDataFrame, *, window: int, min_periods: int): ...
+        def __init__(
+            self,
+            df: PandasDataFrame,
+            *,
+            window: int,
+            min_periods: int,
+            partition_by: list[str] | None = None,
+        ): ...
         def _apply(
             self, op: str, column: str, out_name: str | None
         ) -> CoreDataFrame: ...
@@ -183,6 +319,23 @@ class PandasDataFrame(CoreDataFrame):
     def rolling(self, *, window: int, min_periods: int = 1) -> _Rolling: ...
 
 class PandasGroupedDataFrame(CoreGroupedDataFrame):
+    class _Rolling:
+        __slots__ = ("_inner",)
+
+        def __init__(
+            self, gdf: PandasGroupedDataFrame, *, window: int, min_periods: int
+        ): ...
+        def sum(self, column: str, *, out_name: str | None = None) -> CoreDataFrame: ...
+        def mean(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrame: ...
+        def min(self, column: str, *, out_name: str | None = None) -> CoreDataFrame: ...
+        def max(self, column: str, *, out_name: str | None = None) -> CoreDataFrame: ...
+        def count(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrame: ...
+
+    def rolling(self, *, window: int, min_periods: int = 1) -> _Rolling: ...
     def size(self) -> CoreDataFrame: ...
     def sum(self, *columns: str) -> CoreDataFrame: ...
     def mean(self, *columns: str) -> CoreDataFrame: ...
@@ -284,6 +437,27 @@ class PandasDataFrameModel(CoreDataFrameModel):
     def group_by(self, *keys: Any, **kwargs: Any) -> PandasGroupedDataFrameModel: ...
 
 class PandasGroupedDataFrameModel(CoreGroupedDataFrameModel):
+    class _ModelGroupedRolling:
+        __slots__ = ("_inner", "_mt")
+
+        def __init__(self, mt: type, inner: Any): ...
+        def sum(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrameModel: ...
+        def mean(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrameModel: ...
+        def min(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrameModel: ...
+        def max(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrameModel: ...
+        def count(
+            self, column: str, *, out_name: str | None = None
+        ) -> CoreDataFrameModel: ...
+
+    def rolling(self, *, window: int, min_periods: int = 1) -> _ModelGroupedRolling: ...
     def sum(self, *columns: str) -> CoreDataFrameModel: ...
     def mean(self, *columns: str) -> CoreDataFrameModel: ...
     def count(self, *columns: str) -> CoreDataFrameModel: ...
