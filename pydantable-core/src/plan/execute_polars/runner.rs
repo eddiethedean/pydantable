@@ -551,15 +551,25 @@ impl PolarsPlanRunner {
                 let cond = condition.to_polars_expr()?.fill_null(lit(false));
                 lf = lf.filter(cond);
             }
-            PlanStep::Sort { by, descending } => {
+            PlanStep::Sort {
+                by,
+                descending,
+                nulls_last,
+            } => {
                 let exprs = by.iter().map(col).collect::<Vec<PolarsExpr>>();
                 let mut desc = descending.clone();
                 if desc.is_empty() {
                     desc = vec![false; by.len()];
                 }
+                let mut nl = nulls_last.clone();
+                if nl.is_empty() {
+                    nl = vec![false; by.len()];
+                }
                 lf = lf.sort_by_exprs(
                     exprs,
-                    SortMultipleOptions::new().with_order_descending_multi(desc),
+                    SortMultipleOptions::new()
+                        .with_order_descending_multi(desc)
+                        .with_nulls_last_multi(nl),
                 );
             }
             PlanStep::Unique { subset, keep } => {

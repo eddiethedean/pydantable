@@ -86,11 +86,19 @@ pub(crate) fn execute_plan_rowwise(
                 }
                 n = ctx_len(&ctx)?;
             }
-            PlanStep::Sort { by, descending } => {
+            PlanStep::Sort {
+                by,
+                descending,
+                nulls_last,
+            } => {
                 let mut idx: Vec<usize> = (0..n).collect();
                 let mut desc_flags = descending.clone();
                 if desc_flags.is_empty() {
                     desc_flags = vec![false; by.len()];
+                }
+                let mut nl_flags = nulls_last.clone();
+                if nl_flags.is_empty() {
+                    nl_flags = vec![false; by.len()];
                 }
                 idx.sort_by(|a, b| {
                     use std::cmp::Ordering;
@@ -99,8 +107,20 @@ pub(crate) fn execute_plan_rowwise(
                         let bv = &ctx[key][*b];
                         let ord = match (av, bv) {
                             (None, None) => Ordering::Equal,
-                            (None, Some(_)) => Ordering::Greater,
-                            (Some(_), None) => Ordering::Less,
+                            (None, Some(_)) => {
+                                if nl_flags[k_i] {
+                                    Ordering::Greater
+                                } else {
+                                    Ordering::Less
+                                }
+                            }
+                            (Some(_), None) => {
+                                if nl_flags[k_i] {
+                                    Ordering::Less
+                                } else {
+                                    Ordering::Greater
+                                }
+                            }
                             (Some(LiteralValue::Int(x)), Some(LiteralValue::Int(y))) => x.cmp(y),
                             (Some(LiteralValue::Float(x)), Some(LiteralValue::Float(y))) => {
                                 x.partial_cmp(y).unwrap_or(Ordering::Equal)

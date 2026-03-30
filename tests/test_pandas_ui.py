@@ -206,7 +206,7 @@ def test_pandas_ui_query_rejects_non_whitelisted_function_call() -> None:
 
     df = Row({"s": ["x"]})
     with pytest.raises(NotImplementedError, match="unsupported function call"):
-        df.query("lower(s) == 'x'")
+        df.query("foo(s) == 'x'")
 
 
 def test_pandas_ui_query_between_helper() -> None:
@@ -251,6 +251,40 @@ def test_pandas_ui_query_between_supports_external_constants() -> None:
     assert_table_eq_sorted(out, {"a": [2, 3]}, keys=["a"])
 
 
+def test_pandas_ui_query_string_transform_helpers() -> None:
+    class Row(PandasDataFrameModel):
+        s: str
+
+    df = Row({"s": [" X ", "y"]})
+    out1 = df.query("lower(s) == ' x '").collect(as_lists=True)
+    assert_table_eq_sorted(out1, {"s": [" X "]}, keys=["s"])
+    out2 = df.query("strip(s) == 'X'").collect(as_lists=True)
+    assert_table_eq_sorted(out2, {"s": [" X "]}, keys=["s"])
+    out3 = df.query("upper(s) == 'Y'").collect(as_lists=True)
+    assert_table_eq_sorted(out3, {"s": ["y"]}, keys=["s"])
+
+
+def test_pandas_ui_query_len_length_helpers() -> None:
+    class Row(PandasDataFrameModel):
+        s: str
+
+    df = Row({"s": ["aaa", "b"]})
+    out = df.query("len(s) == 1").collect(as_lists=True)
+    assert_table_eq_sorted(out, {"s": ["b"]}, keys=["s"])
+    out2 = df.query("length(s) == 3").collect(as_lists=True)
+    assert_table_eq_sorted(out2, {"s": ["aaa"]}, keys=["s"])
+
+
+def test_pandas_ui_query_between_rejects_non_literal_bounds() -> None:
+    class Row(PandasDataFrameModel):
+        a: int
+        b: int
+
+    df = Row({"a": [1, 2, 3], "b": [0, 0, 0]})
+    with pytest.raises(NotImplementedError, match="between\\(\\) bounds"):
+        df.query("between(a, b, 3)")
+
+
 def test_pandas_ui_sort_values_key_identifiers() -> None:
     class Row(PandasDataFrameModel):
         s: str
@@ -290,6 +324,24 @@ def test_pandas_ui_sort_values_key_temp_cols_not_leaked() -> None:
     df = Row({"s": ["B", "a"]})
     out = df.sort_values("s", key="lower")
     assert all(not c.startswith("__pd_sort_key_") for c in out.schema_fields())
+
+
+def test_pandas_ui_sort_values_multi_key_with_key_and_na_position() -> None:
+    class Row(PandasDataFrameModel):
+        g: str
+        s: str | None
+
+    df = Row({"g": ["b", "b", "a", "a"], "s": ["X", None, "y", "Z"]})
+    out = df.sort_values(
+        ["g", "s"], ascending=[True, True], key="lower", na_position="last"
+    ).collect(as_lists=True)
+    # Primary key: g asc => a then b.
+    assert out["g"][:2] == ["a", "a"]
+    # Secondary key: s lowercased with nulls last within each group.
+    a_rows = list(zip(out["g"], out["s"], strict=True))[:2]
+    assert a_rows == [("a", "y"), ("a", "Z")]
+    b_rows = list(zip(out["g"], out["s"], strict=True))[2:]
+    assert b_rows == [("b", "X"), ("b", None)]
 
 
 def test_pandas_ui_merge_left_on_requires_right_on() -> None:
@@ -413,6 +465,21 @@ def test_pandas_ui_merge_index_merge_rejects_key_args() -> None:
     right = R({"k": [1]})
     with pytest.raises(NotImplementedError, match=r"on/left_on/right_on"):
         left.merge(right, on="k", left_index=True, right_index=True)
+
+
+def test_pandas_ui_merge_index_merge_rejects_one_sided_index() -> None:
+    class L(PandasDataFrameModel):
+        k: int
+
+    class R(PandasDataFrameModel):
+        k: int
+
+    left = L({"k": [1]})
+    right = R({"k": [1]})
+    with pytest.raises(NotImplementedError, match="right_index"):
+        left.merge(right, left_index=True, right_index=False)  # type: ignore[arg-type]
+    with pytest.raises(NotImplementedError, match="left_index"):
+        left.merge(right, left_index=False, right_index=True)  # type: ignore[arg-type]
 
 
 def test_pandas_ui_merge_accepts_copy_and_rejects_sort_and_index_joins() -> None:
@@ -754,6 +821,23 @@ def test_pandas_ui_merge_suffixes_validation() -> None:
         left.merge(right, on="id", suffixes=("_x",))  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="suffixes"):
         left.merge(right, on="id", suffixes=("_x", 1))  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="suffixes"):
+        left.merge(right, on="id", suffixes=("", ""))
+
+
+def test_pandas_ui_merge_suffixes_empty_right_suffix_collision() -> None:
+    class L(PandasDataFrameModel):
+        id: int
+        v: int
+
+    class R(PandasDataFrameModel):
+        id: int
+        v: int
+
+    left = L({"id": [1], "v": [10]})
+    right = R({"id": [1], "v": [20]})
+    with pytest.raises(ValueError, match="duplicate output column"):
+        left.merge(right, on="id", suffixes=("_x", ""))
 
 
 def test_pandas_model_group_mean_and_count() -> None:
@@ -877,8 +961,8 @@ def test_pandas_ui_sort_values_validation_and_na_position() -> None:
     df = Row({"a": [1, 2], "b": [2, 1]})
     with pytest.raises(ValueError, match="ascending"):
         df.sort_values(["a", "b"], ascending=[True])  # wrong length
-    with pytest.raises(NotImplementedError, match="na_position"):
-        df.sort_values("a", na_position="last")
+    out = df.sort_values("a", na_position="last").collect(as_lists=True)
+    assert out["a"] == [1, 2]
     with pytest.raises(NotImplementedError, match="kind"):
         df.sort_values("a", kind="mergesort")  # type: ignore[arg-type]
     with pytest.raises(NotImplementedError, match="ignore_index"):

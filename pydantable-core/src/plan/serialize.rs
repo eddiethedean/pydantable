@@ -49,10 +49,15 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
                 step_out.set_item("kind", "filter")?;
                 step_out.set_item("condition", exprnode_to_serializable(py, condition)?)?;
             }
-            PlanStep::Sort { by, descending } => {
+            PlanStep::Sort {
+                by,
+                descending,
+                nulls_last,
+            } => {
                 step_out.set_item("kind", "sort")?;
                 step_out.set_item("by", by)?;
                 step_out.set_item("descending", descending)?;
+                step_out.set_item("nulls_last", nulls_last)?;
             }
             PlanStep::Unique { subset, keep } => {
                 step_out.set_item("kind", "unique")?;

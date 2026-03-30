@@ -1647,7 +1647,10 @@ class DataFrame(Generic[SchemaT]):
         )
 
     def sort(
-        self, *by: str | ColumnRef, descending: bool | Sequence[bool] = False
+        self,
+        *by: str | ColumnRef,
+        descending: bool | Sequence[bool] = False,
+        nulls_last: bool | Sequence[bool] | None = None,
     ) -> DataFrame[Any]:
         """Sort by one or more columns (names or single-column expressions)."""
         rust = _require_rust_core()
@@ -1670,7 +1673,13 @@ class DataFrame(Generic[SchemaT]):
             if isinstance(descending, bool)
             else list(descending)
         )
-        rust_plan = rust.plan_sort(self._rust_plan, keys, desc)
+        if nulls_last is None:
+            nl = []
+        elif isinstance(nulls_last, bool):
+            nl = [nulls_last] * len(keys)
+        else:
+            nl = list(nulls_last)
+        rust_plan = rust.plan_sort(self._rust_plan, keys, desc, nl)
         return self._from_plan(
             root_data=self._root_data,
             root_schema_type=self._root_schema_type,

@@ -178,6 +178,8 @@ class PandasDataFrame(CoreDataFrame):
             )
         if not all(isinstance(s, str) for s in suffixes):
             raise TypeError("merge(suffixes=...) must be a tuple[str, str].")
+        if suffixes == ("", ""):
+            raise ValueError("merge(suffixes=...) cannot be ('', '').")
         # `indicator` is handled below (when True).
         suffix = suffixes[1] if suffixes and len(suffixes) >= 2 else "_right"
         on_list = _as_list_str(on, name="on")
@@ -728,9 +730,53 @@ class PandasDataFrame(CoreDataFrame):
                             "positional args."
                         )
                     target = _compile(node.args[0])
-                    low = _compile(node.args[1])
-                    high = _compile(node.args[2])
+                    if isinstance(node.args[1], ast.Constant):
+                        low = _compile(node.args[1])
+                    elif isinstance(node.args[1], ast.Name):
+                        if node.args[1].id in self.schema_fields():
+                            raise NotImplementedError(
+                                "query(): between() bounds must be literals or "
+                                "local_dict/global_dict constants."
+                            )
+                        low = _compile(node.args[1])
+                    else:
+                        raise NotImplementedError(
+                            "query(): between() bounds must be literals or "
+                            "local_dict/global_dict constants."
+                        )
+                    if isinstance(node.args[2], ast.Constant):
+                        high = _compile(node.args[2])
+                    elif isinstance(node.args[2], ast.Name):
+                        if node.args[2].id in self.schema_fields():
+                            raise NotImplementedError(
+                                "query(): between() bounds must be literals or "
+                                "local_dict/global_dict constants."
+                            )
+                        high = _compile(node.args[2])
+                    else:
+                        raise NotImplementedError(
+                            "query(): between() bounds must be literals or "
+                            "local_dict/global_dict constants."
+                        )
                     return (target >= low) & (target <= high)
+                if fname in {"lower", "upper", "strip"}:
+                    if len(node.args) != 1 or node.keywords:
+                        raise TypeError(
+                            f"query(): {fname}() expects one positional argument."
+                        )
+                    target = _compile(node.args[0])
+                    if fname == "lower":
+                        return target.lower()
+                    if fname == "upper":
+                        return target.upper()
+                    return target.strip()
+                if fname in {"len", "length"}:
+                    if len(node.args) != 1 or node.keywords:
+                        raise TypeError(
+                            f"query(): {fname}() expects one positional argument."
+                        )
+                    target = _compile(node.args[0])
+                    return target.char_length()
                 raise NotImplementedError(
                     f"query(): unsupported function call {fname!r}."
                 )
@@ -771,10 +817,14 @@ class PandasDataFrame(CoreDataFrame):
     ) -> CoreDataFrame:
         if kind is not None:
             raise NotImplementedError("sort_values(kind=...) is not supported.")
+        nl_flags: bool | list[bool] | None = None
         if na_position is not None:
-            raise NotImplementedError(
-                "sort_values(na_position=...) is not supported by the engine yet."
-            )
+            pos = str(na_position).lower()
+            if pos not in {"first", "last"}:
+                raise ValueError(
+                    "sort_values(na_position=...) must be 'first' or 'last'."
+                )
+            nl_flags = pos == "last"
         if ignore_index:
             raise NotImplementedError(
                 "sort_values(ignore_index=True) is not supported; "
@@ -800,7 +850,7 @@ class PandasDataFrame(CoreDataFrame):
             if len(desc) != len(by_list):
                 raise ValueError("sort_values(): ascending must match len(by).")
         if key_id is None:
-            return self.sort(*by_list, descending=desc)
+            return self.sort(*by_list, descending=desc, nulls_last=nl_flags)
         if key_id not in {"lower", "upper", "abs", "strip", "length", "len"}:
             raise NotImplementedError(
                 f"sort_values(key={key!r}) is not supported; expected one of "
@@ -827,7 +877,7 @@ class PandasDataFrame(CoreDataFrame):
         tmp_df = self.with_columns(
             **{n: e for n, e in zip(tmp_cols, tmp_exprs, strict=True)}
         )
-        sorted_df = tmp_df.sort(*tmp_cols, descending=desc)
+        sorted_df = tmp_df.sort(*tmp_cols, descending=desc, nulls_last=nl_flags)
         return CoreDataFrame.drop(sorted_df, *tmp_cols)
 
     def drop(

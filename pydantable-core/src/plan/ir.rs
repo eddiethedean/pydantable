@@ -23,6 +23,7 @@ pub enum PlanStep {
     Sort {
         by: Vec<String>,
         descending: Vec<bool>,
+        nulls_last: Vec<bool>,
     },
     Unique {
         subset: Option<Vec<String>>,

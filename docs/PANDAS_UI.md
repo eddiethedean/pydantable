@@ -131,6 +131,8 @@ Additionally supports a small whitelist of helper functions (function-call form 
 - `isnull(col)` / `notnull(col)`
 - `isna(col)` / `notna(col)` (aliases)
 - `between(col, low, high)` (inclusive)
+- `lower(col)` / `upper(col)` / `strip(col)`
+- `len(col)` / `length(col)` (string length)
 
 Unsupported syntax (other function calls, attribute access, subscripts, etc.) raises `NotImplementedError`.
 
@@ -167,7 +169,8 @@ Alias for `sort(...)` with pandas-shaped arguments.
 **Accepted parameters (typed-first):**
 
 - `ascending`: `bool` or `list[bool]` (must match `by` length).
-- `na_position`, `kind`: accepted but raise `NotImplementedError`.
+- `kind`: accepted but raise `NotImplementedError`.
+- `na_position`: supports `"first"` or `"last"` (maps to engine-level null ordering). Other values raise `ValueError`.
 - `key`: supported only as one of the string identifiers `"lower"`, `"upper"`, `"abs"`, `"strip"`, `"length"`, `"len"` (case-insensitive). Python callables raise `NotImplementedError`.
 - `ignore_index`: `False` is accepted; `True` raises `NotImplementedError` (no Index semantics).
 

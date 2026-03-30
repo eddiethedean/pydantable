@@ -169,7 +169,12 @@ pub fn plan_filter(plan: &PlanInner, condition: ExprNode) -> PyResult<PlanInner>
     })
 }
 
-pub fn plan_sort(plan: &PlanInner, by: Vec<String>, descending: Vec<bool>) -> PyResult<PlanInner> {
+pub fn plan_sort(
+    plan: &PlanInner,
+    by: Vec<String>,
+    descending: Vec<bool>,
+    nulls_last: Vec<bool>,
+) -> PyResult<PlanInner> {
     if by.is_empty() {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
             "sort(by=...) requires at least one key.",
@@ -178,6 +183,11 @@ pub fn plan_sort(plan: &PlanInner, by: Vec<String>, descending: Vec<bool>) -> Py
     if !descending.is_empty() && descending.len() != by.len() {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
             "sort(descending=...) must be empty or the same length as by.",
+        ));
+    }
+    if !nulls_last.is_empty() && nulls_last.len() != by.len() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "sort(nulls_last=...) must be empty or the same length as by.",
         ));
     }
     for key in by.iter() {
@@ -189,7 +199,11 @@ pub fn plan_sort(plan: &PlanInner, by: Vec<String>, descending: Vec<bool>) -> Py
         }
     }
     let mut new_steps = plan.steps.clone();
-    new_steps.push(PlanStep::Sort { by, descending });
+    new_steps.push(PlanStep::Sort {
+        by,
+        descending,
+        nulls_last,
+    });
     Ok(PlanInner {
         steps: new_steps,
         schema: plan.schema.clone(),

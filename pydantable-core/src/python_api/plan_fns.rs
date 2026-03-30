@@ -75,9 +75,14 @@ fn plan_filter(plan: &PyPlan, condition: &PyExpr) -> PyResult<PyPlan> {
 }
 
 #[pyfunction]
-fn plan_sort(plan: &PyPlan, by: Vec<String>, descending: Vec<bool>) -> PyResult<PyPlan> {
+fn plan_sort(
+    plan: &PyPlan,
+    by: Vec<String>,
+    descending: Vec<bool>,
+    nulls_last: Vec<bool>,
+) -> PyResult<PyPlan> {
     Ok(PyPlan {
-        inner: plan_sort_inner(&plan.inner, by, descending)?,
+        inner: plan_sort_inner(&plan.inner, by, descending, nulls_last)?,
     })
 }
 
