@@ -39,13 +39,17 @@ from hand-rolling **`asyncio.to_thread`** around pandas or Polars alone.
 
 ## Runnable example in the repo
 
-Source file (in a checkout): `docs/examples/fastapi/golden_path_app.py`
-
+This is the full runnable example (the same file as `docs/examples/fastapi/golden_path_app.py` in the repo).
 It includes:
 
 - **`GET /health`** — cheap probe for load balancers or Kubernetes.
 - **`POST /api/v1/users`** — row-list body, **`select`** then **`acollect(executor=...)`**.
 - **`GET /api/v1/users/stream`** — NDJSON chunks from **`astream`**.
+
+```{literalinclude} examples/fastapi/golden_path_app.py
+:language: python
+:linenos:
+```
 
 ```bash
 cd docs/examples/fastapi
