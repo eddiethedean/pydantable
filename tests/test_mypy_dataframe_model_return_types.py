@@ -32,9 +32,14 @@ def _run_mypy_snippet(tmp_path: Path, code: str) -> subprocess.CompletedProcess[
 
 
 def _mypy_output_or_skip_on_crash(proc: subprocess.CompletedProcess[str]) -> str:
+    out = (proc.stdout or "") + (proc.stderr or "")
     if sys.platform == "win32" and proc.returncode in _MYPY_WINDOWS_CRASH_CODES:
         pytest.skip(f"mypy crashed on Windows (returncode={proc.returncode})")
-    return (proc.stdout or "") + (proc.stderr or "")
+    # Upstream mypy can hit INTERNAL ERROR on some Python versions (e.g. 3.13 with mypy
+    # 1.20.x); treat as an environment/toolchain flake, not a pydantable regression.
+    if proc.returncode != 0 and "INTERNAL ERROR" in out:
+        pytest.skip(f"mypy internal error (returncode={proc.returncode})")
+    return out
 
 
 def test_mypy_accepts_matching_dataframe_model_return_type(tmp_path: Path) -> None:
