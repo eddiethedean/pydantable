@@ -166,6 +166,7 @@ Supported reshape methods:
 - `variable_name` is always non-nullable `str`.
 - `value_name` requires all source `value_vars` to share a compatible scalar base dtype.
 - `value_vars` cannot overlap with `id_vars`.
+- `id_vars` and `value_vars` accept schema-driven `Selector` objects (resolved against the current schema).
 
 `pivot`:
 - Requires `index`, `columns`, and at least one `values` column.

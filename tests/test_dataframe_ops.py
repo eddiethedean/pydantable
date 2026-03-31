@@ -212,6 +212,22 @@ def test_select_all_prefix_suffix() -> None:
     assert df.select_suffix("a").to_dict() == {"a": [1], "aa": [2]}
 
 
+def test_limit_first_last_topk_bottomk() -> None:
+    class S(Schema):
+        k: int
+        v: int
+
+    df = DataFrame[S]({"k": [3, 1, 2], "v": [30, 10, 20]})
+    assert df.limit(2).collect(as_lists=True)["k"] == [3, 1]
+    assert df.first().collect(as_lists=True) == {"k": [3], "v": [30]}
+    assert df.last().collect(as_lists=True) == {"k": [2], "v": [20]}
+
+    top2 = df.top_k(2, by="k").collect(as_lists=True)
+    assert top2["k"] == [3, 2]
+    bottom2 = df.bottom_k(2, by="k").collect(as_lists=True)
+    assert bottom2["k"] == [1, 2]
+
+
 def test_select_with_selector_dsl_name_patterns_and_exclude() -> None:
     class S(Schema):
         a: int
@@ -319,6 +335,39 @@ def test_drop_with_selector_dsl_and_strict_false() -> None:
     out2 = df.drop(s.by_name("missing") | s.by_name("b"), strict=False)
     assert out2.to_dict() == {"a": [1], "c": [3]}
 
+
+def test_fill_null_and_drop_nulls_accept_subset_selector() -> None:
+    class S(Schema):
+        a: int | None
+        b: int | None
+        c: int
+
+    df = DataFrame[S]({"a": [None, 1], "b": [2, None], "c": [9, 9]})
+    filled = df.fill_null(0, subset=s.by_name("a")).collect(as_lists=True)
+    assert filled["a"] == [0, 1]
+
+    dropped = df.drop_nulls(subset=s.by_name("b")).collect(as_lists=True)
+    assert dropped == {"a": [None], "b": [2], "c": [9]}
+
+
+def test_melt_unpivot_accept_selectors_for_id_vars_value_vars() -> None:
+    class S(Schema):
+        id: int
+        a: int
+        b: int
+
+    df = DataFrame[S]({"id": [1], "a": [10], "b": [20]})
+    m = df.melt(id_vars=s.by_name("id"), value_vars=s.starts_with("a")).collect(
+        as_lists=True
+    )
+    assert set(m.keys()) == {"id", "variable", "value"}
+    assert m["id"] == [1]
+    assert m["variable"] == ["a"]
+    assert m["value"] == [10]
+
+    u = df.unpivot(index=s.by_name("id"), on=s.by_name("b")).collect(as_lists=True)
+    assert u["variable"] == ["b"]
+    assert u["value"] == [20]
 
 def test_with_columns_none_requires_destination_type() -> None:
     class UserNullable(Schema):

@@ -36,6 +36,7 @@ contract-tested.
 | Materialization | `collect()` (default), `to_dict()`, `to_polars()` | Implemented | Default `collect()` → `list[BaseModel]`; `to_dict()` columnar dict; `to_polars()` requires optional Python `polars` (`pydantable[polars]`). |
 | Core | `sort`, `unique/distinct`, `drop`, `rename`, `slice/head/tail`, `concat` | Implemented | Contract-tested; deterministic schema propagation. |
 | Null/type | `fill_null`, `drop_nulls`, `cast`, `is_null`, `is_not_null` | Implemented | Includes error contracts and nullable schema derivation. |
+| Core | `limit/first/last/top_k/bottom_k` (schema-first helpers) | Implemented | Convenience wrappers over `slice`/`sort` with deterministic schemas. |
 | Join | `inner/left/right/full/semi/anti/cross` | Implemented | Includes expression key support and suffix collision policy. |
 | GroupBy | `count/sum/mean/min/max/median/std/var/first/last/n_unique` | Implemented | SQL-like all-null-group behavior documented/tested. |
 | Reshape | `melt/unpivot`, `pivot` | Implemented | Deterministic output naming and validation rules. |

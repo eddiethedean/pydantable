@@ -1993,18 +1993,39 @@ class DataFrame(Generic[SchemaT]):
         """
         return self.slice(0, n)
 
+    def limit(self, n: int = 5) -> DataFrame[Any]:
+        """First ``n`` rows (Polars-style alias of :meth:`head`)."""
+        return self.head(n)
+
+    def first(self) -> DataFrame[Any]:
+        """First row as a single-row DataFrame (lazy slice)."""
+        return self.head(1)
+
     def tail(self, n: int = 5) -> DataFrame[Any]:
         """Last ``n`` rows (lazy slice). **Cost:** same idea as :meth:`head`."""
         return self.slice(-n, n)
+
+    def last(self) -> DataFrame[Any]:
+        """Last row as a single-row DataFrame (lazy slice)."""
+        return self.tail(1)
 
     def fill_null(
         self,
         value: Any = None,
         *,
         strategy: str | None = None,
-        subset: Sequence[str] | None = None,
+        subset: Sequence[str] | Selector | None = None,
     ) -> DataFrame[Any]:
         rust = _require_rust_core()
+        if isinstance(subset, Selector):
+            subset_cols = subset.resolve(self._current_field_types)
+            if not subset_cols:
+                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                raise ValueError(
+                    f"fill_null(subset={subset!r}) matched no columns. "
+                    f"Available columns: [{available}]"
+                )
+            subset = subset_cols
         if value is None and strategy is None:
             raise ValueError("fill_null() requires either value or strategy.")
         if value is not None and strategy is not None:
@@ -2027,8 +2048,17 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
-    def drop_nulls(self, subset: Sequence[str] | None = None) -> DataFrame[Any]:
+    def drop_nulls(self, subset: Sequence[str] | Selector | None = None) -> DataFrame[Any]:
         rust = _require_rust_core()
+        if isinstance(subset, Selector):
+            subset_cols = subset.resolve(self._current_field_types)
+            if not subset_cols:
+                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                raise ValueError(
+                    f"drop_nulls(subset={subset!r}) matched no columns. "
+                    f"Available columns: [{available}]"
+                )
+            subset = subset_cols
         rust_plan = rust.plan_drop_nulls(
             self._rust_plan, None if subset is None else list(subset)
         )
@@ -2042,8 +2072,8 @@ class DataFrame(Generic[SchemaT]):
     def melt(
         self,
         *,
-        id_vars: Sequence[str] | None = None,
-        value_vars: Sequence[str] | None = None,
+        id_vars: Sequence[str] | Selector | None = None,
+        value_vars: Sequence[str] | Selector | None = None,
         variable_name: str = "variable",
         value_name: str = "value",
         streaming: bool | None = None,
@@ -2051,6 +2081,10 @@ class DataFrame(Generic[SchemaT]):
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
         )
+        if isinstance(id_vars, Selector):
+            id_vars = id_vars.resolve(self._current_field_types)
+        if isinstance(value_vars, Selector):
+            value_vars = value_vars.resolve(self._current_field_types)
         out_data, schema_descriptors = execute_melt(
             self._rust_plan,
             self._root_data,
@@ -2076,8 +2110,8 @@ class DataFrame(Generic[SchemaT]):
     def unpivot(
         self,
         *,
-        index: Sequence[str] | None = None,
-        on: Sequence[str] | None = None,
+        index: Sequence[str] | Selector | None = None,
+        on: Sequence[str] | Selector | None = None,
         variable_name: str = "variable",
         value_name: str = "value",
     ) -> DataFrame[Any]:
@@ -2087,6 +2121,39 @@ class DataFrame(Generic[SchemaT]):
             variable_name=variable_name,
             value_name=value_name,
         )
+
+    def top_k(
+        self,
+        n: int,
+        *,
+        by: str | Sequence[str],
+        descending: bool = True,
+        nulls_last: bool | None = None,
+    ) -> DataFrame[Any]:
+        """Top-k rows by sort key(s) (schema-first helper: sort then limit)."""
+        keys = [by] if isinstance(by, str) else list(by)
+        return self.sort(
+            *keys,
+            descending=[bool(descending)] * len(keys),
+            nulls_last=None if nulls_last is None else [bool(nulls_last)] * len(keys),
+            maintain_order=True,
+        ).limit(n)
+
+    def bottom_k(
+        self,
+        n: int,
+        *,
+        by: str | Sequence[str],
+        nulls_last: bool | None = None,
+    ) -> DataFrame[Any]:
+        """Bottom-k rows by sort key(s) (schema-first helper: sort then limit)."""
+        keys = [by] if isinstance(by, str) else list(by)
+        return self.sort(
+            *keys,
+            descending=[False] * len(keys),
+            nulls_last=None if nulls_last is None else [bool(nulls_last)] * len(keys),
+            maintain_order=True,
+        ).limit(n)
 
     def pivot(
         self,
