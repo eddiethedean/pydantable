@@ -110,6 +110,14 @@ comparisons. Null propagation follows **Polars** (Kleene / three-valued) rules f
 still keeps rows where the predicate is exactly `True`; combined expressions may
 produce `NULL` boolean cells where operands are null.
 
+### Filter-oriented Expr helper conveniences
+
+The core `Expr` surface includes a few small helpers commonly used for `filter(...)` predicates:
+
+- **Aliases**: `Expr.is_in(...)` is an alias of `Expr.isin(...)`.
+- **String predicates**: `is_empty_str`, `is_blank_str`, `matches` (Rust regex dialect), and null-friendly combinations like `is_null_or_empty_str`.
+- **List/map predicates**: `contains_any` / `contains_all` on list columns (composed from `list_contains`), plus `list_is_empty`, `map_is_empty`, and `map_has_any_key`.
+
 ## Global aggregates in `select` (whole-frame)
 
 `DataFrame.select(...)` can return a **single-row** frame of **global** aggregates:

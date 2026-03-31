@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, get_args, get_origin
 
 from .rust_engine import _require_rust_core
 
@@ -203,6 +203,28 @@ class Expr:  # type: ignore[override]
         rust_expr = _require_rust_core().expr_in_list(self._rust_expr, vals)
         return Expr(rust_expr=rust_expr)
 
+    def is_in(self, *values: Any) -> Expr:
+        """Alias of :meth:`isin` (Polars naming parity)."""
+        return self.isin(*values)
+
+    def len(self) -> Expr:  # noqa: A003 - intentional parity name
+        """String length alias (typed-safe): only valid for ``str`` columns."""
+        dt = self.dtype
+        origin = get_origin(dt)
+        args = get_args(dt)
+        if origin is None:
+            base = dt
+        elif origin is getattr(__import__("typing"), "Union", object()) or str(origin).endswith(
+            "types.UnionType"
+        ):
+            non_none = [a for a in args if a is not type(None)]
+            base = non_none[0] if len(non_none) == 1 else dt
+        else:
+            base = dt
+        if base is not str:
+            raise TypeError("len() is only supported for string columns.")
+        return self.char_length()
+
     def between(self, low: Any, high: Any) -> Expr:
         lo = self._coerce_other(low)
         hi = self._coerce_other(high)
@@ -373,6 +395,26 @@ class Expr:  # type: ignore[override]
                 self._rust_expr, "contains", str(pattern), literal=bool(literal)
             )
         )
+
+    def matches(self, pattern: str) -> Expr:
+        """Regex match predicate (Rust regex dialect)."""
+        if not isinstance(pattern, str) or not pattern:
+            raise TypeError("matches(pattern) expects a non-empty string.")
+        return self.str_contains_pat(pattern, literal=False)
+
+    def is_empty_str(self) -> Expr:
+        """True where string cell is exactly ``\"\"``."""
+        return self == ""
+
+    def is_blank_str(self) -> Expr:
+        """True where string cell is empty after stripping whitespace."""
+        return self.strip().char_length() == 0
+
+    def is_null_or_empty_str(self) -> Expr:
+        return self.is_null() | self.is_empty_str()
+
+    def is_not_null_and_not_empty_str(self) -> Expr:
+        return self.is_not_null() & ~(self.is_empty_str())
 
     def str_split(self, delimiter: str) -> Expr:
         """Split string column into ``list[str]`` (per-row).
@@ -631,6 +673,64 @@ class Expr:  # type: ignore[override]
         return Expr(
             rust_expr=rust.expr_list_contains(self._rust_expr, v._rust_expr),
         )
+
+    def contains_any(self, values: Any) -> Expr:
+        """Any of the provided values is contained in each list cell."""
+        vals = values
+        if isinstance(values, Expr):
+            raise TypeError("contains_any(values) expects literal values, not Expr.")
+        if not isinstance(values, (list, tuple, set)):
+            vals = [values]
+        expr: Expr | None = None
+        for v in list(vals):
+            term = self.list_contains(v)
+            expr = term if expr is None else (expr | term)
+        if expr is None:
+            raise TypeError("contains_any(values) expects at least one value.")
+        return expr
+
+    def contains_all(self, values: Any) -> Expr:
+        """All of the provided values are contained in each list cell."""
+        vals = values
+        if isinstance(values, Expr):
+            raise TypeError("contains_all(values) expects literal values, not Expr.")
+        if not isinstance(values, (list, tuple, set)):
+            vals = [values]
+        expr: Expr | None = None
+        for v in list(vals):
+            term = self.list_contains(v)
+            expr = term if expr is None else (expr & term)
+        if expr is None:
+            raise TypeError("contains_all(values) expects at least one value.")
+        return expr
+
+    def list_is_empty(self) -> Expr:
+        return self.list_len() == 0
+
+    def list_any(self) -> Expr:
+        """Any True in a boolean list."""
+        return self.list_contains(True)
+
+    def list_all(self) -> Expr:
+        """All True in a boolean list."""
+        return ~self.list_contains(False)
+
+    def map_is_empty(self) -> Expr:
+        return self.map_len() == 0
+
+    def map_has_any_key(self, keys: Any) -> Expr:
+        ks = keys
+        if isinstance(keys, Expr):
+            raise TypeError("map_has_any_key(keys) expects literal keys, not Expr.")
+        if not isinstance(keys, (list, tuple, set)):
+            ks = [keys]
+        expr: Expr | None = None
+        for k in list(ks):
+            term = self.map_contains_key(str(k))
+            expr = term if expr is None else (expr | term)
+        if expr is None:
+            raise TypeError("map_has_any_key(keys) expects at least one key.")
+        return expr
 
     def list_min(self) -> Expr:
         rust = _require_rust_core()

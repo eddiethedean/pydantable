@@ -425,6 +425,54 @@ def test_melt_unpivot_accept_selectors_for_id_vars_value_vars() -> None:
     assert u["variable"] == ["b"]
     assert u["value"] == [20]
 
+
+def test_expr_filter_helpers_string_list_map() -> None:
+    class S(Schema):
+        s: str | None
+        tags: list[bool]
+        m: dict[str, int]
+
+    df = DataFrame[S](
+        {
+            "s": ["", "  ", "x", None],
+            "tags": [[True], [False], [True, True], []],
+            "m": [{"a": 1}, {}, {"b": 2}, {"a": 3}],
+        }
+    )
+
+    out_empty = df.filter(df.s.is_empty_str()).collect(as_lists=True)
+    assert out_empty["s"] == [""]
+
+    out_blank = df.filter(df.s.is_blank_str()).collect(as_lists=True)
+    assert out_blank["s"] == ["", "  "]
+
+    out_null_or_empty = df.filter(df.s.is_null_or_empty_str()).collect(as_lists=True)
+    assert out_null_or_empty["s"] == ["", None]
+
+    out_any = df.filter(df.tags.list_any()).collect(as_lists=True)
+    assert out_any["tags"] == [[True], [True, True]]
+
+    out_all = df.filter(df.tags.list_all()).collect(as_lists=True)
+    assert out_all["tags"] == [[True], [True, True], []]
+
+    out_map_empty = df.filter(df.m.map_is_empty()).collect(as_lists=True)
+    assert out_map_empty["m"] == [{}]
+
+    out_map_has = df.filter(df.m.map_has_any_key(["b", "c"])).collect(as_lists=True)
+    assert out_map_has["m"] == [{"b": 2}]
+
+
+def test_expr_filter_helpers_dtype_rejections() -> None:
+    class S(Schema):
+        x: int
+        s: str
+        tags: list[int]
+
+    df = DataFrame[S]({"x": [1], "s": ["x"], "tags": [[1, 2]]})
+    with pytest.raises(TypeError, match="only supported for string"):
+        _ = df.x.len()
+    with pytest.raises(TypeError):
+        _ = df.x.list_any()
 def test_with_columns_none_requires_destination_type() -> None:
     class UserNullable(Schema):
         id: int
