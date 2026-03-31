@@ -52,7 +52,7 @@ from .observe import get_observer, set_observer
 from .schema import DtypeDriftWarning, Schema
 from .types import WKB
 
-__version__ = "1.7.0"
+__version__ = "1.8.0"
 
 __all__ = [
     "WKB",
