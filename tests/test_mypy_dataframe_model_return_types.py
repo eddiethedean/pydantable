@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-
 _MYPY_WINDOWS_CRASH_CODES = {
     # 0xC0000005 (Access violation). Observed in GitHub Actions windows runners as
     # a hard crash of the mypy subprocess (no stdout/stderr).
