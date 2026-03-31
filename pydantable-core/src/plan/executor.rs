@@ -59,6 +59,7 @@ impl PolarsExecutor {
         how: String,
         suffix: String,
         validate: Option<String>,
+        coalesce: Option<bool>,
         as_python_lists: bool,
         streaming: bool,
     ) -> PyResult<(PyObject, PyObject)> {
@@ -73,6 +74,7 @@ impl PolarsExecutor {
             how,
             suffix,
             validate,
+            coalesce,
             as_python_lists,
             streaming,
         )

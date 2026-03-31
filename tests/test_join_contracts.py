@@ -204,3 +204,116 @@ def test_join_validate_scan_roots_multi_key_and_side_specific(tmp_path) -> None:
     # many_to_one should pass because right keys are unique.
     out = left.join(right, on=["k1", "k2"], how="inner", validate="many_to_one").to_dict()
     assert set(out.keys()) >= {"k1", "k2", "v", "v2"}
+
+
+def test_join_coalesce_true_left_on_right_on_left_join_drops_right_key() -> None:
+    class L(Schema):
+        lid: int
+        v: int
+
+    class R(Schema):
+        rid: int
+        w: int
+
+    left = DataFrame[L]({"lid": [1, 2], "v": [10, 20]})
+    right = DataFrame[R]({"rid": [1], "w": [100]})
+
+    out = left.join(
+        right, left_on="lid", right_on="rid", how="left", coalesce=True
+    ).collect(as_lists=True)
+    assert set(out.keys()) == {"lid", "v", "w"}
+    assert out["lid"] == [1, 2]
+
+
+def test_join_coalesce_true_left_on_right_on_right_join_prefers_right_key_including_right_only_rows() -> None:
+    class L(Schema):
+        lid: int
+        v: int
+
+    class R(Schema):
+        rid: int
+        w: int
+
+    left = DataFrame[L]({"lid": [1], "v": [10]})
+    right = DataFrame[R]({"rid": [1, 2], "w": [100, 200]})
+
+    out = left.join(
+        right, left_on="lid", right_on="rid", how="right", coalesce=True
+    ).collect(as_lists=True)
+    assert set(out.keys()) == {"rid", "v", "w"}
+    assert out["rid"] == [1, 2]
+
+
+def test_join_coalesce_true_scan_roots_right_join(tmp_path) -> None:
+    class L(Schema):
+        lid: int
+        v: int
+
+    class R(Schema):
+        rid: int
+        w: int
+
+    lp = tmp_path / "l.csv"
+    rp = tmp_path / "r.csv"
+    lp.write_text("lid,v\n1,10\n", encoding="utf-8")
+    rp.write_text("rid,w\n1,100\n2,200\n", encoding="utf-8")
+
+    left = DataFrame[L].read_csv(str(lp))
+    right = DataFrame[R].read_csv(str(rp))
+    out = left.join(
+        right, left_on="lid", right_on="rid", how="right", coalesce=True
+    ).to_dict()
+    assert set(out.keys()) == {"rid", "v", "w"}
+    assert out["rid"] == [1, 2]
+
+
+def test_join_coalesce_true_multi_key_right_join_drops_left_keys(tmp_path) -> None:
+    class L(Schema):
+        a: int
+        b: int
+        v: int
+
+    class R(Schema):
+        x: int
+        y: int
+        w: int
+
+    left = DataFrame[L]({"a": [1], "b": [1], "v": [10]})
+    right = DataFrame[R]({"x": [1, 2], "y": [1, 2], "w": [100, 200]})
+
+    out = left.join(
+        right,
+        left_on=["a", "b"],
+        right_on=["x", "y"],
+        how="right",
+        coalesce=True,
+    ).collect(as_lists=True)
+    assert set(out.keys()) == {"x", "y", "v", "w"}
+    assert out["x"] == [1, 2]
+    assert out["y"] == [1, 2]
+
+
+def test_join_coalesce_rejected_combinations() -> None:
+    left = DataFrame[LeftSchema]({"id": [1], "age": [None], "score": [10]})
+    right = DataFrame[RightSchema](
+        {"id": [1], "age": [None], "country": ["US"], "score": [100]}
+    )
+
+    with pytest.raises(ValueError, match="cross join does not support coalesce"):
+        left.join(right, how="cross", coalesce=True).to_dict()
+
+    with pytest.raises(NotImplementedError, match="full joins"):
+        class L(Schema):
+            lid: int
+            v: int
+
+        class R(Schema):
+            rid: int
+            w: int
+
+        l2 = DataFrame[L]({"lid": [1], "v": [10]})
+        r2 = DataFrame[R]({"rid": [1], "w": [100]})
+        l2.join(r2, left_on="lid", right_on="rid", how="full", coalesce=True).to_dict()
+
+    with pytest.raises(NotImplementedError, match="expression keys"):
+        left.join(right, left_on=left.id, right_on=right.id, how="inner", coalesce=True).to_dict()

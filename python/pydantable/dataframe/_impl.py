@@ -2207,9 +2207,18 @@ class DataFrame(Generic[SchemaT]):
         if on is not None:
             left_keys = [on] if isinstance(on, str) else list(on)
             right_keys = list(left_keys)
+            used_expr_keys = False
         else:
+            used_expr_keys = False
             left_keys = _resolve_keys(left_on)
             right_keys = _resolve_keys(right_on)
+            raw_left = [] if left_on is None else (
+                [left_on] if isinstance(left_on, (str, Expr)) else list(left_on)
+            )
+            raw_right = [] if right_on is None else (
+                [right_on] if isinstance(right_on, (str, Expr)) else list(right_on)
+            )
+            used_expr_keys = any(isinstance(x, Expr) for x in [*raw_left, *raw_right])
 
         if validate is not None:
             v = str(validate)
@@ -2230,6 +2239,21 @@ class DataFrame(Generic[SchemaT]):
                     "cross join does not support validate=...; remove validate or use a keyed join."
                 )
             validate = v
+
+        if coalesce is True:
+            if how == "cross":
+                raise ValueError(
+                    "cross join does not support coalesce=...; remove coalesce or use a keyed join."
+                )
+            if used_expr_keys and on is None:
+                raise NotImplementedError(
+                    "join(coalesce=True) is not supported with expression keys; use column-name keys."
+                )
+            # Typed-safe constraint: full joins need explicit nullability widening + key naming rules.
+            if how in ("full", "outer") and on is None and left_keys != right_keys:
+                raise NotImplementedError(
+                    "join(coalesce=True) is not implemented for full joins with left_on/right_on keys."
+                )
 
         if how == "cross":
             if left_keys or right_keys:
@@ -2258,6 +2282,7 @@ class DataFrame(Generic[SchemaT]):
             how,
             suffix,
             validate=validate,
+            coalesce=coalesce,
             as_python_lists=True,
             streaming=use_streaming,
         )

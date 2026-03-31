@@ -53,7 +53,25 @@ These flags are supported by the Polars engine. When you need deterministic comp
 `join(validate=...)` performs an explicit join cardinality check:
 
 - Allowed values: `one_to_one`, `one_to_many`, `many_to_one`, `many_to_many` (also accepts `1:1`, `1:m`, `m:1`, `m:m`).
-- Supported on **in-memory roots and scan roots**.\n+  **Cost note:** validation is implemented via engine operations on the join keys; it may require an additional collect-like pass and can be expensive on large scans.\n+  Keep it explicit (do not enable by default) and document it in service code when used.
+- Supported on **in-memory roots and scan roots**.
+  - **Cost note:** validation is implemented via engine operations on the join keys; it may require an additional collect-like pass and can be expensive on large scans.
+  - Keep it explicit (do not enable by default) and document it in service code when used.
+
+### Join key coalescing (`coalesce=...`)
+
+`join(coalesce=...)` controls whether side-specific join keys (`left_on` / `right_on`) are merged into a single observable key column.
+
+- **`coalesce=None` (default)**: preserve current behavior.
+- **`coalesce=True` (typed-safe)**:
+  - **Supported** for `left_on` / `right_on` **column-name keys** (including multi-key) with join kinds: `inner`, `left`, `right`.
+  - Produces exactly **one key column per key pair**:
+    - `inner` / `left`: keeps the **left** key name(s) and drops the right key column(s).
+    - `right`: keeps the **right** key name(s) and drops the left key column(s) (so right-only rows still have a non-null key).
+  - **Not supported**:
+    - `cross` joins
+    - `full`/`outer` joins with side-specific keys (requires explicit nullability widening rules)
+    - expression keys (`left_on=df.col_expr`, `right_on=...`) because output key naming is not guaranteed to be stable.
+- **`coalesce=False`**: accepted for Polars parity; currently a no-op under the schema-first contract.
 
 ### Collision handling
 - Column name collisions introduced by the right-hand side are resolved by

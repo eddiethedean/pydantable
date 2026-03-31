@@ -258,6 +258,7 @@ def execute_join(
     suffix: str,
     *,
     validate: str | None = None,
+    coalesce: bool | None = None,
     as_python_lists: bool = False,
     streaming: bool = False,
 ) -> tuple[Any, Any]:
@@ -272,6 +273,7 @@ def execute_join(
         how=how,
         suffix=suffix,
         validate=validate,
+        coalesce=coalesce,
         as_python_lists=bool(as_python_lists),
         streaming=bool(streaming),
     ):
@@ -285,6 +287,7 @@ def execute_join(
             how,
             suffix,
             validate,
+            coalesce,
             as_python_lists,
             streaming,
         )

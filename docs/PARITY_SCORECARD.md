@@ -25,7 +25,7 @@ contract-tested.
 | Core | `unique/distinct(..., maintain_order=...)` | Implemented | `maintain_order=True` uses stable-unique semantics in the Polars engine. |
 | GroupBy | Group-by convenience methods (`sum/mean/min/max/count/len`) | Implemented | Deterministic naming (`<col>_sum`, etc.) and `len` via synthetic constant column. |
 | GroupBy | `group_by(..., maintain_order=..., drop_nulls=...)` | Implemented | `maintain_order=True` is stable; `drop_nulls=False` retains null-key groups. |
-| Join | `join(..., coalesce=...)` | Partial | Accepted for parity; join key coalescing is already the default behavior for same-named keys. |
+| Join | `join(..., coalesce=...)` | Partial | Implemented for `left_on`/`right_on` **name keys** (incl multi-key) on `inner`/`left`/`right`; not supported for `full`/`cross` or expression keys. |
 | Join | `join(..., validate=...)` | Implemented | Cardinality checks supported for in-memory roots and scan roots (explicit cost). |
 | Reshape | `pivot(..., sort_columns=..., separator=...)` | Implemented | `sort_columns=True` sorts pivot-value column generation; `separator` controls generated output names. |
 | Utilities | `sample`, `shift`, `null_count`, `is_empty` | Implemented | Eager helpers (materialize via `to_dict()`), returning a new `DataFrame` (or `dict` for `null_count`). |
