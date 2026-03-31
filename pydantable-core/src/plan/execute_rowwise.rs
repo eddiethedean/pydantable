@@ -104,6 +104,7 @@ pub(crate) fn execute_plan_rowwise(
                 by,
                 descending,
                 nulls_last,
+                ..
             } => {
                 let mut idx: Vec<usize> = (0..n).collect();
                 let mut desc_flags = descending.clone();
@@ -165,7 +166,9 @@ pub(crate) fn execute_plan_rowwise(
                 }
                 n = ctx_len(&ctx)?;
             }
-            PlanStep::Unique { subset, keep: _ } => {
+            PlanStep::Unique {
+                subset, keep: _, ..
+            } => {
                 use std::collections::HashSet;
                 let keys = subset
                     .clone()

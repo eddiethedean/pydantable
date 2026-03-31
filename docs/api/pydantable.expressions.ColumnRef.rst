@@ -15,12 +15,15 @@
    
       ~ColumnRef.__init__
       ~ColumnRef.abs
+      ~ColumnRef.alias
       ~ColumnRef.between
       ~ColumnRef.binary_len
       ~ColumnRef.cast
       ~ColumnRef.ceil
       ~ColumnRef.char_length
       ~ColumnRef.clip
+      ~ColumnRef.contains_all
+      ~ColumnRef.contains_any
       ~ColumnRef.cummax
       ~ColumnRef.cummin
       ~ColumnRef.cumprod
@@ -40,11 +43,20 @@
       ~ColumnRef.element_at
       ~ColumnRef.ends_with
       ~ColumnRef.floor
+      ~ColumnRef.is_blank_str
+      ~ColumnRef.is_empty_str
+      ~ColumnRef.is_in
       ~ColumnRef.is_not_null
+      ~ColumnRef.is_not_null_and_not_empty_str
       ~ColumnRef.is_null
+      ~ColumnRef.is_null_or_empty_str
       ~ColumnRef.isin
+      ~ColumnRef.len
+      ~ColumnRef.list_all
+      ~ColumnRef.list_any
       ~ColumnRef.list_contains
       ~ColumnRef.list_get
+      ~ColumnRef.list_is_empty
       ~ColumnRef.list_join
       ~ColumnRef.list_len
       ~ColumnRef.list_max
@@ -58,9 +70,12 @@
       ~ColumnRef.map_entries
       ~ColumnRef.map_from_entries
       ~ColumnRef.map_get
+      ~ColumnRef.map_has_any_key
+      ~ColumnRef.map_is_empty
       ~ColumnRef.map_keys
       ~ColumnRef.map_len
       ~ColumnRef.map_values
+      ~ColumnRef.matches
       ~ColumnRef.over
       ~ColumnRef.pct_change
       ~ColumnRef.referenced_columns

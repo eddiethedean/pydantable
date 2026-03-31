@@ -1666,16 +1666,24 @@ class DataFrameModel(Generic[RowT]):
     def drop(self, *columns: Any, strict: bool = True) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.drop(*columns, strict=strict))
 
-    def rename(self, columns: Mapping[str, str], *, strict: bool = True) -> DataFrameModel[Any]:
+    def rename(
+        self, columns: Mapping[str, str], *, strict: bool = True
+    ) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.rename(columns, strict=strict))
 
-    def rename_upper(self, selector: Any = None, *, strict: bool = True) -> DataFrameModel[Any]:
+    def rename_upper(
+        self, selector: Any = None, *, strict: bool = True
+    ) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.rename_upper(selector, strict=strict))
 
-    def rename_lower(self, selector: Any = None, *, strict: bool = True) -> DataFrameModel[Any]:
+    def rename_lower(
+        self, selector: Any = None, *, strict: bool = True
+    ) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.rename_lower(selector, strict=strict))
 
-    def rename_title(self, selector: Any = None, *, strict: bool = True) -> DataFrameModel[Any]:
+    def rename_title(
+        self, selector: Any = None, *, strict: bool = True
+    ) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.rename_title(selector, strict=strict))
 
     def rename_strip(
@@ -1692,7 +1700,9 @@ class DataFrameModel(Generic[RowT]):
     def slice(self, offset: int, length: int) -> Self:
         return self._from_dataframe(self._df.slice(offset, length))
 
-    def with_row_count(self, name: str = "row_nr", *, offset: int = 0) -> DataFrameModel[Any]:
+    def with_row_count(
+        self, name: str = "row_nr", *, offset: int = 0
+    ) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.with_row_count(name=name, offset=offset))
 
     def head(self, n: int = 5) -> Self:
@@ -1840,10 +1850,14 @@ class DataFrameModel(Generic[RowT]):
             )
         )
 
-    def explode(self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None) -> DataFrameModel[Any]:
+    def explode(
+        self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None
+    ) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.explode(columns, streaming=streaming))
 
-    def unnest(self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None) -> DataFrameModel[Any]:
+    def unnest(
+        self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None
+    ) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.unnest(columns, streaming=streaming))
 
     def explode_all(self, *, streaming: bool | None = None) -> DataFrameModel[Any]:

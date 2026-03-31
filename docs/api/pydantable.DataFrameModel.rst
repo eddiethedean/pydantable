@@ -35,6 +35,7 @@
       ~DataFrameModel.ato_dicts
       ~DataFrameModel.ato_polars
       ~DataFrameModel.awrite_sql
+      ~DataFrameModel.clip
       ~DataFrameModel.collect
       ~DataFrameModel.collect_batches
       ~DataFrameModel.concat
@@ -44,6 +45,7 @@
       ~DataFrameModel.drop_nulls
       ~DataFrameModel.explain
       ~DataFrameModel.explode
+      ~DataFrameModel.explode_all
       ~DataFrameModel.export_csv
       ~DataFrameModel.export_ipc
       ~DataFrameModel.export_json
@@ -61,7 +63,10 @@
       ~DataFrameModel.iter_parquet
       ~DataFrameModel.join
       ~DataFrameModel.melt
+      ~DataFrameModel.pipe
       ~DataFrameModel.pivot
+      ~DataFrameModel.pivot_longer
+      ~DataFrameModel.pivot_wider
       ~DataFrameModel.read_csv
       ~DataFrameModel.read_ipc
       ~DataFrameModel.read_json
@@ -70,12 +75,17 @@
       ~DataFrameModel.read_parquet_url
       ~DataFrameModel.read_parquet_url_ctx
       ~DataFrameModel.rename
+      ~DataFrameModel.rename_lower
+      ~DataFrameModel.rename_strip
+      ~DataFrameModel.rename_title
+      ~DataFrameModel.rename_upper
       ~DataFrameModel.rolling_agg
       ~DataFrameModel.row_model
       ~DataFrameModel.rows
       ~DataFrameModel.schema_fields
       ~DataFrameModel.schema_model
       ~DataFrameModel.select
+      ~DataFrameModel.select_schema
       ~DataFrameModel.slice
       ~DataFrameModel.sort
       ~DataFrameModel.stream
@@ -88,9 +98,13 @@
       ~DataFrameModel.try_as_model
       ~DataFrameModel.unique
       ~DataFrameModel.unnest
+      ~DataFrameModel.unnest_all
       ~DataFrameModel.unpivot
       ~DataFrameModel.value_counts
       ~DataFrameModel.with_columns
+      ~DataFrameModel.with_columns_cast
+      ~DataFrameModel.with_columns_fill_null
+      ~DataFrameModel.with_row_count
       ~DataFrameModel.write_csv
       ~DataFrameModel.write_csv_batches
       ~DataFrameModel.write_ipc

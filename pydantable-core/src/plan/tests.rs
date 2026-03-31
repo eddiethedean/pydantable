@@ -282,6 +282,8 @@ mod polars_engine_tests {
                 vec![("s".to_string(), "sum".to_string(), "v".to_string())],
                 true,
                 false,
+                true,
+                false,
             )
             .unwrap();
 
@@ -318,6 +320,8 @@ mod polars_engine_tests {
                 vec![("s".to_string(), "sum".to_string(), "v".to_string())],
                 true,
                 false,
+                true,
+                false,
             )
             .unwrap();
 
@@ -343,6 +347,8 @@ mod polars_engine_tests {
                 root2.as_any(),
                 vec!["k".to_string()],
                 vec![("s".to_string(), "sum".to_string(), "v".to_string())],
+                false,
+                false,
                 false,
                 false,
             )

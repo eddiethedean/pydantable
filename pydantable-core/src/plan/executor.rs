@@ -88,6 +88,7 @@ impl PolarsExecutor {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn groupby_agg(
         py: Python<'_>,
         plan: &PlanInner,

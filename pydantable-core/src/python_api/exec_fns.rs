@@ -263,6 +263,7 @@ fn execute_join(
 
 #[pyfunction]
 #[pyo3(signature = (plan, root_data, by, aggregations, maintain_order=false, drop_nulls=true, as_python_lists=false, streaming=false))]
+#[allow(clippy::too_many_arguments)]
 fn execute_groupby_agg(
     py: Python<'_>,
     plan: &PyPlan,

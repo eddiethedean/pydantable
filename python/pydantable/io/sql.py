@@ -219,11 +219,11 @@ def iter_sql(
             yield _rows_to_cols(chunk)
 
 
-def _infer_columns(data: dict[str, list[Any]]):
+def _infer_columns(data: dict[str, list[Any]]) -> list[Any]:
     from sqlalchemy import Column
     from sqlalchemy import types as sat
 
-    cols = []
+    cols: list[Any] = []
     for name, col in data.items():
         sample = next((x for x in col if x is not None), None)
         if isinstance(sample, bool):

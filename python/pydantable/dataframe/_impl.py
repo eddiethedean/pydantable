@@ -1578,7 +1578,9 @@ class DataFrame(Generic[SchemaT]):
                     "(AliasedExpr)."
                 )
             if item.name in rust_columns or item.name in new_columns:
-                raise ValueError(f"with_columns() duplicate output column {item.name!r}.")
+                raise ValueError(
+                    f"with_columns() duplicate output column {item.name!r}."
+                )
             rust_columns[item.name] = item.expr._rust_expr
 
         for name, value in new_columns.items():
@@ -1610,7 +1612,7 @@ class DataFrame(Generic[SchemaT]):
         selected = selector.resolve(self._current_field_types)
         if not selected:
             if strict:
-                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                available = ", ".join(repr(c) for c in self._current_field_types)
                 raise ValueError(
                     f"with_columns_cast({selector!r}) matched no columns. "
                     f"Available columns: [{available}]"
@@ -1633,7 +1635,7 @@ class DataFrame(Generic[SchemaT]):
         selected = selector.resolve(self._current_field_types)
         if not selected:
             if strict:
-                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                available = ", ".join(repr(c) for c in self._current_field_types)
                 raise ValueError(
                     f"with_columns_fill_null({selector!r}) matched no columns. "
                     f"Available columns: [{available}]"
@@ -1686,9 +1688,10 @@ class DataFrame(Generic[SchemaT]):
             elif isinstance(col, Selector):
                 resolved = col.resolve(self._current_field_types)
                 if not resolved:
-                    available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                    available = ", ".join(repr(c) for c in self._current_field_types)
                     raise ValueError(
-                        f"select({col!r}) matched no columns. Available columns: [{available}]"
+                        f"select({col!r}) matched no columns. "
+                        f"Available columns: [{available}]"
                     )
                 projects.extend(resolved)
             elif isinstance(col, AliasedExpr):
@@ -1716,8 +1719,9 @@ class DataFrame(Generic[SchemaT]):
                         )
             else:
                 raise TypeError(
-                    "select() accepts column names, Selector objects, ColumnRef expressions, "
-                    "global aggregates, or Expr.alias('name') (AliasedExpr)."
+                    "select() accepts column names, Selector objects, "
+                    "ColumnRef expressions, global aggregates, or "
+                    "Expr.alias('name') (AliasedExpr)."
                 )
 
         if named_items and (projects or aggs):
@@ -1730,7 +1734,9 @@ class DataFrame(Generic[SchemaT]):
                 "select() cannot mix global aggregates with plain column projections."
             )
         if exclude_set and (named_items or aggs):
-            raise TypeError("select(exclude=...) cannot be used with global aggregates.")
+            raise TypeError(
+                "select(exclude=...) cannot be used with global aggregates."
+            )
         if named_items:
             rust_plan = rust.plan_global_select(self._rust_plan, named_items)
         elif aggs:
@@ -1739,7 +1745,9 @@ class DataFrame(Generic[SchemaT]):
             if not projects:
                 if not exclude_set:
                     raise ValueError("select() requires at least one column.")
-                projects = [c for c in self._current_field_types.keys() if c not in exclude_set]
+                projects = [
+                    c for c in self._current_field_types if c not in exclude_set
+                ]
             else:
                 projects = [c for c in projects if c not in exclude_set]
             if not projects:
@@ -1798,9 +1806,10 @@ class DataFrame(Generic[SchemaT]):
         if isinstance(item, Selector):
             resolved = item.resolve(self._current_field_types)
             if not resolved:
-                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                available = ", ".join(repr(c) for c in self._current_field_types)
                 raise ValueError(
-                    f"{arg_name}={item!r} matched no columns. Available columns: [{available}]"
+                    f"{arg_name}={item!r} matched no columns. "
+                    f"Available columns: [{available}]"
                 )
             return resolved
         raise TypeError(f"{arg_name} expects a column name or Selector.")
@@ -1812,7 +1821,7 @@ class DataFrame(Generic[SchemaT]):
             wanted.extend(self._resolve_column_names_or_selector(it, arg_name="order"))
         if len(set(wanted)) != len(wanted):
             raise ValueError("reorder_columns(order=...) contains duplicate columns.")
-        remainder = [c for c in self._current_field_types.keys() if c not in wanted]
+        remainder = [c for c in self._current_field_types if c not in wanted]
         return self.select(*wanted, *remainder)
 
     def select_first(self, *cols_or_selectors: str | Selector) -> DataFrame[Any]:
@@ -1822,7 +1831,7 @@ class DataFrame(Generic[SchemaT]):
             wanted.extend(self._resolve_column_names_or_selector(it, arg_name="cols"))
         if len(set(wanted)) != len(wanted):
             raise ValueError("select_first(...) contains duplicate columns.")
-        remainder = [c for c in self._current_field_types.keys() if c not in wanted]
+        remainder = [c for c in self._current_field_types if c not in wanted]
         return self.select(*wanted, *remainder)
 
     def select_last(self, *cols_or_selectors: str | Selector) -> DataFrame[Any]:
@@ -1832,7 +1841,7 @@ class DataFrame(Generic[SchemaT]):
             wanted.extend(self._resolve_column_names_or_selector(it, arg_name="cols"))
         if len(set(wanted)) != len(wanted):
             raise ValueError("select_last(...) contains duplicate columns.")
-        remainder = [c for c in self._current_field_types.keys() if c not in wanted]
+        remainder = [c for c in self._current_field_types if c not in wanted]
         return self.select(*remainder, *wanted)
 
     def move(
@@ -1844,8 +1853,12 @@ class DataFrame(Generic[SchemaT]):
     ) -> DataFrame[Any]:
         """Move column(s) before/after an anchor column (schema-first helper)."""
         if (before is None) == (after is None):
-            raise TypeError("move(..., before=...) or move(..., after=...) is required.")
-        moving = self._resolve_column_names_or_selector(cols_or_selector, arg_name="cols")
+            raise TypeError(
+                "move(..., before=...) or move(..., after=...) is required."
+            )
+        moving = self._resolve_column_names_or_selector(
+            cols_or_selector, arg_name="cols"
+        )
         anchor = before if before is not None else after
         if not isinstance(anchor, str):
             raise TypeError("move(..., before/after=...) expects a column name.")
@@ -1854,7 +1867,7 @@ class DataFrame(Generic[SchemaT]):
         if anchor in moving:
             raise ValueError("move() cannot move a column relative to itself.")
         # Remove moving cols, then re-insert as a block.
-        base = [c for c in self._current_field_types.keys() if c not in moving]
+        base = [c for c in self._current_field_types if c not in moving]
         idx = base.index(anchor)
         insert_at = idx if before is not None else idx + 1
         new_order = [*base[:insert_at], *moving, *base[insert_at:]]
@@ -1913,7 +1926,9 @@ class DataFrame(Generic[SchemaT]):
             nl = list(nulls_last)
         if nl and len(nl) != len(keys):
             raise ValueError("sort(nulls_last=...) length must match sort keys.")
-        rust_plan = rust.plan_sort(self._rust_plan, keys, desc, nl, bool(maintain_order))
+        rust_plan = rust.plan_sort(
+            self._rust_plan, keys, desc, nl, bool(maintain_order)
+        )
         return self._from_plan(
             root_data=self._root_data,
             root_schema_type=self._root_schema_type,
@@ -2053,7 +2068,9 @@ class DataFrame(Generic[SchemaT]):
         rust = _require_rust_core()
         rename_map = dict(columns)
         if not strict:
-            rename_map = {k: v for k, v in rename_map.items() if k in self._current_field_types}
+            rename_map = {
+                k: v for k, v in rename_map.items() if k in self._current_field_types
+            }
         rust_plan = rust.plan_rename(self._rust_plan, rename_map)
         desc = rust_plan.schema_descriptors()
         rename_prev: dict[str, Any] = dict(self._current_field_types)
@@ -2096,7 +2113,7 @@ class DataFrame(Generic[SchemaT]):
             raise TypeError("rename_with_selector(..., fn=...) expects a callable.")
         selected = selector.resolve(self._current_field_types)
         if not selected:
-            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            available = ", ".join(repr(c) for c in self._current_field_types)
             raise ValueError(
                 f"rename_with_selector({selector!r}) matched no columns. "
                 f"Available columns: [{available}]"
@@ -2124,14 +2141,16 @@ class DataFrame(Generic[SchemaT]):
             else selector.resolve(self._current_field_types)
         )
         if selector is not None and not target:
-            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            available = ", ".join(repr(c) for c in self._current_field_types)
             raise ValueError(
                 f"rename_prefix(selector={selector!r}) matched no columns. "
                 f"Available columns: [{available}]"
             )
         rename_map = {c: f"{prefix}{c}" for c in target}
         if len(set(rename_map.values())) != len(rename_map):
-            raise ValueError("rename_prefix(...) produced duplicate output column names.")
+            raise ValueError(
+                "rename_prefix(...) produced duplicate output column names."
+            )
         return self.rename(rename_map, strict=strict)
 
     def rename_suffix(
@@ -2149,14 +2168,16 @@ class DataFrame(Generic[SchemaT]):
             else selector.resolve(self._current_field_types)
         )
         if selector is not None and not target:
-            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            available = ", ".join(repr(c) for c in self._current_field_types)
             raise ValueError(
                 f"rename_suffix(selector={selector!r}) matched no columns. "
                 f"Available columns: [{available}]"
             )
         rename_map = {c: f"{c}{suffix}" for c in target}
         if len(set(rename_map.values())) != len(rename_map):
-            raise ValueError("rename_suffix(...) produced duplicate output column names.")
+            raise ValueError(
+                "rename_suffix(...) produced duplicate output column names."
+            )
         return self.rename(rename_map, strict=strict)
 
     def rename_replace(
@@ -2172,7 +2193,8 @@ class DataFrame(Generic[SchemaT]):
             raise TypeError("rename_replace(old, new) expects strings.")
         if literal is not True:
             raise NotImplementedError(
-                "rename_replace(literal=False) is not supported (schema-first rename only)."
+                "rename_replace(literal=False) is not supported "
+                "(schema-first rename only)."
             )
         target = (
             list(self._current_field_types.keys())
@@ -2180,14 +2202,16 @@ class DataFrame(Generic[SchemaT]):
             else selector.resolve(self._current_field_types)
         )
         if selector is not None and not target:
-            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            available = ", ".join(repr(c) for c in self._current_field_types)
             raise ValueError(
                 f"rename_replace(selector={selector!r}) matched no columns. "
                 f"Available columns: [{available}]"
             )
         rename_map = {c: c.replace(old, new) for c in target}
         if len(set(rename_map.values())) != len(rename_map):
-            raise ValueError("rename_replace(...) produced duplicate output column names.")
+            raise ValueError(
+                "rename_replace(...) produced duplicate output column names."
+            )
         return self.rename(rename_map, strict=strict)
 
     def rename_upper(
@@ -2200,14 +2224,16 @@ class DataFrame(Generic[SchemaT]):
             else selector.resolve(self._current_field_types)
         )
         if selector is not None and not target:
-            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            available = ", ".join(repr(c) for c in self._current_field_types)
             raise ValueError(
                 f"rename_upper(selector={selector!r}) matched no columns. "
                 f"Available columns: [{available}]"
             )
         rename_map = {c: c.upper() for c in target}
         if len(set(rename_map.values())) != len(rename_map):
-            raise ValueError("rename_upper(...) produced duplicate output column names.")
+            raise ValueError(
+                "rename_upper(...) produced duplicate output column names."
+            )
         return self.rename(rename_map, strict=strict)
 
     def rename_lower(
@@ -2220,14 +2246,16 @@ class DataFrame(Generic[SchemaT]):
             else selector.resolve(self._current_field_types)
         )
         if selector is not None and not target:
-            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            available = ", ".join(repr(c) for c in self._current_field_types)
             raise ValueError(
                 f"rename_lower(selector={selector!r}) matched no columns. "
                 f"Available columns: [{available}]"
             )
         rename_map = {c: c.lower() for c in target}
         if len(set(rename_map.values())) != len(rename_map):
-            raise ValueError("rename_lower(...) produced duplicate output column names.")
+            raise ValueError(
+                "rename_lower(...) produced duplicate output column names."
+            )
         return self.rename(rename_map, strict=strict)
 
     def rename_title(
@@ -2240,14 +2268,16 @@ class DataFrame(Generic[SchemaT]):
             else selector.resolve(self._current_field_types)
         )
         if selector is not None and not target:
-            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            available = ", ".join(repr(c) for c in self._current_field_types)
             raise ValueError(
                 f"rename_title(selector={selector!r}) matched no columns. "
                 f"Available columns: [{available}]"
             )
         rename_map = {c: c.title() for c in target}
         if len(set(rename_map.values())) != len(rename_map):
-            raise ValueError("rename_title(...) produced duplicate output column names.")
+            raise ValueError(
+                "rename_title(...) produced duplicate output column names."
+            )
         return self.rename(rename_map, strict=strict)
 
     def rename_strip(
@@ -2266,14 +2296,16 @@ class DataFrame(Generic[SchemaT]):
             else selector.resolve(self._current_field_types)
         )
         if selector is not None and not target:
-            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            available = ", ".join(repr(c) for c in self._current_field_types)
             raise ValueError(
                 f"rename_strip(selector={selector!r}) matched no columns. "
                 f"Available columns: [{available}]"
             )
         rename_map = {c: c.strip(chars) for c in target}
         if len(set(rename_map.values())) != len(rename_map):
-            raise ValueError("rename_strip(...) produced duplicate output column names.")
+            raise ValueError(
+                "rename_strip(...) produced duplicate output column names."
+            )
         return self.rename(rename_map, strict=strict)
 
     def slice(self, offset: int, length: int) -> DataFrame[Any]:
@@ -2286,7 +2318,9 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
-    def with_row_count(self, name: str = "row_nr", *, offset: int = 0) -> DataFrame[Any]:
+    def with_row_count(
+        self, name: str = "row_nr", *, offset: int = 0
+    ) -> DataFrame[Any]:
         """Add a deterministic row number column (Polars-style `with_row_count`)."""
         rust = _require_rust_core()
         if not isinstance(name, str) or not name:
@@ -2342,9 +2376,10 @@ class DataFrame(Generic[SchemaT]):
         if isinstance(subset, Selector):
             cols = subset.resolve(self._current_field_types)
             if not cols:
-                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                available = ", ".join(repr(c) for c in self._current_field_types)
                 raise ValueError(
-                    f"clip(subset={subset!r}) matched no columns. Available columns: [{available}]"
+                    f"clip(subset={subset!r}) matched no columns. "
+                    f"Available columns: [{available}]"
                 )
             subset = cols
 
@@ -2354,10 +2389,9 @@ class DataFrame(Generic[SchemaT]):
             else _selectors.numeric().resolve(self._current_field_types)
         )
         if not targets:
-            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            available = ", ".join(repr(c) for c in self._current_field_types)
             raise ValueError(
-                "clip() matched no numeric columns. "
-                f"Available columns: [{available}]"
+                f"clip() matched no numeric columns. Available columns: [{available}]"
             )
 
         updates: dict[str, Expr] = {}
@@ -2405,7 +2439,7 @@ class DataFrame(Generic[SchemaT]):
         if isinstance(subset, Selector):
             subset_cols = subset.resolve(self._current_field_types)
             if not subset_cols:
-                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                available = ", ".join(repr(c) for c in self._current_field_types)
                 raise ValueError(
                     f"fill_null(subset={subset!r}) matched no columns. "
                     f"Available columns: [{available}]"
@@ -2446,7 +2480,7 @@ class DataFrame(Generic[SchemaT]):
         if isinstance(subset, Selector):
             subset_cols = subset.resolve(self._current_field_types)
             if not subset_cols:
-                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                available = ", ".join(repr(c) for c in self._current_field_types)
                 raise ValueError(
                     f"drop_nulls(subset={subset!r}) matched no columns. "
                     f"Available columns: [{available}]"
@@ -2484,7 +2518,7 @@ class DataFrame(Generic[SchemaT]):
         if isinstance(id_vars, Selector):
             resolved = id_vars.resolve(self._current_field_types)
             if not resolved:
-                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                available = ", ".join(repr(c) for c in self._current_field_types)
                 raise ValueError(
                     f"melt(id_vars={id_vars!r}) matched no columns. "
                     f"Available columns: [{available}]"
@@ -2493,7 +2527,7 @@ class DataFrame(Generic[SchemaT]):
         if isinstance(value_vars, Selector):
             resolved = value_vars.resolve(self._current_field_types)
             if not resolved:
-                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                available = ", ".join(repr(c) for c in self._current_field_types)
                 raise ValueError(
                     f"melt(value_vars={value_vars!r}) matched no columns. "
                     f"Available columns: [{available}]"
@@ -2625,7 +2659,7 @@ class DataFrame(Generic[SchemaT]):
         if isinstance(index, Selector):
             resolved = index.resolve(self._current_field_types)
             if not resolved:
-                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                available = ", ".join(repr(c) for c in self._current_field_types)
                 raise ValueError(
                     f"pivot(index={index!r}) matched no columns. "
                     f"Available columns: [{available}]"
@@ -2637,7 +2671,7 @@ class DataFrame(Generic[SchemaT]):
         if isinstance(values, Selector):
             resolved = values.resolve(self._current_field_types)
             if not resolved:
-                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                available = ", ".join(repr(c) for c in self._current_field_types)
                 raise ValueError(
                     f"pivot(values={values!r}) matched no columns. "
                     f"Available columns: [{available}]"
@@ -2649,7 +2683,7 @@ class DataFrame(Generic[SchemaT]):
         if isinstance(columns, Selector):
             resolved = columns.resolve(self._current_field_types)
             if len(resolved) != 1:
-                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                available = ", ".join(repr(c) for c in self._current_field_types)
                 raise ValueError(
                     "pivot(columns=...) selector must match exactly one column; "
                     f"matched={resolved}. Available columns: [{available}]"
@@ -2661,13 +2695,15 @@ class DataFrame(Generic[SchemaT]):
             referenced = columns.referenced_columns()
             if len(referenced) != 1:
                 raise TypeError(
-                    "pivot(columns=...) expects a column name or single-column ColumnRef; "
+                    "pivot(columns=...) expects a column name or "
+                    "single-column ColumnRef; "
                     f"referenced_columns={sorted(referenced)!r}"
                 )
             columns_col = next(iter(referenced))
         else:
             raise TypeError(
-                "pivot(columns=...) expects a column name, Selector, or single-column ColumnRef."
+                "pivot(columns=...) expects a column name, Selector, or "
+                "single-column ColumnRef."
             )
         if not isinstance(separator, str) or not separator:
             raise TypeError("pivot(separator=...) expects a non-empty string.")
@@ -2704,7 +2740,7 @@ class DataFrame(Generic[SchemaT]):
         if isinstance(columns, Selector):
             cols = columns.resolve(self._current_field_types)
             if not cols:
-                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                available = ", ".join(repr(c) for c in self._current_field_types)
                 raise ValueError(
                     f"explode(columns={columns!r}) matched no columns. "
                     f"Available columns: [{available}]"
@@ -2735,7 +2771,7 @@ class DataFrame(Generic[SchemaT]):
         if isinstance(columns, Selector):
             cols = columns.resolve(self._current_field_types)
             if not cols:
-                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                available = ", ".join(repr(c) for c in self._current_field_types)
                 raise ValueError(
                     f"unnest(columns={columns!r}) matched no columns. "
                     f"Available columns: [{available}]"
@@ -2767,7 +2803,7 @@ class DataFrame(Generic[SchemaT]):
         sel = _selectors.by_dtype(_selectors.LIST)
         matched = sel.resolve(self._current_field_types)
         if not matched:
-            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            available = ", ".join(repr(c) for c in self._current_field_types)
             raise ValueError(
                 "explode_all() matched no list-typed columns. "
                 f"Available columns: [{available}]"
@@ -2781,7 +2817,7 @@ class DataFrame(Generic[SchemaT]):
         sel = _selectors.by_dtype(_selectors.STRUCT)
         matched = sel.resolve(self._current_field_types)
         if not matched:
-            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            available = ", ".join(repr(c) for c in self._current_field_types)
             raise ValueError(
                 "unnest_all() matched no struct-typed columns. "
                 f"Available columns: [{available}]"
@@ -2816,7 +2852,7 @@ class DataFrame(Generic[SchemaT]):
             )
 
         def _available_cols_text(field_types: Mapping[str, Any]) -> str:
-            return ", ".join(repr(c) for c in field_types.keys())
+            return ", ".join(repr(c) for c in field_types)
 
         def _resolve_selector(
             *, sel: Selector, field_types: Mapping[str, Any], arg_name: str
@@ -2857,9 +2893,9 @@ class DataFrame(Generic[SchemaT]):
             origin = get_origin(tp)
             if origin is None:
                 return tp
-            if origin is getattr(__import__("typing"), "Union", object()) or str(origin).endswith(
-                "types.UnionType"
-            ):
+            if origin is getattr(__import__("typing"), "Union", object()) or str(
+                origin
+            ).endswith("types.UnionType"):
                 args = [a for a in get_args(tp) if a is not type(None)]
                 if len(args) == 1:
                     return args[0]
@@ -2881,13 +2917,12 @@ class DataFrame(Generic[SchemaT]):
                 raise KeyError(
                     "join() unknown right join key(s): "
                     f"[{missing}]. Right available columns: [{available}]. "
-                    "Hint: use left_on=.../right_on=... for differently named key columns."
+                    "Hint: use left_on=.../right_on=... for differently named "
+                    "key columns."
                 )
             right_keys = list(left_keys)
-            used_expr_keys = False
             used_non_columnref_expr_keys = False
         else:
-            used_expr_keys = False
             used_non_columnref_expr_keys = False
             if isinstance(left_on, Selector):
                 left_keys = _resolve_selector(
@@ -2906,13 +2941,24 @@ class DataFrame(Generic[SchemaT]):
                 )
             else:
                 right_keys = _resolve_keys(right_on)
-            raw_left = [] if left_on is None else (
-                [left_on] if isinstance(left_on, (str, Expr, Selector)) else list(left_on)
+            raw_left = (
+                []
+                if left_on is None
+                else (
+                    [left_on]
+                    if isinstance(left_on, (str, Expr, Selector))
+                    else list(left_on)
+                )
             )
-            raw_right = [] if right_on is None else (
-                [right_on] if isinstance(right_on, (str, Expr, Selector)) else list(right_on)
+            raw_right = (
+                []
+                if right_on is None
+                else (
+                    [right_on]
+                    if isinstance(right_on, (str, Expr, Selector))
+                    else list(right_on)
+                )
             )
-            used_expr_keys = any(isinstance(x, Expr) for x in [*raw_left, *raw_right])
             used_non_columnref_expr_keys = any(
                 isinstance(x, Expr) and not isinstance(x, ColumnRef)
                 for x in [*raw_left, *raw_right]
@@ -2934,7 +2980,8 @@ class DataFrame(Generic[SchemaT]):
                 )
             if how == "cross":
                 raise ValueError(
-                    "cross join does not support validate=...; remove validate or use a keyed join."
+                    "cross join does not support validate=...; remove validate or "
+                    "use a keyed join."
                 )
             validate = v
 
@@ -2945,7 +2992,8 @@ class DataFrame(Generic[SchemaT]):
             # Rust API version pinned by pydantable-core; keep the argument surface
             # for future parity but fail explicitly for now.
             raise NotImplementedError(
-                "join(allow_parallel=..., force_parallel=...) is not supported in this build."
+                "join(allow_parallel=..., force_parallel=...) is not supported in "
+                "this build."
             )
 
         maintain_order_norm: str | None
@@ -2965,36 +3013,40 @@ class DataFrame(Generic[SchemaT]):
         if coalesce is True:
             if how == "cross":
                 raise ValueError(
-                    "cross join does not support coalesce=...; remove coalesce or use a keyed join."
+                    "cross join does not support coalesce=...; remove coalesce or "
+                    "use a keyed join."
                 )
             if used_non_columnref_expr_keys and on is None:
                 raise NotImplementedError(
-                    "join(coalesce=True) is only supported for column-name keys or simple ColumnRef expression keys."
+                    "join(coalesce=True) is only supported for column-name keys or "
+                    "simple ColumnRef expression keys."
                 )
             if how in ("semi", "anti"):
-                # Left-only output: coalesce has no observable effect but is accepted for parity.
+                # Left-only output: coalesce has no observable effect but is accepted
+                # for parity.
                 pass
             elif how in ("full", "outer") and on is None and left_keys != right_keys:
-                # Typed-safe subset: require exact base dtype match per key pair (no casts).
-                for lk, rk in zip(left_keys, right_keys):
+                # Typed-safe subset: require exact base dtype match per key pair
+                # (no casts).
+                for lk, rk in zip(left_keys, right_keys, strict=True):
                     lt = self._current_field_types.get(lk)
                     rt = other._current_field_types.get(rk)
                     if lt is None or rt is None:
                         continue
                     if _base_type(lt) is not _base_type(rt):
                         raise NotImplementedError(
-                            "join(coalesce=True) for full joins requires matching key base dtypes "
-                            "(no casts)."
+                            "join(coalesce=True) for full joins requires matching key "
+                            "base dtypes (no casts)."
                         )
 
         if coalesce is False and on is None and left_keys != right_keys:
-            # Typed-safe subset: only keep both key columns when it won't collide with an existing
-            # left-side column name.
-            for _lk, rk in zip(left_keys, right_keys):
+            # Typed-safe subset: only keep both key columns when it won't collide
+            # with an existing left-side column name.
+            for _lk, rk in zip(left_keys, right_keys, strict=True):
                 if rk in self._current_field_types:
                     raise NotImplementedError(
-                        "join(coalesce=False) cannot retain both key columns when the right key "
-                        "name collides with an existing left column."
+                        "join(coalesce=False) cannot retain both key columns when the "
+                        "right key name collides with an existing left column."
                     )
 
         if how == "cross":
@@ -3317,14 +3369,20 @@ class DataFrame(Generic[SchemaT]):
         return {k: sum(v is None for v in vs) for k, vs in d.items()}
 
     def is_empty(self) -> bool:
-        """True if the materialized result has zero rows (materializes via :meth:`to_dict`)."""
+        """True if the materialized result has zero rows.
+
+        This is eager (materializes via :meth:`to_dict`).
+        """
         d = self.to_dict()
         if not d:
             return True
         return len(next(iter(d.values()))) == 0
 
     def shift(self, periods: int = 1) -> DataFrame[Any]:
-        """Shift every column by `periods` rows (eager; materializes via :meth:`to_dict`)."""
+        """Shift every column by `periods` rows.
+
+        This is eager (materializes via :meth:`to_dict`).
+        """
         p = int(periods)
         d = self.to_dict()
         if not d:
@@ -4051,7 +4109,9 @@ class GroupedDataFrame:
     def sum(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
         if not columns:
             raise ValueError("sum() requires at least one column name.")
-        return self.agg(streaming=streaming, **{f"{c}_sum": ("sum", c) for c in columns})
+        return self.agg(
+            streaming=streaming, **{f"{c}_sum": ("sum", c) for c in columns}
+        )
 
     def mean(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
         if not columns:
@@ -4063,12 +4123,16 @@ class GroupedDataFrame:
     def min(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
         if not columns:
             raise ValueError("min() requires at least one column name.")
-        return self.agg(streaming=streaming, **{f"{c}_min": ("min", c) for c in columns})
+        return self.agg(
+            streaming=streaming, **{f"{c}_min": ("min", c) for c in columns}
+        )
 
     def max(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
         if not columns:
             raise ValueError("max() requires at least one column name.")
-        return self.agg(streaming=streaming, **{f"{c}_max": ("max", c) for c in columns})
+        return self.agg(
+            streaming=streaming, **{f"{c}_max": ("max", c) for c in columns}
+        )
 
     def count(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
         if not columns:

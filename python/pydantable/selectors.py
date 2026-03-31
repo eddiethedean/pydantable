@@ -6,10 +6,13 @@ import re
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from typing import Any, Callable, Iterable, Mapping, get_args, get_origin
+from typing import TYPE_CHECKING, Any, get_args, get_origin
 from uuid import UUID
 
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Mapping
 
 _PY_INT = int
 _PY_FLOAT = float
@@ -22,9 +25,13 @@ def _unwrap_optional(annotation: Any) -> Any:
     # Python 3.10+: Optional[T] is Union[T, NoneType]
     if origin is type(None):  # pragma: no cover
         return annotation
-    if origin is getattr(__import__("types"), "UnionType", object()):  # pragma: no cover
+    if origin is getattr(
+        __import__("types"), "UnionType", object()
+    ):  # pragma: no cover
         return annotation
-    if origin is getattr(__import__("typing"), "Union", object()) or str(origin).endswith("types.UnionType"):
+    if origin is getattr(__import__("typing"), "Union", object()) or str(
+        origin
+    ).endswith("types.UnionType"):
         args = [a for a in get_args(annotation) if a is not type(None)]
         if len(args) == 1:
             return args[0]
@@ -91,7 +98,7 @@ class Selector:
 
     def resolve(self, schema_field_types: Mapping[str, Any]) -> list[str]:
         selected = self._resolver(schema_field_types)
-        return [name for name in schema_field_types.keys() if name in selected]
+        return [name for name in schema_field_types if name in selected]
 
     def exclude(self, other: Selector | str | Iterable[str]) -> Selector:
         return self - other
@@ -103,7 +110,9 @@ class Selector:
             if self._repr is not None and o._repr is not None
             else None
         )
-        return Selector(lambda schema: self._resolver(schema) | o._resolver(schema), rep)
+        return Selector(
+            lambda schema: self._resolver(schema) | o._resolver(schema), rep
+        )
 
     def __and__(self, other: Selector | str | Iterable[str]) -> Selector:
         o = _as_selector(other)
@@ -112,7 +121,9 @@ class Selector:
             if self._repr is not None and o._repr is not None
             else None
         )
-        return Selector(lambda schema: self._resolver(schema) & o._resolver(schema), rep)
+        return Selector(
+            lambda schema: self._resolver(schema) & o._resolver(schema), rep
+        )
 
     def __sub__(self, other: Selector | str | Iterable[str]) -> Selector:
         o = _as_selector(other)
@@ -121,42 +132,41 @@ class Selector:
             if self._repr is not None and o._repr is not None
             else None
         )
-        return Selector(lambda schema: self._resolver(schema) - o._resolver(schema), rep)
+        return Selector(
+            lambda schema: self._resolver(schema) - o._resolver(schema), rep
+        )
 
     def __invert__(self) -> Selector:
         rep = f"(~{self!r})" if self._repr is not None else None
-        return Selector(lambda schema: set(schema.keys()) - self._resolver(schema), rep)
+        return Selector(lambda schema: set(schema) - self._resolver(schema), rep)
 
 
 def _as_selector(obj: Selector | str | Iterable[str]) -> Selector:
     if isinstance(obj, Selector):
         return obj
     names: tuple[str, ...]
-    if isinstance(obj, str):
-        names = (obj,)
-    else:
-        names = tuple(obj)
+    names = (obj,) if isinstance(obj, str) else tuple(obj)
     return by_name(*names)
 
 
 def everything() -> Selector:
-    return Selector(lambda schema: set(schema.keys()), "everything()")
+    return Selector(lambda schema: set(schema), "everything()")
 
 
-def all() -> Selector:  # noqa: A001 - intentional parity name
+def all() -> Selector:
     return everything()
 
 
 def by_name(*names: str) -> Selector:
     wanted = {str(n) for n in names}
     rep = f"by_name({', '.join(repr(n) for n in names)})"
-    return Selector(lambda schema: {n for n in schema.keys() if n in wanted}, rep)
+    return Selector(lambda schema: {n for n in schema if n in wanted}, rep)
 
 
 def starts_with(prefix: str) -> Selector:
     p = str(prefix)
     return Selector(
-        lambda schema: {n for n in schema.keys() if n.startswith(p)},
+        lambda schema: {n for n in schema if n.startswith(p)},
         f"starts_with({p!r})",
     )
 
@@ -164,7 +174,7 @@ def starts_with(prefix: str) -> Selector:
 def ends_with(suffix: str) -> Selector:
     s = str(suffix)
     return Selector(
-        lambda schema: {n for n in schema.keys() if n.endswith(s)},
+        lambda schema: {n for n in schema if n.endswith(s)},
         f"ends_with({s!r})",
     )
 
@@ -172,7 +182,7 @@ def ends_with(suffix: str) -> Selector:
 def contains(substr: str) -> Selector:
     sub = str(substr)
     return Selector(
-        lambda schema: {n for n in schema.keys() if sub in n},
+        lambda schema: {n for n in schema if sub in n},
         f"contains({sub!r})",
     )
 
@@ -180,7 +190,7 @@ def contains(substr: str) -> Selector:
 def matches(pattern: str | re.Pattern[str]) -> Selector:
     rx = re.compile(pattern) if isinstance(pattern, str) else pattern
     return Selector(
-        lambda schema: {n for n in schema.keys() if rx.search(n) is not None},
+        lambda schema: {n for n in schema if rx.search(n) is not None},
         f"matches({rx.pattern!r})",
     )
 
@@ -216,12 +226,8 @@ UUIDS = _DTypeGroup("UUID", lambda ann: _unwrap_optional(ann) is UUID)
 BINARIES = _DTypeGroup("BINARIES", lambda ann: _unwrap_optional(ann) is bytes)
 MAPS = _DTypeGroup("MAPS", lambda ann: _is_map_annotation(ann))
 ENUMS = _DTypeGroup("ENUMS", lambda ann: _is_enum_annotation(ann))
-IPV4S = _DTypeGroup(
-    "IPV4S", lambda ann: _unwrap_optional(ann) is ipaddress.IPv4Address
-)
-IPV6S = _DTypeGroup(
-    "IPV6S", lambda ann: _unwrap_optional(ann) is ipaddress.IPv6Address
-)
+IPV4S = _DTypeGroup("IPV4S", lambda ann: _unwrap_optional(ann) is ipaddress.IPv4Address)
+IPV6S = _DTypeGroup("IPV6S", lambda ann: _unwrap_optional(ann) is ipaddress.IPv6Address)
 WKBS = _DTypeGroup("WKBS", lambda ann: _is_wkb_annotation(ann))
 
 
@@ -267,7 +273,7 @@ def floats() -> Selector:
     return by_dtype(FLOATS)
 
 
-def float() -> Selector:  # noqa: A001 - intentional parity name
+def float() -> Selector:
     return floats()
 
 
@@ -331,7 +337,9 @@ def wkbs() -> Selector:
     return by_dtype(WKBS)
 
 
-def rename_map(selector: Selector, fn: Callable[[str], str]) -> Callable[[Mapping[str, Any]], dict[str, str]]:
+def rename_map(
+    selector: Selector, fn: Callable[[str], str]
+) -> Callable[[Mapping[str, Any]], dict[str, str]]:
     """Build a rename mapping from a selector and renaming function (schema-driven)."""
     if not isinstance(selector, Selector):
         raise TypeError("rename_map(selector, fn) expects a Selector.")
@@ -341,9 +349,10 @@ def rename_map(selector: Selector, fn: Callable[[str], str]) -> Callable[[Mappin
     def _mk(schema_field_types: Mapping[str, Any]) -> dict[str, str]:
         cols = selector.resolve(schema_field_types)
         if not cols:
-            available = ", ".join(repr(c) for c in schema_field_types.keys())
+            available = ", ".join(repr(c) for c in schema_field_types)
             raise ValueError(
-                f"rename_map({selector!r}) matched no columns. Available columns: [{available}]"
+                f"rename_map({selector!r}) matched no columns. "
+                f"Available columns: [{available}]"
             )
         mapping = {c: str(fn(c)) for c in cols}
         if len(set(mapping.values())) != len(mapping):
@@ -351,4 +360,3 @@ def rename_map(selector: Selector, fn: Callable[[str], str]) -> Callable[[Mappin
         return mapping
 
     return _mk
-

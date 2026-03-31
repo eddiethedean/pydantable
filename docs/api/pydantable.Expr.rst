@@ -15,12 +15,15 @@
    
       ~Expr.__init__
       ~Expr.abs
+      ~Expr.alias
       ~Expr.between
       ~Expr.binary_len
       ~Expr.cast
       ~Expr.ceil
       ~Expr.char_length
       ~Expr.clip
+      ~Expr.contains_all
+      ~Expr.contains_any
       ~Expr.cummax
       ~Expr.cummin
       ~Expr.cumprod
@@ -40,11 +43,20 @@
       ~Expr.element_at
       ~Expr.ends_with
       ~Expr.floor
+      ~Expr.is_blank_str
+      ~Expr.is_empty_str
+      ~Expr.is_in
       ~Expr.is_not_null
+      ~Expr.is_not_null_and_not_empty_str
       ~Expr.is_null
+      ~Expr.is_null_or_empty_str
       ~Expr.isin
+      ~Expr.len
+      ~Expr.list_all
+      ~Expr.list_any
       ~Expr.list_contains
       ~Expr.list_get
+      ~Expr.list_is_empty
       ~Expr.list_join
       ~Expr.list_len
       ~Expr.list_max
@@ -58,9 +70,12 @@
       ~Expr.map_entries
       ~Expr.map_from_entries
       ~Expr.map_get
+      ~Expr.map_has_any_key
+      ~Expr.map_is_empty
       ~Expr.map_keys
       ~Expr.map_len
       ~Expr.map_values
+      ~Expr.matches
       ~Expr.over
       ~Expr.pct_change
       ~Expr.referenced_columns

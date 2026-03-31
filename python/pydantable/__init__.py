@@ -13,6 +13,7 @@ from __future__ import annotations
 from . import pandas as pandas
 from . import plugins as plugins
 from . import pyspark as pyspark
+from . import selectors as selectors
 from ._extension import MissingRustExtensionError
 from .awaitable_dataframe_model import AwaitableDataFrameModel
 from .dataframe import DataFrame
@@ -60,7 +61,6 @@ from .io import (
 from .materialization import PlanMaterialization, plan_materialization_summary
 from .observe import get_observer, set_observer
 from .schema import DtypeDriftWarning, Schema
-from . import selectors as selectors
 from .types import WKB
 
 __all__ = [
@@ -75,7 +75,6 @@ __all__ = [
     "PlanMaterialization",
     "PydantableUserError",
     "Schema",
-    "selectors",
     "afetch_sql",
     "aiter_csv",
     "aiter_ipc",
@@ -114,6 +113,7 @@ __all__ = [
     "read_parquet",
     "read_parquet_url",
     "reset_display_options",
+    "selectors",
     "set_display_options",
     "set_observer",
     "write_csv_batches",

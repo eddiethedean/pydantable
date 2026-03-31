@@ -1,5 +1,6 @@
 import pytest
-from pydantable import DataFrame, selectors as s
+from pydantable import DataFrame
+from pydantable import selectors as s
 from pydantable.schema import Schema
 
 
@@ -31,7 +32,9 @@ def test_with_columns_fill_null_selector_happy_path_and_empty_match_strict() -> 
     with pytest.raises(ValueError, match=r"matched no columns.*Available columns"):
         df.with_columns_fill_null(s.starts_with("zzz"), value=0)
 
-    out2 = df.with_columns_fill_null(s.starts_with("zzz"), value=0, strict=False).to_dict()
+    out2 = df.with_columns_fill_null(
+        s.starts_with("zzz"), value=0, strict=False
+    ).to_dict()
     assert out2 == {"x": [None, 1], "y": [2, None]}
 
 
@@ -60,4 +63,3 @@ def test_select_schema_is_select_alias_with_typecheck() -> None:
 
     with pytest.raises(TypeError, match="expects a Selector"):
         df.select_schema("a")  # type: ignore[arg-type]
-

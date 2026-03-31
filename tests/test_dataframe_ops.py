@@ -1,5 +1,5 @@
-from decimal import Decimal
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 
 import pytest
 from conftest import assert_table_eq_sorted
@@ -374,15 +374,18 @@ def test_phase4_longtail_drop_nulls_how_and_threshold() -> None:
 
     df = DataFrame[S]({"a": [1, None, None], "b": [None, 2, None]})
 
-    # how='any' (default): drop rows with any null in subset => keep only fully non-null rows.
+    # how='any' (default): drop rows with any null in subset
+    # => keep only fully non-null rows.
     out_any = df.drop_nulls(["a", "b"], how="any").to_dict()
     assert out_any == {"a": [], "b": []}
 
-    # how='all': drop rows only if all are null in subset => keep rows where at least one is non-null.
+    # how='all': drop rows only if all are null in subset
+    # => keep rows where at least one is non-null.
     out_all = df.drop_nulls(["a", "b"], how="all").to_dict()
     assert out_all == {"a": [1, None], "b": [None, 2]}
 
-    # threshold=2: keep rows with at least 2 non-null values (same as how='any' for 2 columns).
+    # threshold=2: keep rows with at least 2 non-null values
+    # (same as how='any' for 2 columns).
     out_thr = df.drop_nulls(["a", "b"], threshold=2).to_dict()
     assert out_thr == {"a": [], "b": []}
 
@@ -463,6 +466,7 @@ def test_rename_with_selector_empty_match_raises() -> None:
     with pytest.raises(ValueError, match=r"matched no columns.*Available columns"):
         df.rename_with_selector(s.starts_with("zzz"), lambda c: c).to_dict()
 
+
 def test_drop_with_selector_dsl_and_strict_false() -> None:
     class S(Schema):
         a: int
@@ -511,7 +515,9 @@ def test_melt_unpivot_accept_selectors_for_id_vars_value_vars() -> None:
     assert u["value"] == [20]
 
 
-def test_phase4_reshape_melt_accepts_single_str_and_selector_empty_match_errors() -> None:
+def test_phase4_reshape_melt_accepts_single_str_and_selector_empty_match_errors() -> (
+    None
+):
     class S(Schema):
         id: int
         a: int
@@ -538,9 +544,7 @@ def test_phase4_reshape_pivot_accepts_selectors() -> None:
         x: int
         y: int
 
-    df = DataFrame[S](
-        {"id": [1, 1], "key": ["A", "B"], "x": [10, 20], "y": [1, 2]}
-    )
+    df = DataFrame[S]({"id": [1, 1], "key": ["A", "B"], "x": [10, 20], "y": [1, 2]})
     out = df.pivot(
         index=s.by_name("id"),
         columns=s.by_name("key"),
@@ -660,6 +664,8 @@ def test_expr_filter_helpers_dtype_rejections() -> None:
         _ = df.x.len()
     with pytest.raises(TypeError):
         _ = df.x.list_any()
+
+
 def test_with_columns_none_requires_destination_type() -> None:
     class UserNullable(Schema):
         id: int
@@ -751,6 +757,7 @@ def test_sort_maintain_order_matches_default_on_unique_keys() -> None:
     b = df.sort("k", maintain_order=True).to_dict()
     assert a == b == {"k": [1, 2, 3], "v": [10, 20, 30]}
 
+
 def test_unique_maintain_order_keeps_first_appearance_order() -> None:
     class S(Schema):
         k: int
@@ -770,6 +777,7 @@ def test_unique_keep_last_is_stable() -> None:
     out = df.unique(subset=["k"], keep="last", maintain_order=True).to_dict()
     # For keep='last', stable unique preserves the order of the last occurrences.
     assert out == {"k": [2, 1], "seq": [21, 12]}
+
 
 def test_p2_fill_drop_nulls_and_cast_predicates() -> None:
     class S(Schema):
@@ -901,7 +909,11 @@ def test_p5_pivot_rejects_empty_separator() -> None:
     df = DataFrame[S]({"id": [1], "key": ["A"], "x": [1]})
     with pytest.raises(TypeError, match="separator"):
         df.pivot(
-            index="id", columns="key", values="x", aggregate_function="first", separator=""
+            index="id",
+            columns="key",
+            values="x",
+            aggregate_function="first",
+            separator="",
         ).to_dict()
 
 
@@ -1148,7 +1160,9 @@ def test_group_by_maintain_order_and_drop_nulls_false() -> None:
         v: int
 
     df = DataFrame[S]({"g": ["b", None, "a", "b", None], "v": [1, 2, 3, 4, 5]})
-    out = df.group_by("g", maintain_order=True, drop_nulls=False).agg(v_sum=("sum", "v"))
+    out = df.group_by("g", maintain_order=True, drop_nulls=False).agg(
+        v_sum=("sum", "v")
+    )
     assert out.to_dict() == {"g": ["b", None, "a"], "v_sum": [5, 7, 3]}
 
 

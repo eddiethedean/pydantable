@@ -158,11 +158,21 @@ pub fn execute_join_polars(
             let ctx = py_dict_to_literal_ctx(&plan.schema, data_bound)?;
             let row_count = ctx.values().next().map_or(0, std::vec::Vec::len);
             let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+            let mut key_cols: Vec<&Vec<Option<LiteralValue>>> = Vec::with_capacity(keys.len());
+            for k in keys {
+                let col = ctx.get(k).ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                        "Internal error: missing join key column '{k}'."
+                    ))
+                })?;
+                key_cols.push(col);
+            }
+
             for i in 0..row_count {
                 let mut sig = String::new();
-                for k in keys {
+                for col in key_cols.iter() {
                     sig.push('|');
-                    sig.push_str(&key_fragment(&ctx[k][i]));
+                    sig.push_str(&key_fragment(&col[i]));
                 }
                 if !seen.insert(sig) {
                     return Ok(false);
@@ -300,12 +310,7 @@ pub fn execute_join_polars(
             ));
         }
 
-        let mut joined = left_lf.join(
-            right_lf,
-            left_key_exprs,
-            right_key_exprs,
-            args,
-        );
+        let mut joined = left_lf.join(right_lf, left_key_exprs, right_key_exprs, args);
         if is_semi {
             joined = joined
                 .filter(col("__pydantable_join_marker").is_not_null())

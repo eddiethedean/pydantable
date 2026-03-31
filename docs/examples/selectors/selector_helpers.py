@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from pydantable import DataFrame, selectors as s
+from pydantable import DataFrame
+from pydantable import selectors as s
 from pydantable.schema import Schema
 
 

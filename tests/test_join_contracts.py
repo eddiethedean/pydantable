@@ -125,7 +125,9 @@ def test_join_join_nulls_controls_null_key_matching() -> None:
     assert out_default["v"] == [20]
     assert out_default["w"] == [200]
 
-    out_eq = left.join(right, on="k", how="inner", join_nulls=True).collect(as_lists=True)
+    out_eq = left.join(right, on="k", how="inner", join_nulls=True).collect(
+        as_lists=True
+    )
     assert out_eq["k"] == [None, 1]
     assert out_eq["v"] == [10, 20]
     assert out_eq["w"] == [100, 200]
@@ -214,7 +216,9 @@ def test_join_on_selector_success_and_errors() -> None:
         keys=["id"],
     )
 
-    with pytest.raises(ValueError, match=r"selector matched no columns.*Available columns"):
+    with pytest.raises(
+        ValueError, match=r"selector matched no columns.*Available columns"
+    ):
         left.join(right, on=s.starts_with("zzz"), how="inner").to_dict()
 
     class R2(Schema):
@@ -247,7 +251,9 @@ def test_join_left_on_right_on_selector_resolution_and_length_mismatch() -> None
     )
 
     with pytest.raises(ValueError, match=r"must have the same length"):
-        left.join(right, left_on=s.everything(), right_on=s.by_name("id_r"), how="inner").to_dict()
+        left.join(
+            right, left_on=s.everything(), right_on=s.by_name("id_r"), how="inner"
+        ).to_dict()
 
 
 def test_join_on_selector_scan_roots(tmp_path) -> None:
@@ -268,7 +274,9 @@ def test_join_on_selector_scan_roots(tmp_path) -> None:
     right = DataFrame[R].read_csv(str(right_csv))
 
     out = left.join(right, on=s.by_name("k"), how="inner").collect(as_lists=True)
-    assert_table_eq_sorted(out, {"k": [1, 2], "v": [10, 20], "w": [100, 200]}, keys=["k"])
+    assert_table_eq_sorted(
+        out, {"k": [1, 2], "v": [10, 20], "w": [100, 200]}, keys=["k"]
+    )
 
 
 def test_join_supports_expression_keys() -> None:
@@ -367,7 +375,9 @@ def test_join_validate_scan_roots_multi_key_and_side_specific(tmp_path) -> None:
         left.join(right, on=["k1", "k2"], how="inner", validate="one_to_many").to_dict()
 
     # many_to_one should pass because right keys are unique.
-    out = left.join(right, on=["k1", "k2"], how="inner", validate="many_to_one").to_dict()
+    out = left.join(
+        right, on=["k1", "k2"], how="inner", validate="many_to_one"
+    ).to_dict()
     assert set(out.keys()) >= {"k1", "k2", "v", "v2"}
 
 
@@ -390,7 +400,7 @@ def test_join_coalesce_true_left_on_right_on_left_join_drops_right_key() -> None
     assert out["lid"] == [1, 2]
 
 
-def test_join_coalesce_true_left_on_right_on_right_join_prefers_right_key_including_right_only_rows() -> None:
+def test_join_coalesce_true_right_join_prefers_right_key() -> None:
     class L(Schema):
         lid: int
         v: int
@@ -468,6 +478,7 @@ def test_join_coalesce_rejected_combinations() -> None:
         left.join(right, how="cross", coalesce=True).to_dict()
 
     with pytest.raises(NotImplementedError, match="matching key base dtypes"):
+
         class L(Schema):
             lid: int
             v: int
@@ -481,7 +492,9 @@ def test_join_coalesce_rejected_combinations() -> None:
         l2.join(r2, left_on="lid", right_on="rid", how="full", coalesce=True).to_dict()
 
     with pytest.raises(NotImplementedError, match="expression keys"):
-        _ = left.join(right, left_on=left.id + 0, right_on=right.id, how="inner", coalesce=True).to_dict()
+        _ = left.join(
+            right, left_on=left.id + 0, right_on=right.id, how="inner", coalesce=True
+        ).to_dict()
 
 
 def test_join_coalesce_true_allows_columnref_expression_keys() -> None:

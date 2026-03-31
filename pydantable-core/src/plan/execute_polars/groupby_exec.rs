@@ -75,6 +75,7 @@ fn mask_groupby_sum_mean_columns(
 }
 
 #[cfg(feature = "polars_engine")]
+#[allow(clippy::too_many_arguments)]
 pub fn execute_groupby_agg_polars(
     py: Python<'_>,
     plan: &PlanInner,
@@ -357,7 +358,11 @@ pub fn execute_groupby_agg_polars(
         let mut cond: Option<PolarsExpr> = None;
         for k in by.iter() {
             let e = col(k).is_not_null();
-            cond = Some(if let Some(prev) = cond { prev.and(e) } else { e });
+            cond = Some(if let Some(prev) = cond {
+                prev.and(e)
+            } else {
+                e
+            });
         }
         if let Some(c) = cond {
             lf = lf.filter(c);
@@ -370,12 +375,11 @@ pub fn execute_groupby_agg_polars(
         lf.group_by(by_exprs)
     };
 
-    let mut out_df = collect_lazyframe(py, grouped.agg(agg_exprs), streaming)
-        .map_err(|e| {
-            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Polars execution error (group_by().agg()): {e}"
-            ))
-        })?;
+    let mut out_df = collect_lazyframe(py, grouped.agg(agg_exprs), streaming).map_err(|e| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "Polars execution error (group_by().agg()): {e}"
+        ))
+    })?;
 
     out_df = mask_groupby_sum_mean_columns(out_df, &tmp_count_cols, &out_schema)?;
 

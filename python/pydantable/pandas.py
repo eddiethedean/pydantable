@@ -21,10 +21,10 @@ from .dataframe import GroupedDataFrame as CoreGroupedDataFrame
 from .dataframe_model import DataFrameModel as CoreDataFrameModel
 from .dataframe_model import GroupedDataFrameModel as CoreGroupedDataFrameModel
 from .expressions import ColumnRef, Expr, Literal, coalesce, dense_rank, rank, when
-from .selectors import Selector
 from .rust_engine import _require_rust_core
 from .schema import Schema
 from .schema._impl import make_derived_schema_type, schema_field_types
+from .selectors import Selector
 from .window_spec import WindowSpec
 
 
@@ -1954,9 +1954,7 @@ class PandasDataFrame(CoreDataFrame):
                 raise NotImplementedError("sample(axis=1) is not supported.")
             raise ValueError("sample(axis=...) must be 0 or 'index'.")
         if with_replacement:
-            raise NotImplementedError(
-                "sample(with_replacement=True) is not supported."
-            )
+            raise NotImplementedError("sample(with_replacement=True) is not supported.")
         if replace:
             raise NotImplementedError("sample(replace=True) is not supported.")
         eff_frac = frac if fraction is None else fraction
@@ -3110,9 +3108,7 @@ class PandasGroupedDataFrameModel(CoreGroupedDataFrameModel):
             self._grouped_df.mean(*columns, streaming=streaming)
         )
 
-    def count(
-        self, *columns: str, streaming: bool | None = None
-    ) -> CoreDataFrameModel:
+    def count(self, *columns: str, streaming: bool | None = None) -> CoreDataFrameModel:
         return self._model_type._from_dataframe(
             self._grouped_df.count(*columns, streaming=streaming)
         )

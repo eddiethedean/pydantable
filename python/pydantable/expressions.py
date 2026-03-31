@@ -207,16 +207,16 @@ class Expr:  # type: ignore[override]
         """Alias of :meth:`isin` (Polars naming parity)."""
         return self.isin(*values)
 
-    def len(self) -> Expr:  # noqa: A003 - intentional parity name
+    def len(self) -> Expr:
         """String length alias (typed-safe): only valid for ``str`` columns."""
         dt = self.dtype
         origin = get_origin(dt)
         args = get_args(dt)
         if origin is None:
             base = dt
-        elif origin is getattr(__import__("typing"), "Union", object()) or str(origin).endswith(
-            "types.UnionType"
-        ):
+        elif origin is getattr(__import__("typing"), "Union", object()) or str(
+            origin
+        ).endswith("types.UnionType"):
             non_none = [a for a in args if a is not type(None)]
             base = non_none[0] if len(non_none) == 1 else dt
         else:
