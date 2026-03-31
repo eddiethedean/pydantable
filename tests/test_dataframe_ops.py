@@ -338,6 +338,55 @@ def test_select_with_selector_dsl_empty_match_raises() -> None:
         df.select(s.starts_with("zzz"))
 
 
+def test_phase4_longtail_pipe_and_clip() -> None:
+    class S(Schema):
+        x: int
+        y: float
+
+    df = DataFrame[S]({"x": [1, 5], "y": [1.5, -2.0]})
+
+    out = df.clip(lower=0, upper=3).to_dict()
+    assert out == {"x": [1, 3], "y": [1.5, 0.0]}
+
+    out2 = df.clip(lower=2, subset="x").to_dict()
+    assert out2 == {"x": [2, 5], "y": [1.5, -2.0]}
+
+    out3 = df.pipe(lambda d: d.clip(upper=0, subset=s.by_name("y"))).to_dict()
+    assert out3 == {"x": [1, 5], "y": [0.0, -2.0]}
+
+
+def test_phase4_longtail_with_row_count() -> None:
+    class S(Schema):
+        x: int
+
+    df = DataFrame[S]({"x": [10, 20, 30]})
+    out = df.with_row_count().to_dict()
+    assert out == {"x": [10, 20, 30], "row_nr": [0, 1, 2]}
+
+    out2 = df.with_row_count("rn", offset=5).to_dict()
+    assert out2 == {"x": [10, 20, 30], "rn": [5, 6, 7]}
+
+
+def test_phase4_longtail_drop_nulls_how_and_threshold() -> None:
+    class S(Schema):
+        a: int | None
+        b: int | None
+
+    df = DataFrame[S]({"a": [1, None, None], "b": [None, 2, None]})
+
+    # how='any' (default): drop rows with any null in subset => keep only fully non-null rows.
+    out_any = df.drop_nulls(["a", "b"], how="any").to_dict()
+    assert out_any == {"a": [], "b": []}
+
+    # how='all': drop rows only if all are null in subset => keep rows where at least one is non-null.
+    out_all = df.drop_nulls(["a", "b"], how="all").to_dict()
+    assert out_all == {"a": [1, None], "b": [None, 2]}
+
+    # threshold=2: keep rows with at least 2 non-null values (same as how='any' for 2 columns).
+    out_thr = df.drop_nulls(["a", "b"], threshold=2).to_dict()
+    assert out_thr == {"a": [], "b": []}
+
+
 def test_select_exclude_rejects_global_aggregates() -> None:
     df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
     from pydantable.expressions import global_sum

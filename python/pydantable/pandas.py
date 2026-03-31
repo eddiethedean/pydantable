@@ -2584,11 +2584,11 @@ class PandasDataFrame(CoreDataFrame):
 
     def pipe(
         self,
-        func: Any,
+        fn: Any,
         *args: Any,
         **kwargs: Any,
     ) -> Any:
-        return func(self, *args, **kwargs)
+        return fn(self, *args, **kwargs)
 
     def filter(  # type: ignore[override]
         self,
@@ -2952,8 +2952,8 @@ class PandasDataFrameModel(CoreDataFrameModel):
     def copy(self, *args: Any, **kwargs: Any) -> Self:
         return type(self)._from_dataframe(self._df.copy(*args, **kwargs))
 
-    def pipe(self, func: Any, *args: Any, **kwargs: Any) -> Any:
-        return func(self, *args, **kwargs)
+    def pipe(self, fn: Any, *args: Any, **kwargs: Any) -> Any:
+        return fn(self, *args, **kwargs)
 
     def filter(self, *args: Any, **kwargs: Any) -> Self:
         return type(self)._from_dataframe(self._df.filter(*args, **kwargs))

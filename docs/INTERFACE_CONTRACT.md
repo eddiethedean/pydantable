@@ -201,6 +201,33 @@ Supported reshape methods:
 - `explode` and `unnest` API entrypoints
 - `explode_all` / `unnest_all` (schema-driven helpers)
 
+## Core convenience helpers (schema-first)
+
+### `with_row_count`
+
+`with_row_count(name="row_nr", offset=0)` adds a deterministic row number column:
+
+- Output schema adds a non-nullable `int` column named `name`.
+- `offset` controls the starting value; `offset >= 0` is required.
+- This is implemented in the Rust plan so it works for in-memory and scan roots.
+
+### `clip`
+
+`clip(lower=..., upper=..., subset=...)` clamps numeric values:
+
+- By default (`subset=None`), clamps all schema-numeric columns.
+- `subset` accepts a column name, a sequence of names, or a schema-driven `Selector`.
+- Non-numeric subset columns raise `TypeError`.
+
+### `drop_nulls` (row filter)
+
+`drop_nulls(subset=..., how=..., threshold=...)` filters rows based on nulls:
+
+- `subset` accepts a column name, a sequence of names, or a schema-driven `Selector`.
+- `how="any"` (default): drop rows with **any** null in the subset (require all non-null).
+- `how="all"`: drop rows only if **all** subset values are null (require at least one non-null).
+- `threshold=n`: keep rows with at least `n` non-null values in the subset.
+
 `melt` / `unpivot`:
 - `id_vars` are preserved as-is.
 - `variable_name` is always non-nullable `str`.

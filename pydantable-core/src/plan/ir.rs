@@ -45,6 +45,8 @@ pub enum PlanStep {
     },
     DropNulls {
         subset: Option<Vec<String>>,
+        how: String,
+        threshold: Option<usize>,
     },
     Melt {
         id_vars: Vec<String>,
@@ -70,6 +72,10 @@ pub enum PlanStep {
     /// Drop every row that belongs to a duplicate key group (pandas `drop_duplicates(keep=False)`).
     DropDuplicateGroups {
         subset: Vec<String>,
+    },
+    WithRowCount {
+        name: String,
+        offset: i64,
     },
 }
 

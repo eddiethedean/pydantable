@@ -14,6 +14,7 @@ use crate::plan::{
     plan_rename as plan_rename_inner, plan_rolling_agg as plan_rolling_agg_inner,
     plan_select as plan_select_inner, plan_slice as plan_slice_inner, plan_sort as plan_sort_inner,
     plan_unique as plan_unique_inner, plan_with_columns as plan_with_columns_inner,
+    plan_with_row_count as plan_with_row_count_inner,
 };
 
 use super::types::{PyExpr, PyPlan};
@@ -147,6 +148,14 @@ fn plan_slice(plan: &PyPlan, offset: i64, length: usize) -> PyResult<PyPlan> {
     })
 }
 
+#[pyfunction]
+#[pyo3(signature = (plan, name="row_nr".to_string(), offset=0))]
+fn plan_with_row_count(plan: &PyPlan, name: String, offset: i64) -> PyResult<PyPlan> {
+    Ok(PyPlan {
+        inner: plan_with_row_count_inner(&plan.inner, name, offset)?,
+    })
+}
+
 fn py_value_is_uuid(v: &Bound<'_, PyAny>) -> PyResult<bool> {
     let py = v.py();
     let builtins = py.import_bound("builtins")?;
@@ -224,9 +233,15 @@ fn plan_fill_null(
 }
 
 #[pyfunction]
-fn plan_drop_nulls(plan: &PyPlan, subset: Option<Vec<String>>) -> PyResult<PyPlan> {
+#[pyo3(signature = (plan, subset=None, how="any".to_string(), threshold=None))]
+fn plan_drop_nulls(
+    plan: &PyPlan,
+    subset: Option<Vec<String>>,
+    how: String,
+    threshold: Option<usize>,
+) -> PyResult<PyPlan> {
     Ok(PyPlan {
-        inner: plan_drop_nulls_inner(&plan.inner, subset)?,
+        inner: plan_drop_nulls_inner(&plan.inner, subset, how, threshold)?,
     })
 }
 
@@ -281,6 +296,7 @@ pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(plan_drop, m)?)?;
     m.add_function(wrap_pyfunction!(plan_rename, m)?)?;
     m.add_function(wrap_pyfunction!(plan_slice, m)?)?;
+    m.add_function(wrap_pyfunction!(plan_with_row_count, m)?)?;
     m.add_function(wrap_pyfunction!(plan_fill_null, m)?)?;
     m.add_function(wrap_pyfunction!(plan_drop_nulls, m)?)?;
     m.add_function(wrap_pyfunction!(plan_melt, m)?)?;

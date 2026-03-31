@@ -105,9 +105,20 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
                 step_out.set_item("value", value_obj)?;
                 step_out.set_item("strategy", strategy)?;
             }
-            PlanStep::DropNulls { subset } => {
+            PlanStep::DropNulls {
+                subset,
+                how,
+                threshold,
+            } => {
                 step_out.set_item("kind", "drop_nulls")?;
                 step_out.set_item("subset", subset)?;
+                step_out.set_item("how", how)?;
+                step_out.set_item("threshold", threshold)?;
+            }
+            PlanStep::WithRowCount { name, offset } => {
+                step_out.set_item("kind", "with_row_count")?;
+                step_out.set_item("name", name)?;
+                step_out.set_item("offset", offset)?;
             }
             PlanStep::Melt {
                 id_vars,

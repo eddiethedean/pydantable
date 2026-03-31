@@ -503,7 +503,12 @@ pub fn plan_fill_null(
     })
 }
 
-pub fn plan_drop_nulls(plan: &PlanInner, subset: Option<Vec<String>>) -> PyResult<PlanInner> {
+pub fn plan_drop_nulls(
+    plan: &PlanInner,
+    subset: Option<Vec<String>>,
+    how: String,
+    threshold: Option<usize>,
+) -> PyResult<PlanInner> {
     if let Some(cols) = subset.as_ref() {
         if cols.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -519,11 +524,60 @@ pub fn plan_drop_nulls(plan: &PlanInner, subset: Option<Vec<String>>) -> PyResul
             }
         }
     }
+    match how.as_str() {
+        "any" | "all" => {}
+        other => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "drop_nulls(how=...) unsupported value '{}'.",
+                other
+            )))
+        }
+    }
     let mut new_steps = plan.steps.clone();
-    new_steps.push(PlanStep::DropNulls { subset });
+    new_steps.push(PlanStep::DropNulls {
+        subset,
+        how,
+        threshold,
+    });
     Ok(PlanInner {
         steps: new_steps,
         schema: plan.schema.clone(),
+        root_schema: plan.root_schema.clone(),
+    })
+}
+
+pub fn plan_with_row_count(plan: &PlanInner, name: String, offset: i64) -> PyResult<PlanInner> {
+    if name.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "with_row_count(name=...) must be non-empty.",
+        ));
+    }
+    if offset < 0 {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "with_row_count(offset=...) must be >= 0.",
+        ));
+    }
+    if plan.schema.contains_key(&name) {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "with_row_count(name=...) must not collide with an existing column.",
+        ));
+    }
+
+    let mut new_schema = plan.schema.clone();
+    new_schema.insert(
+        name.clone(),
+        DTypeDesc::Scalar {
+            base: Some(crate::dtype::BaseType::Int),
+            nullable: false,
+            literals: None,
+        },
+    );
+
+    let mut new_steps = plan.steps.clone();
+    new_steps.push(PlanStep::WithRowCount { name, offset });
+    Ok(PlanInner {
+        steps: new_steps,
+        schema: new_schema,
         root_schema: plan.root_schema.clone(),
     })
 }

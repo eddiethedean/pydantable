@@ -210,6 +210,15 @@ pub(crate) fn execute_plan_rowwise(
                 }
                 n = ctx_len(&ctx)?;
             }
+            PlanStep::WithRowCount { name, offset } => {
+                // Deterministic row number column; schema-first, non-null.
+                let start = *offset;
+                let out = (0..n)
+                    .map(|i| Some(LiteralValue::Int(start + i as i64)))
+                    .collect::<Vec<_>>();
+                ctx.insert(name.clone(), out);
+                n = ctx_len(&ctx)?;
+            }
             PlanStep::FillNull {
                 subset,
                 value,
@@ -296,12 +305,26 @@ pub(crate) fn execute_plan_rowwise(
                 }
                 n = ctx_len(&ctx)?;
             }
-            PlanStep::DropNulls { subset } => {
-                let targets = subset
+            PlanStep::DropNulls {
+                subset,
+                how,
+                threshold,
+            } => {
+                let targets: Vec<String> = subset
                     .clone()
                     .unwrap_or_else(|| ctx.keys().cloned().collect());
+                if targets.is_empty() {
+                    continue;
+                }
+                let keep_min = threshold.unwrap_or_else(|| match how.as_str() {
+                    "all" => 1,
+                    _ => targets.len(),
+                });
                 let keep = (0..n)
-                    .filter(|i| targets.iter().all(|c| ctx[c][*i].is_some()))
+                    .filter(|i| {
+                        let non_nulls = targets.iter().filter(|c| ctx[*c][*i].is_some()).count();
+                        non_nulls >= keep_min
+                    })
                     .collect::<Vec<_>>();
                 for (_, col) in ctx.iter_mut() {
                     *col = keep.iter().map(|i| col[*i].clone()).collect();

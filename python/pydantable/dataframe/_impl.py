@@ -2154,6 +2154,24 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
+    def with_row_count(self, name: str = "row_nr", *, offset: int = 0) -> DataFrame[Any]:
+        """Add a deterministic row number column (Polars-style `with_row_count`)."""
+        rust = _require_rust_core()
+        if not isinstance(name, str) or not name:
+            raise TypeError("with_row_count(name=...) expects a non-empty string.")
+        rust_plan = rust.plan_with_row_count(self._rust_plan, str(name), int(offset))
+        desc = rust_plan.schema_descriptors()
+        derived_fields = self._field_types_from_descriptors(desc)
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        return self._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
     def head(self, n: int = 5) -> DataFrame[Any]:
         """First ``n`` rows (lazy slice).
 
@@ -2166,6 +2184,69 @@ class DataFrame(Generic[SchemaT]):
     def limit(self, n: int = 5) -> DataFrame[Any]:
         """First ``n`` rows (Polars-style alias of :meth:`head`)."""
         return self.head(n)
+
+    def pipe(self, fn: Any, *args: Any, **kwargs: Any) -> Any:
+        """Call ``fn(self, *args, **kwargs)`` (pandas/Polars-style helper)."""
+        if not callable(fn):
+            raise TypeError("pipe(fn, ...) expects a callable.")
+        return fn(self, *args, **kwargs)
+
+    def clip(
+        self,
+        *,
+        lower: Any | None = None,
+        upper: Any | None = None,
+        subset: str | Sequence[str] | Selector | None = None,
+    ) -> DataFrame[Any]:
+        """Clamp numeric columns to the given bounds (schema-first)."""
+        from pydantable import selectors as _selectors
+        from pydantable.expressions import Literal, when
+
+        if lower is None and upper is None:
+            raise ValueError("clip() requires at least one of lower=... or upper=....")
+
+        if isinstance(subset, str):
+            subset = [subset]
+        if isinstance(subset, Selector):
+            cols = subset.resolve(self._current_field_types)
+            if not cols:
+                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                raise ValueError(
+                    f"clip(subset={subset!r}) matched no columns. Available columns: [{available}]"
+                )
+            subset = cols
+
+        targets = (
+            list(subset)
+            if subset is not None
+            else _selectors.numeric().resolve(self._current_field_types)
+        )
+        if not targets:
+            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            raise ValueError(
+                "clip() matched no numeric columns. "
+                f"Available columns: [{available}]"
+            )
+
+        updates: dict[str, Expr] = {}
+        for c in targets:
+            dt = self._current_field_types.get(c)
+            if dt is None:
+                raise KeyError(f"clip() unknown subset column {c!r}.")
+            if not _is_describe_numeric(dt):
+                raise TypeError(
+                    f"clip(subset=...) expects numeric columns, got {c!r} dtype={dt!r}."
+                )
+            expr: Expr = self.col(c)
+            if lower is not None:
+                lo = Literal(value=lower).cast(expr.dtype)
+                expr = when(expr < lo, lo).otherwise(expr)
+            if upper is not None:
+                hi = Literal(value=upper).cast(expr.dtype)
+                expr = when(expr > hi, hi).otherwise(expr)
+            updates[c] = expr
+
+        return self.with_columns(**updates)
 
     def first(self) -> DataFrame[Any]:
         """First row as a single-row DataFrame (lazy slice)."""
@@ -2184,9 +2265,11 @@ class DataFrame(Generic[SchemaT]):
         value: Any = None,
         *,
         strategy: str | None = None,
-        subset: Sequence[str] | Selector | None = None,
+        subset: str | Sequence[str] | Selector | None = None,
     ) -> DataFrame[Any]:
         rust = _require_rust_core()
+        if isinstance(subset, str):
+            subset = [subset]
         if isinstance(subset, Selector):
             subset_cols = subset.resolve(self._current_field_types)
             if not subset_cols:
@@ -2218,8 +2301,16 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
-    def drop_nulls(self, subset: Sequence[str] | Selector | None = None) -> DataFrame[Any]:
+    def drop_nulls(
+        self,
+        subset: str | Sequence[str] | Selector | None = None,
+        *,
+        how: str = "any",
+        threshold: int | None = None,
+    ) -> DataFrame[Any]:
         rust = _require_rust_core()
+        if isinstance(subset, str):
+            subset = [subset]
         if isinstance(subset, Selector):
             subset_cols = subset.resolve(self._current_field_types)
             if not subset_cols:
@@ -2230,7 +2321,10 @@ class DataFrame(Generic[SchemaT]):
                 )
             subset = subset_cols
         rust_plan = rust.plan_drop_nulls(
-            self._rust_plan, None if subset is None else list(subset)
+            self._rust_plan,
+            None if subset is None else list(subset),
+            str(how),
+            threshold,
         )
         return self._from_plan(
             root_data=self._root_data,
@@ -2654,7 +2748,8 @@ class DataFrame(Generic[SchemaT]):
                 missing = ", ".join(repr(c) for c in missing_in_right)
                 raise KeyError(
                     "join() unknown right join key(s): "
-                    f"[{missing}]. Right available columns: [{available}]"
+                    f"[{missing}]. Right available columns: [{available}]. "
+                    "Hint: use left_on=.../right_on=... for differently named key columns."
                 )
             right_keys = list(left_keys)
             used_expr_keys = False

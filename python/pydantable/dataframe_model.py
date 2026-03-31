@@ -1639,14 +1639,17 @@ class DataFrameModel(Generic[RowT]):
     ) -> Self:
         return self._from_dataframe(self._df.distinct(subset=subset, keep=keep))
 
-    def drop(self, *columns: Any) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.drop(*columns))
+    def drop(self, *columns: Any, strict: bool = True) -> DataFrameModel[Any]:
+        return self._from_dataframe(self._df.drop(*columns, strict=strict))
 
-    def rename(self, columns: Mapping[str, str]) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.rename(columns))
+    def rename(self, columns: Mapping[str, str], *, strict: bool = True) -> DataFrameModel[Any]:
+        return self._from_dataframe(self._df.rename(columns, strict=strict))
 
     def slice(self, offset: int, length: int) -> Self:
         return self._from_dataframe(self._df.slice(offset, length))
+
+    def with_row_count(self, name: str = "row_nr", *, offset: int = 0) -> DataFrameModel[Any]:
+        return self._from_dataframe(self._df.with_row_count(name=name, offset=offset))
 
     def head(self, n: int = 5) -> Self:
         return self._from_dataframe(self._df.head(n))
@@ -1654,19 +1657,41 @@ class DataFrameModel(Generic[RowT]):
     def tail(self, n: int = 5) -> Self:
         return self._from_dataframe(self._df.tail(n))
 
+    def pipe(self, fn: Any, *args: Any, **kwargs: Any) -> Any:
+        return self._df.pipe(fn, *args, **kwargs)
+
+    def clip(
+        self,
+        *,
+        lower: Any | None = None,
+        upper: Any | None = None,
+        subset: str | Sequence[str] | Any | None = None,
+    ) -> DataFrameModel[Any]:
+        return self._from_dataframe(
+            self._df.clip(lower=lower, upper=upper, subset=subset)
+        )
+
     def fill_null(
         self,
         value: Any = None,
         *,
         strategy: str | None = None,
-        subset: Sequence[str] | None = None,
+        subset: str | Sequence[str] | Any | None = None,
     ) -> DataFrameModel[Any]:
         return self._from_dataframe(
             self._df.fill_null(value, strategy=strategy, subset=subset)
         )
 
-    def drop_nulls(self, subset: Sequence[str] | None = None) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.drop_nulls(subset=subset))
+    def drop_nulls(
+        self,
+        subset: str | Sequence[str] | Any | None = None,
+        *,
+        how: str = "any",
+        threshold: int | None = None,
+    ) -> DataFrameModel[Any]:
+        return self._from_dataframe(
+            self._df.drop_nulls(subset=subset, how=how, threshold=threshold)
+        )
 
     def melt(
         self,

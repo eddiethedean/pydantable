@@ -602,6 +602,18 @@ impl PolarsPlanRunner {
             PlanStep::Slice { offset, length } => {
                 lf = lf.slice(*offset, *length as u32);
             }
+            PlanStep::WithRowCount { name, offset } => {
+                // Stable row number column added at the end of the schema-first plan.
+                // `offset` matches Polars' semantics.
+                lf = lf.with_row_index(
+                    name.clone().as_str(),
+                    Some(u32::try_from(*offset).map_err(|_| {
+                        PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                            "with_row_count(offset=...) must be >= 0.",
+                        )
+                    })?),
+                );
+            }
             PlanStep::FillNull {
                 subset,
                 value,
@@ -681,7 +693,11 @@ impl PolarsPlanRunner {
                     .collect::<Vec<_>>();
                 lf = lf.with_columns(exprs);
             }
-            PlanStep::DropNulls { subset } => {
+            PlanStep::DropNulls {
+                subset,
+                how,
+                threshold,
+            } => {
                 let all_cols = lf
                     .collect_schema()
                     .map_err(polars_err)?
@@ -689,12 +705,25 @@ impl PolarsPlanRunner {
                     .map(|s| s.to_string())
                     .collect::<Vec<_>>();
                 let targets = subset.clone().unwrap_or(all_cols);
-                if let Some(first) = targets.first() {
-                    let mut cond = col(first).is_not_null();
-                    for c in targets.iter().skip(1) {
-                        cond = cond.and(col(c).is_not_null());
+                if !targets.is_empty() {
+                    // `threshold` means "keep rows with at least threshold non-null values".
+                    // If not set, `how=any` drops rows with any null (require all non-null),
+                    // and `how=all` drops rows only if all are null (require at least one non-null).
+                    let keep_min: usize = threshold.unwrap_or_else(|| match how.as_str() {
+                        "all" => 1,
+                        _ => targets.len(),
+                    });
+                    if keep_min > 0 {
+                        let exprs = targets
+                            .iter()
+                            .map(|c| col(c).is_not_null().cast(DataType::Int32))
+                            .collect::<Vec<_>>();
+                        let mut non_nulls = lit(0i32);
+                        for e in exprs {
+                            non_nulls = non_nulls + e;
+                        }
+                        lf = lf.filter(non_nulls.gt_eq(lit(keep_min as i32)));
                     }
-                    lf = lf.filter(cond);
                 }
             }
             PlanStep::Melt {

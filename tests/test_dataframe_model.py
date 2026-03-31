@@ -583,6 +583,28 @@ def test_dataframe_model_transformations_return_derived_model():
     assert df4.collect(as_lists=True) == {"id": [2], "age2": [21]}
 
 
+def test_dataframe_model_pipe_and_clip() -> None:
+    class S(DataFrameModel):
+        x: int
+        y: float
+
+    df = S({"x": [1, 5], "y": [1.5, -2.0]})
+    out = df.clip(lower=0, upper=3).to_dict()
+    assert out == {"x": [1, 3], "y": [1.5, 0.0]}
+
+    out2 = df.pipe(lambda d: d.clip(upper=0, subset="y")).to_dict()
+    assert out2 == {"x": [1, 5], "y": [0.0, -2.0]}
+
+
+def test_dataframe_model_with_row_count() -> None:
+    class S(DataFrameModel):
+        x: int
+
+    df = S({"x": [10, 20, 30]})
+    out = df.with_row_count().to_dict()
+    assert out == {"x": [10, 20, 30], "row_nr": [0, 1, 2]}
+
+
 def test_dataframe_model_row_input_rejects_bad_item_type():
     with pytest.raises(TypeError, match="mapping objects or Pydantic models"):
         UserDF([1, 2, 3])  # type: ignore[arg-type]
