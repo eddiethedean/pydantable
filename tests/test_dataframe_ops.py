@@ -238,6 +238,47 @@ def test_select_with_selector_dsl_by_dtype_groups() -> None:
     assert out.to_dict() == {"i": [1], "f": [2.0], "t": [datetime(2020, 1, 1)]}
 
 
+def test_select_with_selector_dsl_composition_invert_and_regex() -> None:
+    class S(Schema):
+        id: int
+        age: int
+        age2: int
+        name: str
+
+    df = DataFrame[S]({"id": [1], "age": [2], "age2": [3], "name": ["x"]})
+    out = df.select(~s.starts_with("age"))
+    assert out.to_dict() == {"id": [1], "name": ["x"]}
+
+    out2 = df.select(s.matches(r"^age\d?$") | s.by_name("id"))
+    assert out2.to_dict() == {"id": [1], "age": [2], "age2": [3]}
+
+    out3 = df.select((s.numeric() & ~s.by_name("age2")) | s.by_name("name"))
+    assert out3.to_dict() == {"id": [1], "age": [2], "name": ["x"]}
+
+
+def test_select_with_selector_dsl_empty_match_raises() -> None:
+    class S(Schema):
+        a: int
+
+    df = DataFrame[S]({"a": [1]})
+    with pytest.raises(ValueError, match="matched no columns"):
+        df.select(s.starts_with("zzz"))
+
+
+def test_drop_with_selector_dsl_and_strict_false() -> None:
+    class S(Schema):
+        a: int
+        b: int
+        c: int
+
+    df = DataFrame[S]({"a": [1], "b": [2], "c": [3]})
+    out = df.drop(s.starts_with("b"))
+    assert out.to_dict() == {"a": [1], "c": [3]}
+
+    out2 = df.drop(s.by_name("missing") | s.by_name("b"), strict=False)
+    assert out2.to_dict() == {"a": [1], "c": [3]}
+
+
 def test_with_columns_none_requires_destination_type() -> None:
     class UserNullable(Schema):
         id: int
@@ -319,6 +360,16 @@ def test_sort_maintain_order_is_stable_for_ties() -> None:
     assert out == {"k": [1, 1, 1, 2, 2], "seq": [10, 11, 12, 20, 21]}
 
 
+def test_sort_maintain_order_matches_default_on_unique_keys() -> None:
+    class S(Schema):
+        k: int
+        v: int
+
+    df = DataFrame[S]({"k": [3, 1, 2], "v": [30, 10, 20]})
+    a = df.sort("k", maintain_order=False).to_dict()
+    b = df.sort("k", maintain_order=True).to_dict()
+    assert a == b == {"k": [1, 2, 3], "v": [10, 20, 30]}
+
 def test_unique_maintain_order_keeps_first_appearance_order() -> None:
     class S(Schema):
         k: int
@@ -328,6 +379,16 @@ def test_unique_maintain_order_keeps_first_appearance_order() -> None:
     out = df.unique(subset=["k"], keep="first", maintain_order=True).to_dict()
     assert out == {"k": [1, 2], "seq": [10, 20]}
 
+
+def test_unique_keep_last_is_stable() -> None:
+    class S(Schema):
+        k: int
+        seq: int
+
+    df = DataFrame[S]({"k": [1, 2, 1, 2, 1], "seq": [10, 20, 11, 21, 12]})
+    out = df.unique(subset=["k"], keep="last", maintain_order=True).to_dict()
+    # For keep='last', stable unique preserves the order of the last occurrences.
+    assert out == {"k": [2, 1], "seq": [21, 12]}
 
 def test_p2_fill_drop_nulls_and_cast_predicates() -> None:
     class S(Schema):
@@ -425,6 +486,42 @@ def test_p5_pivot_single_and_multi_values() -> None:
     ).collect(as_lists=True)
     assert p4["A__sum"] == [10, None]
     assert p4["B__sum"] == [20, 40]
+
+
+def test_p5_pivot_sort_columns_affects_column_generation_order() -> None:
+    class S(Schema):
+        id: int
+        key: str
+        x: int
+
+    df = DataFrame[S]({"id": [1, 1], "key": ["B", "A"], "x": [1, 2]})
+    # Without sort_columns, pivot value order is first-seen (B then A).
+    out_unsorted = df.pivot(
+        index="id", columns="key", values="x", aggregate_function="first"
+    ).collect(as_lists=True)
+    assert set(out_unsorted.keys()) == {"id", "B_first", "A_first"}
+
+    out_sorted = df.pivot(
+        index="id",
+        columns="key",
+        values="x",
+        aggregate_function="first",
+        sort_columns=True,
+    ).collect(as_lists=True)
+    assert set(out_sorted.keys()) == {"id", "A_first", "B_first"}
+
+
+def test_p5_pivot_rejects_empty_separator() -> None:
+    class S(Schema):
+        id: int
+        key: str
+        x: int
+
+    df = DataFrame[S]({"id": [1], "key": ["A"], "x": [1]})
+    with pytest.raises(TypeError, match="separator"):
+        df.pivot(
+            index="id", columns="key", values="x", aggregate_function="first", separator=""
+        ).to_dict()
 
 
 def test_p5_explode_unnest_raise_not_implemented_for_scalar_schema() -> None:

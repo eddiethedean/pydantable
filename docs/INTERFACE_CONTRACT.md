@@ -22,6 +22,16 @@ When tests or user assertions need deterministic comparisons, compare on the
 subset of columns that define identity (for example, join keys) rather than
 row position. The project test-suite uses sorted comparisons to enforce this.
 
+### `maintain_order`
+
+Some operations accept `maintain_order=...` for Polars parity:
+
+- **`sort(..., maintain_order=True)`**: requests stable ordering for ties (rows with equal sort keys keep their first-appearance order).
+- **`unique(..., maintain_order=True)`**: requests stable “first appearance” semantics for which duplicate is retained (subject to `keep=`).
+- **`group_by(..., maintain_order=True)`**: requests stable group key output ordering (groups emitted in first-appearance order).
+
+These flags are supported by the Polars engine. When you need deterministic comparisons in tests, prefer key-sorted comparisons even when `maintain_order=True` (see above), because downstream operations may still affect physical ordering unless explicitly documented.
+
 ## Introspection (`shape`, `columns`, `dtypes`, `info`, `describe`)
 
 - **`columns`** and **`dtypes`** reflect the **current logical schema** (projected column names and Pydantic field annotations).
@@ -37,6 +47,13 @@ row position. The project test-suite uses sorted comparisons to enforce this.
 - `on` must reference a column that exists on both sides.
 - `join(left_on=..., right_on=...)` supports column names or single-column expressions.
 - `cross` joins do not accept `on`/`left_on`/`right_on`.
+
+### Join validation (`validate=...`)
+
+`join(validate=...)` performs an explicit join cardinality check:
+
+- Allowed values: `one_to_one`, `one_to_many`, `many_to_one`, `many_to_many` (also accepts `1:1`, `1:m`, `m:1`, `m:m`).
+- **Supported only on in-memory roots** (materialized column dict roots). On scan roots (lazy `read_*`), it raises `NotImplementedError`; materialize first if you need these checks.
 
 ### Collision handling
 - Column name collisions introduced by the right-hand side are resolved by
@@ -104,6 +121,13 @@ The output field nullability is preserved/derived accordingly:
 
 **Polars runtime errors (0.18.0+):** On **`collect()`** failure during **`group_by().agg()`**, the raised **`ValueError`** may include **`(group_by().agg())`** in the message (Rust **`polars_err_ctx`**) so the error is attributable to grouped aggregation. This does not change the aggregation rules above; see {doc}`EXECUTION`.
 
+### `drop_nulls`
+
+`group_by(..., drop_nulls=...)` controls whether null key rows participate in grouping:
+
+- `drop_nulls=True` (default): rows where **any** grouping key is null are excluded from grouping.
+- `drop_nulls=False`: null-key groups are retained (Polars parity).
+
 ## Duplicate row detection
 
 - **`unique(subset=..., keep="first"|"last")`**: deduplicates to one row per distinct key (all columns participate when **`subset`** is omitted); pandas UI **`drop_duplicates(..., keep="first"|"last")`** maps here.
@@ -130,8 +154,10 @@ Supported reshape methods:
 - Supports aggregate functions: `count`, `sum`, `mean`, `min`, `max`, `median`, `std`, `var`, `first`, `last`, `n_unique`.
 - Numeric aggregates (`sum`, `mean`, `median`, `std`, `var`) require numeric value dtypes.
 - Generated output columns use deterministic names:
-  - single value column: `<pivot_value>_<agg>`
-  - multiple value columns: `<pivot_value>_<value_col>_<agg>`
+  - single value column: `<pivot_value><separator><agg>`
+  - multiple value columns: `<pivot_value><separator><value_col><separator><agg>`
+ - `sort_columns=True` sorts pivot values before generating output columns.
+ - `separator` controls output naming (default `"_"`).
 
 `explode` / `unnest`:
 - **Homogeneous list** columns (`list[T]` / `List[T]` with supported `T`) are modeled end-to-end; `explode(columns)` unwraps **one** list level and updates the schema to the inner dtype (**always nullable** after explode, matching Polars’ post-explode nullability for element cells). Execution uses Polars `explode` with `empty_as_null=false` and `keep_nulls=true` (same defaults as the Rust engine’s Polars call).

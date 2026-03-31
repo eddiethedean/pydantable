@@ -75,6 +75,18 @@ def test_pyspark_drop_duplicates_with_and_without_subset() -> None:
     assert u2.collect(as_lists=True)["name"] == ["a", "b"]
 
 
+def test_pyspark_order_by_rejects_maintain_order_kwarg() -> None:
+    df = User(
+        {
+            "id": [1, 2, 3, 4],
+            "name": ["a", "b", "c", "d"],
+            "age": [10, 10, 10, 20],
+        }
+    )
+    with pytest.raises(TypeError, match="unexpected keyword argument"):
+        _ = df.orderBy("age", maintain_order=True)  # type: ignore[call-arg]
+
+
 def test_pyspark_dataframe_getitem_errors() -> None:
     df = DataFrame[Row]({"id": [1], "name": ["a"], "age": [10]})
     with pytest.raises(ValueError, match="non-empty"):
