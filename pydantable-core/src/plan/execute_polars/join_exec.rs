@@ -51,6 +51,10 @@ pub fn execute_join_polars(
     suffix: String,
     validate: Option<String>,
     coalesce: Option<bool>,
+    join_nulls: Option<bool>,
+    maintain_order: Option<String>,
+    allow_parallel: Option<bool>,
+    force_parallel: Option<bool>,
     as_python_lists: bool,
     streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
@@ -272,11 +276,35 @@ pub fn execute_join_polars(
     } else {
         let left_key_exprs = left_on.iter().map(col).collect::<Vec<_>>();
         let right_key_exprs = right_on.iter().map(col).collect::<Vec<_>>();
+        let mut args = JoinArgs::new(join_type.clone());
+        if let Some(v) = join_nulls {
+            // Polars uses `nulls_equal` naming: whether null join keys match.
+            args.nulls_equal = v;
+        }
+        if let Some(m) = maintain_order.as_deref() {
+            let mo = match m {
+                "left" => MaintainOrderJoin::Left,
+                "right" => MaintainOrderJoin::Right,
+                "none" => MaintainOrderJoin::None,
+                other => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "join(maintain_order=...) must be 'none', 'left', or 'right' (got {other:?})."
+                    )));
+                }
+            };
+            args.maintain_order = mo;
+        }
+        if allow_parallel.is_some() || force_parallel.is_some() {
+            return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                "join(allow_parallel=..., force_parallel=...) is not supported in this build.",
+            ));
+        }
+
         let mut joined = left_lf.join(
             right_lf,
             left_key_exprs,
             right_key_exprs,
-            JoinArgs::new(join_type.clone()),
+            args,
         );
         if is_semi {
             joined = joined

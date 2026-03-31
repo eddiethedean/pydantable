@@ -106,6 +106,94 @@ def test_cross_join_rejects_on_keys() -> None:
         left.join(right, on="id", how="cross")
 
 
+def test_join_join_nulls_controls_null_key_matching() -> None:
+    class L(Schema):
+        k: int | None
+        v: int
+
+    class R(Schema):
+        k: int | None
+        w: int
+
+    left = DataFrame[L]({"k": [None, 1], "v": [10, 20]})
+    right = DataFrame[R]({"k": [None, 1], "w": [100, 200]})
+
+    out_default = left.join(right, on="k", how="inner").collect(as_lists=True)
+    # Default Polars semantics: null keys do not match.
+    assert out_default["k"] == [1]
+    assert out_default["v"] == [20]
+    assert out_default["w"] == [200]
+
+    out_eq = left.join(right, on="k", how="inner", join_nulls=True).collect(as_lists=True)
+    assert out_eq["k"] == [None, 1]
+    assert out_eq["v"] == [10, 20]
+    assert out_eq["w"] == [100, 200]
+
+
+def test_join_maintain_order_accepts_none_left_right() -> None:
+    class L(Schema):
+        k: int
+        v: int
+
+    class R(Schema):
+        k: int
+        w: int
+
+    left = DataFrame[L]({"k": [2, 1, 3], "v": [20, 10, 30]})
+    right = DataFrame[R]({"k": [1, 2, 3], "w": [100, 200, 300]})
+
+    # Ensure the argument is accepted and materializes.
+    out_left = left.join(right, on="k", how="inner", maintain_order="left").collect(
+        as_lists=True
+    )
+    assert out_left["k"] == [2, 1, 3]
+
+    out_right = left.join(right, on="k", how="inner", maintain_order="right").collect(
+        as_lists=True
+    )
+    assert set(out_right["k"]) == {1, 2, 3}
+
+    out_none = left.join(right, on="k", how="inner", maintain_order="none").collect(
+        as_lists=True
+    )
+    assert set(out_none["k"]) == {1, 2, 3}
+
+
+def test_join_parallel_flags_not_implemented() -> None:
+    left = DataFrame[LeftSchema]({"id": [1], "age": [None], "score": [10]})
+    right = DataFrame[RightSchema](
+        {"id": [1], "age": [None], "country": ["US"], "score": [100]}
+    )
+    with pytest.raises(NotImplementedError, match="allow_parallel"):
+        left.join(right, on="id", how="inner", allow_parallel=True).to_dict()
+    with pytest.raises(NotImplementedError, match="force_parallel"):
+        left.join(right, on="id", how="inner", force_parallel=True).to_dict()
+
+
+def test_join_join_nulls_scan_roots(tmp_path) -> None:
+    left_csv = tmp_path / "left.csv"
+    right_csv = tmp_path / "right.csv"
+    left_csv.write_text("k,v\n,10\n1,20\n", encoding="utf-8")
+    right_csv.write_text("k,w\n,100\n1,200\n", encoding="utf-8")
+
+    class L(Schema):
+        k: int | None
+        v: int
+
+    class R(Schema):
+        k: int | None
+        w: int
+
+    left = DataFrame[L].read_csv(str(left_csv))
+    right = DataFrame[R].read_csv(str(right_csv))
+
+    out_default = left.join(right, on="k", how="inner").to_dict()
+    assert out_default["k"] == [1]
+
+    out_eq = left.join(right, on="k", how="inner", join_nulls=True).to_dict()
+    assert out_eq["k"] == [None, 1]
+
+
 def test_join_supports_expression_keys() -> None:
     left = DataFrame[LeftSchema]({"id": [1, 2], "age": [10, 20], "score": [10, 20]})
     right = DataFrame[RightSchema](

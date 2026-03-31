@@ -27,6 +27,8 @@ contract-tested.
 | GroupBy | `group_by(..., maintain_order=..., drop_nulls=...)` | Implemented | `maintain_order=True` is stable; `drop_nulls=False` retains null-key groups. |
 | Join | `join(..., coalesce=...)` | Partial | Implemented for `left_on`/`right_on` **name keys** (incl multi-key) on `inner`/`left`/`right`/`semi`/`anti`, plus typed-safe `full` (matching key base dtypes only). Expression keys supported only for simple `ColumnRef` refs; computed expr keys remain unsupported. `coalesce=False` preserves both keys when schema-safe (may raise for collisions). |
 | Join | `join(..., validate=...)` | Implemented | Cardinality checks supported for in-memory roots and scan roots (explicit cost). |
+| Join | `join(..., join_nulls=..., maintain_order=...)` | Implemented | `join_nulls` controls null key matching (Polars `nulls_equal`). `maintain_order` supports `'none'|'left'|'right'` plus bool mapping; both work for scan roots. |
+| Join | `join(..., allow_parallel=..., force_parallel=...)` | Partial | Arguments are accepted but currently raise `NotImplementedError` (engine API not exposed in pinned Polars Rust join args). |
 | Reshape | `pivot(..., sort_columns=..., separator=...)` | Implemented | `sort_columns=True` sorts pivot-value column generation; `separator` controls generated output names. |
 | Utilities | `sample`, `shift`, `null_count`, `is_empty` | Implemented | Eager helpers (materialize via `to_dict()`), returning a new `DataFrame` (or `dict` for `null_count`). |
 

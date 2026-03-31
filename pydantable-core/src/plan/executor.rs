@@ -60,6 +60,10 @@ impl PolarsExecutor {
         suffix: String,
         validate: Option<String>,
         coalesce: Option<bool>,
+        join_nulls: Option<bool>,
+        maintain_order: Option<String>,
+        allow_parallel: Option<bool>,
+        force_parallel: Option<bool>,
         as_python_lists: bool,
         streaming: bool,
     ) -> PyResult<(PyObject, PyObject)> {
@@ -75,6 +79,10 @@ impl PolarsExecutor {
             suffix,
             validate,
             coalesce,
+            join_nulls,
+            maintain_order,
+            allow_parallel,
+            force_parallel,
             as_python_lists,
             streaming,
         )

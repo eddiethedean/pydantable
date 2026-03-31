@@ -2573,6 +2573,10 @@ class DataFrame(Generic[SchemaT]):
         suffix: str = "_right",
         coalesce: bool | None = None,
         validate: str | None = None,
+        join_nulls: bool | None = None,
+        maintain_order: bool | str | None = None,
+        allow_parallel: bool | None = None,
+        force_parallel: bool | None = None,
         streaming: bool | None = None,
     ) -> DataFrame[Any]:
         """Join two frames on key column(s); ``how`` is e.g. ``inner``, ``left``."""
@@ -2662,6 +2666,30 @@ class DataFrame(Generic[SchemaT]):
                 )
             validate = v
 
+        if join_nulls is not None and not isinstance(join_nulls, bool):
+            raise TypeError("join(join_nulls=...) expects a bool or None.")
+        if allow_parallel is not None or force_parallel is not None:
+            # Polars join parallelism knobs are not currently exposed in the Polars
+            # Rust API version pinned by pydantable-core; keep the argument surface
+            # for future parity but fail explicitly for now.
+            raise NotImplementedError(
+                "join(allow_parallel=..., force_parallel=...) is not supported in this build."
+            )
+
+        maintain_order_norm: str | None
+        if maintain_order is None:
+            maintain_order_norm = None
+        elif isinstance(maintain_order, bool):
+            maintain_order_norm = "left" if maintain_order else "none"
+        else:
+            m = str(maintain_order).strip().lower()
+            if m not in ("none", "left", "right"):
+                raise ValueError(
+                    "join(maintain_order=...) must be one of 'none', 'left', 'right', "
+                    "a bool (True->'left', False->'none'), or None."
+                )
+            maintain_order_norm = m
+
         if coalesce is True:
             if how == "cross":
                 raise ValueError(
@@ -2700,6 +2728,14 @@ class DataFrame(Generic[SchemaT]):
         if how == "cross":
             if left_keys or right_keys:
                 raise ValueError("cross join does not accept on/left_on/right_on keys.")
+            for name, val in (
+                ("join_nulls", join_nulls),
+                ("maintain_order", maintain_order),
+                ("allow_parallel", allow_parallel),
+                ("force_parallel", force_parallel),
+            ):
+                if val is not None:
+                    raise ValueError(f"cross join does not support {name}=...")
         else:
             if not left_keys or not right_keys:
                 raise ValueError(
@@ -2725,6 +2761,10 @@ class DataFrame(Generic[SchemaT]):
             suffix,
             validate=validate,
             coalesce=coalesce,
+            join_nulls=join_nulls,
+            maintain_order=maintain_order_norm,
+            allow_parallel=allow_parallel,
+            force_parallel=force_parallel,
             as_python_lists=True,
             streaming=use_streaming,
         )

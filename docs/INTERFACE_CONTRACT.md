@@ -77,6 +77,28 @@ These flags are supported by the Polars engine. When you need deterministic comp
     - expression keys beyond simple `ColumnRef` (computed expressions) because output key naming is not guaranteed to be stable.
 - **`coalesce=False`**:\n  - For side-specific name keys, attempts to preserve **both** key columns when it is schema-safe (no output name collisions).\n  - Some combinations may raise `NotImplementedError` with guidance.
 
+### Join null-key matching (`join_nulls=...`)
+
+`join(join_nulls=...)` controls whether **null join keys match** each other (Polars `nulls_equal`):
+
+- **Default (`None`)**: uses the engine default (**null keys do not match**).
+- **`join_nulls=True`**: null keys are considered equal for join matching.
+- **`join_nulls=False`**: null keys do not match.
+
+Supported on **in-memory roots and scan roots**.
+
+### Join output ordering (`maintain_order=...`)
+
+`join(maintain_order=...)` controls whether join output preserves a deterministic order:
+
+- Allowed values: `None`, `True`/`False`, or one of `"none"`, `"left"`, `"right"`.
+  - `True` maps to `"left"`, `False` maps to `"none"`.
+- Supported on **in-memory roots and scan roots**.
+
+### Join parallelism flags (`allow_parallel=...`, `force_parallel=...`)
+
+These arguments are accepted for parity planning but are currently **not implemented** in this build. Passing either raises `NotImplementedError`.
+
 ### Collision handling
 - Column name collisions introduced by the right-hand side are resolved by
   renaming right-side non-key columns with the provided `suffix` (default:

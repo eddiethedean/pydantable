@@ -259,6 +259,10 @@ def execute_join(
     *,
     validate: str | None = None,
     coalesce: bool | None = None,
+    join_nulls: bool | None = None,
+    maintain_order: str | None = None,
+    allow_parallel: bool | None = None,
+    force_parallel: bool | None = None,
     as_python_lists: bool = False,
     streaming: bool = False,
 ) -> tuple[Any, Any]:
@@ -274,6 +278,10 @@ def execute_join(
         suffix=suffix,
         validate=validate,
         coalesce=coalesce,
+        join_nulls=join_nulls,
+        maintain_order=maintain_order,
+        allow_parallel=allow_parallel,
+        force_parallel=force_parallel,
         as_python_lists=bool(as_python_lists),
         streaming=bool(streaming),
     ):
@@ -288,6 +296,10 @@ def execute_join(
             suffix,
             validate,
             coalesce,
+            join_nulls,
+            maintain_order,
+            allow_parallel,
+            force_parallel,
             as_python_lists,
             streaming,
         )

@@ -211,7 +211,7 @@ fn collect_plan_batches(
 
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (left_plan, left_root_data, right_plan, right_root_data, left_on, right_on, how, suffix, validate=None, coalesce=None, as_python_lists=false, streaming=false))]
+#[pyo3(signature = (left_plan, left_root_data, right_plan, right_root_data, left_on, right_on, how, suffix, validate=None, coalesce=None, join_nulls=None, maintain_order=None, allow_parallel=None, force_parallel=None, as_python_lists=false, streaming=false))]
 fn execute_join(
     py: Python<'_>,
     left_plan: &PyPlan,
@@ -224,6 +224,10 @@ fn execute_join(
     suffix: String,
     validate: Option<String>,
     coalesce: Option<bool>,
+    join_nulls: Option<bool>,
+    maintain_order: Option<String>,
+    allow_parallel: Option<bool>,
+    force_parallel: Option<bool>,
     as_python_lists: bool,
     streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
@@ -241,6 +245,10 @@ fn execute_join(
             suffix,
             validate,
             coalesce,
+            join_nulls,
+            maintain_order,
+            allow_parallel,
+            force_parallel,
             as_python_lists,
             streaming,
         )

@@ -1792,6 +1792,13 @@ class DataFrameModel(Generic[RowT]):
         right_on: Any = None,
         how: str = "inner",
         suffix: str = "_right",
+        coalesce: bool | None = None,
+        validate: str | None = None,
+        join_nulls: bool | None = None,
+        maintain_order: bool | str | None = None,
+        allow_parallel: bool | None = None,
+        force_parallel: bool | None = None,
+        streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
         if not isinstance(other, DataFrameModel):
             raise TypeError("join(other=...) expects another DataFrameModel instance.")
@@ -1803,6 +1810,13 @@ class DataFrameModel(Generic[RowT]):
                 right_on=right_on,
                 how=how,
                 suffix=suffix,
+                coalesce=coalesce,
+                validate=validate,
+                join_nulls=join_nulls,
+                maintain_order=maintain_order,
+                allow_parallel=allow_parallel,
+                force_parallel=force_parallel,
+                streaming=streaming,
             )
         )
 
