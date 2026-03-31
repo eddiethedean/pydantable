@@ -1,3 +1,4 @@
+from decimal import Decimal
 from datetime import date, datetime, timedelta
 
 import pytest
@@ -238,6 +239,20 @@ def test_select_with_selector_dsl_by_dtype_groups() -> None:
     assert out.to_dict() == {"i": [1], "f": [2.0], "t": [datetime(2020, 1, 1)]}
 
 
+def test_select_with_selector_dsl_expanded_dtype_groups_and_structs() -> None:
+    class S(Schema):
+        i: int
+        f: float
+        d: Decimal
+        addr: _Addr
+
+    df = DataFrame[S](
+        {"i": [1], "f": [2.5], "d": [Decimal("3.0")], "addr": [{"street": "x"}]}
+    )
+    out = df.select(s.integers() | s.decimals() | s.structs())
+    assert out.to_dict() == {"i": [1], "d": [Decimal("3.0")], "addr": [{"street": "x"}]}
+
+
 def test_select_with_selector_dsl_composition_invert_and_regex() -> None:
     class S(Schema):
         id: int
@@ -261,9 +276,35 @@ def test_select_with_selector_dsl_empty_match_raises() -> None:
         a: int
 
     df = DataFrame[S]({"a": [1]})
-    with pytest.raises(ValueError, match="matched no columns"):
+    with pytest.raises(ValueError, match=r"matched no columns.*Available columns"):
         df.select(s.starts_with("zzz"))
 
+
+def test_rename_with_selector_renames_subset_and_preserves_order() -> None:
+    class S(Schema):
+        a: int
+        aa: int
+        b: int
+
+    df = DataFrame[S]({"a": [1], "aa": [2], "b": [3]})
+    out = df.rename_with_selector(s.starts_with("a"), lambda c: f"x_{c}").to_dict()
+    assert out == {"x_a": [1], "x_aa": [2], "b": [3]}
+
+
+def test_rename_with_selector_rejects_collisions() -> None:
+    class S(Schema):
+        a: int
+        aa: int
+
+    df = DataFrame[S]({"a": [1], "aa": [2]})
+    with pytest.raises(ValueError, match="duplicate output column"):
+        df.rename_with_selector(s.starts_with("a"), lambda _c: "x").to_dict()
+
+
+def test_rename_with_selector_empty_match_raises() -> None:
+    df = DataFrame[User]({"id": [1], "age": [2]})
+    with pytest.raises(ValueError, match=r"matched no columns.*Available columns"):
+        df.rename_with_selector(s.starts_with("zzz"), lambda c: c).to_dict()
 
 def test_drop_with_selector_dsl_and_strict_false() -> None:
     class S(Schema):

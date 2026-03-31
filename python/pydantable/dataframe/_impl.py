@@ -1630,7 +1630,10 @@ class DataFrame(Generic[SchemaT]):
             elif isinstance(col, Selector):
                 resolved = col.resolve(self._current_field_types)
                 if not resolved:
-                    raise ValueError("select(Selector) matched no columns.")
+                    available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                    raise ValueError(
+                        f"select({col!r}) matched no columns. Available columns: [{available}]"
+                    )
                 projects.extend(resolved)
             elif isinstance(col, AliasedExpr):
                 if not isinstance(col.expr, Expr):
@@ -1943,6 +1946,33 @@ class DataFrame(Generic[SchemaT]):
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
         )
+
+    def rename_with_selector(
+        self,
+        selector: Selector,
+        fn: Callable[[str], str],
+        *,
+        strict: bool = True,
+    ) -> DataFrame[Any]:
+        """Rename columns selected by a schema-driven Selector."""
+        if not isinstance(selector, Selector):
+            raise TypeError("rename_with_selector(selector, ...) expects a Selector.")
+        if not callable(fn):
+            raise TypeError("rename_with_selector(..., fn=...) expects a callable.")
+        selected = selector.resolve(self._current_field_types)
+        if not selected:
+            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            raise ValueError(
+                f"rename_with_selector({selector!r}) matched no columns. "
+                f"Available columns: [{available}]"
+            )
+        rename_map: dict[str, str] = {old: str(fn(old)) for old in selected}
+        new_names = list(rename_map.values())
+        if len(set(new_names)) != len(new_names):
+            raise ValueError(
+                "rename_with_selector(...) produced duplicate output column names."
+            )
+        return self.rename(rename_map, strict=strict)
 
     def slice(self, offset: int, length: int) -> DataFrame[Any]:
         rust = _require_rust_core()

@@ -22,10 +22,14 @@ df.select(s.matches(r"^age\\d+$"))
 
 ```python
 df.select(s.numeric())
+df.select(s.integers())
+df.select(s.floats())
+df.select(s.decimals())
 df.select(s.string())
 df.select(s.temporal())
 df.select(s.boolean())
 df.select(s.lists())
+df.select(s.structs())
 df.select(s.uuids())
 ```
 
@@ -45,5 +49,13 @@ df.select(s.everything().exclude(s.ends_with("_debug")))
 
 ### Error behavior
 
-- **`select(Selector)`** raises **`ValueError`** when the selector matches no columns.
+- **`select(Selector)`** raises **`ValueError`** when the selector matches no columns (includes the selector summary and available schema columns).
 - **`drop(Selector)`** follows the existing `drop(strict=...)` rules:\n  - `strict=True`: missing columns error at plan validation time\n  - `strict=False`: missing columns are ignored (no-op if all requested columns are missing)\n+
+
+### Rename helper
+
+Use `rename_with_selector` to rename a subset of columns based on a selector:
+
+```python
+df2 = df.rename_with_selector(s.starts_with("tmp_"), lambda c: c.removeprefix("tmp_"))
+```
