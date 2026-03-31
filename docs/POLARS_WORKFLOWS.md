@@ -136,3 +136,32 @@ Output (one run):
 
 PySpark UI: same idea with `from pydantable.pyspark.sql import functions as F` and
 `df.select(F.count(), F.count(F.col("amount", dtype=int | None)), F.sum(F.col("amount", dtype=int | None)))`.
+
+## 5) Computed expressions in `select` (alias) and schema-driven selectors
+
+Polars commonly uses `select` for computed expressions. In pydantable, computed expressions
+must be explicitly named with `Expr.alias(...)`:
+
+```python
+from pydantable import DataFrameModel
+
+class User(DataFrameModel):
+    id: int
+    age: int
+
+df = User({"id": [1, 2], "age": [20, 30]})
+
+out = df.select(
+    "id",
+    (df.age * 2).alias("age2"),
+)
+print(out.to_dict())
+```
+
+Schema-driven “selector” helpers expand against the current schema (no wildcard DSL):
+
+```python
+df2 = df.with_columns(age2=df.age * 2, age3=df.age * 3)
+print(df2.select_prefix("age").to_dict())  # age, age2, age3
+print(df2.select_all().to_dict())          # full schema order
+```

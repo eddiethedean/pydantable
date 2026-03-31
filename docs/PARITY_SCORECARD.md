@@ -8,6 +8,28 @@ Status definitions:
 - `Partial`: available with explicit constraints or reduced semantics.
 - `Missing`: not yet exposed as a stable API.
 
+## 1.8.0 parity targets (planned)
+
+This section tracks the **planned** parity work for **1.8.0** (see {doc}`POLARS_PARITY_1_8`).
+Items listed here should move to the main table above once implemented and
+contract-tested.
+
+| Area | Target | Status | Notes |
+|---|---|---|---|
+| Core | `select_all()` / `select_prefix()` / `select_suffix()` | Implemented | Schema-driven selectors (no wildcard/regex DSL). |
+| Core | `select` supports explicit expression aliasing | Implemented | `select((expr).alias(\"x\"))` for computed expressions; plain `Expr` requires `ColumnRef` or global agg. |
+| Core | `with_columns` positional aliased expressions | Implemented | Keep kwargs; add `with_columns(expr.alias(\"x\"), ...)`. |
+| Core | `sort(..., maintain_order=...)` | Missing | Accepted in signature; currently raises `NotImplementedError` when true. |
+| Core | `drop(..., strict=...)` | Implemented | `strict=False` ignores missing columns (no-op if all are missing). |
+| Core | `rename(..., strict=...)` | Implemented | `strict=False` ignores missing rename keys. |
+| Core | `unique/distinct(..., maintain_order=...)` | Missing | Accepted in signature; currently raises `NotImplementedError` when true. |
+| GroupBy | Group-by convenience methods (`sum/mean/min/max/count/len`) | Implemented | Deterministic naming (`<col>_sum`, etc.) and `len` via synthetic constant column. |
+| GroupBy | `group_by(..., maintain_order=..., drop_nulls=...)` | Partial | Accepted; non-default values currently raise `NotImplementedError`. |
+| Join | `join(..., coalesce=...)` | Partial | Accepted for parity; join key coalescing is already the default behavior for same-named keys. |
+| Join | `join(..., validate=...)` | Partial | Implemented for in-memory roots; not supported on scan roots (raises `NotImplementedError`). |
+| Reshape | `pivot(..., sort_columns=..., separator=...)` | Partial | Accepted; non-default values currently raise `NotImplementedError`. |
+| Utilities | `sample`, `shift`, `null_count`, `is_empty` | Implemented | Eager helpers (materialize via `to_dict()`), returning a new `DataFrame` (or `dict` for `null_count`). |
+
 | Area | Method/Capability | Status | Notes |
 |---|---|---|---|
 | Core | `select`, `with_columns`, `filter` | Implemented | Typed expression validation and SQL-like null filter behavior. |

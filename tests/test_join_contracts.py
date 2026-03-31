@@ -155,3 +155,12 @@ def test_join_collision_suffixes_all_non_key_overlaps() -> None:
         },
         keys=["id"],
     )
+
+
+def test_join_validate_one_to_one_rejects_duplicates() -> None:
+    left = DataFrame[LeftSchema]({"id": [1, 1], "age": [10, 20], "score": [10, 20]})
+    right = DataFrame[RightSchema](
+        {"id": [1], "age": [10], "country": ["US"], "score": [100]}
+    )
+    with pytest.raises(ValueError, match="one_to_one"):
+        left.join(right, on="id", how="inner", validate="one_to_one").to_dict()

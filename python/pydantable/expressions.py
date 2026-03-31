@@ -8,12 +8,14 @@ pending objects finished with ``.over(WindowSpec(...))``. Globals such as
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from .rust_engine import _require_rust_core
 
 # Public surface for stubs and docs.
 __all__ = [
+    "AliasedExpr",
     "BinaryOp",
     "ColumnRef",
     "CompareOp",
@@ -59,6 +61,18 @@ if TYPE_CHECKING:
     from .window_spec import WindowSpec
 
 
+@dataclass(frozen=True, slots=True)
+class AliasedExpr:
+    """Expression with an explicit output column name (Polars-style alias).
+
+    Used by :meth:`pydantable.dataframe.DataFrame.select` and
+    :meth:`pydantable.dataframe.DataFrame.with_columns` positional overloads.
+    """
+
+    name: str
+    expr: Expr
+
+
 class Expr:  # type: ignore[override]
     """Column expression: operators/methods build a Rust AST with static dtypes."""
 
@@ -71,6 +85,12 @@ class Expr:  # type: ignore[override]
 
     def referenced_columns(self) -> set[str]:
         return set(self._rust_expr.referenced_columns())
+
+    def alias(self, name: str) -> AliasedExpr:
+        """Attach an output column name for use in `select` / `with_columns`."""
+        if not isinstance(name, str) or not name:
+            raise TypeError("alias(name) expects a non-empty string.")
+        return AliasedExpr(name=str(name), expr=self)
 
     def __repr__(self) -> str:
         cls = type(self).__name__

@@ -178,6 +178,38 @@ def test_select_rejects_multi_column_expression() -> None:
         df.select(expr)
 
 
+def test_select_rejects_non_columnref_expr_without_alias() -> None:
+    df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
+    with pytest.raises(TypeError, match=r"Expr\\.alias\\('name'\\)"):
+        df.select(df.age * 2)
+
+
+def test_select_accepts_aliased_expr() -> None:
+    df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
+    out = df.select("id", (df.age * 2).alias("age2"))
+    assert out.schema_fields() == {"id": int, "age2": int}
+    assert out.collect(as_lists=True) == {"id": [1, 2], "age2": [40, 60]}
+
+
+def test_with_columns_positional_aliased_expr() -> None:
+    df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
+    out = df.with_columns((df.age * 2).alias("age2"))
+    assert out.schema_fields()["age2"] is int
+    assert out.collect(as_lists=True)["age2"] == [40, 60]
+
+
+def test_select_all_prefix_suffix() -> None:
+    class S(Schema):
+        a: int
+        aa: int
+        b: int
+
+    df = DataFrame[S]({"a": [1], "aa": [2], "b": [3]})
+    assert df.select_all().to_dict() == {"a": [1], "aa": [2], "b": [3]}
+    assert df.select_prefix("a").to_dict() == {"a": [1], "aa": [2]}
+    assert df.select_suffix("a").to_dict() == {"a": [1], "aa": [2]}
+
+
 def test_with_columns_none_requires_destination_type() -> None:
     class UserNullable(Schema):
         id: int
@@ -229,6 +261,24 @@ def test_p1_sort_unique_drop_rename_slice_concat() -> None:
     right_h = renamed.select("years")
     hcat = DataFrame.concat([left_h, right_h], how="horizontal")
     assert hcat.collect(as_lists=True) == {"id": [1, 2, 3], "years": [None, 20, 30]}
+
+
+def test_drop_strict_false_ignores_missing() -> None:
+    df = DataFrame[User]({"id": [1], "age": [2]})
+    out = df.drop("missing", strict=False)
+    assert out.schema_fields() == {"id": int, "age": int}
+
+
+def test_rename_strict_false_ignores_missing() -> None:
+    df = DataFrame[User]({"id": [1], "age": [2]})
+    out = df.rename({"missing": "x", "age": "years"}, strict=False)
+    assert out.schema_fields() == {"id": int, "years": int}
+
+
+def test_sort_descending_length_mismatch_raises() -> None:
+    df = DataFrame[User]({"id": [1], "age": [2]})
+    with pytest.raises(ValueError, match="descending"):
+        df.sort("id", "age", descending=[True])
 
 
 def test_p2_fill_drop_nulls_and_cast_predicates() -> None:
@@ -306,6 +356,15 @@ def test_p5_pivot_single_and_multi_values() -> None:
     assert p2["B_x_first"] == [20, 40]
     assert p2["A_y_first"] == [1.0, 3.0]
     assert p2["B_y_first"] == [2.0, None]
+
+    with pytest.raises(NotImplementedError, match="separator"):
+        df.pivot(
+            index="id",
+            columns="key",
+            values="x",
+            aggregate_function="sum",
+            separator="__",
+        ).to_dict()
 
 
 def test_p5_explode_unnest_raise_not_implemented_for_scalar_schema() -> None:
@@ -529,3 +588,32 @@ def test_to_polars_when_installed() -> None:
     pdf = df.to_polars()
     assert set(pdf.columns) == {"id", "age"}
     assert pdf["id"].to_list() == [1, 2]
+    assert pdf["age"].to_list() == [20, 30]
+
+
+def test_group_by_convenience_sum_and_len() -> None:
+    class S(Schema):
+        g: str
+        v: int | None
+
+    df = DataFrame[S]({"g": ["a", "a", "b"], "v": [1, None, 3]})
+    summed = df.group_by("g").sum("v").to_dict()
+    assert_table_eq_sorted(summed, {"g": ["a", "b"], "v_sum": [1, 3]}, ["g"])
+
+    lengths = df.group_by("g").len().to_dict()
+    assert_table_eq_sorted(lengths, {"g": ["a", "b"], "len": [2, 1]}, ["g"])
+
+
+def test_null_count_shift_sample_is_empty() -> None:
+    class U(Schema):
+        id: int
+        age: int | None
+
+    df = DataFrame[U]({"id": [1, 2, 3], "age": [10, None, 30]})
+    assert df.null_count() == {"id": 0, "age": 1}
+    assert df.shift(1).to_dict()["age"] == [None, 10, None]
+    assert df.shift(-1).to_dict()["id"] == [2, 3, None]
+    s = df.sample(n=2, seed=0, with_replacement=False).to_dict()
+    assert set(s.keys()) == {"id", "age"}
+    assert len(s["id"]) == 2
+    assert DataFrame[U]({"id": [], "age": []}).is_empty() is True

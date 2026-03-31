@@ -21,6 +21,7 @@ import html
 import importlib
 import logging
 import os
+import random
 import re
 import statistics
 import threading
@@ -44,7 +45,7 @@ from pydantic import BaseModel, TypeAdapter
 from pydantic_core import PydanticUndefined
 
 from pydantable.display import get_repr_html_limits
-from pydantable.expressions import ColumnRef, Expr
+from pydantable.expressions import AliasedExpr, ColumnRef, Expr
 from pydantable.rust_engine import (
     _require_rust_core,
     async_collect_plan_batches,
@@ -1561,13 +1562,23 @@ class DataFrame(Generic[SchemaT]):
             max_cell_len=lim.max_cell_len,
         )
 
-    def with_columns(self, **new_columns: Expr | Any) -> DataFrame[Any]:
+    def with_columns(self, *exprs: Any, **new_columns: Expr | Any) -> DataFrame[Any]:
         """Add or replace columns.
 
         Values are :class:`~pydantable.expressions.Expr` or plain literals.
         """
         rust = _require_rust_core()
         rust_columns: dict[str, Any] = {}
+
+        for item in exprs:
+            if not isinstance(item, AliasedExpr):
+                raise TypeError(
+                    "with_columns() positional args must be Expr.alias('name') "
+                    "(AliasedExpr)."
+                )
+            if item.name in rust_columns or item.name in new_columns:
+                raise ValueError(f"with_columns() duplicate output column {item.name!r}.")
+            rust_columns[item.name] = item.expr._rust_expr
 
         for name, value in new_columns.items():
             if isinstance(value, Expr):
@@ -1589,7 +1600,9 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
-    def select(self, *cols: str | ColumnRef | Expr, **named: Any) -> DataFrame[Any]:
+    def select(
+        self, *cols: str | ColumnRef | Expr | AliasedExpr, **named: Any
+    ) -> DataFrame[Any]:
         """Project columns and/or compute a **single-row** frame of global aggregates.
 
         Positional arguments: base column names, single-column refs, or globals such
@@ -1609,9 +1622,15 @@ class DataFrame(Generic[SchemaT]):
 
         aggs: list[tuple[str, Any]] = []
         projects: list[str] = []
+        computed: dict[str, Any] = {}
         for col in cols:
             if isinstance(col, str):
                 projects.append(col)
+            elif isinstance(col, AliasedExpr):
+                if not isinstance(col.expr, Expr):
+                    raise TypeError("select(AliasedExpr) expects an Expr.")
+                computed[col.name] = col.expr._rust_expr
+                projects.append(col.name)
             elif isinstance(col, Expr):
                 if rust.expr_is_global_agg(col._rust_expr):
                     alias = rust.expr_global_default_alias(col._rust_expr)
@@ -1622,12 +1641,14 @@ class DataFrame(Generic[SchemaT]):
                         )
                     aggs.append((alias, col._rust_expr))
                 else:
-                    referenced = col.referenced_columns()
-                    if len(referenced) != 1:
+                    if isinstance(col, ColumnRef):
+                        projects.append(col._column_name)  # type: ignore[attr-defined]
+                    else:
                         raise TypeError(
-                            "select() accepts column names or a ColumnRef expression."
+                            "select() accepts column names, ColumnRef expressions, "
+                            "global aggregates, or Expr.alias('name') for computed "
+                            "expressions."
                         )
-                    projects.append(next(iter(referenced)))
             else:
                 raise TypeError("select() accepts column names or Expr objects.")
 
@@ -1647,7 +1668,10 @@ class DataFrame(Generic[SchemaT]):
         else:
             if not projects:
                 raise ValueError("select() requires at least one column.")
-            rust_plan = rust.plan_select(self._rust_plan, projects)
+            rust_plan = self._rust_plan
+            if computed:
+                rust_plan = rust.plan_with_columns(rust_plan, computed)
+            rust_plan = rust.plan_select(rust_plan, projects)
         desc = rust_plan.schema_descriptors()
         derived_fields = self._field_types_from_descriptors(desc)
         # Preserve order: for plain projections, match call order.
@@ -1667,6 +1691,28 @@ class DataFrame(Generic[SchemaT]):
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
         )
+
+    def select_all(self) -> DataFrame[Any]:
+        """Select all columns in schema order (schema-driven helper)."""
+        return self.select(*list(self._current_field_types.keys()))
+
+    def select_prefix(self, prefix: str) -> DataFrame[Any]:
+        """Select columns whose names start with `prefix` (schema-driven helper)."""
+        if not isinstance(prefix, str):
+            raise TypeError("select_prefix(prefix) expects a string.")
+        cols = [c for c in self._current_field_types if c.startswith(prefix)]
+        if not cols:
+            raise ValueError(f"select_prefix({prefix!r}) matched no columns.")
+        return self.select(*cols)
+
+    def select_suffix(self, suffix: str) -> DataFrame[Any]:
+        """Select columns whose names end with `suffix` (schema-driven helper)."""
+        if not isinstance(suffix, str):
+            raise TypeError("select_suffix(suffix) expects a string.")
+        cols = [c for c in self._current_field_types if c.endswith(suffix)]
+        if not cols:
+            raise ValueError(f"select_suffix({suffix!r}) matched no columns.")
+        return self.select(*cols)
 
     def filter(self, condition: Expr) -> DataFrame[Any]:
         """Keep rows where the boolean ``condition`` is true."""
@@ -1688,9 +1734,14 @@ class DataFrame(Generic[SchemaT]):
         *by: str | ColumnRef,
         descending: bool | Sequence[bool] = False,
         nulls_last: bool | Sequence[bool] | None = None,
+        maintain_order: bool = False,
     ) -> DataFrame[Any]:
         """Sort by one or more columns (names or single-column expressions)."""
         rust = _require_rust_core()
+        if maintain_order:
+            raise NotImplementedError(
+                "sort(maintain_order=True) is not implemented yet."
+            )
         keys: list[str] = []
         for key in by:
             if isinstance(key, str):
@@ -1710,12 +1761,16 @@ class DataFrame(Generic[SchemaT]):
             if isinstance(descending, bool)
             else list(descending)
         )
+        if len(desc) != len(keys):
+            raise ValueError("sort(descending=...) length must match sort keys.")
         if nulls_last is None:
             nl = []
         elif isinstance(nulls_last, bool):
             nl = [nulls_last] * len(keys)
         else:
             nl = list(nulls_last)
+        if nl and len(nl) != len(keys):
+            raise ValueError("sort(nulls_last=...) length must match sort keys.")
         rust_plan = rust.plan_sort(self._rust_plan, keys, desc, nl)
         return self._from_plan(
             root_data=self._root_data,
@@ -1729,8 +1784,13 @@ class DataFrame(Generic[SchemaT]):
         subset: Sequence[str] | None = None,
         *,
         keep: str = "first",
+        maintain_order: bool = False,
     ) -> DataFrame[Any]:
         rust = _require_rust_core()
+        if maintain_order:
+            raise NotImplementedError(
+                "unique(maintain_order=True) is not implemented yet."
+            )
         rust_plan = rust.plan_unique(
             self._rust_plan, None if subset is None else list(subset), keep
         )
@@ -1803,7 +1863,7 @@ class DataFrame(Generic[SchemaT]):
     ) -> DataFrame[Any]:
         return self.unique(subset=subset, keep=keep)
 
-    def drop(self, *columns: str | ColumnRef) -> DataFrame[Any]:
+    def drop(self, *columns: str | ColumnRef, strict: bool = True) -> DataFrame[Any]:
         rust = _require_rust_core()
         selected: list[str] = []
         for col in columns:
@@ -1818,6 +1878,10 @@ class DataFrame(Generic[SchemaT]):
                 selected.append(next(iter(referenced)))
             else:
                 raise TypeError("drop() accepts column names or ColumnRef objects.")
+        if not strict:
+            selected = [c for c in selected if c in self._current_field_types]
+        if not selected:
+            return self
         rust_plan = rust.plan_drop(self._rust_plan, selected)
         desc = rust_plan.schema_descriptors()
         derived_fields = self._field_types_from_descriptors(desc)
@@ -1838,9 +1902,13 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
-    def rename(self, columns: Mapping[str, str]) -> DataFrame[Any]:
+    def rename(
+        self, columns: Mapping[str, str], *, strict: bool = True
+    ) -> DataFrame[Any]:
         rust = _require_rust_core()
         rename_map = dict(columns)
+        if not strict:
+            rename_map = {k: v for k, v in rename_map.items() if k in self._current_field_types}
         rust_plan = rust.plan_rename(self._rust_plan, rename_map)
         desc = rust_plan.schema_descriptors()
         rename_prev: dict[str, Any] = dict(self._current_field_types)
@@ -1990,6 +2058,8 @@ class DataFrame(Generic[SchemaT]):
         columns: str | ColumnRef,
         values: str | Sequence[str],
         aggregate_function: str = "first",
+        sort_columns: bool = False,
+        separator: str = "_",
         streaming: bool | None = None,
     ) -> DataFrame[Any]:
         index_cols = [index] if isinstance(index, str) else list(index)
@@ -2007,6 +2077,10 @@ class DataFrame(Generic[SchemaT]):
             raise TypeError(
                 "pivot(columns=...) expects a column name or single-column ColumnRef."
             )
+        if sort_columns:
+            raise NotImplementedError("pivot(sort_columns=True) is not implemented yet.")
+        if separator != "_":
+            raise NotImplementedError("pivot(separator!= '_') is not implemented yet.")
         value_cols = [values] if isinstance(values, str) else list(values)
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
@@ -2086,11 +2160,15 @@ class DataFrame(Generic[SchemaT]):
         right_on: str | Expr | Sequence[str | Expr] | None = None,
         how: str = "inner",
         suffix: str = "_right",
+        coalesce: bool | None = None,
+        validate: str | None = None,
         streaming: bool | None = None,
     ) -> DataFrame[Any]:
         """Join two frames on key column(s); ``how`` is e.g. ``inner``, ``left``."""
         if not isinstance(other, DataFrame):
             raise TypeError("join(other=...) expects another DataFrame.")
+        if coalesce is not None and not isinstance(coalesce, bool):
+            raise TypeError("join(coalesce=...) expects a bool or None.")
         if on is not None and (left_on is not None or right_on is not None):
             raise ValueError(
                 "join() use either on=... or left_on=/right_on=..., not both."
@@ -2125,6 +2203,44 @@ class DataFrame(Generic[SchemaT]):
         else:
             left_keys = _resolve_keys(left_on)
             right_keys = _resolve_keys(right_on)
+
+        if validate is not None:
+            v = str(validate)
+            mapping = {
+                "1:1": "one_to_one",
+                "1:m": "one_to_many",
+                "m:1": "many_to_one",
+                "m:m": "many_to_many",
+            }
+            v = mapping.get(v, v)
+            if v not in ("one_to_one", "one_to_many", "many_to_one", "many_to_many"):
+                raise ValueError(
+                    "join(validate=...) must be one of one_to_one, one_to_many, "
+                    "many_to_one, many_to_many (or 1:1/1:m/m:1/m:m)."
+                )
+            # Validation can be expensive on scan roots; keep it explicit.
+            if _is_scan_file_root(self._root_data) or _is_scan_file_root(other._root_data):
+                raise NotImplementedError(
+                    "join(validate=...) is not supported on scan roots; "
+                    "materialize first if you need cardinality checks."
+                )
+
+            def _key_tuples(df: DataFrame[Any], keys: list[str]) -> list[tuple[Any, ...]]:
+                d = df.select(*keys).to_dict()
+                n = len(next(iter(d.values()))) if d else 0
+                return [tuple(d[k][i] for k in keys) for i in range(n)]
+
+            left_t = _key_tuples(self, left_keys)
+            right_t = _key_tuples(other, right_keys)
+            left_unique = len(set(left_t)) == len(left_t)
+            right_unique = len(set(right_t)) == len(right_t)
+            if v == "one_to_one" and not (left_unique and right_unique):
+                raise ValueError("join(validate='one_to_one') failed: keys not unique.")
+            if v == "one_to_many" and not left_unique:
+                raise ValueError("join(validate='one_to_many') failed: left keys not unique.")
+            if v == "many_to_one" and not right_unique:
+                raise ValueError("join(validate='many_to_one') failed: right keys not unique.")
+            # many_to_many always passes
 
         if how == "cross":
             if left_keys or right_keys:
@@ -2175,8 +2291,21 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
-    def group_by(self, *keys: str | ColumnRef) -> GroupedDataFrame:
-        """Group by key column(s); finish with :meth:`GroupedDataFrame.agg`."""
+    def group_by(
+        self,
+        *keys: str | ColumnRef,
+        maintain_order: bool = False,
+        drop_nulls: bool = True,
+    ) -> GroupedDataFrame:
+        """Group by key column(s); finish with :meth:`GroupedDataFrame.agg`.
+
+        `maintain_order` / `drop_nulls` are accepted for Polars parity, but only the
+        default behavior is implemented today.
+        """
+        if maintain_order:
+            raise NotImplementedError("group_by(maintain_order=True) is not implemented.")
+        if drop_nulls is False:
+            raise NotImplementedError("group_by(drop_nulls=False) is not implemented.")
         selected: list[str] = []
         for key in keys:
             if isinstance(key, str):
@@ -2411,6 +2540,87 @@ class DataFrame(Generic[SchemaT]):
         raw = _coerce_enum_columns(raw, self._current_field_types)
         raw = self._apply_io_validation_if_configured(raw)
         return self._column_dict_in_schema_order(raw)
+
+    def null_count(self) -> dict[str, int]:
+        """Count nulls per column (materializes via :meth:`to_dict`)."""
+        d = self.to_dict()
+        return {k: sum(v is None for v in vs) for k, vs in d.items()}
+
+    def is_empty(self) -> bool:
+        """True if the materialized result has zero rows (materializes via :meth:`to_dict`)."""
+        d = self.to_dict()
+        if not d:
+            return True
+        return len(next(iter(d.values()))) == 0
+
+    def shift(self, periods: int = 1) -> DataFrame[Any]:
+        """Shift every column by `periods` rows (eager; materializes via :meth:`to_dict`)."""
+        p = int(periods)
+        d = self.to_dict()
+        if not d:
+            return self
+        n = len(next(iter(d.values())))
+        out: dict[str, list[Any]] = {}
+        for k, vs in d.items():
+            if p == 0:
+                out[k] = list(vs)
+            elif p > 0:
+                out[k] = [None] * min(p, n) + list(vs[: max(0, n - p)])
+            else:
+                q = -p
+                out[k] = list(vs[q:]) + [None] * min(q, n)
+        fields = dict(self._current_field_types)
+        schema_t = make_derived_schema_type(self._current_schema_type, fields)
+        plan = _require_rust_core().make_plan(fields)
+        return self._from_plan(
+            root_data=out,
+            root_schema_type=schema_t,
+            current_schema_type=schema_t,
+            rust_plan=plan,
+        )
+
+    def sample(
+        self,
+        *,
+        n: int | None = None,
+        fraction: float | None = None,
+        seed: int | None = None,
+        with_replacement: bool = False,
+    ) -> DataFrame[Any]:
+        """Sample rows (eager; materializes via :meth:`to_dict`)."""
+        if n is not None and fraction is not None:
+            raise ValueError("sample() accepts n or fraction, not both.")
+        if n is None and fraction is None:
+            raise ValueError("sample() requires n or fraction.")
+        d = self.to_dict()
+        if not d:
+            return self
+        row_count = len(next(iter(d.values())))
+        if fraction is not None:
+            f = float(fraction)
+            if f < 0 or f > 1:
+                raise ValueError("sample(fraction=...) must be between 0 and 1.")
+            n = int(row_count * f)
+        assert n is not None
+        if n < 0:
+            raise ValueError("sample(n=...) must be >= 0.")
+        rng = random.Random(seed)
+        if with_replacement:
+            idxs = [rng.randrange(row_count) for _ in range(n)]
+        else:
+            idxs = list(range(row_count))
+            rng.shuffle(idxs)
+            idxs = idxs[: min(n, row_count)]
+        out: dict[str, list[Any]] = {k: [vs[i] for i in idxs] for k, vs in d.items()}
+        fields = dict(self._current_field_types)
+        schema_t = make_derived_schema_type(self._current_schema_type, fields)
+        plan = _require_rust_core().make_plan(fields)
+        return self._from_plan(
+            root_data=out,
+            root_schema_type=schema_t,
+            current_schema_type=schema_t,
+            rust_plan=plan,
+        )
 
     def write_parquet(
         self,
@@ -3056,6 +3266,42 @@ class GroupedDataFrame:
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
         )
+
+    def sum(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
+        if not columns:
+            raise ValueError("sum() requires at least one column name.")
+        return self.agg(streaming=streaming, **{f"{c}_sum": ("sum", c) for c in columns})
+
+    def mean(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
+        if not columns:
+            raise ValueError("mean() requires at least one column name.")
+        return self.agg(
+            streaming=streaming, **{f"{c}_mean": ("mean", c) for c in columns}
+        )
+
+    def min(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
+        if not columns:
+            raise ValueError("min() requires at least one column name.")
+        return self.agg(streaming=streaming, **{f"{c}_min": ("min", c) for c in columns})
+
+    def max(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
+        if not columns:
+            raise ValueError("max() requires at least one column name.")
+        return self.agg(streaming=streaming, **{f"{c}_max": ("max", c) for c in columns})
+
+    def count(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
+        if not columns:
+            raise ValueError("count() requires at least one column name.")
+        return self.agg(
+            streaming=streaming, **{f"{c}_count": ("count", c) for c in columns}
+        )
+
+    def len(self, *, streaming: bool | None = None) -> DataFrame[Any]:
+        """Per-group row count (includes null rows) via a synthetic constant column."""
+        tmp = "__pydantable_group_len__"
+        df2 = self._df.with_columns(**{tmp: 1})
+        out = df2.group_by(*self._keys).agg(streaming=streaming, len=("sum", tmp))
+        return out.drop(tmp, strict=False)
 
 
 class DynamicGroupedDataFrame:
