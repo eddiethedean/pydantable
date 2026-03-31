@@ -1601,6 +1601,52 @@ class DataFrame(Generic[SchemaT]):
             rust_plan=rust_plan,
         )
 
+    def with_columns_cast(
+        self, selector: Selector, dtype: Any, *, strict: bool = True
+    ) -> DataFrame[Any]:
+        """Cast columns selected by a schema-driven Selector."""
+        if not isinstance(selector, Selector):
+            raise TypeError("with_columns_cast(selector=...) expects a Selector.")
+        selected = selector.resolve(self._current_field_types)
+        if not selected:
+            if strict:
+                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                raise ValueError(
+                    f"with_columns_cast({selector!r}) matched no columns. "
+                    f"Available columns: [{available}]"
+                )
+            return self
+        updates: dict[str, Expr] = {c: self.col(c).cast(dtype) for c in selected}
+        return self.with_columns(**updates)
+
+    def with_columns_fill_null(
+        self,
+        selector: Selector,
+        *,
+        value: Any = None,
+        strategy: str | None = None,
+        strict: bool = True,
+    ) -> DataFrame[Any]:
+        """Fill nulls for columns selected by a schema-driven Selector."""
+        if not isinstance(selector, Selector):
+            raise TypeError("with_columns_fill_null(selector=...) expects a Selector.")
+        selected = selector.resolve(self._current_field_types)
+        if not selected:
+            if strict:
+                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                raise ValueError(
+                    f"with_columns_fill_null({selector!r}) matched no columns. "
+                    f"Available columns: [{available}]"
+                )
+            return self
+        return self.fill_null(value, strategy=strategy, subset=selected)
+
+    def select_schema(self, selector: Selector) -> DataFrame[Any]:
+        """Project columns using a schema-first Selector (explicit helper)."""
+        if not isinstance(selector, Selector):
+            raise TypeError("select_schema(selector) expects a Selector.")
+        return self.select(selector)
+
     def select(
         self,
         *cols: str | ColumnRef | Expr | AliasedExpr | Selector,
@@ -2142,6 +2188,92 @@ class DataFrame(Generic[SchemaT]):
         rename_map = {c: c.replace(old, new) for c in target}
         if len(set(rename_map.values())) != len(rename_map):
             raise ValueError("rename_replace(...) produced duplicate output column names.")
+        return self.rename(rename_map, strict=strict)
+
+    def rename_upper(
+        self, selector: Selector | None = None, *, strict: bool = True
+    ) -> DataFrame[Any]:
+        """Uppercase column names for a subset selected by a schema-driven Selector."""
+        target = (
+            list(self._current_field_types.keys())
+            if selector is None
+            else selector.resolve(self._current_field_types)
+        )
+        if selector is not None and not target:
+            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            raise ValueError(
+                f"rename_upper(selector={selector!r}) matched no columns. "
+                f"Available columns: [{available}]"
+            )
+        rename_map = {c: c.upper() for c in target}
+        if len(set(rename_map.values())) != len(rename_map):
+            raise ValueError("rename_upper(...) produced duplicate output column names.")
+        return self.rename(rename_map, strict=strict)
+
+    def rename_lower(
+        self, selector: Selector | None = None, *, strict: bool = True
+    ) -> DataFrame[Any]:
+        """Lowercase column names for a subset selected by a schema-driven Selector."""
+        target = (
+            list(self._current_field_types.keys())
+            if selector is None
+            else selector.resolve(self._current_field_types)
+        )
+        if selector is not None and not target:
+            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            raise ValueError(
+                f"rename_lower(selector={selector!r}) matched no columns. "
+                f"Available columns: [{available}]"
+            )
+        rename_map = {c: c.lower() for c in target}
+        if len(set(rename_map.values())) != len(rename_map):
+            raise ValueError("rename_lower(...) produced duplicate output column names.")
+        return self.rename(rename_map, strict=strict)
+
+    def rename_title(
+        self, selector: Selector | None = None, *, strict: bool = True
+    ) -> DataFrame[Any]:
+        """Title-case column names for a subset selected by a schema-driven Selector."""
+        target = (
+            list(self._current_field_types.keys())
+            if selector is None
+            else selector.resolve(self._current_field_types)
+        )
+        if selector is not None and not target:
+            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            raise ValueError(
+                f"rename_title(selector={selector!r}) matched no columns. "
+                f"Available columns: [{available}]"
+            )
+        rename_map = {c: c.title() for c in target}
+        if len(set(rename_map.values())) != len(rename_map):
+            raise ValueError("rename_title(...) produced duplicate output column names.")
+        return self.rename(rename_map, strict=strict)
+
+    def rename_strip(
+        self,
+        selector: Selector | None = None,
+        *,
+        chars: str | None = None,
+        strict: bool = True,
+    ) -> DataFrame[Any]:
+        """Strip leading/trailing characters from column names (schema-first)."""
+        if chars is not None and not isinstance(chars, str):
+            raise TypeError("rename_strip(chars=...) expects a string or None.")
+        target = (
+            list(self._current_field_types.keys())
+            if selector is None
+            else selector.resolve(self._current_field_types)
+        )
+        if selector is not None and not target:
+            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            raise ValueError(
+                f"rename_strip(selector={selector!r}) matched no columns. "
+                f"Available columns: [{available}]"
+            )
+        rename_map = {c: c.strip(chars) for c in target}
+        if len(set(rename_map.values())) != len(rename_map):
+            raise ValueError("rename_strip(...) produced duplicate output column names.")
         return self.rename(rename_map, strict=strict)
 
     def slice(self, offset: int, length: int) -> DataFrame[Any]:

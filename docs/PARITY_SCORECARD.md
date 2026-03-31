@@ -40,6 +40,7 @@ contract-tested.
 | Null/type | `fill_null`, `drop_nulls`, `cast`, `is_null`, `is_not_null` | Implemented | Includes error contracts and nullable schema derivation. |
 | Core | `limit/first/last/top_k/bottom_k` (schema-first helpers) | Implemented | Convenience wrappers over `slice`/`sort` with deterministic schemas. |
 | Core | Selection/rename ergonomics (`select(exclude=...)`, reorder helpers, rename prefix/suffix/replace) | Implemented | Schema-driven column selection and naming helpers; collisions and empty selector matches raise explicit errors. |
+| Core | Selector coverage expansions (cast/fill/rename/projection helpers) | Implemented | `with_columns_cast`, `with_columns_fill_null`, `select_schema`, and selector-driven rename conveniences (upper/lower/title/strip). |
 | Core | `with_row_count` / `clip` / `drop_nulls(how=..., threshold=...)` / `pipe` | Implemented | Schema-first helpers: row numbering via plan step, numeric clamping via typed expressions, and row filtering with Polars-style null rules. |
 | Join | `inner/left/right/full/semi/anti/cross` | Implemented | Includes expression key support and suffix collision policy. |
 | GroupBy | `count/sum/mean/min/max/median/std/var/first/last/n_unique` | Implemented | SQL-like all-null-group behavior documented/tested. |

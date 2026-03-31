@@ -1620,8 +1620,32 @@ class DataFrameModel(Generic[RowT]):
     def select(self, *cols: Any) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.select(*cols))
 
+    def select_schema(self, selector: Any) -> DataFrameModel[Any]:
+        return self._from_dataframe(self._df.select_schema(selector))
+
     def with_columns(self, **new_columns: Any) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.with_columns(**new_columns))
+
+    def with_columns_cast(
+        self, selector: Any, dtype: Any, *, strict: bool = True
+    ) -> DataFrameModel[Any]:
+        return self._from_dataframe(
+            self._df.with_columns_cast(selector, dtype, strict=strict)
+        )
+
+    def with_columns_fill_null(
+        self,
+        selector: Any,
+        *,
+        value: Any = None,
+        strategy: str | None = None,
+        strict: bool = True,
+    ) -> DataFrameModel[Any]:
+        return self._from_dataframe(
+            self._df.with_columns_fill_null(
+                selector, value=value, strategy=strategy, strict=strict
+            )
+        )
 
     def filter(self, condition: Any) -> Self:
         return self._from_dataframe(self._df.filter(condition))
@@ -1644,6 +1668,26 @@ class DataFrameModel(Generic[RowT]):
 
     def rename(self, columns: Mapping[str, str], *, strict: bool = True) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.rename(columns, strict=strict))
+
+    def rename_upper(self, selector: Any = None, *, strict: bool = True) -> DataFrameModel[Any]:
+        return self._from_dataframe(self._df.rename_upper(selector, strict=strict))
+
+    def rename_lower(self, selector: Any = None, *, strict: bool = True) -> DataFrameModel[Any]:
+        return self._from_dataframe(self._df.rename_lower(selector, strict=strict))
+
+    def rename_title(self, selector: Any = None, *, strict: bool = True) -> DataFrameModel[Any]:
+        return self._from_dataframe(self._df.rename_title(selector, strict=strict))
+
+    def rename_strip(
+        self,
+        selector: Any = None,
+        *,
+        chars: str | None = None,
+        strict: bool = True,
+    ) -> DataFrameModel[Any]:
+        return self._from_dataframe(
+            self._df.rename_strip(selector, chars=chars, strict=strict)
+        )
 
     def slice(self, offset: int, length: int) -> Self:
         return self._from_dataframe(self._df.slice(offset, length))

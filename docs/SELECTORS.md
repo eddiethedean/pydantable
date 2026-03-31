@@ -83,3 +83,25 @@ You can also build a mapping using `rename_map` and pass it to `rename(...)`:
 m = s.rename_map(s.starts_with("tmp_"), lambda c: c.removeprefix("tmp_"))(df.schema_fields())
 df2 = df.rename(m)
 ```
+
+### Selector-driven column transforms
+
+Some schema-first convenience helpers expand a selector into a concrete column list and then apply a typed-safe transform:
+
+```python
+# cast a subset
+df2 = df.with_columns_cast(s.numeric(), float)
+
+# fill nulls for a subset
+df3 = df.with_columns_fill_null(s.by_name("age"), value=0)
+
+# explicit selector-first projection (alias of select(selector))
+df4 = df.select_schema(s.starts_with("tmp_"))
+```
+
+### Selector-driven rename conveniences
+
+```python
+df2 = df.rename_upper(s.starts_with("tmp_"))
+df3 = df.rename_strip(chars="_")
+```

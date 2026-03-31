@@ -605,6 +605,26 @@ def test_dataframe_model_with_row_count() -> None:
     assert out == {"x": [10, 20, 30], "row_nr": [0, 1, 2]}
 
 
+def test_dataframe_model_selector_helpers() -> None:
+    from pydantable import selectors as s
+
+    class S(DataFrameModel):
+        a: int | None
+        b: int | None
+
+    df = S({"a": [None, 1], "b": [2, None]})
+    out = df.with_columns_fill_null(s.by_name("a"), value=0).to_dict()
+    assert out == {"a": [0, 1], "b": [2, None]}
+
+    out2 = df.with_columns_cast(s.by_name("b"), float).to_dict()
+    assert out2 == {"a": [None, 1], "b": [2.0, None]}
+
+    out3 = df.rename_upper(s.by_name("a")).to_dict()
+    assert out3 == {"A": [None, 1], "b": [2, None]}
+
+    assert df.select_schema(s.by_name("b")).to_dict() == {"b": [2, None]}
+
+
 def test_dataframe_model_row_input_rejects_bad_item_type():
     with pytest.raises(TypeError, match="mapping objects or Pydantic models"):
         UserDF([1, 2, 3])  # type: ignore[arg-type]
