@@ -9,6 +9,13 @@ from pathlib import Path
 import pytest
 
 
+_MYPY_WINDOWS_CRASH_CODES = {
+    # 0xC0000005 (Access violation). Observed in GitHub Actions windows runners as
+    # a hard crash of the mypy subprocess (no stdout/stderr).
+    3221225477
+}
+
+
 def _run_mypy_snippet(tmp_path: Path, code: str) -> subprocess.CompletedProcess[str]:
     snippet = tmp_path / "snippet.py"
     snippet.write_text(textwrap.dedent(code), encoding="utf-8")
@@ -25,6 +32,12 @@ def _run_mypy_snippet(tmp_path: Path, code: str) -> subprocess.CompletedProcess[
     )
 
 
+def _mypy_output_or_skip_on_crash(proc: subprocess.CompletedProcess[str]) -> str:
+    if sys.platform == "win32" and proc.returncode in _MYPY_WINDOWS_CRASH_CODES:
+        pytest.skip(f"mypy crashed on Windows (returncode={proc.returncode})")
+    return (proc.stdout or "") + (proc.stderr or "")
+
+
 def test_mypy_accepts_matching_dataframe_model_return_type(tmp_path: Path) -> None:
     pytest.importorskip("mypy")
     code = """
@@ -37,6 +50,7 @@ def test_mypy_accepts_matching_dataframe_model_return_type(tmp_path: Path) -> No
         return Users({"id": [1, 2]})
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
@@ -55,8 +69,9 @@ def test_mypy_rejects_mismatched_dataframe_model_return_type(tmp_path: Path) -> 
         return Orders({"order_id": [1]})
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    out = _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode != 0
-    assert "Incompatible return value type" in proc.stdout
+    assert "Incompatible return value type" in out
 
 
 def test_mypy_accepts_transformed_schema_wrapped_in_new_model(tmp_path: Path) -> None:
@@ -79,6 +94,7 @@ def test_mypy_accepts_transformed_schema_wrapped_in_new_model(tmp_path: Path) ->
         return UsersWithAge2(out.to_dict())
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
@@ -107,8 +123,9 @@ def test_mypy_rejects_wrong_wrapped_model_for_transformed_schema(
         return UsersWithWrongCols(out.to_dict())
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    out = _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode != 0
-    assert "Incompatible return value type" in proc.stdout
+    assert "Incompatible return value type" in out
 
 
 def test_mypy_cannot_verify_schema_transform_return_model_without_materialize(
@@ -132,6 +149,7 @@ def test_mypy_cannot_verify_schema_transform_return_model_without_materialize(
         return out
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
@@ -156,6 +174,7 @@ def test_mypy_accepts_select_drop_rename_return_model_without_materialize(
         return out
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
@@ -176,6 +195,7 @@ def test_mypy_accepts_select_drop_with_list_literals(tmp_path: Path) -> None:
         return df.drop(["age", "city"]).select(["id"])
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
@@ -204,6 +224,7 @@ def test_mypy_with_columns_infers_literal_and_arithmetic_types(tmp_path: Path) -
         return out
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
@@ -226,8 +247,9 @@ def test_mypy_with_columns_rejects_type_mismatch_when_inferred(tmp_path: Path) -
         return out
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    out = _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode != 0
-    assert "Incompatible return value type" in proc.stdout
+    assert "Incompatible return value type" in out
 
 
 def test_mypy_accepts_join_and_groupby_agg_return_model_without_materialize(
@@ -261,6 +283,7 @@ def test_mypy_accepts_join_and_groupby_agg_return_model_without_materialize(
         return users.group_by("id").agg(age_mean=("mean", "age"))
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
@@ -282,8 +305,9 @@ def test_mypy_schema_preserving_transform_still_checks_model_type(
         return df.filter(df.age > 0)
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    out = _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode != 0
-    assert "Incompatible return value type" in proc.stdout
+    assert "Incompatible return value type" in out
 
 
 def test_mypy_schema_preserving_chain_accepts_same_model_type(tmp_path: Path) -> None:
@@ -305,6 +329,7 @@ def test_mypy_schema_preserving_chain_accepts_same_model_type(tmp_path: Path) ->
         )
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
@@ -329,8 +354,9 @@ def test_mypy_schema_preserving_fill_null_and_drop_nulls_preserve_model_type(
         return df.fill_null(0).drop_nulls()
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    out = _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode != 0
-    assert "Incompatible return value type" in proc.stdout
+    assert "Incompatible return value type" in out
 
 
 def test_mypy_accepts_melt_unpivot_and_rolling_agg_return_model_without_materialize(
@@ -375,6 +401,7 @@ def test_mypy_accepts_melt_unpivot_and_rolling_agg_return_model_without_material
         )
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
@@ -402,8 +429,9 @@ def test_mypy_melt_requires_literal_id_vars_for_refinement(tmp_path: Path) -> No
         return df.melt(id_vars=cols, value_vars=["age"])
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    out = _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode != 0
-    assert "Incompatible return value type" in proc.stdout
+    assert "Incompatible return value type" in out
 
 
 def test_mypy_unpivot_requires_literal_index_for_refinement(tmp_path: Path) -> None:
@@ -429,8 +457,9 @@ def test_mypy_unpivot_requires_literal_index_for_refinement(tmp_path: Path) -> N
         return df.unpivot(index=idx, on=["age"])
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    out = _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode != 0
-    assert "Incompatible return value type" in proc.stdout
+    assert "Incompatible return value type" in out
 
 
 def test_mypy_rolling_agg_count_maps_to_int(tmp_path: Path) -> None:
@@ -453,6 +482,7 @@ def test_mypy_rolling_agg_count_maps_to_int(tmp_path: Path) -> None:
         )
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
@@ -474,8 +504,9 @@ def test_mypy_still_rejects_wrong_model_on_schema_preserving_chain(
         return df.filter(df.age > 0).sort("age").head(1)
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    out = _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode != 0
-    assert "Incompatible return value type" in proc.stdout
+    assert "Incompatible return value type" in out
 
 
 def test_mypy_rejects_wrong_after_model_for_schema_changing_chain(
@@ -497,8 +528,9 @@ def test_mypy_rejects_wrong_after_model_for_schema_changing_chain(
         return df.with_columns(age2=df.age * 2).select("id", "age2")
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    out = _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode != 0
-    assert "Incompatible return value type" in proc.stdout
+    assert "Incompatible return value type" in out
 
 
 def test_mypy_rejects_wrong_after_model_for_join(tmp_path: Path) -> None:
@@ -522,8 +554,9 @@ def test_mypy_rejects_wrong_after_model_for_join(tmp_path: Path) -> None:
         return users.join(cities, on="id")
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    out = _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode != 0
-    assert "Incompatible return value type" in proc.stdout
+    assert "Incompatible return value type" in out
 
 
 def test_mypy_rejects_wrong_after_model_for_groupby_agg(tmp_path: Path) -> None:
@@ -543,8 +576,9 @@ def test_mypy_rejects_wrong_after_model_for_groupby_agg(tmp_path: Path) -> None:
         return users.group_by("id").agg(age_mean=("mean", "age"))
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    out = _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode != 0
-    assert "Incompatible return value type" in proc.stdout
+    assert "Incompatible return value type" in out
 
 
 def test_mypy_accepts_literal_ip_wkb_annotated_str_transform_chain(
@@ -579,6 +613,7 @@ def test_mypy_accepts_literal_ip_wkb_annotated_str_transform_chain(
         return out.with_columns(dup_mode=out.mode).select("mode", "ip", "g", "dup_mode")
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
@@ -608,5 +643,6 @@ def test_mypy_rejects_bad_after_for_literal_ip_wkb_chain(tmp_path: Path) -> None
         return out.with_columns(dup_mode=out.mode).select("mode", "ip", "g", "dup_mode")
     """
     proc = _run_mypy_snippet(tmp_path, code)
+    out = _mypy_output_or_skip_on_crash(proc)
     assert proc.returncode != 0
-    assert "Incompatible return value type" in proc.stdout
+    assert "Incompatible return value type" in out

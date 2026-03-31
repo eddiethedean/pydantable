@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.8.0] — 2026-03-31
+
+### Added
+
+- **Selectors:** selector-driven column and rename helpers (see `pydantable.selectors` and {doc}`/SELECTORS`).
+- **Core DataFrame ergonomics:** `row_count`, `clip`, and `drop_nulls` arguments and convenience behavior aligned with the 1.8 parity push (see {doc}`/POLARS_PARITY_1_8` and {doc}`/PARITY_SCORECARD`).
+- **Joins:** additional join argument parity including `join_nulls` and `maintain_order` (typed contract preserved; see {doc}`/INTERFACE_CONTRACT`).
+- **Reshape:** `pivot_longer` / `pivot_wider` and related reshape ergonomics (see {doc}`/POLARS_WORKFLOWS` and {doc}`/INTERFACE_CONTRACT` reshape notes).
+
+### Docs
+
+- Add explicit **1.8.0** release entry and align “current release” references with the changelog.
+
 ## [1.7.0] — 2026-03-30
 
 ### Added
