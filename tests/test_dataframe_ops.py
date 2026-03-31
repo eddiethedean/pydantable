@@ -261,6 +261,42 @@ def test_select_with_selector_dsl_by_dtype_groups() -> None:
     assert out.to_dict() == {"i": [1], "f": [2.0], "t": [datetime(2020, 1, 1)]}
 
 
+def test_select_with_selector_dsl_more_dtype_groups() -> None:
+    import ipaddress
+    from enum import Enum
+
+    from pydantable.types import WKB
+
+    class E(Enum):
+        A = 1
+        B = 2
+
+    class S(Schema):
+        b: bytes
+        m: dict[str, int]
+        e: E
+        ip4: ipaddress.IPv4Address
+        ip6: ipaddress.IPv6Address
+        geom: WKB
+
+    df = DataFrame[S](
+        {
+            "b": [b"x"],
+            "m": [{"a": 1}],
+            "e": [E.A],
+            "ip4": [ipaddress.IPv4Address("127.0.0.1")],
+            "ip6": [ipaddress.IPv6Address("::1")],
+            "geom": [WKB(b"0101000000000000000000F03F0000000000000040")],
+        }
+    )
+    assert df.select(s.binary()).columns == ["b"]
+    assert df.select(s.maps()).columns == ["m"]
+    assert df.select(s.enums()).columns == ["e"]
+    assert df.select(s.ipv4s()).columns == ["ip4"]
+    assert df.select(s.ipv6s()).columns == ["ip6"]
+    assert df.select(s.wkbs()).columns == ["geom"]
+
+
 def test_select_with_selector_dsl_expanded_dtype_groups_and_structs() -> None:
     class S(Schema):
         i: int

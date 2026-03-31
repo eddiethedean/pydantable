@@ -28,9 +28,15 @@ df.select(s.decimals())
 df.select(s.string())
 df.select(s.temporal())
 df.select(s.boolean())
+df.select(s.binary())
 df.select(s.lists())
+df.select(s.maps())
 df.select(s.structs())
+df.select(s.enums())
+df.select(s.ipv4s())
+df.select(s.ipv6s())
 df.select(s.uuids())
+df.select(s.wkbs())
 ```
 
 ### Composition
@@ -59,7 +65,9 @@ df.select(exclude=["debug_col"])  # everything except debug_col
 ### Error behavior
 
 - **`select(Selector)`** raises **`ValueError`** when the selector matches no columns (includes the selector summary and available schema columns).
-- **`drop(Selector)`** follows the existing `drop(strict=...)` rules:\n  - `strict=True`: missing columns error at plan validation time\n  - `strict=False`: missing columns are ignored (no-op if all requested columns are missing)\n+
+- **`drop(Selector)`** follows the existing `drop(strict=...)` rules:
+  - `strict=True`: missing columns error at plan validation time
+  - `strict=False`: missing columns are ignored (no-op if all requested columns are missing)
 
 ### Rename helper
 

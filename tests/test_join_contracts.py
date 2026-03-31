@@ -1,6 +1,7 @@
 import pytest
 from conftest import assert_table_eq_sorted
 from pydantable import DataFrame
+from pydantable import selectors as s
 from pydantable.schema import Schema
 
 
@@ -192,6 +193,82 @@ def test_join_join_nulls_scan_roots(tmp_path) -> None:
 
     out_eq = left.join(right, on="k", how="inner", join_nulls=True).to_dict()
     assert out_eq["k"] == [None, 1]
+
+
+def test_join_on_selector_success_and_errors() -> None:
+    class L(Schema):
+        id: int
+        v: int
+
+    class R(Schema):
+        id: int
+        w: int
+
+    left = DataFrame[L]({"id": [1, 2], "v": [10, 20]})
+    right = DataFrame[R]({"id": [2, 1], "w": [200, 100]})
+
+    out = left.join(right, on=s.by_name("id"), how="inner").collect(as_lists=True)
+    assert_table_eq_sorted(
+        out,
+        {"id": [1, 2], "v": [10, 20], "w": [100, 200]},
+        keys=["id"],
+    )
+
+    with pytest.raises(ValueError, match=r"selector matched no columns.*Available columns"):
+        left.join(right, on=s.starts_with("zzz"), how="inner").to_dict()
+
+    class R2(Schema):
+        other: int
+
+    right2 = DataFrame[R2]({"other": [1, 2]})
+    with pytest.raises(KeyError, match=r"join\(\) unknown right join key"):
+        left.join(right2, on=s.by_name("id"), how="inner").to_dict()
+
+
+def test_join_left_on_right_on_selector_resolution_and_length_mismatch() -> None:
+    class L(Schema):
+        id_l: int
+        v: int
+
+    class R(Schema):
+        id_r: int
+        w: int
+
+    left = DataFrame[L]({"id_l": [1, 2], "v": [10, 20]})
+    right = DataFrame[R]({"id_r": [2, 1], "w": [200, 100]})
+
+    out = left.join(
+        right, left_on=s.by_name("id_l"), right_on=s.by_name("id_r"), how="inner"
+    ).collect(as_lists=True)
+    assert_table_eq_sorted(
+        out,
+        {"id_l": [1, 2], "v": [10, 20], "w": [100, 200]},
+        keys=["id_l"],
+    )
+
+    with pytest.raises(ValueError, match=r"must have the same length"):
+        left.join(right, left_on=s.everything(), right_on=s.by_name("id_r"), how="inner").to_dict()
+
+
+def test_join_on_selector_scan_roots(tmp_path) -> None:
+    left_csv = tmp_path / "left.csv"
+    right_csv = tmp_path / "right.csv"
+    left_csv.write_text("k,v\n1,10\n2,20\n", encoding="utf-8")
+    right_csv.write_text("k,w\n2,200\n1,100\n", encoding="utf-8")
+
+    class L(Schema):
+        k: int
+        v: int
+
+    class R(Schema):
+        k: int
+        w: int
+
+    left = DataFrame[L].read_csv(str(left_csv))
+    right = DataFrame[R].read_csv(str(right_csv))
+
+    out = left.join(right, on=s.by_name("k"), how="inner").collect(as_lists=True)
+    assert_table_eq_sorted(out, {"k": [1, 2], "v": [10, 20], "w": [100, 200]}, keys=["k"])
 
 
 def test_join_supports_expression_keys() -> None:

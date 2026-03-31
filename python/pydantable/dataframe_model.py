@@ -1787,7 +1787,7 @@ class DataFrameModel(Generic[RowT]):
         self,
         other: DataFrameModel[Any],
         *,
-        on: str | Sequence[str] | None = None,
+        on: str | Sequence[str] | Any | None = None,
         left_on: Any = None,
         right_on: Any = None,
         how: str = "inner",

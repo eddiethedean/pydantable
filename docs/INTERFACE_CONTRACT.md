@@ -51,6 +51,10 @@ These flags are supported by the Polars engine. When you need deterministic comp
 - `join(on=...)` requires at least one join key.
 - `on` must reference a column that exists on both sides.
 - `join(left_on=..., right_on=...)` supports column names or single-column expressions.
+- `Selector` objects are supported for join keys (schema-first, deterministic):
+  - `join(on=Selector)`: selector resolves against the **left** schema; it must match at least one column, and every resolved name must also exist in the **right** schema.
+  - `join(left_on=Selector, right_on=Selector)`: each selector resolves against its own side; both must be non-empty and resolve to the **same number** of columns.
+  - If a selector matches no columns, `ValueError` is raised including available columns.
 - `cross` joins do not accept `on`/`left_on`/`right_on`.
 
 ### Join validation (`validate=...`)

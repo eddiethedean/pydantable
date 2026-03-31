@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import enum
+import ipaddress
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
@@ -42,6 +44,34 @@ def _is_struct_annotation(annotation: Any) -> bool:
         return issubclass(ann, BaseModel)
     except TypeError:  # pragma: no cover
         return False
+
+
+def _is_map_annotation(annotation: Any) -> bool:
+    ann = _unwrap_optional(annotation)
+    origin = get_origin(ann)
+    if origin is not dict:
+        return False
+    args = get_args(ann)
+    return len(args) == 2 and args[0] is str
+
+
+def _is_enum_annotation(annotation: Any) -> bool:
+    ann = _unwrap_optional(annotation)
+    if not isinstance(ann, type):
+        return False
+    try:
+        return issubclass(ann, enum.Enum) and ann is not enum.Enum
+    except TypeError:  # pragma: no cover
+        return False
+
+
+def _is_wkb_annotation(annotation: Any) -> bool:
+    ann = _unwrap_optional(annotation)
+    return (
+        isinstance(ann, type)
+        and ann.__name__ == "WKB"
+        and getattr(ann, "__module__", "") == "pydantable.types"
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,6 +213,16 @@ TEMPORAL = _DTypeGroup(
 LIST = _DTypeGroup("LIST", lambda ann: _is_list_annotation(_unwrap_optional(ann)))
 STRUCT = _DTypeGroup("STRUCT", lambda ann: _is_struct_annotation(ann))
 UUIDS = _DTypeGroup("UUID", lambda ann: _unwrap_optional(ann) is UUID)
+BINARIES = _DTypeGroup("BINARIES", lambda ann: _unwrap_optional(ann) is bytes)
+MAPS = _DTypeGroup("MAPS", lambda ann: _is_map_annotation(ann))
+ENUMS = _DTypeGroup("ENUMS", lambda ann: _is_enum_annotation(ann))
+IPV4S = _DTypeGroup(
+    "IPV4S", lambda ann: _unwrap_optional(ann) is ipaddress.IPv4Address
+)
+IPV6S = _DTypeGroup(
+    "IPV6S", lambda ann: _unwrap_optional(ann) is ipaddress.IPv6Address
+)
+WKBS = _DTypeGroup("WKBS", lambda ann: _is_wkb_annotation(ann))
 
 
 def by_dtype(*dtypes: Any) -> Selector:
@@ -265,6 +305,30 @@ def struct() -> Selector:
 
 def uuids() -> Selector:
     return by_dtype(UUIDS)
+
+
+def binary() -> Selector:
+    return by_dtype(BINARIES)
+
+
+def maps() -> Selector:
+    return by_dtype(MAPS)
+
+
+def enums() -> Selector:
+    return by_dtype(ENUMS)
+
+
+def ipv4s() -> Selector:
+    return by_dtype(IPV4S)
+
+
+def ipv6s() -> Selector:
+    return by_dtype(IPV6S)
+
+
+def wkbs() -> Selector:
+    return by_dtype(WKBS)
 
 
 def rename_map(selector: Selector, fn: Callable[[str], str]) -> Callable[[Mapping[str, Any]], dict[str, str]]:

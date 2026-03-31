@@ -2566,9 +2566,9 @@ class DataFrame(Generic[SchemaT]):
         self,
         other: DataFrame[Any],
         *,
-        on: str | Sequence[str] | None = None,
-        left_on: str | Expr | Sequence[str | Expr] | None = None,
-        right_on: str | Expr | Sequence[str | Expr] | None = None,
+        on: str | Sequence[str] | Selector | None = None,
+        left_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
+        right_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
         how: str = "inner",
         suffix: str = "_right",
         coalesce: bool | None = None,
@@ -2588,6 +2588,21 @@ class DataFrame(Generic[SchemaT]):
             raise ValueError(
                 "join() use either on=... or left_on=/right_on=..., not both."
             )
+
+        def _available_cols_text(field_types: Mapping[str, Any]) -> str:
+            return ", ".join(repr(c) for c in field_types.keys())
+
+        def _resolve_selector(
+            *, sel: Selector, field_types: Mapping[str, Any], arg_name: str
+        ) -> list[str]:
+            matched = sel.resolve(field_types)
+            if not matched:
+                available = _available_cols_text(field_types)
+                raise ValueError(
+                    f"join({arg_name}=...) selector matched no columns. "
+                    f"Available columns: [{available}]"
+                )
+            return matched
 
         def _resolve_keys(keys: str | Expr | Sequence[str | Expr] | None) -> list[str]:
             if keys is None:
@@ -2625,20 +2640,50 @@ class DataFrame(Generic[SchemaT]):
             return tp
 
         if on is not None:
-            left_keys = [on] if isinstance(on, str) else list(on)
+            if isinstance(on, Selector):
+                left_keys = _resolve_selector(
+                    sel=on, field_types=self._current_field_types, arg_name="on"
+                )
+            else:
+                left_keys = [on] if isinstance(on, str) else list(on)
+            missing_in_right = [
+                k for k in left_keys if k not in other._current_field_types
+            ]
+            if missing_in_right:
+                available = _available_cols_text(other._current_field_types)
+                missing = ", ".join(repr(c) for c in missing_in_right)
+                raise KeyError(
+                    "join() unknown right join key(s): "
+                    f"[{missing}]. Right available columns: [{available}]"
+                )
             right_keys = list(left_keys)
             used_expr_keys = False
             used_non_columnref_expr_keys = False
         else:
             used_expr_keys = False
             used_non_columnref_expr_keys = False
-            left_keys = _resolve_keys(left_on)
-            right_keys = _resolve_keys(right_on)
+            if isinstance(left_on, Selector):
+                left_keys = _resolve_selector(
+                    sel=left_on,
+                    field_types=self._current_field_types,
+                    arg_name="left_on",
+                )
+            else:
+                left_keys = _resolve_keys(left_on)
+
+            if isinstance(right_on, Selector):
+                right_keys = _resolve_selector(
+                    sel=right_on,
+                    field_types=other._current_field_types,
+                    arg_name="right_on",
+                )
+            else:
+                right_keys = _resolve_keys(right_on)
             raw_left = [] if left_on is None else (
-                [left_on] if isinstance(left_on, (str, Expr)) else list(left_on)
+                [left_on] if isinstance(left_on, (str, Expr, Selector)) else list(left_on)
             )
             raw_right = [] if right_on is None else (
-                [right_on] if isinstance(right_on, (str, Expr)) else list(right_on)
+                [right_on] if isinstance(right_on, (str, Expr, Selector)) else list(right_on)
             )
             used_expr_keys = any(isinstance(x, Expr) for x in [*raw_left, *raw_right])
             used_non_columnref_expr_keys = any(
