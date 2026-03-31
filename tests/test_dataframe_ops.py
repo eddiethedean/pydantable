@@ -242,6 +242,12 @@ def test_select_with_selector_dsl_name_patterns_and_exclude() -> None:
     out2 = df.select(s.everything().exclude(s.ends_with("b")))
     assert out2.to_dict() == {"a": [1], "aa": [2]}
 
+    out3 = df.select("a", "aa", "bb", exclude=s.ends_with("b"))
+    assert out3.to_dict() == {"a": [1], "aa": [2]}
+
+    out4 = df.select(exclude=["bb"])
+    assert out4.to_dict() == {"a": [1], "aa": [2], "b": [3]}
+
 
 def test_select_with_selector_dsl_by_dtype_groups() -> None:
     class S(Schema):
@@ -294,6 +300,56 @@ def test_select_with_selector_dsl_empty_match_raises() -> None:
     df = DataFrame[S]({"a": [1]})
     with pytest.raises(ValueError, match=r"matched no columns.*Available columns"):
         df.select(s.starts_with("zzz"))
+
+
+def test_select_exclude_rejects_global_aggregates() -> None:
+    df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
+    from pydantable.expressions import global_sum
+
+    with pytest.raises(TypeError, match="cannot be used with global aggregates"):
+        df.select(global_sum(df.age), exclude=["id"]).to_dict()
+
+
+def test_reorder_columns_select_first_select_last_and_move() -> None:
+    class S(Schema):
+        a: int
+        aa: int
+        b: int
+        bb: int
+
+    df = DataFrame[S]({"a": [1], "aa": [2], "b": [3], "bb": [4]})
+    out = df.reorder_columns([s.starts_with("b"), "a"]).to_dict()
+    assert list(out.keys()) == ["b", "bb", "a", "aa"]
+
+    out2 = df.select_first("bb", s.starts_with("a")).to_dict()
+    assert list(out2.keys()) == ["bb", "a", "aa", "b"]
+
+    out3 = df.select_last(s.starts_with("a")).to_dict()
+    assert list(out3.keys()) == ["b", "bb", "a", "aa"]
+
+    out4 = df.move(s.starts_with("a"), after="bb").to_dict()
+    assert list(out4.keys()) == ["b", "bb", "a", "aa"]
+
+
+def test_rename_prefix_suffix_replace_and_rename_map() -> None:
+    class S(Schema):
+        a: int
+        aa: int
+        b: int
+
+    df = DataFrame[S]({"a": [1], "aa": [2], "b": [3]})
+    out = df.rename_prefix("x_", selector=s.starts_with("a")).to_dict()
+    assert set(out.keys()) == {"x_a", "x_aa", "b"}
+
+    out2 = df.rename_suffix("_y", selector=s.by_name("b")).to_dict()
+    assert set(out2.keys()) == {"a", "aa", "b_y"}
+
+    out3 = df.rename_replace("a", "z", selector=s.starts_with("a")).to_dict()
+    assert set(out3.keys()) == {"z", "zz", "b"}
+
+    m = s.rename_map(s.starts_with("a"), lambda c: f"p_{c}")(df.schema_fields())
+    out4 = df.rename(m).to_dict()
+    assert set(out4.keys()) == {"p_a", "p_aa", "b"}
 
 
 def test_rename_with_selector_renames_subset_and_preserves_order() -> None:

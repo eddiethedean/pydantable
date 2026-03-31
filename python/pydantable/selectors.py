@@ -265,3 +265,25 @@ def struct() -> Selector:
 def uuids() -> Selector:
     return by_dtype(UUIDS)
 
+
+def rename_map(selector: Selector, fn: Callable[[str], str]) -> Callable[[Mapping[str, Any]], dict[str, str]]:
+    """Build a rename mapping from a selector and renaming function (schema-driven)."""
+    if not isinstance(selector, Selector):
+        raise TypeError("rename_map(selector, fn) expects a Selector.")
+    if not callable(fn):
+        raise TypeError("rename_map(selector, fn) expects a callable.")
+
+    def _mk(schema_field_types: Mapping[str, Any]) -> dict[str, str]:
+        cols = selector.resolve(schema_field_types)
+        if not cols:
+            available = ", ".join(repr(c) for c in schema_field_types.keys())
+            raise ValueError(
+                f"rename_map({selector!r}) matched no columns. Available columns: [{available}]"
+            )
+        mapping = {c: str(fn(c)) for c in cols}
+        if len(set(mapping.values())) != len(mapping):
+            raise ValueError("rename_map(...) produced duplicate output column names.")
+        return mapping
+
+    return _mk
+

@@ -1602,7 +1602,10 @@ class DataFrame(Generic[SchemaT]):
         )
 
     def select(
-        self, *cols: str | ColumnRef | Expr | AliasedExpr | Selector, **named: Any
+        self,
+        *cols: str | ColumnRef | Expr | AliasedExpr | Selector,
+        exclude: Selector | Sequence[str] | None = None,
+        **named: Any,
     ) -> DataFrame[Any]:
         """Project columns and/or compute a **single-row** frame of global aggregates.
 
@@ -1620,6 +1623,13 @@ class DataFrame(Generic[SchemaT]):
                     "(global aggregates)."
                 )
             named_items.append((name, e._rust_expr))
+
+        exclude_set: set[str] = set()
+        if exclude is not None:
+            if isinstance(exclude, Selector):
+                exclude_set = set(exclude.resolve(self._current_field_types))
+            else:
+                exclude_set = {str(c) for c in exclude}
 
         aggs: list[tuple[str, Any]] = []
         projects: list[str] = []
@@ -1660,7 +1670,8 @@ class DataFrame(Generic[SchemaT]):
                         )
             else:
                 raise TypeError(
-                    "select() accepts column names, Selector objects, or Expr objects."
+                    "select() accepts column names, Selector objects, ColumnRef expressions, "
+                    "global aggregates, or Expr.alias('name') (AliasedExpr)."
                 )
 
         if named_items and (projects or aggs):
@@ -1672,13 +1683,21 @@ class DataFrame(Generic[SchemaT]):
             raise TypeError(
                 "select() cannot mix global aggregates with plain column projections."
             )
+        if exclude_set and (named_items or aggs):
+            raise TypeError("select(exclude=...) cannot be used with global aggregates.")
         if named_items:
             rust_plan = rust.plan_global_select(self._rust_plan, named_items)
         elif aggs:
             rust_plan = rust.plan_global_select(self._rust_plan, aggs)
         else:
             if not projects:
-                raise ValueError("select() requires at least one column.")
+                if not exclude_set:
+                    raise ValueError("select() requires at least one column.")
+                projects = [c for c in self._current_field_types.keys() if c not in exclude_set]
+            else:
+                projects = [c for c in projects if c not in exclude_set]
+            if not projects:
+                raise ValueError("select(...) produced an empty projection.")
             rust_plan = self._rust_plan
             if computed:
                 rust_plan = rust.plan_with_columns(rust_plan, computed)
@@ -1724,6 +1743,76 @@ class DataFrame(Generic[SchemaT]):
         if not cols:
             raise ValueError(f"select_suffix({suffix!r}) matched no columns.")
         return self.select(*cols)
+
+    def _resolve_column_names_or_selector(
+        self, item: str | Selector, *, arg_name: str
+    ) -> list[str]:
+        if isinstance(item, str):
+            return [item]
+        if isinstance(item, Selector):
+            resolved = item.resolve(self._current_field_types)
+            if not resolved:
+                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                raise ValueError(
+                    f"{arg_name}={item!r} matched no columns. Available columns: [{available}]"
+                )
+            return resolved
+        raise TypeError(f"{arg_name} expects a column name or Selector.")
+
+    def reorder_columns(self, order: Sequence[str | Selector]) -> DataFrame[Any]:
+        """Reorder columns by explicit names/selectors; append remaining columns."""
+        wanted: list[str] = []
+        for it in order:
+            wanted.extend(self._resolve_column_names_or_selector(it, arg_name="order"))
+        if len(set(wanted)) != len(wanted):
+            raise ValueError("reorder_columns(order=...) contains duplicate columns.")
+        remainder = [c for c in self._current_field_types.keys() if c not in wanted]
+        return self.select(*wanted, *remainder)
+
+    def select_first(self, *cols_or_selectors: str | Selector) -> DataFrame[Any]:
+        """Move selected columns to the front; keep remaining order."""
+        wanted: list[str] = []
+        for it in cols_or_selectors:
+            wanted.extend(self._resolve_column_names_or_selector(it, arg_name="cols"))
+        if len(set(wanted)) != len(wanted):
+            raise ValueError("select_first(...) contains duplicate columns.")
+        remainder = [c for c in self._current_field_types.keys() if c not in wanted]
+        return self.select(*wanted, *remainder)
+
+    def select_last(self, *cols_or_selectors: str | Selector) -> DataFrame[Any]:
+        """Move selected columns to the end; keep remaining order."""
+        wanted: list[str] = []
+        for it in cols_or_selectors:
+            wanted.extend(self._resolve_column_names_or_selector(it, arg_name="cols"))
+        if len(set(wanted)) != len(wanted):
+            raise ValueError("select_last(...) contains duplicate columns.")
+        remainder = [c for c in self._current_field_types.keys() if c not in wanted]
+        return self.select(*remainder, *wanted)
+
+    def move(
+        self,
+        cols_or_selector: str | Selector,
+        *,
+        before: str | None = None,
+        after: str | None = None,
+    ) -> DataFrame[Any]:
+        """Move column(s) before/after an anchor column (schema-first helper)."""
+        if (before is None) == (after is None):
+            raise TypeError("move(..., before=...) or move(..., after=...) is required.")
+        moving = self._resolve_column_names_or_selector(cols_or_selector, arg_name="cols")
+        anchor = before if before is not None else after
+        if not isinstance(anchor, str):
+            raise TypeError("move(..., before/after=...) expects a column name.")
+        if anchor not in self._current_field_types:
+            raise KeyError(f"move() unknown anchor column {anchor!r}.")
+        if anchor in moving:
+            raise ValueError("move() cannot move a column relative to itself.")
+        # Remove moving cols, then re-insert as a block.
+        base = [c for c in self._current_field_types.keys() if c not in moving]
+        idx = base.index(anchor)
+        insert_at = idx if before is not None else idx + 1
+        new_order = [*base[:insert_at], *moving, *base[insert_at:]]
+        return self.select(*new_order)
 
     def filter(self, condition: Expr) -> DataFrame[Any]:
         """Keep rows where the boolean ``condition`` is true."""
@@ -1972,6 +2061,87 @@ class DataFrame(Generic[SchemaT]):
             raise ValueError(
                 "rename_with_selector(...) produced duplicate output column names."
             )
+        return self.rename(rename_map, strict=strict)
+
+    def rename_prefix(
+        self,
+        prefix: str,
+        *,
+        selector: Selector | None = None,
+        strict: bool = True,
+    ) -> DataFrame[Any]:
+        if not isinstance(prefix, str):
+            raise TypeError("rename_prefix(prefix) expects a string.")
+        target = (
+            list(self._current_field_types.keys())
+            if selector is None
+            else selector.resolve(self._current_field_types)
+        )
+        if selector is not None and not target:
+            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            raise ValueError(
+                f"rename_prefix(selector={selector!r}) matched no columns. "
+                f"Available columns: [{available}]"
+            )
+        rename_map = {c: f"{prefix}{c}" for c in target}
+        if len(set(rename_map.values())) != len(rename_map):
+            raise ValueError("rename_prefix(...) produced duplicate output column names.")
+        return self.rename(rename_map, strict=strict)
+
+    def rename_suffix(
+        self,
+        suffix: str,
+        *,
+        selector: Selector | None = None,
+        strict: bool = True,
+    ) -> DataFrame[Any]:
+        if not isinstance(suffix, str):
+            raise TypeError("rename_suffix(suffix) expects a string.")
+        target = (
+            list(self._current_field_types.keys())
+            if selector is None
+            else selector.resolve(self._current_field_types)
+        )
+        if selector is not None and not target:
+            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            raise ValueError(
+                f"rename_suffix(selector={selector!r}) matched no columns. "
+                f"Available columns: [{available}]"
+            )
+        rename_map = {c: f"{c}{suffix}" for c in target}
+        if len(set(rename_map.values())) != len(rename_map):
+            raise ValueError("rename_suffix(...) produced duplicate output column names.")
+        return self.rename(rename_map, strict=strict)
+
+    def rename_replace(
+        self,
+        old: str,
+        new: str,
+        *,
+        selector: Selector | None = None,
+        strict: bool = True,
+        literal: bool = True,
+    ) -> DataFrame[Any]:
+        if not isinstance(old, str) or not isinstance(new, str):
+            raise TypeError("rename_replace(old, new) expects strings.")
+        if literal is not True:
+            raise NotImplementedError(
+                "rename_replace(literal=False) is not supported (schema-first rename only)."
+            )
+        target = (
+            list(self._current_field_types.keys())
+            if selector is None
+            else selector.resolve(self._current_field_types)
+        )
+        if selector is not None and not target:
+            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            raise ValueError(
+                f"rename_replace(selector={selector!r}) matched no columns. "
+                f"Available columns: [{available}]"
+            )
+        rename_map = {c: c.replace(old, new) for c in target}
+        if len(set(rename_map.values())) != len(rename_map):
+            raise ValueError("rename_replace(...) produced duplicate output column names.")
         return self.rename(rename_map, strict=strict)
 
     def slice(self, offset: int, length: int) -> DataFrame[Any]:

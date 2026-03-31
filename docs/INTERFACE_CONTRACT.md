@@ -22,6 +22,11 @@ When tests or user assertions need deterministic comparisons, compare on the
 subset of columns that define identity (for example, join keys) rather than
 row position. The project test-suite uses sorted comparisons to enforce this.
 
+### Schema-driven selection ergonomics
+
+Some schema-first helpers exist to reduce verbosity when working with explicit column lists:
+
+- **`select(exclude=...)`**: remove columns from a projection using names or `Selector` objects.\n  If `select()` is called with **no** positional columns, `exclude=...` means “everything except …”.\n  `exclude` is not supported for global-aggregate `select(...)` calls.\n- **Column reordering**: `reorder_columns(...)`, `select_first(...)`, `select_last(...)`, and `move(..., before=.../after=...)` reorder columns without computing new ones.\n- **Rename convenience**: `rename_prefix(...)`, `rename_suffix(...)`, `rename_replace(...)`, and `rename_with_selector(...)` build deterministic rename maps; collisions raise `ValueError`.\n+
 ### `maintain_order`
 
 Some operations accept `maintain_order=...` for Polars parity:

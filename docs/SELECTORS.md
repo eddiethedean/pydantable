@@ -47,6 +47,15 @@ df.drop(s.starts_with("tmp_") - s.by_name("tmp_keep"))
 df.select(s.everything().exclude(s.ends_with("_debug")))
 ```
 
+### Excluding columns in `select`
+
+Use `exclude=` to remove columns from a projection (names or selectors):
+
+```python
+df.select("id", "age", "age2", exclude=s.starts_with("age"))
+df.select(exclude=["debug_col"])  # everything except debug_col
+```
+
 ### Error behavior
 
 - **`select(Selector)`** raises **`ValueError`** when the selector matches no columns (includes the selector summary and available schema columns).
@@ -58,4 +67,11 @@ Use `rename_with_selector` to rename a subset of columns based on a selector:
 
 ```python
 df2 = df.rename_with_selector(s.starts_with("tmp_"), lambda c: c.removeprefix("tmp_"))
+```
+
+You can also build a mapping using `rename_map` and pass it to `rename(...)`:
+
+```python
+m = s.rename_map(s.starts_with("tmp_"), lambda c: c.removeprefix("tmp_"))(df.schema_fields())
+df2 = df.rename(m)
 ```
