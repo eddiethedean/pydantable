@@ -174,5 +174,33 @@ def test_join_validate_not_supported_on_scan_roots(tmp_path) -> None:
 
     left = DataFrame[LeftSchema].read_csv(str(left_csv))
     right = DataFrame[RightSchema].read_csv(str(right_csv))
-    with pytest.raises(NotImplementedError, match="scan roots"):
-        left.join(right, on="id", how="inner", validate="one_to_one").to_dict()
+    out = left.join(right, on="id", how="inner", validate="one_to_one").to_dict()
+    assert set(out.keys()) >= {"id", "age", "score", "country", "score_right"}
+
+
+def test_join_validate_scan_roots_multi_key_and_side_specific(tmp_path) -> None:
+    class L(Schema):
+        k1: int
+        k2: int
+        v: int
+
+    class R(Schema):
+        k1: int
+        k2: int
+        v2: int
+
+    lp = tmp_path / "l.csv"
+    rp = tmp_path / "r.csv"
+    # Left duplicates on (k1,k2) but right is unique.
+    lp.write_text("k1,k2,v\n1,1,10\n1,1,11\n2,2,20\n", encoding="utf-8")
+    rp.write_text("k1,k2,v2\n1,1,100\n2,2,200\n", encoding="utf-8")
+
+    left = DataFrame[L].read_csv(str(lp))
+    right = DataFrame[R].read_csv(str(rp))
+
+    with pytest.raises(ValueError, match="one_to_many"):
+        left.join(right, on=["k1", "k2"], how="inner", validate="one_to_many").to_dict()
+
+    # many_to_one should pass because right keys are unique.
+    out = left.join(right, on=["k1", "k2"], how="inner", validate="many_to_one").to_dict()
+    assert set(out.keys()) >= {"k1", "k2", "v", "v2"}

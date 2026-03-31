@@ -33,6 +33,7 @@ use polars_io::prelude::{SerReader, SerWriter};
 use numpy::PyReadonlyArray1;
 
 use super::common::*;
+use super::literal_agg::py_dict_to_literal_ctx;
 use super::materialize::{dtype_from_polars, series_to_py_list};
 use super::root_lazy::{collect_lazyframe, plan_to_lazyframe};
 use super::runner::PolarsPlanRunner;
@@ -48,6 +49,7 @@ pub fn execute_join_polars(
     right_on: Vec<String>,
     how: String,
     suffix: String,
+    validate: Option<String>,
     as_python_lists: bool,
     streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
@@ -101,8 +103,94 @@ pub fn execute_join_polars(
         }
     };
 
+    if validate.is_some() && is_cross {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "cross join does not support validate=...; remove validate or use a keyed join.",
+        ));
+    }
+
     let left_lf = plan_to_lazyframe(py, left_plan, left_root_data)?;
     let mut right_lf = plan_to_lazyframe(py, right_plan, right_root_data)?;
+
+    if let Some(v) = validate.as_deref() {
+        fn key_fragment(value: &Option<LiteralValue>) -> String {
+            match value {
+                None => "N".to_string(),
+                Some(LiteralValue::Int(i)) => format!("I:{i}"),
+                Some(LiteralValue::Float(f)) => format!("F:{f:?}"),
+                Some(LiteralValue::Bool(b)) => format!("B:{b}"),
+                Some(LiteralValue::Str(s)) => format!("S:{s}"),
+                Some(LiteralValue::EnumStr(s)) => format!("E:{s}"),
+                Some(LiteralValue::Uuid(s)) => format!("U:{s}"),
+                Some(LiteralValue::Decimal(v)) => format!("DEC:{v}"),
+                Some(LiteralValue::DateTimeMicros(v)) => format!("DT:{v}"),
+                Some(LiteralValue::DateDays(v)) => format!("D:{v}"),
+                Some(LiteralValue::DurationMicros(v)) => format!("TD:{v}"),
+                Some(LiteralValue::TimeNanos(v)) => format!("T:{v}"),
+                Some(LiteralValue::Binary(b)) => format!("BIN:{}", b.len()),
+            }
+        }
+
+        fn keys_unique(
+            py: Python<'_>,
+            plan: &PlanInner,
+            root_data: &Bound<'_, PyAny>,
+            keys: &[String],
+            streaming: bool,
+        ) -> PyResult<bool> {
+            if keys.is_empty() {
+                return Ok(true);
+            }
+            let data_obj = crate::plan::execute_plan(py, plan, root_data, true, streaming)?;
+            let data_bound = data_obj.bind(py);
+            let ctx = py_dict_to_literal_ctx(&plan.schema, data_bound)?;
+            let row_count = ctx.values().next().map_or(0, std::vec::Vec::len);
+            let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+            for i in 0..row_count {
+                let mut sig = String::new();
+                for k in keys {
+                    sig.push('|');
+                    sig.push_str(&key_fragment(&ctx[k][i]));
+                }
+                if !seen.insert(sig) {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        }
+
+        let left_unique = keys_unique(py, left_plan, left_root_data, &left_on, streaming)?;
+        let right_unique = keys_unique(py, right_plan, right_root_data, &right_on, streaming)?;
+        match v {
+            "one_to_one" => {
+                if !(left_unique && right_unique) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "join(validate='one_to_one') failed: keys not unique.",
+                    ));
+                }
+            }
+            "one_to_many" => {
+                if !left_unique {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "join(validate='one_to_many') failed: left keys not unique.",
+                    ));
+                }
+            }
+            "many_to_one" => {
+                if !right_unique {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "join(validate='many_to_one') failed: right keys not unique.",
+                    ));
+                }
+            }
+            "many_to_many" => {}
+            other => {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "join(validate=...) must be one of one_to_one, one_to_many, many_to_one, many_to_many (got {other:?}).",
+                )));
+            }
+        }
+    }
 
     // Deterministic collision handling:
     // - keep left names unchanged

@@ -26,7 +26,7 @@ contract-tested.
 | GroupBy | Group-by convenience methods (`sum/mean/min/max/count/len`) | Implemented | Deterministic naming (`<col>_sum`, etc.) and `len` via synthetic constant column. |
 | GroupBy | `group_by(..., maintain_order=..., drop_nulls=...)` | Implemented | `maintain_order=True` is stable; `drop_nulls=False` retains null-key groups. |
 | Join | `join(..., coalesce=...)` | Partial | Accepted for parity; join key coalescing is already the default behavior for same-named keys. |
-| Join | `join(..., validate=...)` | Partial | Implemented for in-memory roots; not supported on scan roots (raises `NotImplementedError`). |
+| Join | `join(..., validate=...)` | Implemented | Cardinality checks supported for in-memory roots and scan roots (explicit cost). |
 | Reshape | `pivot(..., sort_columns=..., separator=...)` | Implemented | `sort_columns=True` sorts pivot-value column generation; `separator` controls generated output names. |
 | Utilities | `sample`, `shift`, `null_count`, `is_empty` | Implemented | Eager helpers (materialize via `to_dict()`), returning a new `DataFrame` (or `dict` for `null_count`). |
 

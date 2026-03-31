@@ -53,7 +53,7 @@ These flags are supported by the Polars engine. When you need deterministic comp
 `join(validate=...)` performs an explicit join cardinality check:
 
 - Allowed values: `one_to_one`, `one_to_many`, `many_to_one`, `many_to_many` (also accepts `1:1`, `1:m`, `m:1`, `m:m`).
-- **Supported only on in-memory roots** (materialized column dict roots). On scan roots (lazy `read_*`), it raises `NotImplementedError`; materialize first if you need these checks.
+- Supported on **in-memory roots and scan roots**.\n+  **Cost note:** validation is implemented via engine operations on the join keys; it may require an additional collect-like pass and can be expensive on large scans.\n+  Keep it explicit (do not enable by default) and document it in service code when used.
 
 ### Collision handling
 - Column name collisions introduced by the right-hand side are resolved by

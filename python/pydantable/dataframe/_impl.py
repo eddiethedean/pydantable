@@ -2225,29 +2225,11 @@ class DataFrame(Generic[SchemaT]):
                     "join(validate=...) must be one of one_to_one, one_to_many, "
                     "many_to_one, many_to_many (or 1:1/1:m/m:1/m:m)."
                 )
-            # Validation can be expensive on scan roots; keep it explicit.
-            if _is_scan_file_root(self._root_data) or _is_scan_file_root(other._root_data):
-                raise NotImplementedError(
-                    "join(validate=...) is not supported on scan roots; "
-                    "materialize first if you need cardinality checks."
+            if how == "cross":
+                raise ValueError(
+                    "cross join does not support validate=...; remove validate or use a keyed join."
                 )
-
-            def _key_tuples(df: DataFrame[Any], keys: list[str]) -> list[tuple[Any, ...]]:
-                d = df.select(*keys).to_dict()
-                n = len(next(iter(d.values()))) if d else 0
-                return [tuple(d[k][i] for k in keys) for i in range(n)]
-
-            left_t = _key_tuples(self, left_keys)
-            right_t = _key_tuples(other, right_keys)
-            left_unique = len(set(left_t)) == len(left_t)
-            right_unique = len(set(right_t)) == len(right_t)
-            if v == "one_to_one" and not (left_unique and right_unique):
-                raise ValueError("join(validate='one_to_one') failed: keys not unique.")
-            if v == "one_to_many" and not left_unique:
-                raise ValueError("join(validate='one_to_many') failed: left keys not unique.")
-            if v == "many_to_one" and not right_unique:
-                raise ValueError("join(validate='many_to_one') failed: right keys not unique.")
-            # many_to_many always passes
+            validate = v
 
         if how == "cross":
             if left_keys or right_keys:
@@ -2275,6 +2257,7 @@ class DataFrame(Generic[SchemaT]):
             right_keys,
             how,
             suffix,
+            validate=validate,
             as_python_lists=True,
             streaming=use_streaming,
         )

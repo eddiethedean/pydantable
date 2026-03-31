@@ -58,6 +58,7 @@ impl PolarsExecutor {
         right_on: Vec<String>,
         how: String,
         suffix: String,
+        validate: Option<String>,
         as_python_lists: bool,
         streaming: bool,
     ) -> PyResult<(PyObject, PyObject)> {
@@ -71,6 +72,7 @@ impl PolarsExecutor {
             right_on,
             how,
             suffix,
+            validate,
             as_python_lists,
             streaming,
         )
