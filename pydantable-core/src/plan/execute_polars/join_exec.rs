@@ -114,14 +114,8 @@ pub fn execute_join_polars(
             "cross join does not support coalesce=...; remove coalesce or use a keyed join.",
         ));
     }
-    if coalesce == Some(true) && matches!(join_type, JoinType::Full) {
-        let has_side_specific_keys = left_on.iter().zip(right_on.iter()).any(|(l, r)| l != r);
-        if has_side_specific_keys {
-            return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-                "join(coalesce=True) is not implemented for full joins with left_on/right_on keys.",
-            ));
-        }
-    }
+    // Full joins with side-specific keys are supported only for typed-safe coalescing; Python
+    // enforces dtype compatibility. Coalesce behavior is implemented below.
 
     let mut left_lf = plan_to_lazyframe(py, left_plan, left_root_data)?;
     let mut right_lf = plan_to_lazyframe(py, right_plan, right_root_data)?;
@@ -244,8 +238,7 @@ pub fn execute_join_polars(
     // Polars drops join key columns from (at least) the right side, even when the key names differ.
     // For typed-safe coalescing on left_on/right_on, we need both key values present post-join.
     let mut coalesce_key_pairs: Vec<(String, String, usize)> = Vec::new();
-    if coalesce == Some(true) && !is_cross && !is_semi && !is_anti && !matches!(join_type, JoinType::Full)
-    {
+    if coalesce.is_some() && !is_cross && !is_semi && !is_anti {
         for (i, (lk, rk)) in left_on.iter().zip(right_on.iter()).enumerate() {
             if lk != rk {
                 coalesce_key_pairs.push((lk.clone(), rk.clone(), i));
@@ -311,6 +304,7 @@ pub fn execute_join_polars(
             let right_dup = format!("__pydantable_right_key_{}", i);
             let (dst, other) = match join_type {
                 JoinType::Right => (rk.as_str(), left_dup.as_str()),
+                JoinType::Full => (lk.as_str(), right_dup.as_str()),
                 _ => (lk.as_str(), right_dup.as_str()),
             };
             exprs.push(
@@ -322,6 +316,9 @@ pub fn execute_join_polars(
             match join_type {
                 JoinType::Right => {
                     drop.insert(lk.clone());
+                }
+                JoinType::Full => {
+                    drop.insert(rk.clone());
                 }
                 _ => {
                     drop.insert(rk.clone());
@@ -337,6 +334,54 @@ pub fn execute_join_polars(
                 .filter(|n| !drop.contains(n.as_str()))
                 .map(|n| col(n.as_str()))
                 .collect::<Vec<_>>();
+            let lf2 = out_df.lazy().with_columns(exprs).select(keep);
+            out_df = collect_lazyframe(py, lf2, streaming)?;
+        }
+    }
+
+    if coalesce == Some(false) && !is_cross && !is_semi && !is_anti {
+        // Preserve both key columns for side-specific keys by re-introducing the dropped side
+        // from duplicated key columns.
+        let join_type = join_type.clone();
+        let mut exprs: Vec<PolarsExpr> = Vec::new();
+        let mut drop: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut added_names: Vec<String> = Vec::new();
+        for (lk, rk, i) in coalesce_key_pairs.iter() {
+            if lk == rk {
+                continue;
+            }
+            let left_dup = format!("__pydantable_left_key_{}", i);
+            let right_dup = format!("__pydantable_right_key_{}", i);
+            match join_type {
+                JoinType::Right => {
+                    exprs.push(col(left_dup.as_str()).alias(lk.as_str()));
+                    added_names.push(lk.clone());
+                }
+                _ => {
+                    exprs.push(col(right_dup.as_str()).alias(rk.as_str()));
+                    added_names.push(rk.clone());
+                }
+            }
+            drop.insert(left_dup);
+            drop.insert(right_dup);
+        }
+        if !exprs.is_empty() && !drop.is_empty() {
+            let mut keep: Vec<PolarsExpr> = out_df
+                .get_column_names()
+                .iter()
+                .filter(|n| !drop.contains(n.as_str()))
+                .map(|n| col(n.as_str()))
+                .collect::<Vec<_>>();
+            let existing: std::collections::HashSet<&str> = out_df
+                .get_column_names()
+                .iter()
+                .map(|n| n.as_str())
+                .collect();
+            for name in added_names.iter() {
+                if !existing.contains(name.as_str()) {
+                    keep.push(col(name.as_str()));
+                }
+            }
             let lf2 = out_df.lazy().with_columns(exprs).select(keep);
             out_df = collect_lazyframe(py, lf2, streaming)?;
         }

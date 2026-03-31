@@ -302,18 +302,86 @@ def test_join_coalesce_rejected_combinations() -> None:
     with pytest.raises(ValueError, match="cross join does not support coalesce"):
         left.join(right, how="cross", coalesce=True).to_dict()
 
-    with pytest.raises(NotImplementedError, match="full joins"):
+    with pytest.raises(NotImplementedError, match="matching key base dtypes"):
         class L(Schema):
             lid: int
             v: int
 
         class R(Schema):
-            rid: int
+            rid: str
             w: int
 
         l2 = DataFrame[L]({"lid": [1], "v": [10]})
-        r2 = DataFrame[R]({"rid": [1], "w": [100]})
+        r2 = DataFrame[R]({"rid": ["1"], "w": [100]})
         l2.join(r2, left_on="lid", right_on="rid", how="full", coalesce=True).to_dict()
 
     with pytest.raises(NotImplementedError, match="expression keys"):
-        left.join(right, left_on=left.id, right_on=right.id, how="inner", coalesce=True).to_dict()
+        _ = left.join(right, left_on=left.id + 0, right_on=right.id, how="inner", coalesce=True).to_dict()
+
+
+def test_join_coalesce_true_allows_columnref_expression_keys() -> None:
+    left = DataFrame[LeftSchema]({"id": [1, 2], "age": [10, 20], "score": [10, 20]})
+    right = DataFrame[RightSchema](
+        {"id": [2, 1], "age": [20, 10], "country": ["US", "CA"], "score": [200, 100]}
+    )
+    out = left.join(
+        right, left_on=left.id, right_on=right.id, how="inner", coalesce=True
+    ).collect(as_lists=True)
+    assert set(out.keys()) >= {"id", "age", "score", "country", "score_right"}
+
+
+def test_join_coalesce_true_semi_anti_accepts_left_on_right_on() -> None:
+    class L(Schema):
+        lid: int
+        v: int
+
+    class R(Schema):
+        rid: int
+        w: int
+
+    left = DataFrame[L]({"lid": [1, 2], "v": [10, 20]})
+    right = DataFrame[R]({"rid": [2], "w": [200]})
+
+    out_semi = left.join(
+        right, left_on="lid", right_on="rid", how="semi", coalesce=True
+    ).collect(as_lists=True)
+    assert out_semi == {"lid": [2], "v": [20]}
+
+    out_anti = left.join(
+        right, left_on="lid", right_on="rid", how="anti", coalesce=True
+    ).collect(as_lists=True)
+    assert out_anti == {"lid": [1], "v": [10]}
+
+
+def test_join_coalesce_true_full_join_side_specific() -> None:
+    class L(Schema):
+        lid: int
+        v: int
+
+    class R(Schema):
+        rid: int
+        w: int
+
+    left = DataFrame[L]({"lid": [1], "v": [10]})
+    right = DataFrame[R]({"rid": [2], "w": [200]})
+    out = left.join(
+        right, left_on="lid", right_on="rid", how="full", coalesce=True
+    ).collect(as_lists=True)
+    assert set(out.keys()) == {"lid", "v", "w"}
+
+
+def test_join_coalesce_false_keeps_both_keys_left_join() -> None:
+    class L(Schema):
+        lid: int
+        v: int
+
+    class R(Schema):
+        rid: int
+        w: int
+
+    left = DataFrame[L]({"lid": [1, 2], "v": [10, 20]})
+    right = DataFrame[R]({"rid": [1], "w": [100]})
+    out = left.join(
+        right, left_on="lid", right_on="rid", how="left", coalesce=False
+    ).collect(as_lists=True)
+    assert set(out.keys()) == {"lid", "rid", "v", "w"}

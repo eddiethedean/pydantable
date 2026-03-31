@@ -68,15 +68,14 @@ These flags are supported by the Polars engine. When you need deterministic comp
 
 - **`coalesce=None` (default)**: preserve current behavior.
 - **`coalesce=True` (typed-safe)**:
-  - **Supported** for `left_on` / `right_on` **column-name keys** (including multi-key) with join kinds: `inner`, `left`, `right`.
+  - **Supported** for `left_on` / `right_on` **column-name keys** (including multi-key) with join kinds: `inner`, `left`, `right`, `semi`, `anti`, `full`.\n    - For `semi`/`anti`, coalesce is accepted but has no observable effect (left-only output).\n    - For `full`, coalescing is supported only when the key base dtypes match exactly (no casts); the coalesced output key is nullable.
   - Produces exactly **one key column per key pair**:
     - `inner` / `left`: keeps the **left** key name(s) and drops the right key column(s).
     - `right`: keeps the **right** key name(s) and drops the left key column(s) (so right-only rows still have a non-null key).
   - **Not supported**:
     - `cross` joins
-    - `full`/`outer` joins with side-specific keys (requires explicit nullability widening rules)
-    - expression keys (`left_on=df.col_expr`, `right_on=...`) because output key naming is not guaranteed to be stable.
-- **`coalesce=False`**: accepted for Polars parity; currently a no-op under the schema-first contract.
+    - expression keys beyond simple `ColumnRef` (computed expressions) because output key naming is not guaranteed to be stable.
+- **`coalesce=False`**:\n  - For side-specific name keys, attempts to preserve **both** key columns when it is schema-safe (no output name collisions).\n  - Some combinations may raise `NotImplementedError` with guidance.
 
 ### Collision handling
 - Column name collisions introduced by the right-hand side are resolved by

@@ -2471,12 +2471,26 @@ class DataFrame(Generic[SchemaT]):
                     )
             return out
 
+        def _base_type(tp: Any) -> Any:
+            origin = get_origin(tp)
+            if origin is None:
+                return tp
+            if origin is getattr(__import__("typing"), "Union", object()) or str(origin).endswith(
+                "types.UnionType"
+            ):
+                args = [a for a in get_args(tp) if a is not type(None)]
+                if len(args) == 1:
+                    return args[0]
+            return tp
+
         if on is not None:
             left_keys = [on] if isinstance(on, str) else list(on)
             right_keys = list(left_keys)
             used_expr_keys = False
+            used_non_columnref_expr_keys = False
         else:
             used_expr_keys = False
+            used_non_columnref_expr_keys = False
             left_keys = _resolve_keys(left_on)
             right_keys = _resolve_keys(right_on)
             raw_left = [] if left_on is None else (
@@ -2486,6 +2500,10 @@ class DataFrame(Generic[SchemaT]):
                 [right_on] if isinstance(right_on, (str, Expr)) else list(right_on)
             )
             used_expr_keys = any(isinstance(x, Expr) for x in [*raw_left, *raw_right])
+            used_non_columnref_expr_keys = any(
+                isinstance(x, Expr) and not isinstance(x, ColumnRef)
+                for x in [*raw_left, *raw_right]
+            )
 
         if validate is not None:
             v = str(validate)
@@ -2512,15 +2530,35 @@ class DataFrame(Generic[SchemaT]):
                 raise ValueError(
                     "cross join does not support coalesce=...; remove coalesce or use a keyed join."
                 )
-            if used_expr_keys and on is None:
+            if used_non_columnref_expr_keys and on is None:
                 raise NotImplementedError(
-                    "join(coalesce=True) is not supported with expression keys; use column-name keys."
+                    "join(coalesce=True) is only supported for column-name keys or simple ColumnRef expression keys."
                 )
-            # Typed-safe constraint: full joins need explicit nullability widening + key naming rules.
-            if how in ("full", "outer") and on is None and left_keys != right_keys:
-                raise NotImplementedError(
-                    "join(coalesce=True) is not implemented for full joins with left_on/right_on keys."
-                )
+            if how in ("semi", "anti"):
+                # Left-only output: coalesce has no observable effect but is accepted for parity.
+                pass
+            elif how in ("full", "outer") and on is None and left_keys != right_keys:
+                # Typed-safe subset: require exact base dtype match per key pair (no casts).
+                for lk, rk in zip(left_keys, right_keys):
+                    lt = self._current_field_types.get(lk)
+                    rt = other._current_field_types.get(rk)
+                    if lt is None or rt is None:
+                        continue
+                    if _base_type(lt) is not _base_type(rt):
+                        raise NotImplementedError(
+                            "join(coalesce=True) for full joins requires matching key base dtypes "
+                            "(no casts)."
+                        )
+
+        if coalesce is False and on is None and left_keys != right_keys:
+            # Typed-safe subset: only keep both key columns when it won't collide with an existing
+            # left-side column name.
+            for _lk, rk in zip(left_keys, right_keys):
+                if rk in self._current_field_types:
+                    raise NotImplementedError(
+                        "join(coalesce=False) cannot retain both key columns when the right key "
+                        "name collides with an existing left column."
+                    )
 
         if how == "cross":
             if left_keys or right_keys:
