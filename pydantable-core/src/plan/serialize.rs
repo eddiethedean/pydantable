@@ -53,16 +53,23 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
                 by,
                 descending,
                 nulls_last,
+                maintain_order,
             } => {
                 step_out.set_item("kind", "sort")?;
                 step_out.set_item("by", by)?;
                 step_out.set_item("descending", descending)?;
                 step_out.set_item("nulls_last", nulls_last)?;
+                step_out.set_item("maintain_order", maintain_order)?;
             }
-            PlanStep::Unique { subset, keep } => {
+            PlanStep::Unique {
+                subset,
+                keep,
+                maintain_order,
+            } => {
                 step_out.set_item("kind", "unique")?;
                 step_out.set_item("subset", subset)?;
                 step_out.set_item("keep", keep)?;
+                step_out.set_item("maintain_order", maintain_order)?;
             }
             PlanStep::Rename { columns } => {
                 step_out.set_item("kind", "rename")?;

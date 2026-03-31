@@ -158,10 +158,16 @@ out = df.select(
 print(out.to_dict())
 ```
 
-Schema-driven “selector” helpers expand against the current schema (no wildcard DSL):
+Schema-driven selector helpers expand against the current schema:
 
 ```python
+from pydantable import selectors as s
+
 df2 = df.with_columns(age2=df.age * 2, age3=df.age * 3)
 print(df2.select_prefix("age").to_dict())  # age, age2, age3
 print(df2.select_all().to_dict())          # full schema order
+
+# Selector DSL (composable, schema-first)
+print(df2.select(s.starts_with("age") | s.by_name("id")).to_dict())
+print(df2.select(s.numeric() & ~s.by_name("id")).to_dict())
 ```

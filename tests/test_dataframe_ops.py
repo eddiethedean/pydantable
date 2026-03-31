@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 import pytest
 from conftest import assert_table_eq_sorted
 from pydantable import DataFrame, Schema
+from pydantable import selectors as s
 from pydantable.expressions import ColumnRef
 from pydantic import BaseModel
 
@@ -173,14 +174,14 @@ def test_select_rejects_multi_column_expression() -> None:
     expr = df.age + df.id
     with pytest.raises(
         TypeError,
-        match=r"select\(\) accepts column names or a ColumnRef expression",
+        match=r"Expr\.alias\('name'\)",
     ):
         df.select(expr)
 
 
 def test_select_rejects_non_columnref_expr_without_alias() -> None:
     df = DataFrame[User]({"id": [1, 2], "age": [20, 30]})
-    with pytest.raises(TypeError, match=r"Expr\\.alias\\('name'\\)"):
+    with pytest.raises(TypeError, match=r"Expr\.alias\('name'\)"):
         df.select(df.age * 2)
 
 
@@ -208,6 +209,33 @@ def test_select_all_prefix_suffix() -> None:
     assert df.select_all().to_dict() == {"a": [1], "aa": [2], "b": [3]}
     assert df.select_prefix("a").to_dict() == {"a": [1], "aa": [2]}
     assert df.select_suffix("a").to_dict() == {"a": [1], "aa": [2]}
+
+
+def test_select_with_selector_dsl_name_patterns_and_exclude() -> None:
+    class S(Schema):
+        a: int
+        aa: int
+        b: int
+        bb: int
+
+    df = DataFrame[S]({"a": [1], "aa": [2], "b": [3], "bb": [4]})
+    out = df.select(s.starts_with("a") | s.by_name("bb"))
+    assert out.to_dict() == {"a": [1], "aa": [2], "bb": [4]}
+
+    out2 = df.select(s.everything().exclude(s.ends_with("b")))
+    assert out2.to_dict() == {"a": [1], "aa": [2]}
+
+
+def test_select_with_selector_dsl_by_dtype_groups() -> None:
+    class S(Schema):
+        i: int
+        f: float
+        t: datetime
+        s1: str
+
+    df = DataFrame[S]({"i": [1], "f": [2.0], "t": [datetime(2020, 1, 1)], "s1": ["x"]})
+    out = df.select(s.numeric() | s.temporal())
+    assert out.to_dict() == {"i": [1], "f": [2.0], "t": [datetime(2020, 1, 1)]}
 
 
 def test_with_columns_none_requires_destination_type() -> None:
@@ -279,6 +307,26 @@ def test_sort_descending_length_mismatch_raises() -> None:
     df = DataFrame[User]({"id": [1], "age": [2]})
     with pytest.raises(ValueError, match="descending"):
         df.sort("id", "age", descending=[True])
+
+
+def test_sort_maintain_order_is_stable_for_ties() -> None:
+    class S(Schema):
+        k: int
+        seq: int
+
+    df = DataFrame[S]({"k": [1, 1, 1, 2, 2], "seq": [10, 11, 12, 20, 21]})
+    out = df.sort("k", maintain_order=True).to_dict()
+    assert out == {"k": [1, 1, 1, 2, 2], "seq": [10, 11, 12, 20, 21]}
+
+
+def test_unique_maintain_order_keeps_first_appearance_order() -> None:
+    class S(Schema):
+        k: int
+        seq: int
+
+    df = DataFrame[S]({"k": [1, 2, 1, 2, 1], "seq": [10, 20, 11, 21, 12]})
+    out = df.unique(subset=["k"], keep="first", maintain_order=True).to_dict()
+    assert out == {"k": [1, 2], "seq": [10, 20]}
 
 
 def test_p2_fill_drop_nulls_and_cast_predicates() -> None:
@@ -357,14 +405,26 @@ def test_p5_pivot_single_and_multi_values() -> None:
     assert p2["A_y_first"] == [1.0, 3.0]
     assert p2["B_y_first"] == [2.0, None]
 
-    with pytest.raises(NotImplementedError, match="separator"):
-        df.pivot(
-            index="id",
-            columns="key",
-            values="x",
-            aggregate_function="sum",
-            separator="__",
-        ).to_dict()
+    p3 = df.pivot(
+        index="id",
+        columns="key",
+        values="x",
+        aggregate_function="sum",
+        separator="__",
+    ).collect(as_lists=True)
+    assert p3["A__sum"] == [10, None]
+    assert p3["B__sum"] == [20, 40]
+
+    p4 = df.pivot(
+        index="id",
+        columns="key",
+        values="x",
+        aggregate_function="sum",
+        sort_columns=True,
+        separator="__",
+    ).collect(as_lists=True)
+    assert p4["A__sum"] == [10, None]
+    assert p4["B__sum"] == [20, 40]
 
 
 def test_p5_explode_unnest_raise_not_implemented_for_scalar_schema() -> None:
@@ -602,6 +662,16 @@ def test_group_by_convenience_sum_and_len() -> None:
 
     lengths = df.group_by("g").len().to_dict()
     assert_table_eq_sorted(lengths, {"g": ["a", "b"], "len": [2, 1]}, ["g"])
+
+
+def test_group_by_maintain_order_and_drop_nulls_false() -> None:
+    class S(Schema):
+        g: str | None
+        v: int
+
+    df = DataFrame[S]({"g": ["b", None, "a", "b", None], "v": [1, 2, 3, 4, 5]})
+    out = df.group_by("g", maintain_order=True, drop_nulls=False).agg(v_sum=("sum", "v"))
+    assert out.to_dict() == {"g": ["b", None, "a"], "v_sum": [5, 7, 3]}
 
 
 def test_null_count_shift_sample_is_empty() -> None:

@@ -24,10 +24,12 @@ pub enum PlanStep {
         by: Vec<String>,
         descending: Vec<bool>,
         nulls_last: Vec<bool>,
+        maintain_order: bool,
     },
     Unique {
         subset: Option<Vec<String>>,
         keep: String,
+        maintain_order: bool,
     },
     Rename {
         columns: HashMap<String, String>,

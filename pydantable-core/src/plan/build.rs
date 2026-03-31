@@ -174,6 +174,7 @@ pub fn plan_sort(
     by: Vec<String>,
     descending: Vec<bool>,
     nulls_last: Vec<bool>,
+    maintain_order: bool,
 ) -> PyResult<PlanInner> {
     if by.is_empty() {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -203,6 +204,7 @@ pub fn plan_sort(
         by,
         descending,
         nulls_last,
+        maintain_order,
     });
     Ok(PlanInner {
         steps: new_steps,
@@ -215,6 +217,7 @@ pub fn plan_unique(
     plan: &PlanInner,
     subset: Option<Vec<String>>,
     keep: String,
+    maintain_order: bool,
 ) -> PyResult<PlanInner> {
     if let Some(keys) = subset.as_ref() {
         if keys.is_empty() {
@@ -241,7 +244,11 @@ pub fn plan_unique(
         }
     }
     let mut new_steps = plan.steps.clone();
-    new_steps.push(PlanStep::Unique { subset, keep });
+    new_steps.push(PlanStep::Unique {
+        subset,
+        keep,
+        maintain_order,
+    });
     Ok(PlanInner {
         steps: new_steps,
         schema: plan.schema.clone(),
@@ -739,6 +746,7 @@ pub fn plan_rolling_agg(
             by: sort_by,
             descending: vec![false; n],
             nulls_last: vec![false; n],
+            maintain_order: false,
         });
     }
     new_steps.push(PlanStep::RollingAgg {

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from .window_spec import WindowSpec
 
 __all__ = [
+    "AliasedExpr",
     "BinaryOp",
     "ColumnRef",
     "CompareOp",
@@ -35,6 +37,11 @@ _MAX_EXPR_REPR_AST = 200
 
 def _rust_expr_ast_snippet(rust_expr: Any) -> str: ...
 
+@dataclass(frozen=True, slots=True)
+class AliasedExpr:
+    name: str
+    expr: Expr
+
 class Expr:
     _rust_expr: Any
 
@@ -42,6 +49,7 @@ class Expr:
     @property
     def dtype(self) -> Any: ...
     def referenced_columns(self) -> set[str]: ...
+    def alias(self, name: str) -> AliasedExpr: ...
     def __repr__(self) -> str: ...
     def _coerce_other(self, other: Any) -> Expr: ...
     def _binary(self, op_symbol: str, other: Any) -> Expr: ...
@@ -206,6 +214,7 @@ def global_max(column: Expr) -> Expr: ...
 def global_row_count() -> Expr: ...
 
 __all__ = [
+    "AliasedExpr",
     "BinaryOp",
     "ColumnRef",
     "CompareOp",

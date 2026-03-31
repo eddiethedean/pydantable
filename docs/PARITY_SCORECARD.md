@@ -19,15 +19,15 @@ contract-tested.
 | Core | `select_all()` / `select_prefix()` / `select_suffix()` | Implemented | Schema-driven selectors (no wildcard/regex DSL). |
 | Core | `select` supports explicit expression aliasing | Implemented | `select((expr).alias(\"x\"))` for computed expressions; plain `Expr` requires `ColumnRef` or global agg. |
 | Core | `with_columns` positional aliased expressions | Implemented | Keep kwargs; add `with_columns(expr.alias(\"x\"), ...)`. |
-| Core | `sort(..., maintain_order=...)` | Missing | Accepted in signature; currently raises `NotImplementedError` when true. |
+| Core | `sort(..., maintain_order=...)` | Implemented | `maintain_order=True` uses stable sort semantics in the Polars engine. |
 | Core | `drop(..., strict=...)` | Implemented | `strict=False` ignores missing columns (no-op if all are missing). |
 | Core | `rename(..., strict=...)` | Implemented | `strict=False` ignores missing rename keys. |
-| Core | `unique/distinct(..., maintain_order=...)` | Missing | Accepted in signature; currently raises `NotImplementedError` when true. |
+| Core | `unique/distinct(..., maintain_order=...)` | Implemented | `maintain_order=True` uses stable-unique semantics in the Polars engine. |
 | GroupBy | Group-by convenience methods (`sum/mean/min/max/count/len`) | Implemented | Deterministic naming (`<col>_sum`, etc.) and `len` via synthetic constant column. |
-| GroupBy | `group_by(..., maintain_order=..., drop_nulls=...)` | Partial | Accepted; non-default values currently raise `NotImplementedError`. |
+| GroupBy | `group_by(..., maintain_order=..., drop_nulls=...)` | Implemented | `maintain_order=True` is stable; `drop_nulls=False` retains null-key groups. |
 | Join | `join(..., coalesce=...)` | Partial | Accepted for parity; join key coalescing is already the default behavior for same-named keys. |
 | Join | `join(..., validate=...)` | Partial | Implemented for in-memory roots; not supported on scan roots (raises `NotImplementedError`). |
-| Reshape | `pivot(..., sort_columns=..., separator=...)` | Partial | Accepted; non-default values currently raise `NotImplementedError`. |
+| Reshape | `pivot(..., sort_columns=..., separator=...)` | Implemented | `sort_columns=True` sorts pivot-value column generation; `separator` controls generated output names. |
 | Utilities | `sample`, `shift`, `null_count`, `is_empty` | Implemented | Eager helpers (materialize via `to_dict()`), returning a new `DataFrame` (or `dict` for `null_count`). |
 
 | Area | Method/Capability | Status | Notes |

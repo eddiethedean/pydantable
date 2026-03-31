@@ -3,6 +3,7 @@ from __future__ import annotations
 from . import pandas as pandas
 from . import plugins as plugins
 from . import pyspark as pyspark
+from . import selectors as selectors
 from ._extension import MissingRustExtensionError
 from .awaitable_dataframe_model import AwaitableDataFrameModel
 from .dataframe import DataFrame
@@ -104,6 +105,7 @@ __all__ = [
     "read_parquet",
     "read_parquet_url",
     "reset_display_options",
+    "selectors",
     "set_display_options",
     "set_observer",
     "write_csv_batches",

@@ -164,3 +164,15 @@ def test_join_validate_one_to_one_rejects_duplicates() -> None:
     )
     with pytest.raises(ValueError, match="one_to_one"):
         left.join(right, on="id", how="inner", validate="one_to_one").to_dict()
+
+
+def test_join_validate_not_supported_on_scan_roots(tmp_path) -> None:
+    left_csv = tmp_path / "left.csv"
+    right_csv = tmp_path / "right.csv"
+    left_csv.write_text("id,age,score\n1,10,10\n", encoding="utf-8")
+    right_csv.write_text("id,age,country,score\n1,10,US,100\n", encoding="utf-8")
+
+    left = DataFrame[LeftSchema].read_csv(str(left_csv))
+    right = DataFrame[RightSchema].read_csv(str(right_csv))
+    with pytest.raises(NotImplementedError, match="scan roots"):
+        left.join(right, on="id", how="inner", validate="one_to_one").to_dict()

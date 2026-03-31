@@ -183,6 +183,8 @@ pub fn execute_pivot_polars(
     columns: String,
     values: Vec<String>,
     aggregate_function: String,
+    sort_columns: bool,
+    separator: String,
     as_python_lists: bool,
     streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
@@ -260,6 +262,9 @@ pub fn execute_pivot_polars(
             pivot_values.push(key);
         }
     }
+    if sort_columns {
+        pivot_values.sort();
+    }
 
     let mut groups: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     let row_count = ctx.values().next().map_or(0, std::vec::Vec::len);
@@ -289,9 +294,9 @@ pub fn execute_pivot_polars(
     for pv in pivot_values.iter() {
         for v in values.iter() {
             let name = if values.len() == 1 {
-                format!("{}_{}", pv, aggregate_function)
+                format!("{pv}{separator}{aggregate_function}")
             } else {
-                format!("{}_{}_{}", pv, v, aggregate_function)
+                format!("{pv}{separator}{v}{separator}{aggregate_function}")
             };
             if out_schema.contains_key(&name) {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
@@ -379,9 +384,9 @@ pub fn execute_pivot_polars(
                 .collect::<Vec<_>>();
             for (name, source_col, out_d) in generated_cols.iter() {
                 let expected_name = if values.len() == 1 {
-                    format!("{}_{}", pv, aggregate_function)
+                format!("{pv}{separator}{aggregate_function}")
                 } else {
-                    format!("{}_{}_{}", pv, source_col, aggregate_function)
+                format!("{pv}{separator}{source_col}{separator}{aggregate_function}")
                 };
                 if &expected_name != name {
                     continue;

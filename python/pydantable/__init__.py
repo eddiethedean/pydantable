@@ -60,6 +60,7 @@ from .io import (
 from .materialization import PlanMaterialization, plan_materialization_summary
 from .observe import get_observer, set_observer
 from .schema import DtypeDriftWarning, Schema
+from . import selectors as selectors
 from .types import WKB
 
 __all__ = [
@@ -74,6 +75,7 @@ __all__ = [
     "PlanMaterialization",
     "PydantableUserError",
     "Schema",
+    "selectors",
     "afetch_sql",
     "aiter_csv",
     "aiter_ipc",

@@ -293,6 +293,8 @@ def execute_groupby_agg(
     by: Sequence[str],
     aggregations: Any,
     *,
+    maintain_order: bool = False,
+    drop_nulls: bool = True,
     as_python_lists: bool = False,
     streaming: bool = False,
 ) -> tuple[Any, Any]:
@@ -305,11 +307,20 @@ def execute_groupby_agg(
     with span(
         "execute_groupby_agg",
         by=list(by),
+        maintain_order=bool(maintain_order),
+        drop_nulls=bool(drop_nulls),
         as_python_lists=bool(as_python_lists),
         streaming=bool(streaming),
     ):
         return rust.execute_groupby_agg(
-            plan, root_data, list(by), aggregations, as_python_lists, streaming
+            plan,
+            root_data,
+            list(by),
+            aggregations,
+            bool(maintain_order),
+            bool(drop_nulls),
+            as_python_lists,
+            streaming,
         )
 
 
@@ -378,6 +389,8 @@ def execute_pivot(
     values: Sequence[str],
     aggregate_function: str,
     *,
+    sort_columns: bool = False,
+    separator: str = "_",
     as_python_lists: bool = False,
     streaming: bool = False,
 ) -> tuple[Any, Any]:
@@ -396,6 +409,8 @@ def execute_pivot(
             columns,
             list(values),
             aggregate_function,
+            bool(sort_columns),
+            str(separator),
             as_python_lists,
             streaming,
         )

@@ -82,6 +82,8 @@ impl PolarsExecutor {
         root_data: &Bound<'_, PyAny>,
         by: Vec<String>,
         aggregations: Vec<(String, String, String)>,
+        maintain_order: bool,
+        drop_nulls: bool,
         as_python_lists: bool,
         streaming: bool,
     ) -> PyResult<(PyObject, PyObject)> {
@@ -91,6 +93,8 @@ impl PolarsExecutor {
             root_data,
             by,
             aggregations,
+            maintain_order,
+            drop_nulls,
             as_python_lists,
             streaming,
         )
@@ -153,6 +157,8 @@ impl PolarsExecutor {
         columns: String,
         values: Vec<String>,
         aggregate_function: String,
+        sort_columns: bool,
+        separator: String,
         as_python_lists: bool,
         streaming: bool,
     ) -> PyResult<(PyObject, PyObject)> {
@@ -164,6 +170,8 @@ impl PolarsExecutor {
             columns,
             values,
             aggregate_function,
+            sort_columns,
+            separator,
             as_python_lists,
             streaming,
         )

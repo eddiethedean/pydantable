@@ -82,16 +82,22 @@ fn plan_sort(
     by: Vec<String>,
     descending: Vec<bool>,
     nulls_last: Vec<bool>,
+    maintain_order: bool,
 ) -> PyResult<PyPlan> {
     Ok(PyPlan {
-        inner: plan_sort_inner(&plan.inner, by, descending, nulls_last)?,
+        inner: plan_sort_inner(&plan.inner, by, descending, nulls_last, maintain_order)?,
     })
 }
 
 #[pyfunction]
-fn plan_unique(plan: &PyPlan, subset: Option<Vec<String>>, keep: String) -> PyResult<PyPlan> {
+fn plan_unique(
+    plan: &PyPlan,
+    subset: Option<Vec<String>>,
+    keep: String,
+    maintain_order: bool,
+) -> PyResult<PyPlan> {
     Ok(PyPlan {
-        inner: plan_unique_inner(&plan.inner, subset, keep)?,
+        inner: plan_unique_inner(&plan.inner, subset, keep, maintain_order)?,
     })
 }
 

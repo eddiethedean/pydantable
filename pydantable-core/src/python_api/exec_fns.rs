@@ -250,13 +250,15 @@ fn execute_join(
 }
 
 #[pyfunction]
-#[pyo3(signature = (plan, root_data, by, aggregations, as_python_lists=false, streaming=false))]
+#[pyo3(signature = (plan, root_data, by, aggregations, maintain_order=false, drop_nulls=true, as_python_lists=false, streaming=false))]
 fn execute_groupby_agg(
     py: Python<'_>,
     plan: &PyPlan,
     root_data: &Bound<'_, PyAny>,
     by: Vec<String>,
     aggregations: &Bound<'_, PyAny>,
+    maintain_order: bool,
+    drop_nulls: bool,
     as_python_lists: bool,
     streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
@@ -282,6 +284,8 @@ fn execute_groupby_agg(
             root_data,
             by,
             aggs,
+            maintain_order,
+            drop_nulls,
             as_python_lists,
             streaming,
         )
@@ -366,7 +370,7 @@ fn execute_melt(
 
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (plan, root_data, index, columns, values, aggregate_function, as_python_lists=false, streaming=false))]
+#[pyo3(signature = (plan, root_data, index, columns, values, aggregate_function, sort_columns=false, separator="_".to_string(), as_python_lists=false, streaming=false))]
 fn execute_pivot(
     py: Python<'_>,
     plan: &PyPlan,
@@ -375,6 +379,8 @@ fn execute_pivot(
     columns: String,
     values: Vec<String>,
     aggregate_function: String,
+    sort_columns: bool,
+    separator: String,
     as_python_lists: bool,
     streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
@@ -388,6 +394,8 @@ fn execute_pivot(
             columns,
             values,
             aggregate_function,
+            sort_columns,
+            separator,
             as_python_lists,
             streaming,
         )

@@ -556,6 +556,7 @@ impl PolarsPlanRunner {
                 by,
                 descending,
                 nulls_last,
+                maintain_order,
             } => {
                 let exprs = by.iter().map(col).collect::<Vec<PolarsExpr>>();
                 let mut desc = descending.clone();
@@ -570,10 +571,15 @@ impl PolarsPlanRunner {
                     exprs,
                     SortMultipleOptions::new()
                         .with_order_descending_multi(desc)
-                        .with_nulls_last_multi(nl),
+                        .with_nulls_last_multi(nl)
+                        .with_maintain_order(*maintain_order),
                 );
             }
-            PlanStep::Unique { subset, keep } => {
+            PlanStep::Unique {
+                subset,
+                keep,
+                maintain_order,
+            } => {
                 let keep_strategy = match keep.as_str() {
                     "first" => UniqueKeepStrategy::First,
                     "last" => UniqueKeepStrategy::Last,
@@ -582,6 +588,10 @@ impl PolarsPlanRunner {
                 let subset_exprs = subset
                     .clone()
                     .map(|v| v.into_iter().map(col).collect::<Vec<PolarsExpr>>());
+                // Determinism: keep stable semantics by default (schema-first UX).
+                // `maintain_order` exists for Polars parity; today both code paths
+                // preserve first appearance order.
+                let _ = maintain_order;
                 lf = lf.unique_stable_generic(subset_exprs, keep_strategy);
             }
             PlanStep::Rename { columns } => {

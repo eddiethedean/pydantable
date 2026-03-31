@@ -87,6 +87,7 @@ from pydantable.schema import (
     schema_from_descriptors,
     validate_columns_strict,
 )
+from pydantable.selectors import Selector
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -1403,7 +1404,7 @@ class DataFrame(Generic[SchemaT]):
         if column not in self._current_field_types:
             raise KeyError(f"Unknown column {column!r} for current schema.")
         out_name = "__pydantable_vc_n"
-        g = self.group_by(column).agg(
+        g = self.group_by(column, drop_nulls=bool(dropna)).agg(
             streaming=None,
             **{out_name: ("count", column)},
         )
@@ -1601,7 +1602,7 @@ class DataFrame(Generic[SchemaT]):
         )
 
     def select(
-        self, *cols: str | ColumnRef | Expr | AliasedExpr, **named: Any
+        self, *cols: str | ColumnRef | Expr | AliasedExpr | Selector, **named: Any
     ) -> DataFrame[Any]:
         """Project columns and/or compute a **single-row** frame of global aggregates.
 
@@ -1626,6 +1627,11 @@ class DataFrame(Generic[SchemaT]):
         for col in cols:
             if isinstance(col, str):
                 projects.append(col)
+            elif isinstance(col, Selector):
+                resolved = col.resolve(self._current_field_types)
+                if not resolved:
+                    raise ValueError("select(Selector) matched no columns.")
+                projects.extend(resolved)
             elif isinstance(col, AliasedExpr):
                 if not isinstance(col.expr, Expr):
                     raise TypeError("select(AliasedExpr) expects an Expr.")
@@ -1650,7 +1656,9 @@ class DataFrame(Generic[SchemaT]):
                             "expressions."
                         )
             else:
-                raise TypeError("select() accepts column names or Expr objects.")
+                raise TypeError(
+                    "select() accepts column names, Selector objects, or Expr objects."
+                )
 
         if named_items and (projects or aggs):
             raise TypeError(
@@ -1738,10 +1746,6 @@ class DataFrame(Generic[SchemaT]):
     ) -> DataFrame[Any]:
         """Sort by one or more columns (names or single-column expressions)."""
         rust = _require_rust_core()
-        if maintain_order:
-            raise NotImplementedError(
-                "sort(maintain_order=True) is not implemented yet."
-            )
         keys: list[str] = []
         for key in by:
             if isinstance(key, str):
@@ -1771,7 +1775,7 @@ class DataFrame(Generic[SchemaT]):
             nl = list(nulls_last)
         if nl and len(nl) != len(keys):
             raise ValueError("sort(nulls_last=...) length must match sort keys.")
-        rust_plan = rust.plan_sort(self._rust_plan, keys, desc, nl)
+        rust_plan = rust.plan_sort(self._rust_plan, keys, desc, nl, bool(maintain_order))
         return self._from_plan(
             root_data=self._root_data,
             root_schema_type=self._root_schema_type,
@@ -1787,12 +1791,11 @@ class DataFrame(Generic[SchemaT]):
         maintain_order: bool = False,
     ) -> DataFrame[Any]:
         rust = _require_rust_core()
-        if maintain_order:
-            raise NotImplementedError(
-                "unique(maintain_order=True) is not implemented yet."
-            )
         rust_plan = rust.plan_unique(
-            self._rust_plan, None if subset is None else list(subset), keep
+            self._rust_plan,
+            None if subset is None else list(subset),
+            keep,
+            bool(maintain_order),
         )
         return self._from_plan(
             root_data=self._root_data,
@@ -1863,12 +1866,16 @@ class DataFrame(Generic[SchemaT]):
     ) -> DataFrame[Any]:
         return self.unique(subset=subset, keep=keep)
 
-    def drop(self, *columns: str | ColumnRef, strict: bool = True) -> DataFrame[Any]:
+    def drop(
+        self, *columns: str | ColumnRef | Selector, strict: bool = True
+    ) -> DataFrame[Any]:
         rust = _require_rust_core()
         selected: list[str] = []
         for col in columns:
             if isinstance(col, str):
                 selected.append(col)
+            elif isinstance(col, Selector):
+                selected.extend(col.resolve(self._current_field_types))
             elif isinstance(col, Expr):
                 referenced = col.referenced_columns()
                 if len(referenced) != 1:
@@ -2077,10 +2084,8 @@ class DataFrame(Generic[SchemaT]):
             raise TypeError(
                 "pivot(columns=...) expects a column name or single-column ColumnRef."
             )
-        if sort_columns:
-            raise NotImplementedError("pivot(sort_columns=True) is not implemented yet.")
-        if separator != "_":
-            raise NotImplementedError("pivot(separator!= '_') is not implemented yet.")
+        if not isinstance(separator, str) or not separator:
+            raise TypeError("pivot(separator=...) expects a non-empty string.")
         value_cols = [values] if isinstance(values, str) else list(values)
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
@@ -2092,6 +2097,8 @@ class DataFrame(Generic[SchemaT]):
             columns_col,
             value_cols,
             aggregate_function,
+            sort_columns=bool(sort_columns),
+            separator=str(separator),
             as_python_lists=True,
             streaming=use_streaming,
         )
@@ -2302,10 +2309,6 @@ class DataFrame(Generic[SchemaT]):
         `maintain_order` / `drop_nulls` are accepted for Polars parity, but only the
         default behavior is implemented today.
         """
-        if maintain_order:
-            raise NotImplementedError("group_by(maintain_order=True) is not implemented.")
-        if drop_nulls is False:
-            raise NotImplementedError("group_by(drop_nulls=False) is not implemented.")
         selected: list[str] = []
         for key in keys:
             if isinstance(key, str):
@@ -2321,7 +2324,12 @@ class DataFrame(Generic[SchemaT]):
                 raise TypeError(
                     "group_by() accepts column names or ColumnRef expressions."
                 )
-        return GroupedDataFrame(self, selected)
+        return GroupedDataFrame(
+            self,
+            selected,
+            maintain_order=bool(maintain_order),
+            drop_nulls=bool(drop_nulls),
+        )
 
     def rolling_agg(
         self,
@@ -3189,9 +3197,18 @@ class DataFrame(Generic[SchemaT]):
 class GroupedDataFrame:
     """Result of :meth:`DataFrame.group_by`; call :meth:`agg` to finalize."""
 
-    def __init__(self, df: DataFrame[Any], keys: Sequence[str]):
+    def __init__(
+        self,
+        df: DataFrame[Any],
+        keys: Sequence[str],
+        *,
+        maintain_order: bool = False,
+        drop_nulls: bool = True,
+    ):
         self._df = df
         self._keys = list(keys)
+        self._maintain_order = bool(maintain_order)
+        self._drop_nulls = bool(drop_nulls)
 
     def __repr__(self) -> str:
         inner = "\n".join(f"  {line}" for line in repr(self._df).split("\n"))
@@ -3252,6 +3269,8 @@ class GroupedDataFrame:
             self._df._root_data,
             self._keys,
             agg_specs,
+            maintain_order=self._maintain_order,
+            drop_nulls=self._drop_nulls,
             as_python_lists=True,
             streaming=use_streaming,
         )

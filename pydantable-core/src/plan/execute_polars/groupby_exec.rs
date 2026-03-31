@@ -81,6 +81,8 @@ pub fn execute_groupby_agg_polars(
     root_data: &Bound<'_, PyAny>,
     by: Vec<String>,
     aggregations: Vec<(String, String, String)>,
+    maintain_order: bool,
+    drop_nulls: bool,
     as_python_lists: bool,
     streaming: bool,
 ) -> PyResult<(PyObject, PyObject)> {
@@ -103,7 +105,7 @@ pub fn execute_groupby_agg_polars(
         ));
     }
 
-    let lf = plan_to_lazyframe(py, plan, root_data)?;
+    let mut lf = plan_to_lazyframe(py, plan, root_data)?;
     let by_exprs = by.iter().map(col).collect::<Vec<_>>();
     let mut agg_exprs = Vec::new();
     let mut out_schema: HashMap<String, DTypeDesc> = HashMap::new();
@@ -351,7 +353,24 @@ pub fn execute_groupby_agg_polars(
         }
     }
 
-    let mut out_df = collect_lazyframe(py, lf.group_by(by_exprs).agg(agg_exprs), streaming)
+    if drop_nulls {
+        let mut cond: Option<PolarsExpr> = None;
+        for k in by.iter() {
+            let e = col(k).is_not_null();
+            cond = Some(if let Some(prev) = cond { prev.and(e) } else { e });
+        }
+        if let Some(c) = cond {
+            lf = lf.filter(c);
+        }
+    }
+
+    let grouped = if maintain_order {
+        lf.group_by_stable(by_exprs)
+    } else {
+        lf.group_by(by_exprs)
+    };
+
+    let mut out_df = collect_lazyframe(py, grouped.agg(agg_exprs), streaming)
         .map_err(|e| {
             PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                 "Polars execution error (group_by().agg()): {e}"
