@@ -426,6 +426,108 @@ def test_melt_unpivot_accept_selectors_for_id_vars_value_vars() -> None:
     assert u["value"] == [20]
 
 
+def test_phase4_reshape_melt_accepts_single_str_and_selector_empty_match_errors() -> None:
+    class S(Schema):
+        id: int
+        a: int
+        b: int
+
+    df = DataFrame[S]({"id": [1], "a": [10], "b": [20]})
+
+    out = df.melt(id_vars="id", value_vars="a").collect(as_lists=True)
+    assert out["id"] == [1]
+    assert out["variable"] == ["a"]
+    assert out["value"] == [10]
+
+    with pytest.raises(ValueError, match=r"melt\(id_vars=.*matched no columns"):
+        df.melt(id_vars=s.by_name("missing"), value_vars=["a"]).to_dict()
+
+    with pytest.raises(ValueError, match=r"melt\(value_vars=.*matched no columns"):
+        df.melt(id_vars=["id"], value_vars=s.by_name("missing")).to_dict()
+
+
+def test_phase4_reshape_pivot_accepts_selectors() -> None:
+    class S(Schema):
+        id: int
+        key: str
+        x: int
+        y: int
+
+    df = DataFrame[S](
+        {"id": [1, 1], "key": ["A", "B"], "x": [10, 20], "y": [1, 2]}
+    )
+    out = df.pivot(
+        index=s.by_name("id"),
+        columns=s.by_name("key"),
+        values=s.by_name("x") | s.by_name("y"),
+        aggregate_function="first",
+    ).collect(as_lists=True)
+    assert out["id"] == [1]
+    assert "A_x_first" in out and "B_x_first" in out
+    assert "A_y_first" in out and "B_y_first" in out
+
+    with pytest.raises(ValueError, match=r"pivot\(columns=.*match exactly one"):
+        df.pivot(
+            index="id",
+            columns=s.by_name("key") | s.by_name("id"),
+            values="x",
+            aggregate_function="first",
+        ).to_dict()
+
+
+def test_phase4_reshape_explode_unnest_accept_selectors_and_all_helpers() -> None:
+    class WithList(Schema):
+        id: int
+        tags: list[int]
+
+    df = DataFrame[WithList]({"id": [1, 2], "tags": [[1, 2], [3]]})
+    out = df.explode(s.by_name("tags")).collect(as_lists=True)
+    assert out == {"id": [1, 1, 2], "tags": [1, 2, 3]}
+
+    out2 = df.explode_all().collect(as_lists=True)
+    assert out2 == out
+
+    with pytest.raises(ValueError, match=r"explode\(columns=.*matched no columns"):
+        df.explode(s.by_name("missing")).to_dict()
+
+    class Person(Schema):
+        id: int
+        addr: _Addr
+
+    df2 = DataFrame[Person]({"id": [1], "addr": [{"street": "x"}]})
+    out3 = df2.unnest(s.by_name("addr")).collect(as_lists=True)
+    assert out3 == {"id": [1], "addr_street": ["x"]}
+    out4 = df2.unnest_all().collect(as_lists=True)
+    assert out4 == out3
+
+    with pytest.raises(ValueError, match=r"unnest\(columns=.*matched no columns"):
+        df2.unnest(s.by_name("missing")).to_dict()
+
+
+def test_phase4_reshape_pivot_longer_and_pivot_wider_aliases() -> None:
+    class S(Schema):
+        id: int
+        a: int
+        b: int
+
+    df = DataFrame[S]({"id": [1], "a": [10], "b": [20]})
+    m1 = df.melt(id_vars="id", value_vars=["a", "b"]).collect(as_lists=True)
+    m2 = df.pivot_longer(id_vars="id", value_vars=["a", "b"]).collect(as_lists=True)
+    assert m1 == m2
+
+    class P(Schema):
+        id: int
+        key: str
+        x: int
+
+    dfp = DataFrame[P]({"id": [1, 1], "key": ["A", "B"], "x": [10, 20]})
+    p1 = dfp.pivot(index="id", columns="key", values="x").collect(as_lists=True)
+    p2 = dfp.pivot_wider(index="id", names_from="key", values_from="x").collect(
+        as_lists=True
+    )
+    assert p1 == p2
+
+
 def test_expr_filter_helpers_string_list_map() -> None:
     class S(Schema):
         s: str | None

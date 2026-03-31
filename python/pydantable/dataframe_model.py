@@ -1671,10 +1671,11 @@ class DataFrameModel(Generic[RowT]):
     def melt(
         self,
         *,
-        id_vars: Sequence[str] | None = None,
-        value_vars: Sequence[str] | None = None,
+        id_vars: str | Sequence[str] | Any | None = None,
+        value_vars: str | Sequence[str] | Any | None = None,
         variable_name: str = "variable",
         value_name: str = "value",
+        streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
         return self._from_dataframe(
             self._df.melt(
@@ -1682,16 +1683,18 @@ class DataFrameModel(Generic[RowT]):
                 value_vars=value_vars,
                 variable_name=variable_name,
                 value_name=value_name,
+                streaming=streaming,
             )
         )
 
     def unpivot(
         self,
         *,
-        index: Sequence[str] | None = None,
-        on: Sequence[str] | None = None,
+        index: str | Sequence[str] | Any | None = None,
+        on: str | Sequence[str] | Any | None = None,
         variable_name: str = "variable",
         value_name: str = "value",
+        streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
         return self._from_dataframe(
             self._df.unpivot(
@@ -1699,16 +1702,62 @@ class DataFrameModel(Generic[RowT]):
                 on=on,
                 variable_name=variable_name,
                 value_name=value_name,
+                streaming=streaming,
+            )
+        )
+
+    def pivot_longer(
+        self,
+        *,
+        id_vars: str | Sequence[str] | Any | None = None,
+        value_vars: str | Sequence[str] | Any | None = None,
+        names_to: str = "variable",
+        values_to: str = "value",
+        streaming: bool | None = None,
+    ) -> DataFrameModel[Any]:
+        return self._from_dataframe(
+            self._df.pivot_longer(
+                id_vars=id_vars,
+                value_vars=value_vars,
+                names_to=names_to,
+                values_to=values_to,
+                streaming=streaming,
+            )
+        )
+
+    def pivot_wider(
+        self,
+        *,
+        index: str | Sequence[str] | Any,
+        names_from: str | Any,
+        values_from: str | Sequence[str] | Any,
+        aggregate_function: str = "first",
+        sort_columns: bool = False,
+        separator: str = "_",
+        streaming: bool | None = None,
+    ) -> DataFrameModel[Any]:
+        return self._from_dataframe(
+            self._df.pivot_wider(
+                index=index,
+                names_from=names_from,
+                values_from=values_from,
+                aggregate_function=aggregate_function,
+                sort_columns=sort_columns,
+                separator=separator,
+                streaming=streaming,
             )
         )
 
     def pivot(
         self,
         *,
-        index: str | Sequence[str],
+        index: str | Sequence[str] | Any,
         columns: Any,
-        values: str | Sequence[str],
+        values: str | Sequence[str] | Any,
         aggregate_function: str = "first",
+        sort_columns: bool = False,
+        separator: str = "_",
+        streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
         return self._from_dataframe(
             self._df.pivot(
@@ -1716,14 +1765,23 @@ class DataFrameModel(Generic[RowT]):
                 columns=columns,
                 values=values,
                 aggregate_function=aggregate_function,
+                sort_columns=sort_columns,
+                separator=separator,
+                streaming=streaming,
             )
         )
 
-    def explode(self, columns: str | Sequence[str]) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.explode(columns))
+    def explode(self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None) -> DataFrameModel[Any]:
+        return self._from_dataframe(self._df.explode(columns, streaming=streaming))
 
-    def unnest(self, columns: str | Sequence[str]) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.unnest(columns))
+    def unnest(self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None) -> DataFrameModel[Any]:
+        return self._from_dataframe(self._df.unnest(columns, streaming=streaming))
+
+    def explode_all(self, *, streaming: bool | None = None) -> DataFrameModel[Any]:
+        return self._from_dataframe(self._df.explode_all(streaming=streaming))
+
+    def unnest_all(self, *, streaming: bool | None = None) -> DataFrameModel[Any]:
+        return self._from_dataframe(self._df.unnest_all(streaming=streaming))
 
     def join(
         self,

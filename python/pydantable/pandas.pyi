@@ -9,8 +9,9 @@ from .dataframe import DataFrame as CoreDataFrame
 from .dataframe import GroupedDataFrame as CoreGroupedDataFrame
 from .dataframe_model import DataFrameModel as CoreDataFrameModel
 from .dataframe_model import GroupedDataFrameModel as CoreGroupedDataFrameModel
-from .expressions import Expr
+from .expressions import ColumnRef, Expr
 from .schema import Schema
+from .selectors import Selector
 
 def wide_to_long(
     df: CoreDataFrame,
@@ -120,6 +121,8 @@ class PandasDataFrame(CoreDataFrame):
     def group_by(
         self,
         *keys: Any,
+        maintain_order: bool = False,
+        drop_nulls: bool = True,
         dropna: Any = None,
         as_index: Any = None,
         sort: Any = None,
@@ -163,10 +166,12 @@ class PandasDataFrame(CoreDataFrame):
     def pivot(
         self,
         *,
-        index: str | Sequence[str],
-        columns: str | Expr,
-        values: str | Sequence[str],
+        index: str | Sequence[str] | Selector,
+        columns: str | Selector | ColumnRef,
+        values: str | Sequence[str] | Selector,
         aggregate_function: str = "first",
+        sort_columns: bool = False,
+        separator: str = "_",
         streaming: bool | None = None,
     ) -> CoreDataFrame: ...
     def factorize_column(self, column: str) -> tuple[list[int], list[Any]]: ...
@@ -192,8 +197,8 @@ class PandasDataFrame(CoreDataFrame):
     def melt(
         self,
         *,
-        id_vars: Sequence[str] | None = None,
-        value_vars: Sequence[str] | None = None,
+        id_vars: str | Sequence[str] | Selector | None = None,
+        value_vars: str | Sequence[str] | Selector | None = None,
         variable_name: str = "variable",
         value_name: str = "value",
         streaming: bool | None = None,
@@ -250,6 +255,9 @@ class PandasDataFrame(CoreDataFrame):
         n: int | None = None,
         frac: float | None = None,
         *,
+        fraction: float | None = None,
+        seed: int | None = None,
+        with_replacement: bool = False,
         replace: bool = False,
         random_state: int | None = None,
         axis: Any = 0,
@@ -404,9 +412,9 @@ class PandasGroupedDataFrame(CoreGroupedDataFrame):
 
     def rolling(self, *, window: int, min_periods: int = 1) -> _Rolling: ...
     def size(self) -> CoreDataFrame: ...
-    def sum(self, *columns: str) -> CoreDataFrame: ...
-    def mean(self, *columns: str) -> CoreDataFrame: ...
-    def count(self, *columns: str) -> CoreDataFrame: ...
+    def sum(self, *columns: str, streaming: bool | None = None) -> CoreDataFrame: ...
+    def mean(self, *columns: str, streaming: bool | None = None) -> CoreDataFrame: ...
+    def count(self, *columns: str, streaming: bool | None = None) -> CoreDataFrame: ...
     def nunique(self, *columns: str) -> CoreDataFrame: ...
     def first(self, *columns: str) -> CoreDataFrame: ...
     def last(self, *columns: str) -> CoreDataFrame: ...
@@ -525,9 +533,15 @@ class PandasGroupedDataFrameModel(CoreGroupedDataFrameModel):
         ) -> CoreDataFrameModel: ...
 
     def rolling(self, *, window: int, min_periods: int = 1) -> _ModelGroupedRolling: ...
-    def sum(self, *columns: str) -> CoreDataFrameModel: ...
-    def mean(self, *columns: str) -> CoreDataFrameModel: ...
-    def count(self, *columns: str) -> CoreDataFrameModel: ...
+    def sum(
+        self, *columns: str, streaming: bool | None = None
+    ) -> CoreDataFrameModel: ...
+    def mean(
+        self, *columns: str, streaming: bool | None = None
+    ) -> CoreDataFrameModel: ...
+    def count(
+        self, *columns: str, streaming: bool | None = None
+    ) -> CoreDataFrameModel: ...
     def size(self) -> CoreDataFrameModel: ...
     def nunique(self, *columns: str) -> CoreDataFrameModel: ...
     def first(self, *columns: str) -> CoreDataFrameModel: ...

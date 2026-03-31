@@ -123,9 +123,14 @@ class DataFrame(CoreDataFrame):
         """Filter rows (Spark ``filter``)."""
         return cast("DataFrame", super().filter(condition))
 
-    def select(self, *cols: str | ColumnRef | Expr, **named: Any) -> DataFrame:
+    def select(
+        self,
+        *cols: Any,
+        exclude: Any = None,
+        **named: Any,
+    ) -> DataFrame:
         """Project columns (Spark ``select``)."""
-        return cast("DataFrame", super().select(*cols, **named))
+        return cast("DataFrame", super().select(*cols, exclude=exclude, **named))
 
     def orderBy(
         self,
@@ -145,15 +150,15 @@ class DataFrame(CoreDataFrame):
             descending = [not x for x in ascending]
         return cast("DataFrame", super().sort(*columns, descending=descending))
 
-    def limit(self, num: int) -> DataFrame:
+    def limit(self, num: int = 0) -> DataFrame:
         """Take the first ``num`` rows (Spark ``limit``)."""
         if num < 0:
             raise ValueError("limit(n) expects n >= 0.")
         return cast("DataFrame", super().head(num))
 
-    def drop(self, *columns: str | ColumnRef) -> DataFrame:
+    def drop(self, *columns: Any, strict: bool = True) -> DataFrame:
         """Drop columns by name (Spark ``drop``)."""
-        return cast("DataFrame", super().drop(*columns))
+        return cast("DataFrame", super().drop(*columns, strict=strict))
 
     def distinct(
         self,

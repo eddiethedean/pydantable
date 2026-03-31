@@ -101,6 +101,7 @@ class Selector:
 def _as_selector(obj: Selector | str | Iterable[str]) -> Selector:
     if isinstance(obj, Selector):
         return obj
+    names: tuple[str, ...]
     if isinstance(obj, str):
         names = (obj,)
     else:

@@ -2242,8 +2242,8 @@ class DataFrame(Generic[SchemaT]):
     def melt(
         self,
         *,
-        id_vars: Sequence[str] | Selector | None = None,
-        value_vars: Sequence[str] | Selector | None = None,
+        id_vars: str | Sequence[str] | Selector | None = None,
+        value_vars: str | Sequence[str] | Selector | None = None,
         variable_name: str = "variable",
         value_name: str = "value",
         streaming: bool | None = None,
@@ -2251,10 +2251,28 @@ class DataFrame(Generic[SchemaT]):
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
         )
+        if isinstance(id_vars, str):
+            id_vars = [id_vars]
+        if isinstance(value_vars, str):
+            value_vars = [value_vars]
         if isinstance(id_vars, Selector):
-            id_vars = id_vars.resolve(self._current_field_types)
+            resolved = id_vars.resolve(self._current_field_types)
+            if not resolved:
+                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                raise ValueError(
+                    f"melt(id_vars={id_vars!r}) matched no columns. "
+                    f"Available columns: [{available}]"
+                )
+            id_vars = resolved
         if isinstance(value_vars, Selector):
-            value_vars = value_vars.resolve(self._current_field_types)
+            resolved = value_vars.resolve(self._current_field_types)
+            if not resolved:
+                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                raise ValueError(
+                    f"melt(value_vars={value_vars!r}) matched no columns. "
+                    f"Available columns: [{available}]"
+                )
+            value_vars = resolved
         out_data, schema_descriptors = execute_melt(
             self._rust_plan,
             self._root_data,
@@ -2280,16 +2298,58 @@ class DataFrame(Generic[SchemaT]):
     def unpivot(
         self,
         *,
-        index: Sequence[str] | Selector | None = None,
-        on: Sequence[str] | Selector | None = None,
+        index: str | Sequence[str] | Selector | None = None,
+        on: str | Sequence[str] | Selector | None = None,
         variable_name: str = "variable",
         value_name: str = "value",
+        streaming: bool | None = None,
     ) -> DataFrame[Any]:
         return self.melt(
             id_vars=index,
             value_vars=on,
             variable_name=variable_name,
             value_name=value_name,
+            streaming=streaming,
+        )
+
+    def pivot_longer(
+        self,
+        *,
+        id_vars: str | Sequence[str] | Selector | None = None,
+        value_vars: str | Sequence[str] | Selector | None = None,
+        names_to: str = "variable",
+        values_to: str = "value",
+        streaming: bool | None = None,
+    ) -> DataFrame[Any]:
+        """Polars-friendly alias of :meth:`melt` (aka pivot_longer)."""
+        return self.melt(
+            id_vars=id_vars,
+            value_vars=value_vars,
+            variable_name=names_to,
+            value_name=values_to,
+            streaming=streaming,
+        )
+
+    def pivot_wider(
+        self,
+        *,
+        index: str | Sequence[str] | Selector,
+        names_from: str | Selector | ColumnRef,
+        values_from: str | Sequence[str] | Selector,
+        aggregate_function: str = "first",
+        sort_columns: bool = False,
+        separator: str = "_",
+        streaming: bool | None = None,
+    ) -> DataFrame[Any]:
+        """Polars-friendly alias of :meth:`pivot` (aka pivot_wider)."""
+        return self.pivot(
+            index=index,
+            columns=names_from,
+            values=values_from,
+            aggregate_function=aggregate_function,
+            sort_columns=sort_columns,
+            separator=separator,
+            streaming=streaming,
         )
 
     def top_k(
@@ -2328,32 +2388,63 @@ class DataFrame(Generic[SchemaT]):
     def pivot(
         self,
         *,
-        index: str | Sequence[str],
-        columns: str | ColumnRef,
-        values: str | Sequence[str],
+        index: str | Sequence[str] | Selector,
+        columns: str | Selector | ColumnRef,
+        values: str | Sequence[str] | Selector,
         aggregate_function: str = "first",
         sort_columns: bool = False,
         separator: str = "_",
         streaming: bool | None = None,
     ) -> DataFrame[Any]:
-        index_cols = [index] if isinstance(index, str) else list(index)
-        if isinstance(columns, str):
+        if isinstance(index, Selector):
+            resolved = index.resolve(self._current_field_types)
+            if not resolved:
+                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                raise ValueError(
+                    f"pivot(index={index!r}) matched no columns. "
+                    f"Available columns: [{available}]"
+                )
+            index_cols = resolved
+        else:
+            index_cols = [index] if isinstance(index, str) else list(index)
+
+        if isinstance(values, Selector):
+            resolved = values.resolve(self._current_field_types)
+            if not resolved:
+                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                raise ValueError(
+                    f"pivot(values={values!r}) matched no columns. "
+                    f"Available columns: [{available}]"
+                )
+            value_cols = resolved
+        else:
+            value_cols = [values] if isinstance(values, str) else list(values)
+
+        if isinstance(columns, Selector):
+            resolved = columns.resolve(self._current_field_types)
+            if len(resolved) != 1:
+                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                raise ValueError(
+                    "pivot(columns=...) selector must match exactly one column; "
+                    f"matched={resolved}. Available columns: [{available}]"
+                )
+            columns_col = resolved[0]
+        elif isinstance(columns, str):
             columns_col = columns
         elif isinstance(columns, Expr):
             referenced = columns.referenced_columns()
             if len(referenced) != 1:
                 raise TypeError(
-                    "pivot(columns=...) expects a column name or "
-                    "single-column ColumnRef."
+                    "pivot(columns=...) expects a column name or single-column ColumnRef; "
+                    f"referenced_columns={sorted(referenced)!r}"
                 )
             columns_col = next(iter(referenced))
         else:
             raise TypeError(
-                "pivot(columns=...) expects a column name or single-column ColumnRef."
+                "pivot(columns=...) expects a column name, Selector, or single-column ColumnRef."
             )
         if not isinstance(separator, str) or not separator:
             raise TypeError("pivot(separator=...) expects a non-empty string.")
-        value_cols = [values] if isinstance(values, str) else list(values)
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
         )
@@ -2382,9 +2473,18 @@ class DataFrame(Generic[SchemaT]):
         )
 
     def explode(
-        self, columns: str | Sequence[str], *, streaming: bool | None = None
+        self, columns: str | Sequence[str] | Selector, *, streaming: bool | None = None
     ) -> DataFrame[Any]:
-        cols = [columns] if isinstance(columns, str) else list(columns)
+        if isinstance(columns, Selector):
+            cols = columns.resolve(self._current_field_types)
+            if not cols:
+                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                raise ValueError(
+                    f"explode(columns={columns!r}) matched no columns. "
+                    f"Available columns: [{available}]"
+                )
+        else:
+            cols = [columns] if isinstance(columns, str) else list(columns)
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
         )
@@ -2404,9 +2504,18 @@ class DataFrame(Generic[SchemaT]):
         )
 
     def unnest(
-        self, columns: str | Sequence[str], *, streaming: bool | None = None
+        self, columns: str | Sequence[str] | Selector, *, streaming: bool | None = None
     ) -> DataFrame[Any]:
-        cols = [columns] if isinstance(columns, str) else list(columns)
+        if isinstance(columns, Selector):
+            cols = columns.resolve(self._current_field_types)
+            if not cols:
+                available = ", ".join(repr(c) for c in self._current_field_types.keys())
+                raise ValueError(
+                    f"unnest(columns={columns!r}) matched no columns. "
+                    f"Available columns: [{available}]"
+                )
+        else:
+            cols = [columns] if isinstance(columns, str) else list(columns)
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
         )
@@ -2424,6 +2533,34 @@ class DataFrame(Generic[SchemaT]):
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
         )
+
+    def explode_all(self, *, streaming: bool | None = None) -> DataFrame[Any]:
+        """Explode all list-typed columns (schema-driven)."""
+        from pydantable import selectors as _selectors
+
+        sel = _selectors.by_dtype(_selectors.LIST)
+        matched = sel.resolve(self._current_field_types)
+        if not matched:
+            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            raise ValueError(
+                "explode_all() matched no list-typed columns. "
+                f"Available columns: [{available}]"
+            )
+        return self.explode(sel, streaming=streaming)
+
+    def unnest_all(self, *, streaming: bool | None = None) -> DataFrame[Any]:
+        """Unnest all struct-typed columns (schema-driven)."""
+        from pydantable import selectors as _selectors
+
+        sel = _selectors.by_dtype(_selectors.STRUCT)
+        matched = sel.resolve(self._current_field_types)
+        if not matched:
+            available = ", ".join(repr(c) for c in self._current_field_types.keys())
+            raise ValueError(
+                "unnest_all() matched no struct-typed columns. "
+                f"Available columns: [{available}]"
+            )
+        return self.unnest(sel, streaming=streaming)
 
     def join(
         self,

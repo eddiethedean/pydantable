@@ -20,7 +20,8 @@ from .dataframe import DataFrame as CoreDataFrame
 from .dataframe import GroupedDataFrame as CoreGroupedDataFrame
 from .dataframe_model import DataFrameModel as CoreDataFrameModel
 from .dataframe_model import GroupedDataFrameModel as CoreGroupedDataFrameModel
-from .expressions import Expr, Literal, coalesce, dense_rank, rank, when
+from .expressions import ColumnRef, Expr, Literal, coalesce, dense_rank, rank, when
+from .selectors import Selector
 from .rust_engine import _require_rust_core
 from .schema import Schema
 from .schema._impl import make_derived_schema_type, schema_field_types
@@ -1405,6 +1406,8 @@ class PandasDataFrame(CoreDataFrame):
     def group_by(
         self,
         *keys: Any,
+        maintain_order: bool = False,
+        drop_nulls: bool = True,
         dropna: Any = None,
         as_index: Any = None,
         sort: Any = None,
@@ -1418,7 +1421,9 @@ class PandasDataFrame(CoreDataFrame):
             raise NotImplementedError("group_by(sort=...) is not supported.")
         if observed is not None:
             raise NotImplementedError("group_by(observed=...) is not supported.")
-        inner = super().group_by(*keys)
+        inner = super().group_by(
+            *keys, maintain_order=maintain_order, drop_nulls=drop_nulls
+        )
         return PandasGroupedDataFrame(inner._df, inner._keys)
 
     def drop_duplicates(
@@ -1624,10 +1629,12 @@ class PandasDataFrame(CoreDataFrame):
     def pivot(
         self,
         *,
-        index: str | Sequence[str],
-        columns: str | Expr,
-        values: str | Sequence[str],
+        index: str | Sequence[str] | Selector,
+        columns: str | Selector | ColumnRef,
+        values: str | Sequence[str] | Selector,
         aggregate_function: str = "first",
+        sort_columns: bool = False,
+        separator: str = "_",
         streaming: bool | None = None,
     ) -> CoreDataFrame:
         """Typed :meth:`~pydantable.dataframe.DataFrame.pivot`.
@@ -1639,6 +1646,8 @@ class PandasDataFrame(CoreDataFrame):
             columns=columns,
             values=values,
             aggregate_function=aggregate_function,
+            sort_columns=sort_columns,
+            separator=separator,
             streaming=streaming,
         )
 
@@ -1720,8 +1729,8 @@ class PandasDataFrame(CoreDataFrame):
     def melt(
         self,
         *,
-        id_vars: Sequence[str] | None = None,
-        value_vars: Sequence[str] | None = None,
+        id_vars: str | Sequence[str] | Selector | None = None,
+        value_vars: str | Sequence[str] | Selector | None = None,
         variable_name: str = "variable",
         value_name: str = "value",
         streaming: bool | None = None,
@@ -1731,7 +1740,9 @@ class PandasDataFrame(CoreDataFrame):
             raise TypeError("melt(): pass only one of variable_name and var_name.")
         eff_variable = variable_name if var_name is None else var_name
 
-        if id_vars is not None:
+        if isinstance(id_vars, Selector):
+            id_norm: Any = id_vars
+        elif id_vars is not None:
             if isinstance(id_vars, str):
                 id_norm = [id_vars]
             elif (
@@ -1748,7 +1759,9 @@ class PandasDataFrame(CoreDataFrame):
         else:
             id_norm = None
 
-        if value_vars is None:
+        if isinstance(value_vars, Selector):
+            val_norm: Any = value_vars
+        elif value_vars is None:
             val_norm = None
         elif isinstance(value_vars, str):
             val_norm = [value_vars]
@@ -1929,6 +1942,9 @@ class PandasDataFrame(CoreDataFrame):
         n: int | None = None,
         frac: float | None = None,
         *,
+        fraction: float | None = None,
+        seed: int | None = None,
+        with_replacement: bool = False,
         replace: bool = False,
         random_state: int | None = None,
         axis: Any = 0,
@@ -1937,16 +1953,22 @@ class PandasDataFrame(CoreDataFrame):
             if axis == 1:
                 raise NotImplementedError("sample(axis=1) is not supported.")
             raise ValueError("sample(axis=...) must be 0 or 'index'.")
+        if with_replacement:
+            raise NotImplementedError(
+                "sample(with_replacement=True) is not supported."
+            )
         if replace:
             raise NotImplementedError("sample(replace=True) is not supported.")
-        if n is None and frac is None:
-            raise TypeError("sample requires n=... or frac=....")
+        eff_frac = frac if fraction is None else fraction
+        eff_seed = random_state if seed is None else seed
+        if n is None and eff_frac is None:
+            raise TypeError("sample requires n=... or frac=... or fraction=....")
         data = self.collect(as_lists=True)
         nrow = len(next(iter(data.values()))) if data else 0
         if nrow == 0:
             return self
-        rng = random.Random(random_state)
-        k = round(float(frac) * nrow) if frac is not None else int(n or 0)
+        rng = random.Random(eff_seed)
+        k = round(float(eff_frac) * nrow) if eff_frac is not None else int(n or 0)
         k = max(0, min(int(k), nrow))
         idx = rng.sample(range(nrow), k=k)
         sub = _row_subset_from_lists(data, idx)
@@ -2742,27 +2764,27 @@ class PandasGroupedDataFrame(CoreGroupedDataFrame):
         marked = self._df.with_columns(**{tmp: Literal(value=1)})
         return marked.group_by(*self._keys).agg(**{out: ("sum", tmp)})
 
-    def sum(self, *columns: str) -> CoreDataFrame:
+    def sum(self, *columns: str, streaming: bool | None = None) -> CoreDataFrame:
         if not columns:
             raise TypeError("sum() requires at least one column name.")
         return self.agg(
-            streaming=None,
+            streaming=streaming,
             **{f"{c}_sum": ("sum", c) for c in columns},
         )
 
-    def mean(self, *columns: str) -> CoreDataFrame:
+    def mean(self, *columns: str, streaming: bool | None = None) -> CoreDataFrame:
         if not columns:
             raise TypeError("mean() requires at least one column name.")
         return self.agg(
-            streaming=None,
+            streaming=streaming,
             **{f"{c}_mean": ("mean", c) for c in columns},
         )
 
-    def count(self, *columns: str) -> CoreDataFrame:
+    def count(self, *columns: str, streaming: bool | None = None) -> CoreDataFrame:
         if not columns:
             raise TypeError("count() requires at least one column name.")
         return self.agg(
-            streaming=None,
+            streaming=streaming,
             **{f"{c}_count": ("count", c) for c in columns},
         )
 
@@ -3078,14 +3100,22 @@ class PandasGroupedDataFrameModel(CoreGroupedDataFrameModel):
         r = self._grouped_df.rolling(window=window, min_periods=min_periods)
         return PandasGroupedDataFrameModel._ModelGroupedRolling(type(self), r)
 
-    def sum(self, *columns: str) -> CoreDataFrameModel:
-        return self._model_type._from_dataframe(self._grouped_df.sum(*columns))
+    def sum(self, *columns: str, streaming: bool | None = None) -> CoreDataFrameModel:
+        return self._model_type._from_dataframe(
+            self._grouped_df.sum(*columns, streaming=streaming)
+        )
 
-    def mean(self, *columns: str) -> CoreDataFrameModel:
-        return self._model_type._from_dataframe(self._grouped_df.mean(*columns))
+    def mean(self, *columns: str, streaming: bool | None = None) -> CoreDataFrameModel:
+        return self._model_type._from_dataframe(
+            self._grouped_df.mean(*columns, streaming=streaming)
+        )
 
-    def count(self, *columns: str) -> CoreDataFrameModel:
-        return self._model_type._from_dataframe(self._grouped_df.count(*columns))
+    def count(
+        self, *columns: str, streaming: bool | None = None
+    ) -> CoreDataFrameModel:
+        return self._model_type._from_dataframe(
+            self._grouped_df.count(*columns, streaming=streaming)
+        )
 
     def size(self) -> CoreDataFrameModel:
         return self._model_type._from_dataframe(self._grouped_df.size())

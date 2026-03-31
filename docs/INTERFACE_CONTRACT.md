@@ -170,15 +170,18 @@ These compile to Rust plan steps when the Polars engine is enabled; the row-wise
 
 Supported reshape methods:
 - `melt` / `unpivot`
+- `pivot_longer` / `pivot_wider` (aliases)
 - `pivot`
 - `explode` and `unnest` API entrypoints
+- `explode_all` / `unnest_all` (schema-driven helpers)
 
 `melt` / `unpivot`:
 - `id_vars` are preserved as-is.
 - `variable_name` is always non-nullable `str`.
 - `value_name` requires all source `value_vars` to share a compatible scalar base dtype.
 - `value_vars` cannot overlap with `id_vars`.
-- `id_vars` and `value_vars` accept schema-driven `Selector` objects (resolved against the current schema).
+- `id_vars` and `value_vars` accept schema-driven `Selector` objects (resolved against the current schema). If a selector matches no columns, `ValueError` is raised with a list of available columns.
+- `id_vars` / `value_vars` also accept a single column name (`str`) as a convenience.
 
 `pivot`:
 - Requires `index`, `columns`, and at least one `values` column.
@@ -189,12 +192,15 @@ Supported reshape methods:
   - multiple value columns: `<pivot_value><separator><value_col><separator><agg>`
  - `sort_columns=True` sorts pivot values before generating output columns.
  - `separator` controls output naming (default `"_"`).
+ - `index` and `values` accept schema-driven `Selector` objects (resolved against the current schema).
+ - `columns` accepts a schema-driven `Selector` only when it matches **exactly one** column; otherwise `ValueError` is raised.
 
 `explode` / `unnest`:
 - **Homogeneous list** columns (`list[T]` / `List[T]` with supported `T`) are modeled end-to-end; `explode(columns)` unwraps **one** list level and updates the schema to the inner dtype (**always nullable** after explode, matching Polars’ post-explode nullability for element cells). Execution uses Polars `explode` with `empty_as_null=false` and `keep_nulls=true` (same defaults as the Rust engine’s Polars call).
 - **Multi-column explode:** all named columns must be list-typed; Polars requires **matching list lengths per row**. Mismatched lengths for the same row raise at execution (contract-tested).
 - **Empty lists:** an empty list cell yields **no output rows** for that input row (Polars behavior); other columns are not replicated for that row.
 - **`unnest`** for **struct** columns (nested model columns) uses Polars `unnest` with separator **`_`**: each struct field becomes a top-level column named **`{parent}_{field}`** (e.g. `addr_street`). The logical schema follows that naming; struct nullability is propagated to field columns per the Rust descriptor rules. See [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md).
+- `explode(columns=...)` and `unnest(columns=...)` accept schema-driven `Selector` objects; an empty match raises `ValueError` with available columns.
 
 ## Row-wise expression evaluation (`polars_engine` disabled)
 
