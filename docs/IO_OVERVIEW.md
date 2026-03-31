@@ -38,6 +38,10 @@ See {doc}`DATAFRAMEMODEL` for the detailed ingest contract.
 
 **`PYDANTABLE_IO_ENGINE`:** **`auto`** (default), **`rust`**, or **`pyarrow`** where supported.
 
+```{note}
+Some eager **Rust** I/O paths (especially **`export_*`** / column-dict writes) require the optional **`polars`** Python package at runtime. If you force `engine="rust"` without that extra installed, you may get an `ImportError`. Using `engine="auto"` will fall back where a pure-Python / PyArrow path exists.
+```
+
 | Function | Rust path (typical) | PyArrow / fallback |
 |----------|---------------------|------------------------|
 | **`materialize_parquet`** | Local file path, **`columns is None`** | **`columns`** set, or **`bytes`** / **`BinaryIO`** source, or `auto` fallback |

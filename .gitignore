@@ -48,6 +48,7 @@ htmlcov/
 *.egg
 .cache/
 /.cache/
+posts/
 
 # Docs build output
 site/

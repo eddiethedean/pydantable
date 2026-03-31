@@ -35,6 +35,10 @@
 - **`export_csv`**, **`aexport_csv`** — eager column dict → file.
 - **`write_csv_batches`** — append many rectangular batches to one CSV (**`mode="w"`** / **`"a"`**, **`write_header`**).
 
+```{note}
+If you pass `engine="rust"` to **`export_csv`**, the Rust writer may require the optional **`polars`** package at runtime. Prefer `engine="auto"` unless you want to force the Rust path.
+```
+
 ## Runnable example
 
 Run conventions: {doc}`IO_OVERVIEW` (**Runnable example**).
