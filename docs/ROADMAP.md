@@ -348,6 +348,17 @@ Practical inputs that feed that phase:
 
 ---
 
+## Planned for 1.11.0 (local I/O ↔ Polars parity)
+
+- [ ] **Multi-file & directory reads:** extend **`scan_kwargs`** and behavior for **Parquet** (incl. hive-style partitions), **NDJSON** (**`glob`** and related where Polars supports it), **IPC** multi-file where supported; **CSV** validation + tests; align **`read_json`** path semantics with documented defaults.
+- [ ] **Partitioned / dataset writes:** **Parquet** partitioned (directory) sinks first; clarify **`write_*_batches`** vs directory targets.
+- [ ] **Eager & iterators:** **`materialize_*`** and **`iter_*` / `aiter_*`** multi-file story (helpers or explicit deferral to lazy **`read_*`**).
+- [ ] **Docs & tests:** golden-path narrative, examples under **`docs/examples/io/`**, changelog, **kwargs** allowlist tests.
+
+**Full phased checklist:** {doc}`ROADMAP_1_11_LOCAL_IO`.
+
+---
+
 ## Planned v1.0.0 (production-ready major release) — completed for `1.0.0`
 
 **Goal (achieved for `v1.0.0`):** a **stable public API** under **semver**, **documented** semantics, and **repeatable** release quality—not a large new feature dump.
