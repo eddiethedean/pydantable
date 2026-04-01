@@ -37,6 +37,7 @@ Use this page when you know **what you need to do**, but not **where it is docum
 ### Project & contribution
 
 - **Roadmap**: {doc}`ROADMAP`
+- **1.10.0 JSON & struct plan**: {doc}`ROADMAP_1_10_JSON_STRUCT`
 - **Developer guide**: {doc}`DEVELOPER`
 - **Performance notes**: {doc}`PERFORMANCE`
 - **Changelog**: {doc}`changelog`

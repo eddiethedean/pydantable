@@ -339,6 +339,12 @@ Practical inputs that feed that phase:
 
 ---
 
+## Planned: 1.10.0 (JSON processing & struct ergonomics)
+
+**Living checklist and phased plan:** {doc}`ROADMAP_1_10_JSON_STRUCT` — JSON ↔ schema audit, struct expression parity (**`struct_json_encode`**, **`struct_with_fields`**, etc.), optional **string → struct** decode, I/O/streaming docs, and UX polish.
+
+---
+
 ## Planned v1.0.0 (production-ready major release) — completed for `1.0.0`
 
 **Goal (achieved for `v1.0.0`):** a **stable public API** under **semver**, **documented** semantics, and **repeatable** release quality—not a large new feature dump.
