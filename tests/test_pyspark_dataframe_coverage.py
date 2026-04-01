@@ -144,6 +144,27 @@ def test_pyspark_groupby_agg_returns_pyspark_dataframe() -> None:
     assert out.__class__.__module__ == "pydantable.pyspark.dataframe"
 
 
+def test_pyspark_groupby_agg_accepts_exprs_with_alias() -> None:
+    from pydantable.pyspark.sql import functions as F
+
+    class S(Schema):
+        g: str
+        v: int
+
+    df = DataFrame[S]({"g": ["A", "A", "B"], "v": [1, 2, 10]})
+    out = df.groupBy("g").agg(F.sum("v").alias("s"), F.max("v").alias("m")).to_dict()
+    order = sorted(range(len(out["g"])), key=lambda i: out["g"][i])
+    got = {k: [out[k][i] for i in order] for k in out}
+    assert got == {"g": ["A", "B"], "s": [3, 10], "m": [2, 10]}
+
+
+def test_pyspark_groupby_agg_expr_requires_alias() -> None:
+    from pydantable.pyspark.sql import functions as F
+
+    df = DataFrame[Row]({"id": [1, 1], "name": ["a", "b"], "age": [1, 2]})
+    with pytest.raises(TypeError, match="alias"):
+        df.groupBy("id").agg(F.sum("age"))  # type: ignore[arg-type]
+
 def test_pyspark_groupby_count_no_args_is_per_group_len() -> None:
     df = DataFrame[Row]({"id": [1, 1, 2], "name": ["a", "b", "c"], "age": [1, 2, 3]})
     out = df.groupBy("id").count().to_dict()
@@ -403,6 +424,17 @@ def test_pyspark_intersect_and_subtract() -> None:
     assert df1.intersect(df2).to_dict() == {"id": [2], "name": ["b"], "age": [2]}
     sub = df1.subtract(df2).to_dict()
     assert sub["id"] == [1]
+
+
+def test_pyspark_except_is_distinct_set_difference_and_alias_works() -> None:
+    df1 = DataFrame[Row](
+        {"id": [1, 1, 2], "name": ["a", "a", "b"], "age": [1, 1, 2]}
+    )
+    df2 = DataFrame[Row]({"id": [2], "name": ["b"], "age": [2]})
+
+    out = getattr(df1, "except")(df2).to_dict()
+    # distinct-set: duplicates removed
+    assert out == {"id": [1], "name": ["a"], "age": [1]}
 
 
 def test_pyspark_except_all_and_intersect_all_multiset_semantics() -> None:

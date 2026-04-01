@@ -20,7 +20,7 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `DataFrame.crossJoin` | **Supported** (**1.9.0+**) | `join(how="cross")`. |
 | `DataFrame.count()` (action) | **Supported** (**1.9.0+**) | Returns **`int`** via `global_row_count()` in the plan. |
 | `DataFrame.unionByName` | **Supported** (**1.9.0+**) | Name-aligned concat; optional `allowMissingColumns` null-fill. |
-| `DataFrame.intersect` / `subtract` | **Partial** (**1.9.0+**) | `intersect` ≈ inner join on all columns + `distinct`. `subtract` ≈ anti join on all columns. |
+| `DataFrame.intersect` / `subtract` / `except` | **Partial** (**1.9.0+**) | Distinct-set semantics: `intersect` ≈ inner join on all columns + `distinct`; `subtract`/`except` ≈ anti join on all columns + `distinct`. (`except` is a runtime alias of `except_` in Python.) |
 | `DataFrame.exceptAll` / `intersectAll` | **Supported** (**1.9.0+**) | Multiset semantics: `exceptAll` yields `max(count_left-count_right,0)`; `intersectAll` yields `min(count_left,count_right)`. |
 | `DataFrame.fillna` / `dropna` / `na` | **Supported** (**1.9.0+**) | Map to `fill_null` / `drop_nulls`; unsupported kw combinations raise clearly. |
 | `DataFrame.printSchema` / `explain` | **Supported** (**1.9.0+**) | Readable schema tree; printed logical plan. |

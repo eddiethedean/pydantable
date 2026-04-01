@@ -76,7 +76,7 @@ Core operations (`collect`, `join`, `group_by`, typed `filter`, …) behave like
 | `crossJoin(other)` | `join(other, how="cross")` (**1.9.0+**) |
 | `count()` | Row count as **`int`** via `global_row_count()` in the plan (**1.9.0+**); distinct from grouped `GroupedDataFrame.count(*cols)` |
 | `unionByName(other, allowMissingColumns=False)` | Reorder `other` by name, then vertical `concat`; optional null-padding for missing columns (**1.9.0+**) |
-| `intersect` / `subtract` | Typed join + `distinct` / anti-join (**1.9.0+**) |
+| `intersect` / `subtract` / `except` | Typed join + `distinct` / anti-join (**1.9.0+**). Note: `except` is exposed at runtime as `df.except(...)` but is implemented as `except_` in Python/stubs since `except` is a keyword. |
 | `intersectAll` / `exceptAll` | Multiset set ops (**1.9.0+**); `exceptAll` keeps duplicates per `max(left-right,0)` counts, `intersectAll` keeps `min(left,right)` counts. |
 | `fillna` / `dropna` / `na.drop` / `na.fill` | `fill_null` / `drop_nulls` with Spark-shaped kwargs (**1.9.0+**) |
 | `printSchema()` | Text tree from `df.schema` (**1.9.0+**) |

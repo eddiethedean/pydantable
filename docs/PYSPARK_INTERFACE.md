@@ -41,7 +41,7 @@ See:
 | `count()` (action) | `count()` | Implemented (**1.9.0+**) | **`int`** row count via **`global_row_count()`**; distinct from grouped **`count(...)`**. |
 | `sort` / `crossJoin` | same | Implemented (**1.9.0+**) | Global **`sort`** only; **`crossJoin`** → **`join(how="cross")`**. |
 | `unionByName` | same | Implemented (**1.9.0+**) | Name order + optional **`allowMissingColumns`**. |
-| `intersect` / `subtract` | same | Partial (**1.9.0+**) | `intersect` is distinct-set via join+distinct; `subtract` is anti join on all columns (distinct-set semantics). |
+| `intersect` / `subtract` / `except` | same | Partial (**1.9.0+**) | Distinct-set semantics. `except` is exposed at runtime as `df.except(...)` but implemented as `except_` in Python/stubs. |
 | `exceptAll` / `intersectAll` | same | Implemented (**1.9.0+**) | Multiset semantics via Rust/Polars core. |
 | `fillna` / `dropna` / `na` | same | Implemented (**1.9.0+**) | **`fill_null`** / **`drop_nulls`** with Spark-shaped kwargs. |
 | `printSchema` / `explain` | same | Implemented (**1.9.0+**) | Text schema tree; printed plan. |

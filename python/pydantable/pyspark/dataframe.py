@@ -54,11 +54,27 @@ class PySparkGroupedDataFrame(CoreGroupedDataFrame):
 
     def agg(
         self,
-        *,
+        *exprs: Any,
         streaming: bool | None = None,
         **aggregations: tuple[str, str] | tuple[str, Expr],
     ) -> DataFrame:
-        out = super().agg(streaming=streaming, **aggregations)
+        if exprs:
+            from pydantable.pyspark.sql.functions import _GroupedAggSpecAliased
+
+            extra: dict[str, tuple[str, str]] = {}
+            for e in exprs:
+                if not isinstance(e, _GroupedAggSpecAliased):
+                    raise TypeError(
+                        "agg(exprs...) expects expressions like "
+                        "F.sum('col').alias('out') (Spark-style)."
+                    )
+                extra[e._out_name] = (e._spec._op, e._spec._col)
+            for k in extra:
+                if k in aggregations:
+                    raise ValueError(f"Duplicate aggregation output name: {k!r}")
+            out = super().agg(streaming=streaming, **(extra | aggregations))
+        else:
+            out = super().agg(streaming=streaming, **aggregations)
         return DataFrame._as_pyspark_df(out)
 
     def sum(self, *columns: str, streaming: bool | None = None) -> DataFrame:
@@ -128,8 +144,8 @@ class PySparkGroupedDataFrameModel:
         inner = "\n".join(f"  {line}" for line in repr(self._grouped).split("\n"))
         return f"PySparkGroupedDataFrameModel({self._model_type.__name__})\n{inner}"
 
-    def agg(self, **aggregations: Any) -> DataFrameModel:
-        return self._model_type._from_dataframe(self._grouped.agg(**aggregations))
+    def agg(self, *exprs: Any, **aggregations: Any) -> DataFrameModel:
+        return self._model_type._from_dataframe(self._grouped.agg(*exprs, **aggregations))
 
     def sum(self, *columns: str, streaming: bool | None = None) -> DataFrameModel:
         return self._model_type._from_dataframe(
@@ -742,6 +758,13 @@ class DataFrame(CoreDataFrame):
             raise ValueError("subtract() requires identical schemas.")
         return self._as_pyspark_df(super().join(other, on=keys, how="anti"))
 
+    def except_(self, other: DataFrame) -> DataFrame:
+        """Distinct set difference (Spark ``except`` / SQL ``EXCEPT DISTINCT``)."""
+        return self.subtract(other).distinct()
+
+    # Python keyword compatibility: expose `.except(...)` name too.
+    except__doc__ = "Alias for except_ (Spark except)."
+
     def exceptAll(self, other: DataFrame) -> DataFrame:
         """Multiset difference (Spark ``EXCEPT ALL``)."""
         if self._current_field_types != other._current_field_types:
@@ -1106,6 +1129,11 @@ class DataFrameModel(CoreDataFrameModel):
             self._from_dataframe(self._df.subtract(od)),
         )
 
+    def except_(self, other: DataFrameModel | DataFrame) -> DataFrameModel:
+        """Distinct set difference (Spark ``except`` / SQL ``EXCEPT DISTINCT``)."""
+        od = other._df if isinstance(other, DataFrameModel) else other
+        return cast("DataFrameModel", self._from_dataframe(self._df.except_(od)))
+
     def exceptAll(self, other: DataFrameModel | DataFrame) -> DataFrameModel:
         od = other._df if isinstance(other, DataFrameModel) else other
         return cast(
@@ -1228,3 +1256,8 @@ class DataFrameModel(CoreDataFrameModel):
 
     def __getitem__(self, key: str | list[str]) -> Any:
         return self._df[key]  # type: ignore[index]
+
+
+# Python keyword compatibility: allow `df.except(other)` at runtime.
+setattr(DataFrame, "except", DataFrame.except_)
+setattr(DataFrameModel, "except", DataFrameModel.except_)

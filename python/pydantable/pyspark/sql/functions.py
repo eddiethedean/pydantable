@@ -53,6 +53,27 @@ from pydantable.expressions import (
 from pydantable.rust_engine import _require_rust_core as _rust_core
 
 
+class _GroupedAggSpec:
+    __slots__ = ("_col", "_op")
+
+    def __init__(self, *, op: str, col: str) -> None:
+        self._op = str(op)
+        self._col = str(col)
+
+    def alias(self, name: str) -> _GroupedAggSpecAliased:
+        if not isinstance(name, str) or not name:
+            raise TypeError("alias(name) expects a non-empty string.")
+        return _GroupedAggSpecAliased(out_name=name, spec=self)
+
+
+class _GroupedAggSpecAliased:
+    __slots__ = ("_out_name", "_spec")
+
+    def __init__(self, *, out_name: str, spec: _GroupedAggSpec) -> None:
+        self._out_name = out_name
+        self._spec = spec
+
+
 def lit(value: Any) -> Literal:
     """Typed literal column (Spark `lit`)."""
     return Literal(value=value)
@@ -479,8 +500,10 @@ def window_max(column: Expr) -> Any:
     return window_max_expr(column)
 
 
-def sum(column: Expr) -> Expr:
+def sum(column: Expr | str) -> Expr | _GroupedAggSpec:
     """Global ``sum`` for :meth:`~pydantable.dataframe.DataFrame.select`."""
+    if isinstance(column, str):
+        return _GroupedAggSpec(op="sum", col=column)
     if not isinstance(column, Expr):
         raise TypeError(
             "functions.sum() expects a typed column Expr (use col(..., dtype=...))."
@@ -488,36 +511,44 @@ def sum(column: Expr) -> Expr:
     return Expr(rust_expr=_rust_core().expr_global_sum(column._rust_expr))
 
 
-def avg(column: Expr) -> Expr:
+def avg(column: Expr | str) -> Expr | _GroupedAggSpec:
     """Global ``avg`` / mean for :meth:`~pydantable.dataframe.DataFrame.select`."""
+    if isinstance(column, str):
+        return _GroupedAggSpec(op="mean", col=column)
     if not isinstance(column, Expr):
         raise TypeError("functions.avg() expects a typed column Expr.")
     return Expr(rust_expr=_rust_core().expr_global_mean(column._rust_expr))
 
 
-def mean(column: Expr) -> Expr:
+def mean(column: Expr | str) -> Expr | _GroupedAggSpec:
     """Alias of :func:`avg`."""
     return avg(column)
 
 
-def max(column: Expr) -> Expr:
+def max(column: Expr | str) -> Expr | _GroupedAggSpec:
     """Global ``max`` for :meth:`~pydantable.dataframe.DataFrame.select`."""
+    if isinstance(column, str):
+        return _GroupedAggSpec(op="max", col=column)
     if not isinstance(column, Expr):
         raise TypeError("functions.max() expects a typed column Expr.")
     return Expr(rust_expr=_rust_core().expr_global_max(column._rust_expr))
 
 
-def min(column: Expr) -> Expr:
+def min(column: Expr | str) -> Expr | _GroupedAggSpec:
     """Global ``min`` for :meth:`~pydantable.dataframe.DataFrame.select`."""
+    if isinstance(column, str):
+        return _GroupedAggSpec(op="min", col=column)
     if not isinstance(column, Expr):
         raise TypeError("functions.min() expects a typed column Expr.")
     return Expr(rust_expr=_rust_core().expr_global_min(column._rust_expr))
 
 
-def count(column: Expr | None = None) -> Expr:
+def count(column: Expr | str | None = None) -> Expr | _GroupedAggSpec:
     """Non-null count of *column*, or row count if omitted (``count(*)``)."""
     if column is None:
         return Expr(rust_expr=_rust_core().expr_global_row_count())
+    if isinstance(column, str):
+        return _GroupedAggSpec(op="count", col=column)
     if not isinstance(column, Expr):
         raise TypeError("functions.count() expects a typed column Expr or None.")
     return Expr(rust_expr=_rust_core().expr_global_count(column._rust_expr))
