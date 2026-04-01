@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.9.0] — 2026-04-01
+
+### Docs / tooling
+
+- **Versioning:** bump to **1.9.0** across Python package metadata, Rust crate, and shipped stubs; docs “current release” strings aligned.
+
 ## [1.8.0] — 2026-03-31
 
 ### Added
