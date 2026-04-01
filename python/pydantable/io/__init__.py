@@ -457,7 +457,14 @@ def export_json(
     *,
     indent: int | None = None,
 ) -> None:
-    """Write ``dict[str, list]`` as one JSON array of row objects."""
+    """Write ``dict[str, list]`` as one JSON array of row objects.
+
+    Uses :func:`json.dump` with ``default=str``. Nested ``dict``/``list`` cells
+    serialize as JSON objects/arrays; non-JSON-native scalars (e.g. ``datetime``,
+    ``Decimal``, ``UUID``) become ``str(value)``, not necessarily ISO-8601. For
+    stable JSON output, prefer normalizing rows or using Pydantic
+    ``model_dump(mode="json")`` after materialization.
+    """
     keys = list(data.keys())
     n = len(data[keys[0]]) if keys else 0
     rows = [{k: data[k][i] for k in keys} for i in range(n)]

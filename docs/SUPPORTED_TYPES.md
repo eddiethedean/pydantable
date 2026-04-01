@@ -10,6 +10,22 @@ This page is the **authoritative list** of column types pydantable accepts on
 
 For behavior contracts (nulls, joins, ordering), see `INTERFACE_CONTRACT.md`.
 
+## JSON (RFC 8259) vs column types
+
+When data is **JSON on the wire** (files, HTTP bodies), use this mapping from JSON value kinds to pydantable fields. For **lazy** JSON Lines scans vs **eager** array files, see {doc}`IO_JSON`.
+
+| JSON kind | Model as | Notes |
+|-----------|----------|--------|
+| `null` | `Optional[T]` / `T \| None` | SQL-style null propagation; see **Nullability** below |
+| boolean | `bool` | |
+| string | `str`, `Literal[...]`, `UUID`, enums, IP types, `Annotated[str, ...]`, etc. | Same as **Scalar base types** |
+| number | `int`, `float`, or `Decimal` | JSON does not distinguish integers from floats; Pydantic coercion applies on validation |
+| array | `list[T]` (homogeneous) | **Heterogeneous** arrays (e.g. `[1, "a", {}]`) are **not** a single `list[T]` column—use a **`str`** column plus parse/validate elsewhere, or split fields |
+| object (nested) | Nested **`Schema` / `BaseModel`** | **Struct** column; use `Expr.struct_field`, `unnest`, etc. |
+| object (string-keyed map) | `dict[str, T]` | **Map** column (string keys only); see **Map-like columns** below |
+
+**Arbitrary or schemaless JSON:** pydantable does not provide a catch-all “JSON cell” dtype. Store **`str`** and use **`Expr.str_json_path_match`** or parse in Python after **`collect()`** / **`to_dicts()`**, or normalize upstream into typed columns.
+
 ## Scalar base types (columns + expressions)
 
 Each column in your schema is one **scalar** Python type from this set:

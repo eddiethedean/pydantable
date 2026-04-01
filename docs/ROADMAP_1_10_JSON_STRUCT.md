@@ -38,9 +38,9 @@ Ship an authoritative **matrix** (in {doc}`SUPPORTED_TYPES` or a dedicated subse
 
 **Checklist**
 
-- [ ] Matrix landed in docs and linked from {doc}`IO_JSON`.
-- [ ] Integration tests: round-trip **export** / re-import for nested struct + list + map columns (where supported).
-- [ ] Explicit statement on **heterogeneous JSON arrays** and **arbitrary nested JSON** (recommended pattern: `str` + expressions / Pydantic parse at materialization).
+- [x] Matrix landed in docs and linked from {doc}`IO_JSON`.
+- [x] Integration tests: round-trip **export** / re-import for nested struct + list + map columns (where supported).
+- [x] Explicit statement on **heterogeneous JSON arrays** and **arbitrary nested JSON** (recommended pattern: `str` + expressions / Pydantic parse at materialization).
 
 ---
 
@@ -48,9 +48,11 @@ Ship an authoritative **matrix** (in {doc}`SUPPORTED_TYPES` or a dedicated subse
 
 **Outcome:** No new user APIs required; risk reduction for later phases.
 
-- [ ] Expand tests for **`materialize_json`** (array vs NDJSON), **`export_json`**, and lazy **`read_ndjson`** / **`read_json`** with nested columns (struct/list/map) aligned with Polars inference.
-- [ ] Document **`export_json`** serialization for nested cells (`default=str`, datetimes, decimals—spell out behavior).
-- [ ] Cross-link **FastAPI** columnar JSON patterns ({doc}`FASTAPI`) with struct/map examples.
+- [x] Expand tests for **`materialize_json`** (array vs NDJSON), **`export_json`**, and lazy **`read_ndjson`** / **`read_json`** with nested columns (struct/list/map) aligned with Polars inference.
+- [x] Document **`export_json`** serialization for nested cells (`default=str`, datetimes, decimals—spell out behavior).
+- [x] Cross-link **FastAPI** columnar JSON patterns ({doc}`FASTAPI`) with struct/map examples.
+
+**Shipped in 1.10.0 (Phase A):** JSON ↔ schema matrix in {doc}`SUPPORTED_TYPES`, **`export_json`** semantics in {doc}`IO_JSON` and **`pydantable.io.export_json`** docstring, FastAPI cross-links, integration tests in **`tests/test_json_io_phase_a.py`**.
 
 ---
 

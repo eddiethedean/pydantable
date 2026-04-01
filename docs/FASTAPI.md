@@ -96,6 +96,8 @@ For **row-array** JSON bodies, use **`rows_dependency(User)`**; OpenAPI document
 
 **Nested row fields** (e.g. **`inner: NestedModel`**) become **`list[NestedModel]`** in columnar JSON (one nested object per row index). That shape is valid but can be heavy on the wire; prefer flat columns when you can.
 
+**Map-like columns** (**`dict[str, T]`**) use the same columnar encoding: each field is **`list[dict]`**-compatible per row (parallel **`dict`** values at each index), matching **`to_dict()`** after ingest. See **Map-like columns** in {doc}`SUPPORTED_TYPES`. For the JSON value-kind mapping (nested object vs map vs list), see **JSON (RFC 8259) vs column types** in {doc}`SUPPORTED_TYPES`. File-based JSON loading (array vs JSON Lines, eager vs lazy) is described in {doc}`IO_JSON`—HTTP columnar bodies use the same **logical** shapes as **`materialize_json`** / **`to_dict()`**.
+
 **Validation layers:** Pydantic validates each column as **`list[T]`** (wrong element types → **422** before your handler). **Row/column length consistency** is enforced when constructing **`DataFrameModel`** inside the dependency; mismatched lengths raise **`ColumnLengthMismatchError`** (subclass of **`ValueError`**). With **`register_exception_handlers`**, that maps to **400**; without it, you typically see **500**—see {ref}`fastapi-errors`.
 
 **NDJSON** streaming responses do not get a per-chunk OpenAPI schema (same as any streaming body); columnar **`response_model`** applies to single JSON **`to_dict()`** responses only.
