@@ -146,7 +146,16 @@ def read_csv(
     columns: list[str] | None = None,
     **scan_kwargs: Any,
 ) -> Any:
-    """Lazy CSV read (local path); returns ``ScanFileRoot``. See ``read_parquet`` for ``**scan_kwargs``."""
+    """Lazy CSV read (local path); returns ``ScanFileRoot``. Use ``DataFrame[Schema].read_csv``.
+
+    Extra keyword arguments are forwarded as Polars ``LazyCsvReader`` options (e.g. ``has_header``,
+    ``separator``, ``skip_rows``, ``skip_lines``, ``n_rows``, ``infer_schema_length``,
+    ``ignore_errors``, ``low_memory``, ``rechunk``, ``glob``, ``cache``, ``quote_char``, ``eol_char``,
+    ``include_file_paths``, ``row_index_name``, ``row_index_offset``, ``raise_if_empty``,
+    ``truncate_ragged_lines``, ``decimal_comma``, ``try_parse_dates``). Unknown keys raise
+    ``ValueError`` from the Rust layer. Per-scan details: ``IO_CSV`` on the doc site; kwargs matrix:
+    ``DATA_IO_SOURCES`` (**Audit: Polars 0.53.x vs pydantable**).
+    """
     sk = scan_kwargs if scan_kwargs else None
     return _scan_file_root(path, "csv", columns=columns, scan_kwargs=sk)
 

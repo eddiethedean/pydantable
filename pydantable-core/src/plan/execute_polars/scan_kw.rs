@@ -94,6 +94,40 @@ fn idx_size_from_usize(n: usize) -> PyResult<IdxSize> {
     })
 }
 
+/// Shared `row_index_name` / `row_index_offset` handling for Parquet and CSV lazy scans.
+/// - `Ok(None)` — do not change row index.
+/// - `Ok(Some(None))` — clear row index.
+/// - `Ok(Some(Some(RowIndex)))` — set row index column.
+fn row_index_update_from_kwargs(kw: &Bound<'_, PyDict>) -> PyResult<Option<Option<RowIndex>>> {
+    let has_name_key = kw.contains("row_index_name")?;
+    let has_offset_only = kw.contains("row_index_offset")? && !has_name_key;
+    if has_offset_only {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "row_index_offset requires row_index_name",
+        ));
+    }
+    if !has_name_key {
+        return Ok(None);
+    }
+    match kw.get_item("row_index_name")? {
+        None => Ok(None),
+        Some(v) if v.is_none() => Ok(Some(None)),
+        Some(v) => {
+            let name: String = v.extract()?;
+            if name.is_empty() {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "row_index_name must be non-empty when set",
+                ));
+            }
+            let off = get_usize(kw, "row_index_offset")?.unwrap_or(0);
+            Ok(Some(Some(RowIndex {
+                name: PlSmallStr::from_str(&name),
+                offset: idx_size_from_usize(off)?,
+            })))
+        }
+    }
+}
+
 fn scan_args_parquet_from_kwargs(
     py: Python<'_>,
     mut args: ScanArgsParquet,
@@ -168,31 +202,10 @@ fn scan_args_parquet_from_kwargs(
         }
     }
 
-    // Row index column (applied after scan in Polars)
-    let has_name_key = kw.contains("row_index_name")?;
-    let has_offset_only = kw.contains("row_index_offset")? && !has_name_key;
-    if has_offset_only {
-        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            "row_index_offset requires row_index_name",
-        ));
-    }
-    if has_name_key {
-        match kw.get_item("row_index_name")? {
-            None => {}
-            Some(v) if v.is_none() => args.row_index = None,
-            Some(v) => {
-                let name: String = v.extract()?;
-                if name.is_empty() {
-                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "row_index_name must be non-empty when set",
-                    ));
-                }
-                let off = get_usize(kw, "row_index_offset")?.unwrap_or(0);
-                args.row_index = Some(RowIndex {
-                    name: PlSmallStr::from_str(&name),
-                    offset: idx_size_from_usize(off)?,
-                });
-            }
+    match row_index_update_from_kwargs(kw)? {
+        None => {}
+        Some(ri) => {
+            args.row_index = ri;
         }
     }
 
@@ -219,6 +232,13 @@ fn lazy_csv_with_kwargs(
         "cache",
         "quote_char",
         "eol_char",
+        "include_file_paths",
+        "row_index_name",
+        "row_index_offset",
+        "raise_if_empty",
+        "truncate_ragged_lines",
+        "decimal_comma",
+        "try_parse_dates",
     ];
     unknown_scan_keys(py, kw, ALLOWED)?;
     if let Some(v) = get_bool(kw, "has_header")? {
@@ -292,6 +312,40 @@ fn lazy_csv_with_kwargs(
         }
         r = r.with_eol_char(n as u8);
     }
+
+    if kw.contains("include_file_paths")? {
+        match kw.get_item("include_file_paths")? {
+            None => {}
+            Some(v) if v.is_none() => {
+                r = r.with_include_file_paths(None);
+            }
+            Some(v) => {
+                let s: String = v.extract()?;
+                r = r.with_include_file_paths(Some(PlSmallStr::from_str(&s)));
+            }
+        }
+    }
+
+    match row_index_update_from_kwargs(kw)? {
+        None => {}
+        Some(ri) => {
+            r = r.with_row_index(ri);
+        }
+    }
+
+    if let Some(v) = get_bool(kw, "raise_if_empty")? {
+        r = r.with_raise_if_empty(v);
+    }
+    if let Some(v) = get_bool(kw, "truncate_ragged_lines")? {
+        r = r.with_truncate_ragged_lines(v);
+    }
+    if let Some(v) = get_bool(kw, "decimal_comma")? {
+        r = r.with_decimal_comma(v);
+    }
+    if let Some(v) = get_bool(kw, "try_parse_dates")? {
+        r = r.with_try_parse_dates(v);
+    }
+
     Ok(r)
 }
 

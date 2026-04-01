@@ -7,11 +7,13 @@ All notable changes to this project are documented here. The format is inspired 
 ### Added
 
 - **Parquet lazy `scan_kwargs` (1.11.0 Phase B1):** **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** forwarded to Polars **`ScanArgsParquet`** in **`pydantable-core`** (`scan_kw.rs`). Tests: **`tests/test_parquet_scan_hive_b1.py`**.
+- **CSV lazy `scan_kwargs` (1.11.0 Phase B2):** **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`**, **`raise_if_empty`**, **`truncate_ragged_lines`**, **`decimal_comma`**, **`try_parse_dates`** forwarded to Polars **`LazyCsvReader`** in **`pydantable-core`** (`lazy_csv_with_kwargs`); shared **`row_index_*`** parsing with Parquet. Tests: **`tests/test_csv_scan_directory_b2.py`** (directory / **`*.csv`** glob, hive path behavior, unknown kw).
 
 ### Docs
 
 - **Local I/O audit (1.11.0 Phase A):** Polars **0.53.0** vs pydantable **`scan_kwargs`** matrix, directory/glob/hive notes—{ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`; multi-file entrypoint table—{doc}`IO_DECISION_TREE`; **Local lazy file scans**—{doc}`INTERFACE_CONTRACT`; path/glob subsections on {doc}`IO_PARQUET`, {doc}`IO_CSV`, {doc}`IO_NDJSON`, {doc}`IO_IPC`, {doc}`IO_JSON`; link from {doc}`IO_OVERVIEW`. Roadmap: {doc}`ROADMAP_1_11_LOCAL_IO`.
 - **Parquet B1:** {doc}`DATA_IO_SOURCES` audit + summary table; {doc}`IO_PARQUET`; {doc}`INTERFACE_CONTRACT` (Parquet lineage / hive kwargs).
+- **CSV B2:** {doc}`DATA_IO_SOURCES` audit + summary table; {doc}`IO_CSV`; {doc}`INTERFACE_CONTRACT` (CSV **`include_file_paths`** / **`row_index_*`**); {doc}`ROADMAP_1_11_LOCAL_IO` Phase B2.
 
 ## [1.11.0] — 2026-04-01
 

@@ -81,6 +81,9 @@ def _scan_file_root(
 def read_parquet(
     path: str | Path, *, columns: list[str] | None = None, **scan_kwargs: Any
 ) -> Any: ...
+# CSV ``scan_kwargs`` (subset; see Rust allowlist): ``include_file_paths``, ``row_index_name``,
+# ``row_index_offset``, ``raise_if_empty``, ``truncate_ragged_lines``, ``decimal_comma``,
+# ``try_parse_dates``, plus ``has_header``, ``glob``, …
 def read_csv(
     path: str | Path, *, columns: list[str] | None = None, **scan_kwargs: Any
 ) -> Any: ...

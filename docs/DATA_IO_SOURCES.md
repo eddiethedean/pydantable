@@ -19,7 +19,7 @@ This document lists **common and useful** places applications read and write tab
 | Format | Read kwargs (examples) | Write kwargs |
 |--------|------------------------|--------------|
 | **Parquet** | **`n_rows`**, **`low_memory`**, **`rechunk`**, **`use_statistics`**, **`cache`**, **`glob`**, **`allow_missing_columns`**, **`parallel`**, **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** | **`compression`**, **`row_group_size`**, **`data_page_size`**, **`statistics`**, **`parallel`** |
-| **CSV** | **`has_header`**, **`separator`**, **`skip_rows`**, **`skip_lines`**, **`n_rows`**, **`infer_schema_length`**, **`ignore_errors`**, **`low_memory`**, **`rechunk`**, **`glob`**, **`cache`**, **`quote_char`**, **`eol_char`** | **`include_header`**, **`include_bom`** (plus top-level **`separator`**, **`compression`** where applicable) |
+| **CSV** | **`has_header`**, **`separator`**, **`skip_rows`**, **`skip_lines`**, **`n_rows`**, **`infer_schema_length`**, **`ignore_errors`**, **`low_memory`**, **`rechunk`**, **`glob`**, **`cache`**, **`quote_char`**, **`eol_char`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`**, **`raise_if_empty`**, **`truncate_ragged_lines`**, **`decimal_comma`**, **`try_parse_dates`** | **`include_header`**, **`include_bom`** (plus top-level **`separator`**, **`compression`** where applicable) |
 | **NDJSON** | **`low_memory`**, **`rechunk`**, **`ignore_errors`**, **`n_rows`**, **`infer_schema_length`** | **`json_format`** (**`"lines"`** / **`"json"`**) |
 | **IPC** | **`record_batch_statistics`** | Use top-level **`compression=`** only; extra **`write_kwargs`** are rejected. |
 
@@ -28,7 +28,7 @@ For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **preset
 (local-io-audit)=
 ### Audit: Polars 0.53.x vs pydantable (1.11.0 Phase A)
 
-**Scope:** Polars Rust **0.53.0** (the version pinned by **`pydantable-core`**) compared to the kwargs pydantable forwards from **`pydantable-core/src/plan/execute_polars/scan_kw.rs`** (`dispatch_file_scan`). **Parquet hive / lineage / row index** kwargs landed in {doc}`ROADMAP_1_11_LOCAL_IO` **Phase B1**; remaining gaps are tracked there (e.g. **`ScanArgsParquet.schema`**, **`HiveOptions.schema`**).
+**Scope:** Polars Rust **0.53.0** (the version pinned by **`pydantable-core`**) compared to the kwargs pydantable forwards from **`pydantable-core/src/plan/execute_polars/scan_kw.rs`** (`dispatch_file_scan`). **Parquet hive / lineage / row index** kwargs landed in {doc}`ROADMAP_1_11_LOCAL_IO` **Phase B1**; **CSV** directory/glob tests and extra **`LazyCsvReader`** kwargs in **Phase B2**; remaining gaps are tracked there (e.g. **`ScanArgsParquet.schema`**, **`HiveOptions.schema`**).
 
 **Directory and glob semantics**
 
@@ -61,7 +61,11 @@ For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **preset
 | CSV parse / skip / infer options (`has_header`, `separator`, `skip_rows`, …) | **mapped** | see summary table above; matches `lazy_csv_with_kwargs` allowlist in **`scan_kw.rs`** |
 | `glob` | **mapped** | default **`true`** on **`LazyCsvReader::new`** in Polars |
 | **`UnifiedScanArgs.hive_options`** inside Polars CSV scan | **Polars sets `HiveOptions::new_disabled()`** | Hive-style partition columns from **directory paths are not** applied for **lazy CSV** in Polars 0.53 (even if pydantable forwards **`glob`**). |
-| `include_file_paths`, `row_index`, `schema`, `cloud_options`, … | **not exposed** | builder methods exist on **`LazyCsvReader`**; not in pydantable allowlist yet |
+| `include_file_paths`, `row_index` | **mapped** | same kwargs as Parquet-style lineage / row index (**`include_file_paths`** column name; **`row_index_name`** / **`row_index_offset`**) |
+| `raise_if_empty`, `truncate_ragged_lines`, `decimal_comma`, `try_parse_dates` | **mapped** | boolean options on **`LazyCsvReader`** |
+| `schema`, `cloud_options`, … | **not exposed** | builder methods exist on **`LazyCsvReader`**; not in pydantable allowlist yet |
+
+**Tests:** multi-file directory and **`*.csv`** glob behavior are covered by **`tests/test_csv_scan_directory_b2.py`** (Phase B2).
 
 **NDJSON — `LazyJsonLineReader` (Polars) vs pydantable `scan_kwargs`**
 

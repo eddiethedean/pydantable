@@ -61,8 +61,10 @@
 
 ### B2 — CSV
 
-- [ ] Confirm **directory + `glob`** behavior matches Polars for representative cases; add tests for **`*.csv`** in a directory.
-- [ ] Evaluate additional **high-traffic** `LazyCsvReader` options not yet in **`ALLOWED`** (only if needed for directory reads or common enterprise CSV).
+**B2 shipped:** **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`**, **`raise_if_empty`**, **`truncate_ragged_lines`**, **`decimal_comma`**, **`try_parse_dates`** in **`scan_kw.rs`** (`lazy_csv_with_kwargs`); shared **`row_index_*`** parsing with Parquet via **`row_index_update_from_kwargs`**; tests **`tests/test_csv_scan_directory_b2.py`** (directory + **`*.csv`** glob, hive path does not add partition column, unknown kw, row index / include paths).
+
+- [x] Confirm **directory + `glob`** behavior matches Polars for representative cases; add tests for **`*.csv`** in a directory.
+- [x] Evaluate additional **high-traffic** `LazyCsvReader` options not yet in **`ALLOWED`** (only if needed for directory reads or common enterprise CSV).
 
 ### B3 — NDJSON / JSON Lines
 
