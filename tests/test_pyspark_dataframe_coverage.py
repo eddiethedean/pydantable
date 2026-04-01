@@ -500,6 +500,80 @@ def test_pyspark_join_returns_pyspark_dataframe() -> None:
     assert j.__class__.__module__ == "pydantable.pyspark.dataframe"
 
 
+def test_pyspark_join_left_semi_and_left_anti() -> None:
+    class L(Schema):
+        id: int
+        x: str
+
+    class R(Schema):
+        id: int
+        y: int
+
+    left = DataFrame[L]({"id": [1, 2, 3], "x": ["a", "b", "c"]})
+    right = DataFrame[R]({"id": [2], "y": [10]})
+
+    semi = left.join(right, on="id", how="left_semi").to_dict()
+    assert semi == {"id": [2], "x": ["b"]}
+
+    anti = left.join(right, on="id", how="left_anti").to_dict()
+    assert anti == {"id": [1, 3], "x": ["a", "c"]}
+
+
+def test_pyspark_join_on_accepts_list_tuple_and_mixed_columnref() -> None:
+    class L(Schema):
+        a: int
+        b: int
+        x: str
+
+    class R(Schema):
+        a: int
+        b: int
+        y: str
+
+    left = DataFrame[L]({"a": [1, 2], "b": [10, 20], "x": ["x1", "x2"]})
+    right = DataFrame[R]({"a": [1, 2], "b": [10, 20], "y": ["y1", "y2"]})
+
+    out1 = left.join(right, on=["a", left["b"]], how="inner").to_dict()
+    assert out1["a"] == [1, 2]
+    assert out1["b"] == [10, 20]
+    assert out1["x"] == ["x1", "x2"]
+    assert out1["y"] == ["y1", "y2"]
+
+    out2 = left.join(right, on=("a", "b"), how="inner").to_dict()
+    assert out2["a"] == [1, 2]
+
+
+def test_pyspark_join_usingcolumns_drops_right_join_keys_by_default_and_opt_out() -> None:
+    class L(Schema):
+        id: int
+        v: int
+
+    class R(Schema):
+        id: int
+        w: int
+
+    left = DataFrame[L]({"id": [1, 2], "v": [10, 20]})
+    right = DataFrame[R]({"id": [1, 2], "w": [100, 200]})
+
+    out = left.join(right, on="id", how="inner").to_dict()
+    assert set(out.keys()) == {"id", "v", "w"}
+
+    out_keep = left.join(
+        right, on="id", how="inner", keepRightJoinKeys=True
+    ).to_dict()
+    # With opt-out we allow whatever the core join returns; at minimum, keys exist.
+    assert "id" in out_keep
+
+
+def test_pyspark_join_rejects_invalid_on_entry_and_unknown_how() -> None:
+    left = DataFrame[Row]({"id": [1], "name": ["a"], "age": [1]})
+    right = DataFrame[Row]({"id": [1], "name": ["a"], "age": [1]})
+    with pytest.raises(TypeError, match="join\\(on="):
+        _ = left.join(right, on=["id", object()])  # type: ignore[list-item]
+    with pytest.raises(ValueError):
+        _ = left.join(right, on="id", how="not_a_join")
+
+
 def test_pyspark_except_all_matches_subtract() -> None:
     df1 = DataFrame[Row]({"id": [1, 2], "name": ["a", "b"], "age": [1, 2]})
     df2 = DataFrame[Row]({"id": [2, 3], "name": ["b", "c"], "age": [2, 3]})

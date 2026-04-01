@@ -74,6 +74,8 @@ Core operations (`collect`, `join`, `group_by`, typed `filter`, …) behave like
 | `groupBy(...).pivot(...).count()` / `.sum(...)` / `.avg(...)` / `.min(...)` / `.max(...)` | Convenience wrappers over grouped-pivot `.agg(...)` (Spark-shaped), including `count()` as rows per `(keys, pivot_value)` cell (**1.9.0+**). |
 | `orderBy(*columns, ascending=...)` / `sort(...)` | Core `sort` / `order_by` (global sort only; not Spark `sortWithinPartitions`) |
 | `crossJoin(other)` | `join(other, how="cross")` (**1.9.0+**) |
+| `join(other, on=[...], how="left_semi"|"left_anti")` | Core `join(how="semi"|"anti")` with Spark-ish names; output is left-only columns (**1.9.0+**). |
+| `join(..., on=[...])` key handling | Spark-ish USING behavior: duplicate right join keys are dropped by default; set `keepRightJoinKeys=True` to opt out (**1.9.0+**). |
 | `count()` | Row count as **`int`** via `global_row_count()` in the plan (**1.9.0+**); distinct from grouped `GroupedDataFrame.count(*cols)` |
 | `unionByName(other, allowMissingColumns=False)` | Reorder `other` by name, then vertical `concat`; optional null-padding for missing columns (**1.9.0+**) |
 | `intersect` / `subtract` / `except` | Typed join + `distinct` / anti-join (**1.9.0+**). Note: `except` is exposed at runtime as `df.except(...)` but is implemented as `except_` in Python/stubs since `except` is a keyword. |

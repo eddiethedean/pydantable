@@ -827,9 +827,94 @@ class DataFrame(CoreDataFrame):
             )
         )
 
-    def join(self, other: CoreDataFrame, **kwargs: Any) -> DataFrame:
-        out = super().join(other, **kwargs)
-        return self._as_pyspark_df(out)
+    def join(
+        self,
+        other: CoreDataFrame,
+        *,
+        on: str | ColumnRef | Sequence[str | ColumnRef] | None = None,
+        how: str = "inner",
+        suffix: str = "_right",
+        coalesce: bool | None = None,
+        validate: str | None = None,
+        join_nulls: bool | None = None,
+        maintain_order: bool | str | None = None,
+        streaming: bool | None = None,
+        keepRightJoinKeys: bool = False,
+    ) -> DataFrame:
+        """Join two frames (Spark-shaped wrapper over core join)."""
+        if not isinstance(keepRightJoinKeys, bool):
+            raise TypeError("join(keepRightJoinKeys=...) expects a bool.")
+
+        how_norm = str(how).strip().lower()
+        if how_norm == "left_semi":
+            how_norm = "semi"
+        elif how_norm == "left_anti":
+            how_norm = "anti"
+
+        on_names: str | list[str] | None
+        used_on = on is not None
+        if on is None:
+            on_names = None
+        elif isinstance(on, str):
+            on_names = on
+        elif isinstance(on, ColumnRef):
+            referenced = on.referenced_columns()
+            if len(referenced) != 1:
+                raise TypeError(
+                    "join(on=...) ColumnRef must reference exactly one column; "
+                    f"referenced_columns={sorted(referenced)!r}"
+                )
+            on_names = next(iter(referenced))
+        else:
+            raw = list(on)
+            out: list[str] = []
+            for k in raw:
+                if isinstance(k, str):
+                    out.append(k)
+                elif isinstance(k, ColumnRef):
+                    referenced = k.referenced_columns()
+                    if len(referenced) != 1:
+                        raise TypeError(
+                            "join(on=...) ColumnRef must reference exactly one column; "
+                            f"referenced_columns={sorted(referenced)!r}"
+                        )
+                    out.append(next(iter(referenced)))
+                else:
+                    raise TypeError(
+                        "join(on=...) expects str, ColumnRef, or a sequence of "
+                        "str|ColumnRef."
+                    )
+            if len(set(out)) != len(out):
+                raise ValueError("join(on=...) must not contain duplicate keys.")
+            on_names = out
+
+        joined = super().join(
+            other,
+            on=on_names,
+            how=how_norm,
+            suffix=suffix,
+            coalesce=coalesce,
+            validate=validate,
+            join_nulls=join_nulls,
+            maintain_order=maintain_order,
+            streaming=streaming,
+        )
+
+        # Spark-ish USING behavior: when joining on same-named keys, keep one copy
+        # of each join key by default.
+        if used_on and on_names is not None and not keepRightJoinKeys:
+            # Core join can still produce suffixed duplicates depending on rules;
+            # drop any right-side key duplicates if present.
+            keys = [on_names] if isinstance(on_names, str) else list(on_names)
+            drop_cols: list[str] = []
+            for k in keys:
+                rk = f"{k}{suffix}"
+                if rk in joined._current_field_types:
+                    drop_cols.append(rk)
+            if drop_cols:
+                joined = joined.drop(*drop_cols)
+
+        return self._as_pyspark_df(joined)
 
     def group_by(
         self,
@@ -1112,6 +1197,39 @@ class DataFrameModel(CoreDataFrameModel):
             "DataFrameModel",
             self._from_dataframe(
                 self._df.unionByName(od, allowMissingColumns=allowMissingColumns)
+            ),
+        )
+
+    def join(
+        self,
+        other: DataFrameModel | DataFrame,
+        *,
+        on: str | ColumnRef | Sequence[str | ColumnRef] | None = None,
+        how: str = "inner",
+        suffix: str = "_right",
+        coalesce: bool | None = None,
+        validate: str | None = None,
+        join_nulls: bool | None = None,
+        maintain_order: bool | str | None = None,
+        streaming: bool | None = None,
+        keepRightJoinKeys: bool = False,
+    ) -> DataFrameModel:
+        od = other._df if isinstance(other, DataFrameModel) else other
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(
+                self._df.join(
+                    od,
+                    on=on,
+                    how=how,
+                    suffix=suffix,
+                    coalesce=coalesce,
+                    validate=validate,
+                    join_nulls=join_nulls,
+                    maintain_order=maintain_order,
+                    streaming=streaming,
+                    keepRightJoinKeys=keepRightJoinKeys,
+                )
             ),
         )
 

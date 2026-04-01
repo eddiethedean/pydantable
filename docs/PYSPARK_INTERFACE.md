@@ -40,6 +40,8 @@ See:
 | `groupBy(...).pivot(...).count/sum/avg/min/max` | `groupBy(...).pivot(...).count/sum/avg/min/max` | Implemented (**1.9.0+**) | Convenience wrappers over grouped pivot; `count()` counts rows per group+pivot cell and names outputs as `<pivot_value>_count`. |
 | `count()` (action) | `count()` | Implemented (**1.9.0+**) | **`int`** row count via **`global_row_count()`**; distinct from grouped **`count(...)`**. |
 | `sort` / `crossJoin` | same | Implemented (**1.9.0+**) | Global **`sort`** only; **`crossJoin`** → **`join(how="cross")`**. |
+| `join(..., how=\"left_semi\"|\"left_anti\")` | same | Implemented (**1.9.0+**) | Spark-ish join-mode names mapped to core `semi`/`anti`. |
+| `join(..., on=[...])` key handling | same | Implemented (**1.9.0+**) | Spark-ish USING behavior: duplicate right join key columns are dropped by default; opt out with `keepRightJoinKeys=True`. |
 | `unionByName` | same | Implemented (**1.9.0+**) | Name order + optional **`allowMissingColumns`**. |
 | `intersect` / `subtract` / `except` | same | Partial (**1.9.0+**) | Distinct-set semantics. `except` is exposed at runtime as `df.except(...)` but implemented as `except_` in Python/stubs. |
 | `exceptAll` / `intersectAll` | same | Implemented (**1.9.0+**) | Multiset semantics via Rust/Polars core. |

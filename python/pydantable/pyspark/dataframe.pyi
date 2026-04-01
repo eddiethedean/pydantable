@@ -101,6 +101,20 @@ class DataFrame(CoreDataFrame[Any]):
         *,
         allowMissingColumns: bool = False,
     ) -> DataFrame: ...
+    def join(
+        self,
+        other: DataFrame,
+        *,
+        on: str | ColumnRef | list[str | ColumnRef] | tuple[str | ColumnRef, ...] | None = None,
+        how: str = "inner",
+        suffix: str = "_right",
+        coalesce: bool | None = None,
+        validate: str | None = None,
+        join_nulls: bool | None = None,
+        maintain_order: bool | str | None = None,
+        streaming: bool | None = None,
+        keepRightJoinKeys: bool = False,
+    ) -> DataFrame: ...
     def intersect(self, other: DataFrame) -> DataFrame: ...
     def subtract(self, other: DataFrame) -> DataFrame: ...
     def except_(self, other: DataFrame) -> DataFrame: ...
@@ -157,6 +171,20 @@ class DataFrameModel(CoreDataFrameModel):
         other: DataFrameModel | DataFrame,
         *,
         allowMissingColumns: bool = False,
+    ) -> DataFrameModel: ...
+    def join(
+        self,
+        other: DataFrameModel | DataFrame,
+        *,
+        on: str | ColumnRef | list[str | ColumnRef] | tuple[str | ColumnRef, ...] | None = None,
+        how: str = "inner",
+        suffix: str = "_right",
+        coalesce: bool | None = None,
+        validate: str | None = None,
+        join_nulls: bool | None = None,
+        maintain_order: bool | str | None = None,
+        streaming: bool | None = None,
+        keepRightJoinKeys: bool = False,
     ) -> DataFrameModel: ...
     def intersect(self, other: DataFrameModel | DataFrame) -> DataFrameModel: ...
     def subtract(self, other: DataFrameModel | DataFrame) -> DataFrameModel: ...
