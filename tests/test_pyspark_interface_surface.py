@@ -55,7 +55,7 @@ def test_pyspark_interface_consolidated_pipeline() -> None:
         .select("id", "bucket", "ts", "amount", "amount_f")
     )
     joined = base.join(right, on="id", how="left")
-    grouped = joined.group_by("bucket").agg(
+    grouped = joined.groupBy("bucket").agg(
         amount_sum=("sum", "amount"),
         id_count=("count", "id"),
     )

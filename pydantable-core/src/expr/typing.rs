@@ -795,6 +795,17 @@ impl ExprNode {
                 ));
             }
         };
+        // SQL NULL (`Literal(None)` with unknown-base dtype): cast to a concrete nullable scalar.
+        if input.dtype().is_scalar_unknown_nullable() {
+            return Ok(ExprNode::Cast {
+                input: Box::new(input),
+                dtype: DTypeDesc::Scalar {
+                    base: Some(base),
+                    nullable: true,
+                    literals: None,
+                },
+            });
+        }
         let in_base = match input.dtype() {
             DTypeDesc::Scalar { base: Some(b), .. } => b,
             _ => {
