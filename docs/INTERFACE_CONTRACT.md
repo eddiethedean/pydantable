@@ -256,6 +256,7 @@ Supported reshape methods:
   - single value column: `<pivot_value><separator><agg>`
   - multiple value columns: `<pivot_value><separator><value_col><separator><agg>`
  - `sort_columns=True` sorts pivot values before generating output columns.
+ - `pivot_values=[...]` (when provided) fixes the pivot-value set and output column order; `sort_columns` is ignored.
  - `separator` controls output naming (default `"_"`).
  - `index` and `values` accept schema-driven `Selector` objects (resolved against the current schema).
  - `columns` accepts a schema-driven `Selector` only when it matches **exactly one** column; otherwise `ValueError` is raised.

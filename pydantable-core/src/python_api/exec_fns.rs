@@ -383,7 +383,7 @@ fn execute_melt(
 
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (plan, root_data, index, columns, values, aggregate_function, sort_columns=false, separator="_".to_string(), as_python_lists=false, streaming=false))]
+#[pyo3(signature = (plan, root_data, index, columns, values, aggregate_function, pivot_values=None, sort_columns=false, separator="_".to_string(), as_python_lists=false, streaming=false))]
 fn execute_pivot(
     py: Python<'_>,
     plan: &PyPlan,
@@ -392,6 +392,7 @@ fn execute_pivot(
     columns: String,
     values: Vec<String>,
     aggregate_function: String,
+    pivot_values: Option<Vec<PyObject>>,
     sort_columns: bool,
     separator: String,
     as_python_lists: bool,
@@ -407,6 +408,7 @@ fn execute_pivot(
             columns,
             values,
             aggregate_function,
+            pivot_values,
             sort_columns,
             separator,
             as_python_lists,

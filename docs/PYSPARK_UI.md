@@ -70,6 +70,7 @@ Core operations (`collect`, `join`, `group_by`, typed `filter`, …) behave like
 | `where(condition)` / `filter(condition)` | `filter(condition)` |
 | `select(*cols)` | Core `select` |
 | `groupBy(...)` / `group_by(...)` | Core `group_by`; returns **`PySparkGroupedDataFrame`** so `.agg()` stays Spark-flavored (**1.9.0+**). |
+| `groupBy(...).pivot(pivot_col, values=[...]).agg(...)` | Group at `(keys + pivot_col)` then core `pivot` to wide columns (**1.9.0+**). |
 | `orderBy(*columns, ascending=...)` / `sort(...)` | Core `sort` / `order_by` (global sort only; not Spark `sortWithinPartitions`) |
 | `crossJoin(other)` | `join(other, how="cross")` (**1.9.0+**) |
 | `count()` | Row count as **`int`** via `global_row_count()` in the plan (**1.9.0+**); distinct from grouped `GroupedDataFrame.count(*cols)` |

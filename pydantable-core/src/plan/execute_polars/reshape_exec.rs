@@ -6,7 +6,10 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Cursor;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyList, PyTime};
+use pyo3::types::{
+    PyAny, PyBool, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFloat, PyInt, PyList, PyString,
+    PyTime,
+};
 
 use crate::dtype::{
     py_decimal_to_scaled_i128, py_enum_to_wire_string, scaled_i128_to_py_decimal, BaseType,
@@ -183,6 +186,7 @@ pub fn execute_pivot_polars(
     columns: String,
     values: Vec<String>,
     aggregate_function: String,
+    pivot_values_override: Option<Vec<PyObject>>,
     sort_columns: bool,
     separator: String,
     as_python_lists: bool,
@@ -234,36 +238,118 @@ pub fn execute_pivot_polars(
     let data_bound = data_obj.bind(py);
     let ctx = py_dict_to_literal_ctx(&plan.schema, data_bound)?;
 
-    let mut pivot_values: Vec<String> = Vec::new();
-    let mut seen_pivot: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let pivot_col = ctx.get(&columns).ok_or_else(|| {
-        PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
-            "pivot() unknown columns argument '{}'.",
-            columns
-        ))
-    })?;
-    for item in pivot_col.iter() {
-        let key = match item {
-            Some(LiteralValue::Str(s)) => s.clone(),
-            Some(LiteralValue::EnumStr(s)) => s.clone(),
-            Some(LiteralValue::Uuid(s)) => s.clone(),
-            Some(LiteralValue::Decimal(v)) => v.to_string(),
-            Some(LiteralValue::Int(v)) => v.to_string(),
-            Some(LiteralValue::Float(v)) => v.to_string(),
-            Some(LiteralValue::Bool(v)) => v.to_string(),
-            Some(LiteralValue::DateTimeMicros(v)) => v.to_string(),
-            Some(LiteralValue::DateDays(v)) => v.to_string(),
-            Some(LiteralValue::DurationMicros(v)) => v.to_string(),
-            Some(LiteralValue::TimeNanos(v)) => v.to_string(),
-            Some(LiteralValue::Binary(b)) => format!("B:{}", b.len()),
-            None => "null".to_string(),
-        };
-        if seen_pivot.insert(key.clone()) {
-            pivot_values.push(key);
+    fn pivot_key_from_py(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<String> {
+        if value.is_none() {
+            return Ok("null".to_string());
         }
+        if let Ok(s) = value.downcast::<PyString>() {
+            return Ok(s.to_string());
+        }
+        if let Ok(b) = value.downcast::<PyBool>() {
+            return Ok(b.extract::<bool>()?.to_string());
+        }
+        if let Ok(i) = value.downcast::<PyInt>() {
+            return Ok(i.extract::<i64>()?.to_string());
+        }
+        if let Ok(f) = value.downcast::<PyFloat>() {
+            return Ok(f.extract::<f64>()?.to_string());
+        }
+        let builtins = py.import_bound("builtins")?;
+        let isinstance = builtins.getattr("isinstance")?;
+        let uuid_mod = py.import_bound("uuid")?;
+        let uuid_cls = uuid_mod.getattr("UUID")?;
+        if isinstance
+            .call1((value, &uuid_cls))?
+            .extract::<bool>()
+            .unwrap_or(false)
+        {
+            return Ok(value.str()?.extract::<String>()?);
+        }
+        let dec_mod = py.import_bound("decimal")?;
+        let dec_cls = dec_mod.getattr("Decimal")?;
+        if isinstance
+            .call1((value, &dec_cls))?
+            .extract::<bool>()
+            .unwrap_or(false)
+        {
+            return Ok(py_decimal_to_scaled_i128(value)?.to_string());
+        }
+        let enums = py.import_bound("enum")?;
+        let enum_cls = enums.getattr("Enum")?;
+        if isinstance
+            .call1((value, &enum_cls))?
+            .extract::<bool>()
+            .unwrap_or(false)
+        {
+            return Ok(py_enum_to_wire_string(value)?);
+        }
+        if let Ok(dt) = value.downcast::<PyDateTime>() {
+            let secs: f64 = dt.call_method0("timestamp")?.extract()?;
+            return Ok(((secs * 1_000_000.0).round() as i64).to_string());
+        }
+        if let Ok(d) = value.downcast::<PyDate>() {
+            let ordinal: i32 = d.call_method0("toordinal")?.extract()?;
+            return Ok((ordinal - 719_163).to_string());
+        }
+        if let Ok(td) = value.downcast::<PyDelta>() {
+            let secs: f64 = td.call_method0("total_seconds")?.extract()?;
+            return Ok(((secs * 1_000_000.0).round() as i64).to_string());
+        }
+        if let Ok(t) = value.downcast::<PyTime>() {
+            let h: i64 = t.getattr("hour")?.extract()?;
+            let m: i64 = t.getattr("minute")?.extract()?;
+            let s: i64 = t.getattr("second")?.extract()?;
+            let micro: i64 = t.getattr("microsecond")?.extract()?;
+            let ns = ((h * 3600 + m * 60 + s) * 1_000_000_000i64) + micro * 1000;
+            return Ok(ns.to_string());
+        }
+        if let Ok(b) = value.downcast::<PyBytes>() {
+            return Ok(format!("B:{}", b.as_bytes().len()));
+        }
+        Ok(value.str()?.extract::<String>()?)
     }
-    if sort_columns {
-        pivot_values.sort();
+
+    let mut pivot_values: Vec<String> = Vec::new();
+    let mut seen_pivot: HashSet<String> = HashSet::new();
+
+    if let Some(raw) = pivot_values_override {
+        for obj in raw.into_iter() {
+            let key = pivot_key_from_py(py, &obj.bind(py))?;
+            if seen_pivot.insert(key.clone()) {
+                pivot_values.push(key);
+            }
+        }
+        // Explicit pivot values define output ordering; ignore sort_columns.
+    } else {
+        let pivot_col = ctx.get(&columns).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "pivot() unknown columns argument '{}'.",
+                columns
+            ))
+        })?;
+        for item in pivot_col.iter() {
+            let key = match item {
+                Some(LiteralValue::Str(s)) => s.clone(),
+                Some(LiteralValue::EnumStr(s)) => s.clone(),
+                Some(LiteralValue::Uuid(s)) => s.clone(),
+                Some(LiteralValue::Decimal(v)) => v.to_string(),
+                Some(LiteralValue::Int(v)) => v.to_string(),
+                Some(LiteralValue::Float(v)) => v.to_string(),
+                Some(LiteralValue::Bool(v)) => v.to_string(),
+                Some(LiteralValue::DateTimeMicros(v)) => v.to_string(),
+                Some(LiteralValue::DateDays(v)) => v.to_string(),
+                Some(LiteralValue::DurationMicros(v)) => v.to_string(),
+                Some(LiteralValue::TimeNanos(v)) => v.to_string(),
+                Some(LiteralValue::Binary(b)) => format!("B:{}", b.len()),
+                None => "null".to_string(),
+            };
+            if seen_pivot.insert(key.clone()) {
+                pivot_values.push(key);
+            }
+        }
+        if sort_columns {
+            pivot_values.sort();
+        }
     }
 
     let mut groups: BTreeMap<String, Vec<usize>> = BTreeMap::new();

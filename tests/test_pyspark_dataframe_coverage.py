@@ -138,6 +138,34 @@ def test_pyspark_groupby_count_no_args_is_per_group_len() -> None:
     assert by_id == [(1, 2), (2, 1)]
 
 
+def test_pyspark_groupby_pivot_agg_multi_ops_and_explicit_values() -> None:
+    class S(Schema):
+        g: str
+        k: str
+        v: int
+
+    df = DataFrame[S](
+        {
+            "g": ["A", "A", "B"],
+            "k": ["x", "y", "x"],
+            "v": [1, 2, 3],
+        }
+    )
+    out = (
+        df.groupBy("g")
+        .pivot("k", values=["x", "y"])
+        .agg(s=("sum", "v"), m=("max", "v"))
+        .to_dict()
+    )
+    order = sorted(range(len(out["g"])), key=lambda i: out["g"][i])
+    got = {k: [out[k][i] for i in order] for k in out}
+    assert got["g"] == ["A", "B"]
+    assert got["x_s"] == [1, 3]
+    assert got["y_s"] == [2, None]
+    assert got["x_m"] == [1, 3]
+    assert got["y_m"] == [2, None]
+
+
 def test_pyspark_cross_join_and_count() -> None:
     class A(Schema):
         x: int

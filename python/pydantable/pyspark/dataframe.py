@@ -76,6 +76,36 @@ class PySparkGroupedDataFrame(CoreGroupedDataFrame):
     def len(self, *, streaming: bool | None = None) -> DataFrame:
         return DataFrame._as_pyspark_df(super().len(streaming=streaming))
 
+    def pivot(
+        self,
+        pivot_col: str | ColumnRef,
+        *,
+        values: list[Any] | None = None,
+    ) -> PySparkPivotedGroupedDataFrame:
+        """Spark-style grouped pivot handle: ``groupBy(...).pivot(...).agg(...)``."""
+        if isinstance(pivot_col, str):
+            pivot_name = pivot_col
+        elif isinstance(pivot_col, Expr):
+            referenced = pivot_col.referenced_columns()
+            if len(referenced) != 1:
+                raise TypeError(
+                    "pivot(pivot_col=...) expects a column name or single-column "
+                    f"ColumnRef; referenced_columns={sorted(referenced)!r}"
+                )
+            pivot_name = next(iter(referenced))
+        else:
+            raise TypeError("pivot(pivot_col=...) expects a column name or ColumnRef.")
+        if values is not None and not isinstance(values, list):
+            raise TypeError("pivot(values=...) expects a list or None.")
+        return PySparkPivotedGroupedDataFrame(
+            df=self._df,
+            keys=self._keys,
+            pivot_col=pivot_name,
+            pivot_values=values,
+            maintain_order=self._maintain_order,
+            drop_nulls=self._drop_nulls,
+        )
+
 
 class PySparkGroupedDataFrameModel:
     """Model-level grouped handle after :meth:`DataFrameModel.groupBy`."""
@@ -122,6 +152,147 @@ class PySparkGroupedDataFrameModel:
 
     def len(self, *, streaming: bool | None = None) -> DataFrameModel:
         return self._model_type._from_dataframe(self._grouped.len(streaming=streaming))
+
+    def pivot(
+        self,
+        pivot_col: str | ColumnRef,
+        *,
+        values: list[Any] | None = None,
+    ) -> PySparkPivotedGroupedDataFrameModel:
+        return PySparkPivotedGroupedDataFrameModel(
+            grouped=self._grouped.pivot(pivot_col, values=values),
+        )
+
+
+class PySparkPivotedGroupedDataFrame:
+    """Handle for Spark-style ``groupBy(...).pivot(...).agg(...)``."""
+
+    __slots__ = (
+        "_df",
+        "_drop_nulls",
+        "_keys",
+        "_maintain_order",
+        "_pivot_col",
+        "_pivot_values",
+    )
+
+    def __init__(
+        self,
+        *,
+        df: CoreDataFrame,
+        keys: Sequence[str],
+        pivot_col: str,
+        pivot_values: list[Any] | None,
+        maintain_order: bool,
+        drop_nulls: bool,
+    ) -> None:
+        self._df = df
+        self._keys = list(keys)
+        self._pivot_col = str(pivot_col)
+        self._pivot_values = pivot_values
+        self._maintain_order = bool(maintain_order)
+        self._drop_nulls = bool(drop_nulls)
+
+    def __repr__(self) -> str:
+        return (
+            "PySparkPivotedGroupedDataFrame("
+            f"by={self._keys!r}, pivot={self._pivot_col!r}, "
+            f"values={self._pivot_values!r})"
+        )
+
+    def agg(
+        self,
+        *,
+        streaming: bool | None = None,
+        **aggregations: tuple[str, str] | tuple[str, Expr],
+    ) -> DataFrame:
+        if not aggregations:
+            raise TypeError("agg() requires at least one aggregation spec.")
+
+        # Use an internal separator so we can reliably strip the pivot executor suffix.
+        internal_sep = "__"
+
+        out_names: list[str] = []
+        specs: dict[str, tuple[str, str]] = {}
+        for out_name, spec in aggregations.items():
+            if not isinstance(out_name, str) or not out_name:
+                raise TypeError("agg() output names must be non-empty strings.")
+            if internal_sep in out_name:
+                raise ValueError(
+                    f"agg() output name {out_name!r} cannot contain {internal_sep!r}."
+                )
+            if not isinstance(spec, tuple) or len(spec) != 2:
+                raise TypeError(
+                    "agg() expects specs like "
+                    "output_name=('count'|'sum'|'mean'|'min'|'max'|'median'|"
+                    "'std'|'var'|'first'|'last'|'n_unique', column)."
+                )
+            op, col_spec = spec
+            if not isinstance(op, str) or not op:
+                raise TypeError("Aggregation operator must be a non-empty string.")
+            if isinstance(col_spec, str):
+                in_col = col_spec
+            elif isinstance(col_spec, Expr):
+                referenced = col_spec.referenced_columns()
+                if len(referenced) != 1:
+                    raise TypeError(
+                        "Aggregation column must reference exactly one column."
+                    )
+                in_col = next(iter(referenced))
+            else:
+                raise TypeError(
+                    "Aggregation column must be a column name or Expr "
+                    "referencing one column."
+                )
+            out_names.append(out_name)
+            specs[out_name] = (op, in_col)
+
+        # Aggregate at (keys + pivot_col) grain, then pivot those aggregated outputs.
+        use_streaming = streaming
+        grouped = self._df.group_by(
+            *self._keys,
+            self._pivot_col,
+            maintain_order=self._maintain_order,
+            drop_nulls=self._drop_nulls,
+        )
+        aggregated = grouped.agg(streaming=use_streaming, **specs)
+        pivoted = aggregated.pivot(
+            index=self._keys,
+            columns=self._pivot_col,
+            values=out_names,
+            aggregate_function="first",
+            separator=internal_sep,
+            pivot_values=self._pivot_values,
+            streaming=use_streaming,
+        )
+
+        # Rename `<pivot_value>__<out_name>__first` -> `<pivot_value>_<out_name>`.
+        rename_map: dict[str, str] = {}
+        for c in pivoted.columns:
+            if c in self._keys:
+                continue
+            parts = c.rsplit(internal_sep, 2)
+            if len(parts) == 3 and parts[2] == "first" and parts[1] in specs:
+                pivot_value, out_name, _ = parts
+                rename_map[c] = f"{pivot_value}_{out_name}"
+        if rename_map:
+            pivoted = pivoted.rename(rename_map)
+        return DataFrame._as_pyspark_df(pivoted)
+
+
+class PySparkPivotedGroupedDataFrameModel:
+    """Model-level wrapper for grouped pivot; output is a :class:`DataFrame`."""
+
+    __slots__ = ("_grouped",)
+
+    def __init__(self, *, grouped: PySparkPivotedGroupedDataFrame) -> None:
+        self._grouped = grouped
+
+    def __repr__(self) -> str:
+        return f"PySparkPivotedGroupedDataFrameModel(\n  {self._grouped!r}\n)"
+
+    def agg(self, **aggregations: Any) -> DataFrame:
+        return self._grouped.agg(**aggregations)
 
 
 class DataFrameNaFunctions:
