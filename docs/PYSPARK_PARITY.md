@@ -17,7 +17,9 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `DataFrame.join(left_on=..., right_on=...)` | **Supported** (**1.9.0+**) | Join on differently named keys; list/tuple and `ColumnRef` keys supported in the PySpark facade. |
 | `DataFrame.join(validate=\"1:1\"|\"1:m\"|\"m:1\"|\"m:m\")` | **Supported** (**1.9.0+**) | Shorthands forwarded to core join validation. |
 | `DataFrame.groupBy` / `.agg` | **Supported** (**1.9.0+**) | CamelCase `groupBy` returns a PySpark grouped wrapper; tuple `agg` specs (not Spark `agg(expr)` only). |
+| `GroupedDataFrame.agg({col: op(s)})` | **Supported** (**1.9.0+**) | Dict-form `agg`: `{\"v\":\"sum\"}` → `v_sum`; multi-op lists supported; common Spark op synonyms mapped (e.g. `avg` → `mean`). |
 | `GroupedDataFrame.pivot(...).agg(...)` | **Supported** (**1.9.0+**) | Spark-style `groupBy(...).pivot(...).agg(...)` lowers to core `group_by(...).agg(...)` + `pivot(...)` (typed, in-process). |
+| `GroupedDataFrame.pivot(...).agg({col: op(s)})` | **Supported** (**1.9.0+**) | Dict-form pivot `agg` with Spark-ish naming: `<pivot_value>_<col_op>` (e.g. `x_v_sum`). |
 | `GroupedDataFrame.pivot(...).count/sum/avg/min/max` | **Supported** (**1.9.0+**) | Convenience wrappers over `pivot(...).agg(...)`; `count()` counts rows per group+pivot cell. |
 | `GroupedData.count()` (no args) | **Supported** (**1.9.0+**) | Per-group row count (core `len` / synthetic sum). |
 | `DataFrame.orderBy` / `sort` | **Supported** | Column names + ascending flags; global sort only (not `sortWithinPartitions`). |

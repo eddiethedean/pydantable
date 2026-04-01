@@ -158,6 +158,49 @@ def test_pyspark_groupby_agg_accepts_exprs_with_alias() -> None:
     assert got == {"g": ["A", "B"], "s": [3, 10], "m": [2, 10]}
 
 
+def test_pyspark_groupby_agg_accepts_dict_form_and_synonyms() -> None:
+    class S(Schema):
+        g: str
+        v: int
+        w: int
+
+    df = DataFrame[S]({"g": ["A", "A", "B"], "v": [1, 2, 10], "w": [5, 6, 7]})
+    out = df.groupBy("g").agg({"v": ["sum", "max"], "w": "avg"}).to_dict()
+    order = sorted(range(len(out["g"])), key=lambda i: out["g"][i])
+    got = {k: [out[k][i] for i in order] for k in out}
+    assert got["g"] == ["A", "B"]
+    assert got["v_sum"] == [3, 10]
+    assert got["v_max"] == [2, 10]
+    assert got["w_mean"] == [5.5, 7.0]
+
+
+def test_pyspark_groupby_pivot_agg_accepts_dict_form() -> None:
+    class S(Schema):
+        g: str
+        k: str
+        v: int
+
+    df = DataFrame[S](
+        {
+            "g": ["A", "A", "B"],
+            "k": ["x", "y", "x"],
+            "v": [1, 2, 3],
+        }
+    )
+    out = (
+        df.groupBy("g")
+        .pivot("k", values=["x", "y"])
+        .agg({"v": ["sum", "max"]})
+        .to_dict()
+    )
+    order = sorted(range(len(out["g"])), key=lambda i: out["g"][i])
+    got = {k: [out[k][i] for i in order] for k in out}
+    assert got["g"] == ["A", "B"]
+    assert got["x_v_sum"] == [1, 3]
+    assert got["y_v_sum"] == [2, None]
+    assert got["x_v_max"] == [1, 3]
+    assert got["y_v_max"] == [2, None]
+
 def test_pyspark_groupby_agg_expr_requires_alias() -> None:
     from pydantable.pyspark.sql import functions as F
 
@@ -311,6 +354,16 @@ def test_pyspark_groupby_pivot_sum_requires_columns() -> None:
     df = DataFrame[S]({"g": ["A"], "k": ["x"], "v": [1]})
     with pytest.raises(TypeError, match="requires at least one"):
         df.groupBy("g").pivot("k").sum()
+
+
+def test_pyspark_groupby_agg_dict_form_errors_on_unknown_op() -> None:
+    class S(Schema):
+        g: str
+        v: int
+
+    df = DataFrame[S]({"g": ["A"], "v": [1]})
+    with pytest.raises(TypeError, match="Aggregation operator"):
+        df.groupBy("g").agg({"v": ""})
 
 def test_pyspark_cross_join_and_count() -> None:
     class A(Schema):

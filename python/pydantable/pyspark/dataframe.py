@@ -52,12 +52,68 @@ def _format_schema_type_lines(dt: DataType, prefix: str) -> list[str]:
 class PySparkGroupedDataFrame(CoreGroupedDataFrame):
     """Spark ``groupBy`` result; aggregations return :class:`DataFrame`."""
 
+    @staticmethod
+    def _normalize_agg_op(op: str) -> str:
+        o = str(op).strip()
+        if not o:
+            raise TypeError("Aggregation operator must be a non-empty string.")
+        key = o.lower().replace(" ", "").replace("-", "_")
+        synonyms = {
+            "avg": "mean",
+            "countdistinct": "n_unique",
+            "count_distinct": "n_unique",
+        }
+        return synonyms.get(key, key)
+
+    @classmethod
+    def _parse_dict_aggs(
+        cls, agg_dict: Mapping[str, Any]
+    ) -> dict[str, tuple[str, str]]:
+        if not isinstance(agg_dict, dict):
+            agg_dict = dict(agg_dict)
+        out: dict[str, tuple[str, str]] = {}
+        for col, ops in agg_dict.items():
+            if not isinstance(col, str) or not col:
+                raise TypeError("Dict-form agg keys must be non-empty column names.")
+            if isinstance(ops, str):
+                ops_list = [ops]
+            elif isinstance(ops, (list, tuple)):
+                if not ops:
+                    raise TypeError(f"agg({col!r}) op list must be non-empty.")
+                ops_list = list(ops)
+            else:
+                raise TypeError(
+                    "Dict-form agg values must be an op string or list/tuple of op strings."
+                )
+            for raw_op in ops_list:
+                if not isinstance(raw_op, str):
+                    raise TypeError("Aggregation operators must be strings.")
+                op = cls._normalize_agg_op(raw_op)
+                out_name = f"{col}_{op}"
+                if out_name in out:
+                    raise ValueError(f"Duplicate aggregation output name: {out_name!r}")
+                out[out_name] = (op, col)
+        return out
+
     def agg(
         self,
         *exprs: Any,
         streaming: bool | None = None,
         **aggregations: tuple[str, str] | tuple[str, Expr],
     ) -> DataFrame:
+        agg_dict = None
+        if exprs and isinstance(exprs[0], dict):
+            agg_dict = exprs[0]
+            exprs = exprs[1:]
+
+        dict_specs: dict[str, tuple[str, str]] = {}
+        if agg_dict is not None:
+            from collections.abc import Mapping as _Mapping
+
+            if not isinstance(agg_dict, _Mapping):
+                raise TypeError("agg(dict) expects a mapping of column -> op(s).")
+            dict_specs = self._parse_dict_aggs(agg_dict)
+
         if exprs:
             from pydantable.pyspark.sql.functions import _GroupedAggSpecAliased
 
@@ -70,11 +126,19 @@ class PySparkGroupedDataFrame(CoreGroupedDataFrame):
                     )
                 extra[e._out_name] = (e._spec._op, e._spec._col)
             for k in extra:
+                if k in aggregations or k in dict_specs:
+                    raise ValueError(f"Duplicate aggregation output name: {k!r}")
+            for k in dict_specs:
                 if k in aggregations:
                     raise ValueError(f"Duplicate aggregation output name: {k!r}")
-            out = super().agg(streaming=streaming, **(extra | aggregations))
+            out = super().agg(
+                streaming=streaming, **(extra | dict_specs | aggregations)
+            )
         else:
-            out = super().agg(streaming=streaming, **aggregations)
+            for k in dict_specs:
+                if k in aggregations:
+                    raise ValueError(f"Duplicate aggregation output name: {k!r}")
+            out = super().agg(streaming=streaming, **(dict_specs | aggregations))
         return DataFrame._as_pyspark_df(out)
 
     def sum(self, *columns: str, streaming: bool | None = None) -> DataFrame:
@@ -224,10 +288,22 @@ class PySparkPivotedGroupedDataFrame:
 
     def agg(
         self,
+        aggDict: Any | None = None,
         *,
         streaming: bool | None = None,
         **aggregations: tuple[str, str] | tuple[str, Expr],
     ) -> DataFrame:
+        if aggDict is not None:
+            from collections.abc import Mapping as _Mapping
+
+            if not isinstance(aggDict, _Mapping):
+                raise TypeError("agg(dict) expects a mapping of column -> op(s).")
+            dict_specs = PySparkGroupedDataFrame._parse_dict_aggs(dict(aggDict))
+            for k in dict_specs:
+                if k in aggregations:
+                    raise ValueError(f"Duplicate aggregation output name: {k!r}")
+            aggregations = dict_specs | aggregations
+
         if not aggregations:
             raise TypeError("agg() requires at least one aggregation spec.")
 

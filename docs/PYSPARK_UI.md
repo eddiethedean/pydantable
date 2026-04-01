@@ -71,6 +71,8 @@ Core operations (`collect`, `join`, `group_by`, typed `filter`, …) behave like
 | `select(*cols)` | Core `select` |
 | `groupBy(...)` / `group_by(...)` | Core `group_by`; returns **`PySparkGroupedDataFrame`** so `.agg()` stays Spark-flavored (**1.9.0+**). |
 | `groupBy(...).pivot(pivot_col, values=[...]).agg(...)` | Group at `(keys + pivot_col)` then core `pivot` to wide columns (**1.9.0+**). |
+| `groupBy(...).agg({\"v\": \"sum\", \"w\": \"max\"})` | Dict-form `agg` (Spark-ish) auto-names outputs as `v_sum`, `w_max`; multi-op per column supported via lists (**1.9.0+**). |
+| `groupBy(...).pivot(...).agg({\"v\": [\"sum\", \"max\"]})` | Dict-form pivot `agg` auto-names per pivot value: e.g. `x_v_sum`, `x_v_max` (**1.9.0+**). |
 | `groupBy(...).pivot(...).count()` / `.sum(...)` / `.avg(...)` / `.min(...)` / `.max(...)` | Convenience wrappers over grouped-pivot `.agg(...)` (Spark-shaped), including `count()` as rows per `(keys, pivot_value)` cell (**1.9.0+**). |
 | `orderBy(*columns, ascending=...)` / `sort(...)` | Core `sort` / `order_by` (global sort only; not Spark `sortWithinPartitions`) |
 | `crossJoin(other)` | `join(other, how="cross")` (**1.9.0+**) |
