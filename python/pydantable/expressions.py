@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Sequence, get_args, get_origin
+from typing import TYPE_CHECKING, Any, get_args, get_origin
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 from .rust_engine import _require_rust_core
 
@@ -254,7 +257,7 @@ class Expr:  # type: ignore[override]
         return Expr(rust_expr=rust_expr)
 
     def struct_json_encode(self) -> Expr:
-        """Encode each struct cell as a JSON text value (Polars ``struct.json_encode``)."""
+        """Encode struct cells as JSON text (Polars ``struct.json_encode``)."""
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_struct_json_encode(self._rust_expr))
 
@@ -537,7 +540,7 @@ class Expr:  # type: ignore[override]
         return Expr(rust_expr=rust.expr_str_json_path_match(self._rust_expr, str(path)))
 
     def str_json_decode(self, dtype: Any) -> Expr:
-        """Parse JSON text per row into a struct or map column (Polars ``str.json_decode``).
+        """Parse JSON text per row into struct or map (Polars ``str.json_decode``).
 
         ``dtype`` is a nested model or ``dict[str, T]`` annotation, same style as
         :meth:`cast`. Null string cells yield null. With Polars 0.53, **any

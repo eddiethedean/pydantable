@@ -113,9 +113,11 @@ If scope slips, move unfinished items to **1.11.0** and keep Phase B as the 1.10
 
 ## Phase E — User experience polish
 
-- [ ] **Selectors:** examples combining **`s.structs()`**, **`unnest`**, **`struct_field`** chains ({doc}`SELECTORS`).
-- [ ] **Cookbook** entry: “JSON logs → typed frame → unnest → export”.
-- [ ] **Changelog** entry for 1.10.0 listing JSON/struct items ({doc}`changelog`).
+- [x] **Selectors:** examples combining **`s.structs()`**, **`unnest`**, **`struct_field`** chains ({doc}`SELECTORS`).
+- [x] **Cookbook** entry: “JSON logs → typed frame → unnest → export” ({doc}`/cookbook/json_logs_unnest_export`).
+- [x] **Changelog** entry for 1.10.0 listing JSON/struct items ({doc}`changelog`).
+
+**Shipped in 1.10.0 (Phase E):** {doc}`SELECTORS` (**Nested structs**); cookbook {doc}`/cookbook/json_logs_unnest_export`; consolidated **1.10.0** JSON/struct **Docs** bullet in {doc}`changelog`.
 
 ---
 

@@ -20,6 +20,7 @@ All notable changes to this project are documented here. The format is inspired 
 - **FastAPI:** columnar **map** / nested field notes with links to {doc}`SUPPORTED_TYPES` and {doc}`IO_JSON`.
 - **Roadmap:** Phase A + B + C checklists completed in {doc}`ROADMAP_1_10_JSON_STRUCT`; **`str_json_decode`** / error semantics in {doc}`SUPPORTED_TYPES` and {doc}`INTERFACE_CONTRACT`; {doc}`IO_JSON` cross-link.
 - **Phase D (I/O):** {doc}`IO_JSON` — **`read_json`** vs **`read_ndjson`** vs **`materialize_json`**, large-file / **`streaming`** patterns, NDJSON **`scan_kwargs`** presets; example **`docs/examples/io/large_ndjson_patterns.py`**; cross-links from {doc}`DATA_IO_SOURCES`, {doc}`EXECUTION`, {doc}`IO_NDJSON`.
+- **Phase E (UX) & 1.10.0 JSON/struct summary:** {doc}`SELECTORS` — **`s.structs()`**, **`unnest`**, **`struct_field`** pipeline; cookbook {doc}`/cookbook/json_logs_unnest_export` (NDJSON → unnest → **`export_json`**); {doc}`DOCS_MAP` link. **Release narrative:** Phases A–E of {doc}`ROADMAP_1_10_JSON_STRUCT` — JSON ↔ schema matrix and I/O tests; struct expressions (**`struct_json_encode`**, path/rename/with-fields); **`str_json_decode`**; Phase D large-file NDJSON docs; Phase E selectors + cookbook + this changelog index.
 
 ### Changed
 

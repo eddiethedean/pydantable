@@ -147,8 +147,8 @@ fn str_json_decode_rejects_non_string_inner() {
 fn str_json_decode_rejects_scalar_target() {
     let inner = ExprNode::make_column_ref("j".to_string(), DTypeDesc::non_nullable(BaseType::Str))
         .expect("column");
-    let err = ExprNode::make_str_json_decode(inner, DTypeDesc::non_nullable(BaseType::Int))
-        .unwrap_err();
+    let err =
+        ExprNode::make_str_json_decode(inner, DTypeDesc::non_nullable(BaseType::Int)).unwrap_err();
     assert!(err.to_string().contains("struct") && err.to_string().contains("map"));
 }
 

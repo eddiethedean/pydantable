@@ -1,14 +1,17 @@
-"""Phase 1.10.0 JSON I/O: nested materialize/export and lazy NDJSON with struct/map columns."""
+"""Phase 1.10 JSON I/O: nested materialize/export, lazy NDJSON, struct/map columns."""
 
 from __future__ import annotations
 
 import json
 from datetime import datetime
 from decimal import Decimal
-from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path
 from pydantable import DataFrame, Schema
 from pydantable.io import export_json, materialize_json, read_json, read_ndjson
 
@@ -18,7 +21,7 @@ class _Meta(Schema):
 
 
 class _RowNested(Schema):
-    """Lazy NDJSON: nested struct + list (map column tested via materialize_json path)."""
+    """Lazy NDJSON: nested struct + list; map via materialize_json path."""
 
     id: int
     meta: _Meta
@@ -89,7 +92,7 @@ def test_materialize_json_ndjson_nested_matches_array_shape(tmp_path: Path) -> N
 
 
 def test_export_json_roundtrip_nested_dict_and_list(tmp_path: Path) -> None:
-    # json.dump uses default=str for non-JSON-native scalars; nested dict/list are native.
+    # json.dump: default=str for odd scalars; nested dict/list stay native.
     path = tmp_path / "out.json"
     data = {
         "id": [1],
@@ -130,7 +133,7 @@ def test_read_json_alias_matches_ndjson_nested(tmp_path: Path) -> None:
 
 
 def test_lazy_read_ndjson_nested_collect_shape_only(tmp_path: Path) -> None:
-    """Polars lazy NDJSON → struct + list columns; map-shaped JSON needs materialize_json path."""
+    """Lazy NDJSON → struct + list; map JSON uses materialize_json path."""
     pytest.importorskip("pydantable._core")
     path = tmp_path / "n.ndjson"
     path.write_text(
@@ -152,7 +155,7 @@ def test_lazy_read_ndjson_nested_collect_shape_only(tmp_path: Path) -> None:
 
 
 def test_materialize_json_then_constructor_includes_map_column(tmp_path: Path) -> None:
-    """Eager materialize preserves JSON objects as dict cells; good for dict[str, T] maps."""
+    """Eager materialize keeps JSON objects as dict cells (dict[str, T] maps)."""
     path = tmp_path / "m.json"
     path.write_text(
         json.dumps(

@@ -119,9 +119,7 @@ impl PolarsPlanRunner {
             | ExprNode::StructRenameFields { base, .. } => Self::expr_has_framed_window(base),
             ExprNode::StructWithFields { base, updates, .. } => {
                 Self::expr_has_framed_window(base)
-                    || updates
-                        .iter()
-                        .any(|(_, e)| Self::expr_has_framed_window(e))
+                    || updates.iter().any(|(_, e)| Self::expr_has_framed_window(e))
             }
             ExprNode::ListGet { inner, index, .. }
             | ExprNode::ListContains {

@@ -19,6 +19,7 @@ fastapi_observability
 fastapi_settings
 io_lazy_pipeline_write
 io_http_parquet_ctx
+json_logs_unnest_export
 transforms_join_groupby
 windows_framing_primer
 ```

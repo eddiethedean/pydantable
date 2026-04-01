@@ -1429,8 +1429,7 @@ impl ExprNode {
             }
         }
         let mut out_fields: Vec<(String, DTypeDesc)> = base_fields.clone();
-        let mut boxed_updates: Vec<(String, Box<ExprNode>)> =
-            Vec::with_capacity(updates.len());
+        let mut boxed_updates: Vec<(String, Box<ExprNode>)> = Vec::with_capacity(updates.len());
         for (name, expr) in updates {
             let fd = Self::dtype_under_nullable_struct(struct_nullable, expr.dtype());
             if let Some(pos) = out_fields.iter().position(|(n, _)| n == &name) {

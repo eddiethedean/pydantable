@@ -4,9 +4,9 @@ mod dtype;
 mod expr;
 #[cfg(feature = "polars_engine")]
 mod io_polars;
+mod plan;
 #[cfg(feature = "polars_engine")]
 mod polars_dtype;
-mod plan;
 mod python_api;
 
 use pyo3::prelude::*;

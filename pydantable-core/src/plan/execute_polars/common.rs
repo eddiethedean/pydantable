@@ -12,8 +12,8 @@ use crate::dtype::{
     py_decimal_to_scaled_i128, py_enum_to_wire_string, scaled_i128_to_py_decimal, BaseType,
     DTypeDesc, DECIMAL_PRECISION, DECIMAL_SCALE,
 };
-use crate::polars_dtype::dtype_desc_to_polars_data_type;
 use crate::expr::{ExprNode, LiteralValue, WindowFrame, WindowOp};
+use crate::polars_dtype::dtype_desc_to_polars_data_type;
 
 use crate::plan::ir::{PlanInner, PlanStep};
 use crate::plan::schema_py::schema_descriptors_as_py;

@@ -25,14 +25,16 @@ class _JsonTextRow(Schema):
 
 
 def test_struct_json_encode_round_trip_str_json_decode() -> None:
-    df = DataFrame[_Row]({"id": [1, 2], "s": [{"x": 7, "y": "hi"}, {"x": 0, "y": None}]})
+    df = DataFrame[_Row](
+        {"id": [1, 2], "s": [{"x": 7, "y": "hi"}, {"x": 0, "y": None}]}
+    )
     enc = df.with_columns(js=df.s.struct_json_encode())
     out = enc.with_columns(s2=enc.js.str_json_decode(_Inner)).collect(as_lists=True)
     assert out["s2"] == out["s"]
 
 
 def test_str_json_decode_map_from_entries_json() -> None:
-    """Polars decodes ``dict[str, T]`` as list-of-{{key,value}}; JSON must match that shape."""
+    """Polars ``dict[str, T]`` is list-of-{key,value}; JSON must match that shape."""
     df = DataFrame[_JsonTextRow](
         {
             "id": [1],
@@ -41,12 +43,14 @@ def test_str_json_decode_map_from_entries_json() -> None:
             ],
         }
     )
-    got = df.with_columns(m=df.raw.str_json_decode(dict[str, int])).collect(as_lists=True)
+    got = df.with_columns(m=df.raw.str_json_decode(dict[str, int])).collect(
+        as_lists=True
+    )
     assert got["m"] == [{"a": 10, "b": 20}]
 
 
 def test_str_json_decode_invalid_json_raises_at_collect() -> None:
-    """Polars ``json_decode`` errors the evaluation when any row is not valid JSON (v0.53)."""
+    """``json_decode`` fails eval when any row is invalid JSON (Polars v0.53)."""
     df = DataFrame[_JsonTextRow](
         {
             "id": [1, 2],
@@ -54,7 +58,7 @@ def test_str_json_decode_invalid_json_raises_at_collect() -> None:
         }
     )
     bad = df.with_columns(parsed=df.raw.str_json_decode(_Inner))
-    with pytest.raises(ValueError, match="json|JSON"):
+    with pytest.raises(ValueError, match=r"json|JSON"):
         bad.collect(as_lists=True)
 
 
