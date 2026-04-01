@@ -75,7 +75,10 @@ Core operations (`collect`, `join`, `group_by`, typed `filter`, …) behave like
 | `orderBy(*columns, ascending=...)` / `sort(...)` | Core `sort` / `order_by` (global sort only; not Spark `sortWithinPartitions`) |
 | `crossJoin(other)` | `join(other, how="cross")` (**1.9.0+**) |
 | `join(other, on=[...], how="left_semi"|"left_anti")` | Core `join(how="semi"|"anti")` with Spark-ish names; output is left-only columns (**1.9.0+**). |
+| `join(other, on=[...], how="right_semi"|"right_anti")` | Spark-ish aliases implemented by swapping join sides; output is right-only columns (**1.9.0+**). |
 | `join(..., on=[...])` key handling | Spark-ish USING behavior: duplicate right join keys are dropped by default; set `keepRightJoinKeys=True` to opt out (**1.9.0+**). |
+| `join(left_on=[...], right_on=[...])` | Join on differently named keys (Spark-style). Keys accept `str` or `ColumnRef` and list/tuple forms (**1.9.0+**). |
+| `join(validate="1:1"|"1:m"|"m:1"|"m:m")` | Join cardinality validation shorthands (forwarded to core join) (**1.9.0+**). |
 | `count()` | Row count as **`int`** via `global_row_count()` in the plan (**1.9.0+**); distinct from grouped `GroupedDataFrame.count(*cols)` |
 | `unionByName(other, allowMissingColumns=False)` | Reorder `other` by name, then vertical `concat`; optional null-padding for missing columns (**1.9.0+**) |
 | `intersect` / `subtract` / `except` | Typed join + `distinct` / anti-join (**1.9.0+**). Note: `except` is exposed at runtime as `df.except(...)` but is implemented as `except_` in Python/stubs since `except` is a keyword. |

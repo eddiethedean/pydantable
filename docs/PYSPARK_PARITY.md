@@ -13,6 +13,9 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `DataFrame.withColumn` | **Supported** | |
 | `DataFrame.join` | **Supported** | Suffix/collision rules per `INTERFACE_CONTRACT.md`. |
 | `DataFrame.join(..., how=\"left_semi\"|\"left_anti\")` | **Supported** (**1.9.0+**) | Spark-ish `left_semi`/`left_anti` map to core `semi`/`anti` joins; output is left-only columns. |
+| `DataFrame.join(..., how=\"right_semi\"|\"right_anti\")` | **Supported** (**1.9.0+**) | Spark-ish `right_*` aliases implemented by swapping join sides; output is right-only columns. |
+| `DataFrame.join(left_on=..., right_on=...)` | **Supported** (**1.9.0+**) | Join on differently named keys; list/tuple and `ColumnRef` keys supported in the PySpark facade. |
+| `DataFrame.join(validate=\"1:1\"|\"1:m\"|\"m:1\"|\"m:m\")` | **Supported** (**1.9.0+**) | Shorthands forwarded to core join validation. |
 | `DataFrame.groupBy` / `.agg` | **Supported** (**1.9.0+**) | CamelCase `groupBy` returns a PySpark grouped wrapper; tuple `agg` specs (not Spark `agg(expr)` only). |
 | `GroupedDataFrame.pivot(...).agg(...)` | **Supported** (**1.9.0+**) | Spark-style `groupBy(...).pivot(...).agg(...)` lowers to core `group_by(...).agg(...)` + `pivot(...)` (typed, in-process). |
 | `GroupedDataFrame.pivot(...).count/sum/avg/min/max` | **Supported** (**1.9.0+**) | Convenience wrappers over `pivot(...).agg(...)`; `count()` counts rows per group+pivot cell. |

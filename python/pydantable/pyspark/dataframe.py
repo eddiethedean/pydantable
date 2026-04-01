@@ -832,6 +832,8 @@ class DataFrame(CoreDataFrame):
         other: CoreDataFrame,
         *,
         on: str | ColumnRef | Sequence[str | ColumnRef] | None = None,
+        left_on: str | ColumnRef | Sequence[str | ColumnRef] | None = None,
+        right_on: str | ColumnRef | Sequence[str | ColumnRef] | None = None,
         how: str = "inner",
         suffix: str = "_right",
         coalesce: bool | None = None,
@@ -840,33 +842,47 @@ class DataFrame(CoreDataFrame):
         maintain_order: bool | str | None = None,
         streaming: bool | None = None,
         keepRightJoinKeys: bool = False,
+        keepLeftJoinKeys: bool = False,
     ) -> DataFrame:
-        """Join two frames (Spark-shaped wrapper over core join)."""
+        """Join two frames (Spark-shaped wrapper over core join).
+
+        Supports Spark-ish join modes like ``left_semi``/``left_anti`` and
+        ``right_semi``/``right_anti`` (aliases over core ``semi``/``anti``), plus
+        Spark-style validate shorthands: ``validate='1:1'|'1:m'|'m:1'|'m:m'``.
+        """
         if not isinstance(keepRightJoinKeys, bool):
             raise TypeError("join(keepRightJoinKeys=...) expects a bool.")
+        if not isinstance(keepLeftJoinKeys, bool):
+            raise TypeError("join(keepLeftJoinKeys=...) expects a bool.")
+        if on is not None and (left_on is not None or right_on is not None):
+            raise ValueError("join() use either on=... or left_on=/right_on=..., not both.")
 
         how_norm = str(how).strip().lower()
         if how_norm == "left_semi":
             how_norm = "semi"
         elif how_norm == "left_anti":
             how_norm = "anti"
+        elif how_norm == "right_semi":
+            how_norm = "right_semi"
+        elif how_norm == "right_anti":
+            how_norm = "right_anti"
 
-        on_names: str | list[str] | None
-        used_on = on is not None
-        if on is None:
-            on_names = None
-        elif isinstance(on, str):
-            on_names = on
-        elif isinstance(on, ColumnRef):
-            referenced = on.referenced_columns()
-            if len(referenced) != 1:
-                raise TypeError(
-                    "join(on=...) ColumnRef must reference exactly one column; "
-                    f"referenced_columns={sorted(referenced)!r}"
-                )
-            on_names = next(iter(referenced))
-        else:
-            raw = list(on)
+        def _resolve_key_arg(
+            arg: str | ColumnRef | Sequence[str | ColumnRef] | None, *, arg_name: str
+        ) -> str | list[str] | None:
+            if arg is None:
+                return None
+            if isinstance(arg, str):
+                return arg
+            if isinstance(arg, ColumnRef):
+                referenced = arg.referenced_columns()
+                if len(referenced) != 1:
+                    raise TypeError(
+                        f"join({arg_name}=...) ColumnRef must reference exactly one column; "
+                        f"referenced_columns={sorted(referenced)!r}"
+                    )
+                return next(iter(referenced))
+            raw = list(arg)
             out: list[str] = []
             for k in raw:
                 if isinstance(k, str):
@@ -875,22 +891,82 @@ class DataFrame(CoreDataFrame):
                     referenced = k.referenced_columns()
                     if len(referenced) != 1:
                         raise TypeError(
-                            "join(on=...) ColumnRef must reference exactly one column; "
+                            f"join({arg_name}=...) ColumnRef must reference exactly one column; "
                             f"referenced_columns={sorted(referenced)!r}"
                         )
                     out.append(next(iter(referenced)))
                 else:
                     raise TypeError(
-                        "join(on=...) expects str, ColumnRef, or a sequence of "
+                        f"join({arg_name}=...) expects str, ColumnRef, or a sequence of "
                         "str|ColumnRef."
                     )
             if len(set(out)) != len(out):
-                raise ValueError("join(on=...) must not contain duplicate keys.")
-            on_names = out
+                raise ValueError(f"join({arg_name}=...) must not contain duplicate keys.")
+            return out
+
+        on_names = _resolve_key_arg(on, arg_name="on")
+        left_names = _resolve_key_arg(left_on, arg_name="left_on")
+        right_names = _resolve_key_arg(right_on, arg_name="right_on")
+
+        used_on = on_names is not None
+        used_lr = left_names is not None or right_names is not None
+        if how_norm != "cross":
+            if used_on:
+                pass
+            elif used_lr:
+                if left_names is None or right_names is None:
+                    raise ValueError(
+                        "join() requires both left_on=... and right_on=... when on=... "
+                        "is not set."
+                    )
+                left_list = [left_names] if isinstance(left_names, str) else list(left_names)
+                right_list = [right_names] if isinstance(right_names, str) else list(right_names)
+                if len(left_list) != len(right_list):
+                    raise ValueError(
+                        "join(left_on=..., right_on=...) must have matching key lengths."
+                    )
+            else:
+                raise ValueError(
+                    "join() requires on=... or left_on=.../right_on=... for non-cross joins."
+                )
+
+        if how_norm in ("right_semi", "right_anti"):
+            swapped_how = "semi" if how_norm == "right_semi" else "anti"
+            if used_on:
+                swapped = other.join(
+                    self,
+                    on=on_names,
+                    how=swapped_how,
+                    suffix=suffix,
+                    coalesce=coalesce,
+                    validate=validate,
+                    join_nulls=join_nulls,
+                    maintain_order=maintain_order,
+                    streaming=streaming,
+                )
+            else:
+                # swap sides: keys swap too
+                swapped = other.join(
+                    self,
+                    left_on=right_names,
+                    right_on=left_names,
+                    how=swapped_how,
+                    suffix=suffix,
+                    coalesce=coalesce,
+                    validate=validate,
+                    join_nulls=join_nulls,
+                    maintain_order=maintain_order,
+                    streaming=streaming,
+                )
+            # right-only output is already guaranteed by semi/anti on swapped join.
+            _ = keepLeftJoinKeys  # reserved for future parity knobs
+            return self._as_pyspark_df(swapped)
 
         joined = super().join(
             other,
             on=on_names,
+            left_on=left_names,
+            right_on=right_names,
             how=how_norm,
             suffix=suffix,
             coalesce=coalesce,
@@ -1205,6 +1281,8 @@ class DataFrameModel(CoreDataFrameModel):
         other: DataFrameModel | DataFrame,
         *,
         on: str | ColumnRef | Sequence[str | ColumnRef] | None = None,
+        left_on: str | ColumnRef | Sequence[str | ColumnRef] | None = None,
+        right_on: str | ColumnRef | Sequence[str | ColumnRef] | None = None,
         how: str = "inner",
         suffix: str = "_right",
         coalesce: bool | None = None,
@@ -1213,6 +1291,7 @@ class DataFrameModel(CoreDataFrameModel):
         maintain_order: bool | str | None = None,
         streaming: bool | None = None,
         keepRightJoinKeys: bool = False,
+        keepLeftJoinKeys: bool = False,
     ) -> DataFrameModel:
         od = other._df if isinstance(other, DataFrameModel) else other
         return cast(
@@ -1221,6 +1300,8 @@ class DataFrameModel(CoreDataFrameModel):
                 self._df.join(
                     od,
                     on=on,
+                    left_on=left_on,
+                    right_on=right_on,
                     how=how,
                     suffix=suffix,
                     coalesce=coalesce,
@@ -1229,6 +1310,7 @@ class DataFrameModel(CoreDataFrameModel):
                     maintain_order=maintain_order,
                     streaming=streaming,
                     keepRightJoinKeys=keepRightJoinKeys,
+                    keepLeftJoinKeys=keepLeftJoinKeys,
                 )
             ),
         )

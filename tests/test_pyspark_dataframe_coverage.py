@@ -519,6 +519,62 @@ def test_pyspark_join_left_semi_and_left_anti() -> None:
     assert anti == {"id": [1, 3], "x": ["a", "c"]}
 
 
+def test_pyspark_join_right_semi_and_right_anti_are_right_only() -> None:
+    class L(Schema):
+        id: int
+        x: str
+
+    class R(Schema):
+        id: int
+        y: int
+
+    left = DataFrame[L]({"id": [1, 2, 3], "x": ["a", "b", "c"]})
+    right = DataFrame[R]({"id": [2], "y": [10]})
+
+    semi = left.join(right, on="id", how="right_semi").to_dict()
+    assert semi == {"id": [2], "y": [10]}
+
+    anti = left.join(right, on="id", how="right_anti").to_dict()
+    assert anti == {"id": [], "y": []}
+
+
+def test_pyspark_join_left_on_right_on_accept_lists_and_columnrefs() -> None:
+    class L(Schema):
+        lk: int
+        v: int
+
+    class R(Schema):
+        rk: int
+        w: int
+
+    left = DataFrame[L]({"lk": [1, 2], "v": [10, 20]})
+    right = DataFrame[R]({"rk": [2], "w": [200]})
+
+    out = left.join(
+        right,
+        left_on=["lk"],
+        right_on=[right["rk"]],
+        how="inner",
+    ).to_dict()
+    assert out["lk"] == [2]
+    assert out["v"] == [20]
+    assert out["w"] == [200]
+
+
+def test_pyspark_join_validate_shorthands_are_accepted() -> None:
+    class L(Schema):
+        id: int
+        v: int
+
+    class R(Schema):
+        id: int
+        w: int
+
+    left = DataFrame[L]({"id": [1, 2], "v": [10, 20]})
+    right = DataFrame[R]({"id": [1, 2], "w": [100, 200]})
+    out = left.join(right, on="id", how="inner", validate="1:1").to_dict()
+    assert out["id"] == [1, 2]
+
 def test_pyspark_join_on_accepts_list_tuple_and_mixed_columnref() -> None:
     class L(Schema):
         a: int

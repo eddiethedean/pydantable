@@ -106,6 +106,8 @@ class DataFrame(CoreDataFrame[Any]):
         other: DataFrame,
         *,
         on: str | ColumnRef | list[str | ColumnRef] | tuple[str | ColumnRef, ...] | None = None,
+        left_on: str | ColumnRef | list[str | ColumnRef] | tuple[str | ColumnRef, ...] | None = None,
+        right_on: str | ColumnRef | list[str | ColumnRef] | tuple[str | ColumnRef, ...] | None = None,
         how: str = "inner",
         suffix: str = "_right",
         coalesce: bool | None = None,
@@ -114,6 +116,7 @@ class DataFrame(CoreDataFrame[Any]):
         maintain_order: bool | str | None = None,
         streaming: bool | None = None,
         keepRightJoinKeys: bool = False,
+        keepLeftJoinKeys: bool = False,
     ) -> DataFrame: ...
     def intersect(self, other: DataFrame) -> DataFrame: ...
     def subtract(self, other: DataFrame) -> DataFrame: ...
@@ -177,6 +180,8 @@ class DataFrameModel(CoreDataFrameModel):
         other: DataFrameModel | DataFrame,
         *,
         on: str | ColumnRef | list[str | ColumnRef] | tuple[str | ColumnRef, ...] | None = None,
+        left_on: str | ColumnRef | list[str | ColumnRef] | tuple[str | ColumnRef, ...] | None = None,
+        right_on: str | ColumnRef | list[str | ColumnRef] | tuple[str | ColumnRef, ...] | None = None,
         how: str = "inner",
         suffix: str = "_right",
         coalesce: bool | None = None,
@@ -185,6 +190,7 @@ class DataFrameModel(CoreDataFrameModel):
         maintain_order: bool | str | None = None,
         streaming: bool | None = None,
         keepRightJoinKeys: bool = False,
+        keepLeftJoinKeys: bool = False,
     ) -> DataFrameModel: ...
     def intersect(self, other: DataFrameModel | DataFrame) -> DataFrameModel: ...
     def subtract(self, other: DataFrameModel | DataFrame) -> DataFrameModel: ...

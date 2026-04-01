@@ -41,7 +41,10 @@ See:
 | `count()` (action) | `count()` | Implemented (**1.9.0+**) | **`int`** row count via **`global_row_count()`**; distinct from grouped **`count(...)`**. |
 | `sort` / `crossJoin` | same | Implemented (**1.9.0+**) | Global **`sort`** only; **`crossJoin`** → **`join(how="cross")`**. |
 | `join(..., how=\"left_semi\"|\"left_anti\")` | same | Implemented (**1.9.0+**) | Spark-ish join-mode names mapped to core `semi`/`anti`. |
+| `join(..., how=\"right_semi\"|\"right_anti\")` | same | Implemented (**1.9.0+**) | Spark-ish `right_*` join aliases implemented by swapping join sides; output is right-only columns. |
 | `join(..., on=[...])` key handling | same | Implemented (**1.9.0+**) | Spark-ish USING behavior: duplicate right join key columns are dropped by default; opt out with `keepRightJoinKeys=True`. |
+| `join(left_on=[...], right_on=[...])` | same | Implemented (**1.9.0+**) | Join on differently named keys; accept list/tuple keys and `ColumnRef` entries. |
+| `join(validate=\"1:1\"|\"1:m\"|\"m:1\"|\"m:m\")` | same | Implemented (**1.9.0+**) | Spark-style validate shorthands forwarded to core join. |
 | `unionByName` | same | Implemented (**1.9.0+**) | Name order + optional **`allowMissingColumns`**. |
 | `intersect` / `subtract` / `except` | same | Partial (**1.9.0+**) | Distinct-set semantics. `except` is exposed at runtime as `df.except(...)` but implemented as `except_` in Python/stubs. |
 | `exceptAll` / `intersectAll` | same | Implemented (**1.9.0+**) | Multiset semantics via Rust/Polars core. |
