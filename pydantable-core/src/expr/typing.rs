@@ -230,6 +230,10 @@ impl ExprNode {
             | ExprNode::StringReplace { dtype, .. }
             | ExprNode::StringPredicate { dtype, .. }
             | ExprNode::StructField { dtype, .. }
+            | ExprNode::StructJsonEncode { dtype, .. }
+            | ExprNode::StructJsonPathMatch { dtype, .. }
+            | ExprNode::StructRenameFields { dtype, .. }
+            | ExprNode::StructWithFields { dtype, .. }
             | ExprNode::UnaryNumeric { dtype, .. }
             | ExprNode::StringUnary { dtype, .. }
             | ExprNode::LogicalBinary { dtype, .. }
@@ -376,7 +380,17 @@ impl ExprNode {
                 out.extend(right.referenced_columns());
                 out
             }
-            ExprNode::StructField { base, .. } => base.referenced_columns(),
+            ExprNode::StructField { base, .. }
+            | ExprNode::StructJsonEncode { base, .. }
+            | ExprNode::StructJsonPathMatch { base, .. }
+            | ExprNode::StructRenameFields { base, .. } => base.referenced_columns(),
+            ExprNode::StructWithFields { base, updates, .. } => {
+                let mut out = base.referenced_columns();
+                for (_, e) in updates {
+                    out.extend(e.referenced_columns());
+                }
+                out
+            }
             ExprNode::GlobalAgg { inner, .. } => inner.referenced_columns(),
             ExprNode::GlobalRowCount { .. } => HashSet::new(),
             ExprNode::Window {
@@ -1274,6 +1288,163 @@ impl ExprNode {
         Ok(ExprNode::StructField {
             base: Box::new(inner),
             field,
+            dtype,
+        })
+    }
+
+    fn dtype_under_nullable_struct(struct_nullable: bool, d: DTypeDesc) -> DTypeDesc {
+        if !struct_nullable {
+            return d;
+        }
+        match d {
+            DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
+                base,
+                nullable: true,
+                literals: None,
+            },
+            DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
+                fields,
+                nullable: true,
+            },
+            DTypeDesc::List { inner, .. } => DTypeDesc::List {
+                inner,
+                nullable: true,
+            },
+            DTypeDesc::Map { value, .. } => DTypeDesc::Map {
+                value,
+                nullable: true,
+            },
+        }
+    }
+
+    pub fn make_struct_json_encode(inner: ExprNode) -> PyResult<Self> {
+        if !inner.dtype().is_struct() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "struct_json_encode() requires a struct-typed expression.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::StructJsonEncode {
+            base: Box::new(inner),
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Str),
+                nullable,
+                literals: None,
+            },
+        })
+    }
+
+    pub fn make_struct_json_path_match(inner: ExprNode, path: String) -> PyResult<Self> {
+        if !inner.dtype().is_struct() {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "struct_json_path_match() requires a struct-typed expression.",
+            ));
+        }
+        if path.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "JSONPath pattern must not be empty.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::StructJsonPathMatch {
+            base: Box::new(inner),
+            path,
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Str),
+                nullable,
+                literals: None,
+            },
+        })
+    }
+
+    pub fn make_struct_rename_fields(inner: ExprNode, names: Vec<String>) -> PyResult<Self> {
+        let DTypeDesc::Struct {
+            fields,
+            nullable: struct_nullable,
+        } = inner.dtype()
+        else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "struct_rename_fields() requires a struct-typed expression.",
+            ));
+        };
+        if names.len() != fields.len() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "struct_rename_fields() expected {} names (one per struct field), got {}.",
+                fields.len(),
+                names.len()
+            )));
+        }
+        let mut seen = std::collections::HashSet::new();
+        for n in &names {
+            if !seen.insert(n.as_str()) {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "struct_rename_fields() duplicate new field name {:?}.",
+                    n
+                )));
+            }
+        }
+        let new_fields: Vec<(String, DTypeDesc)> = names
+            .iter()
+            .zip(fields.iter())
+            .map(|(n, (_, dt))| (n.clone(), dt.clone()))
+            .collect();
+        let dtype = DTypeDesc::Struct {
+            fields: new_fields,
+            nullable: struct_nullable,
+        };
+        Ok(ExprNode::StructRenameFields {
+            base: Box::new(inner),
+            names,
+            dtype,
+        })
+    }
+
+    pub fn make_struct_with_fields(
+        inner: ExprNode,
+        updates: Vec<(String, ExprNode)>,
+    ) -> PyResult<Self> {
+        let DTypeDesc::Struct {
+            fields: base_fields,
+            nullable: struct_nullable,
+        } = inner.dtype()
+        else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "struct_with_fields() requires a struct-typed expression.",
+            ));
+        };
+        if updates.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "struct_with_fields() requires at least one field expression.",
+            ));
+        }
+        let mut seen_update_keys = std::collections::HashSet::new();
+        for (name, _) in &updates {
+            if !seen_update_keys.insert(name.as_str()) {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "struct_with_fields() duplicate field name {:?} in updates.",
+                    name
+                )));
+            }
+        }
+        let mut out_fields: Vec<(String, DTypeDesc)> = base_fields.clone();
+        let mut boxed_updates: Vec<(String, Box<ExprNode>)> =
+            Vec::with_capacity(updates.len());
+        for (name, expr) in updates {
+            let fd = Self::dtype_under_nullable_struct(struct_nullable, expr.dtype());
+            if let Some(pos) = out_fields.iter().position(|(n, _)| n == &name) {
+                out_fields[pos] = (name.clone(), fd);
+            } else {
+                out_fields.push((name.clone(), fd));
+            }
+            boxed_updates.push((name, Box::new(expr)));
+        }
+        let dtype = DTypeDesc::Struct {
+            fields: out_fields,
+            nullable: struct_nullable,
+        };
+        Ok(ExprNode::StructWithFields {
+            base: Box::new(inner),
+            updates: boxed_updates,
             dtype,
         })
     }
@@ -4031,9 +4202,13 @@ impl ExprNode {
                     "This expression is only supported with the Polars execution engine.",
                 ))
             }
-            ExprNode::StructField { .. } => {
+            ExprNode::StructField { .. }
+            | ExprNode::StructJsonEncode { .. }
+            | ExprNode::StructJsonPathMatch { .. }
+            | ExprNode::StructRenameFields { .. }
+            | ExprNode::StructWithFields { .. } => {
                 Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-                    "Struct field access is only supported with the Polars execution engine.",
+                    "Struct operations are only supported with the Polars execution engine.",
                 ))
             }
             ExprNode::Window { .. } => {

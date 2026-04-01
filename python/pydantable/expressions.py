@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Sequence, get_args, get_origin
 
 from .rust_engine import _require_rust_core
 
@@ -252,6 +252,52 @@ class Expr:  # type: ignore[override]
     def struct_field(self, name: str) -> Expr:
         rust_expr = _require_rust_core().expr_struct_field(self._rust_expr, name)
         return Expr(rust_expr=rust_expr)
+
+    def struct_json_encode(self) -> Expr:
+        """Encode each struct cell as a JSON text value (Polars ``struct.json_encode``)."""
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_struct_json_encode(self._rust_expr))
+
+    def struct_json_path_match(self, path: str) -> Expr:
+        """JSONPath against struct cells (JSON-encode then ``str.json_path_match``).
+
+        Same null/match semantics as :meth:`str_json_path_match` on strings.
+        Empty ``path`` raises ``ValueError``.
+        """
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_struct_json_path_match(self._rust_expr, str(path)),
+        )
+
+    def struct_rename_fields(self, names: Sequence[str]) -> Expr:
+        """Rename struct subfields in order (one new name per existing field)."""
+        rust = _require_rust_core()
+        return Expr(
+            rust_expr=rust.expr_struct_rename_fields(
+                self._rust_expr, [str(x) for x in names]
+            ),
+        )
+
+    def struct_with_fields(self, **fields: Any) -> Expr:
+        """Add or replace struct subfields (Polars ``struct.with_fields``).
+
+        Each keyword must be a field name; each value must be an :class:`Expr`.
+        """
+        if not fields:
+            raise TypeError(
+                "struct_with_fields() requires at least one keyword field=Expr."
+            )
+        rust = _require_rust_core()
+        updates: list[tuple[str, Any]] = []
+        for k, v in fields.items():
+            if not isinstance(v, Expr):
+                raise TypeError(
+                    f"struct_with_fields({k}=...) expects Expr, got {type(v).__name__}."
+                )
+            updates.append((str(k), v._rust_expr))
+        return Expr(
+            rust_expr=rust.expr_struct_with_fields(self._rust_expr, updates),
+        )
 
     # Numeric
     def abs(self) -> Expr:

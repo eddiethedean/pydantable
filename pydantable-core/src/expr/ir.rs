@@ -219,6 +219,29 @@ pub enum ExprNode {
         field: String,
         dtype: DTypeDesc,
     },
+    /// Struct column → JSON text (`struct.json_encode`).
+    StructJsonEncode {
+        base: Box<ExprNode>,
+        dtype: DTypeDesc,
+    },
+    /// JSONPath on struct as JSON text (`struct.json_encode` + `str.json_path_match`).
+    StructJsonPathMatch {
+        base: Box<ExprNode>,
+        path: String,
+        dtype: DTypeDesc,
+    },
+    /// Rename struct subfields in order (`struct.rename_fields`).
+    StructRenameFields {
+        base: Box<ExprNode>,
+        names: Vec<String>,
+        dtype: DTypeDesc,
+    },
+    /// Add/replace struct subfields (`struct.with_fields`).
+    StructWithFields {
+        base: Box<ExprNode>,
+        updates: Vec<(String, Box<ExprNode>)>,
+        dtype: DTypeDesc,
+    },
     UnaryNumeric {
         op: UnaryNumericOp,
         inner: Box<ExprNode>,

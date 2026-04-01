@@ -233,6 +233,32 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             dict.set_item("base", exprnode_to_serializable(py, base)?)?;
             dict.set_item("field", field)?;
         }
+        ExprNode::StructJsonEncode { base, .. } => {
+            dict.set_item("kind", "struct_json_encode")?;
+            dict.set_item("base", exprnode_to_serializable(py, base)?)?;
+        }
+        ExprNode::StructJsonPathMatch { base, path, .. } => {
+            dict.set_item("kind", "struct_json_path_match")?;
+            dict.set_item("base", exprnode_to_serializable(py, base)?)?;
+            dict.set_item("path", path.as_str())?;
+        }
+        ExprNode::StructRenameFields { base, names, .. } => {
+            dict.set_item("kind", "struct_rename_fields")?;
+            dict.set_item("base", exprnode_to_serializable(py, base)?)?;
+            dict.set_item("names", names.clone())?;
+        }
+        ExprNode::StructWithFields { base, updates, .. } => {
+            dict.set_item("kind", "struct_with_fields")?;
+            dict.set_item("base", exprnode_to_serializable(py, base)?)?;
+            let upd = pyo3::types::PyList::empty_bound(py);
+            for (n, e) in updates {
+                let pair = pyo3::types::PyList::empty_bound(py);
+                pair.append(n)?;
+                pair.append(exprnode_to_serializable(py, e.as_ref())?)?;
+                upd.append(pair)?;
+            }
+            dict.set_item("updates", upd)?;
+        }
         ExprNode::UnaryNumeric { op, inner, .. } => {
             dict.set_item("kind", "unary_numeric")?;
             let (op_s, dec) = match op {

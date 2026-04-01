@@ -435,9 +435,9 @@ contract tests. Order is **not** priority order.
 
 ### Structs and maps
 
-- [ ] **`struct_rename_fields`**, **`struct_with_fields`** (add/replace nested fields by
+- [x] **`struct_rename_fields`**, **`struct_with_fields`** (add/replace nested fields by
   name).
-- [ ] **`struct_json_encode`** / **`struct_json_path_match`** symmetry with string JSON
+- [x] **`struct_json_encode`** / **`struct_json_path_match`** symmetry with string JSON
   helpers.
 - [ ] **Map transforms:** **`map_filter`**, **`map_entries_sorted`**, **`map_zip`** where
   Polars exposes stable operations and our schema story stays **`dict[str, T]`**.

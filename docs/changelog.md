@@ -8,14 +8,16 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Added
 
+- **Struct expressions (Polars):** **`Expr.struct_json_encode`**, **`struct_json_path_match`**, **`struct_rename_fields`**, **`struct_with_fields`** (Rust **`ExprNode`** + lowering); PySpark façade **`pydantable.pyspark.sql.functions.struct_json_encode`** / **`struct_json_path_match`**. Tests: **`tests/test_struct_expr_phase_b.py`**.
 - **Tests:** **`tests/test_json_io_phase_a.py`** — nested **`materialize_json`** (array vs NDJSON), **`export_json`** round-trip and **`default=str`** for **`datetime`** / **`Decimal`** / **`UUID`**, lazy **`read_ndjson`** / **`read_json`** alias with nested struct + list, eager path with **`dict[str, T]`** map column.
 
 ### Docs
 
 - **JSON modeling:** **JSON (RFC 8259) vs column types** in {doc}`SUPPORTED_TYPES` (heterogeneous arrays, arbitrary JSON, link from {doc}`IO_JSON`).
-- **I/O:** **Eager `export_json` serialization** in {doc}`IO_JSON`; extended **`export_json`** docstring in **`pydantable.io`** (`json.dump` + `default=str`).
+- **I/O:** **Eager `export_json` serialization** in {doc}`IO_JSON`; extended **`export_json`** docstring in **`pydantable.io`** (`json.dump` + `default=str`); struct → JSON text pointer (**`struct_json_encode`**).
+- **Structs:** **`SUPPORTED_TYPES`** and **`INTERFACE_CONTRACT`** — struct JSON / **`with_fields`** / **`rename_fields`** semantics and row-wise limits.
 - **FastAPI:** columnar **map** / nested field notes with links to {doc}`SUPPORTED_TYPES` and {doc}`IO_JSON`.
-- **Roadmap:** Phase A checklist completed in {doc}`ROADMAP_1_10_JSON_STRUCT`.
+- **Roadmap:** Phase A + Phase B checklists completed in {doc}`ROADMAP_1_10_JSON_STRUCT`.
 
 ### Changed
 

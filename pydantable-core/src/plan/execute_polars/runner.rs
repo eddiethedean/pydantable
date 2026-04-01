@@ -112,7 +112,16 @@ impl PolarsPlanRunner {
                         .map(|e| Self::expr_has_framed_window(e))
                         .unwrap_or(false)
             }
-            ExprNode::StructField { base, .. } => Self::expr_has_framed_window(base),
+            ExprNode::StructField { base, .. }
+            | ExprNode::StructJsonEncode { base, .. }
+            | ExprNode::StructJsonPathMatch { base, .. }
+            | ExprNode::StructRenameFields { base, .. } => Self::expr_has_framed_window(base),
+            ExprNode::StructWithFields { base, updates, .. } => {
+                Self::expr_has_framed_window(base)
+                    || updates
+                        .iter()
+                        .any(|(_, e)| Self::expr_has_framed_window(e))
+            }
             ExprNode::ListGet { inner, index, .. }
             | ExprNode::ListContains {
                 inner,

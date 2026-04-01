@@ -232,6 +232,41 @@ fn expr_struct_field(inner: Bound<'_, PyExpr>, field: String) -> PyResult<PyExpr
 }
 
 #[pyfunction]
+fn expr_struct_json_encode(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_struct_json_encode(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
+fn expr_struct_json_path_match(inner: Bound<'_, PyExpr>, path: String) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_struct_json_path_match(inner.borrow().node.clone(), path)?,
+    })
+}
+
+#[pyfunction]
+fn expr_struct_rename_fields(inner: Bound<'_, PyExpr>, names: Vec<String>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_struct_rename_fields(inner.borrow().node.clone(), names)?,
+    })
+}
+
+#[pyfunction]
+fn expr_struct_with_fields(
+    inner: Bound<'_, PyExpr>,
+    updates: Vec<(String, Bound<'_, PyExpr>)>,
+) -> PyResult<PyExpr> {
+    let pairs: Vec<(String, ExprNode)> = updates
+        .into_iter()
+        .map(|(k, e)| Ok((k, e.borrow().node.clone())))
+        .collect::<PyResult<_>>()?;
+    Ok(PyExpr {
+        node: ExprNode::make_struct_with_fields(inner.borrow().node.clone(), pairs)?,
+    })
+}
+
+#[pyfunction]
 fn expr_abs(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
     Ok(PyExpr {
         node: ExprNode::make_unary_numeric(inner.borrow().node.clone(), UnaryNumericOp::Abs)?,
@@ -1023,6 +1058,10 @@ pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr_string_replace, m)?)?;
     m.add_function(wrap_pyfunction!(expr_string_predicate, m)?)?;
     m.add_function(wrap_pyfunction!(expr_struct_field, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_struct_json_encode, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_struct_json_path_match, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_struct_rename_fields, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_struct_with_fields, m)?)?;
     m.add_function(wrap_pyfunction!(expr_abs, m)?)?;
     m.add_function(wrap_pyfunction!(expr_round, m)?)?;
     m.add_function(wrap_pyfunction!(expr_floor, m)?)?;

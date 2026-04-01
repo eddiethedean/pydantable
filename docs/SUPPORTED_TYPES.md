@@ -141,9 +141,10 @@ model instance: in columnar Python input, use a **list of dicts** (or objects th
 validate as the nested model).
 
 Rust maps these to **struct** dtypes and Polars **struct** columns. **Expression
-support for struct columns is intentionally limited** (for example, no arithmetic
-on whole structs; equality is allowed only when struct shapes match). Prefer
-scalar fields or `Expr.struct_field(...)` for field projection.
+support for whole-struct ops is conservative** (no arithmetic on whole structs;
+equality is allowed only when struct shapes match). Use **`Expr.struct_field(...)`**
+for scalar field projection, plus struct helpers below (all **Polars-backed**;
+see {doc}`INTERFACE_CONTRACT` row-wise notes).
 
 ## Map-like columns (`dict[str, T]`)
 
@@ -242,6 +243,7 @@ Beyond generic arithmetic and comparisons, the following are supported (see
 - **Datetime / date / time:** `dt_year()` … `dt_day()` on **`date`** or **`datetime`**; **`dt_weekday()`** (ISO weekday: Monday = 1 … Sunday = 7, same as Polars) and **`dt_quarter()`** (1–4) on **`date`** or **`datetime`**; **`dt_week()`** (ISO 8601 week number 1–53, same as Polars **`dt.week()`** and Python **`date.isocalendar().week`**); **`dt_dayofyear()`** (day of year 1–366; Polars **`dt.ordinal_day()`**) on **`date`** or **`datetime`**; `dt_hour()` … **`dt_nanosecond()`** on **`datetime`** or **`time`**; **`dt_date()`** on **`datetime`** (calendar `date`). **`strptime(format, to_datetime=...)`** parses **`str`** → **`date`** or **`datetime`**. **`unix_timestamp(unit=...)`** returns epoch **`int`** from **`date`** / **`datetime`**. **`from_unix_time(unit=...)`** on **`int`** / **`float`** columns yields UTC-naive **`datetime`** (inverse of **`unix_timestamp`** for typical values). **`datetime ± timedelta`** and **`date ± timedelta`** use typed binary ops (see Rust `infer_arith_dtype`).
 - **Homogeneous lists:** `list_len()`, **`list_get(index)`** (int index; OOB → null), **`list_contains(value)`**, **`list_min()`** / **`list_max()`** / **`list_sum()`** / **`list_mean()`** on `list[int]` or `list[float]` (**`list_mean`** result is **`float`**; empty list cells yield null); **`list_join(separator, ignore_nulls=False)`** for **`list[str]`** → **`str`**; **`list_sort(...)`** and **`list_unique(stable=False)`** for lists whose elements are sortable scalars (see below).
 - **Maps (`dict[str, T]`):** **`map_len()`** (number of entries), **`map_get(key)`** (value or null), **`map_contains_key(key)`** (boolean), **`map_keys()`** (list of keys), **`map_values()`** (list of values), **`map_entries()`** (list of `{key, value}` structs); physical encoding is `List(Struct{key, value})`.
+- **Struct (nested model columns):** **`struct_field(name)`**; **`struct_json_encode()`** → **`str`** (JSON text per cell via Polars **`struct.json_encode`**); **`struct_json_path_match(path)`** (JSON-encode then **`str.json_path_match`**; same empty-**`path`** **`ValueError`** and null-on-miss semantics as **`str_json_path_match`**); **`struct_rename_fields([...])`** (exactly one new name per existing subfield, **unique** names); **`struct_with_fields(...)`** (keyword args **`field=Expr`** to add or replace subfields; at least one update). Nullable outer struct cells propagate **nullability** to projected **`str`** / subfield dtypes like **`struct_field`**.
 - **Binary (`bytes`):** **`binary_len()`** (per-row byte length).
 - **Cast:** `cast(T)` supports the usual primitive conversions plus `datetime` → `date` / `str` and `date` → `str`, and **`str` → `date` / `datetime`** using Polars’ string parsing (ISO-8601-shaped strings; behavior follows Polars). For a **fixed format**, use **`strptime(format, ...)`** instead of `cast`.
 
@@ -279,6 +281,7 @@ Temporal part extraction and `dt_date()` on timezone-aware `datetime` values fol
 
 - **`str_extract_regex`**: empty **`pattern`** raises **`ValueError`** when the expression is built. Uses Polars **`str.extract`** (Rust regex). **`group_index`** **`0`** is the full match; **`1+`** are capture groups. **Out-of-range** **`group_index`** or non-matching rows typically yield **null** at execution (no error per row).
 - **`str_json_path_match`**: **`path`** uses Polars JSONPath (**`$...`** style). Empty **`path`** raises **`ValueError`**. Each cell must hold JSON text; **malformed JSON** or **no match** typically yields **null** (engine-dependent). The output dtype is **`str`** (matched fragment as string, e.g. JSON scalars without quotes per Polars). Use a **`str`** column whose values are JSON documents (or JSON embedded in a string literal), not a separate JSON dtype.
+- **`struct_json_path_match`**: same JSONPath dialect and typical **null** behavior, applied after encoding each **struct** cell as JSON text (see **`struct_json_encode`**). Prefer this over nesting **`struct_json_encode()`** and **`str_json_path_match(...)`** in user code when both are on the same struct column.
 
 ## Not supported as schema column types
 

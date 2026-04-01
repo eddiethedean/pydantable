@@ -20,4 +20,6 @@ For a single JSON **array** of objects (``[{...}, {...}]``), use :func:`pydantab
 
 **Lazy NDJSON** and **eager** ``materialize_json`` can infer nested shapes differently; map-like JSON objects may round-trip more reliably through **eager** ``materialize_json`` + a typed constructor than through a **lazy** scan—see tests in ``tests/test_json_io_phase_a.py``.
 
+To emit JSON **text from nested model columns inside a frame**, use :meth:`~pydantable.expressions.Expr.struct_json_encode` on the struct-typed :class:`~pydantable.expressions.Expr` (Polars-backed); see {doc}`SUPPORTED_TYPES`.
+
 See also: {doc}`IO_NDJSON`, {doc}`IO_DECISION_TREE`.

@@ -69,10 +69,12 @@ Mirror **string** JSON helpers for **struct** columns (see {doc}`ROADMAP` **Stru
 
 **Checklist**
 
-- [ ] Rust `ExprNode` + typing in `pydantable-core` (+ serialization if needed).
-- [ ] Python `Expr` methods and PySpark façade aliases where naming matches.
-- [ ] `INTERFACE_CONTRACT` + {doc}`SUPPORTED_TYPES` updates (expression typing, struct nullability).
-- [ ] Contract tests mirroring `tests/test_nested_model_dtype.py` / string JSON tests.
+- [x] Rust `ExprNode` + typing in `pydantable-core` (+ serialization if needed).
+- [x] Python `Expr` methods and PySpark façade aliases where naming matches.
+- [x] `INTERFACE_CONTRACT` + {doc}`SUPPORTED_TYPES` updates (expression typing, struct nullability).
+- [x] Contract tests mirroring `tests/test_nested_model_dtype.py` / string JSON tests.
+
+**Shipped in 1.10.0 (Phase B):** **`Expr.struct_json_encode`**, **`struct_json_path_match`**, **`struct_rename_fields`**, **`struct_with_fields`**; PySpark **`functions.struct_json_encode`** / **`struct_json_path_match`**; tests **`tests/test_struct_expr_phase_b.py`**.
 
 **Suggested priority order:** `struct_json_encode` → `struct_with_fields` / `struct_rename_fields` → `struct_json_path_match` (depends on Polars surface and typing).
 

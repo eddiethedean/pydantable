@@ -436,6 +436,22 @@ def json_path_match(column: Expr, path: str) -> Expr:
     return column.str_json_path_match(path)
 
 
+def struct_json_encode(column: Expr) -> Expr:
+    """Struct column → JSON text per row (core :meth:`Expr.struct_json_encode`)."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.struct_json_encode() expects a typed column Expr.")
+    return column.struct_json_encode()
+
+
+def struct_json_path_match(column: Expr, path: str) -> Expr:
+    """JSONPath on struct cells after JSON encoding."""
+    if not isinstance(column, Expr):
+        raise TypeError(
+            "functions.struct_json_path_match() expects a typed column Expr."
+        )
+    return column.struct_json_path_match(path)
+
+
 def strip_prefix(column: Expr, prefix: str) -> Expr:
     """Remove literal ``prefix`` from string start (core ``Expr.strip_prefix``)."""
     if not isinstance(column, Expr):
@@ -829,6 +845,8 @@ __all__ = [
     "isnotnull",
     "isnull",
     "json_path_match",
+    "struct_json_encode",
+    "struct_json_path_match",
     "lag",
     "last_value",
     "lead",

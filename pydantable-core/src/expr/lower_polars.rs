@@ -462,6 +462,26 @@ impl ExprNode {
                 .to_polars_expr()?
                 .struct_()
                 .field_by_name(field.as_str())),
+            ExprNode::StructJsonEncode { base, .. } => {
+                Ok(base.to_polars_expr()?.struct_().json_encode())
+            }
+            ExprNode::StructJsonPathMatch { base, path, .. } => Ok(base
+                .to_polars_expr()?
+                .struct_()
+                .json_encode()
+                .str()
+                .json_path_match(lit(path.as_str()))),
+            ExprNode::StructRenameFields { base, names, .. } => Ok(base
+                .to_polars_expr()?
+                .struct_()
+                .rename_fields(names.iter().map(|s| s.as_str()))),
+            ExprNode::StructWithFields { base, updates, .. } => {
+                let mut flds: Vec<PolarsExpr> = Vec::with_capacity(updates.len());
+                for (name, en) in updates {
+                    flds.push(en.to_polars_expr()?.alias(name.as_str()));
+                }
+                Ok(base.to_polars_expr()?.struct_().with_fields(flds))
+            }
             ExprNode::UnaryNumeric { op, inner, .. } => {
                 let e = inner.to_polars_expr()?;
                 match op {
