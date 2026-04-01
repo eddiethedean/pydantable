@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence  # noqa: TC003
-from typing import TYPE_CHECKING, Any, cast, get_args, get_origin, Union
 from types import UnionType
+from typing import TYPE_CHECKING, Any, Union, cast, get_args, get_origin
 from typing import Literal as TypingLiteral
 
 from pydantable.dataframe import DataFrame as CoreDataFrame
@@ -83,7 +83,8 @@ class PySparkGroupedDataFrame(CoreGroupedDataFrame):
                 ops_list = list(ops)
             else:
                 raise TypeError(
-                    "Dict-form agg values must be an op string or list/tuple of op strings."
+                    "Dict-form agg values must be an op string or list/tuple of "
+                    "op strings."
                 )
             for raw_op in ops_list:
                 if not isinstance(raw_op, str):
@@ -209,7 +210,9 @@ class PySparkGroupedDataFrameModel:
         return f"PySparkGroupedDataFrameModel({self._model_type.__name__})\n{inner}"
 
     def agg(self, *exprs: Any, **aggregations: Any) -> DataFrameModel:
-        return self._model_type._from_dataframe(self._grouped.agg(*exprs, **aggregations))
+        return self._model_type._from_dataframe(
+            self._grouped.agg(*exprs, **aggregations)
+        )
 
     def sum(self, *columns: str, streaming: bool | None = None) -> DataFrameModel:
         return self._model_type._from_dataframe(
@@ -597,7 +600,7 @@ class DataFrame(CoreDataFrame):
     def withColumns(self, colsMap: Mapping[str, Any]) -> DataFrame:
         """Add or replace multiple columns (Spark ``withColumns``)."""
         cm = dict(colsMap)
-        for k, v in cm.items():
+        for _k, v in cm.items():
             if not isinstance(v, Expr):
                 raise TypeError(
                     "withColumns(colsMap) expects mapping values to be typed Exprs. "
@@ -722,19 +725,20 @@ class DataFrame(CoreDataFrame):
         outer: bool = False,
         streaming: bool | None = None,
     ) -> DataFrame:
-        """Explode one or more **list-typed** columns (Spark ``explode``; use ``outer=True`` for ``explode_outer``)."""
+        """Explode **list** columns (Spark ``explode``).
+
+        Use ``outer=True`` for ``explode_outer``.
+        """
         return self._as_pyspark_df(
             super().explode(column, outer=outer, streaming=streaming)
         )
 
-    def explode_outer(
-        self, column: Any, *, streaming: bool | None = None
-    ) -> DataFrame:
+    def explode_outer(self, column: Any, *, streaming: bool | None = None) -> DataFrame:
         """Explode list columns with Spark-ish outer null/empty handling (see docs)."""
         return self._as_pyspark_df(super().explode_outer(column, streaming=streaming))
 
     def explode_all(self, *, streaming: bool | None = None) -> DataFrame:
-        """Explode every list-typed column in the schema (not a separate Spark name; convenience)."""
+        """Explode every list-typed column (schema-driven; not a Spark name)."""
         return self._as_pyspark_df(super().explode_all(streaming=streaming))
 
     def posexplode(
@@ -746,7 +750,7 @@ class DataFrame(CoreDataFrame):
         outer: bool = False,
         streaming: bool | None = None,
     ) -> DataFrame:
-        """Explode one list column and add a **0-based** index column (Spark ``posexplode``)."""
+        """Explode one list column with a **0-based** index (Spark ``posexplode``)."""
         return self._as_pyspark_df(
             super().posexplode(
                 column, pos=pos, value=value, outer=outer, streaming=streaming
@@ -766,10 +770,8 @@ class DataFrame(CoreDataFrame):
             super().posexplode_outer(column, pos=pos, value=value, streaming=streaming)
         )
 
-    def unnest(
-        self, column: Any, *, streaming: bool | None = None
-    ) -> DataFrame:
-        """Expand **struct** columns to top-level fields (common Spark ``struct`` expansion pattern)."""
+    def unnest(self, column: Any, *, streaming: bool | None = None) -> DataFrame:
+        """Expand **struct** columns to top-level fields (Spark struct pattern)."""
         return self._as_pyspark_df(super().unnest(column, streaming=streaming))
 
     def unnest_all(self, *, streaming: bool | None = None) -> DataFrame:
@@ -790,7 +792,7 @@ class DataFrame(CoreDataFrame):
         return cast("DataFrame", super().distinct(subset=subset, keep=keep))
 
     def dropDuplicates(self, subset: list[str] | None = None) -> DataFrame:
-        """Spark ``dropDuplicates``; keep-first semantics (engine-dependent without ordering)."""
+        """Spark ``dropDuplicates``; keep-first (engine-dependent without ordering)."""
         return (
             self.distinct(subset=subset, keep="first")
             if subset is not None
@@ -825,7 +827,9 @@ class DataFrame(CoreDataFrame):
                 "unionByName requires identical column names on both sides "
                 "unless allowMissingColumns=True."
             )
-        return self._union_by_name_allow_missing(other, allow_missing=allowMissingColumns)
+        return self._union_by_name_allow_missing(
+            other, allow_missing=allowMissingColumns
+        )
 
     def _union_by_name_allow_missing(
         self, other: DataFrame, *, allow_missing: bool
@@ -841,7 +845,9 @@ class DataFrame(CoreDataFrame):
             origin = get_origin(ann)
             if origin is None:
                 return False
-            return (origin is UnionType or origin is Union) and type(None) in get_args(ann)
+            return (origin is UnionType or origin is Union) and type(None) in get_args(
+                ann
+            )
 
         def _strip_optional(ann: Any) -> Any:
             args = tuple(a for a in get_args(ann) if a is not type(None))
@@ -885,8 +891,9 @@ class DataFrame(CoreDataFrame):
                 f"column {name!r}: left={lt!r}, right={rt!r}"
             )
             if allow_missing:
-                msg = "unionByName(allowMissingColumns=True) has incompatible dtypes for " + (
-                    f"column {name!r}: left={lt!r}, right={rt!r}"
+                msg = (
+                    "unionByName(allowMissingColumns=True) has incompatible dtypes for "
+                    + (f"column {name!r}: left={lt!r}, right={rt!r}")
                 )
             raise TypeError(msg)
 
@@ -902,7 +909,11 @@ class DataFrame(CoreDataFrame):
                     out = out.with_columns(**{name: Literal(value=None).cast(target)})
                 elif side_types[name] != target:
                     out = out.with_columns(
-                        **{name: ColumnRef(name=name, dtype=side_types[name]).cast(target)}
+                        **{
+                            name: ColumnRef(name=name, dtype=side_types[name]).cast(
+                                target
+                            )
+                        }
                     )
             return out.select(*all_names)
 
@@ -1024,7 +1035,9 @@ class DataFrame(CoreDataFrame):
         if not isinstance(keepLeftJoinKeys, bool):
             raise TypeError("join(keepLeftJoinKeys=...) expects a bool.")
         if on is not None and (left_on is not None or right_on is not None):
-            raise ValueError("join() use either on=... or left_on=/right_on=..., not both.")
+            raise ValueError(
+                "join() use either on=... or left_on=/right_on=..., not both."
+            )
 
         how_norm = str(how).strip().lower()
         how_aliases = {
@@ -1087,8 +1100,8 @@ class DataFrame(CoreDataFrame):
                 referenced = arg.referenced_columns()
                 if len(referenced) != 1:
                     raise TypeError(
-                        f"join({arg_name}=...) ColumnRef must reference exactly one column; "
-                        f"referenced_columns={sorted(referenced)!r}"
+                        f"join({arg_name}=...) ColumnRef must reference exactly "
+                        f"one column; referenced_columns={sorted(referenced)!r}"
                     )
                 return next(iter(referenced))
             raw = list(arg)
@@ -1100,17 +1113,19 @@ class DataFrame(CoreDataFrame):
                     referenced = k.referenced_columns()
                     if len(referenced) != 1:
                         raise TypeError(
-                            f"join({arg_name}=...) ColumnRef must reference exactly one column; "
-                            f"referenced_columns={sorted(referenced)!r}"
+                            f"join({arg_name}=...) ColumnRef must reference exactly "
+                            f"one column; referenced_columns={sorted(referenced)!r}"
                         )
                     out.append(next(iter(referenced)))
                 else:
                     raise TypeError(
-                        f"join({arg_name}=...) expects str, ColumnRef, or a sequence of "
-                        "str|ColumnRef."
+                        f"join({arg_name}=...) expects str, ColumnRef, or a "
+                        "sequence of str|ColumnRef."
                     )
             if len(set(out)) != len(out):
-                raise ValueError(f"join({arg_name}=...) must not contain duplicate keys.")
+                raise ValueError(
+                    f"join({arg_name}=...) must not contain duplicate keys."
+                )
             return out
 
         on_names = _resolve_key_arg(on, arg_name="on")
@@ -1128,15 +1143,20 @@ class DataFrame(CoreDataFrame):
                         "join() requires both left_on=... and right_on=... when on=... "
                         "is not set."
                     )
-                left_list = [left_names] if isinstance(left_names, str) else list(left_names)
-                right_list = [right_names] if isinstance(right_names, str) else list(right_names)
+                left_list = (
+                    [left_names] if isinstance(left_names, str) else list(left_names)
+                )
+                right_list = (
+                    [right_names] if isinstance(right_names, str) else list(right_names)
+                )
                 if len(left_list) != len(right_list):
                     raise ValueError(
-                        "join(left_on=..., right_on=...) must have matching key lengths."
+                        "join(left_on=..., right_on=...) key lists must match length."
                     )
             else:
                 raise ValueError(
-                    "join() requires on=... or left_on=.../right_on=... for non-cross joins."
+                    "join() requires on=... or left_on=.../right_on=... for "
+                    "non-cross joins."
                 )
 
         if how_norm in ("right_semi", "right_anti"):
@@ -1198,8 +1218,15 @@ class DataFrame(CoreDataFrame):
                     drop_cols.append(rk)
             if drop_cols:
                 joined = joined.drop(*drop_cols)
-        elif used_lr and not keepRightJoinKeys and left_names is not None and right_names is not None:
-            left_list = [left_names] if isinstance(left_names, str) else list(left_names)
+        elif (
+            used_lr
+            and not keepRightJoinKeys
+            and left_names is not None
+            and right_names is not None
+        ):
+            left_list = (
+                [left_names] if isinstance(left_names, str) else list(left_names)
+            )
             right_list = (
                 [right_names] if isinstance(right_names, str) else list(right_names)
             )
@@ -1388,10 +1415,14 @@ class DataFrameModel(CoreDataFrameModel):
     _dataframe_cls = DataFrame
 
     def withColumn(self, name: str, col: Any) -> DataFrameModel:
-        return cast("DataFrameModel", self._from_dataframe(self._df.withColumn(name, col)))
+        return cast(
+            "DataFrameModel", self._from_dataframe(self._df.withColumn(name, col))
+        )
 
     def withColumns(self, colsMap: Mapping[str, Any]) -> DataFrameModel:
-        return cast("DataFrameModel", self._from_dataframe(self._df.withColumns(colsMap)))
+        return cast(
+            "DataFrameModel", self._from_dataframe(self._df.withColumns(colsMap))
+        )
 
     def withColumnRenamed(self, existing: str, new: str) -> DataFrameModel:
         return cast(
@@ -1476,7 +1507,10 @@ class DataFrameModel(CoreDataFrameModel):
         outer: bool = False,
         streaming: bool | None = None,
     ) -> DataFrameModel:
-        """Explode **list-typed** columns (Spark ``explode``); use ``outer=True`` for ``explode_outer``."""
+        """Explode **list** columns (Spark ``explode``).
+
+        Use ``outer=True`` for ``explode_outer``.
+        """
         return cast(
             "DataFrameModel",
             self._from_dataframe(
@@ -1509,7 +1543,7 @@ class DataFrameModel(CoreDataFrameModel):
         outer: bool = False,
         streaming: bool | None = None,
     ) -> DataFrameModel:
-        """Explode one list column and add a **0-based** position column (Spark ``posexplode``)."""
+        """Explode one list with **0-based** positions (Spark ``posexplode``)."""
         return cast(
             "DataFrameModel",
             self._from_dataframe(
@@ -1531,14 +1565,14 @@ class DataFrameModel(CoreDataFrameModel):
         return cast(
             "DataFrameModel",
             self._from_dataframe(
-                self._df.posexplode_outer(column, pos=pos, value=value, streaming=streaming)
+                self._df.posexplode_outer(
+                    column, pos=pos, value=value, streaming=streaming
+                )
             ),
         )
 
-    def unnest(
-        self, columns: Any, *, streaming: bool | None = None
-    ) -> DataFrameModel:
-        """Expand **struct** columns to top-level fields (Spark struct expansion analogue)."""
+    def unnest(self, columns: Any, *, streaming: bool | None = None) -> DataFrameModel:
+        """Expand **struct** columns to top-level fields (Spark analogue)."""
         return cast(
             "DataFrameModel",
             self._from_dataframe(self._df.unnest(columns, streaming=streaming)),

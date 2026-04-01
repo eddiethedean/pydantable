@@ -360,6 +360,12 @@ def main(argv: list[str] | None = None) -> int:
     pyspark_sql_functions_stub = _render_module_stub(
         pkg / "pyspark" / "sql" / "functions.py"
     )
+    # Return unions reference this private runtime helper; it is not in ``__all__``
+    # so the AST renderer omits it unless we inject a stub marker here.
+    if "class _GroupedAggSpec" not in pyspark_sql_functions_stub:
+        pyspark_sql_functions_stub = pyspark_sql_functions_stub.replace(
+            "def abs(", "class _GroupedAggSpec: ...\n\ndef abs(", 1
+        )
     pyspark_sql_window_stub = _render_module_stub(pkg / "pyspark" / "sql" / "window.py")
     pyspark_sql_column_stub = _render_module_stub(pkg / "pyspark" / "sql" / "column.py")
 

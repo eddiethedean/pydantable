@@ -12,7 +12,11 @@ use crate::plan::schema_py::schema_descriptors_as_py;
 
 use super::literal_agg::{literal_to_py, py_dict_to_literal_ctx};
 
-fn validate_identical_schema(left: &PlanInner, right: &PlanInner, op: &str) -> PyResult<Vec<String>> {
+fn validate_identical_schema(
+    left: &PlanInner,
+    right: &PlanInner,
+    op: &str,
+) -> PyResult<Vec<String>> {
     if left.schema.len() != right.schema.len() {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
             "{op}() requires identical schemas."
@@ -91,19 +95,23 @@ fn signature_for_row(
     out
 }
 
+#[allow(clippy::type_complexity)]
 fn compute_counts(
     ctx: &HashMap<String, Vec<Option<LiteralValue>>>,
     cols: &[String],
-) -> (HashMap<Vec<u8>, usize>, HashMap<Vec<u8>, Vec<Option<LiteralValue>>>) {
+) -> (
+    HashMap<Vec<u8>, usize>,
+    HashMap<Vec<u8>, Vec<Option<LiteralValue>>>,
+) {
     let row_count = ctx.values().next().map_or(0, std::vec::Vec::len);
     let mut counts: HashMap<Vec<u8>, usize> = HashMap::new();
     let mut exemplar: HashMap<Vec<u8>, Vec<Option<LiteralValue>>> = HashMap::new();
     for i in 0..row_count {
         let sig = signature_for_row(ctx, cols, i);
         *counts.entry(sig.clone()).or_insert(0) += 1;
-        exemplar.entry(sig).or_insert_with(|| {
-            cols.iter().map(|c| ctx[c][i].clone()).collect()
-        });
+        exemplar
+            .entry(sig)
+            .or_insert_with(|| cols.iter().map(|c| ctx[c][i].clone()).collect());
     }
     (counts, exemplar)
 }
@@ -215,4 +223,3 @@ pub fn execute_intersect_all_polars(
     let df_cls = pl.getattr("DataFrame")?;
     Ok((df_cls.call1((out_dict,))?.into_py(py), desc))
 }
-

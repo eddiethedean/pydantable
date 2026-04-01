@@ -502,9 +502,7 @@ def execute_explode(
         streaming=bool(streaming),
         outer=bool(outer),
     ):
-        return rust.execute_explode(
-            plan, root_data, list(columns), streaming, outer
-        )
+        return rust.execute_explode(plan, root_data, list(columns), streaming, outer)
 
 
 def execute_posexplode(

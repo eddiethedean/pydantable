@@ -912,6 +912,7 @@ def test_sql_functions_greatest_least_nullif_nvl_isnan_nanvl() -> None:
     assert out["n1"][:2] == [1.0, 9.0] and math.isnan(out["n1"][2])
     assert out["z"] == [2.0, None, 4.0]
 
+
 def test_sql_functions_window_min_max_type_errors() -> None:
     with pytest.raises(TypeError, match="window_min"):
         F.window_min(1)  # type: ignore[arg-type]

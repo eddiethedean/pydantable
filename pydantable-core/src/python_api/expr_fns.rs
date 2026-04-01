@@ -629,7 +629,14 @@ fn expr_window_ntile(
     frame_end: Option<i64>,
 ) -> PyResult<PyExpr> {
     Ok(PyExpr {
-        node: ExprNode::make_window_ntile(n, partition_by, order_by, frame_kind, frame_start, frame_end)?,
+        node: ExprNode::make_window_ntile(
+            n,
+            partition_by,
+            order_by,
+            frame_kind,
+            frame_start,
+            frame_end,
+        )?,
     })
 }
 
@@ -642,7 +649,13 @@ fn expr_window_percent_rank(
     frame_end: Option<i64>,
 ) -> PyResult<PyExpr> {
     Ok(PyExpr {
-        node: ExprNode::make_window_percent_rank(partition_by, order_by, frame_kind, frame_start, frame_end)?,
+        node: ExprNode::make_window_percent_rank(
+            partition_by,
+            order_by,
+            frame_kind,
+            frame_start,
+            frame_end,
+        )?,
     })
 }
 
@@ -655,7 +668,13 @@ fn expr_window_cume_dist(
     frame_end: Option<i64>,
 ) -> PyResult<PyExpr> {
     Ok(PyExpr {
-        node: ExprNode::make_window_cume_dist(partition_by, order_by, frame_kind, frame_start, frame_end)?,
+        node: ExprNode::make_window_cume_dist(
+            partition_by,
+            order_by,
+            frame_kind,
+            frame_start,
+            frame_end,
+        )?,
     })
 }
 

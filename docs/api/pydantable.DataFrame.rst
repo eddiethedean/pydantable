@@ -40,6 +40,7 @@
       ~DataFrame.explain
       ~DataFrame.explode
       ~DataFrame.explode_all
+      ~DataFrame.explode_outer
       ~DataFrame.fill_null
       ~DataFrame.filter
       ~DataFrame.first
@@ -63,6 +64,8 @@
       ~DataFrame.pivot
       ~DataFrame.pivot_longer
       ~DataFrame.pivot_wider
+      ~DataFrame.posexplode
+      ~DataFrame.posexplode_outer
       ~DataFrame.read_csv
       ~DataFrame.read_ipc
       ~DataFrame.read_json

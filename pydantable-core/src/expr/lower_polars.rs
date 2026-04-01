@@ -789,10 +789,10 @@ impl ExprNode {
                         )?;
                         let cnt = apply_window_over(len().cast(DataType::Int64), part, ord)?;
                         // (rank-1)/(cnt-1) with cnt<=1 -> 0.0
-                        Ok(when(cnt.clone().lt_eq(lit(1i64)))
-                            .then(lit(0.0))
-                            .otherwise((rk.cast(DataType::Float64) - lit(1.0))
-                                / (cnt.cast(DataType::Float64) - lit(1.0))))
+                        Ok(when(cnt.clone().lt_eq(lit(1i64))).then(lit(0.0)).otherwise(
+                            (rk.cast(DataType::Float64) - lit(1.0))
+                                / (cnt.cast(DataType::Float64) - lit(1.0)),
+                        ))
                     }
                     WindowOp::CumeDist => {
                         let order_name = ord.first().ok_or_else(|| {

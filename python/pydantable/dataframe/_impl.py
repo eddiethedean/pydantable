@@ -57,8 +57,8 @@ from pydantable.rust_engine import (
     execute_join,
     execute_melt,
     execute_pivot,
-    execute_posexplode,
     execute_plan,
+    execute_posexplode,
     execute_unnest,
     rust_has_async_collect_plan_batches,
     rust_has_async_execute_plan,
@@ -2782,7 +2782,7 @@ class DataFrame(Generic[SchemaT]):
         *,
         streaming: bool | None = None,
     ) -> DataFrame[Any]:
-        """Explode list columns with Spark-ish *outer* null/empty handling (see docs)."""
+        """Explode lists; Spark-ish *outer* null/empty handling (see docs)."""
         return self.explode(columns, outer=True, streaming=streaming)
 
     def posexplode(
@@ -2794,7 +2794,7 @@ class DataFrame(Generic[SchemaT]):
         outer: bool = False,
         streaming: bool | None = None,
     ) -> DataFrame[Any]:
-        """Explode one list column and add a 0-based index column (Spark ``posexplode``)."""
+        """Explode one list column with a 0-based index (Spark ``posexplode``)."""
         if not isinstance(column, str) or not column:
             raise TypeError("posexplode() expects a non-empty str column name.")
         if not isinstance(pos, str) or not pos:

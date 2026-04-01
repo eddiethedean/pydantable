@@ -962,13 +962,23 @@ class _WindowValuePending:
         if self._kind == "first_value":
             return Expr(
                 rust_expr=rust.expr_window_first_value(
-                    self._inner._rust_expr, part, order, frame_kind, frame_start, frame_end
+                    self._inner._rust_expr,
+                    part,
+                    order,
+                    frame_kind,
+                    frame_start,
+                    frame_end,
                 )
             )
         if self._kind == "last_value":
             return Expr(
                 rust_expr=rust.expr_window_last_value(
-                    self._inner._rust_expr, part, order, frame_kind, frame_start, frame_end
+                    self._inner._rust_expr,
+                    part,
+                    order,
+                    frame_kind,
+                    frame_start,
+                    frame_end,
                 )
             )
         if self._kind == "nth_value":

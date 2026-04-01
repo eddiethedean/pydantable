@@ -37,7 +37,11 @@ class PySparkGroupedDataFrameModel:
 
 class PySparkPivotedGroupedDataFrame:
     def agg(
-        self, aggDict: Any | None = None, *, streaming: bool | None = None, **aggregations: Any
+        self,
+        aggDict: Any | None = None,
+        *,
+        streaming: bool | None = None,
+        **aggregations: Any,
     ) -> DataFrame: ...
     def count(self, *, streaming: bool | None = None) -> DataFrame: ...
     def sum(self, *columns: str, streaming: bool | None = None) -> DataFrame: ...
@@ -101,13 +105,25 @@ class DataFrame(CoreDataFrame[Any]):
         *,
         allowMissingColumns: bool = False,
     ) -> DataFrame: ...
-    def join(
+    def join(  # type: ignore[override]
         self,
         other: DataFrame,
         *,
-        on: str | ColumnRef | list[str | ColumnRef] | tuple[str | ColumnRef, ...] | None = None,
-        left_on: str | ColumnRef | list[str | ColumnRef] | tuple[str | ColumnRef, ...] | None = None,
-        right_on: str | ColumnRef | list[str | ColumnRef] | tuple[str | ColumnRef, ...] | None = None,
+        on: str
+        | ColumnRef
+        | list[str | ColumnRef]
+        | tuple[str | ColumnRef, ...]
+        | None = None,
+        left_on: str
+        | ColumnRef
+        | list[str | ColumnRef]
+        | tuple[str | ColumnRef, ...]
+        | None = None,
+        right_on: str
+        | ColumnRef
+        | list[str | ColumnRef]
+        | tuple[str | ColumnRef, ...]
+        | None = None,
         how: str = "inner",
         suffix: str = "_right",
         coalesce: bool | None = None,
@@ -148,7 +164,7 @@ class DataFrame(CoreDataFrame[Any]):
     ) -> None: ...
     def describe(self) -> str: ...
     def toPandas(self) -> Any: ...
-    def sample(
+    def sample(  # type: ignore[override]
         self,
         withReplacement: bool | None = None,
         fraction: float | None = None,
@@ -161,7 +177,9 @@ class DataFrame(CoreDataFrame[Any]):
         outer: bool = False,
         streaming: bool | None = None,
     ) -> DataFrame: ...
-    def explode_outer(self, column: Any, *, streaming: bool | None = None) -> DataFrame: ...
+    def explode_outer(
+        self, column: Any, *, streaming: bool | None = None
+    ) -> DataFrame: ...
     def explode_all(self, *, streaming: bool | None = None) -> DataFrame: ...
     def posexplode(
         self,
@@ -209,13 +227,25 @@ class DataFrameModel(CoreDataFrameModel):
         *,
         allowMissingColumns: bool = False,
     ) -> DataFrameModel: ...
-    def join(
+    def join(  # type: ignore[override]
         self,
         other: DataFrameModel | DataFrame,
         *,
-        on: str | ColumnRef | list[str | ColumnRef] | tuple[str | ColumnRef, ...] | None = None,
-        left_on: str | ColumnRef | list[str | ColumnRef] | tuple[str | ColumnRef, ...] | None = None,
-        right_on: str | ColumnRef | list[str | ColumnRef] | tuple[str | ColumnRef, ...] | None = None,
+        on: str
+        | ColumnRef
+        | list[str | ColumnRef]
+        | tuple[str | ColumnRef, ...]
+        | None = None,
+        left_on: str
+        | ColumnRef
+        | list[str | ColumnRef]
+        | tuple[str | ColumnRef, ...]
+        | None = None,
+        right_on: str
+        | ColumnRef
+        | list[str | ColumnRef]
+        | tuple[str | ColumnRef, ...]
+        | None = None,
         how: str = "inner",
         suffix: str = "_right",
         coalesce: bool | None = None,

@@ -46,6 +46,7 @@
       ~DataFrameModel.explain
       ~DataFrameModel.explode
       ~DataFrameModel.explode_all
+      ~DataFrameModel.explode_outer
       ~DataFrameModel.export_csv
       ~DataFrameModel.export_ipc
       ~DataFrameModel.export_json
@@ -67,6 +68,8 @@
       ~DataFrameModel.pivot
       ~DataFrameModel.pivot_longer
       ~DataFrameModel.pivot_wider
+      ~DataFrameModel.posexplode
+      ~DataFrameModel.posexplode_outer
       ~DataFrameModel.read_csv
       ~DataFrameModel.read_ipc
       ~DataFrameModel.read_json

@@ -509,6 +509,7 @@ fn execute_explode(
 
 #[pyfunction]
 #[pyo3(signature = (plan, root_data, list_column, pos_name, value_name, streaming=false, outer=false))]
+#[allow(clippy::too_many_arguments)]
 fn execute_posexplode(
     py: Python<'_>,
     plan: &PyPlan,

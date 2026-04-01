@@ -245,6 +245,7 @@ impl PolarsExecutor {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn posexplode(
         py: Python<'_>,
         plan: &PlanInner,

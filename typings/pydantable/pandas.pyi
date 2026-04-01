@@ -170,6 +170,7 @@ class PandasDataFrame(CoreDataFrame):
         columns: str | Selector | ColumnRef,
         values: str | Sequence[str] | Selector,
         aggregate_function: str = "first",
+        pivot_values: Sequence[Any] | None = None,
         sort_columns: bool = False,
         separator: str = "_",
         streaming: bool | None = None,

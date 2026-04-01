@@ -263,7 +263,7 @@ pub fn execute_pivot_polars(
             .extract::<bool>()
             .unwrap_or(false)
         {
-            return Ok(value.str()?.extract::<String>()?);
+            return value.str()?.extract::<String>();
         }
         let dec_mod = py.import_bound("decimal")?;
         let dec_cls = dec_mod.getattr("Decimal")?;
@@ -281,7 +281,7 @@ pub fn execute_pivot_polars(
             .extract::<bool>()
             .unwrap_or(false)
         {
-            return Ok(py_enum_to_wire_string(value)?);
+            return py_enum_to_wire_string(value);
         }
         if let Ok(dt) = value.downcast::<PyDateTime>() {
             let secs: f64 = dt.call_method0("timestamp")?.extract()?;
@@ -306,7 +306,7 @@ pub fn execute_pivot_polars(
         if let Ok(b) = value.downcast::<PyBytes>() {
             return Ok(format!("B:{}", b.as_bytes().len()));
         }
-        Ok(value.str()?.extract::<String>()?)
+        value.str()?.extract::<String>()
     }
 
     let mut pivot_values: Vec<String> = Vec::new();
@@ -314,7 +314,7 @@ pub fn execute_pivot_polars(
 
     if let Some(raw) = pivot_values_override {
         for obj in raw.into_iter() {
-            let key = pivot_key_from_py(py, &obj.bind(py))?;
+            let key = pivot_key_from_py(py, obj.bind(py))?;
             if seen_pivot.insert(key.clone()) {
                 pivot_values.push(key);
             }
@@ -940,6 +940,7 @@ pub fn execute_explode_polars(
 }
 
 #[cfg(feature = "polars_engine")]
+#[allow(clippy::too_many_arguments)]
 pub fn execute_posexplode_polars(
     py: Python<'_>,
     plan: &PlanInner,
@@ -991,19 +992,16 @@ pub fn execute_posexplode_polars(
     }
 
     let mut lf = plan_to_lazyframe(py, plan, root_data)?;
-    let list_len = col(list_column.as_str())
-        .list()
-        .len()
-        .cast(DataType::Int64);
+    let list_len = col(list_column.as_str()).list().len().cast(DataType::Int64);
     let idx_list = int_ranges(lit(0i64), list_len, lit(1i64), DataType::Int64).alias(TMP);
     lf = lf.with_column(idx_list);
-    lf = lf.explode(
-        cols([TMP, list_column.as_str()]),
-        explode_options(outer),
-    );
+    lf = lf.explode(cols([TMP, list_column.as_str()]), explode_options(outer));
     if value_name != list_column {
         lf = lf.rename(
-            [PlSmallStr::from_str(TMP), PlSmallStr::from_str(list_column.as_str())],
+            [
+                PlSmallStr::from_str(TMP),
+                PlSmallStr::from_str(list_column.as_str()),
+            ],
             [
                 PlSmallStr::from_str(pos_name.as_str()),
                 PlSmallStr::from_str(value_name.as_str()),

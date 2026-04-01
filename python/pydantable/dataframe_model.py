@@ -1864,7 +1864,9 @@ class DataFrameModel(Generic[RowT]):
     def explode_outer(
         self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None
     ) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.explode_outer(columns, streaming=streaming))
+        return self._from_dataframe(
+            self._df.explode_outer(columns, streaming=streaming)
+        )
 
     def posexplode(
         self,

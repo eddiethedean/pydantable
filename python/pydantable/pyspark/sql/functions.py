@@ -21,10 +21,10 @@ from pydantable.expressions import (
     concat as concat_expr,
 )
 from pydantable.expressions import (
-    dense_rank as dense_rank_expr,
+    cume_dist as cume_dist_expr,
 )
 from pydantable.expressions import (
-    cume_dist as cume_dist_expr,
+    dense_rank as dense_rank_expr,
 )
 from pydantable.expressions import (
     first_value as first_value_expr,
@@ -39,10 +39,10 @@ from pydantable.expressions import (
     lead as lead_expr,
 )
 from pydantable.expressions import (
-    ntile as ntile_expr,
+    nth_value as nth_value_expr,
 )
 from pydantable.expressions import (
-    nth_value as nth_value_expr,
+    ntile as ntile_expr,
 )
 from pydantable.expressions import (
     percent_rank as percent_rank_expr,
@@ -230,6 +230,7 @@ def nanvl(column: Expr, other: Expr | Any) -> Expr:
         raise TypeError("nanvl(column, other) expects column to be an Expr.")
     o = other if isinstance(other, Expr) else Literal(value=other)
     return when(isnan(column), o).otherwise(column)
+
 
 def when(condition: Expr, value: Expr) -> WhenChain:
     """First branch of a ``CASE WHEN`` (chain ``.when(...).otherwise(...)``)."""
@@ -422,6 +423,7 @@ def regexp_instr(column: Expr, pattern: str) -> Expr:
         column.is_null(),
         Literal(value=None).cast(int | None),
     ).otherwise(when(prefix.is_null(), Literal(value=0)).otherwise(length(prefix) + 1))
+
 
 def json_path_match(column: Expr, path: str) -> Expr:
     if not isinstance(column, Expr):
@@ -783,8 +785,6 @@ __all__ = [
     "cast",
     "ceil",
     "coalesce",
-    "greatest",
-    "isnan",
     "col",
     "column",
     "concat",
@@ -795,20 +795,22 @@ __all__ = [
     "dayofmonth",
     "dayofweek",
     "dense_rank",
-    "first_value",
     "element_at",
     "ends_with",
     "explode",
+    "first_value",
     "floor",
+    "greatest",
     "hour",
     "isin",
+    "isnan",
     "isnotnull",
     "isnull",
     "json_path_match",
     "lag",
     "last_value",
-    "least",
     "lead",
+    "least",
     "length",
     "list_contains",
     "list_get",
@@ -835,10 +837,10 @@ __all__ = [
     "min",
     "minute",
     "month",
-    "ntile",
-    "nth_value",
-    "nanvl",
     "nanosecond",
+    "nanvl",
+    "nth_value",
+    "ntile",
     "nullif",
     "nvl",
     "percent_rank",

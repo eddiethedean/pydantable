@@ -222,12 +222,14 @@ def test_pyspark_groupby_pivot_agg_accepts_dict_form() -> None:
     assert got["x_v_max"] == [1, 3]
     assert got["y_v_max"] == [2, None]
 
+
 def test_pyspark_groupby_agg_expr_requires_alias() -> None:
     from pydantable.pyspark.sql import functions as F
 
     df = DataFrame[Row]({"id": [1, 1], "name": ["a", "b"], "age": [1, 2]})
     with pytest.raises(TypeError, match="alias"):
         df.groupBy("id").agg(F.sum("age"))  # type: ignore[arg-type]
+
 
 def test_pyspark_groupby_count_no_args_is_per_group_len() -> None:
     df = DataFrame[Row]({"id": [1, 1, 2], "name": ["a", "b", "c"], "age": [1, 2, 3]})
@@ -304,12 +306,7 @@ def test_pyspark_groupby_pivot_agg_preserves_explicit_pivot_order() -> None:
         v: int
 
     df = DataFrame[S]({"g": ["A"], "k": ["x"], "v": [1]})
-    out = (
-        df.groupBy("g")
-        .pivot("k", values=["y", "x"])
-        .agg(s=("sum", "v"))
-        .to_dict()
-    )
+    out = df.groupBy("g").pivot("k", values=["y", "x"]).agg(s=("sum", "v")).to_dict()
     # Explicit pivot values must be present (even if missing in data).
     assert out["g"] == ["A"]
     assert out["x_s"] == [1]
@@ -385,6 +382,7 @@ def test_pyspark_groupby_agg_dict_form_errors_on_unknown_op() -> None:
     df = DataFrame[S]({"g": ["A"], "v": [1]})
     with pytest.raises(TypeError, match="Aggregation operator"):
         df.groupBy("g").agg({"v": ""})
+
 
 def test_pyspark_cross_join_and_count() -> None:
     class A(Schema):
@@ -501,9 +499,7 @@ def test_pyspark_intersect_and_subtract() -> None:
 
 
 def test_pyspark_except_is_distinct_set_difference_and_alias_works() -> None:
-    df1 = DataFrame[Row](
-        {"id": [1, 1, 2], "name": ["a", "a", "b"], "age": [1, 1, 2]}
-    )
+    df1 = DataFrame[Row]({"id": [1, 1, 2], "name": ["a", "a", "b"], "age": [1, 1, 2]})
     df2 = DataFrame[Row]({"id": [2], "name": ["b"], "age": [2]})
 
     out = getattr(df1, "except")(df2).to_dict()
@@ -540,6 +536,7 @@ def test_pyspark_setops_all_treat_nulls_as_equal() -> None:
     it = a.intersectAll(b).to_dict()
     assert it["id"] == [1]
     assert it["v"] == [None]
+
 
 def test_pyspark_model_groupby_and_cross_join() -> None:
     class MX(DataFrameModel):
@@ -649,6 +646,7 @@ def test_pyspark_join_validate_shorthands_are_accepted() -> None:
     out = left.join(right, on="id", how="inner", validate="1:1").to_dict()
     assert out["id"] == [1, 2]
 
+
 def test_pyspark_join_on_accepts_list_tuple_and_mixed_columnref() -> None:
     class L(Schema):
         a: int
@@ -673,7 +671,9 @@ def test_pyspark_join_on_accepts_list_tuple_and_mixed_columnref() -> None:
     assert out2["a"] == [1, 2]
 
 
-def test_pyspark_join_usingcolumns_drops_right_join_keys_by_default_and_opt_out() -> None:
+def test_pyspark_join_usingcolumns_drops_right_join_keys_by_default_and_opt_out() -> (
+    None
+):
     class L(Schema):
         id: int
         v: int
@@ -688,9 +688,7 @@ def test_pyspark_join_usingcolumns_drops_right_join_keys_by_default_and_opt_out(
     out = left.join(right, on="id", how="inner").to_dict()
     assert set(out.keys()) == {"id", "v", "w"}
 
-    out_keep = left.join(
-        right, on="id", how="inner", keepRightJoinKeys=True
-    ).to_dict()
+    out_keep = left.join(right, on="id", how="inner", keepRightJoinKeys=True).to_dict()
     # With opt-out we allow whatever the core join returns; at minimum, keys exist.
     assert "id" in out_keep
 
@@ -839,7 +837,7 @@ def test_pyspark_dataframe_model_posexplode() -> None:
 
 
 def test_pyspark_explode_outer_keeps_empty_list_row() -> None:
-    """``explode_outer`` maps empty lists to a null element row; default ``explode`` drops them."""
+    """``explode_outer`` keeps empty lists as a null row; ``explode`` drops them."""
 
     class WithList(Schema):
         id: int
