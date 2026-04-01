@@ -339,9 +339,12 @@ Practical inputs that feed that phase:
 
 ---
 
-## Planned: 1.10.0 (JSON processing & struct ergonomics)
+## Shipped in 1.10.0 (JSON processing & struct ergonomics)
 
-**Living checklist and phased plan:** {doc}`ROADMAP_1_10_JSON_STRUCT` — JSON ↔ schema audit, struct expression parity (**`struct_json_encode`**, **`struct_with_fields`**, etc.), optional **string → struct** decode, **I/O/streaming docs (Phase D: large NDJSON patterns, `read_json` naming, scan kwargs)** in {doc}`IO_JSON`, and **UX polish (Phase E: selectors + NDJSON cookbook + changelog index)**.
+- [x] **Struct expressions (Polars):** **`Expr.struct_json_encode`**, **`struct_json_path_match`**, **`struct_rename_fields`**, **`struct_with_fields`**; PySpark **`struct_json_encode`** / **`struct_json_path_match`**. See {doc}`changelog` **1.10.0**, {doc}`ROADMAP_1_10_JSON_STRUCT` Phases B–E.
+- [x] **JSON decode:** **`Expr.str_json_decode`** (string → struct or homogeneous map).
+- [x] **I/O & tests:** nested **`materialize_json`**, **`export_json`** round-trip; **`tests/test_json_io_phase_a.py`** and related coverage.
+- [x] **Docs:** {doc}`IO_JSON`, {doc}`SUPPORTED_TYPES`, {doc}`SELECTORS`, NDJSON cookbook, Phase D/E narrative in {doc}`ROADMAP_1_10_JSON_STRUCT`.
 
 ---
 
