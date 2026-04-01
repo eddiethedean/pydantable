@@ -132,7 +132,9 @@ def read_parquet(
     """Lazy Parquet read (local path); returns ``ScanFileRoot``. Use ``DataFrame[Schema].read_parquet``.
 
     Extra keyword arguments are forwarded as Polars scan options (e.g. ``low_memory``, ``n_rows``,
-    ``parallel``, ``glob``). Unknown keys raise ``ValueError`` from the Rust layer.
+    ``parallel``, ``glob``, ``hive_partitioning``, ``hive_start_idx``, ``try_parse_hive_dates``,
+    ``include_file_paths``, ``row_index_name``, ``row_index_offset``). Unknown keys raise
+    ``ValueError`` from the Rust layer. Per-scan details: ``IO_PARQUET`` on the doc site; kwargs matrix: ``DATA_IO_SOURCES`` (**Audit: Polars 0.53.x vs pydantable**).
     """
     sk = scan_kwargs if scan_kwargs else None
     return _scan_file_root(path, "parquet", columns=columns, scan_kwargs=sk)

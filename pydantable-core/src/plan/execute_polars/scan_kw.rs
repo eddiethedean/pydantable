@@ -12,7 +12,10 @@ use polars_io::ipc::IpcScanOptions;
 use polars_io::parquet::read::ParallelStrategy;
 use polars_io::parquet::write::{ParquetCompression, ParquetWriteOptions, StatisticsOptions};
 use polars_io::prelude::{CsvWriter, JsonFormat, JsonWriter, ParquetWriter};
+use polars_io::RowIndex;
 use polars_io::SerWriter;
+use polars_utils::pl_str::PlSmallStr;
+use polars_utils::IdxSize;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyDictMethods};
 
@@ -83,6 +86,14 @@ fn parse_parallel_strategy(s: &str) -> PyResult<ParallelStrategy> {
     }
 }
 
+fn idx_size_from_usize(n: usize) -> PyResult<IdxSize> {
+    IdxSize::try_from(n).map_err(|_| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "row_index_offset must fit in IdxSize (got {n})"
+        ))
+    })
+}
+
 fn scan_args_parquet_from_kwargs(
     py: Python<'_>,
     mut args: ScanArgsParquet,
@@ -97,6 +108,12 @@ fn scan_args_parquet_from_kwargs(
         "glob",
         "allow_missing_columns",
         "parallel",
+        "hive_partitioning",
+        "hive_start_idx",
+        "try_parse_hive_dates",
+        "include_file_paths",
+        "row_index_name",
+        "row_index_offset",
     ];
     unknown_scan_keys(py, kw, ALLOWED)?;
     if let Some(n) = get_usize(kw, "n_rows")? {
@@ -123,6 +140,62 @@ fn scan_args_parquet_from_kwargs(
     if let Some(s) = get_str(kw, "parallel")? {
         args.parallel = parse_parallel_strategy(s.trim())?;
     }
+
+    // Hive partitioning (ScanArgsParquet.hive_options)
+    if kw.contains("hive_partitioning")? {
+        match kw.get_item("hive_partitioning")? {
+            None => {}
+            Some(v) if v.is_none() => args.hive_options.enabled = None,
+            Some(v) => args.hive_options.enabled = Some(v.extract::<bool>()?),
+        }
+    }
+    if let Some(n) = get_usize(kw, "hive_start_idx")? {
+        args.hive_options.hive_start_idx = n;
+    }
+    if let Some(v) = get_bool(kw, "try_parse_hive_dates")? {
+        args.hive_options.try_parse_dates = v;
+    }
+
+    // Lineage column for source file paths
+    if kw.contains("include_file_paths")? {
+        match kw.get_item("include_file_paths")? {
+            None => {}
+            Some(v) if v.is_none() => args.include_file_paths = None,
+            Some(v) => {
+                let s: String = v.extract()?;
+                args.include_file_paths = Some(PlSmallStr::from_str(&s));
+            }
+        }
+    }
+
+    // Row index column (applied after scan in Polars)
+    let has_name_key = kw.contains("row_index_name")?;
+    let has_offset_only = kw.contains("row_index_offset")? && !has_name_key;
+    if has_offset_only {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "row_index_offset requires row_index_name",
+        ));
+    }
+    if has_name_key {
+        match kw.get_item("row_index_name")? {
+            None => {}
+            Some(v) if v.is_none() => args.row_index = None,
+            Some(v) => {
+                let name: String = v.extract()?;
+                if name.is_empty() {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "row_index_name must be non-empty when set",
+                    ));
+                }
+                let off = get_usize(kw, "row_index_offset")?.unwrap_or(0);
+                args.row_index = Some(RowIndex {
+                    name: PlSmallStr::from_str(&name),
+                    offset: idx_size_from_usize(off)?,
+                });
+            }
+        }
+    }
+
     Ok(args)
 }
 

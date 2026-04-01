@@ -4,9 +4,14 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+### Added
+
+- **Parquet lazy `scan_kwargs` (1.11.0 Phase B1):** **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** forwarded to Polars **`ScanArgsParquet`** in **`pydantable-core`** (`scan_kw.rs`). Tests: **`tests/test_parquet_scan_hive_b1.py`**.
+
 ### Docs
 
 - **Local I/O audit (1.11.0 Phase A):** Polars **0.53.0** vs pydantable **`scan_kwargs`** matrix, directory/glob/hive notes—{ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`; multi-file entrypoint table—{doc}`IO_DECISION_TREE`; **Local lazy file scans**—{doc}`INTERFACE_CONTRACT`; path/glob subsections on {doc}`IO_PARQUET`, {doc}`IO_CSV`, {doc}`IO_NDJSON`, {doc}`IO_IPC`, {doc}`IO_JSON`; link from {doc}`IO_OVERVIEW`. Roadmap: {doc}`ROADMAP_1_11_LOCAL_IO`.
+- **Parquet B1:** {doc}`DATA_IO_SOURCES` audit + summary table; {doc}`IO_PARQUET`; {doc}`INTERFACE_CONTRACT` (Parquet lineage / hive kwargs).
 
 ## [1.11.0] — 2026-04-01
 

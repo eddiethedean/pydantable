@@ -18,7 +18,7 @@ This document lists **common and useful** places applications read and write tab
 
 | Format | Read kwargs (examples) | Write kwargs |
 |--------|------------------------|--------------|
-| **Parquet** | **`n_rows`**, **`low_memory`**, **`rechunk`**, **`use_statistics`**, **`cache`**, **`glob`**, **`allow_missing_columns`**, **`parallel`** | **`compression`**, **`row_group_size`**, **`data_page_size`**, **`statistics`**, **`parallel`** |
+| **Parquet** | **`n_rows`**, **`low_memory`**, **`rechunk`**, **`use_statistics`**, **`cache`**, **`glob`**, **`allow_missing_columns`**, **`parallel`**, **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** | **`compression`**, **`row_group_size`**, **`data_page_size`**, **`statistics`**, **`parallel`** |
 | **CSV** | **`has_header`**, **`separator`**, **`skip_rows`**, **`skip_lines`**, **`n_rows`**, **`infer_schema_length`**, **`ignore_errors`**, **`low_memory`**, **`rechunk`**, **`glob`**, **`cache`**, **`quote_char`**, **`eol_char`** | **`include_header`**, **`include_bom`** (plus top-level **`separator`**, **`compression`** where applicable) |
 | **NDJSON** | **`low_memory`**, **`rechunk`**, **`ignore_errors`**, **`n_rows`**, **`infer_schema_length`** | **`json_format`** (**`"lines"`** / **`"json"`**) |
 | **IPC** | **`record_batch_statistics`** | Use top-level **`compression=`** only; extra **`write_kwargs`** are rejected. |
@@ -28,7 +28,7 @@ For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **preset
 (local-io-audit)=
 ### Audit: Polars 0.53.x vs pydantable (1.11.0 Phase A)
 
-**Scope:** Polars Rust **0.53.0** (the version pinned by **`pydantable-core`**) compared to the kwargs pydantable forwards from **`pydantable-core/src/plan/execute_polars/scan_kw.rs`** (`dispatch_file_scan`). This is a **documentation audit**; exposing more options is tracked in {doc}`ROADMAP_1_11_LOCAL_IO` Phase B+.
+**Scope:** Polars Rust **0.53.0** (the version pinned by **`pydantable-core`**) compared to the kwargs pydantable forwards from **`pydantable-core/src/plan/execute_polars/scan_kw.rs`** (`dispatch_file_scan`). **Parquet hive / lineage / row index** kwargs landed in {doc}`ROADMAP_1_11_LOCAL_IO` **Phase B1**; remaining gaps are tracked there (e.g. **`ScanArgsParquet.schema`**, **`HiveOptions.schema`**).
 
 **Directory and glob semantics**
 
@@ -48,11 +48,11 @@ For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **preset
 | `cache` | **mapped** | |
 | `glob` | **mapped** | default in Polars is **`true`** |
 | `allow_missing_columns` | **mapped** | |
-| `hive_options` | **not exposed** | Polars default **`HiveOptions`** enables hive-style partition discovery when applicable; **tuning** (`enabled`, `hive_start_idx`, `schema`, `try_parse_dates`) is **not** forwarded from Python yet (Phase B). |
-| `row_index` | **not exposed** | |
+| `hive_options` | **partially mapped** | **`hive_partitioning`** → `enabled` (pass **`None`** to clear to Polars automatic mode); **`hive_start_idx`**; **`try_parse_hive_dates`** → `try_parse_dates`. **`HiveOptions.schema`** (partition dtype overrides) is **not** exposed. |
+| `row_index` | **mapped** | **`row_index_name`** (non-empty **`str`**; use explicit **`None`** to clear); **`row_index_offset`** (default **`0`**). |
 | `schema` | **not exposed** | |
 | `cloud_options` | **not exposed** | |
-| `include_file_paths` | **not exposed** | |
+| `include_file_paths` | **mapped** | column name **`str`**; explicit **`None`** clears. |
 
 **CSV — `LazyCsvReader` (Polars) vs pydantable `scan_kwargs`**
 

@@ -304,7 +304,7 @@ Rolling/dynamic contracts:
 
 ## Local lazy file scans (multi-file and `glob`)
 
-- Lazy **`read_*` / `aread_*`** roots delegate **file discovery, glob expansion, and hive-style path handling** to **Polars** according to the Rust **`scan_kwargs`** pydantable forwards (see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`). **Schema union across files** and **per-file lineage** follow Polars behavior for the pinned version unless/until pydantable exposes more options (e.g. **`include_file_paths`**).
+- Lazy **`read_*` / `aread_*`** roots delegate **file discovery, glob expansion, and hive-style path handling** to **Polars** according to the Rust **`scan_kwargs`** pydantable forwards (see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`). **Parquet** scans can request **`include_file_paths`**, **`hive_partitioning`**, and **`row_index_*`** via **`scan_kwargs`**. **Schema union across files** and **partition column dtypes** follow Polars for the pinned version; **`HiveOptions.schema`** overrides are **not** exposed yet.
 - **Typed validation** (**`trusted_mode`**, strict cell checks, optional-column filling, …) applies at **materialization** (**`collect()`**, **`to_dict()`**, **`to_arrow()`**, …), not when the **`ScanFileRoot`** is constructed.
 
 ## Arrow interchange (0.16.0)

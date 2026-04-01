@@ -43,11 +43,11 @@ The temp file for **`read_parquet_url`** is **not** deleted automatically; see {
 - **`iter_parquet(path, *, batch_size=..., columns=None)`** / **`aiter_parquet`** — yield rectangular column dicts (optional **`columns`** projection).
 - **`write_parquet_batches(path, batches, *, compression=None)`** — append multiple batches as row groups in one file.
 
-**`scan_kwargs`:** for example **`n_rows`**, **`low_memory`**, **`rechunk`**, **`use_statistics`**, **`cache`**, **`glob`**, **`allow_missing_columns`**, **`parallel`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
+**`scan_kwargs`:** for example **`n_rows`**, **`low_memory`**, **`rechunk`**, **`use_statistics`**, **`cache`**, **`glob`**, **`allow_missing_columns`**, **`parallel`**, **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
 
 ### Paths, directories, and `glob`
 
-Lazy **`read_parquet`** uses Polars **`scan_parquet`**; **`glob`** is forwarded via **`scan_kwargs`** (Polars **`ScanArgsParquet::default()`** uses **`glob: true`**). **Hive-style partition** options (**`hive_options`**, **`include_file_paths`**, …) are **not** exposed as Python kwargs yet; defaults still follow Polars. See {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>` and {doc}`ROADMAP_1_11_LOCAL_IO` Phase B.
+Lazy **`read_parquet`** uses Polars **`scan_parquet`**; **`glob`** is forwarded via **`scan_kwargs`** (Polars **`ScanArgsParquet::default()`** uses **`glob: true`**). **Hive-style partitions** are tunable via **`hive_partitioning`** / **`hive_start_idx`** / **`try_parse_hive_dates`**; **`include_file_paths`** adds a source path column; **`row_index_name`** / **`row_index_offset`** add a row index. **`HiveOptions.schema`** (partition dtype overrides) and **`ScanArgsParquet.schema`** are still **not** exposed—see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>` and {doc}`ROADMAP_1_11_LOCAL_IO` Phase B1+.
 
 ## Write (targets)
 

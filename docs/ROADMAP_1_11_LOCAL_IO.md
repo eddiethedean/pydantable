@@ -53,9 +53,11 @@
 
 ### B1 — Parquet
 
-- [ ] Forward **hive-partitioning** (and related) **`scan_kwargs`** supported by **`LazyFrame::scan_parquet`** / **`ScanArgsParquet`** in the pinned Polars version; extend **`unknown_scan_keys`** allowlist and mapping in `scan_kw.rs`.
-- [ ] Optional: **`include_file_paths`** / lineage-style columns if exposed on the same scan path without forking Polars internals.
-- [ ] Tests: **hive-partitioned** fixture under `tests/` or `tests/fixtures/`; round-trip **`read_parquet`** → **`collect()`** / **`to_dict()`** with schema expectations.
+**B1 shipped:** **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** in **`scan_kw.rs`**; tests **`tests/test_parquet_scan_hive_b1.py`**.
+
+- [x] Forward **hive-partitioning** (and related) **`scan_kwargs`** supported by **`LazyFrame::scan_parquet`** / **`ScanArgsParquet`** in the pinned Polars version; extend **`unknown_scan_keys`** allowlist and mapping in `scan_kw.rs`.
+- [x] Optional: **`include_file_paths`** / lineage-style columns if exposed on the same scan path without forking Polars internals.
+- [x] Tests: **hive-partitioned** fixture under `tests/` or `tests/fixtures/`; round-trip **`read_parquet`** → **`collect()`** / **`to_dict()`** with schema expectations.
 
 ### B2 — CSV
 
@@ -78,8 +80,8 @@
 
 **Checklist**
 
-- [ ] Python **`read_*` / `aread_*`** docstrings and **`pydantable.io` stubs** (`*.pyi`) list new kwargs.
-- [ ] {doc}`DATA_IO_SOURCES` table (**Read kwargs**) updated.
+- [x] Python **`read_*` / `aread_*`** docstrings and **`pydantable.io` stubs** (`*.pyi`) list new kwargs.
+- [x] {doc}`DATA_IO_SOURCES` table (**Read kwargs**) updated.
 
 ---
 
