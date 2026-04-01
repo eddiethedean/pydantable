@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.11.0] — 2026-04-01
+
+### Changed
+
+- **Versioning:** Python package metadata and Rust crate aligned at **1.11.0** for this release; docs “current release” strings ({doc}`index`, {doc}`ROADMAP`, {doc}`POLARS_TRANSFORMATIONS_ROADMAP`) aligned.
+
 ## [1.10.0] — 2026-04-01
 
 ### Added
