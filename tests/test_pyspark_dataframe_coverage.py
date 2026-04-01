@@ -166,6 +166,58 @@ def test_pyspark_groupby_pivot_agg_multi_ops_and_explicit_values() -> None:
     assert got["y_m"] == [2, None]
 
 
+def test_pyspark_groupby_pivot_rejects_non_list_values() -> None:
+    class S(Schema):
+        g: str
+        k: str
+        v: int
+
+    df = DataFrame[S]({"g": ["A"], "k": ["x"], "v": [1]})
+    with pytest.raises(TypeError, match=r"pivot\(values="):
+        _ = df.groupBy("g").pivot("k", values=("x", "y"))  # type: ignore[arg-type]
+
+
+def test_pyspark_groupby_pivot_agg_requires_specs() -> None:
+    class S(Schema):
+        g: str
+        k: str
+        v: int
+
+    df = DataFrame[S]({"g": ["A"], "k": ["x"], "v": [1]})
+    with pytest.raises(TypeError, match=r"agg\(\) requires at least one"):
+        df.groupBy("g").pivot("k").agg()  # type: ignore[call-arg]
+
+
+def test_pyspark_groupby_pivot_agg_rejects_out_name_with_internal_sep() -> None:
+    class S(Schema):
+        g: str
+        k: str
+        v: int
+
+    df = DataFrame[S]({"g": ["A"], "k": ["x"], "v": [1]})
+    with pytest.raises(ValueError, match="cannot contain"):
+        df.groupBy("g").pivot("k").agg(**{"bad__name": ("sum", "v")})
+
+
+def test_pyspark_groupby_pivot_agg_preserves_explicit_pivot_order() -> None:
+    class S(Schema):
+        g: str
+        k: str
+        v: int
+
+    df = DataFrame[S]({"g": ["A"], "k": ["x"], "v": [1]})
+    out = (
+        df.groupBy("g")
+        .pivot("k", values=["y", "x"])
+        .agg(s=("sum", "v"))
+        .to_dict()
+    )
+    # Explicit pivot values must be present (even if missing in data).
+    assert out["g"] == ["A"]
+    assert out["x_s"] == [1]
+    assert out["y_s"] == [None]
+
+
 def test_pyspark_cross_join_and_count() -> None:
     class A(Schema):
         x: int

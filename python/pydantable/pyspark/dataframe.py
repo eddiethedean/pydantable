@@ -266,7 +266,9 @@ class PySparkPivotedGroupedDataFrame:
             streaming=use_streaming,
         )
 
-        # Rename `<pivot_value>__<out_name>__first` -> `<pivot_value>_<out_name>`.
+        # Rename core pivot outputs to Spark-ish names:
+        # - multi-value: `<pivot_value>__<out_name>__first` -> `<pivot_value>_<out_name>`
+        # - single-value: `<pivot_value>__first` -> `<pivot_value>_<out_name>`
         rename_map: dict[str, str] = {}
         for c in pivoted.columns:
             if c in self._keys:
@@ -275,6 +277,9 @@ class PySparkPivotedGroupedDataFrame:
             if len(parts) == 3 and parts[2] == "first" and parts[1] in specs:
                 pivot_value, out_name, _ = parts
                 rename_map[c] = f"{pivot_value}_{out_name}"
+            elif len(parts) == 2 and parts[1] == "first" and len(out_names) == 1:
+                pivot_value, _ = parts
+                rename_map[c] = f"{pivot_value}_{out_names[0]}"
         if rename_map:
             pivoted = pivoted.rename(rename_map)
         return DataFrame._as_pyspark_df(pivoted)

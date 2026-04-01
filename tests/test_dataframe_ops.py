@@ -564,6 +564,27 @@ def test_phase4_reshape_pivot_accepts_selectors() -> None:
         ).to_dict()
 
 
+def test_phase4_reshape_pivot_values_parameter_controls_output_and_order() -> None:
+    class S(Schema):
+        id: int
+        key: str
+        x: int
+
+    df = DataFrame[S]({"id": [1, 1], "key": ["A", "B"], "x": [10, 20]})
+    out = df.pivot(
+        index="id",
+        columns="key",
+        values="x",
+        aggregate_function="sum",
+        pivot_values=["B", "C", "A"],
+    ).collect(as_lists=True)
+    assert out["id"] == [1]
+    # Missing pivot values are present and null-filled.
+    assert out["C_sum"] == [None]
+    assert out["A_sum"] == [10]
+    assert out["B_sum"] == [20]
+
+
 def test_phase4_reshape_explode_unnest_accept_selectors_and_all_helpers() -> None:
     class WithList(Schema):
         id: int
