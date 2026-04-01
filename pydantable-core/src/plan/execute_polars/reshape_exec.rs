@@ -21,7 +21,7 @@ use crate::plan::ir::{PlanInner, PlanStep};
 use crate::plan::schema_py::schema_descriptors_as_py;
 
 use polars::chunked_array::builder::get_list_builder;
-use polars::lazy::dsl::{col, cols, lit, when, Expr as PolarsExpr};
+use polars::lazy::dsl::{col, cols, int_ranges, lit, when, Expr as PolarsExpr};
 use polars::prelude::{
     AnyValue, BooleanChunked, CrossJoin, DataFrame, DataType, ExplodeOptions, Field,
     FillNullStrategy, Float64Chunked, Int128Chunked, Int32Chunked, Int64Chunked, IntoColumn,
@@ -871,12 +871,29 @@ fn dtype_after_explode(inner: &DTypeDesc) -> DTypeDesc {
 }
 
 #[cfg(feature = "polars_engine")]
+fn explode_options(outer: bool) -> ExplodeOptions {
+    if outer {
+        // Spark-ish explode_outer: preserve null/empty-list rows as far as Polars allows.
+        ExplodeOptions {
+            empty_as_null: true,
+            keep_nulls: true,
+        }
+    } else {
+        // Default pydantable explode (historical Polars options).
+        ExplodeOptions {
+            empty_as_null: false,
+            keep_nulls: true,
+        }
+    }
+}
+
 pub fn execute_explode_polars(
     py: Python<'_>,
     plan: &PlanInner,
     root_data: &Bound<'_, PyAny>,
     columns: Vec<String>,
     streaming: bool,
+    outer: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     for c in columns.iter() {
         let dt = plan.schema.get(c).ok_or_else(|| {
@@ -896,10 +913,7 @@ pub fn execute_explode_polars(
     let mut lf = plan_to_lazyframe(py, plan, root_data)?;
     lf = lf.explode(
         cols(columns.iter().map(|c| c.as_str())),
-        ExplodeOptions {
-            empty_as_null: false,
-            keep_nulls: true,
-        },
+        explode_options(outer),
     );
     let out_df = collect_lazyframe(py, lf, streaming)?;
 
@@ -910,6 +924,113 @@ pub fn execute_explode_polars(
             out_schema.insert(c.clone(), new_d);
         }
     }
+
+    let out_dict = PyDict::new_bound(py);
+    for (name, dtype) in out_schema.iter() {
+        let s = out_df
+            .column(name)
+            .map_err(polars_err)?
+            .as_materialized_series()
+            .clone();
+        let py_list = series_to_py_list(py, &s, dtype)?;
+        out_dict.set_item(name, py_list)?;
+    }
+    let desc = schema_descriptors_as_py(py, &out_schema)?;
+    Ok((out_dict.into_py(py), desc))
+}
+
+#[cfg(feature = "polars_engine")]
+pub fn execute_posexplode_polars(
+    py: Python<'_>,
+    plan: &PlanInner,
+    root_data: &Bound<'_, PyAny>,
+    list_column: String,
+    pos_name: String,
+    value_name: String,
+    streaming: bool,
+    outer: bool,
+) -> PyResult<(PyObject, PyObject)> {
+    const TMP: &str = "__pdt__posex_idx";
+    if plan.schema.contains_key(TMP) {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "posexplode() internal error: reserved temp column name already exists in schema.",
+        ));
+    }
+    if pos_name == value_name {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "posexplode() pos_name and value_name must differ.",
+        ));
+    }
+    if pos_name == list_column {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "posexplode() pos_name must not equal the list column name.",
+        ));
+    }
+    let dt = plan.schema.get(&list_column).ok_or_else(|| {
+        PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+            "posexplode() unknown column '{}'.",
+            list_column
+        ))
+    })?;
+    let DTypeDesc::List { inner, .. } = dt else {
+        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+            "posexplode() column '{}' must have list dtype.",
+            list_column
+        )));
+    };
+    let inner_el = dtype_after_explode(inner);
+    if plan.schema.contains_key(&pos_name) {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "posexplode() pos_name '{pos_name}' already exists.",
+        )));
+    }
+    if value_name != list_column && plan.schema.contains_key(&value_name) {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "posexplode() value_name '{value_name}' already exists.",
+        )));
+    }
+
+    let mut lf = plan_to_lazyframe(py, plan, root_data)?;
+    let list_len = col(list_column.as_str())
+        .list()
+        .len()
+        .cast(DataType::Int64);
+    let idx_list = int_ranges(lit(0i64), list_len, lit(1i64), DataType::Int64).alias(TMP);
+    lf = lf.with_column(idx_list);
+    lf = lf.explode(
+        cols([TMP, list_column.as_str()]),
+        explode_options(outer),
+    );
+    if value_name != list_column {
+        lf = lf.rename(
+            [PlSmallStr::from_str(TMP), PlSmallStr::from_str(list_column.as_str())],
+            [
+                PlSmallStr::from_str(pos_name.as_str()),
+                PlSmallStr::from_str(value_name.as_str()),
+            ],
+            true,
+        );
+    } else {
+        lf = lf.rename(
+            [PlSmallStr::from_str(TMP)],
+            [PlSmallStr::from_str(pos_name.as_str())],
+            true,
+        );
+    }
+
+    let out_df = collect_lazyframe(py, lf, streaming)?;
+
+    let mut out_schema: HashMap<String, DTypeDesc> = plan.schema.clone();
+    out_schema.remove(&list_column);
+    out_schema.insert(
+        pos_name.clone(),
+        DTypeDesc::Scalar {
+            base: Some(BaseType::Int),
+            nullable: true,
+            literals: None,
+        },
+    );
+    out_schema.insert(value_name.clone(), inner_el);
 
     let out_dict = PyDict::new_bound(py);
     for (name, dtype) in out_schema.iter() {

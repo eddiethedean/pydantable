@@ -38,6 +38,11 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `DataFrame.distinct` | **Supported** | All-column distinct rows; optional `subset=` matches core `distinct`. |
 | `DataFrame.withColumnRenamed` | **Supported** | Single rename per call (or use `rename` with dict). |
 | `DataFrame.union` / `unionAll` | **Supported** | Vertical concat via core `concat(..., how="vertical")`. |
+| `DataFrame.explode` / `explode_outer` | **Supported** | **List columns only**; implemented as a **frame reshape** (Polars `explode`). `outer=True` / `explode_outer` uses Spark-ish **null/empty** handling via Polars `ExplodeOptions` (`empty_as_null: true`, `keep_nulls: true`). |
+| `DataFrame.posexplode` / `posexplode_outer` | **Supported** | One list column at a time; adds a **0-based** position column plus the element column (name configurable). |
+| `DataFrame.unnest` / `unnest_all` | **Supported** | Struct flattening to top-level fields (often what Spark users mean by “struct explode”). |
+| `DataFrame.explode_all` | **Supported** | Schema-driven: explode every list-typed column. |
+| `functions.explode` | **Raises `TypeError`** | pydantable has no `select(explode(col))` generator expressions; use **`DataFrame.explode`** / **`posexplode`**. |
 | `functions.lit`, `functions.col` | **Supported** | `col` requires `dtype=` or use `df.col()`. |
 | `functions.isnull`, `isnotnull`, `coalesce` | **Supported** | Via Rust `ExprNode`. |
 | `functions.when` / `otherwise` | **Supported** | `CaseWhen` in Rust; chain `.when(...).otherwise(...)`. |

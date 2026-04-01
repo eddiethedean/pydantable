@@ -1851,9 +1851,47 @@ class DataFrameModel(Generic[RowT]):
         )
 
     def explode(
+        self,
+        columns: str | Sequence[str] | Any,
+        *,
+        outer: bool = False,
+        streaming: bool | None = None,
+    ) -> DataFrameModel[Any]:
+        return self._from_dataframe(
+            self._df.explode(columns, outer=outer, streaming=streaming)
+        )
+
+    def explode_outer(
         self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None
     ) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.explode(columns, streaming=streaming))
+        return self._from_dataframe(self._df.explode_outer(columns, streaming=streaming))
+
+    def posexplode(
+        self,
+        column: str,
+        *,
+        pos: str = "pos",
+        value: str | None = None,
+        outer: bool = False,
+        streaming: bool | None = None,
+    ) -> DataFrameModel[Any]:
+        return self._from_dataframe(
+            self._df.posexplode(
+                column, pos=pos, value=value, outer=outer, streaming=streaming
+            )
+        )
+
+    def posexplode_outer(
+        self,
+        column: str,
+        *,
+        pos: str = "pos",
+        value: str | None = None,
+        streaming: bool | None = None,
+    ) -> DataFrameModel[Any]:
+        return self._from_dataframe(
+            self._df.posexplode_outer(column, pos=pos, value=value, streaming=streaming)
+        )
 
     def unnest(
         self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None

@@ -715,6 +715,67 @@ class DataFrame(CoreDataFrame):
             )
         )
 
+    def explode(
+        self,
+        column: Any,
+        *,
+        outer: bool = False,
+        streaming: bool | None = None,
+    ) -> DataFrame:
+        """Explode one or more **list-typed** columns (Spark ``explode``; use ``outer=True`` for ``explode_outer``)."""
+        return self._as_pyspark_df(
+            super().explode(column, outer=outer, streaming=streaming)
+        )
+
+    def explode_outer(
+        self, column: Any, *, streaming: bool | None = None
+    ) -> DataFrame:
+        """Explode list columns with Spark-ish outer null/empty handling (see docs)."""
+        return self._as_pyspark_df(super().explode_outer(column, streaming=streaming))
+
+    def explode_all(self, *, streaming: bool | None = None) -> DataFrame:
+        """Explode every list-typed column in the schema (not a separate Spark name; convenience)."""
+        return self._as_pyspark_df(super().explode_all(streaming=streaming))
+
+    def posexplode(
+        self,
+        column: str,
+        *,
+        pos: str = "pos",
+        value: str | None = None,
+        outer: bool = False,
+        streaming: bool | None = None,
+    ) -> DataFrame:
+        """Explode one list column and add a **0-based** index column (Spark ``posexplode``)."""
+        return self._as_pyspark_df(
+            super().posexplode(
+                column, pos=pos, value=value, outer=outer, streaming=streaming
+            )
+        )
+
+    def posexplode_outer(
+        self,
+        column: str,
+        *,
+        pos: str = "pos",
+        value: str | None = None,
+        streaming: bool | None = None,
+    ) -> DataFrame:
+        """``posexplode(..., outer=True)`` alias."""
+        return self._as_pyspark_df(
+            super().posexplode_outer(column, pos=pos, value=value, streaming=streaming)
+        )
+
+    def unnest(
+        self, column: Any, *, streaming: bool | None = None
+    ) -> DataFrame:
+        """Expand **struct** columns to top-level fields (common Spark ``struct`` expansion pattern)."""
+        return self._as_pyspark_df(super().unnest(column, streaming=streaming))
+
+    def unnest_all(self, *, streaming: bool | None = None) -> DataFrame:
+        """Unnest every struct-typed column in the schema."""
+        return self._as_pyspark_df(super().unnest_all(streaming=streaming))
+
     def drop(self, *columns: Any, strict: bool = True) -> DataFrame:
         """Drop columns by name (Spark ``drop``)."""
         return cast("DataFrame", super().drop(*columns, strict=strict))
@@ -1406,6 +1467,88 @@ class DataFrameModel(CoreDataFrameModel):
                     seed=seed,
                 )
             ),
+        )
+
+    def explode(
+        self,
+        columns: Any,
+        *,
+        outer: bool = False,
+        streaming: bool | None = None,
+    ) -> DataFrameModel:
+        """Explode **list-typed** columns (Spark ``explode``); use ``outer=True`` for ``explode_outer``."""
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(
+                self._df.explode(columns, outer=outer, streaming=streaming)
+            ),
+        )
+
+    def explode_outer(
+        self, columns: Any, *, streaming: bool | None = None
+    ) -> DataFrameModel:
+        """Explode lists with Spark-ish *outer* null/empty handling (see docs)."""
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(self._df.explode_outer(columns, streaming=streaming)),
+        )
+
+    def explode_all(self, *, streaming: bool | None = None) -> DataFrameModel:
+        """Explode every list-typed column in the schema (schema-driven convenience)."""
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(self._df.explode_all(streaming=streaming)),
+        )
+
+    def posexplode(
+        self,
+        column: str,
+        *,
+        pos: str = "pos",
+        value: str | None = None,
+        outer: bool = False,
+        streaming: bool | None = None,
+    ) -> DataFrameModel:
+        """Explode one list column and add a **0-based** position column (Spark ``posexplode``)."""
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(
+                self._df.posexplode(
+                    column, pos=pos, value=value, outer=outer, streaming=streaming
+                )
+            ),
+        )
+
+    def posexplode_outer(
+        self,
+        column: str,
+        *,
+        pos: str = "pos",
+        value: str | None = None,
+        streaming: bool | None = None,
+    ) -> DataFrameModel:
+        """``posexplode(..., outer=True)`` alias."""
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(
+                self._df.posexplode_outer(column, pos=pos, value=value, streaming=streaming)
+            ),
+        )
+
+    def unnest(
+        self, columns: Any, *, streaming: bool | None = None
+    ) -> DataFrameModel:
+        """Expand **struct** columns to top-level fields (Spark struct expansion analogue)."""
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(self._df.unnest(columns, streaming=streaming)),
+        )
+
+    def unnest_all(self, *, streaming: bool | None = None) -> DataFrameModel:
+        """Unnest every struct-typed column in the schema."""
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(self._df.unnest_all(streaming=streaming)),
         )
 
     def drop(self, *cols: str | ColumnRef) -> DataFrameModel:

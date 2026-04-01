@@ -492,11 +492,50 @@ def execute_explode(
     columns: Sequence[str],
     *,
     streaming: bool = False,
+    outer: bool = False,
 ) -> tuple[Any, Any]:
     """Explode list columns to one row per element."""
     rust = _require_rust_core()
-    with span("execute_explode", columns=list(columns), streaming=bool(streaming)):
-        return rust.execute_explode(plan, root_data, list(columns), streaming)
+    with span(
+        "execute_explode",
+        columns=list(columns),
+        streaming=bool(streaming),
+        outer=bool(outer),
+    ):
+        return rust.execute_explode(
+            plan, root_data, list(columns), streaming, outer
+        )
+
+
+def execute_posexplode(
+    plan: Any,
+    root_data: Any,
+    list_column: str,
+    pos_name: str,
+    value_name: str,
+    *,
+    streaming: bool = False,
+    outer: bool = False,
+) -> tuple[Any, Any]:
+    """Explode one list column with 0-based positions (Spark posexplode)."""
+    rust = _require_rust_core()
+    with span(
+        "execute_posexplode",
+        list_column=list_column,
+        pos_name=pos_name,
+        value_name=value_name,
+        streaming=bool(streaming),
+        outer=bool(outer),
+    ):
+        return rust.execute_posexplode(
+            plan,
+            root_data,
+            str(list_column),
+            str(pos_name),
+            str(value_name),
+            streaming,
+            outer,
+        )
 
 
 def execute_unnest(

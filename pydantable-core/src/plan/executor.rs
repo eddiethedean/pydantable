@@ -238,8 +238,33 @@ impl PolarsExecutor {
         root_data: &Bound<'_, PyAny>,
         columns: Vec<String>,
         streaming: bool,
+        outer: bool,
     ) -> PyResult<(PyObject, PyObject)> {
-        super::execute_polars::execute_explode_polars(py, plan, root_data, columns, streaming)
+        super::execute_polars::execute_explode_polars(
+            py, plan, root_data, columns, streaming, outer,
+        )
+    }
+
+    pub fn posexplode(
+        py: Python<'_>,
+        plan: &PlanInner,
+        root_data: &Bound<'_, PyAny>,
+        list_column: String,
+        pos_name: String,
+        value_name: String,
+        streaming: bool,
+        outer: bool,
+    ) -> PyResult<(PyObject, PyObject)> {
+        super::execute_polars::execute_posexplode_polars(
+            py,
+            plan,
+            root_data,
+            list_column,
+            pos_name,
+            value_name,
+            streaming,
+            outer,
+        )
     }
 
     pub fn unnest(

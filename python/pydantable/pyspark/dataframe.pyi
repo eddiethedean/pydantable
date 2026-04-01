@@ -154,6 +154,34 @@ class DataFrame(CoreDataFrame[Any]):
         fraction: float | None = None,
         seed: int | None = None,
     ) -> DataFrame: ...
+    def explode(
+        self,
+        column: Any,
+        *,
+        outer: bool = False,
+        streaming: bool | None = None,
+    ) -> DataFrame: ...
+    def explode_outer(self, column: Any, *, streaming: bool | None = None) -> DataFrame: ...
+    def explode_all(self, *, streaming: bool | None = None) -> DataFrame: ...
+    def posexplode(
+        self,
+        column: str,
+        *,
+        pos: str = ...,
+        value: str | None = ...,
+        outer: bool = ...,
+        streaming: bool | None = ...,
+    ) -> DataFrame: ...
+    def posexplode_outer(
+        self,
+        column: str,
+        *,
+        pos: str = ...,
+        value: str | None = ...,
+        streaming: bool | None = ...,
+    ) -> DataFrame: ...
+    def unnest(self, column: Any, *, streaming: bool | None = None) -> DataFrame: ...
+    def unnest_all(self, *, streaming: bool | None = None) -> DataFrame: ...
 
 class DataFrameModel(CoreDataFrameModel):
     def group_by(  # type: ignore[override]
@@ -234,3 +262,35 @@ class DataFrameModel(CoreDataFrameModel):
         fraction: float | None = None,
         seed: int | None = None,
     ) -> DataFrameModel: ...
+    def explode(
+        self,
+        columns: Any,
+        *,
+        outer: bool = False,
+        streaming: bool | None = None,
+    ) -> DataFrameModel: ...
+    def explode_outer(
+        self, columns: Any, *, streaming: bool | None = None
+    ) -> DataFrameModel: ...
+    def explode_all(self, *, streaming: bool | None = None) -> DataFrameModel: ...
+    def posexplode(
+        self,
+        column: str,
+        *,
+        pos: str = ...,
+        value: str | None = ...,
+        outer: bool = ...,
+        streaming: bool | None = ...,
+    ) -> DataFrameModel: ...
+    def posexplode_outer(
+        self,
+        column: str,
+        *,
+        pos: str = ...,
+        value: str | None = ...,
+        streaming: bool | None = ...,
+    ) -> DataFrameModel: ...
+    def unnest(
+        self, columns: Any, *, streaming: bool | None = None
+    ) -> DataFrameModel: ...
+    def unnest_all(self, *, streaming: bool | None = None) -> DataFrameModel: ...

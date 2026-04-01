@@ -6,7 +6,7 @@ static typing requires ``dtype=`` on ``col`` (or use ``df.col()`` on a typed fra
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NoReturn
 
 from pydantable.expressions import (
     ColumnRef,
@@ -117,6 +117,21 @@ def col(name: str, *, dtype: Any | None = None) -> ColumnRef:
 def column(name: str, *, dtype: Any | None = None) -> ColumnRef:
     """Alias of :func:`col`."""
     return col(name, dtype=dtype)
+
+
+def explode(_column: Expr) -> NoReturn:
+    """Reject Spark-style ``select(explode(c))``.
+
+    pydantable models list explosion as a **DataFrame reshape**, not a table-generating
+    expression in ``select``. Use :meth:`~pydantable.pyspark.DataFrame.explode` or
+    :meth:`~pydantable.pyspark.DataFrame.posexplode` on the frame instead (see
+    ``docs/PYSPARK_UI.md``).
+    """
+    raise TypeError(
+        "pydantable does not support Spark-style select(F.explode(col)). "
+        "Use DataFrame.explode(...) or DataFrame.posexplode(...) instead "
+        "(list explosion is a frame reshape, not an Expr); see docs/PYSPARK_UI.md."
+    )
 
 
 def isnull(column: Expr) -> Expr:
@@ -783,6 +798,7 @@ __all__ = [
     "first_value",
     "element_at",
     "ends_with",
+    "explode",
     "floor",
     "hour",
     "isin",

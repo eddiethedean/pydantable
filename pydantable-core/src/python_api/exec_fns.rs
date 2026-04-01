@@ -486,22 +486,56 @@ fn execute_pivot(
 }
 
 #[pyfunction]
-#[pyo3(signature = (plan, root_data, columns, streaming=false))]
+#[pyo3(signature = (plan, root_data, columns, streaming=false, outer=false))]
 fn execute_explode(
     py: Python<'_>,
     plan: &PyPlan,
     root_data: &Bound<'_, PyAny>,
     columns: Vec<String>,
     streaming: bool,
+    outer: bool,
 ) -> PyResult<(PyObject, PyObject)> {
     #[cfg(feature = "polars_engine")]
     {
-        PolarsExecutor::explode(py, &plan.inner, root_data, columns, streaming)
+        PolarsExecutor::explode(py, &plan.inner, root_data, columns, streaming, outer)
     }
     #[cfg(not(feature = "polars_engine"))]
     {
         Err(pyo3::exceptions::PyRuntimeError::new_err(
             "explode requires pydantable-core built with the `polars_engine` feature.",
+        ))
+    }
+}
+
+#[pyfunction]
+#[pyo3(signature = (plan, root_data, list_column, pos_name, value_name, streaming=false, outer=false))]
+fn execute_posexplode(
+    py: Python<'_>,
+    plan: &PyPlan,
+    root_data: &Bound<'_, PyAny>,
+    list_column: String,
+    pos_name: String,
+    value_name: String,
+    streaming: bool,
+    outer: bool,
+) -> PyResult<(PyObject, PyObject)> {
+    #[cfg(feature = "polars_engine")]
+    {
+        PolarsExecutor::posexplode(
+            py,
+            &plan.inner,
+            root_data,
+            list_column,
+            pos_name,
+            value_name,
+            streaming,
+            outer,
+        )
+    }
+    #[cfg(not(feature = "polars_engine"))]
+    {
+        Err(pyo3::exceptions::PyRuntimeError::new_err(
+            "posexplode requires pydantable-core built with the `polars_engine` feature.",
         ))
     }
 }
@@ -613,6 +647,7 @@ pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(execute_melt, m)?)?;
     m.add_function(wrap_pyfunction!(execute_pivot, m)?)?;
     m.add_function(wrap_pyfunction!(execute_explode, m)?)?;
+    m.add_function(wrap_pyfunction!(execute_posexplode, m)?)?;
     m.add_function(wrap_pyfunction!(execute_unnest, m)?)?;
     m.add_function(wrap_pyfunction!(execute_rolling_agg, m)?)?;
     m.add_function(wrap_pyfunction!(execute_groupby_dynamic_agg, m)?)?;

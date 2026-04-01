@@ -91,6 +91,12 @@ Core operations (`collect`, `join`, `group_by`, typed `filter`, …) behave like
 | `toPandas()` | `to_dict()` → `pandas.DataFrame` (eager; requires **pandas**) (**1.9.0+**) |
 | `limit(num)` | `limit(num)` |
 | `sample(withReplacement=False, fraction=..., seed=None)` | Core `sample(fraction=..., seed=..., with_replacement=...)` (eager; materializes via `to_dict()`) |
+| `explode(column(s), outer=False)` | Core list reshape (Polars `explode`); `outer=True` maps to Spark-ish `explode_outer` null/empty handling (see parity doc). |
+| `explode_outer(...)` | Same as `explode(..., outer=True)`. |
+| `explode_all()` | Explode every **list**-typed column (schema-driven). |
+| `posexplode(column, pos='pos', value=None, outer=False)` | One list column → synchronized position (0-based) + element columns; `value` defaults to the list column name. |
+| `posexplode_outer(...)` | `posexplode(..., outer=True)`. |
+| `unnest(column(s))` / `unnest_all()` | Core **struct** flattening (Spark users often want this for nested structs, not `explode`). |
 | `drop(*cols)` | `drop(*cols)` |
 | `distinct()` | All-column distinct rows |
 | `withColumnRenamed(existing, new)` | `with_column_renamed` |
@@ -115,7 +121,11 @@ See {doc}`PANDAS_UI` **Naming map** for **`with_columns` / `assign` / `withColum
 
 ## `DataFrameModel` (PySpark UI)
 
-Delegates Spark-like methods to the inner PySpark UI `DataFrame` and re-wraps as the same model class. **`schema`** and **`columns`** follow the inner frame. **1.9.0+** adds the same **`groupBy`**, **`sort`**, **`crossJoin`**, **`count()`**, **`unionByName`**, set-style helpers, **`fillna` / `dropna` / `.na`**, **`printSchema`**, **`explain`**, and **`toPandas`** surface as on `DataFrame`.
+Delegates Spark-like methods to the inner PySpark UI `DataFrame` and re-wraps as the same model class. **`schema`** and **`columns`** follow the inner frame. **1.9.0+** adds the same **`groupBy`**, **`sort`**, **`crossJoin`**, **`count()`**, **`unionByName`**, set-style helpers, **`fillna` / `dropna` / `.na`**, **`printSchema`**, **`explain`**, and **`toPandas`** surface as on `DataFrame`. **`explode`**, **`posexplode`**, **`unnest`**, and **`explode_all` / `unnest_all`** are documented on both `DataFrame` and `DataFrameModel`.
+
+### List explosion vs `functions.explode`
+
+Apache Spark allows `select(explode(col))` because `explode` is a generator expression. **pydantable does not:** there is no table-generating `Expr` for explosion in `select`. Importing **`pydantable.pyspark.sql.functions as F`** and calling **`F.explode(...)`** raises **`TypeError`** with directions to use **`DataFrame.explode(...)`** or **`DataFrame.posexplode(...)`** instead.
 
 ## `pydantable.pyspark.sql`
 
@@ -127,7 +137,7 @@ from pydantable.pyspark.sql import functions as F, Column, IntegerType, StructTy
 
 This block only checks that imports resolve; it has no printed output.
 
-- **`functions`** — `lit`, typed **`col(..., dtype=...)`**, `isnull` / `isnotnull`, `coalesce`, `when` / `otherwise`, `cast`, `between`, `isin`, `concat`, `substring`, `length`, **`year` / `month` / `day` / `hour` / `minute` / `second` / `nanosecond` / `to_date` / `unix_timestamp`** (wrappers over core `Expr` temporal APIs), global **`sum`/`avg`/`mean`/`count`/`min`/`max`** for **`select`** (including **`count()`** with no args → row count), and window helpers — see the parity matrix.
+- **`functions`** — `lit`, typed **`col(..., dtype=...)`**, `isnull` / `isnotnull`, `coalesce`, `when` / `otherwise`, `cast`, `between`, `isin`, `concat`, `substring`, `length`, **`explode`** (raises **`TypeError`**; use **`DataFrame.explode`** / **`posexplode`**), **`year` / `month` / `day` / `hour` / `minute` / `second` / `nanosecond` / `to_date` / `unix_timestamp`** (wrappers over core `Expr` temporal APIs), global **`sum`/`avg`/`mean`/`count`/`min`/`max`** for **`select`** (including **`count()`** with no args → row count), and window helpers — see the parity matrix.
 - **`Column`** — type alias for pydantable **`Expr`**.
 - **`types`** — simple `IntegerType`, `StringType`, `StructField`, `StructType`, … for documentation and `schema` views.
 

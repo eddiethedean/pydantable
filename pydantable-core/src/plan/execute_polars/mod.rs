@@ -20,7 +20,7 @@ pub(crate) use materialize::execute_plan_polars;
 pub(crate) use materialize::{dtype_from_polars, series_to_py_list};
 pub use reshape_exec::{
     execute_explode_polars, execute_groupby_dynamic_agg_polars, execute_melt_polars,
-    execute_pivot_polars, execute_unnest_polars,
+    execute_posexplode_polars, execute_pivot_polars, execute_unnest_polars,
 };
 pub(crate) use root_lazy::{
     collect_plan_batches_polars, sink_csv_polars, sink_ipc_polars, sink_ndjson_polars,

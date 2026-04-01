@@ -57,6 +57,7 @@ from pydantable.rust_engine import (
     execute_join,
     execute_melt,
     execute_pivot,
+    execute_posexplode,
     execute_plan,
     execute_unnest,
     rust_has_async_collect_plan_batches,
@@ -2737,7 +2738,11 @@ class DataFrame(Generic[SchemaT]):
         )
 
     def explode(
-        self, columns: str | Sequence[str] | Selector, *, streaming: bool | None = None
+        self,
+        columns: str | Sequence[str] | Selector,
+        *,
+        outer: bool = False,
+        streaming: bool | None = None,
     ) -> DataFrame[Any]:
         if isinstance(columns, Selector):
             cols = columns.resolve(self._current_field_types)
@@ -2753,7 +2758,11 @@ class DataFrame(Generic[SchemaT]):
             streaming=streaming, default=self._engine_streaming_default
         )
         out_data, schema_descriptors = execute_explode(
-            self._rust_plan, self._root_data, cols, streaming=use_streaming
+            self._rust_plan,
+            self._root_data,
+            cols,
+            streaming=use_streaming,
+            outer=outer,
         )
         derived_fields = self._field_types_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
@@ -2765,6 +2774,69 @@ class DataFrame(Generic[SchemaT]):
             root_schema_type=derived_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+        )
+
+    def explode_outer(
+        self,
+        columns: str | Sequence[str] | Selector,
+        *,
+        streaming: bool | None = None,
+    ) -> DataFrame[Any]:
+        """Explode list columns with Spark-ish *outer* null/empty handling (see docs)."""
+        return self.explode(columns, outer=True, streaming=streaming)
+
+    def posexplode(
+        self,
+        column: str,
+        *,
+        pos: str = "pos",
+        value: str | None = None,
+        outer: bool = False,
+        streaming: bool | None = None,
+    ) -> DataFrame[Any]:
+        """Explode one list column and add a 0-based index column (Spark ``posexplode``)."""
+        if not isinstance(column, str) or not column:
+            raise TypeError("posexplode() expects a non-empty str column name.")
+        if not isinstance(pos, str) or not pos:
+            raise TypeError("posexplode(pos=...) must be a non-empty str.")
+        value_name = column if value is None else value
+        if not isinstance(value_name, str) or not value_name:
+            raise TypeError("posexplode(value=...) must be a non-empty str when set.")
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming, default=self._engine_streaming_default
+        )
+        out_data, schema_descriptors = execute_posexplode(
+            self._rust_plan,
+            self._root_data,
+            column,
+            pos,
+            value_name,
+            streaming=use_streaming,
+            outer=outer,
+        )
+        derived_fields = self._field_types_from_descriptors(schema_descriptors)
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        rust_plan = _require_rust_core().make_plan(derived_fields)
+        return self._from_plan(
+            root_data=out_data,
+            root_schema_type=derived_schema_type,
+            current_schema_type=derived_schema_type,
+            rust_plan=rust_plan,
+        )
+
+    def posexplode_outer(
+        self,
+        column: str,
+        *,
+        pos: str = "pos",
+        value: str | None = None,
+        streaming: bool | None = None,
+    ) -> DataFrame[Any]:
+        """``posexplode(..., outer=True)`` alias."""
+        return self.posexplode(
+            column, pos=pos, value=value, outer=True, streaming=streaming
         )
 
     def unnest(

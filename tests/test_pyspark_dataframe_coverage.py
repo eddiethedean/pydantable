@@ -4,6 +4,7 @@ import pytest
 from conftest import assert_table_eq_sorted
 from pydantable.pyspark import DataFrame, DataFrameModel
 from pydantable.pyspark.dataframe import _text_show_table
+from pydantable.pyspark.sql import functions as F
 from pydantable.schema import Schema
 
 
@@ -779,3 +780,85 @@ def test_pyspark_dropna_with_thresh() -> None:
     )
     out = df.dropna(thresh=2, subset=["name", "age"])
     assert out.to_dict()["id"] == [1, 3]
+
+
+class WithTags(Schema):
+    id: int
+    tags: list[str]
+
+
+class TwoLists(Schema):
+    id: int
+    xs: list[int]
+    ys: list[str]
+
+
+def test_pyspark_functions_explode_raises_typeerror() -> None:
+    with pytest.raises(TypeError, match="DataFrame\\.explode"):
+        F.explode(F.col("x", dtype=int))
+
+
+def test_pyspark_explode_multi_column_lists() -> None:
+    df = DataFrame[TwoLists](
+        {"id": [1, 2], "xs": [[10, 20], [30]], "ys": [["a", "b"], ["c"]]}
+    )
+    out = df.explode(["xs", "ys"]).to_dict()
+    assert out["id"] == [1, 1, 2]
+    assert out["xs"] == [10, 20, 30]
+    assert out["ys"] == ["a", "b", "c"]
+
+
+def test_pyspark_posexplode_preserves_siblings_and_zero_based_pos() -> None:
+    df = DataFrame[WithTags](
+        {"id": [1, 2], "tags": [["x", "y"], ["z"]]},
+    )
+    out = df.posexplode("tags").to_dict()
+    assert out["id"] == [1, 1, 2]
+    assert out["pos"] == [0, 1, 0]
+    assert out["tags"] == ["x", "y", "z"]
+
+
+def test_pyspark_posexplode_value_alias() -> None:
+    df = DataFrame[WithTags]({"id": [1], "tags": [["a", "b"]]})
+    out = df.posexplode("tags", value="t").to_dict()
+    assert set(out) == {"id", "pos", "t"}
+    assert out["t"] == ["a", "b"]
+    assert out["pos"] == [0, 1]
+
+
+def test_pyspark_dataframe_model_posexplode() -> None:
+    class M(DataFrameModel):
+        id: int
+        tags: list[str]
+
+    m = M({"id": [10], "tags": [["p", "q"]]})
+    out = m.posexplode("tags", pos="i").to_dict()
+    assert out["id"] == [10, 10]
+    assert out["i"] == [0, 1]
+    assert out["tags"] == ["p", "q"]
+
+
+def test_pyspark_explode_outer_keeps_empty_list_row() -> None:
+    """``explode_outer`` maps empty lists to a null element row; default ``explode`` drops them."""
+
+    class WithList(Schema):
+        id: int
+        items: list[int]
+
+    df = DataFrame[WithList]({"id": [1, 2], "items": [[], [7, 8]]})
+    outer = df.explode_outer("items").to_dict()
+    assert outer["id"] == [1, 2, 2]
+    assert outer["items"] == [None, 7, 8]
+    inner = df.explode("items").to_dict()
+    assert inner["id"] == [2, 2]
+    assert inner["items"] == [7, 8]
+
+
+def test_pyspark_posexplode_outer_includes_empty_list_row() -> None:
+    class WithList(Schema):
+        id: int
+        items: list[int]
+
+    df = DataFrame[WithList]({"id": [1, 2], "items": [[], [1]]})
+    out = df.posexplode_outer("items").to_dict()
+    assert out == {"id": [1, 2], "pos": [None, 0], "items": [None, 1]}
