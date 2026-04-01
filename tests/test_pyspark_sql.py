@@ -876,3 +876,47 @@ def test_sql_functions_strip_suffix_happy_path() -> None:
         as_lists=True
     )
     assert out["t"] == ["alpha", "beta"]
+
+
+def test_sql_functions_regex_helpers_rlike_extract_and_substr() -> None:
+    class S(Schema):
+        s: str | None
+
+    df = DataFrame[S]({"s": ["abc-123", "nope", None]})
+    c = F.col("s", dtype=str | None)
+    out = (
+        df.withColumn("m", F.rlike(c, r"\d+"))
+        .withColumn("g0", F.regexp_substr(c, r"(\d+)", 0))
+        .withColumn("g1", F.regexp_extract(c, r"(\d+)", 1))
+        .withColumn("g1b", F.regexp_substr(c, r"(\d+)", 1))
+        .collect(as_lists=True)
+    )
+    assert out["m"] == [True, False, None]
+    assert out["g0"] == ["123", None, None]
+    assert out["g1"] == ["123", None, None]
+    assert out["g1b"] == ["123", None, None]
+
+
+def test_sql_functions_regexp_like_is_alias_of_rlike() -> None:
+    class S(Schema):
+        s: str
+
+    df = DataFrame[S]({"s": ["x1", "x"]})
+    c = F.col("s", dtype=str)
+    a = df.withColumn("m", F.rlike(c, r"\\d")).collect(as_lists=True)
+    b = df.withColumn("m", F.regexp_like(c, r"\\d")).collect(as_lists=True)
+    assert a == b
+
+
+def test_sql_functions_regex_empty_pattern_errors() -> None:
+    class S(Schema):
+        s: str
+
+    df = DataFrame[S]({"s": ["x"]})
+    c = F.col("s", dtype=str)
+    with pytest.raises(ValueError, match="pattern must not be empty"):
+        df.withColumn("m", F.rlike(c, "")).collect(as_lists=True)
+    with pytest.raises(ValueError, match="pattern must not be empty"):
+        df.withColumn("t", F.regexp_replace(c, "", "z")).collect(as_lists=True)
+    with pytest.raises(ValueError, match="pattern must not be empty"):
+        df.withColumn("x", F.regexp_extract(c, "", 0)).collect(as_lists=True)

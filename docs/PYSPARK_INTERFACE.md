@@ -36,6 +36,7 @@ See:
 | `transform` | `transform` | Implemented | Callable pipeline helper returning DataFrame/DataFrameModel. |
 | `selectExpr` | `select_typed` | Out of scope | SQL-string expressions intentionally excluded; use typed expressions + aliases. |
 | `groupBy` | `groupBy` / `group_by` | Implemented (**1.9.0+**) | Returns **`PySparkGroupedDataFrame`** (or model wrapper); `.agg(...)` uses tuple specs. |
+| `groupBy(...).pivot(...).agg(...)` | `groupBy(...).pivot(...).agg(...)` | Implemented (**1.9.0+**) | Spark-shaped grouped pivot. `pivot(values=[...])` fixes the pivot value set (missing values become null columns). Output naming uses `<pivot_value>_<out_name>` for grouped pivot aggregations. |
 | `count()` (action) | `count()` | Implemented (**1.9.0+**) | **`int`** row count via **`global_row_count()`**; distinct from grouped **`count(...)`**. |
 | `sort` / `crossJoin` | same | Implemented (**1.9.0+**) | Global **`sort`** only; **`crossJoin`** → **`join(how="cross")`**. |
 | `unionByName` | same | Implemented (**1.9.0+**) | Name order + optional **`allowMissingColumns`**. |

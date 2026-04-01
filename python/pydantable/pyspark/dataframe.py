@@ -10,6 +10,11 @@ from pydantable.dataframe import DataFrame as CoreDataFrame
 from pydantable.dataframe import GroupedDataFrame as CoreGroupedDataFrame
 from pydantable.dataframe_model import DataFrameModel as CoreDataFrameModel
 from pydantable.expressions import ColumnRef, Expr, Literal, global_row_count
+from pydantable.rust_engine import (
+    _require_rust_core,
+    execute_except_all,
+    execute_intersect_all,
+)
 from pydantable.schema import make_derived_schema_type
 
 from .sql.types import (
@@ -267,7 +272,8 @@ class PySparkPivotedGroupedDataFrame:
         )
 
         # Rename core pivot outputs to Spark-ish names:
-        # - multi-value: `<pivot_value>__<out_name>__first` -> `<pivot_value>_<out_name>`
+        # - multi-value: `<pivot_value>__<out_name>__first`
+        #   -> `<pivot_value>_<out_name>`
         # - single-value: `<pivot_value>__first` -> `<pivot_value>_<out_name>`
         rename_map: dict[str, str] = {}
         for c in pivoted.columns:
@@ -588,8 +594,66 @@ class DataFrame(CoreDataFrame):
         return self._as_pyspark_df(super().join(other, on=keys, how="anti"))
 
     def exceptAll(self, other: DataFrame) -> DataFrame:
-        """Alias of :meth:`subtract` (not Spark multiset ``EXCEPT ALL``)."""
-        return self.subtract(other)
+        """Multiset difference (Spark ``EXCEPT ALL``)."""
+        if self._current_field_types != other._current_field_types:
+            raise ValueError("exceptAll() requires identical schemas.")
+        use_streaming = (
+            bool(self._engine_streaming_default)
+            if self._engine_streaming_default is not None
+            else False
+        )
+        out_data, schema_desc = execute_except_all(
+            self._rust_plan,
+            self._root_data,
+            other._rust_plan,
+            other._root_data,
+            as_python_lists=True,
+            streaming=use_streaming,
+        )
+        derived_fields = self._field_types_from_descriptors(schema_desc)
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        rust_plan = _require_rust_core().make_plan(derived_fields)
+        return self._as_pyspark_df(
+            self._from_plan(
+                root_data=out_data,
+                root_schema_type=derived_schema_type,
+                current_schema_type=derived_schema_type,
+                rust_plan=rust_plan,
+            )
+        )
+
+    def intersectAll(self, other: DataFrame) -> DataFrame:
+        """Multiset intersection (Spark ``INTERSECT ALL``)."""
+        if self._current_field_types != other._current_field_types:
+            raise ValueError("intersectAll() requires identical schemas.")
+        use_streaming = (
+            bool(self._engine_streaming_default)
+            if self._engine_streaming_default is not None
+            else False
+        )
+        out_data, schema_desc = execute_intersect_all(
+            self._rust_plan,
+            self._root_data,
+            other._rust_plan,
+            other._root_data,
+            as_python_lists=True,
+            streaming=use_streaming,
+        )
+        derived_fields = self._field_types_from_descriptors(schema_desc)
+        derived_schema_type = make_derived_schema_type(
+            self._current_schema_type, derived_fields
+        )
+        rust_plan = _require_rust_core().make_plan(derived_fields)
+        return self._as_pyspark_df(
+            self._from_plan(
+                root_data=out_data,
+                root_schema_type=derived_schema_type,
+                current_schema_type=derived_schema_type,
+                rust_plan=rust_plan,
+            )
+        )
 
     def join(self, other: CoreDataFrame, **kwargs: Any) -> DataFrame:
         out = super().join(other, **kwargs)
@@ -894,6 +958,13 @@ class DataFrameModel(CoreDataFrameModel):
         return cast(
             "DataFrameModel",
             self._from_dataframe(self._df.exceptAll(od)),
+        )
+
+    def intersectAll(self, other: DataFrameModel | DataFrame) -> DataFrameModel:
+        od = other._df if isinstance(other, DataFrameModel) else other
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(self._df.intersectAll(od)),
         )
 
     def group_by(

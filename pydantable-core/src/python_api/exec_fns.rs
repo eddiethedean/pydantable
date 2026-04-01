@@ -346,6 +346,68 @@ fn execute_concat(
 }
 
 #[pyfunction]
+#[pyo3(signature = (left_plan, left_root_data, right_plan, right_root_data, as_python_lists=false, streaming=false))]
+fn execute_except_all(
+    py: Python<'_>,
+    left_plan: &PyPlan,
+    left_root_data: &Bound<'_, PyAny>,
+    right_plan: &PyPlan,
+    right_root_data: &Bound<'_, PyAny>,
+    as_python_lists: bool,
+    streaming: bool,
+) -> PyResult<(PyObject, PyObject)> {
+    #[cfg(feature = "polars_engine")]
+    {
+        PolarsExecutor::except_all(
+            py,
+            &left_plan.inner,
+            left_root_data,
+            &right_plan.inner,
+            right_root_data,
+            as_python_lists,
+            streaming,
+        )
+    }
+    #[cfg(not(feature = "polars_engine"))]
+    {
+        Err(pyo3::exceptions::PyRuntimeError::new_err(
+            "exceptAll requires pydantable-core built with the `polars_engine` feature.",
+        ))
+    }
+}
+
+#[pyfunction]
+#[pyo3(signature = (left_plan, left_root_data, right_plan, right_root_data, as_python_lists=false, streaming=false))]
+fn execute_intersect_all(
+    py: Python<'_>,
+    left_plan: &PyPlan,
+    left_root_data: &Bound<'_, PyAny>,
+    right_plan: &PyPlan,
+    right_root_data: &Bound<'_, PyAny>,
+    as_python_lists: bool,
+    streaming: bool,
+) -> PyResult<(PyObject, PyObject)> {
+    #[cfg(feature = "polars_engine")]
+    {
+        PolarsExecutor::intersect_all(
+            py,
+            &left_plan.inner,
+            left_root_data,
+            &right_plan.inner,
+            right_root_data,
+            as_python_lists,
+            streaming,
+        )
+    }
+    #[cfg(not(feature = "polars_engine"))]
+    {
+        Err(pyo3::exceptions::PyRuntimeError::new_err(
+            "intersectAll requires pydantable-core built with the `polars_engine` feature.",
+        ))
+    }
+}
+
+#[pyfunction]
 #[pyo3(signature = (plan, root_data, id_vars, value_vars, variable_name, value_name, as_python_lists=false, streaming=false))]
 #[allow(clippy::too_many_arguments)]
 fn execute_melt(
@@ -546,6 +608,8 @@ pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(execute_join, m)?)?;
     m.add_function(wrap_pyfunction!(execute_groupby_agg, m)?)?;
     m.add_function(wrap_pyfunction!(execute_concat, m)?)?;
+    m.add_function(wrap_pyfunction!(execute_except_all, m)?)?;
+    m.add_function(wrap_pyfunction!(execute_intersect_all, m)?)?;
     m.add_function(wrap_pyfunction!(execute_melt, m)?)?;
     m.add_function(wrap_pyfunction!(execute_pivot, m)?)?;
     m.add_function(wrap_pyfunction!(execute_explode, m)?)?;

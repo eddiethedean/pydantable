@@ -1166,6 +1166,11 @@ impl ExprNode {
                 "str_replace() requires a string-like column.",
             ));
         }
+        if !literal && pattern.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Regex pattern must not be empty.",
+            ));
+        }
         let nullable = inner.dtype().nullable_flag();
         Ok(ExprNode::StringReplace {
             inner: Box::new(inner),

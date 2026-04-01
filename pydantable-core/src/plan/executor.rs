@@ -136,6 +136,46 @@ impl PolarsExecutor {
         )
     }
 
+    pub fn except_all(
+        py: Python<'_>,
+        left_plan: &PlanInner,
+        left_root_data: &Bound<'_, PyAny>,
+        right_plan: &PlanInner,
+        right_root_data: &Bound<'_, PyAny>,
+        as_python_lists: bool,
+        streaming: bool,
+    ) -> PyResult<(PyObject, PyObject)> {
+        super::execute_polars::execute_except_all_polars(
+            py,
+            left_plan,
+            left_root_data,
+            right_plan,
+            right_root_data,
+            as_python_lists,
+            streaming,
+        )
+    }
+
+    pub fn intersect_all(
+        py: Python<'_>,
+        left_plan: &PlanInner,
+        left_root_data: &Bound<'_, PyAny>,
+        right_plan: &PlanInner,
+        right_root_data: &Bound<'_, PyAny>,
+        as_python_lists: bool,
+        streaming: bool,
+    ) -> PyResult<(PyObject, PyObject)> {
+        super::execute_polars::execute_intersect_all_polars(
+            py,
+            left_plan,
+            left_root_data,
+            right_plan,
+            right_root_data,
+            as_python_lists,
+            streaming,
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn melt(
         py: Python<'_>,

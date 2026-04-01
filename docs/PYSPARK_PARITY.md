@@ -19,7 +19,8 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `DataFrame.crossJoin` | **Supported** (**1.9.0+**) | `join(how="cross")`. |
 | `DataFrame.count()` (action) | **Supported** (**1.9.0+**) | Returns **`int`** via `global_row_count()` in the plan. |
 | `DataFrame.unionByName` | **Supported** (**1.9.0+**) | Name-aligned concat; optional `allowMissingColumns` null-fill. |
-| `DataFrame.intersect` / `subtract` / `exceptAll` | **Partial** (**1.9.0+**) | `intersect` ≈ inner join on all columns + `distinct`. `subtract` ≈ anti join on all columns. `exceptAll` aliases `subtract` (not Spark multiset `EXCEPT ALL`). |
+| `DataFrame.intersect` / `subtract` | **Partial** (**1.9.0+**) | `intersect` ≈ inner join on all columns + `distinct`. `subtract` ≈ anti join on all columns. |
+| `DataFrame.exceptAll` / `intersectAll` | **Supported** (**1.9.0+**) | Multiset semantics: `exceptAll` yields `max(count_left-count_right,0)`; `intersectAll` yields `min(count_left,count_right)`. |
 | `DataFrame.fillna` / `dropna` / `na` | **Supported** (**1.9.0+**) | Map to `fill_null` / `drop_nulls`; unsupported kw combinations raise clearly. |
 | `DataFrame.printSchema` / `explain` | **Supported** (**1.9.0+**) | Readable schema tree; printed logical plan. |
 | `DataFrame.toPandas` | **Supported** (**1.9.0+**) | Eager via `to_dict()`; requires **pandas**. |
@@ -35,6 +36,7 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `functions.when` / `otherwise` | **Supported** | `CaseWhen` in Rust; chain `.when(...).otherwise(...)`. |
 | `functions.cast`, `between`, `isin`, `concat`, `substring`, `length` | **Supported** | Base types only; `substring` is 1-based (Spark-style). |
 | `functions.str_replace`, `regexp_replace`, `strip_prefix`, `strip_suffix`, `strip_chars`, `strptime`, `binary_len`, `list_len`, `list_get`, `list_contains`, `list_min`, `list_max`, `list_sum` | **Supported** (**0.17.0**) | Thin wrappers over core :class:`~pydantable.expressions.Expr` methods (same Rust lowering). `regexp_replace` is an alias for literal substring replace, not full regex. |
+| `functions.rlike` / `regexp_like` / `regexp_substr` | **Supported** (**1.9.0+**) | Regex predicates and substring extract via Rust `regex` dialect; requires Polars-backed execution for regex. |
 | `functions.sum`, `avg`, `count`, `min`, `max`, … as column exprs | **Supported** (global) | Global `sum`/`avg`/`mean`/`count`/`min`/`max` on a typed `Expr` in `DataFrame.select(...)` (single-row). **`count()`** with **no** argument → row count (**0.8.0**). Grouped paths use `group_by().agg`. |
 | `Column.cast`, `isin`, `between`, `substr`/`char_length` | **Supported** | On `Expr` / `Column`; includes **`str` → `date` / `datetime`** via Polars parsing (use `strptime` for fixed formats). |
 | `Window`, window functions | **Partial** | `Window.partitionBy().orderBy(..., nulls_last=...)` (**NULLS FIRST/LAST**); `row_number`, `rank`, `dense_rank`, `window_sum`, `window_avg`, `window_min`, `window_max`, `lag`, `lead` + core `Expr` lowering. Framing support includes `rowsBetween` for all named window ops and `rangeBetween` for numeric/temporal aggregates: **first** `orderBy` column must be numeric, `date`, `datetime`, or `duration`; additional `orderBy` columns are sort tie-breakers only ([`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md)). Unframed multi-key windows: only the first key’s `nulls_last` is passed to Polars `SortOptions`. |

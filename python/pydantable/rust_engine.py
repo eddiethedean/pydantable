@@ -371,6 +371,56 @@ def execute_concat(
         )
 
 
+def execute_except_all(
+    left_plan: Any,
+    left_root_data: Any,
+    right_plan: Any,
+    right_root_data: Any,
+    *,
+    as_python_lists: bool = False,
+    streaming: bool = False,
+) -> tuple[Any, Any]:
+    rust = _require_rust_core()
+    with span(
+        "execute_except_all",
+        as_python_lists=bool(as_python_lists),
+        streaming=bool(streaming),
+    ):
+        return rust.execute_except_all(
+            left_plan,
+            left_root_data,
+            right_plan,
+            right_root_data,
+            as_python_lists,
+            streaming,
+        )
+
+
+def execute_intersect_all(
+    left_plan: Any,
+    left_root_data: Any,
+    right_plan: Any,
+    right_root_data: Any,
+    *,
+    as_python_lists: bool = False,
+    streaming: bool = False,
+) -> tuple[Any, Any]:
+    rust = _require_rust_core()
+    with span(
+        "execute_intersect_all",
+        as_python_lists=bool(as_python_lists),
+        streaming=bool(streaming),
+    ):
+        return rust.execute_intersect_all(
+            left_plan,
+            left_root_data,
+            right_plan,
+            right_root_data,
+            as_python_lists,
+            streaming,
+        )
+
+
 def execute_melt(
     plan: Any,
     root_data: Any,

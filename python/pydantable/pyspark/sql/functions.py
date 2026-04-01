@@ -260,6 +260,24 @@ def regexp_extract(column: Expr, pattern: str, group_index: int = 1) -> Expr:
     return column.str_extract_regex(pattern, group_index)
 
 
+def rlike(column: Expr, pattern: str) -> Expr:
+    """Regex match predicate (Spark ``rlike`` / SQL ``RLIKE``)."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.rlike() expects a typed column Expr.")
+    return column.str_contains_pat(pattern, literal=False)
+
+
+def regexp_like(column: Expr, pattern: str) -> Expr:
+    """Alias of :func:`rlike`."""
+    return rlike(column, pattern)
+
+
+def regexp_substr(column: Expr, pattern: str, group_index: int = 0) -> Expr:
+    """First regex match (group 0) or capture group (1+)."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.regexp_substr() expects a typed column Expr.")
+    return column.str_extract_regex(pattern, group_index)
+
 def json_path_match(column: Expr, path: str) -> Expr:
     if not isinstance(column, Expr):
         raise TypeError("functions.json_path_match() expects a typed column Expr.")
@@ -629,8 +647,11 @@ __all__ = [
     "quarter",
     "rank",
     "regexp_extract",
+    "regexp_like",
     "regexp_replace",
+    "regexp_substr",
     "reverse",
+    "rlike",
     "round",
     "row_number",
     "rpad",

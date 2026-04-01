@@ -7,6 +7,7 @@ mod join_exec;
 mod literal_agg;
 mod materialize;
 mod reshape_exec;
+mod setops_exec;
 mod root_lazy;
 mod runner;
 mod scan_kw;
@@ -14,6 +15,7 @@ mod scan_kw;
 pub use concat_exec::execute_concat_polars;
 pub use groupby_exec::execute_groupby_agg_polars;
 pub use join_exec::execute_join_polars;
+pub use setops_exec::{execute_except_all_polars, execute_intersect_all_polars};
 pub(crate) use materialize::execute_plan_polars;
 pub(crate) use materialize::{dtype_from_polars, series_to_py_list};
 pub use reshape_exec::{

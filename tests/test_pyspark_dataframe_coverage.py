@@ -286,6 +286,36 @@ def test_pyspark_intersect_and_subtract() -> None:
     assert sub["id"] == [1]
 
 
+def test_pyspark_except_all_and_intersect_all_multiset_semantics() -> None:
+    df1 = DataFrame[Row]({"id": [1, 1, 2], "name": ["a", "a", "b"], "age": [1, 1, 2]})
+    df2 = DataFrame[Row]({"id": [1, 2], "name": ["a", "b"], "age": [1, 2]})
+
+    # exceptAll keeps one of the duplicate (1,'a',1) rows.
+    out_ex = df1.exceptAll(df2).to_dict()
+    assert out_ex == {"id": [1], "name": ["a"], "age": [1]}
+
+    # intersectAll keeps min multiplicities: (1,'a',1) once and (2,'b',2) once.
+    out_in = df1.intersectAll(df2).to_dict()
+    assert sorted(zip(out_in["id"], out_in["name"], out_in["age"], strict=True)) == [
+        (1, "a", 1),
+        (2, "b", 2),
+    ]
+
+
+def test_pyspark_setops_all_treat_nulls_as_equal() -> None:
+    class S(Schema):
+        id: int
+        v: int | None
+
+    a = DataFrame[S]({"id": [1, 1], "v": [None, None]})
+    b = DataFrame[S]({"id": [1], "v": [None]})
+    ex = a.exceptAll(b).to_dict()
+    assert ex["id"] == [1]
+    assert ex["v"] == [None]
+    it = a.intersectAll(b).to_dict()
+    assert it["id"] == [1]
+    assert it["v"] == [None]
+
 def test_pyspark_model_groupby_and_cross_join() -> None:
     class MX(DataFrameModel):
         x: int
