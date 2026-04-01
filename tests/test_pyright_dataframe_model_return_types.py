@@ -159,3 +159,34 @@ def test_pyright_accepts_literal_ip_wkb_annotated_model_and_as_model(
     """
     proc = _run_pyright_snippet(tmp_path, code)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
+def test_pyright_sees_dataframe_model_io_and_model_helpers(tmp_path: Path) -> None:
+    """Hand ``dataframe_model.pyi`` exposes I/O classmethods and helpers for Pyright."""
+    pytest.importorskip("pyright")
+    code = """
+    from typing import Any
+
+    from pydantable import DataFrameModel
+
+    class U(DataFrameModel):
+        id: int
+
+    # Lazy readers / async shims (surface only; no runtime I/O).
+    _: object = U.read_parquet
+    _: object = U.read_ndjson
+    _: object = U.iter_ndjson
+    _: object = U.aread_json
+    _: object = U.write_parquet_batches
+    _: object = U.row_model
+    _: object = U.schema_model
+    _: object = U.concat
+
+    def narrowed(df: U) -> U:
+        return df.filter(df.id == 1).distinct()
+
+    def typed(df: U) -> DataFrameModel[Any]:
+        return df.with_columns_cast("id", int)
+    """
+    proc = _run_pyright_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)

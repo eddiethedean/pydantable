@@ -34,6 +34,8 @@ _DYNAMIC_GROUPED_BASE_FULLNAME = (
 )
 _HOOK_NAMES = {
     "with_columns",
+    "with_columns_cast",
+    "with_columns_fill_null",
     "select",
     "drop",
     "rename",
@@ -411,7 +413,15 @@ def _hook(ctx: MethodContext, method: str) -> Type:
             }
         fields = {**grouped_fields, **agg_outputs}
 
-    elif method in {"fill_null", "drop_nulls", "explode", "unnest"}:
+    elif method in {
+        "fill_null",
+        "drop_nulls",
+        "explode",
+        "unnest",
+        # Same column names; dtype/null-fill changes only (best-effort: keep model).
+        "with_columns_cast",
+        "with_columns_fill_null",
+    }:
         # Schema-preserving transforms: keep the same field set/types.
         pass
 

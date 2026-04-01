@@ -337,6 +337,28 @@ def test_mypy_schema_preserving_chain_accepts_same_model_type(tmp_path: Path) ->
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
+def test_mypy_with_columns_cast_and_fill_null_preserve_model_type(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("mypy")
+    code = """
+    from pydantable import DataFrameModel
+
+    class U(DataFrameModel):
+        id: int
+        age: int
+
+    def f_cast(df: U) -> U:
+        return df.with_columns_cast("age", int)
+
+    def f_fill(df: U) -> U:
+        return df.with_columns_fill_null("age", value=0)
+    """
+    proc = _run_mypy_snippet(tmp_path, code)
+    _mypy_output_or_skip_on_crash(proc)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
 def test_mypy_schema_preserving_fill_null_and_drop_nulls_preserve_model_type(
     tmp_path: Path,
 ) -> None:

@@ -291,6 +291,8 @@ When you add or change typing surface area:
 - re-run `python scripts/generate_typing_artifacts.py`
 - extend snippet-based typing tests and re-run `make check-typing`
 
+**Stub ownership:** Most `python/pydantable/**/*.pyi` files next to sources are **generated** by `generate_typing_artifacts.py` and mirrored under `typings/pydantable/`. **`dataframe_model.pyi`** and **`awaitable_dataframe_model.pyi`** are **hand-maintained** (the generator copies them verbatim); when you add or change `DataFrameModel` / awaitable I/O surface, update those two files and re-run the generator so `typings/` stays in sync.
+
 ### Build docs (Sphinx)
 
 ```bash
