@@ -6,6 +6,9 @@ Run from the repository root::
 
 Fails on assertion errors or import failures so README and Sphinx snippets stay
 in sync with the API.
+
+Runnable scripts under ``docs/examples/`` are also executed by
+``tests/test_docs_example_scripts.py`` (subprocess per file).
 """
 
 # ruff: noqa: E402

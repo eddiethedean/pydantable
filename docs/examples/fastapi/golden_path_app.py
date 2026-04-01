@@ -8,6 +8,10 @@ Run (from this directory)::
     pip install 'pydantable[fastapi]'
     uvicorn golden_path_app:app --reload
 
+Smoke-test without uvicorn (from repo root)::
+
+    PYTHONPATH=python python docs/examples/fastapi/golden_path_app.py
+
 Try::
 
     curl -s localhost:8000/health
@@ -92,3 +96,14 @@ app.include_router(api)
 def health() -> dict[str, str]:
     """Load balancer / Kubernetes probe: no pydantable work."""
     return {"status": "ok"}
+
+
+if __name__ == "__main__":
+    # Smoke-test import + routing without starting uvicorn (CI / doc example runner).
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok"}
+    print("golden_path_app: ok")

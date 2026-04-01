@@ -1,3 +1,5 @@
+"""Helpers for validating and concatenating rectangular column batches."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any

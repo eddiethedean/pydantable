@@ -1,3 +1,12 @@
+"""Mypy plugin: schema-evolving return types for :class:`DataFrameModel` chains.
+
+Registered in ``pyproject.toml`` as ``python/pydantable/mypy_plugin.py``. Hooks
+``with_columns``, ``select``, ``join``, ``agg``, and other transforms so concrete
+model types flow through static analysis where literals allow it.
+
+See **TYPING** in the documentation.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast

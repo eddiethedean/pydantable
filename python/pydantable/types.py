@@ -1,4 +1,7 @@
-"""Semantic marker types for pydantable columns (beyond plain ``bytes`` / ``str``)."""
+"""Semantic marker types for column annotations (beyond plain ``bytes`` / ``str``).
+
+:class:`WKB` distinguishes geospatial well-known binary from opaque binary blobs.
+"""
 
 from __future__ import annotations
 

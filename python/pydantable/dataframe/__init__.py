@@ -1,4 +1,7 @@
-"""Typed :class:`DataFrame` and grouped handles (implementation in :mod:`._impl`)."""
+"""Core typed :class:`DataFrame`, grouped views, and plan step types.
+
+The heavy implementation is in :mod:`pydantable.dataframe._impl`.
+"""
 
 from __future__ import annotations
 

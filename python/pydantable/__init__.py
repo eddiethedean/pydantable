@@ -1,11 +1,13 @@
-"""PydanTable: typed, Pydantic-backed tables executed by a Rust (Polars) core.
+"""PydanTable: strongly typed, Pydantic-backed tables with a Rust execution core.
 
-Exports the primary types: :class:`DataFrame`, :class:`Schema`, :class:`Expr`, and
-:class:`DataFrameModel`. Use ``DataFrame[YourSchema](data)`` after defining
-``YourSchema`` as a Pydantic model subclassing :class:`Schema`.
+**Primary exports:** :class:`DataFrame`, :class:`Schema`, :class:`Expr`,
+:class:`DataFrameModel`. Build ``DataFrame[YourSchema](data)`` where ``YourSchema``
+subclasses :class:`Schema`.
 
-Alternate facades live in :mod:`pydantable.pandas` (pandas-like names) and
-:mod:`pydantable.pyspark` (PySpark-like names); they share the same engine.
+**Facades:** :mod:`pydantable.pandas` (pandas-like names) and
+:mod:`pydantable.pyspark` (PySpark-like names) wrap the same engine.
+
+**I/O:** many helpers are re-exported from :mod:`pydantable.io` for convenience.
 """
 
 from __future__ import annotations

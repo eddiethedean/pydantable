@@ -22,6 +22,7 @@ def set_observer(fn: Observer | None) -> None:
 
 
 def get_observer() -> Observer | None:
+    """Return the callback set by :func:`set_observer`, or ``None`` if disabled."""
     return _OBSERVER
 
 

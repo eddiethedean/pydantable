@@ -1,4 +1,4 @@
-"""Native extension availability and errors."""
+"""Native extension (:mod:`pydantable._core`) availability and import errors."""
 
 from __future__ import annotations
 
@@ -11,10 +11,10 @@ _MISSING_CORE = (
 
 
 class MissingRustExtensionError(NotImplementedError):
-    """Raised when :mod:`pydantable._core` is not importable or lacks a needed symbol.
+    """Raised when the compiled extension is missing or too old for the requested API.
 
-    Still subclasses :exc:`NotImplementedError` so broad ``except NotImplementedError``
-    handlers keep working.
+    Subclasses :exc:`NotImplementedError` so existing broad handlers continue to match.
+    Install a wheel or build from source (see project **README** / **DEVELOPER** docs).
     """
 
     def __init__(self, detail: str | None = None) -> None:

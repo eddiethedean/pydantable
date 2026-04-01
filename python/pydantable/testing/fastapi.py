@@ -1,4 +1,8 @@
-"""Test helpers for FastAPI apps using pydantable."""
+"""FastAPI test fixtures: shared executor lifespan and ASGI test clients.
+
+Use for integration tests that need ``app.state.executor`` and optional
+:class:`~pydantable.errors.PydantableUserError` handlers.
+"""
 
 from __future__ import annotations
 

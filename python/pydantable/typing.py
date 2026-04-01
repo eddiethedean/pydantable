@@ -1,3 +1,12 @@
+"""Structural typing helpers for ``DataFrameModel`` and async materialization.
+
+Protocols such as :class:`SupportsLazyAsyncMaterialize` and
+:class:`DataFrameModelWithRow` type cross-cutting helpers without fixing a single
+concrete model class.
+
+See **TYPING** in the documentation.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable

@@ -1,3 +1,10 @@
+"""Python helpers that mirror Rust logical-plan schema inference for tests and tooling.
+
+Functions delegate to :mod:`pydantable._core` to compute output
+``schema_descriptors`` after transforms such as select, drop, rename, and
+``with_columns``. Used by :mod:`tests.test_typing_engine_parity` and similar checks.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any

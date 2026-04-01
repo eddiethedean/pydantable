@@ -1,4 +1,9 @@
-"""Spark-style :class:`DataFrame` and :class:`DataFrameModel` (core API underneath)."""
+"""PySpark-shaped :class:`DataFrame` and :class:`DataFrameModel` facades.
+
+Method names follow Spark where possible (``withColumn``, ``orderBy``, …); the
+implementation delegates to :mod:`pydantable.dataframe` and
+:mod:`pydantable.dataframe_model`.
+"""
 
 from __future__ import annotations
 

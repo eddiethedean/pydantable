@@ -1,3 +1,14 @@
+"""Schema-driven column selection for :meth:`DataFrame.select_schema`.
+
+Construct :class:`Selector` values with factories such as :func:`everything`,
+:func:`by_name`, :func:`by_dtype`, and dtype groups (:data:`NUMERIC`,
+:data:`STRUCT`, ...). Combine selectors with ``|`` (union), ``&`` (intersection),
+``-`` (difference), and ``~`` (complement). Resolution uses only the current
+column name → annotation mapping.
+
+See the **SELECTORS** documentation page.
+"""
+
 from __future__ import annotations
 
 import enum
@@ -97,13 +108,16 @@ class Selector:
         return self._repr or "Selector(<resolver>)"
 
     def resolve(self, schema_field_types: Mapping[str, Any]) -> list[str]:
+        """Return matching column names in *schema* iteration order."""
         selected = self._resolver(schema_field_types)
         return [name for name in schema_field_types if name in selected]
 
     def exclude(self, other: Selector | str | Iterable[str]) -> Selector:
+        """Equivalent to ``self - other`` (remove columns matched by ``other``)."""
         return self - other
 
     def __or__(self, other: Selector | str | Iterable[str]) -> Selector:
+        """Union of the two selectors' column sets."""
         o = _as_selector(other)
         rep = (
             f"({self!r} | {o!r})"
@@ -115,6 +129,7 @@ class Selector:
         )
 
     def __and__(self, other: Selector | str | Iterable[str]) -> Selector:
+        """Intersection of the two selectors' column sets."""
         o = _as_selector(other)
         rep = (
             f"({self!r} & {o!r})"
@@ -126,6 +141,7 @@ class Selector:
         )
 
     def __sub__(self, other: Selector | str | Iterable[str]) -> Selector:
+        """Set difference: columns in ``self`` that are not in ``other``."""
         o = _as_selector(other)
         rep = (
             f"({self!r} - {o!r})"
@@ -137,6 +153,7 @@ class Selector:
         )
 
     def __invert__(self) -> Selector:
+        """Complement: all schema columns not matched by ``self``."""
         rep = f"(~{self!r})" if self._repr is not None else None
         return Selector(lambda schema: set(schema) - self._resolver(schema), rep)
 
@@ -150,20 +167,24 @@ def _as_selector(obj: Selector | str | Iterable[str]) -> Selector:
 
 
 def everything() -> Selector:
+    """Select every column present in the schema mapping."""
     return Selector(lambda schema: set(schema), "everything()")
 
 
 def all() -> Selector:
+    """Alias for :func:`everything` (spelled ``all`` for readability in pipelines)."""
     return everything()
 
 
 def by_name(*names: str) -> Selector:
+    """Select columns whose names appear in ``names``."""
     wanted = {str(n) for n in names}
     rep = f"by_name({', '.join(repr(n) for n in names)})"
     return Selector(lambda schema: {n for n in schema if n in wanted}, rep)
 
 
 def starts_with(prefix: str) -> Selector:
+    """Select columns whose names start with ``prefix``."""
     p = str(prefix)
     return Selector(
         lambda schema: {n for n in schema if n.startswith(p)},
@@ -172,6 +193,7 @@ def starts_with(prefix: str) -> Selector:
 
 
 def ends_with(suffix: str) -> Selector:
+    """Select columns whose names end with ``suffix``."""
     s = str(suffix)
     return Selector(
         lambda schema: {n for n in schema if n.endswith(s)},
@@ -180,6 +202,7 @@ def ends_with(suffix: str) -> Selector:
 
 
 def contains(substr: str) -> Selector:
+    """Select columns whose names contain the substring ``substr``."""
     sub = str(substr)
     return Selector(
         lambda schema: {n for n in schema if sub in n},
@@ -188,6 +211,7 @@ def contains(substr: str) -> Selector:
 
 
 def matches(pattern: str | re.Pattern[str]) -> Selector:
+    """Select columns whose names match the regex ``pattern`` (``search`` semantics)."""
     rx = re.compile(pattern) if isinstance(pattern, str) else pattern
     return Selector(
         lambda schema: {n for n in schema if rx.search(n) is not None},
@@ -232,6 +256,11 @@ WKBS = _DTypeGroup("WKBS", lambda ann: _is_wkb_annotation(ann))
 
 
 def by_dtype(*dtypes: Any) -> Selector:
+    """Select columns whose annotations match any of ``dtypes``.
+
+    Pass concrete Python types (``int``, ``str``, …) or dtype groups such as
+    :data:`NUMERIC`, :data:`STRUCT`, :data:`MAPS`.
+    """
     requested = tuple(dtypes)
 
     def _matches_any(annotation: Any) -> bool:
@@ -258,82 +287,102 @@ def by_dtype(*dtypes: Any) -> Selector:
 
 
 def numeric() -> Selector:
+    """Select int, float, and :class:`decimal.Decimal` columns."""
     return by_dtype(NUMERIC)
 
 
 def integers() -> Selector:
+    """Select ``int`` columns."""
     return by_dtype(INTEGERS)
 
 
 def integer() -> Selector:
+    """Alias for :func:`integers`."""
     return integers()
 
 
 def floats() -> Selector:
+    """Select ``float`` columns."""
     return by_dtype(FLOATS)
 
 
 def float() -> Selector:
+    """Alias for :func:`floats`."""
     return floats()
 
 
 def decimals() -> Selector:
+    """Select :class:`decimal.Decimal` columns."""
     return by_dtype(DECIMALS)
 
 
 def decimal() -> Selector:
+    """Alias for :func:`decimals`."""
     return decimals()
 
 
 def string() -> Selector:
+    """Select ``str`` columns."""
     return by_dtype(STRING)
 
 
 def boolean() -> Selector:
+    """Select ``bool`` columns."""
     return by_dtype(BOOLEAN)
 
 
 def temporal() -> Selector:
+    """Select ``date``, ``datetime``, ``time``, or ``timedelta`` columns."""
     return by_dtype(TEMPORAL)
 
 
 def lists() -> Selector:
+    """Select list/tuple/set-typed columns."""
     return by_dtype(LIST)
 
 
 def structs() -> Selector:
+    """Select nested Pydantic :class:`~pydantic.BaseModel` columns."""
     return by_dtype(STRUCT)
 
 
 def struct() -> Selector:
+    """Alias for :func:`structs`."""
     return structs()
 
 
 def uuids() -> Selector:
+    """Select :class:`uuid.UUID` columns."""
     return by_dtype(UUIDS)
 
 
 def binary() -> Selector:
+    """Select raw ``bytes`` columns (use :func:`wkbs` for WKB geometry)."""
     return by_dtype(BINARIES)
 
 
 def maps() -> Selector:
+    """Select ``dict[str, T]`` columns."""
     return by_dtype(MAPS)
 
 
 def enums() -> Selector:
+    """Select :class:`enum.Enum` subclass columns."""
     return by_dtype(ENUMS)
 
 
 def ipv4s() -> Selector:
+    """Select :class:`ipaddress.IPv4Address` columns."""
     return by_dtype(IPV4S)
 
 
 def ipv6s() -> Selector:
+    """Select :class:`ipaddress.IPv6Address` columns."""
     return by_dtype(IPV6S)
 
 
 def wkbs() -> Selector:
+    """Select :class:`~pydantable.types.WKB` (well-known binary) columns."""
     return by_dtype(WKBS)
 
 

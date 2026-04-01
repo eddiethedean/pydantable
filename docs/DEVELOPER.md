@@ -312,6 +312,8 @@ PYTHONPATH=python .venv/bin/python scripts/verify_doc_examples.py
 
 This executes the same patterns as the Quick Start and several doc examples (no network). Fix failures before merging user-facing doc changes.
 
+**`docs/examples/**/*.py`:** `tests/test_docs_example_scripts.py` subprocess-runs each example script (skips `docs/examples/fastapi/service_layout/`, which is meant to be run with `uvicorn` from that directory). Keeps runnable files under `docs/examples/` in sync with the API; requires a built `pydantable._core`.
+
 **CI** runs `scripts/verify_doc_examples.py` on **Ubuntu + Python 3.11** after tests (see `.github/workflows/_shared-ci.yml` via `ci.yml`).
 
 Optional Python **`polars`** for local `to_polars()` / benchmark comparisons: `pip install -e ".[polars]"` or `".[benchmark]"` (see benchmark sections below). CI installs Polars on the **Ubuntu 3.11** matrix leg so `import polars` / `to_polars()` tests are not skipped there.

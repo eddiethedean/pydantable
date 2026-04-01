@@ -1,3 +1,5 @@
+"""Streaming writers that accept iterators of ``dict[str, list]`` batches."""
+
 from __future__ import annotations
 
 import csv

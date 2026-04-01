@@ -1,3 +1,10 @@
+"""Chunked, iterator-based file readers yielding ``dict[str, list]`` batches.
+
+Used by :class:`~pydantable.dataframe_model.DataFrameModel.iter_*` classmethods and
+standalone scripts. Optional dependencies (``pyarrow``, etc.) apply per format; see
+each function's docstring.
+"""
+
 from __future__ import annotations
 
 import csv

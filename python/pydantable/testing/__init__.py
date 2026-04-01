@@ -1,4 +1,7 @@
-"""Testing utilities (import ``pydantable.testing.fastapi``, etc.)."""
+"""Test helpers for applications using pydantable (optional imports by submodule).
+
+Re-exports FastAPI-oriented fixtures from :mod:`pydantable.testing.fastapi`.
+"""
 
 from __future__ import annotations
 

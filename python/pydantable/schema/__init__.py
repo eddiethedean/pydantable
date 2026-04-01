@@ -1,4 +1,7 @@
-"""Schema base, dtype rules, and column validation; see :mod:`._impl`."""
+"""Public schema API: :class:`Schema`, dtype helpers, and validation utilities.
+
+Implementation details and extended helpers live in :mod:`pydantable.schema._impl`.
+"""
 
 from __future__ import annotations
 
