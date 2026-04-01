@@ -599,6 +599,10 @@ impl ExprNode {
                 .to_polars_expr()?
                 .str()
                 .json_path_match(lit(path.as_str()))),
+            ExprNode::StringJsonDecode { inner, target, .. } => {
+                let dt = crate::polars_dtype::dtype_desc_to_polars_data_type(target)?;
+                Ok(inner.to_polars_expr()?.str().json_decode(dt))
+            }
             ExprNode::DatetimeToDate { inner, .. } => Ok(inner.to_polars_expr()?.dt().date()),
             ExprNode::Strptime {
                 inner,

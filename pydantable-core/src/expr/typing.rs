@@ -252,6 +252,7 @@ impl ExprNode {
             | ExprNode::StringSplit { dtype, .. }
             | ExprNode::StringExtract { dtype, .. }
             | ExprNode::StringJsonPathMatch { dtype, .. }
+            | ExprNode::StringJsonDecode { dtype, .. }
             | ExprNode::DatetimeToDate { dtype, .. }
             | ExprNode::Strptime { dtype, .. }
             | ExprNode::UnixTimestamp { dtype, .. }
@@ -352,6 +353,7 @@ impl ExprNode {
             | ExprNode::StringSplit { inner, .. }
             | ExprNode::StringExtract { inner, .. }
             | ExprNode::StringJsonPathMatch { inner, .. }
+            | ExprNode::StringJsonDecode { inner, .. }
             | ExprNode::DatetimeToDate { inner, .. }
             | ExprNode::Strptime { inner, .. }
             | ExprNode::UnixTimestamp { inner, .. }
@@ -1998,6 +2000,37 @@ impl ExprNode {
                 nullable,
                 literals: None,
             },
+        })
+    }
+
+    pub fn make_str_json_decode(inner: ExprNode, target: DTypeDesc) -> PyResult<Self> {
+        if inner.dtype().is_struct()
+            || inner.dtype().is_list()
+            || !dtype_is_string_like(&inner.dtype())
+        {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "str_json_decode() requires a string-like column.",
+            ));
+        }
+        let dtype = match &target {
+            DTypeDesc::Struct { fields, .. } => DTypeDesc::Struct {
+                fields: fields.clone(),
+                nullable: true,
+            },
+            DTypeDesc::Map { value, .. } => DTypeDesc::Map {
+                value: value.clone(),
+                nullable: true,
+            },
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "str_json_decode() target dtype must be a struct (nested model) or dict[str, T] map.",
+                ));
+            }
+        };
+        Ok(ExprNode::StringJsonDecode {
+            inner: Box::new(inner),
+            target,
+            dtype,
         })
     }
 
@@ -4187,6 +4220,7 @@ impl ExprNode {
             | ExprNode::StringSplit { .. }
             | ExprNode::StringExtract { .. }
             | ExprNode::StringJsonPathMatch { .. }
+            | ExprNode::StringJsonDecode { .. }
             | ExprNode::Strptime { .. }
             | ExprNode::UnixTimestamp { .. }
             | ExprNode::FromUnixTime { .. }

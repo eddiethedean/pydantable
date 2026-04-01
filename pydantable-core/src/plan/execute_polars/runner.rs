@@ -74,6 +74,7 @@ impl PolarsPlanRunner {
             | ExprNode::StringSplit { inner, .. }
             | ExprNode::StringExtract { inner, .. }
             | ExprNode::StringJsonPathMatch { inner, .. }
+            | ExprNode::StringJsonDecode { inner, .. }
             | ExprNode::DatetimeToDate { inner, .. }
             | ExprNode::Strptime { inner, .. }
             | ExprNode::UnixTimestamp { inner, .. }

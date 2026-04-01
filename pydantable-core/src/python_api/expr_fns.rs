@@ -537,6 +537,18 @@ fn expr_str_json_path_match(inner: Bound<'_, PyExpr>, path: String) -> PyResult<
 }
 
 #[pyfunction]
+fn expr_str_json_decode(
+    py: Python<'_>,
+    inner: Bound<'_, PyExpr>,
+    dtype_annotation: &Bound<'_, PyAny>,
+) -> PyResult<PyExpr> {
+    let target = py_annotation_to_dtype(py, dtype_annotation)?;
+    Ok(PyExpr {
+        node: ExprNode::make_str_json_decode(inner.borrow().node.clone(), target)?,
+    })
+}
+
+#[pyfunction]
 fn expr_string_split(inner: Bound<'_, PyExpr>, delimiter: String) -> PyResult<PyExpr> {
     Ok(PyExpr {
         node: ExprNode::make_string_split(inner.borrow().node.clone(), delimiter)?,
@@ -1087,6 +1099,7 @@ pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr_str_zfill, m)?)?;
     m.add_function(wrap_pyfunction!(expr_str_extract_regex, m)?)?;
     m.add_function(wrap_pyfunction!(expr_str_json_path_match, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_str_json_decode, m)?)?;
     m.add_function(wrap_pyfunction!(expr_string_split, m)?)?;
     m.add_function(wrap_pyfunction!(expr_datetime_to_date, m)?)?;
     m.add_function(wrap_pyfunction!(expr_window_row_number, m)?)?;

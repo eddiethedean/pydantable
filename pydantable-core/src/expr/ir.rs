@@ -341,6 +341,13 @@ pub enum ExprNode {
         path: String,
         dtype: DTypeDesc,
     },
+    /// Parse JSON text per row into a struct or map column (`str.json_decode`); null input → null (Polars). Invalid JSON fails evaluation (see docs).
+    StringJsonDecode {
+        inner: Box<ExprNode>,
+        /// Schema requested at plan build (e.g. annotation); output `dtype` forces outer nullability for decode failures.
+        target: DTypeDesc,
+        dtype: DTypeDesc,
+    },
     /// `datetime` column → calendar `date` (Polars `dt.date()`).
     DatetimeToDate {
         inner: Box<ExprNode>,

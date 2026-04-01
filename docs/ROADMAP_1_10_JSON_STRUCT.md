@@ -84,9 +84,11 @@ Mirror **string** JSON helpers for **struct** columns (see {doc}`ROADMAP` **Stru
 
 **Outcome:** Complement **`Expr.str_json_path_match`** with **structured** decode when the user supplies a target schema.
 
-- [ ] Design: **`str` → struct** (and possibly **`str` → map**) as `Expr` methods with **known output dtype** at plan build time.
-- [ ] Execution: Polars **`str.json_decode`** (or equivalent) with dtype alignment to `DTypeDesc::Struct` / map.
-- [ ] Errors: invalid JSON per row—null vs raise; document policy.
+- [x] Design: **`str` → struct** (and **`str` → map**) as `Expr.str_json_decode(dtype=...)` with **known output dtype** at plan build time.
+- [x] Execution: Polars **`str.json_decode`** with dtype alignment to `DTypeDesc::Struct` / map (`dtype_desc_to_polars_data_type` shared with execution).
+- [x] Errors: **Polars 0.53:** invalid JSON **fails `collect()`** for the plan (not per-row null); null string → null—documented in **`INTERFACE_CONTRACT`** / **`SUPPORTED_TYPES`**.
+
+**Shipped in 1.10.0 (Phase C):** **`Expr.str_json_decode`**; tests **`tests/test_str_json_decode_phase_c.py`**; Rust **`ExprNode::StringJsonDecode`**.
 
 If scope slips, move unfinished items to **1.11.0** and keep Phase B as the 1.10.0 centerpiece.
 

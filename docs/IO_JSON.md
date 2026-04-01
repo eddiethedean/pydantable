@@ -22,4 +22,6 @@ For a single JSON **array** of objects (``[{...}, {...}]``), use :func:`pydantab
 
 To emit JSON **text from nested model columns inside a frame**, use :meth:`~pydantable.expressions.Expr.struct_json_encode` on the struct-typed :class:`~pydantable.expressions.Expr` (Polars-backed); see {doc}`SUPPORTED_TYPES`.
 
+To **parse JSON strings in-column** back into structs or maps (without a separate file read), use :meth:`~pydantable.expressions.Expr.str_json_decode` after you have a **`str`** column of JSON text (e.g. from **`struct_json_encode`**, logging pipelines, or `materialize_json` on a string field).
+
 See also: {doc}`IO_NDJSON`, {doc}`IO_DECISION_TREE`.

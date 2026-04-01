@@ -439,6 +439,7 @@ contract tests. Order is **not** priority order.
   name).
 - [x] **`struct_json_encode`** / **`struct_json_path_match`** symmetry with string JSON
   helpers.
+- [x] **`str_json_decode`** (string JSON → struct / **`dict[str, T]`**; see {doc}`ROADMAP_1_10_JSON_STRUCT` Phase C).
 - [ ] **Map transforms:** **`map_filter`**, **`map_entries_sorted`**, **`map_zip`** where
   Polars exposes stable operations and our schema story stays **`dict[str, T]`**.
 

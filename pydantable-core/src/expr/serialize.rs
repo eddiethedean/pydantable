@@ -437,6 +437,14 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
             dict.set_item("path", path.as_str())?;
         }
+        ExprNode::StringJsonDecode { inner, target, .. } => {
+            dict.set_item("kind", "string_json_decode")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+            dict.set_item(
+                "target",
+                crate::dtype::dtype_to_descriptor_py(py, target)?,
+            )?;
+        }
         ExprNode::DatetimeToDate { inner, .. } => {
             dict.set_item("kind", "datetime_to_date")?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;

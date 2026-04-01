@@ -536,6 +536,20 @@ class Expr:  # type: ignore[override]
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_str_json_path_match(self._rust_expr, str(path)))
 
+    def str_json_decode(self, dtype: Any) -> Expr:
+        """Parse JSON text per row into a struct or map column (Polars ``str.json_decode``).
+
+        ``dtype`` is a nested model or ``dict[str, T]`` annotation, same style as
+        :meth:`cast`. Null string cells yield null. With Polars 0.53, **any
+        invalid JSON in the column typically fails execution** at
+        :meth:`~pydantable.dataframe.DataFrame.collect` (not a per-row null).
+        Map targets use the physical list-of-``{key,value}`` entries; JSON must
+        be an **array** such as ``[{"key":"a","value":1}]``, not a bare JSON
+        object. Polars execution only; see ``INTERFACE_CONTRACT``.
+        """
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_str_json_decode(self._rust_expr, dtype))
+
     def strip_prefix(self, prefix: str) -> Expr:
         rust = _require_rust_core()
         return Expr(

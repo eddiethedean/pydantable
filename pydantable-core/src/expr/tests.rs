@@ -132,6 +132,42 @@ fn exprnode_to_serializable_column_ref_roundtrip_shape() {
 }
 
 #[test]
+fn str_json_decode_rejects_non_string_inner() {
+    let inner = ExprNode::make_column_ref("s".to_string(), DTypeDesc::non_nullable(BaseType::Int))
+        .expect("column");
+    let target = DTypeDesc::Struct {
+        fields: vec![("a".to_string(), DTypeDesc::non_nullable(BaseType::Int))],
+        nullable: false,
+    };
+    let err = ExprNode::make_str_json_decode(inner, target).unwrap_err();
+    assert!(err.to_string().contains("string-like"));
+}
+
+#[test]
+fn str_json_decode_rejects_scalar_target() {
+    let inner = ExprNode::make_column_ref("j".to_string(), DTypeDesc::non_nullable(BaseType::Str))
+        .expect("column");
+    let err = ExprNode::make_str_json_decode(inner, DTypeDesc::non_nullable(BaseType::Int))
+        .unwrap_err();
+    assert!(err.to_string().contains("struct") && err.to_string().contains("map"));
+}
+
+#[test]
+fn str_json_decode_struct_target_outer_nullable() {
+    let inner = ExprNode::make_column_ref("j".to_string(), DTypeDesc::non_nullable(BaseType::Str))
+        .expect("column");
+    let target = DTypeDesc::Struct {
+        fields: vec![("a".to_string(), DTypeDesc::non_nullable(BaseType::Int))],
+        nullable: false,
+    };
+    let node = ExprNode::make_str_json_decode(inner, target).expect("decode");
+    let DTypeDesc::Struct { nullable, .. } = node.dtype() else {
+        panic!("expected struct dtype");
+    };
+    assert!(nullable);
+}
+
+#[test]
 fn window_range_frame_serializes_with_kind_and_bounds() {
     ensure_python_initialized();
     Python::with_gil(|py| {
