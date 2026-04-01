@@ -23,6 +23,8 @@ This document lists **common and useful** places applications read and write tab
 | **NDJSON** | **`low_memory`**, **`rechunk`**, **`ignore_errors`**, **`n_rows`**, **`infer_schema_length`** | **`json_format`** (**`"lines"`** / **`"json"`**) |
 | **IPC** | **`record_batch_statistics`** | Use top-level **`compression=`** only; extra **`write_kwargs`** are rejected. |
 
+For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **presets**, and how **`read_json`** relates to **`read_ndjson`**, see {doc}`IO_JSON` (**Large files**, **NDJSON scan kwargs**).
+
 **`read_parquet_url`**: URL fetch still uses **`**kwargs`** for the HTTP path; avoid mixing fetch and scan options in one dict unless you split them in application code.
 
 ## `read_parquet_url` / `aread_parquet_url` temp-file lifecycle

@@ -87,6 +87,7 @@
       ~ColumnRef.str_contains
       ~ColumnRef.str_contains_pat
       ~ColumnRef.str_extract_regex
+      ~ColumnRef.str_json_decode
       ~ColumnRef.str_json_path_match
       ~ColumnRef.str_pad_end
       ~ColumnRef.str_pad_start
@@ -100,6 +101,10 @@
       ~ColumnRef.strip_suffix
       ~ColumnRef.strptime
       ~ColumnRef.struct_field
+      ~ColumnRef.struct_json_encode
+      ~ColumnRef.struct_json_path_match
+      ~ColumnRef.struct_rename_fields
+      ~ColumnRef.struct_with_fields
       ~ColumnRef.substr
       ~ColumnRef.unix_timestamp
       ~ColumnRef.upper

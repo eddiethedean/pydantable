@@ -2,11 +2,49 @@
 
 How JSON values map to typed columns (including nested objects and maps) is summarized in {doc}`SUPPORTED_TYPES` (**JSON (RFC 8259) vs column types**).
 
-## Lazy local file (`read_json`)
+## Naming: `read_json` vs `read_ndjson` vs `materialize_json`
 
-**Default:** :meth:`~pydantable.dataframe_model.DataFrameModel.read_json` / :meth:`~pydantable.dataframe_model.DataFrameModel.aread_json` (lazy **JSON Lines** scan — same Polars path as :func:`~pydantable.io.read_ndjson`). Module :func:`pydantable.io.read_json` returns a raw :class:`~pydantable._core.ScanFileRoot` for :class:`~pydantable.dataframe.DataFrame` / :class:`~pydantable.dataframe_model.DataFrameModel` without a typed wrapper.
+| API | Role | Layout |
+|-----|------|--------|
+| :func:`pydantable.io.read_json` | Returns a raw :class:`~pydantable._core.ScanFileRoot` (lazy scan). | **JSON Lines** only — implemented as a call to :func:`~pydantable.io.read_ndjson`. |
+| :func:`pydantable.io.read_ndjson` | Same lazy **NDJSON** scan as ``read_json``. | One JSON object per line. |
+| :meth:`~pydantable.dataframe_model.DataFrameModel.read_json` / :meth:`~pydantable.dataframe_model.DataFrameModel.read_ndjson` | Typed lazy :class:`~pydantable.dataframe.DataFrame` / :class:`~pydantable.dataframe_model.DataFrameModel` (same Polars path). | JSON Lines. |
+| :func:`pydantable.io.materialize_json` | Eager **``dict[str, list]``** read. | Detects **array** ``[{...}, ...]`` **or** JSON Lines in one file. |
 
-For a single JSON **array** of objects (``[{...}, {...}]``), use :func:`pydantable.io.materialize_json` / :func:`~pydantable.io.amaterialize_json` and pass the result to **`MyModel(...)`** — there is no out-of-core lazy scan for that layout in pydantable today. For **batched** Python-side processing of an array file, :func:`~pydantable.io.iter_json_array` / :func:`~pydantable.io.aiter_json_array` still **load the entire JSON** first, then yield **`dict[str, list]`** chunks (**batch_size**).
+There is **no** lazy scan for a single JSON **array** file in pydantable today — use :func:`materialize_json` (or :func:`~pydantable.io.iter_json_array` for batched array processing after a full parse).
+
+## Large files, memory, and entrypoint choice
+
+**Prefer lazy JSON Lines for big logs:** :meth:`~pydantable.dataframe_model.DataFrameModel.read_ndjson` / ``read_json`` (or :class:`~pydantable.dataframe.DataFrame` classmethods) keep work on a Polars :class:`~polars.LazyFrame` until you :meth:`~pydantable.dataframe.DataFrame.collect`, :meth:`~pydantable.dataframe.DataFrame.to_dict`, or :meth:`~pydantable.dataframe.DataFrame.write_parquet` / ``write_ndjson`` / etc. The full file is **not** loaded as a Python column dict first.
+
+**Terminal materialization:** :meth:`~pydantable.dataframe.DataFrame.collect` runs the plan and returns rows (or use ``collect(as_lists=True)`` / :meth:`~pydantable.dataframe.DataFrame.to_dict` for columnar dicts). For very large results, consider :meth:`~pydantable.dataframe.DataFrame.head` / :meth:`~pydantable.dataframe.DataFrame.slice` **before** collect, or write to disk with a lazy ``write_*`` sink instead of pulling everything into Python.
+
+**Polars streaming engine:** on terminal APIs you can pass ``streaming=True`` (or set ``PYDANTABLE_ENGINE_STREAMING``) so the Rust engine requests Polars **streaming** collect where supported — **best-effort**; some plans fall back to in-memory behavior. See {doc}`EXECUTION` (**Streaming / engine collect**).
+
+**Chunked Python-side reads:** :func:`~pydantable.io.iter_ndjson` / :func:`~pydantable.io.aiter_ndjson` yield ``dict[str, list]`` **batches** of a fixed row count — useful when you want bounded Python memory **without** building a lazy ``DataFrame`` plan (e.g. simple ETL scripts). See {doc}`IO_OVERVIEW` (**Batched column dict I/O**).
+
+**JSON array files** (``[{...}, {...}]``): use :func:`materialize_json` / :func:`~pydantable.io.amaterialize_json` for a full eager column dict, or :func:`~pydantable.io.iter_json_array` / :func:`~pydantable.io.aiter_json_array` — those paths **load the entire JSON** first, then chunk in Python.
+
+Runnable example (lazy filter + ``iter_ndjson`` batches):
+
+```bash
+python docs/examples/io/large_ndjson_patterns.py
+```
+
+```{literalinclude} examples/io/large_ndjson_patterns.py
+:language: python
+```
+
+## NDJSON scan kwargs (presets)
+
+Typed and untyped lazy reads accept **``**scan_kwargs``** forwarded to Polars (see {doc}`DATA_IO_SOURCES`). For **NDJSON / JSON Lines**, allowed keys include:
+
+- **``infer_schema_length``** — how many lines Polars uses to infer dtypes (or ``None`` for engine default). Increase if early lines are not representative of the full file (e.g. sparse optional fields appear later).
+- **``n_rows``** — cap rows read from the file (sampling / debugging).
+- **``ignore_errors``** — skip malformed lines where the engine allows it; **can drop data silently** — use only for dirty logs when you accept lossy ingest.
+- **``low_memory``**, **``rechunk``** — Polars memory / chunking hints.
+
+Omitted keys use **Polars** defaults for ``LazyJsonLineReader`` (pydantable pins Polars **0.53**; see upstream Polars docs for default numeric values).
 
 ## Eager column dict
 

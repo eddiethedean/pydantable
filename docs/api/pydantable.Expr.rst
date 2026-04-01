@@ -87,6 +87,7 @@
       ~Expr.str_contains
       ~Expr.str_contains_pat
       ~Expr.str_extract_regex
+      ~Expr.str_json_decode
       ~Expr.str_json_path_match
       ~Expr.str_pad_end
       ~Expr.str_pad_start
@@ -100,6 +101,10 @@
       ~Expr.strip_suffix
       ~Expr.strptime
       ~Expr.struct_field
+      ~Expr.struct_json_encode
+      ~Expr.struct_json_path_match
+      ~Expr.struct_rename_fields
+      ~Expr.struct_with_fields
       ~Expr.substr
       ~Expr.unix_timestamp
       ~Expr.upper

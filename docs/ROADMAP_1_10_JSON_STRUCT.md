@@ -104,8 +104,10 @@ If scope slips, move unfinished items to **1.11.0** and keep Phase B as the 1.10
 
 **Checklist**
 
-- [ ] At least **docs + examples** for large-file JSON patterns (`read_ndjson` + `collect`, chunked `iter_ndjson`, when to use `materialize_json`).
-- [ ] If implemented: async/sync iterators documented in {doc}`DATA_IO_SOURCES` and {doc}`EXECUTION`.
+- [x] At least **docs + examples** for large-file JSON patterns (`read_ndjson` + `collect`, chunked `iter_ndjson`, when to use `materialize_json`).
+- [x] Async/sync iterators cross-linked in {doc}`DATA_IO_SOURCES` and {doc}`EXECUTION` (see {doc}`IO_JSON`).
+
+**Shipped in 1.10.0 (Phase D):** {doc}`IO_JSON` — naming table, large-file / streaming notes, NDJSON **scan_kwargs** presets; example **`docs/examples/io/large_ndjson_patterns.py`**; links from {doc}`IO_NDJSON`, {doc}`DATA_IO_SOURCES`, {doc}`EXECUTION`.
 
 ---
 

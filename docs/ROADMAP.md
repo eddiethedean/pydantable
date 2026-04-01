@@ -341,7 +341,7 @@ Practical inputs that feed that phase:
 
 ## Planned: 1.10.0 (JSON processing & struct ergonomics)
 
-**Living checklist and phased plan:** {doc}`ROADMAP_1_10_JSON_STRUCT` — JSON ↔ schema audit, struct expression parity (**`struct_json_encode`**, **`struct_with_fields`**, etc.), optional **string → struct** decode, I/O/streaming docs, and UX polish.
+**Living checklist and phased plan:** {doc}`ROADMAP_1_10_JSON_STRUCT` — JSON ↔ schema audit, struct expression parity (**`struct_json_encode`**, **`struct_with_fields`**, etc.), optional **string → struct** decode, **I/O/streaming docs (Phase D: large NDJSON patterns, `read_json` naming, scan kwargs)** in {doc}`IO_JSON`, and UX polish.
 
 ---
 
