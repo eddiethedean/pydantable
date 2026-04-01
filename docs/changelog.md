@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.10.0] — Unreleased
+
+### Changed
+
+- Bump Python package and Rust crate versions to **1.10.0** for the next development cycle.
+
 ## [1.9.0] — 2026-04-01
 
 ### Added
