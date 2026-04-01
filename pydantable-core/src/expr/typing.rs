@@ -132,6 +132,15 @@ fn iso_week_from_ymd(y: i32, month: u32, day: u32) -> i64 {
         .unwrap_or(1)
 }
 
+/// Calendar day-of-year 1–366 (matches Polars `dt.ordinal_day()` / Spark `dayofyear`).
+#[cfg(not(feature = "polars_engine"))]
+fn ordinal_day_from_ymd(y: i32, month: u32, day: u32) -> i64 {
+    use chrono::Datelike;
+    chrono::NaiveDate::from_ymd_opt(y, month, day)
+        .map(|d| i64::from(d.ordinal()))
+        .unwrap_or(1)
+}
+
 #[cfg(not(feature = "polars_engine"))]
 fn str_pad_start_chars(s: &str, length: u32, ch: char) -> String {
     let n = length as usize;
@@ -242,6 +251,7 @@ impl ExprNode {
             | ExprNode::DatetimeToDate { dtype, .. }
             | ExprNode::Strptime { dtype, .. }
             | ExprNode::UnixTimestamp { dtype, .. }
+            | ExprNode::FromUnixTime { dtype, .. }
             | ExprNode::BinaryLength { dtype, .. }
             | ExprNode::MapLen { dtype, .. }
             | ExprNode::MapGet { dtype, .. }
@@ -341,6 +351,7 @@ impl ExprNode {
             | ExprNode::DatetimeToDate { inner, .. }
             | ExprNode::Strptime { inner, .. }
             | ExprNode::UnixTimestamp { inner, .. }
+            | ExprNode::FromUnixTime { inner, .. }
             | ExprNode::BinaryLength { inner, .. }
             | ExprNode::MapLen { inner, .. }
             | ExprNode::MapGet { inner, .. }
@@ -1413,7 +1424,8 @@ impl ExprNode {
             | TemporalPart::Day
             | TemporalPart::Weekday
             | TemporalPart::Quarter
-            | TemporalPart::Week => {
+            | TemporalPart::Week
+            | TemporalPart::DayOfYear => {
                 if !(is_dt || is_date) {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "That temporal part requires a datetime or date column.",
@@ -2496,6 +2508,25 @@ impl ExprNode {
             unit,
             dtype: DTypeDesc::Scalar {
                 base: Some(BaseType::Int),
+                nullable,
+                literals: None,
+            },
+        })
+    }
+
+    pub fn make_from_unix_time(inner: ExprNode, unit: UnixTimestampUnit) -> PyResult<Self> {
+        let b = inner.dtype().as_scalar_base_field().flatten();
+        if b != Some(BaseType::Int) && b != Some(BaseType::Float) {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "from_unix_time() requires an int or float column.",
+            ));
+        }
+        let nullable = inner.dtype().nullable_flag();
+        Ok(ExprNode::FromUnixTime {
+            inner: Box::new(inner),
+            unit,
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::DateTime),
                 nullable,
                 literals: None,
             },
@@ -3915,6 +3946,7 @@ impl ExprNode {
                                 }
                                 TemporalPart::Quarter => ((i64::from(mo) - 1) / 3) + 1,
                                 TemporalPart::Week => iso_week_from_ymd(y, mo, d),
+                                TemporalPart::DayOfYear => ordinal_day_from_ymd(y, mo, d),
                             };
                             Some(LiteralValue::Int(i))
                         }
@@ -3928,7 +3960,8 @@ impl ExprNode {
                             | TemporalPart::Day
                             | TemporalPart::Weekday
                             | TemporalPart::Quarter
-                            | TemporalPart::Week => {
+                            | TemporalPart::Week
+                            | TemporalPart::DayOfYear => {
                                 let (y, mo, d) = utc_calendar_from_epoch_days(days);
                                 let i = match part {
                                     TemporalPart::Year => i64::from(y),
@@ -3939,6 +3972,7 @@ impl ExprNode {
                                     }
                                     TemporalPart::Quarter => ((i64::from(mo) - 1) / 3) + 1,
                                     TemporalPart::Week => iso_week_from_ymd(y, mo, d),
+                                    TemporalPart::DayOfYear => ordinal_day_from_ymd(y, mo, d),
                                     _ => unreachable!(),
                                 };
                                 Some(LiteralValue::Int(i))
@@ -3950,7 +3984,8 @@ impl ExprNode {
                             | TemporalPart::Day
                             | TemporalPart::Weekday
                             | TemporalPart::Quarter
-                            | TemporalPart::Week => None,
+                            | TemporalPart::Week
+                            | TemporalPart::DayOfYear => None,
                             TemporalPart::Hour => {
                                 Some(LiteralValue::Int((ns / NS_PER_HOUR).rem_euclid(24)))
                             }
@@ -3983,6 +4018,7 @@ impl ExprNode {
             | ExprNode::StringJsonPathMatch { .. }
             | ExprNode::Strptime { .. }
             | ExprNode::UnixTimestamp { .. }
+            | ExprNode::FromUnixTime { .. }
             | ExprNode::BinaryLength { .. }
             | ExprNode::MapLen { .. }
             | ExprNode::MapGet { .. }

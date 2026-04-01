@@ -31,6 +31,7 @@
       ~ColumnRef.diff
       ~ColumnRef.dt_date
       ~ColumnRef.dt_day
+      ~ColumnRef.dt_dayofyear
       ~ColumnRef.dt_hour
       ~ColumnRef.dt_minute
       ~ColumnRef.dt_month
@@ -43,6 +44,7 @@
       ~ColumnRef.element_at
       ~ColumnRef.ends_with
       ~ColumnRef.floor
+      ~ColumnRef.from_unix_time
       ~ColumnRef.is_blank_str
       ~ColumnRef.is_empty_str
       ~ColumnRef.is_in

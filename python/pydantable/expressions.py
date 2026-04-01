@@ -593,6 +593,14 @@ class Expr:  # type: ignore[override]
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "week"))
 
+    def dt_dayofyear(self) -> Expr:
+        """Day of year 1-366 on ``date`` / ``datetime`` (Spark ``dayofyear``).
+
+        Matches Polars ``dt.ordinal_day()``. Not valid on ``time`` columns.
+        """
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "dayofyear"))
+
     def dt_date(self) -> Expr:
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_datetime_to_date(self._rust_expr))
@@ -610,6 +618,14 @@ class Expr:  # type: ignore[override]
         """Unix epoch from ``date``/``datetime``; ``unit`` is ``seconds`` or ``ms``."""
         rust = _require_rust_core()
         return Expr(rust_expr=rust.expr_unix_timestamp(self._rust_expr, str(unit)))
+
+    def from_unix_time(self, unit: str = "seconds") -> Expr:
+        """UTC-naive ``datetime`` from numeric epoch; ``unit`` is ``seconds`` or ``ms``.
+
+        Inverse of :meth:`unix_timestamp` for typical non-null numeric input.
+        """
+        rust = _require_rust_core()
+        return Expr(rust_expr=rust.expr_from_unix_time(self._rust_expr, str(unit)))
 
     def binary_len(self) -> Expr:
         """Byte length of a ``bytes`` column."""

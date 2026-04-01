@@ -481,6 +481,26 @@ def test_functions_unix_timestamp_seconds_and_ms() -> None:
     assert ms["u"] == [exp * 1000]
 
 
+def test_functions_dayofyear_and_from_unixtime() -> None:
+    import calendar
+
+    class S(Schema):
+        d: date
+        x: int
+
+    epoch = int(calendar.timegm((2024, 7, 4, 0, 0, 0, 0, 0, 0)))
+    df = DataFrame[S]({"d": [date(2024, 7, 4)], "x": [epoch]})
+    cd = F.col("d", dtype=date)
+    cx = F.col("x", dtype=int)
+    out = (
+        df.withColumn("doy", F.dayofyear(cd))
+        .withColumn("ts", F.from_unixtime(cx))
+        .collect(as_lists=True)
+    )
+    assert out["doy"] == [date(2024, 7, 4).timetuple().tm_yday]
+    assert abs(out["ts"][0].timestamp() - float(epoch)) < 1.0
+
+
 def test_functions_nanosecond_on_datetime() -> None:
     class S(Schema):
         ts: datetime

@@ -517,6 +517,7 @@ impl ExprNode {
                     TemporalPart::Weekday => Ok(dt.weekday()),
                     TemporalPart::Quarter => Ok(dt.quarter()),
                     TemporalPart::Week => Ok(dt.week()),
+                    TemporalPart::DayOfYear => Ok(dt.ordinal_day()),
                 }
             }
             ExprNode::ListLen { inner, .. } => Ok(inner.to_polars_expr()?.list().len()),
@@ -612,6 +613,15 @@ impl ExprNode {
                     .cast(DataType::Int64)),
                     UnixTimestampUnit::Milliseconds => Ok(dt.timestamp(TimeUnit::Milliseconds)),
                 }
+            }
+            ExprNode::FromUnixTime { inner, unit, .. } => {
+                let e = inner.to_polars_expr()?.cast(DataType::Int64);
+                // Polars interprets integer casts to `Datetime(Microseconds)` as µs since UNIX epoch.
+                let micros = match unit {
+                    UnixTimestampUnit::Seconds => e * lit(1_000_000i64),
+                    UnixTimestampUnit::Milliseconds => e * lit(1_000i64),
+                };
+                Ok(micros.cast(DataType::Datetime(TimeUnit::Microseconds, None)))
             }
             ExprNode::BinaryLength { inner, .. } => {
                 Ok(inner.to_polars_expr()?.binary().size_bytes())

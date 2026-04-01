@@ -103,7 +103,16 @@ Core operations (`collect`, `join`, `group_by`, typed `filter`, …) behave like
 | `dropDuplicates(subset=None)` | Core `distinct(keep="first")` (engine-dependent “first” unless ordered); `subset=` maps to `distinct(subset=..., keep="first")` |
 | `union` / `unionAll` | Core vertical `concat` (same schema required) |
 | `show(n=20, truncate=True, vertical=False)` | **0.20.0+** — prints a bounded text table (`head`-like sample). |
-| `summary()` | **0.20.0+** — returns the same **string** as core **`describe()`** (numeric columns MVP), not Apache Spark’s full **`summary`** statistics set. |
+| `summary()` | **0.20.0+** — see [**`summary` vs Spark**](#summary-vs-apache-spark) below. |
+
+(summary-vs-apache-spark)=
+### `summary` vs Apache Spark
+
+Spark’s **`DataFrame.summary()`** returns another **DataFrame** of statistics (and accepts optional stat names). In pydantable, PySpark **`summary()`** is deliberately a thin alias of core **`describe()`**: it returns a **single multi-line string**, not a table-shaped frame.
+
+**What `describe()` / `summary()` include** (after one **`to_dict()`** materialization): **int** and **float** (count, mean, std, min, max; skew/kurtosis/sem when **numpy** is available and count ≥ 4), **bool** (true/false/null counts), **str** (count, `n_unique`, min/max length), **`date` / `datetime`** (non-null count, min, max, nulls). Other column types are omitted from the report.
+
+For distributional stats Spark’s **`summary`** column set, use Polars or pandas on a materialized export, or build explicit **`select`** aggregates.
 
 ### Naming map (core ↔ pandas ↔ PySpark)
 
@@ -137,7 +146,7 @@ from pydantable.pyspark.sql import functions as F, Column, IntegerType, StructTy
 
 This block only checks that imports resolve; it has no printed output.
 
-- **`functions`** — `lit`, typed **`col(..., dtype=...)`**, `isnull` / `isnotnull`, `coalesce`, `when` / `otherwise`, `cast`, `between`, `isin`, `concat`, `substring`, `length`, **`explode`** (raises **`TypeError`**; use **`DataFrame.explode`** / **`posexplode`**), **`year` / `month` / `day` / `hour` / `minute` / `second` / `nanosecond` / `to_date` / `unix_timestamp`** (wrappers over core `Expr` temporal APIs), global **`sum`/`avg`/`mean`/`count`/`min`/`max`** for **`select`** (including **`count()`** with no args → row count), and window helpers — see the parity matrix.
+- **`functions`** — `lit`, typed **`col(..., dtype=...)`**, `isnull` / `isnotnull`, `coalesce`, `when` / `otherwise`, `cast`, `between`, `isin`, `concat`, `substring`, `length`, **`explode`** (raises **`TypeError`**; use **`DataFrame.explode`** / **`posexplode`**), **date/time:** `year`, `month`, `day`, `dayofmonth`, `dayofweek`, `quarter`, `weekofyear`, `dayofyear`, `hour`, `minute`, `second`, `nanosecond`, `to_date`, `strptime`, `unix_timestamp`, `from_unixtime` (see **[PySpark parity](PYSPARK_PARITY.md)** Phase B for semantics), global **`sum`/`avg`/`mean`/`count`/`min`/`max`** for **`select`**, and window helpers.
 - **`Column`** — type alias for pydantable **`Expr`**.
 - **`types`** — simple `IntegerType`, `StringType`, `StructField`, `StructType`, … for documentation and `schema` views.
 

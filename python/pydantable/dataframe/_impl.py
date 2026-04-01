@@ -160,6 +160,11 @@ def _is_describe_str(annotation: Any) -> bool:
     return inner is str
 
 
+def _is_describe_temporal(annotation: Any) -> bool:
+    inner, _ = _annotation_nullable_inner(annotation)
+    return inner is date or inner is datetime
+
+
 def _dtype_repr(annotation: Any) -> str:
     """Stable, readable dtype string for schema annotations (repr / logging)."""
     if annotation is None:
@@ -1306,7 +1311,7 @@ class DataFrame(Generic[SchemaT]):
         return "\n".join(lines)
 
     def describe(self) -> str:
-        """Summary statistics for int, float, bool, and str columns.
+        """Summary statistics for int, float, bool, str, and date/datetime columns.
 
         **Cost:** one full :meth:`to_dict()` materialization. String columns
         ``n_unique`` scans all non-null strings. See {doc}`EXECUTION`.
@@ -1320,11 +1325,14 @@ class DataFrame(Generic[SchemaT]):
         str_cols = [
             n for n, a in self._current_field_types.items() if _is_describe_str(a)
         ]
-        if not numeric and not bool_cols and not str_cols:
-            return "describe(): no int/float/bool/str columns in schema."
+        temporal_cols = [
+            n for n, a in self._current_field_types.items() if _is_describe_temporal(a)
+        ]
+        if not numeric and not bool_cols and not str_cols and not temporal_cols:
+            return "describe(): no int/float/bool/str/date/datetime columns in schema."
         data = self.to_dict()
         lines = [
-            "describe() — one to_dict(); int/float/bool/str columns.",
+            "describe() — one to_dict(); int/float/bool/str/date/datetime columns.",
             "",
         ]
         for name in numeric:
@@ -1384,6 +1392,21 @@ class DataFrame(Generic[SchemaT]):
             lines.append(
                 f"{name}: count={len(str_vals)} n_unique={n_unique} "
                 f"min_len={min(lens)} max_len={max(lens)} null={n_null}"
+            )
+        for name in temporal_cols:
+            col = data[name]
+            raw = [x for x in col if x is not None]
+            n_null = len(col) - len(raw)
+            if not raw:
+                lines.append(f"{name}: count=0 (all null)")
+                continue
+            vals = [x for x in raw if isinstance(x, (date, datetime))]
+            if not vals:
+                lines.append(f"{name}: count=0 (all null)")
+                continue
+            mn, mx = min(vals), max(vals)
+            lines.append(
+                f"{name}: count={len(vals)} min={mn!s} max={mx!s} null={n_null}"
             )
         return "\n".join(lines)
 

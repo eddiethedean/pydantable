@@ -331,9 +331,10 @@ fn expr_temporal_part(inner: Bound<'_, PyExpr>, part: String) -> PyResult<PyExpr
         "weekday" => TemporalPart::Weekday,
         "quarter" => TemporalPart::Quarter,
         "week" => TemporalPart::Week,
+        "dayofyear" => TemporalPart::DayOfYear,
         _ => {
             return Err(pyo3::exceptions::PyValueError::new_err(
-                "temporal part must be year|month|day|hour|minute|second|nanosecond|weekday|quarter|week",
+                "temporal part must be year|month|day|hour|minute|second|nanosecond|weekday|quarter|week|dayofyear",
             ));
         }
     };
@@ -800,6 +801,22 @@ fn expr_unix_timestamp(inner: Bound<'_, PyExpr>, unit: String) -> PyResult<PyExp
 }
 
 #[pyfunction]
+fn expr_from_unix_time(inner: Bound<'_, PyExpr>, unit: String) -> PyResult<PyExpr> {
+    let u = match unit.as_str() {
+        "seconds" | "s" => UnixTimestampUnit::Seconds,
+        "milliseconds" | "ms" => UnixTimestampUnit::Milliseconds,
+        _ => {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "from_unix_time unit must be 'seconds' or 'milliseconds'.",
+            ));
+        }
+    };
+    Ok(PyExpr {
+        node: ExprNode::make_from_unix_time(inner.borrow().node.clone(), u)?,
+    })
+}
+
+#[pyfunction]
 fn expr_binary_length(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
     Ok(PyExpr {
         node: ExprNode::make_binary_length(inner.borrow().node.clone())?,
@@ -1049,6 +1066,7 @@ pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr_global_mean, m)?)?;
     m.add_function(wrap_pyfunction!(expr_strptime, m)?)?;
     m.add_function(wrap_pyfunction!(expr_unix_timestamp, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_from_unix_time, m)?)?;
     m.add_function(wrap_pyfunction!(expr_binary_length, m)?)?;
     m.add_function(wrap_pyfunction!(expr_map_len, m)?)?;
     m.add_function(wrap_pyfunction!(expr_map_get, m)?)?;

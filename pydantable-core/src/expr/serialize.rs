@@ -324,6 +324,7 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
                     TemporalPart::Weekday => "weekday",
                     TemporalPart::Quarter => "quarter",
                     TemporalPart::Week => "week",
+                    TemporalPart::DayOfYear => "dayofyear",
                 },
             )?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
@@ -427,6 +428,17 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
         }
         ExprNode::UnixTimestamp { inner, unit, .. } => {
             dict.set_item("kind", "unix_timestamp")?;
+            dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
+            dict.set_item(
+                "unit",
+                match unit {
+                    UnixTimestampUnit::Seconds => "seconds",
+                    UnixTimestampUnit::Milliseconds => "milliseconds",
+                },
+            )?;
+        }
+        ExprNode::FromUnixTime { inner, unit, .. } => {
+            dict.set_item("kind", "from_unix_time")?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
             dict.set_item(
                 "unit",

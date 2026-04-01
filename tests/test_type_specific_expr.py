@@ -18,6 +18,10 @@ class _IntOnly(Schema):
     x: int
 
 
+class _IntOpt(Schema):
+    x: int | None
+
+
 class _Str(Schema):
     s: str
 
@@ -289,6 +293,36 @@ def test_temporal_parts_date_only() -> None:
     assert out["y"] == [2024, 1999]
     assert out["m"] == [5, 12]
     assert out["day"] == [1, 31]
+
+
+def test_dt_dayofyear_date_and_datetime() -> None:
+    df_d = DataFrame[_Donly]({"d": [date(2024, 1, 1), date(2024, 12, 31)]})
+    o_d = df_d.with_columns(doy=df_d.d.dt_dayofyear()).collect(as_lists=True)
+    assert o_d["doy"] == [1, 366]
+
+    df_dt = DataFrame[_Dt](
+        {"ts": [datetime(2024, 3, 1, 0, 0, 0), datetime(2024, 7, 15, 0, 0, 0)]}
+    )
+    o_dt = df_dt.with_columns(doy=df_dt.ts.dt_dayofyear()).collect(as_lists=True)
+    assert o_dt["doy"] == [
+        date(2024, 3, 1).timetuple().tm_yday,
+        date(2024, 7, 15).timetuple().tm_yday,
+    ]
+
+
+def test_from_unix_time_round_trip_utc_instant() -> None:
+    ts = datetime(2024, 6, 10, 12, 30, 45)
+    sec = calendar.timegm(ts.timetuple())
+    df_i = DataFrame[_IntOpt]({"x": [sec, None]})
+    out = df_i.with_columns(d=df_i.x.from_unix_time("seconds")).collect(as_lists=True)
+    assert out["d"][0] is not None
+    assert abs(out["d"][0].timestamp() - float(sec)) < 1.0
+    assert out["d"][1] is None
+
+    msec = sec * 1000
+    df_m = DataFrame[_IntOnly]({"x": [msec]})
+    om = df_m.with_columns(d=df_m.x.from_unix_time("ms")).collect(as_lists=True)
+    assert abs(om["d"][0].timestamp() - float(sec)) < 1.0
 
 
 def test_dt_hour_rejects_date_column() -> None:

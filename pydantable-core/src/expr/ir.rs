@@ -99,6 +99,8 @@ pub enum TemporalPart {
     Quarter,
     /// ISO 8601 week number 1–53 (`datetime` / `date`; Polars `dt.week()`).
     Week,
+    /// Day of year 1–366 (`datetime` / `date`; Polars `dt.ordinal_day()`).
+    DayOfYear,
 }
 
 /// String column predicate producing `bool` (Polars `str` namespace).
@@ -112,7 +114,7 @@ pub enum StringPredicateKind {
     },
 }
 
-/// Unit for [`ExprNode::UnixTimestamp`].
+/// Unit for [`ExprNode::UnixTimestamp`] and [`ExprNode::FromUnixTime`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnixTimestampUnit {
     Seconds,
@@ -330,6 +332,12 @@ pub enum ExprNode {
     },
     /// `datetime` / `date` → Unix timestamp (integer).
     UnixTimestamp {
+        inner: Box<ExprNode>,
+        unit: UnixTimestampUnit,
+        dtype: DTypeDesc,
+    },
+    /// Numeric epoch → UTC-naive `datetime` (inverse of [`ExprNode::UnixTimestamp`]).
+    FromUnixTime {
         inner: Box<ExprNode>,
         unit: UnixTimestampUnit,
         dtype: DTypeDesc,

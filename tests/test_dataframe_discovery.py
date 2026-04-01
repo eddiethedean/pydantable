@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 from contextlib import redirect_stdout
-from datetime import date
+from datetime import date, datetime
 
 from pydantable import DataFrame, DataFrameModel
 from pydantic import BaseModel
@@ -22,6 +22,10 @@ class _StrOnly(BaseModel):
 
 class _DateOnly(BaseModel):
     when: date
+
+
+class _BytesOnly(BaseModel):
+    blob: bytes
 
 
 class _OptNums(BaseModel):
@@ -86,8 +90,32 @@ def test_describe_numeric() -> None:
 
 
 def test_describe_no_supported_columns() -> None:
-    df = DataFrame[_DateOnly]({"when": [date(2020, 1, 1), date(2020, 1, 2)]})
-    assert df.describe() == "describe(): no int/float/bool/str columns in schema."
+    df = DataFrame[_BytesOnly]({"blob": [b"a", b"bc"]})
+    assert df.describe() == (
+        "describe(): no int/float/bool/str/date/datetime columns in schema."
+    )
+
+
+def test_describe_date_column_min_max() -> None:
+    df = DataFrame[_DateOnly]({"when": [date(2020, 1, 1), date(2021, 6, 15)]})
+    d = df.describe()
+    assert "when:" in d
+    assert "count=2" in d
+    assert "min=2020-01-01" in d
+    assert "max=2021-06-15" in d
+
+
+def test_describe_datetime_column() -> None:
+    class _Dt(BaseModel):
+        ts: datetime
+
+    df = DataFrame[_Dt](
+        {"ts": [datetime(2020, 1, 1, 12, 0), datetime(2020, 1, 2, 0, 0)]}
+    )
+    d = df.describe()
+    assert "ts:" in d
+    assert "count=2" in d
+    assert "null=0" in d
 
 
 def test_describe_bool_and_str_columns() -> None:

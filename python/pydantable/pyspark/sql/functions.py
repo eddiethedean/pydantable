@@ -303,6 +303,11 @@ def weekofyear(column: Expr) -> Expr:
     return column.dt_week()
 
 
+def dayofyear(column: Expr) -> Expr:
+    """Day of year 1-366 (Spark ``dayofyear``); core :meth:`Expr.dt_dayofyear`."""
+    return column.dt_dayofyear()
+
+
 def lower(column: Expr) -> Expr:
     """Lowercase string column (Spark ``lower``)."""
     return column.lower()
@@ -591,6 +596,21 @@ def unix_timestamp(column: Expr, unit: str = "seconds") -> Expr:
     return column.unix_timestamp(unit)
 
 
+def from_unixtime(
+    column: Expr,
+    format: str | None = None,
+    *,
+    unit: str = "seconds",
+) -> Expr:
+    """Numeric epoch → UTC-naive ``datetime`` (Spark ``from_unixtime`` shape).
+
+    The optional Spark **format** string is not supported (Spark formats string
+    output); leave unset or use parsing helpers on string columns.
+    """
+    _ = format
+    return column.from_unix_time(unit)
+
+
 def row_number() -> Any:
     """Spark ``row_number``; use ``.over(Window.partitionBy(...).orderBy(...))``."""
     return row_number_expr()
@@ -794,12 +814,14 @@ __all__ = [
     "day",
     "dayofmonth",
     "dayofweek",
+    "dayofyear",
     "dense_rank",
     "element_at",
     "ends_with",
     "explode",
     "first_value",
     "floor",
+    "from_unixtime",
     "greatest",
     "hour",
     "isin",

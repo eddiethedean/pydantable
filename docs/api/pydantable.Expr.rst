@@ -31,6 +31,7 @@
       ~Expr.diff
       ~Expr.dt_date
       ~Expr.dt_day
+      ~Expr.dt_dayofyear
       ~Expr.dt_hour
       ~Expr.dt_minute
       ~Expr.dt_month
@@ -43,6 +44,7 @@
       ~Expr.element_at
       ~Expr.ends_with
       ~Expr.floor
+      ~Expr.from_unix_time
       ~Expr.is_blank_str
       ~Expr.is_empty_str
       ~Expr.is_in

@@ -77,6 +77,7 @@ impl PolarsPlanRunner {
             | ExprNode::DatetimeToDate { inner, .. }
             | ExprNode::Strptime { inner, .. }
             | ExprNode::UnixTimestamp { inner, .. }
+            | ExprNode::FromUnixTime { inner, .. }
             | ExprNode::BinaryLength { inner, .. }
             | ExprNode::MapLen { inner, .. }
             | ExprNode::MapGet { inner, .. }
