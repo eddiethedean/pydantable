@@ -4,12 +4,12 @@ The **PySpark UI** is an optional import surface that adds **Apache Spark–styl
 
 Execution uses pydantable’s Rust/Polars core (see [Execution](EXECUTION.md)).
 
-### Release context (1.8.0 vs 1.9.0)
+## Release context (1.8.0 vs 1.9.0)
 
 - **1.8.0** focused on **core** ergonomics (selectors, joins, `drop_nulls`, reshape parity, etc.)—the same engine every import style uses; see the {doc}`changelog` **1.8.0** section.
 - **1.9.0** adds the **Spark-shaped `DataFrame` / `DataFrameModel` surface** in this document: `groupBy`, frame `count()`, `crossJoin`, `unionByName`, set-style helpers, `fillna` / `dropna` / `.na`, `printSchema`, `explain`, `toPandas`, and related typing/stubs. Behavior and limitations are summarized in [PySpark parity](PYSPARK_PARITY.md) and [Interface contract](INTERFACE_CONTRACT.md).
 
-### Tests
+## Tests
 
 CI and local runs exercise the PySpark UI via:
 
@@ -18,7 +18,7 @@ CI and local runs exercise the PySpark UI via:
 
 When adding Spark-named wrappers, extend those files (or add focused tests next to them) so regressions are caught on all platforms.
 
-### Semantic differences vs Apache Spark
+## Semantic differences vs Apache Spark
 
 - **No cluster:** all methods lower to the **in-process** Rust/Polars plan; `count()` is a logical row count, not a distributed action across executors.
 - **`exceptAll`:** implemented as **`subtract`** (anti join + distinct semantics as documented)—not Spark multiset **`EXCEPT ALL`**.

@@ -50,7 +50,7 @@ class DataFrameModelNaFunctions:
     ) -> DataFrameModel: ...
 
 class DataFrame(CoreDataFrame[Any]):
-    def group_by(
+    def group_by(  # type: ignore[override]
         self,
         *keys: str | ColumnRef,
         maintain_order: bool = False,
@@ -62,7 +62,7 @@ class DataFrame(CoreDataFrame[Any]):
         maintain_order: bool = False,
         drop_nulls: bool = True,
     ) -> PySparkGroupedDataFrame: ...
-    def sort(
+    def sort(  # type: ignore[override]
         self,
         *columns: str,
         ascending: bool | list[bool] | None = None,
@@ -94,7 +94,7 @@ class DataFrame(CoreDataFrame[Any]):
     @property
     def na(self) -> DataFrameNaFunctions: ...
     def printSchema(self, level: int | None = None) -> None: ...
-    def explain(
+    def explain(  # type: ignore[override]
         self,
         extended: bool | None = None,
         mode: str | None = None,
@@ -105,7 +105,7 @@ class DataFrame(CoreDataFrame[Any]):
     def toPandas(self) -> Any: ...
 
 class DataFrameModel(CoreDataFrameModel):
-    def group_by(
+    def group_by(  # type: ignore[override]
         self,
         *keys: Any,
         maintain_order: bool = False,
@@ -117,7 +117,7 @@ class DataFrameModel(CoreDataFrameModel):
         maintain_order: bool = False,
         drop_nulls: bool = True,
     ) -> PySparkGroupedDataFrameModel: ...
-    def sort(
+    def sort(  # type: ignore[override]
         self,
         *columns: str,
         ascending: bool | list[bool] | None = None,
@@ -149,7 +149,7 @@ class DataFrameModel(CoreDataFrameModel):
     @property
     def na(self) -> DataFrameModelNaFunctions: ...
     def printSchema(self, level: int | None = None) -> None: ...
-    def explain(
+    def explain(  # type: ignore[override]
         self,
         extended: bool | None = None,
         mode: str | None = None,
