@@ -37,10 +37,12 @@ See:
 | `selectExpr` | `select_typed` | Out of scope | SQL-string expressions intentionally excluded; use typed expressions + aliases. |
 | `groupBy` | `groupBy` / `group_by` | Implemented (**1.9.0+**) | Returns **`PySparkGroupedDataFrame`** (or model wrapper); `.agg(...)` uses tuple specs. |
 | `groupBy(...).pivot(...).agg(...)` | `groupBy(...).pivot(...).agg(...)` | Implemented (**1.9.0+**) | Spark-shaped grouped pivot. `pivot(values=[...])` fixes the pivot value set (missing values become null columns). Output naming uses `<pivot_value>_<out_name>` for grouped pivot aggregations. |
+| `groupBy(...).pivot(...).count/sum/avg/min/max` | `groupBy(...).pivot(...).count/sum/avg/min/max` | Implemented (**1.9.0+**) | Convenience wrappers over grouped pivot; `count()` counts rows per group+pivot cell and names outputs as `<pivot_value>_count`. |
 | `count()` (action) | `count()` | Implemented (**1.9.0+**) | **`int`** row count via **`global_row_count()`**; distinct from grouped **`count(...)`**. |
 | `sort` / `crossJoin` | same | Implemented (**1.9.0+**) | Global **`sort`** only; **`crossJoin`** → **`join(how="cross")`**. |
 | `unionByName` | same | Implemented (**1.9.0+**) | Name order + optional **`allowMissingColumns`**. |
-| `intersect` / `subtract` / `exceptAll` | same | Partial (**1.9.0+**) | Join + dedupe / anti join; **`exceptAll`** → **`subtract`**. |
+| `intersect` / `subtract` | same | Partial (**1.9.0+**) | `intersect` is distinct-set via join+distinct; `subtract` is anti join on all columns (distinct-set semantics). |
+| `exceptAll` / `intersectAll` | same | Implemented (**1.9.0+**) | Multiset semantics via Rust/Polars core. |
 | `fillna` / `dropna` / `na` | same | Implemented (**1.9.0+**) | **`fill_null`** / **`drop_nulls`** with Spark-shaped kwargs. |
 | `printSchema` / `explain` | same | Implemented (**1.9.0+**) | Text schema tree; printed plan. |
 | `toPandas` | same | Implemented (**1.9.0+**) | Eager; requires **pandas**. |

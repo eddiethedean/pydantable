@@ -21,7 +21,7 @@ When adding Spark-named wrappers, extend those files (or add focused tests next 
 ## Semantic differences vs Apache Spark
 
 - **No cluster:** all methods lower to the **in-process** Rust/Polars plan; `count()` is a logical row count, not a distributed action across executors.
-- **`exceptAll`:** implemented as **`subtract`** (anti join + distinct semantics as documented)—not Spark multiset **`EXCEPT ALL`**.
+- **`subtract`:** implemented as an anti join on all columns (distinct-set semantics), not Spark multiset **`EXCEPT ALL`**. Use `exceptAll` for multiset semantics.
 - **`sort`/`orderBy`:** global sort only; there is no **`sortWithinPartitions`**.
 - **`summary()`:** still the same **string** as core `describe()` for numeric columns (MVP), not Spark’s full multi-column `summary` table unless/until a future release adds a table-shaped stats path.
 
@@ -71,11 +71,12 @@ Core operations (`collect`, `join`, `group_by`, typed `filter`, …) behave like
 | `select(*cols)` | Core `select` |
 | `groupBy(...)` / `group_by(...)` | Core `group_by`; returns **`PySparkGroupedDataFrame`** so `.agg()` stays Spark-flavored (**1.9.0+**). |
 | `groupBy(...).pivot(pivot_col, values=[...]).agg(...)` | Group at `(keys + pivot_col)` then core `pivot` to wide columns (**1.9.0+**). |
+| `groupBy(...).pivot(...).count()` / `.sum(...)` / `.avg(...)` / `.min(...)` / `.max(...)` | Convenience wrappers over grouped-pivot `.agg(...)` (Spark-shaped), including `count()` as rows per `(keys, pivot_value)` cell (**1.9.0+**). |
 | `orderBy(*columns, ascending=...)` / `sort(...)` | Core `sort` / `order_by` (global sort only; not Spark `sortWithinPartitions`) |
 | `crossJoin(other)` | `join(other, how="cross")` (**1.9.0+**) |
 | `count()` | Row count as **`int`** via `global_row_count()` in the plan (**1.9.0+**); distinct from grouped `GroupedDataFrame.count(*cols)` |
 | `unionByName(other, allowMissingColumns=False)` | Reorder `other` by name, then vertical `concat`; optional null-padding for missing columns (**1.9.0+**) |
-| `intersect` / `subtract` / `exceptAll` | Typed join + `distinct` / anti-join (**1.9.0+**); `exceptAll` is **`subtract`** here — not Spark multiset `EXCEPT ALL` |
+| `intersect` / `subtract` | Typed join + `distinct` / anti-join (**1.9.0+**) |
 | `intersectAll` / `exceptAll` | Multiset set ops (**1.9.0+**); `exceptAll` keeps duplicates per `max(left-right,0)` counts, `intersectAll` keeps `min(left,right)` counts. |
 | `fillna` / `dropna` / `na.drop` / `na.fill` | `fill_null` / `drop_nulls` with Spark-shaped kwargs (**1.9.0+**) |
 | `printSchema()` | Text tree from `df.schema` (**1.9.0+**) |
@@ -85,7 +86,7 @@ Core operations (`collect`, `join`, `group_by`, typed `filter`, …) behave like
 | `drop(*cols)` | `drop(*cols)` |
 | `distinct()` | All-column distinct rows |
 | `withColumnRenamed(existing, new)` | `with_column_renamed` |
-| `dropDuplicates(subset=None)` | Core `distinct(subset=...)` when `subset` is set; else all-column `distinct()` |
+| `dropDuplicates(subset=None)` | Core `distinct(keep="first")` (engine-dependent “first” unless ordered); `subset=` maps to `distinct(subset=..., keep="first")` |
 | `union` / `unionAll` | Core vertical `concat` (same schema required) |
 | `show(n=20, truncate=True, vertical=False)` | **0.20.0+** — prints a bounded text table (`head`-like sample). |
 | `summary()` | **0.20.0+** — returns the same **string** as core **`describe()`** (numeric columns MVP), not Apache Spark’s full **`summary`** statistics set. |

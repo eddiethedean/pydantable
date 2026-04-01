@@ -82,6 +82,19 @@ def test_pyspark_drop_duplicates_with_and_without_subset() -> None:
     assert u2.collect(as_lists=True)["name"] == ["a", "b"]
 
 
+def test_pyspark_drop_duplicates_subset_keep_first_with_explicit_order() -> None:
+    df = User(
+        {
+            "id": [1, 2, 3],
+            "name": ["b", "b", "a"],
+            "age": [20, 10, 99],
+        }
+    )
+    out = df.orderBy("age").dropDuplicates(["name"]).to_dict()
+    assert out["name"] == ["b", "a"]
+    assert out["age"] == [10, 99]
+
+
 def test_pyspark_order_by_rejects_maintain_order_kwarg() -> None:
     df = User(
         {
@@ -218,6 +231,66 @@ def test_pyspark_groupby_pivot_agg_preserves_explicit_pivot_order() -> None:
     assert out["y_s"] == [None]
 
 
+def test_pyspark_groupby_pivot_count_sum_avg_min_max_multi_col() -> None:
+    class S(Schema):
+        g: str
+        k: str
+        a: int
+        b: int
+
+    df = DataFrame[S](
+        {
+            "g": ["A", "A", "A", "B"],
+            "k": ["x", "x", "y", "x"],
+            "a": [1, 2, 10, 3],
+            "b": [5, 6, 7, 8],
+        }
+    )
+
+    counted = df.groupBy("g").pivot("k", values=["x", "y"]).count().to_dict()
+    order = sorted(range(len(counted["g"])), key=lambda i: counted["g"][i])
+    got_count = {k: [counted[k][i] for i in order] for k in counted}
+    assert got_count["g"] == ["A", "B"]
+    assert got_count["x_count"] == [2, 1]
+    assert got_count["y_count"] == [1, None]
+
+    summed = df.groupBy("g").pivot("k", values=["x", "y"]).sum("a", "b").to_dict()
+    order = sorted(range(len(summed["g"])), key=lambda i: summed["g"][i])
+    got_sum = {k: [summed[k][i] for i in order] for k in summed}
+    assert got_sum["x_a"] == [3, 3]
+    assert got_sum["y_a"] == [10, None]
+    assert got_sum["x_b"] == [11, 8]
+    assert got_sum["y_b"] == [7, None]
+
+    avged = df.groupBy("g").pivot("k", values=["x", "y"]).avg("a").to_dict()
+    order = sorted(range(len(avged["g"])), key=lambda i: avged["g"][i])
+    got_avg = {k: [avged[k][i] for i in order] for k in avged}
+    assert got_avg["x_a"] == [1.5, 3.0]
+    assert got_avg["y_a"] == [10.0, None]
+
+    mined = df.groupBy("g").pivot("k", values=["x", "y"]).min("a").to_dict()
+    order = sorted(range(len(mined["g"])), key=lambda i: mined["g"][i])
+    got_min = {k: [mined[k][i] for i in order] for k in mined}
+    assert got_min["x_a"] == [1, 3]
+    assert got_min["y_a"] == [10, None]
+
+    maxed = df.groupBy("g").pivot("k", values=["x", "y"]).max("a").to_dict()
+    order = sorted(range(len(maxed["g"])), key=lambda i: maxed["g"][i])
+    got_max = {k: [maxed[k][i] for i in order] for k in maxed}
+    assert got_max["x_a"] == [2, 3]
+    assert got_max["y_a"] == [10, None]
+
+
+def test_pyspark_groupby_pivot_sum_requires_columns() -> None:
+    class S(Schema):
+        g: str
+        k: str
+        v: int
+
+    df = DataFrame[S]({"g": ["A"], "k": ["x"], "v": [1]})
+    with pytest.raises(TypeError, match="requires at least one"):
+        df.groupBy("g").pivot("k").sum()
+
 def test_pyspark_cross_join_and_count() -> None:
     class A(Schema):
         x: int
@@ -276,6 +349,52 @@ def test_pyspark_union_by_name_allow_missing_columns() -> None:
     assert d["id"] == [1, 2]
     assert d["x"][0] == 10
     assert d["x"][1] is None
+
+
+def test_pyspark_union_by_name_allow_missing_widens_to_nullable() -> None:
+    class L(Schema):
+        id: int
+        x: int
+
+    class R(Schema):
+        id: int
+
+    left = DataFrame[L]({"id": [1], "x": [10]})
+    right = DataFrame[R]({"id": [2]})
+    out = left.unionByName(right, allowMissingColumns=True).to_dict()
+    assert out["id"] == [1, 2]
+    assert out["x"] == [10, None]
+
+
+def test_pyspark_union_by_name_allow_missing_numeric_supertype() -> None:
+    class L(Schema):
+        id: int
+        x: int
+
+    class R(Schema):
+        id: int
+        x: float
+
+    left = DataFrame[L]({"id": [1], "x": [1]})
+    right = DataFrame[R]({"id": [2], "x": [2.5]})
+    out = left.unionByName(right, allowMissingColumns=True).to_dict()
+    assert out["id"] == [1, 2]
+    assert out["x"] == [1.0, 2.5]
+
+
+def test_pyspark_union_by_name_allow_missing_incompatible_dtypes_errors() -> None:
+    class L(Schema):
+        id: int
+        x: int
+
+    class R(Schema):
+        id: int
+        x: str
+
+    left = DataFrame[L]({"id": [1], "x": [1]})
+    right = DataFrame[R]({"id": [2], "x": ["a"]})
+    with pytest.raises(TypeError, match="incompatible dtypes"):
+        _ = left.unionByName(right, allowMissingColumns=True)
 
 
 def test_pyspark_intersect_and_subtract() -> None:

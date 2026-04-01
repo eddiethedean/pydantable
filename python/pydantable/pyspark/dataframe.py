@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence  # noqa: TC003
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, cast, get_args, get_origin, Union
+from types import UnionType
 from typing import Literal as TypingLiteral
 
 from pydantable.dataframe import DataFrame as CoreDataFrame
@@ -290,6 +291,69 @@ class PySparkPivotedGroupedDataFrame:
             pivoted = pivoted.rename(rename_map)
         return DataFrame._as_pyspark_df(pivoted)
 
+    def count(self, *, streaming: bool | None = None) -> DataFrame:
+        """Spark-style pivot count (rows per group + pivot value)."""
+        internal_sep = "__"
+        use_streaming = streaming
+        grouped = self._df.group_by(
+            *self._keys,
+            self._pivot_col,
+            maintain_order=self._maintain_order,
+            drop_nulls=self._drop_nulls,
+        )
+        aggregated = grouped.len(streaming=use_streaming)
+        pivoted = aggregated.pivot(
+            index=self._keys,
+            columns=self._pivot_col,
+            values=["len"],
+            aggregate_function="first",
+            separator=internal_sep,
+            pivot_values=self._pivot_values,
+            streaming=use_streaming,
+        )
+
+        rename_map: dict[str, str] = {}
+        for c in pivoted.columns:
+            if c in self._keys:
+                continue
+            parts = c.rsplit(internal_sep, 2)
+            if len(parts) == 3 and parts[2] == "first":
+                pivot_value, _, _ = parts
+                rename_map[c] = f"{pivot_value}_count"
+            elif len(parts) == 2 and parts[1] == "first":
+                pivot_value, _ = parts
+                rename_map[c] = f"{pivot_value}_count"
+        if rename_map:
+            pivoted = pivoted.rename(rename_map)
+        return DataFrame._as_pyspark_df(pivoted)
+
+    def sum(self, *columns: str, streaming: bool | None = None) -> DataFrame:
+        if not columns:
+            raise TypeError("sum() requires at least one column name.")
+        aggs = {c: ("sum", c) for c in columns}
+        return self.agg(streaming=streaming, **aggs)
+
+    def avg(self, *columns: str, streaming: bool | None = None) -> DataFrame:
+        if not columns:
+            raise TypeError("avg() requires at least one column name.")
+        aggs = {c: ("mean", c) for c in columns}
+        return self.agg(streaming=streaming, **aggs)
+
+    def mean(self, *columns: str, streaming: bool | None = None) -> DataFrame:
+        return self.avg(*columns, streaming=streaming)
+
+    def min(self, *columns: str, streaming: bool | None = None) -> DataFrame:
+        if not columns:
+            raise TypeError("min() requires at least one column name.")
+        aggs = {c: ("min", c) for c in columns}
+        return self.agg(streaming=streaming, **aggs)
+
+    def max(self, *columns: str, streaming: bool | None = None) -> DataFrame:
+        if not columns:
+            raise TypeError("max() requires at least one column name.")
+        aggs = {c: ("max", c) for c in columns}
+        return self.agg(streaming=streaming, **aggs)
+
 
 class PySparkPivotedGroupedDataFrameModel:
     """Model-level wrapper for grouped pivot; output is a :class:`DataFrame`."""
@@ -304,6 +368,24 @@ class PySparkPivotedGroupedDataFrameModel:
 
     def agg(self, **aggregations: Any) -> DataFrame:
         return self._grouped.agg(**aggregations)
+
+    def count(self, *, streaming: bool | None = None) -> DataFrame:
+        return self._grouped.count(streaming=streaming)
+
+    def sum(self, *columns: str, streaming: bool | None = None) -> DataFrame:
+        return self._grouped.sum(*columns, streaming=streaming)
+
+    def avg(self, *columns: str, streaming: bool | None = None) -> DataFrame:
+        return self._grouped.avg(*columns, streaming=streaming)
+
+    def mean(self, *columns: str, streaming: bool | None = None) -> DataFrame:
+        return self._grouped.mean(*columns, streaming=streaming)
+
+    def min(self, *columns: str, streaming: bool | None = None) -> DataFrame:
+        return self._grouped.min(*columns, streaming=streaming)
+
+    def max(self, *columns: str, streaming: bool | None = None) -> DataFrame:
+        return self._grouped.max(*columns, streaming=streaming)
 
 
 class DataFrameNaFunctions:
@@ -523,8 +605,12 @@ class DataFrame(CoreDataFrame):
         return cast("DataFrame", super().distinct(subset=subset, keep=keep))
 
     def dropDuplicates(self, subset: list[str] | None = None) -> DataFrame:
-        """Spark ``dropDuplicates``; delegates to :meth:`distinct`."""
-        return self.distinct(subset=subset) if subset is not None else self.distinct()
+        """Spark ``dropDuplicates``; keep-first semantics (engine-dependent without ordering)."""
+        return (
+            self.distinct(subset=subset, keep="first")
+            if subset is not None
+            else self.distinct(keep="first")
+        )
 
     def union(self, other: DataFrame) -> DataFrame:
         """Append rows from ``other`` (vertical concat; schemas must align)."""
@@ -549,33 +635,96 @@ class DataFrame(CoreDataFrame):
         """
         left = list(self._current_field_types.keys())
         right = list(other._current_field_types.keys())
-        if set(left) != set(right):
-            if not allowMissingColumns:
-                raise ValueError(
-                    "unionByName requires identical column names on both sides "
-                    "unless allowMissingColumns=True."
+        if set(left) != set(right) and not allowMissingColumns:
+            raise ValueError(
+                "unionByName requires identical column names on both sides "
+                "unless allowMissingColumns=True."
+            )
+        return self._union_by_name_allow_missing(other, allow_missing=allowMissingColumns)
+
+    def _union_by_name_allow_missing(
+        self, other: DataFrame, *, allow_missing: bool
+    ) -> DataFrame:
+        left_types = dict(self._current_field_types)
+        right_types = dict(other._current_field_types)
+        if allow_missing:
+            all_names = list(dict.fromkeys([*left_types.keys(), *right_types.keys()]))
+        else:
+            all_names = list(left_types.keys())
+
+        def _is_optional(ann: Any) -> bool:
+            origin = get_origin(ann)
+            if origin is None:
+                return False
+            return (origin is UnionType or origin is Union) and type(None) in get_args(ann)
+
+        def _strip_optional(ann: Any) -> Any:
+            args = tuple(a for a in get_args(ann) if a is not type(None))
+            if len(args) == 1:
+                return args[0]
+            return ann
+
+        def _optionalize(ann: Any) -> Any:
+            return ann | None  # PEP604
+
+        def _unify(name: str, lt: Any | None, rt: Any | None) -> Any:
+            if lt is None:
+                if not allow_missing:
+                    raise ValueError(
+                        "unionByName requires identical column names on both sides "
+                        "unless allowMissingColumns=True."
+                    )
+                return _optionalize(rt)
+            if rt is None:
+                if not allow_missing:
+                    raise ValueError(
+                        "unionByName requires identical column names on both sides "
+                        "unless allowMissingColumns=True."
+                    )
+                return _optionalize(lt)
+            if lt == rt:
+                return lt
+
+            l_opt = _is_optional(lt)
+            r_opt = _is_optional(rt)
+            l_base = _strip_optional(lt) if l_opt else lt
+            r_base = _strip_optional(rt) if r_opt else rt
+
+            if l_base == r_base:
+                return _optionalize(l_base) if (l_opt or r_opt) else l_base
+            if {l_base, r_base} == {int, float}:
+                return _optionalize(float) if (l_opt or r_opt) else float
+
+            msg = (
+                "unionByName has incompatible dtypes for "
+                f"column {name!r}: left={lt!r}, right={rt!r}"
+            )
+            if allow_missing:
+                msg = "unionByName(allowMissingColumns=True) has incompatible dtypes for " + (
+                    f"column {name!r}: left={lt!r}, right={rt!r}"
                 )
-            return self._union_by_name_allow_missing(other)
-        return self.union(self._as_pyspark_df(other.select(*left)))
+            raise TypeError(msg)
 
-    def _union_by_name_allow_missing(self, other: DataFrame) -> DataFrame:
-        left_names = list(self._current_field_types.keys())
-        right_names = list(other._current_field_types.keys())
-        all_names = list(dict.fromkeys([*left_names, *right_names]))
+        unified: dict[str, Any] = {}
+        for name in all_names:
+            unified[name] = _unify(name, left_types.get(name), right_types.get(name))
 
-        def _pad(df: CoreDataFrame, *, peer: CoreDataFrame) -> CoreDataFrame:
+        def _align(df: CoreDataFrame, side_types: dict[str, Any]) -> CoreDataFrame:
             out = df
-            have = set(df._current_field_types.keys())
             for name in all_names:
-                if name not in have and name in peer._current_field_types:
-                    ann = peer._current_field_types[name]
-                    out = out.with_columns(**{name: Literal(value=None).cast(ann)})
+                target = unified[name]
+                if name not in side_types:
+                    out = out.with_columns(**{name: Literal(value=None).cast(target)})
+                elif side_types[name] != target:
+                    out = out.with_columns(
+                        **{name: ColumnRef(name=name, dtype=side_types[name]).cast(target)}
+                    )
             return out.select(*all_names)
 
-        left_padded = _pad(self, peer=other)
-        right_padded = _pad(other, peer=self)
+        left_aligned = _align(self, left_types)
+        right_aligned = _align(other, right_types)
         return self._as_pyspark_df(
-            CoreDataFrame.concat([left_padded, right_padded], how="vertical"),
+            CoreDataFrame.concat([left_aligned, right_aligned], how="vertical"),
         )
 
     def intersect(self, other: DataFrame) -> DataFrame:
@@ -916,7 +1065,11 @@ class DataFrameModel(CoreDataFrameModel):
         )
 
     def dropDuplicates(self, subset: list[str] | None = None) -> DataFrameModel:
-        return self.distinct(subset=subset) if subset is not None else self.distinct()
+        return (
+            self.distinct(subset=subset, keep="first")
+            if subset is not None
+            else self.distinct(keep="first")
+        )
 
     def union(self, other: DataFrameModel | DataFrame) -> DataFrameModel:
         od = other._df if isinstance(other, DataFrameModel) else other
