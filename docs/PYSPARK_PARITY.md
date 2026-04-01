@@ -12,8 +12,16 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `DataFrame.select`, `filter`, `where` | **Supported** | Typed `Expr`; `where` mirrors Spark. |
 | `DataFrame.withColumn` | **Supported** | |
 | `DataFrame.join` | **Supported** | Suffix/collision rules per `INTERFACE_CONTRACT.md`. |
-| `DataFrame.groupBy.agg` | **Supported** | Tuple specs, not Spark `agg(expr)` only. |
-| `DataFrame.orderBy` / `sort` | **Supported** | Column names + ascending flags; see core `DataFrame`. |
+| `DataFrame.groupBy` / `.agg` | **Supported** (**1.9.0+**) | CamelCase `groupBy` returns a PySpark grouped wrapper; tuple `agg` specs (not Spark `agg(expr)` only). |
+| `GroupedData.count()` (no args) | **Supported** (**1.9.0+**) | Per-group row count (core `len` / synthetic sum). |
+| `DataFrame.orderBy` / `sort` | **Supported** | Column names + ascending flags; global sort only (not `sortWithinPartitions`). |
+| `DataFrame.crossJoin` | **Supported** (**1.9.0+**) | `join(how="cross")`. |
+| `DataFrame.count()` (action) | **Supported** (**1.9.0+**) | Returns **`int`** via `global_row_count()` in the plan. |
+| `DataFrame.unionByName` | **Supported** (**1.9.0+**) | Name-aligned concat; optional `allowMissingColumns` null-fill. |
+| `DataFrame.intersect` / `subtract` / `exceptAll` | **Partial** (**1.9.0+**) | `intersect` ≈ inner join on all columns + `distinct`. `subtract` ≈ anti join on all columns. `exceptAll` aliases `subtract` (not Spark multiset `EXCEPT ALL`). |
+| `DataFrame.fillna` / `dropna` / `na` | **Supported** (**1.9.0+**) | Map to `fill_null` / `drop_nulls`; unsupported kw combinations raise clearly. |
+| `DataFrame.printSchema` / `explain` | **Supported** (**1.9.0+**) | Readable schema tree; printed logical plan. |
+| `DataFrame.toPandas` | **Supported** (**1.9.0+**) | Eager via `to_dict()`; requires **pandas**. |
 | `DataFrame.limit` | **Supported** | |
 | `DataFrame.show` | **Supported** (**0.20.0**) | Prints a bounded text preview (`head`-like); not distributed Spark. |
 | `DataFrame.summary` | **Partial** (**0.20.0**) | Returns the same string as core **`describe()`** (numeric MVP)—not Spark’s full **`summary`** column set. |
@@ -40,6 +48,8 @@ For execution, the PySpark UI uses the same Rust/Polars path as the default expo
 **0.19.0:** Matrix **unchanged**—documentation and **0.x** versioning policy only; see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.19.0**.
 
 **0.20.0:** **`DataFrame.show()`** / **`summary()`** rows above; core discovery helpers are shared with the default **`DataFrame`**. See [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.20.0**.
+
+**1.9.0:** PySpark-shaped **`groupBy`**, row-count **`count()`**, **`crossJoin`**, **`unionByName`**, join-layer **set ops**, **`fillna` / `dropna` / `.na`**, **`printSchema`**, **`explain`**, **`toPandas`**, and matching **`DataFrameModel`** methods — see table rows marked **1.9.0+** above.
 
 ## Phase B status (expression surface)
 

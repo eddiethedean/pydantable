@@ -4,18 +4,189 @@ from __future__ import annotations
 
 from collections.abc import Sequence  # noqa: TC003
 from typing import TYPE_CHECKING, Any, cast
+from typing import Literal as TypingLiteral
 
 from pydantable.dataframe import DataFrame as CoreDataFrame
+from pydantable.dataframe import GroupedDataFrame as CoreGroupedDataFrame
 from pydantable.dataframe_model import DataFrameModel as CoreDataFrameModel
-from pydantable.expressions import ColumnRef, Expr  # noqa: TC001
+from pydantable.expressions import ColumnRef, Expr, Literal, global_row_count
 from pydantable.schema import make_derived_schema_type
 
-from .sql.types import StructField, StructType, annotation_to_data_type
+from .sql.types import (
+    ArrayType,
+    DataType,
+    StructField,
+    StructType,
+    annotation_to_data_type,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
 _MAX_SHOW_CELL = 48
+
+
+def _format_schema_type_lines(dt: DataType, prefix: str) -> list[str]:
+    lines: list[str] = []
+    if isinstance(dt, StructType):
+        for sf in dt.fields:
+            child = sf.dataType
+            nul = str(child.nullable).lower()
+            if isinstance(child, StructType):
+                lines.append(f"{prefix} |-- {sf.name}: struct (nullable = {nul})")
+                lines.extend(_format_schema_type_lines(child, prefix + "    "))
+            elif isinstance(child, ArrayType):
+                lines.append(f"{prefix} |-- {sf.name}: array (nullable = {nul})")
+            else:
+                tn = child.typeName
+                lines.append(f"{prefix} |-- {sf.name}: {tn} (nullable = {nul})")
+    return lines
+
+
+class PySparkGroupedDataFrame(CoreGroupedDataFrame):
+    """Spark ``groupBy`` result; aggregations return :class:`DataFrame`."""
+
+    def agg(
+        self,
+        *,
+        streaming: bool | None = None,
+        **aggregations: tuple[str, str] | tuple[str, Expr],
+    ) -> DataFrame:
+        out = super().agg(streaming=streaming, **aggregations)
+        return DataFrame._as_pyspark_df(out)
+
+    def sum(self, *columns: str, streaming: bool | None = None) -> DataFrame:
+        return DataFrame._as_pyspark_df(super().sum(*columns, streaming=streaming))
+
+    def mean(self, *columns: str, streaming: bool | None = None) -> DataFrame:
+        return DataFrame._as_pyspark_df(super().mean(*columns, streaming=streaming))
+
+    def min(self, *columns: str, streaming: bool | None = None) -> DataFrame:
+        return DataFrame._as_pyspark_df(super().min(*columns, streaming=streaming))
+
+    def max(self, *columns: str, streaming: bool | None = None) -> DataFrame:
+        return DataFrame._as_pyspark_df(super().max(*columns, streaming=streaming))
+
+    def count(self, *columns: str, streaming: bool | None = None) -> DataFrame:
+        """Spark ``count()`` with no args = rows per group (uses core :meth:`len`)."""
+        if not columns:
+            return DataFrame._as_pyspark_df(super().len(streaming=streaming))
+        return DataFrame._as_pyspark_df(super().count(*columns, streaming=streaming))
+
+    def len(self, *, streaming: bool | None = None) -> DataFrame:
+        return DataFrame._as_pyspark_df(super().len(streaming=streaming))
+
+
+class PySparkGroupedDataFrameModel:
+    """Model-level grouped handle after :meth:`DataFrameModel.groupBy`."""
+
+    def __init__(
+        self,
+        grouped: PySparkGroupedDataFrame,
+        model_type: type[CoreDataFrameModel],
+    ) -> None:
+        self._grouped = grouped
+        self._model_type = model_type
+
+    def __repr__(self) -> str:
+        inner = "\n".join(f"  {line}" for line in repr(self._grouped).split("\n"))
+        return f"PySparkGroupedDataFrameModel({self._model_type.__name__})\n{inner}"
+
+    def agg(self, **aggregations: Any) -> DataFrameModel:
+        return self._model_type._from_dataframe(self._grouped.agg(**aggregations))
+
+    def sum(self, *columns: str, streaming: bool | None = None) -> DataFrameModel:
+        return self._model_type._from_dataframe(
+            self._grouped.sum(*columns, streaming=streaming)
+        )
+
+    def mean(self, *columns: str, streaming: bool | None = None) -> DataFrameModel:
+        return self._model_type._from_dataframe(
+            self._grouped.mean(*columns, streaming=streaming)
+        )
+
+    def min(self, *columns: str, streaming: bool | None = None) -> DataFrameModel:
+        return self._model_type._from_dataframe(
+            self._grouped.min(*columns, streaming=streaming)
+        )
+
+    def max(self, *columns: str, streaming: bool | None = None) -> DataFrameModel:
+        return self._model_type._from_dataframe(
+            self._grouped.max(*columns, streaming=streaming)
+        )
+
+    def count(self, *columns: str, streaming: bool | None = None) -> DataFrameModel:
+        return self._model_type._from_dataframe(
+            self._grouped.count(*columns, streaming=streaming)
+        )
+
+    def len(self, *, streaming: bool | None = None) -> DataFrameModel:
+        return self._model_type._from_dataframe(self._grouped.len(streaming=streaming))
+
+
+class DataFrameNaFunctions:
+    """Spark ``df.na``-style missing-value helpers (delegates to core)."""
+
+    __slots__ = ("_df",)
+
+    def __init__(self, df: DataFrame) -> None:
+        self._df = df
+
+    def drop(
+        self,
+        how: str = "any",
+        thresh: int | None = None,
+        subset: str | list[str] | None = None,
+    ) -> DataFrame:
+        if thresh is not None:
+            return self._df.dropna(how=how, thresh=thresh, subset=subset)
+        return self._df.dropna(how=how, subset=subset)
+
+    def fill(
+        self,
+        value: Any,
+        subset: str | list[str] | None = None,
+    ) -> DataFrame:
+        return self._df.fillna(value, subset=subset)
+
+
+class DataFrameModelNaFunctions:
+    """Spark ``df.na`` for :class:`DataFrameModel`."""
+
+    __slots__ = ("_m",)
+
+    def __init__(self, m: DataFrameModel) -> None:
+        self._m = m
+
+    def drop(
+        self,
+        how: str = "any",
+        thresh: int | None = None,
+        subset: str | list[str] | None = None,
+    ) -> DataFrameModel:
+        mt = type(self._m)
+        if thresh is not None:
+            return cast(
+                "DataFrameModel",
+                mt._from_dataframe(
+                    self._m._df.dropna(how=how, thresh=thresh, subset=subset),
+                ),
+            )
+        return cast(
+            "DataFrameModel",
+            mt._from_dataframe(self._m._df.dropna(how=how, subset=subset)),
+        )
+
+    def fill(
+        self,
+        value: Any,
+        subset: str | list[str] | None = None,
+    ) -> DataFrameModel:
+        mt = type(self._m)
+        return cast(
+            "DataFrameModel",
+            mt._from_dataframe(self._m._df.fillna(value, subset=subset)),
+        )
 
 
 def _text_show_table(
@@ -175,14 +346,197 @@ class DataFrame(CoreDataFrame):
 
     def union(self, other: DataFrame) -> DataFrame:
         """Append rows from ``other`` (vertical concat; schemas must align)."""
-        return cast(
-            "DataFrame",
+        return self._as_pyspark_df(
             CoreDataFrame.concat([self, other], how="vertical"),
         )
 
     def unionAll(self, other: DataFrame) -> DataFrame:
         """Alias of :meth:`union` (Spark naming)."""
         return self.union(other)
+
+    def unionByName(
+        self,
+        other: DataFrame,
+        *,
+        allowMissingColumns: bool = False,
+    ) -> DataFrame:
+        """Union rows aligning columns by name (reorders ``other`` to match ``self``).
+
+        Column sets must match unless ``allowMissingColumns=True`` (then missing
+        fields are filled with nulls; requires compatible nullable dtypes).
+        """
+        left = list(self._current_field_types.keys())
+        right = list(other._current_field_types.keys())
+        if set(left) != set(right):
+            if not allowMissingColumns:
+                raise ValueError(
+                    "unionByName requires identical column names on both sides "
+                    "unless allowMissingColumns=True."
+                )
+            return self._union_by_name_allow_missing(other)
+        return self.union(self._as_pyspark_df(other.select(*left)))
+
+    def _union_by_name_allow_missing(self, other: DataFrame) -> DataFrame:
+        left_names = list(self._current_field_types.keys())
+        right_names = list(other._current_field_types.keys())
+        all_names = list(dict.fromkeys([*left_names, *right_names]))
+
+        def _pad(df: CoreDataFrame, *, peer: CoreDataFrame) -> CoreDataFrame:
+            out = df
+            have = set(df._current_field_types.keys())
+            for name in all_names:
+                if name not in have and name in peer._current_field_types:
+                    ann = peer._current_field_types[name]
+                    out = out.with_columns(**{name: Literal(value=None).cast(ann)})
+            return out.select(*all_names)
+
+        left_padded = _pad(self, peer=other)
+        right_padded = _pad(other, peer=self)
+        return self._as_pyspark_df(
+            CoreDataFrame.concat([left_padded, right_padded], how="vertical"),
+        )
+
+    def intersect(self, other: DataFrame) -> DataFrame:
+        """Rows present in both frames (distinct row keys; same schema required)."""
+        keys = list(self._current_field_types.keys())
+        if keys != list(other._current_field_types.keys()):
+            raise ValueError("intersect() requires identical schemas.")
+        inner = super().join(other, on=keys, how="inner")
+        return self._as_pyspark_df(inner.distinct())
+
+    def subtract(self, other: DataFrame) -> DataFrame:
+        """Anti join on all columns (schemas must match)."""
+        keys = list(self._current_field_types.keys())
+        if keys != list(other._current_field_types.keys()):
+            raise ValueError("subtract() requires identical schemas.")
+        return self._as_pyspark_df(super().join(other, on=keys, how="anti"))
+
+    def exceptAll(self, other: DataFrame) -> DataFrame:
+        """Alias of :meth:`subtract` (not Spark multiset ``EXCEPT ALL``)."""
+        return self.subtract(other)
+
+    def join(self, other: CoreDataFrame, **kwargs: Any) -> DataFrame:
+        out = super().join(other, **kwargs)
+        return self._as_pyspark_df(out)
+
+    def group_by(
+        self,
+        *keys: str | ColumnRef,
+        maintain_order: bool = False,
+        drop_nulls: bool = True,
+    ) -> PySparkGroupedDataFrame:
+        inner = super().group_by(
+            *keys, maintain_order=maintain_order, drop_nulls=drop_nulls
+        )
+        return PySparkGroupedDataFrame(
+            inner._df,
+            inner._keys,
+            maintain_order=inner._maintain_order,
+            drop_nulls=inner._drop_nulls,
+        )
+
+    def groupBy(
+        self,
+        *keys: str | ColumnRef,
+        maintain_order: bool = False,
+        drop_nulls: bool = True,
+    ) -> PySparkGroupedDataFrame:
+        """Spark alias of :meth:`group_by`."""
+        return self.group_by(
+            *keys, maintain_order=maintain_order, drop_nulls=drop_nulls
+        )
+
+    def sort(
+        self,
+        *columns: str,
+        ascending: bool | list[bool] | None = None,
+    ) -> DataFrame:
+        """Sort by column names (Spark ``sort`` / ``orderBy``)."""
+        return self.orderBy(*columns, ascending=ascending)
+
+    def crossJoin(self, other: DataFrame) -> DataFrame:
+        """Cross join (Spark ``crossJoin``)."""
+        return self._as_pyspark_df(super().join(other, how="cross"))
+
+    def count(self) -> int:
+        """Row count via ``global_row_count()`` (Spark-style action)."""
+        d = self.select(global_row_count()).to_dict()
+        col = next(iter(d.keys()))
+        return int(d[col][0])
+
+    def fillna(
+        self,
+        value: Any = None,
+        *,
+        subset: str | list[str] | None = None,
+    ) -> DataFrame:
+        """Spark name for :meth:`fill_null`."""
+        if isinstance(subset, str):
+            sub: str | list[str] | None = subset
+        elif subset is None:
+            sub = None
+        else:
+            sub = list(subset)
+        return self._as_pyspark_df(self.fill_null(value, subset=sub))
+
+    def dropna(
+        self,
+        how: str = "any",
+        *,
+        thresh: int | None = None,
+        subset: str | list[str] | None = None,
+    ) -> DataFrame:
+        """Spark name for :meth:`drop_nulls` (``thresh`` maps to ``threshold``)."""
+        if isinstance(subset, str):
+            sub: str | list[str] | None = subset
+        elif subset is None:
+            sub = None
+        else:
+            sub = list(subset)
+        return self._as_pyspark_df(
+            self.drop_nulls(sub, how=how, threshold=thresh),
+        )
+
+    @property
+    def na(self) -> DataFrameNaFunctions:
+        return DataFrameNaFunctions(self)
+
+    def printSchema(self, level: int | None = None) -> None:
+        """Print schema tree (Spark ``printSchema``; ``level`` accepted for parity)."""
+        _ = level
+        print("root")
+        for line in _format_schema_type_lines(self.schema, ""):
+            print(line)
+
+    def explain(
+        self,
+        extended: bool | None = None,
+        mode: str | None = None,
+        *,
+        format: TypingLiteral["text", "json"] = "text",
+    ) -> None:
+        """Print logical plan (Spark ``explain``; ``extended`` / ``mode`` reserved)."""
+        _ = extended
+        _ = mode
+        out = super().explain(format=format)
+        if isinstance(out, dict):
+            import json
+
+            print(json.dumps(out, indent=2, sort_keys=True))
+        else:
+            print(out)
+
+    def describe(self) -> str:
+        """Same string as core :meth:`~pydantable.dataframe.DataFrame.describe`."""
+        return super().describe()
+
+    def toPandas(self):
+        """Materialize to a ``pandas.DataFrame`` (requires ``pandas`` installed)."""
+        try:
+            import pandas as pd
+        except ImportError as e:
+            raise ImportError("toPandas() requires pandas (pip install pandas).") from e
+        return pd.DataFrame(self.to_dict())
 
     def show(
         self,
@@ -330,6 +684,131 @@ class DataFrameModel(CoreDataFrameModel):
 
     def unionAll(self, other: DataFrameModel | DataFrame) -> DataFrameModel:
         return self.union(other)
+
+    def unionByName(
+        self,
+        other: DataFrameModel | DataFrame,
+        *,
+        allowMissingColumns: bool = False,
+    ) -> DataFrameModel:
+        od = other._df if isinstance(other, DataFrameModel) else other
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(
+                self._df.unionByName(od, allowMissingColumns=allowMissingColumns)
+            ),
+        )
+
+    def intersect(self, other: DataFrameModel | DataFrame) -> DataFrameModel:
+        od = other._df if isinstance(other, DataFrameModel) else other
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(self._df.intersect(od)),
+        )
+
+    def subtract(self, other: DataFrameModel | DataFrame) -> DataFrameModel:
+        od = other._df if isinstance(other, DataFrameModel) else other
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(self._df.subtract(od)),
+        )
+
+    def exceptAll(self, other: DataFrameModel | DataFrame) -> DataFrameModel:
+        od = other._df if isinstance(other, DataFrameModel) else other
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(self._df.exceptAll(od)),
+        )
+
+    def group_by(
+        self,
+        *keys: Any,
+        maintain_order: bool = False,
+        drop_nulls: bool = True,
+    ) -> PySparkGroupedDataFrameModel:
+        inner = self._df.group_by(
+            *keys, maintain_order=maintain_order, drop_nulls=drop_nulls
+        )
+        if not isinstance(inner, PySparkGroupedDataFrame):
+            raise TypeError("group_by did not return PySparkGroupedDataFrame.")
+        return PySparkGroupedDataFrameModel(inner, type(self))
+
+    def groupBy(
+        self,
+        *keys: Any,
+        maintain_order: bool = False,
+        drop_nulls: bool = True,
+    ) -> PySparkGroupedDataFrameModel:
+        return self.group_by(
+            *keys, maintain_order=maintain_order, drop_nulls=drop_nulls
+        )
+
+    def sort(
+        self,
+        *columns: str,
+        ascending: bool | list[bool] | None = None,
+    ) -> DataFrameModel:
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(self._df.sort(*columns, ascending=ascending)),
+        )
+
+    def crossJoin(self, other: DataFrameModel | DataFrame) -> DataFrameModel:
+        od = other._df if isinstance(other, DataFrameModel) else other
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(self._df.crossJoin(od)),
+        )
+
+    def count(self) -> int:
+        return self._df.count()
+
+    def fillna(
+        self,
+        value: Any = None,
+        *,
+        subset: str | list[str] | None = None,
+    ) -> DataFrameModel:
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(self._df.fillna(value, subset=subset)),
+        )
+
+    def dropna(
+        self,
+        how: str = "any",
+        *,
+        thresh: int | None = None,
+        subset: str | list[str] | None = None,
+    ) -> DataFrameModel:
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(
+                self._df.dropna(how=how, thresh=thresh, subset=subset),
+            ),
+        )
+
+    @property
+    def na(self) -> DataFrameModelNaFunctions:
+        return DataFrameModelNaFunctions(self)
+
+    def printSchema(self, level: int | None = None) -> None:
+        self._df.printSchema(level=level)
+
+    def explain(
+        self,
+        extended: bool | None = None,
+        mode: str | None = None,
+        *,
+        format: TypingLiteral["text", "json"] = "text",
+    ) -> None:
+        self._df.explain(extended=extended, mode=mode, format=format)
+
+    def describe(self) -> str:
+        return self._df.describe()
+
+    def toPandas(self):
+        return self._df.toPandas()
 
     def show(
         self,

@@ -158,6 +158,18 @@ The core `Expr` surface includes a few small helpers commonly used for `filter(.
 - **PySpark façade:** `functions.count()` with **no** column argument matches
   **`global_row_count()`**; `functions.count(F.col(...))` matches **`global_count`** on
   that column.
+- **PySpark UI `DataFrame.count()`** (frame action, not grouped): returns **`int`**
+  using **`global_row_count()`** in the logical plan (same semantics as
+  `select(global_row_count())`).
+- **PySpark UI `unionByName` / `intersect` / `subtract` / `exceptAll`:** implemented
+  over core **`concat`**, **`join`**, **`distinct`**, and typed column alignment — not
+  separate distributed physical operators. **`exceptAll`** is an alias of **`subtract`**
+  on the façade and does **not** implement Apache Spark multiset **`EXCEPT ALL`**
+  semantics.
+- **Typed NULL literal cast:** **`Literal(None).cast(T)`** (equivalently **`cast_expr`** on a
+  **`None`** literal) lowers to a **nullable** scalar of the target base type, so missing
+  columns in **`unionByName(..., allowMissingColumns=True)`** can be filled with SQL NULL
+  while keeping engine typing consistent.
 - Global aggregate expressions may also appear in **`with_columns`**, where they lower to
   a scalar **broadcast** to every row (same height as the frame).
 

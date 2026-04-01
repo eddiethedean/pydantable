@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [1.9.0] — 2026-04-01
 
+### Added
+
+- **PySpark UI parity:** **`groupBy`** returning **`PySparkGroupedDataFrame`** / **`PySparkGroupedDataFrameModel`** (aggregations stay Spark-flavored), **`sort`**, **`crossJoin`**, frame action **`count()` → int** (via **`global_row_count()`**), **`unionByName`** (optional **`allowMissingColumns`**), **`intersect`** / **`subtract`** / **`exceptAll`** (join-layer semantics; **`exceptAll`** aliases **`subtract`**, not Spark multiset **`EXCEPT ALL`**), **`fillna`** / **`dropna`** / **`.na`**, **`printSchema`**, **`explain`**, **`toPandas`**, and the same methods on **`DataFrameModel`**. See {doc}`PYSPARK_UI`, {doc}`PYSPARK_PARITY`, and {doc}`INTERFACE_CONTRACT`.
+- **Engine:** **`cast_expr`** / **`Expr.cast`** now accepts **`Literal(None)`** (unknown-base SQL NULL) and casts it to a **nullable** scalar dtype, enabling typed null padding (e.g. **`unionByName(..., allowMissingColumns=True)`**).
+
 ### Docs / tooling
 
 - **Versioning:** bump to **1.9.0** across Python package metadata, Rust crate, and shipped stubs; docs “current release” strings aligned.

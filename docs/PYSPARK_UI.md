@@ -48,7 +48,16 @@ Core operations (`collect`, `join`, `group_by`, typed `filter`, …) behave like
 | `withColumn(name, col)` | `with_columns(**{name: col})` |
 | `where(condition)` / `filter(condition)` | `filter(condition)` |
 | `select(*cols)` | Core `select` |
-| `orderBy(*columns, ascending=...)` / `sort(...)` | `order_by(...)` |
+| `groupBy(...)` / `group_by(...)` | Core `group_by`; returns **`PySparkGroupedDataFrame`** so `.agg()` stays Spark-flavored (**1.9.0+**). |
+| `orderBy(*columns, ascending=...)` / `sort(...)` | Core `sort` / `order_by` (global sort only; not Spark `sortWithinPartitions`) |
+| `crossJoin(other)` | `join(other, how="cross")` (**1.9.0+**) |
+| `count()` | Row count as **`int`** via `global_row_count()` in the plan (**1.9.0+**); distinct from grouped `GroupedDataFrame.count(*cols)` |
+| `unionByName(other, allowMissingColumns=False)` | Reorder `other` by name, then vertical `concat`; optional null-padding for missing columns (**1.9.0+**) |
+| `intersect` / `subtract` / `exceptAll` | Typed join + `distinct` / anti-join (**1.9.0+**); `exceptAll` is **`subtract`** here — not Spark multiset `EXCEPT ALL` |
+| `fillna` / `dropna` / `na.drop` / `na.fill` | `fill_null` / `drop_nulls` with Spark-shaped kwargs (**1.9.0+**) |
+| `printSchema()` | Text tree from `df.schema` (**1.9.0+**) |
+| `explain(...)` | Prints core logical plan string (**1.9.0+**) |
+| `toPandas()` | `to_dict()` → `pandas.DataFrame` (eager; requires **pandas**) (**1.9.0+**) |
 | `limit(num)` | `limit(num)` |
 | `drop(*cols)` | `drop(*cols)` |
 | `distinct()` | All-column distinct rows |
@@ -74,7 +83,7 @@ See {doc}`PANDAS_UI` **Naming map** for **`with_columns` / `assign` / `withColum
 
 ## `DataFrameModel` (PySpark UI)
 
-Delegates Spark-like methods to the inner PySpark UI `DataFrame` and re-wraps as the same model class. **`schema`** and **`columns`** follow the inner frame.
+Delegates Spark-like methods to the inner PySpark UI `DataFrame` and re-wraps as the same model class. **`schema`** and **`columns`** follow the inner frame. **1.9.0+** adds the same **`groupBy`**, **`sort`**, **`crossJoin`**, **`count()`**, **`unionByName`**, set-style helpers, **`fillna` / `dropna` / `.na`**, **`printSchema`**, **`explain`**, and **`toPandas`** surface as on `DataFrame`.
 
 ## `pydantable.pyspark.sql`
 

@@ -35,6 +35,14 @@ See:
 | `toDF` | `toDF` | Implemented | Full-column rename with strict arity validation. |
 | `transform` | `transform` | Implemented | Callable pipeline helper returning DataFrame/DataFrameModel. |
 | `selectExpr` | `select_typed` | Out of scope | SQL-string expressions intentionally excluded; use typed expressions + aliases. |
+| `groupBy` | `groupBy` / `group_by` | Implemented (**1.9.0+**) | Returns **`PySparkGroupedDataFrame`** (or model wrapper); `.agg(...)` uses tuple specs. |
+| `count()` (action) | `count()` | Implemented (**1.9.0+**) | **`int`** row count via **`global_row_count()`**; distinct from grouped **`count(...)`**. |
+| `sort` / `crossJoin` | same | Implemented (**1.9.0+**) | Global **`sort`** only; **`crossJoin`** → **`join(how="cross")`**. |
+| `unionByName` | same | Implemented (**1.9.0+**) | Name order + optional **`allowMissingColumns`**. |
+| `intersect` / `subtract` / `exceptAll` | same | Partial (**1.9.0+**) | Join + dedupe / anti join; **`exceptAll`** → **`subtract`**. |
+| `fillna` / `dropna` / `na` | same | Implemented (**1.9.0+**) | **`fill_null`** / **`drop_nulls`** with Spark-shaped kwargs. |
+| `printSchema` / `explain` | same | Implemented (**1.9.0+**) | Text schema tree; printed plan. |
+| `toPandas` | same | Implemented (**1.9.0+**) | Eager; requires **pandas**. |
 
 ## End-to-end workflow example
 
@@ -65,7 +73,7 @@ users = Users({"user_id": [10, 20], "country": ["US", "CA"]})
 result = (
     orders.join(users, on="user_id", how="left")
     .fill_null(0, subset=["amount"])
-    .group_by("country")
+    .groupBy("country")
     .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
     .to_dict()
 )
