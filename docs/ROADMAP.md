@@ -261,7 +261,7 @@ Practical inputs that feed that phase:
 
 - [x] **Core API:** **`columns`**, **`shape`**, **`empty`**, **`dtypes`** on **`DataFrame`** / **`DataFrameModel`** (root-buffer semantics for **`shape[0]`**—see **Introspection** in [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md)).
 - [x] **`info()`** — multi-line **str** with schema and column list (row count when consistent with **`shape`** policy).
-- [x] **`describe()`** — **numeric** **`int` / `float`**, **bool**, and **str** summaries; materializes via **`to_dict()`** once; see [`EXECUTION.md`](EXECUTION.md).
+- [x] **`describe()`** — **numeric** **`int` / `float`**, **bool**, **str**, **`date`**, and **`datetime`** summaries; materializes via **`to_dict()`** once; see [`EXECUTION.md`](EXECUTION.md).
 - [x] **PySpark façade:** **`DataFrame.show()`** (text table; **`head`**-like), **`summary()`** → same string contract as **`describe()`**. See [`PYSPARK_UI.md`](PYSPARK_UI.md), [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md).
 
 ### Notebook utilities (Jupyter, VS Code, Colab)
@@ -327,6 +327,15 @@ Practical inputs that feed that phase:
 - [x] **Docs + tests:** [`EXECUTION.md`](EXECUTION.md), [`DATA_IO_SOURCES.md`](DATA_IO_SOURCES.md), [`FASTAPI.md`](FASTAPI.md), [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md); **`tests/test_io_comprehensive.py`** (**`test_read_parquet_filter_write_roundtrip`**, HTTP **`fetch_*`**, SQL **`Connection`**); **`tests/test_io_improvements.py`** (JSON, **`max_bytes`**, URL context managers, **`MissingRustExtensionError`** subprocess, async I/O + **`DataFrameModel`** SQL shims); **`tests/test_hypothesis_properties.py`** (bounded lazy Parquet **`read_*` + filter**).
 
 **Later:** Polars **`streaming`** / **`PYDANTABLE_ENGINE_STREAMING`** knob; **`collect_batches`**; scan-backed joins.
+
+---
+
+## Shipped in 1.9.0 (PySpark `DataFrame` surface + temporal + `describe`)
+
+- [x] **PySpark UI:** **`groupBy`** / grouped **`pivot`** / dict-form **`agg`**, **`crossJoin`**, frame **`count()`**, **`unionByName`**, set-style **`intersect`** / **`subtract`** / **`exceptAll`**, **`fillna`** / **`dropna`** / **`.na`**, **`printSchema`**, **`explain`**, **`toPandas`** (and **`DataFrameModel`** parity). See {doc}`changelog` **1.9.0**, {doc}`PYSPARK_UI`, {doc}`PYSPARK_PARITY`.
+- [x] **Engine typing:** **`cast`** accepts **`Literal(None)`** for nullable null-padding (e.g. **`unionByName(..., allowMissingColumns=True)`**).
+- [x] **Temporal helpers:** **`Expr.dt_dayofyear`**, **`Expr.from_unix_time`**, **`F.dayofyear`**, **`F.from_unixtime`** (Rust **`TemporalPart::DayOfYear`**, **`ExprNode::FromUnixTime`**).
+- [x] **Discovery:** **`describe()`** **`date`** / **`datetime`** stats ( **`summary()`** on the PySpark façade is unchanged as an alias).
 
 ---
 

@@ -10,10 +10,13 @@ All notable changes to this project are documented here. The format is inspired 
 
 - **PySpark UI parity:** **`groupBy`** returning **`PySparkGroupedDataFrame`** / **`PySparkGroupedDataFrameModel`** (aggregations stay Spark-flavored), **`sort`**, **`crossJoin`**, frame action **`count()` → int** (via **`global_row_count()`**), **`unionByName`** (optional **`allowMissingColumns`**), **`intersect`** / **`subtract`** / **`exceptAll`** (join-layer semantics; **`exceptAll`** aliases **`subtract`**, not Spark multiset **`EXCEPT ALL`**), **`fillna`** / **`dropna`** / **`.na`**, **`printSchema`**, **`explain`**, **`toPandas`**, and the same methods on **`DataFrameModel`**. See {doc}`PYSPARK_UI`, {doc}`PYSPARK_PARITY`, and {doc}`INTERFACE_CONTRACT`.
 - **Engine:** **`cast_expr`** / **`Expr.cast`** now accepts **`Literal(None)`** (unknown-base SQL NULL) and casts it to a **nullable** scalar dtype, enabling typed null padding (e.g. **`unionByName(..., allowMissingColumns=True)`**).
+- **Temporal:** **`Expr.dt_dayofyear`**, **`Expr.from_unix_time`**, PySpark **`F.dayofyear`** / **`F.from_unixtime`** (numeric epoch → UTC-naive **`datetime`**; Spark’s optional **`from_unixtime` format** string is not modeled—use parsing helpers on strings). Rust: **`TemporalPart::DayOfYear`**, **`ExprNode::FromUnixTime`**.
+- **Introspection:** **`DataFrame.describe()`** (and PySpark **`summary()`**) now includes **`date`** and **`datetime`** columns: non-null **count**, **min**, **max**, and **null** count (one **`to_dict()`** materialization). Tests: **`tests/test_dataframe_discovery.py`**.
 
 ### Docs / tooling
 
-- **Versioning:** bump to **1.9.0** across Python package metadata, Rust crate, and shipped stubs; docs “current release” strings aligned.
+- **Versioning:** bump to **1.9.0** across Python package metadata, Rust crate, and shipped stubs; docs “current release” strings ({doc}`index`, {doc}`ROADMAP`, {doc}`POLARS_TRANSFORMATIONS_ROADMAP`) aligned.
+- **Docs:** **`describe()`** / **`summary()`**, **`SUPPORTED_TYPES`** temporal helpers, **{doc}`INTERFACE_CONTRACT`**, **{doc}`EXECUTION`**, **{doc}`PYSPARK_PARITY`**, **{doc}`PARITY_SCORECARD`**, **{doc}`DEVELOPER`**, **{doc}`PANDAS_UI`**, and **{doc}`POLARS_TRANSFORMATIONS_ROADMAP`** updated for **1.9.0** behavior.
 
 ## [1.8.0] — 2026-03-31
 

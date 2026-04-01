@@ -7,7 +7,7 @@ Execution uses pydantable’s Rust/Polars core (see [Execution](EXECUTION.md)).
 ## Release context (1.8.0 vs 1.9.0)
 
 - **1.8.0** focused on **core** ergonomics (selectors, joins, `drop_nulls`, reshape parity, etc.)—the same engine every import style uses; see the {doc}`changelog` **1.8.0** section.
-- **1.9.0** adds the **Spark-shaped `DataFrame` / `DataFrameModel` surface** in this document: `groupBy`, frame `count()`, `crossJoin`, `unionByName`, set-style helpers, `fillna` / `dropna` / `.na`, `printSchema`, `explain`, `toPandas`, and related typing/stubs. Behavior and limitations are summarized in [PySpark parity](PYSPARK_PARITY.md) and [Interface contract](INTERFACE_CONTRACT.md).
+- **1.9.0** adds the **Spark-shaped `DataFrame` / `DataFrameModel` surface** in this document: `groupBy`, frame `count()`, `crossJoin`, `unionByName`, set-style helpers, `fillna` / `dropna` / `.na`, `printSchema`, `explain`, `toPandas`, **`F.dayofyear`** / **`F.from_unixtime`**, and related typing/stubs. Core **`describe()`** (and PySpark **`summary()`**) include **`date`** / **`datetime`** summary lines when those columns exist. Behavior and limitations are summarized in [PySpark parity](PYSPARK_PARITY.md) and [Interface contract](INTERFACE_CONTRACT.md).
 
 ## Tests
 
@@ -23,7 +23,7 @@ When adding Spark-named wrappers, extend those files (or add focused tests next 
 - **No cluster:** all methods lower to the **in-process** Rust/Polars plan; `count()` is a logical row count, not a distributed action across executors.
 - **`subtract`:** implemented as an anti join on all columns (distinct-set semantics), not Spark multiset **`EXCEPT ALL`**. Use `exceptAll` for multiset semantics.
 - **`sort`/`orderBy`:** global sort only; there is no **`sortWithinPartitions`**.
-- **`summary()`:** still the same **string** as core `describe()` for numeric columns (MVP), not Spark’s full multi-column `summary` table unless/until a future release adds a table-shaped stats path.
+- **`summary()`:** same **string** as core **`describe()`** (int/float/bool/str/**date**/**datetime** lines where those columns exist), not Spark’s full multi-column **`summary`** **`DataFrame`** unless/until a future release adds a table-shaped stats path.
 
 ## When to use it
 

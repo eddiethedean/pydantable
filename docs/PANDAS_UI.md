@@ -318,7 +318,7 @@ These names match pandas where possible but are **typed** and sometimes **strict
 | `corr(method="pearson")` | **Eager**; needs **NumPy**; at least two numeric columns; returns a correlation **matrix** as a typed `DataFrame` (dynamic schema). |
 | `cov()` | Same pattern for sample covariance matrix. |
 
-**`describe()`** on the core frame may append **skew / kurtosis / sem** (when NumPy is available and \(n \ge 4\)) for numeric columns—see implementation in `dataframe/_impl.py`.
+**`describe()`** on the core frame may append **skew / kurtosis / sem** (when NumPy is available and \(n \ge 4\)) for numeric columns; **`date`** / **`datetime`** columns get non-null **count**, **min**, **max**, and **null** counts—see {doc}`INTERFACE_CONTRACT` **Introspection** and `dataframe/_impl.py`.
 
 ### Transforms (facade and `Expr`)
 

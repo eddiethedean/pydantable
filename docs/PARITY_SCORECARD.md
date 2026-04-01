@@ -8,11 +8,9 @@ Status definitions:
 - `Partial`: available with explicit constraints or reduced semantics.
 - `Missing`: not yet exposed as a stable API.
 
-## 1.8.0 parity targets (planned)
+## 1.8.0 parity targets (reference)
 
-This section tracks the **planned** parity work for **1.8.0** (see {doc}`POLARS_PARITY_1_8`).
-Items listed here should move to the main table above once implemented and
-contract-tested.
+**1.8.0** shipped the selector/ergonomics work below (see {doc}`POLARS_PARITY_1_8` and {doc}`changelog` **1.8.0**). This table remains the checklist-style reference for what landed in that minor.
 
 | Area | Target | Status | Notes |
 |---|---|---|---|
@@ -50,9 +48,9 @@ contract-tested.
 | Window/time | `row_number`/`rank`/`dense_rank`/`window_sum`/`window_mean`/`window_min`/`window_max`/`lag`/`lead` + `WindowSpec`, `rolling_agg`, `group_by_dynamic(...).agg(...)` | Implemented | `Window.orderBy(..., nulls_last=...)` (**NULLS FIRST/LAST**); `row_number` requires `order_by`; `lag`/`lead` require `order_by`; generic `Expr.over(partition_by=..., order_by=...)` raises `TypeError` (use named window fns + `WindowSpec`). `rowsBetween` / `rangeBetween` framed windows use the Rust executor path; `rangeBetween` uses the first `orderBy` column as the range axis ([`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md)). Unframed multi-key `.over`: Polars accepts one `SortOptions` for all order columns—**mixed** per-key `ascending` / `nulls_last` raises **`ValueError`**; use matching options on every key or a framed window. |
 | Temporal typing | `datetime`, `date`, `duration`, `time` (+ nullable) | Implemented | End-to-end descriptor roundtrip and execution materialization paths. |
 | Globals in `select` | `sum`/`mean`/`count`/`min`/`max` over a column, **`global_row_count`** / `count(*)` | Implemented | Single-row `DataFrame.select`; see `INTERFACE_CONTRACT`. |
-| Expr helpers | `strptime`, `unix_timestamp`, `cast(str→date/datetime)`, `isin/is_in`, `matches`, string empty/blank helpers, list/map predicate conveniences, `map_len`/`map_get`/`map_contains_key`, `binary_len`, `dt_nanosecond` | Implemented | Rust `ExprNode` + composed Python Expr helpers; contract tests. |
+| Expr helpers | `strptime`, `unix_timestamp`, `from_unix_time`, `dt_dayofyear`, `cast(str→date/datetime)`, `isin/is_in`, `matches`, string empty/blank helpers, list/map predicate conveniences, `map_len`/`map_get`/`map_contains_key`, `binary_len`, `dt_nanosecond` | Implemented | Rust `ExprNode` + composed Python Expr helpers; contract tests. |
 | Performance | Guardrails for major transforms | Implemented | Lightweight regression checks in test suite. |
-| Ecosystem | Optional interfaces `pandas` and `pyspark` | Implemented | Alternate import/naming surfaces; execution is the same Rust core as default (not native pandas/Spark). **0.17.0:** PySpark `sql.functions` adds string/list/bytes helpers (`str_replace`, `strip_*`, `strptime`, `binary_len`, `list_*`) as thin wrappers over core `Expr`. **0.20.0:** PySpark UI `DataFrame.show()` / `summary()`; core + façades share `columns` / `shape` / `info` / `describe` (see `INTERFACE_CONTRACT` **Introspection**). |
+| Ecosystem | Optional interfaces `pandas` and `pyspark` | Implemented | Alternate import/naming surfaces; execution is the same Rust core as default (not native pandas/Spark). **0.17.0:** PySpark `sql.functions` adds string/list/bytes helpers (`str_replace`, `strip_*`, `strptime`, `binary_len`, `list_*`) as thin wrappers over core `Expr`. **0.20.0:** PySpark UI `DataFrame.show()` / `summary()`; core + façades share `columns` / `shape` / `info` / `describe` (including **`date`** / **`datetime`** stats—see `INTERFACE_CONTRACT` **Introspection**). |
 
 ## Remaining parity gaps
 

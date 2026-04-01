@@ -68,7 +68,7 @@ if you need a Polars **`DataFrame`** in Python. Install **`pydantable[arrow]`** 
 | **`collect()`**, **`to_dict()`**, **`to_polars()`**, **`to_arrow()`** | Full plan execution in Rust (then Python wrappers build Polars/Arrow objects where applicable). |
 | **`head()`** / **`tail()`** / **`slice()`** | Adds a lazy slice to the plan; cost hits when you materialize the result. |
 | **`_repr_html_()`** / Jupyter HTML | Materializes **`head(N)`** + **`to_dict()`** for the preview bounds (see **Display options**). |
-| **`describe()`** | One **`to_dict()`** on the current plan; string columns compute **`n_unique`** with a full scan of non-null values. |
+| **`describe()`** | One **`to_dict()`** on the current plan; string columns compute **`n_unique`** with a full scan of non-null values; **`date`** / **`datetime`** columns report min/max over non-null values. |
 | **`info()`**, **`repr()`** | Schema / root-buffer **`shape`** only; no row data materialization. |
 | **Async** **`acollect`** / **`ato_dict`** / … | Same work as sync; prefers Rust/Tokio awaitable when available, else thread pool ({doc}`FASTAPI`). |
 | **`submit`** / **`ExecutionHandle.result`** | Same as **`collect`**; background thread or **`executor.submit`**. |
@@ -161,7 +161,7 @@ This is for **REPLs, logs, and tracebacks**—not a substitute for materializing
 ## `info()` and `describe()` (**0.20.0+**)
 
 - **`info()`** returns a **multi-line string** listing logical column names, **dtype** annotations, and a **row count** aligned with **`shape[0]`** (root-buffer semantics—see {doc}`INTERFACE_CONTRACT` **Introspection**). It does **not** force a full **`collect()`** beyond what **`shape`** already implies for buffer-backed frames.
-- **`describe()`** (**0.20.0+**): one **`to_dict()`** materialization, then Python-side stats for **int**, **float**, **bool**, and **str** columns (nullable forms included). Numeric: mean/min/max/std where applicable. Bool: true/false/null counts. String: row count, **`n_unique`** (full scan of non-null strings), min/max **length**, null count. Other dtypes are omitted.
+- **`describe()`** (**0.20.0+**): one **`to_dict()`** materialization, then Python-side stats for **int**, **float**, **bool**, **str**, **`date`**, and **`datetime`** columns (nullable forms included). Numeric: mean/min/max/std where applicable. Bool: true/false/null counts. String: row count, **`n_unique`** (full scan of non-null strings), min/max **length**, null count. **`date` / `datetime`**: non-null count, min, max, null count. Other dtypes are omitted.
 
 ## Jupyter / HTML (`_repr_html_`) and display options
 

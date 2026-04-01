@@ -33,7 +33,7 @@ For how to import and use the PySpark-style `DataFrame` and `sql` package, see
 | `DataFrame.toPandas` | **Supported** (**1.9.0+**) | Eager via `to_dict()`; requires **pandas**. |
 | `DataFrame.limit` | **Supported** | |
 | `DataFrame.show` | **Supported** (**0.20.0**) | Prints a bounded text preview (`head`-like); not distributed Spark. |
-| `DataFrame.summary` | **Partial** (**0.20.0**) | Returns the same string as core **`describe()`** (numeric MVP)—not Spark’s full **`summary`** column set. |
+| `DataFrame.summary` | **Partial** (**0.20.0**) | Returns the same string as core **`describe()`** (int/float/bool/str/**date**/**datetime** summaries; one string, not a stats **`DataFrame`**)—not Spark’s full **`summary`** column set. |
 | `DataFrame.drop` | **Supported** | Drop by column name(s). |
 | `DataFrame.distinct` | **Supported** | All-column distinct rows; optional `subset=` matches core `distinct`. |
 | `DataFrame.withColumnRenamed` | **Supported** | Single rename per call (or use `rename` with dict). |
