@@ -21,6 +21,10 @@ Each line of the file is one JSON object; the scanner infers or aligns columns a
 
 **`scan_kwargs`:** **`low_memory`**, **`rechunk`**, **`ignore_errors`**, **`n_rows`**, **`infer_schema_length`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
 
+### Paths, directories, and `glob`
+
+Pydantable does **not** list **`glob`** among NDJSON **`scan_kwargs`**; Polars still enables **path glob expansion** inside the NDJSON lazy reader. **Hive-style partitions** are **disabled** for NDJSON in Polars **0.53**. Details: {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`.
+
 ## Write (targets)
 
 ### `DataFrame[Schema]` and `DataFrameModel`

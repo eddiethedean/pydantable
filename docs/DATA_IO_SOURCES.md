@@ -25,6 +25,61 @@ This document lists **common and useful** places applications read and write tab
 
 For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **presets**, and how **`read_json`** relates to **`read_ndjson`**, see {doc}`IO_JSON` (**Large files**, **NDJSON scan kwargs**).
 
+(local-io-audit)=
+### Audit: Polars 0.53.x vs pydantable (1.11.0 Phase A)
+
+**Scope:** Polars Rust **0.53.0** (the version pinned by **`pydantable-core`**) compared to the kwargs pydantable forwards from **`pydantable-core/src/plan/execute_polars/scan_kw.rs`** (`dispatch_file_scan`). This is a **documentation audit**; exposing more options is tracked in {doc}`ROADMAP_1_11_LOCAL_IO` Phase B+.
+
+**Directory and glob semantics**
+
+- Lazy reads pass the path string to Polars **`PlRefPath`** and use **`LazyFrame::scan_*`** (or equivalent) inside **`pydantable._core`**. **Glob expansion, directory listing, and hive-style path parsing** follow **Polars** for the options pydantable sets on the Rust side.
+- **`ScanArgsParquet::default()`** in Polars uses **`glob: true`** (so a directory or glob pattern is expanded unless **`glob=False`** is passed through **`scan_kwargs`** where supported).
+- **Typed validation** (`trusted_mode`, per-cell checks, etc.) runs at **materialization** (**`collect()`**, **`to_dict()`**, …), not when constructing the lazy root—see {doc}`DATAFRAMEMODEL` and {doc}`INTERFACE_CONTRACT` (**Local lazy file scans**).
+
+**Parquet — `ScanArgsParquet` (Polars) vs pydantable `scan_kwargs`**
+
+| Polars `ScanArgsParquet` field | pydantable `scan_kwargs` | Notes |
+|--------------------------------|---------------------------|--------|
+| `n_rows` | **mapped** | |
+| `parallel` | **mapped** | string: `none`, `columns`, `row_groups`, `prefiltered`, `auto` |
+| `low_memory` | **mapped** | |
+| `rechunk` | **mapped** | |
+| `use_statistics` | **mapped** | |
+| `cache` | **mapped** | |
+| `glob` | **mapped** | default in Polars is **`true`** |
+| `allow_missing_columns` | **mapped** | |
+| `hive_options` | **not exposed** | Polars default **`HiveOptions`** enables hive-style partition discovery when applicable; **tuning** (`enabled`, `hive_start_idx`, `schema`, `try_parse_dates`) is **not** forwarded from Python yet (Phase B). |
+| `row_index` | **not exposed** | |
+| `schema` | **not exposed** | |
+| `cloud_options` | **not exposed** | |
+| `include_file_paths` | **not exposed** | |
+
+**CSV — `LazyCsvReader` (Polars) vs pydantable `scan_kwargs`**
+
+| Polars / reader concern | pydantable `scan_kwargs` | Notes |
+|-------------------------|---------------------------|--------|
+| CSV parse / skip / infer options (`has_header`, `separator`, `skip_rows`, …) | **mapped** | see summary table above; matches `lazy_csv_with_kwargs` allowlist in **`scan_kw.rs`** |
+| `glob` | **mapped** | default **`true`** on **`LazyCsvReader::new`** in Polars |
+| **`UnifiedScanArgs.hive_options`** inside Polars CSV scan | **Polars sets `HiveOptions::new_disabled()`** | Hive-style partition columns from **directory paths are not** applied for **lazy CSV** in Polars 0.53 (even if pydantable forwards **`glob`**). |
+| `include_file_paths`, `row_index`, `schema`, `cloud_options`, … | **not exposed** | builder methods exist on **`LazyCsvReader`**; not in pydantable allowlist yet |
+
+**NDJSON — `LazyJsonLineReader` (Polars) vs pydantable `scan_kwargs`**
+
+| Polars / reader concern | pydantable `scan_kwargs` | Notes |
+|-------------------------|---------------------------|--------|
+| `low_memory`, `rechunk`, `ignore_errors`, `n_rows`, `infer_schema_length` | **mapped** | |
+| **`glob` (toggle)** | **not a Python kwarg** | Polars **`LazyJsonLineReader::finish`** builds **`UnifiedScanArgs { glob: true, … }`** internally; **glob expansion is on**; pydantable does not expose **`glob=False`**. |
+| **`HiveOptions`** for NDJSON | **`HiveOptions::new_disabled()`** in Polars | Hive-style partition columns from paths are **disabled** for NDJSON scans in Polars 0.53. |
+| `schema`, `row_index`, `include_file_paths`, `cloud_options`, … | **not exposed** | |
+
+**IPC — `IpcScanOptions` + `UnifiedScanArgs` (Polars) vs pydantable `scan_kwargs`**
+
+| Polars type / field | pydantable `scan_kwargs` | Notes |
+|---------------------|---------------------------|--------|
+| `IpcScanOptions.record_batch_statistics` | **mapped** | |
+| `IpcScanOptions.checked` | **not exposed** | |
+| **`UnifiedScanArgs`** (`glob`, `hive_options`, `cache`, `include_file_paths`, …) | **not** tunable from Python | pydantable calls **`LazyFrame::scan_ipc(path, ipc_opts, UnifiedScanArgs::default())`**. Polars defaults: **`glob: true`**, **`hive_options`** **enabled** (see **`UnifiedScanArgs::default()`** in **`polars-plan`** 0.53). |
+
 **`read_parquet_url`**: URL fetch still uses **`**kwargs`** for the HTTP path; avoid mixing fetch and scan options in one dict unless you split them in application code.
 
 ## `read_parquet_url` / `aread_parquet_url` temp-file lifecycle

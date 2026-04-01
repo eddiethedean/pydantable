@@ -19,6 +19,10 @@
 
 **`scan_kwargs`:** for example **`separator`**, **`has_header`**, **`skip_rows`**, **`skip_lines`**, **`n_rows`**, **`infer_schema_length`**, **`ignore_errors`**, **`low_memory`**, **`rechunk`**, **`glob`**, **`cache`**, **`quote_char`**, **`eol_char`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
 
+### Paths, directories, and `glob`
+
+**`glob`** is forwarded via **`scan_kwargs`**. In Polars **0.53**, the lazy CSV scan wires **`HiveOptions::new_disabled()`** into the unified scan, so **hive-style partition columns from directory paths are not** applied for CSV—see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`.
+
 **`use_rap=True`** ( **`materialize_csv`** only): uses **`aread_csv_rap`** when **no** event loop; in async code **`await aread_csv_rap(path)`** from **`pydantable.io.rap_support`**.
 
 ## Write (targets)

@@ -13,6 +13,8 @@ How JSON values map to typed columns (including nested objects and maps) is summ
 
 There is **no** lazy scan for a single JSON **array** file in pydantable today — use :func:`materialize_json` (or :func:`~pydantable.io.iter_json_array` for batched array processing after a full parse).
 
+**Multi-file / directory:** lazy **`read_json`** / **`read_ndjson`** follow **JSON Lines** path semantics in Polars (see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`). **JSON array** datasets in directories are **not** lazily scanned—use per-file **`materialize_json`** / **`iter_json_array`**, or convert to NDJSON.
+
 ## Large files, memory, and entrypoint choice
 
 **Prefer lazy JSON Lines for big logs:** :meth:`~pydantable.dataframe_model.DataFrameModel.read_ndjson` / ``read_json`` (or :class:`~pydantable.dataframe.DataFrame` classmethods) keep work on a Polars :class:`~polars.LazyFrame` until you :meth:`~pydantable.dataframe.DataFrame.collect`, :meth:`~pydantable.dataframe.DataFrame.to_dict`, or :meth:`~pydantable.dataframe.DataFrame.write_parquet` / ``write_ndjson`` / etc. The full file is **not** loaded as a Python column dict first.

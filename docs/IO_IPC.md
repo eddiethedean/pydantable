@@ -21,6 +21,10 @@ This covers **Arrow IPC file** (`.arrow` / `.feather`-style single file), not ar
 
 **`scan_kwargs`:** **`record_batch_statistics`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
 
+### Paths, directories, and multi-file
+
+**`read_ipc`** passes **`UnifiedScanArgs::default()`** from Polars (not tunable from Python); defaults include **`glob: true`** and **hive options enabled**. Only **`IpcScanOptions`** fields are forwarded today—see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`.
+
 **`as_stream=False`** (default): local file paths can use Rust; otherwise PyArrow. **`as_stream=True`** uses PyArrow stream decoding. Install **`pydantable[arrow]`** when the path goes through PyArrow.
 
 ## Write (targets)

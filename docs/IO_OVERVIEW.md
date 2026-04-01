@@ -4,7 +4,7 @@
 
 **Utilities (`pydantable.io`):** **`materialize_*`**, **`fetch_sql`**, **`iter_sql`**, URL helpers, and format-specific readers that return **`dict[str, list]`** or **`ScanFileRoot`** for **`DataFrame`** construction.
 
-For **execution semantics** (lazy vs collect, Rust engine), see {doc}`EXECUTION`. For **roadmap-style** “what to support next,” see {doc}`DATA_IO_SOURCES`. **Which API should I call?** See {doc}`IO_DECISION_TREE`.
+For **execution semantics** (lazy vs collect, Rust engine), see {doc}`EXECUTION`. For **roadmap-style** “what to support next,” see {doc}`DATA_IO_SOURCES`. **Polars 0.53 scan kwargs vs pydantable** (paths, globs, hive): {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`. **Which API should I call?** See {doc}`IO_DECISION_TREE`.
 
 (full-api-in-pydantableio)=
 ## Module reference: `pydantable.io`

@@ -302,6 +302,11 @@ Rolling/dynamic contracts:
 - Dynamic windows support `every` / `period` with `s/m/h/d` suffixes and explicit aggregation contracts.
 - Nulls are ignored for numeric aggregations; all-null windows yield `None` for nullable aggregates and `0` for `count`.
 
+## Local lazy file scans (multi-file and `glob`)
+
+- Lazy **`read_*` / `aread_*`** roots delegate **file discovery, glob expansion, and hive-style path handling** to **Polars** according to the Rust **`scan_kwargs`** pydantable forwards (see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`). **Schema union across files** and **per-file lineage** follow Polars behavior for the pinned version unless/until pydantable exposes more options (e.g. **`include_file_paths`**).
+- **Typed validation** (**`trusted_mode`**, strict cell checks, optional-column filling, …) applies at **materialization** (**`collect()`**, **`to_dict()`**, **`to_arrow()`**, …), not when the **`ScanFileRoot`** is constructed.
+
 ## Arrow interchange (0.16.0)
 
 - **`pydantable.io.materialize_parquet`** / **`materialize_ipc`** feed **`dict[str, list]`** into **`DataFrameModel(...)`** / **`DataFrame(...)`** constructors. **`materialize_ipc(..., as_stream=True)`** selects the **streaming** IPC format; default is **file** IPC. For lazy local files use **`read_*`** + **`DataFrame.write_parquet`** ({doc}`EXECUTION`).

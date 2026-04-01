@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+### Docs
+
+- **Local I/O audit (1.11.0 Phase A):** Polars **0.53.0** vs pydantable **`scan_kwargs`** matrix, directory/glob/hive notes—{ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`; multi-file entrypoint table—{doc}`IO_DECISION_TREE`; **Local lazy file scans**—{doc}`INTERFACE_CONTRACT`; path/glob subsections on {doc}`IO_PARQUET`, {doc}`IO_CSV`, {doc}`IO_NDJSON`, {doc}`IO_IPC`, {doc}`IO_JSON`; link from {doc}`IO_OVERVIEW`. Roadmap: {doc}`ROADMAP_1_11_LOCAL_IO`.
+
 ## [1.11.0] — 2026-04-01
 
 ### Changed

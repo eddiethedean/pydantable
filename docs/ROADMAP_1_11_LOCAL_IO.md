@@ -31,17 +31,19 @@
 
 **Outcome:** Agreed-upon behavior before large code changes; reduces churn in `INTERFACE_CONTRACT`.
 
+**Phase A (docs) shipped:** audit appendix {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`, multi-file guidance in {doc}`IO_DECISION_TREE`, **Local lazy file scans** in {doc}`INTERFACE_CONTRACT`, per-format path notes in {doc}`IO_PARQUET`, {doc}`IO_CSV`, {doc}`IO_NDJSON`, {doc}`IO_IPC`, {doc}`IO_JSON`, link from {doc}`IO_OVERVIEW`.
+
 | Item | Description | Status |
 |------|-------------|--------|
-| Polars Rust API survey | For **0.53.x** (or current crate pin): list **`ScanArgsParquet`**, **`LazyCsvReader`**, **`LazyJsonLineReader`**, **`scan_ipc`** options relevant to **paths / globs / hive**. | [ ] |
-| Current pydantable matrix | Document what **`scan_kw.rs`** already maps vs what is **missing** (per format). | [ ] |
-| Directory semantics | Specify: e.g. trailing **`/`** directory → implicit **`glob=True`** vs requiring explicit **`glob=True`** (match Polars; document in {doc}`IO_PARQUET` / {doc}`IO_CSV`). | [ ] |
-| Lazy vs eager guidance | When to use **`read_*`** vs **`materialize_*`** vs **`iter_*`** for multi-file (table in {doc}`IO_DECISION_TREE` or {doc}`DATA_IO_SOURCES`). | [ ] |
+| Polars Rust API survey | For **0.53.x** (or current crate pin): list **`ScanArgsParquet`**, **`LazyCsvReader`**, **`LazyJsonLineReader`**, **`scan_ipc`** options relevant to **paths / globs / hive**. | [x] |
+| Current pydantable matrix | Document what **`scan_kw.rs`** already maps vs what is **missing** (per format). | [x] |
+| Directory semantics | Specify: e.g. trailing **`/`** directory → implicit **`glob=True`** vs requiring explicit **`glob=True`** (match Polars; document in {doc}`IO_PARQUET` / {doc}`IO_CSV`). | [x] |
+| Lazy vs eager guidance | When to use **`read_*`** vs **`materialize_*`** vs **`iter_*`** for multi-file (table in {doc}`IO_DECISION_TREE` or {doc}`DATA_IO_SOURCES`). | [x] |
 
 **Checklist**
 
-- [ ] Audit appendix landed (subsection in {doc}`DATA_IO_SOURCES` or {doc}`IO_OVERVIEW`, linked from here).
-- [ ] {doc}`INTERFACE_CONTRACT` updated for any **new** defaults or guarantees.
+- [x] Audit appendix landed (subsection in {doc}`DATA_IO_SOURCES` or {doc}`IO_OVERVIEW`, linked from here).
+- [x] {doc}`INTERFACE_CONTRACT` updated for **documented** lazy-scan semantics (no new runtime defaults in Phase A).
 
 ---
 

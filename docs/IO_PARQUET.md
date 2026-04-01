@@ -45,6 +45,10 @@ The temp file for **`read_parquet_url`** is **not** deleted automatically; see {
 
 **`scan_kwargs`:** for example **`n_rows`**, **`low_memory`**, **`rechunk`**, **`use_statistics`**, **`cache`**, **`glob`**, **`allow_missing_columns`**, **`parallel`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
 
+### Paths, directories, and `glob`
+
+Lazy **`read_parquet`** uses Polars **`scan_parquet`**; **`glob`** is forwarded via **`scan_kwargs`** (Polars **`ScanArgsParquet::default()`** uses **`glob: true`**). **Hive-style partition** options (**`hive_options`**, **`include_file_paths`**, …) are **not** exposed as Python kwargs yet; defaults still follow Polars. See {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>` and {doc}`ROADMAP_1_11_LOCAL_IO` Phase B.
+
 ## Write (targets)
 
 ### `DataFrame[Schema]` and `DataFrameModel`
