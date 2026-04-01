@@ -555,6 +555,111 @@ fn expr_window_rank(
 }
 
 #[pyfunction]
+fn expr_window_first_value(
+    inner: Bound<'_, PyExpr>,
+    partition_by: Vec<String>,
+    order_by: Vec<(String, bool, bool)>,
+    frame_kind: Option<String>,
+    frame_start: Option<i64>,
+    frame_end: Option<i64>,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_window_first_value(
+            inner.borrow().node.clone(),
+            partition_by,
+            order_by,
+            frame_kind,
+            frame_start,
+            frame_end,
+        )?,
+    })
+}
+
+#[pyfunction]
+fn expr_window_last_value(
+    inner: Bound<'_, PyExpr>,
+    partition_by: Vec<String>,
+    order_by: Vec<(String, bool, bool)>,
+    frame_kind: Option<String>,
+    frame_start: Option<i64>,
+    frame_end: Option<i64>,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_window_last_value(
+            inner.borrow().node.clone(),
+            partition_by,
+            order_by,
+            frame_kind,
+            frame_start,
+            frame_end,
+        )?,
+    })
+}
+
+#[pyfunction]
+fn expr_window_nth_value(
+    inner: Bound<'_, PyExpr>,
+    n: u32,
+    partition_by: Vec<String>,
+    order_by: Vec<(String, bool, bool)>,
+    frame_kind: Option<String>,
+    frame_start: Option<i64>,
+    frame_end: Option<i64>,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_window_nth_value(
+            inner.borrow().node.clone(),
+            n,
+            partition_by,
+            order_by,
+            frame_kind,
+            frame_start,
+            frame_end,
+        )?,
+    })
+}
+
+#[pyfunction]
+fn expr_window_ntile(
+    n: u32,
+    partition_by: Vec<String>,
+    order_by: Vec<(String, bool, bool)>,
+    frame_kind: Option<String>,
+    frame_start: Option<i64>,
+    frame_end: Option<i64>,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_window_ntile(n, partition_by, order_by, frame_kind, frame_start, frame_end)?,
+    })
+}
+
+#[pyfunction]
+fn expr_window_percent_rank(
+    partition_by: Vec<String>,
+    order_by: Vec<(String, bool, bool)>,
+    frame_kind: Option<String>,
+    frame_start: Option<i64>,
+    frame_end: Option<i64>,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_window_percent_rank(partition_by, order_by, frame_kind, frame_start, frame_end)?,
+    })
+}
+
+#[pyfunction]
+fn expr_window_cume_dist(
+    partition_by: Vec<String>,
+    order_by: Vec<(String, bool, bool)>,
+    frame_kind: Option<String>,
+    frame_start: Option<i64>,
+    frame_end: Option<i64>,
+) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_window_cume_dist(partition_by, order_by, frame_kind, frame_start, frame_end)?,
+    })
+}
+
+#[pyfunction]
 fn expr_window_sum(
     inner: Bound<'_, PyExpr>,
     partition_by: Vec<String>,
@@ -911,6 +1016,12 @@ pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr_datetime_to_date, m)?)?;
     m.add_function(wrap_pyfunction!(expr_window_row_number, m)?)?;
     m.add_function(wrap_pyfunction!(expr_window_rank, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_window_first_value, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_window_last_value, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_window_nth_value, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_window_ntile, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_window_percent_rank, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_window_cume_dist, m)?)?;
     m.add_function(wrap_pyfunction!(expr_window_sum, m)?)?;
     m.add_function(wrap_pyfunction!(expr_window_mean, m)?)?;
     m.add_function(wrap_pyfunction!(expr_window_min, m)?)?;

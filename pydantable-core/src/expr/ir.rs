@@ -425,6 +425,18 @@ pub enum WindowOp {
     RowNumber,
     Rank,
     DenseRank,
+    /// First value within the window (supports ordering).
+    FirstValue,
+    /// Last value within the window (supports ordering).
+    LastValue,
+    /// Nth value within the window (1-based, supports ordering).
+    NthValue { n: u32 },
+    /// NTile bucket number (1..=n).
+    NTile { n: u32 },
+    /// Percent rank (0..=1).
+    PercentRank,
+    /// Cumulative distribution (0..=1).
+    CumeDist,
     Sum,
     Mean,
     Min,

@@ -68,6 +68,12 @@ def test_pyspark_union_all_alias() -> None:
     assert sorted(out["id"]) == [1, 2]
 
 
+def test_pyspark_withcolumn_rejects_raw_literal_and_suggests_lit() -> None:
+    df = User({"id": [1], "name": ["a"], "age": [10]})
+    with pytest.raises(TypeError, match="functions\\.lit"):
+        _ = df.withColumn("x", 1)  # type: ignore[arg-type]
+
+
 def test_pyspark_drop_duplicates_with_and_without_subset() -> None:
     df = User(
         {
@@ -80,6 +86,20 @@ def test_pyspark_drop_duplicates_with_and_without_subset() -> None:
     assert len(u1.collect(as_lists=True)["id"]) == 2
     u2 = df.dropDuplicates(["name"])
     assert u2.collect(as_lists=True)["name"] == ["a", "b"]
+
+
+def test_pyspark_sample_fraction_and_seed_is_deterministic() -> None:
+    df = User({"id": [1, 2, 3, 4], "name": ["a", "b", "c", "d"], "age": [1, 2, 3, 4]})
+    a = df.sample(fraction=0.5, seed=0).collect(as_lists=True)
+    b = df.sample(fraction=0.5, seed=0).collect(as_lists=True)
+    assert a == b
+    assert len(a["id"]) == 2
+
+
+def test_pyspark_sample_requires_fraction() -> None:
+    df = User({"id": [1], "name": ["a"], "age": [1]})
+    with pytest.raises(ValueError, match="fraction"):
+        _ = df.sample()  # type: ignore[call-arg]
 
 
 def test_pyspark_drop_duplicates_subset_keep_first_with_explicit_order() -> None:
@@ -681,6 +701,23 @@ def test_pyspark_join_rejects_invalid_on_entry_and_unknown_how() -> None:
         _ = left.join(right, on=["id", object()])  # type: ignore[list-item]
     with pytest.raises(ValueError):
         _ = left.join(right, on="id", how="not_a_join")
+
+
+def test_pyspark_join_how_aliases_full_outer_and_right_outer() -> None:
+    class L(Schema):
+        id: int
+        x: int
+
+    class R(Schema):
+        id: int
+        y: int
+
+    left = DataFrame[L]({"id": [1], "x": [10]})
+    right = DataFrame[R]({"id": [2], "y": [20]})
+    out_full = left.join(right, on="id", how="full_outer").to_dict()
+    assert set(out_full.keys()) >= {"id", "x", "y"}
+    out_right = left.join(right, on="id", how="right_outer").to_dict()
+    assert out_right["y"] == [20]
 
 
 def test_pyspark_except_all_matches_subtract() -> None:

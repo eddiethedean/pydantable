@@ -515,6 +515,32 @@ def test_window_functions_reexported_from_sql_functions() -> None:
     assert out["rn"] == [1, 2]
 
 
+def test_pyspark_window_value_fns_and_rank_metrics_unframed() -> None:
+    from pydantable.pyspark.sql import Window
+
+    class S(Schema):
+        g: int
+        v: int
+
+    df = DataFrame[S]({"g": [1, 1, 1], "v": [10, 20, 20]})
+    w = Window.partitionBy("g").orderBy("v", ascending=True)
+    out = (
+        df.withColumn("fv", F.first_value(F.col("v", dtype=int)).over(w))
+        .withColumn("lv", F.last_value(F.col("v", dtype=int)).over(w))
+        .withColumn("nv2", F.nth_value(F.col("v", dtype=int), 2).over(w))
+        .withColumn("t2", F.ntile(2).over(w))
+        .withColumn("pr", F.percent_rank().over(w))
+        .withColumn("cd", F.cume_dist().over(w))
+        .collect(as_lists=True)
+    )
+    assert out["fv"] == [10, 10, 10]
+    assert out["lv"] == [20, 20, 20]
+    assert out["nv2"] == [20, 20, 20]
+    assert out["t2"] == [1, 1, 2]
+    assert out["pr"] == [0.0, 0.5, 0.5]
+    assert out["cd"] == [1.0 / 3.0, 1.0, 1.0]
+
+
 def test_pyspark_window_rows_between_ir_threading() -> None:
     from pydantable.pyspark.sql import Window
 
@@ -820,13 +846,13 @@ def test_sql_functions_global_agg_type_errors() -> None:
     with pytest.raises(TypeError, match=r"sum\(\)"):
         F.sum(7)  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="avg"):
-        F.avg("x")  # type: ignore[arg-type]
+        F.avg(None)  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="max"):
         F.max(None)  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="min"):
         F.min([])  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="count"):
-        F.count("nope")  # type: ignore[arg-type]
+        F.count({})  # type: ignore[arg-type]
 
 
 def test_sql_functions_map_and_string_helpers_type_errors() -> None:
@@ -860,6 +886,32 @@ def test_sql_functions_map_and_string_helpers_type_errors() -> None:
         F.element_at(1, "k")  # type: ignore[arg-type]
 
 
+def test_sql_functions_greatest_least_nullif_nvl_isnan_nanvl() -> None:
+    import math
+
+    class S(Schema):
+        a: float | None
+        b: float | None
+
+    df = DataFrame[S]({"a": [1.0, None, float("nan")], "b": [2.0, 3.0, 4.0]})
+    a = F.col("a", dtype=float | None)
+    b = F.col("b", dtype=float | None)
+    out = (
+        df.withColumn("g", F.greatest(a, b))
+        .withColumn("l", F.least(a, b))
+        .withColumn("ni", F.isnan(a))
+        .withColumn("nv", F.nanvl(a, b))
+        .withColumn("n1", F.nvl(a, 9.0))
+        .withColumn("z", F.nullif(F.col("b", dtype=float | None), 3.0))
+        .collect(as_lists=True)
+    )
+    assert out["g"][:2] == [2.0, 3.0] and math.isnan(out["g"][2])
+    assert out["l"] == [1.0, 3.0, 4.0]
+    assert out["ni"] == [False, False, True]
+    assert out["nv"][0] == 1.0 and out["nv"][1] is None and out["nv"][2] == 4.0
+    assert out["n1"][:2] == [1.0, 9.0] and math.isnan(out["n1"][2])
+    assert out["z"] == [2.0, None, 4.0]
+
 def test_sql_functions_window_min_max_type_errors() -> None:
     with pytest.raises(TypeError, match="window_min"):
         F.window_min(1)  # type: ignore[arg-type]
@@ -889,12 +941,14 @@ def test_sql_functions_regex_helpers_rlike_extract_and_substr() -> None:
         .withColumn("g0", F.regexp_substr(c, r"(\d+)", 0))
         .withColumn("g1", F.regexp_extract(c, r"(\d+)", 1))
         .withColumn("g1b", F.regexp_substr(c, r"(\d+)", 1))
+        .withColumn("pos", F.regexp_instr(c, r"\d+"))
         .collect(as_lists=True)
     )
     assert out["m"] == [True, False, None]
     assert out["g0"] == ["123", None, None]
     assert out["g1"] == ["123", None, None]
     assert out["g1b"] == ["123", None, None]
+    assert out["pos"] == [5, 0, None]
 
 
 def test_sql_functions_regexp_like_is_alias_of_rlike() -> None:

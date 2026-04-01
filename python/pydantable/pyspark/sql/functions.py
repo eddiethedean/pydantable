@@ -24,10 +24,28 @@ from pydantable.expressions import (
     dense_rank as dense_rank_expr,
 )
 from pydantable.expressions import (
+    cume_dist as cume_dist_expr,
+)
+from pydantable.expressions import (
+    first_value as first_value_expr,
+)
+from pydantable.expressions import (
     lag as lag_expr,
 )
 from pydantable.expressions import (
+    last_value as last_value_expr,
+)
+from pydantable.expressions import (
     lead as lead_expr,
+)
+from pydantable.expressions import (
+    ntile as ntile_expr,
+)
+from pydantable.expressions import (
+    nth_value as nth_value_expr,
+)
+from pydantable.expressions import (
+    percent_rank as percent_rank_expr,
 )
 from pydantable.expressions import (
     rank as rank_expr,
@@ -118,6 +136,85 @@ def coalesce(*cols: Expr) -> Expr:
             raise TypeError("coalesce() arguments must be Expr instances.")
     return coalesce_expr(*cols)
 
+
+def greatest(*cols: Expr) -> Expr:
+    """Greatest non-null value across columns (Spark ``greatest``)."""
+    if len(cols) < 2:
+        raise TypeError("greatest() expects at least two Expr arguments.")
+    for c in cols:
+        if not isinstance(c, Expr):
+            raise TypeError("greatest() arguments must be Expr instances.")
+    out = cols[0]
+    for c in cols[1:]:
+        out = (
+            when(out.is_null(), c)
+            .when(c.is_null(), out)
+            .when(out >= c, out)
+            .otherwise(c)
+        )
+    return out
+
+
+def least(*cols: Expr) -> Expr:
+    """Least non-null value across columns (Spark ``least``)."""
+    if len(cols) < 2:
+        raise TypeError("least() expects at least two Expr arguments.")
+    for c in cols:
+        if not isinstance(c, Expr):
+            raise TypeError("least() arguments must be Expr instances.")
+    out = cols[0]
+    for c in cols[1:]:
+        out = (
+            when(out.is_null(), c)
+            .when(c.is_null(), out)
+            .when(out <= c, out)
+            .otherwise(c)
+        )
+    return out
+
+
+def nullif(column: Expr, other: Expr | Any) -> Expr:
+    """Return null if column equals other (Spark ``nullif``)."""
+    if not isinstance(column, Expr):
+        raise TypeError("nullif(column, other) expects column to be an Expr.")
+    other_expr = other if isinstance(other, Expr) else Literal(value=other)
+    nul = Literal(value=None).cast(column.dtype)
+    return when(column == other_expr, nul).otherwise(column)
+
+
+def nvl(column: Expr, default: Expr | Any) -> Expr:
+    """Alias of ``coalesce(column, default)`` (Spark ``nvl``)."""
+    if not isinstance(column, Expr):
+        raise TypeError("nvl(column, default) expects column to be an Expr.")
+    d = default if isinstance(default, Expr) else Literal(value=default)
+    return coalesce(column, d)
+
+
+def isnan(column: Expr) -> Expr:
+    """True where float column is NaN (Spark ``isnan``)."""
+    if not isinstance(column, Expr):
+        raise TypeError("isnan(column) expects a typed column Expr.")
+    dt = column.dtype
+    base = dt
+    origin = getattr(dt, "__origin__", None)
+    args = getattr(dt, "__args__", ())
+    if origin is not None and args:
+        non_none = [a for a in args if a is not type(None)]
+        if len(non_none) == 1:
+            base = non_none[0]
+    if base is not float:
+        raise TypeError("isnan(column) expects a float or float|None column.")
+    # Polars-style comparisons around NaN can be surprising across backends; for
+    # parity we detect NaN via stringification.
+    return column.is_not_null() & (lower(cast(column, str)) == Literal(value="nan"))
+
+
+def nanvl(column: Expr, other: Expr | Any) -> Expr:
+    """Return other if column is NaN, else column (Spark ``nanvl``)."""
+    if not isinstance(column, Expr):
+        raise TypeError("nanvl(column, other) expects column to be an Expr.")
+    o = other if isinstance(other, Expr) else Literal(value=other)
+    return when(isnan(column), o).otherwise(column)
 
 def when(condition: Expr, value: Expr) -> WhenChain:
     """First branch of a ``CASE WHEN`` (chain ``.when(...).otherwise(...)``)."""
@@ -298,6 +395,18 @@ def regexp_substr(column: Expr, pattern: str, group_index: int = 0) -> Expr:
     if not isinstance(column, Expr):
         raise TypeError("functions.regexp_substr() expects a typed column Expr.")
     return column.str_extract_regex(pattern, group_index)
+
+
+def regexp_instr(column: Expr, pattern: str) -> Expr:
+    """1-based position of first regex match, or 0 if none (Spark ``regexp_instr``)."""
+    if not isinstance(column, Expr):
+        raise TypeError("functions.regexp_instr() expects a typed column Expr.")
+    # Extract the shortest prefix before the first match.
+    prefix = regexp_extract(column, rf"^(.*?){pattern}", 1)
+    return when(
+        column.is_null(),
+        Literal(value=None).cast(int | None),
+    ).otherwise(when(prefix.is_null(), Literal(value=0)).otherwise(length(prefix) + 1))
 
 def json_path_match(column: Expr, path: str) -> Expr:
     if not isinstance(column, Expr):
@@ -480,6 +589,36 @@ def dense_rank() -> Any:
     return dense_rank_expr()
 
 
+def percent_rank() -> Any:
+    """Spark ``percent_rank`` over a window."""
+    return percent_rank_expr()
+
+
+def cume_dist() -> Any:
+    """Spark ``cume_dist`` over a window."""
+    return cume_dist_expr()
+
+
+def first_value(column: Expr) -> Any:
+    """Spark ``first_value`` over a window."""
+    return first_value_expr(column)
+
+
+def last_value(column: Expr) -> Any:
+    """Spark ``last_value`` over a window."""
+    return last_value_expr(column)
+
+
+def nth_value(column: Expr, n: int) -> Any:
+    """Spark ``nth_value`` over a window (1-based)."""
+    return nth_value_expr(column, n)
+
+
+def ntile(n: int) -> Any:
+    """Spark ``ntile`` over a window."""
+    return ntile_expr(n)
+
+
 def window_sum(column: Expr) -> Any:
     """Windowed ``sum`` (not ``group_by``); finish with ``.over(Window...)``."""
     return window_sum_expr(column)
@@ -629,15 +768,19 @@ __all__ = [
     "cast",
     "ceil",
     "coalesce",
+    "greatest",
+    "isnan",
     "col",
     "column",
     "concat",
     "contains",
     "count",
+    "cume_dist",
     "day",
     "dayofmonth",
     "dayofweek",
     "dense_rank",
+    "first_value",
     "element_at",
     "ends_with",
     "floor",
@@ -647,6 +790,8 @@ __all__ = [
     "isnull",
     "json_path_match",
     "lag",
+    "last_value",
+    "least",
     "lead",
     "length",
     "list_contains",
@@ -674,10 +819,17 @@ __all__ = [
     "min",
     "minute",
     "month",
+    "ntile",
+    "nth_value",
+    "nanvl",
     "nanosecond",
+    "nullif",
+    "nvl",
+    "percent_rank",
     "quarter",
     "rank",
     "regexp_extract",
+    "regexp_instr",
     "regexp_like",
     "regexp_replace",
     "regexp_substr",

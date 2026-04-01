@@ -10,7 +10,7 @@ use super::ir::{
 };
 
 use polars::lazy::dsl::{
-    coalesce, col, concat_str, element, int_range, len, lit, ternary_expr, Expr as PolarsExpr,
+    coalesce, col, concat_str, element, int_range, len, lit, ternary_expr, when, Expr as PolarsExpr,
 };
 use polars::prelude::{
     ClosedInterval, DataType, Int128Chunked, IntoSeries, Literal, NamedFrom, NewChunkedArray, Null,
@@ -721,6 +721,98 @@ impl ExprNode {
                             None,
                         );
                         apply_window_over(inner, part, ord)
+                    }
+                    WindowOp::FirstValue => {
+                        let op_inner = operand.as_ref().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "internal: first_value missing operand",
+                            )
+                        })?;
+                        let inner = op_inner.to_polars_expr()?.first();
+                        apply_window_over(inner, part, ord)
+                    }
+                    WindowOp::LastValue => {
+                        let op_inner = operand.as_ref().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "internal: last_value missing operand",
+                            )
+                        })?;
+                        let inner = op_inner.to_polars_expr()?.last();
+                        apply_window_over(inner, part, ord)
+                    }
+                    WindowOp::NthValue { n } => {
+                        let op_inner = operand.as_ref().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "internal: nth_value missing operand",
+                            )
+                        })?;
+                        let idx0: i64 = (*n as i64) - 1;
+                        let inner = op_inner
+                            .to_polars_expr()?
+                            .implode()
+                            .list()
+                            .get(lit(idx0), true);
+                        apply_window_over(inner, part, ord)
+                    }
+                    WindowOp::NTile { n } => {
+                        if ord.is_empty() {
+                            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "ntile() requires order_by columns.",
+                            ));
+                        }
+                        let rn = apply_window_over(
+                            int_range(lit(0i64), len(), 1, DataType::Int64) + lit(1i64),
+                            part,
+                            ord,
+                        )?;
+                        let cnt = apply_window_over(len().cast(DataType::Int64), part, ord)?;
+                        let nn = lit(i64::from(*n));
+                        // bucket = floor((rn-1) * n / cnt) + 1
+                        Ok((((rn - lit(1i64)) * nn) / cnt) + lit(1i64))
+                    }
+                    WindowOp::PercentRank => {
+                        let order_name = ord.first().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "percent_rank() requires order_by columns.",
+                            )
+                        })?;
+                        let rk = apply_window_over(
+                            col(order_name.0.as_str()).rank(
+                                RankOptions {
+                                    method: RankMethod::Min,
+                                    descending: !order_name.1,
+                                },
+                                None,
+                            ),
+                            part,
+                            ord,
+                        )?;
+                        let cnt = apply_window_over(len().cast(DataType::Int64), part, ord)?;
+                        // (rank-1)/(cnt-1) with cnt<=1 -> 0.0
+                        Ok(when(cnt.clone().lt_eq(lit(1i64)))
+                            .then(lit(0.0))
+                            .otherwise((rk.cast(DataType::Float64) - lit(1.0))
+                                / (cnt.cast(DataType::Float64) - lit(1.0))))
+                    }
+                    WindowOp::CumeDist => {
+                        let order_name = ord.first().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "cume_dist() requires order_by columns.",
+                            )
+                        })?;
+                        let rk = apply_window_over(
+                            col(order_name.0.as_str()).rank(
+                                RankOptions {
+                                    method: RankMethod::Max,
+                                    descending: !order_name.1,
+                                },
+                                None,
+                            ),
+                            part,
+                            ord,
+                        )?;
+                        let cnt = apply_window_over(len().cast(DataType::Int64), part, ord)?;
+                        Ok(rk.cast(DataType::Float64) / cnt.cast(DataType::Float64))
                     }
                     WindowOp::Sum => {
                         let op_inner = operand.as_ref().ok_or_else(|| {

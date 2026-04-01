@@ -1957,6 +1957,201 @@ impl ExprNode {
         })
     }
 
+    pub fn make_window_first_value(
+        inner: ExprNode,
+        partition_by: Vec<String>,
+        order_by: Vec<WindowOrderKey>,
+        frame_kind: Option<String>,
+        frame_start: Option<i64>,
+        frame_end: Option<i64>,
+    ) -> PyResult<Self> {
+        if order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "first_value() requires at least one order_by column.",
+            ));
+        }
+        let dtype = match inner.dtype() {
+            DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
+                base,
+                nullable: true,
+                literals: None,
+            },
+            other => other,
+        };
+        let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
+        Self::reject_range_frame(&frame, "first_value")?;
+        Ok(ExprNode::Window {
+            op: WindowOp::FirstValue,
+            operand: Some(Box::new(inner)),
+            partition_by,
+            order_by,
+            frame,
+            dtype,
+        })
+    }
+
+    pub fn make_window_last_value(
+        inner: ExprNode,
+        partition_by: Vec<String>,
+        order_by: Vec<WindowOrderKey>,
+        frame_kind: Option<String>,
+        frame_start: Option<i64>,
+        frame_end: Option<i64>,
+    ) -> PyResult<Self> {
+        if order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "last_value() requires at least one order_by column.",
+            ));
+        }
+        let dtype = match inner.dtype() {
+            DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
+                base,
+                nullable: true,
+                literals: None,
+            },
+            other => other,
+        };
+        let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
+        Self::reject_range_frame(&frame, "last_value")?;
+        Ok(ExprNode::Window {
+            op: WindowOp::LastValue,
+            operand: Some(Box::new(inner)),
+            partition_by,
+            order_by,
+            frame,
+            dtype,
+        })
+    }
+
+    pub fn make_window_nth_value(
+        inner: ExprNode,
+        n: u32,
+        partition_by: Vec<String>,
+        order_by: Vec<WindowOrderKey>,
+        frame_kind: Option<String>,
+        frame_start: Option<i64>,
+        frame_end: Option<i64>,
+    ) -> PyResult<Self> {
+        if n == 0 {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "nth_value() n must be >= 1.",
+            ));
+        }
+        if order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "nth_value() requires at least one order_by column.",
+            ));
+        }
+        let dtype = match inner.dtype() {
+            DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
+                base,
+                nullable: true,
+                literals: None,
+            },
+            other => other,
+        };
+        let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
+        Self::reject_range_frame(&frame, "nth_value")?;
+        Ok(ExprNode::Window {
+            op: WindowOp::NthValue { n },
+            operand: Some(Box::new(inner)),
+            partition_by,
+            order_by,
+            frame,
+            dtype,
+        })
+    }
+
+    pub fn make_window_ntile(
+        ntiles: u32,
+        partition_by: Vec<String>,
+        order_by: Vec<WindowOrderKey>,
+        frame_kind: Option<String>,
+        frame_start: Option<i64>,
+        frame_end: Option<i64>,
+    ) -> PyResult<Self> {
+        if ntiles == 0 {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "ntile() n must be >= 1.",
+            ));
+        }
+        if order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "ntile() requires at least one order_by column.",
+            ));
+        }
+        let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
+        Self::reject_range_frame(&frame, "ntile")?;
+        Ok(ExprNode::Window {
+            op: WindowOp::NTile { n: ntiles },
+            operand: None,
+            partition_by,
+            order_by,
+            frame,
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Int),
+                nullable: true,
+                literals: None,
+            },
+        })
+    }
+
+    pub fn make_window_percent_rank(
+        partition_by: Vec<String>,
+        order_by: Vec<WindowOrderKey>,
+        frame_kind: Option<String>,
+        frame_start: Option<i64>,
+        frame_end: Option<i64>,
+    ) -> PyResult<Self> {
+        if order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "percent_rank() requires at least one order_by column.",
+            ));
+        }
+        let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
+        Self::reject_range_frame(&frame, "percent_rank")?;
+        Ok(ExprNode::Window {
+            op: WindowOp::PercentRank,
+            operand: None,
+            partition_by,
+            order_by,
+            frame,
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Float),
+                nullable: true,
+                literals: None,
+            },
+        })
+    }
+
+    pub fn make_window_cume_dist(
+        partition_by: Vec<String>,
+        order_by: Vec<WindowOrderKey>,
+        frame_kind: Option<String>,
+        frame_start: Option<i64>,
+        frame_end: Option<i64>,
+    ) -> PyResult<Self> {
+        if order_by.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "cume_dist() requires at least one order_by column.",
+            ));
+        }
+        let frame = Self::parse_window_frame(frame_kind, frame_start, frame_end)?;
+        Self::reject_range_frame(&frame, "cume_dist")?;
+        Ok(ExprNode::Window {
+            op: WindowOp::CumeDist,
+            operand: None,
+            partition_by,
+            order_by,
+            frame,
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Float),
+                nullable: true,
+                literals: None,
+            },
+        })
+    }
+
     fn infer_window_sum_mean_dtype(inner: &ExprNode, mean: bool) -> PyResult<DTypeDesc> {
         let d = inner.dtype();
         if d.is_struct() || d.is_list() {

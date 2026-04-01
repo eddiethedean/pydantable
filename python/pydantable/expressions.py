@@ -926,7 +926,90 @@ class _WindowFnPending:
                     True, part, order, frame_kind, frame_start, frame_end
                 )
             )
+        if self._kind == "percent_rank":
+            return Expr(
+                rust_expr=rust.expr_window_percent_rank(
+                    part, order, frame_kind, frame_start, frame_end
+                )
+            )
+        if self._kind == "cume_dist":
+            return Expr(
+                rust_expr=rust.expr_window_cume_dist(
+                    part, order, frame_kind, frame_start, frame_end
+                )
+            )
         raise AssertionError(self._kind)
+
+
+class _WindowValuePending:
+    """Deferred window value function; complete with ``.over(WindowSpec(...))``."""
+
+    def __init__(self, inner: Expr, kind: str, n: int | None = None):
+        self._inner = inner
+        self._kind = kind
+        self._n = n
+
+    def __repr__(self) -> str:
+        return f"_WindowValuePending({self._kind!r}, n={self._n!r})"
+
+    def over(self, window: WindowSpec) -> Expr:
+        rust = _require_rust_core()
+        part = list(window.partition_by)
+        order = list(window.order_by)
+        frame_kind = window.frame_kind
+        frame_start = window.frame_start
+        frame_end = window.frame_end
+        if self._kind == "first_value":
+            return Expr(
+                rust_expr=rust.expr_window_first_value(
+                    self._inner._rust_expr, part, order, frame_kind, frame_start, frame_end
+                )
+            )
+        if self._kind == "last_value":
+            return Expr(
+                rust_expr=rust.expr_window_last_value(
+                    self._inner._rust_expr, part, order, frame_kind, frame_start, frame_end
+                )
+            )
+        if self._kind == "nth_value":
+            assert self._n is not None
+            return Expr(
+                rust_expr=rust.expr_window_nth_value(
+                    self._inner._rust_expr,
+                    int(self._n),
+                    part,
+                    order,
+                    frame_kind,
+                    frame_start,
+                    frame_end,
+                )
+            )
+        raise AssertionError(self._kind)
+
+
+class _WindowNtilePending:
+    """Deferred ntile(N); complete with ``.over(WindowSpec(...))``."""
+
+    def __init__(self, n: int):
+        self._n = n
+
+    def __repr__(self) -> str:
+        return f"_WindowNtilePending({self._n!r})"
+
+    def over(self, window: WindowSpec) -> Expr:
+        rust = _require_rust_core()
+        part = list(window.partition_by)
+        order = list(window.order_by)
+        return Expr(
+            rust_expr=rust.expr_window_ntile(
+                int(self._n),
+                part,
+                order,
+                window.frame_kind,
+                window.frame_start,
+                window.frame_end,
+            )
+        )
 
 
 class _WindowAggPending:
@@ -1053,6 +1136,16 @@ def dense_rank() -> _WindowFnPending:
     return _WindowFnPending("dense_rank")
 
 
+def percent_rank() -> _WindowFnPending:
+    """Spark ``percent_rank`` over a window."""
+    return _WindowFnPending("percent_rank")
+
+
+def cume_dist() -> _WindowFnPending:
+    """Spark ``cume_dist`` over a window."""
+    return _WindowFnPending("cume_dist")
+
+
 def window_sum(column: Expr) -> _WindowAggPending:
     """``sum`` over a window (not ``group_by`` aggregation)."""
     if not isinstance(column, Expr):
@@ -1079,6 +1172,26 @@ def window_max(column: Expr) -> _WindowAggPending:
     if not isinstance(column, Expr):
         raise TypeError("window_max() expects an Expr.")
     return _WindowAggPending(column, "max")
+
+
+def first_value(column: Expr) -> _WindowValuePending:
+    """Spark ``first_value`` over a window."""
+    return _WindowValuePending(column, "first_value")
+
+
+def last_value(column: Expr) -> _WindowValuePending:
+    """Spark ``last_value`` over a window."""
+    return _WindowValuePending(column, "last_value")
+
+
+def nth_value(column: Expr, n: int) -> _WindowValuePending:
+    """Spark ``nth_value`` over a window (1-based)."""
+    return _WindowValuePending(column, "nth_value", n=int(n))
+
+
+def ntile(n: int) -> _WindowNtilePending:
+    """Spark ``ntile`` over a window."""
+    return _WindowNtilePending(n=int(n))
 
 
 def lag(column: Expr, n: int = 1) -> _WindowShiftPending:

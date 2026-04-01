@@ -232,6 +232,19 @@ impl PolarsPlanRunner {
                 "Framed windows require order_by columns.",
             ));
         }
+        if matches!(
+            op,
+            WindowOp::FirstValue
+                | WindowOp::LastValue
+                | WindowOp::NthValue { .. }
+                | WindowOp::NTile { .. }
+                | WindowOp::PercentRank
+                | WindowOp::CumeDist
+        ) {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "This window function is not yet supported with rowsBetween/rangeBetween.",
+            ));
+        }
 
         let n = df.height();
         let mut groups: BTreeMap<String, Vec<usize>> = BTreeMap::new();
@@ -267,7 +280,15 @@ impl PolarsPlanRunner {
                 };
                 Some(name.clone())
             }
-            WindowOp::RowNumber | WindowOp::Rank | WindowOp::DenseRank => None,
+            WindowOp::RowNumber
+            | WindowOp::Rank
+            | WindowOp::DenseRank
+            | WindowOp::FirstValue
+            | WindowOp::LastValue
+            | WindowOp::NthValue { .. }
+            | WindowOp::NTile { .. }
+            | WindowOp::PercentRank
+            | WindowOp::CumeDist => None,
         };
 
         for (c, _, _) in order_by.iter() {
@@ -480,7 +501,15 @@ impl PolarsPlanRunner {
                             out_i64[*idx] = None;
                         }
                     }
-                    WindowOp::RowNumber | WindowOp::Rank | WindowOp::DenseRank => {}
+                    WindowOp::RowNumber
+                    | WindowOp::Rank
+                    | WindowOp::DenseRank
+                    | WindowOp::FirstValue
+                    | WindowOp::LastValue
+                    | WindowOp::NthValue { .. }
+                    | WindowOp::NTile { .. }
+                    | WindowOp::PercentRank
+                    | WindowOp::CumeDist => {}
                 }
             }
         }

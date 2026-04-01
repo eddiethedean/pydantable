@@ -504,6 +504,18 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
                 WindowOp::RowNumber => dict.set_item("op", "row_number")?,
                 WindowOp::Rank => dict.set_item("op", "rank")?,
                 WindowOp::DenseRank => dict.set_item("op", "dense_rank")?,
+                WindowOp::FirstValue => dict.set_item("op", "first_value")?,
+                WindowOp::LastValue => dict.set_item("op", "last_value")?,
+                WindowOp::NthValue { n } => {
+                    dict.set_item("op", "nth_value")?;
+                    dict.set_item("n", *n)?;
+                }
+                WindowOp::NTile { n } => {
+                    dict.set_item("op", "ntile")?;
+                    dict.set_item("n", *n)?;
+                }
+                WindowOp::PercentRank => dict.set_item("op", "percent_rank")?,
+                WindowOp::CumeDist => dict.set_item("op", "cume_dist")?,
                 WindowOp::Sum => dict.set_item("op", "sum")?,
                 WindowOp::Mean => dict.set_item("op", "mean")?,
                 WindowOp::Min => dict.set_item("op", "min")?,

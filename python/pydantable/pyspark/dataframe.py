@@ -586,11 +586,24 @@ class DataFrame(CoreDataFrame):
 
     def withColumn(self, name: str, col: Any) -> DataFrame:
         """Add or replace a column (Spark ``withColumn``)."""
+        if not isinstance(col, Expr):
+            raise TypeError(
+                "withColumn(name, col) expects a typed column Expr. "
+                "Hint: use pyspark.sql.functions.lit(...) for literals, or "
+                "df['col'] / df.col('col') for existing columns."
+            )
         return self._as_pyspark_df(self.with_columns(**{name: col}))
 
     def withColumns(self, colsMap: Mapping[str, Any]) -> DataFrame:
         """Add or replace multiple columns (Spark ``withColumns``)."""
-        return self._as_pyspark_df(self.with_columns(**dict(colsMap)))
+        cm = dict(colsMap)
+        for k, v in cm.items():
+            if not isinstance(v, Expr):
+                raise TypeError(
+                    "withColumns(colsMap) expects mapping values to be typed Exprs. "
+                    "Hint: use pyspark.sql.functions.lit(...) for literals."
+                )
+        return self._as_pyspark_df(self.with_columns(**cm))
 
     def withColumnRenamed(self, existing: str, new: str) -> DataFrame:
         """Rename one column (Spark ``withColumnRenamed``)."""
@@ -682,6 +695,25 @@ class DataFrame(CoreDataFrame):
         if num < 0:
             raise ValueError("limit(n) expects n >= 0.")
         return cast("DataFrame", super().head(num))
+
+    def sample(
+        self,
+        withReplacement: bool | None = None,
+        fraction: float | None = None,
+        seed: int | None = None,
+    ) -> DataFrame:
+        """Sample rows (Spark ``sample``; fraction required in this facade)."""
+        if fraction is None:
+            raise ValueError("sample(fraction=...) is required (Spark-style).")
+        if withReplacement is None:
+            withReplacement = False
+        if not isinstance(withReplacement, bool):
+            raise TypeError("sample(withReplacement=...) must be a bool.")
+        return self._as_pyspark_df(
+            super().sample(
+                fraction=fraction, seed=seed, with_replacement=withReplacement
+            )
+        )
 
     def drop(self, *columns: Any, strict: bool = True) -> DataFrame:
         """Drop columns by name (Spark ``drop``)."""
@@ -934,6 +966,14 @@ class DataFrame(CoreDataFrame):
             raise ValueError("join() use either on=... or left_on=/right_on=..., not both.")
 
         how_norm = str(how).strip().lower()
+        how_aliases = {
+            "outer": "outer",
+            "full_outer": "full",
+            "full": "full",
+            "right_outer": "right",
+            "left_outer": "left",
+        }
+        how_norm = how_aliases.get(how_norm, how_norm)
         if how_norm == "left_semi":
             how_norm = "semi"
         elif how_norm == "left_anti":
@@ -942,6 +982,38 @@ class DataFrame(CoreDataFrame):
             how_norm = "right_semi"
         elif how_norm == "right_anti":
             how_norm = "right_anti"
+
+        supported_hows = {
+            "inner",
+            "left",
+            "right",
+            "outer",
+            "full",
+            "cross",
+            "semi",
+            "anti",
+            "left_semi",
+            "left_anti",
+            "right_semi",
+            "right_anti",
+            "left_outer",
+            "right_outer",
+            "full_outer",
+        }
+        if how_norm not in {"right_semi", "right_anti"} and how_norm not in {
+            "inner",
+            "left",
+            "right",
+            "outer",
+            "full",
+            "cross",
+            "semi",
+            "anti",
+        }:
+            raise ValueError(
+                "join(how=...) must be one of: "
+                + ", ".join(repr(x) for x in sorted(supported_hows))
+            )
 
         def _resolve_key_arg(
             arg: str | ColumnRef | Sequence[str | ColumnRef] | None, *, arg_name: str
@@ -1063,6 +1135,19 @@ class DataFrame(CoreDataFrame):
                 rk = f"{k}{suffix}"
                 if rk in joined._current_field_types:
                     drop_cols.append(rk)
+            if drop_cols:
+                joined = joined.drop(*drop_cols)
+        elif used_lr and not keepRightJoinKeys and left_names is not None and right_names is not None:
+            left_list = [left_names] if isinstance(left_names, str) else list(left_names)
+            right_list = (
+                [right_names] if isinstance(right_names, str) else list(right_names)
+            )
+            drop_cols: list[str] = []
+            for lk, rk in zip(left_list, right_list, strict=True):
+                if lk == rk:
+                    cand = f"{rk}{suffix}"
+                    if cand in joined._current_field_types:
+                        drop_cols.append(cand)
             if drop_cols:
                 joined = joined.drop(*drop_cols)
 
@@ -1242,14 +1327,10 @@ class DataFrameModel(CoreDataFrameModel):
     _dataframe_cls = DataFrame
 
     def withColumn(self, name: str, col: Any) -> DataFrameModel:
-        return cast(
-            "DataFrameModel", self._from_dataframe(self._df.withColumn(name, col))
-        )
+        return cast("DataFrameModel", self._from_dataframe(self._df.withColumn(name, col)))
 
     def withColumns(self, colsMap: Mapping[str, Any]) -> DataFrameModel:
-        return cast(
-            "DataFrameModel", self._from_dataframe(self._df.withColumns(colsMap))
-        )
+        return cast("DataFrameModel", self._from_dataframe(self._df.withColumns(colsMap)))
 
     def withColumnRenamed(self, existing: str, new: str) -> DataFrameModel:
         return cast(
@@ -1309,6 +1390,23 @@ class DataFrameModel(CoreDataFrameModel):
 
     def limit(self, num: int) -> DataFrameModel:
         return cast("DataFrameModel", self._from_dataframe(self._df.limit(num)))
+
+    def sample(
+        self,
+        withReplacement: bool | None = None,
+        fraction: float | None = None,
+        seed: int | None = None,
+    ) -> DataFrameModel:
+        return cast(
+            "DataFrameModel",
+            self._from_dataframe(
+                self._df.sample(
+                    withReplacement=withReplacement,
+                    fraction=fraction,
+                    seed=seed,
+                )
+            ),
+        )
 
     def drop(self, *cols: str | ColumnRef) -> DataFrameModel:
         return cast("DataFrameModel", self._from_dataframe(self._df.drop(*cols)))

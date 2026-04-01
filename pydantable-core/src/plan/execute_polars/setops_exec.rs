@@ -35,22 +35,69 @@ fn validate_identical_schema(left: &PlanInner, right: &PlanInner, op: &str) -> P
     Ok(cols)
 }
 
-fn signature_for_row(ctx: &HashMap<String, Vec<Option<LiteralValue>>>, cols: &[String], i: usize) -> String {
-    let mut s = String::new();
+fn signature_for_row(
+    ctx: &HashMap<String, Vec<Option<LiteralValue>>>,
+    cols: &[String],
+    i: usize,
+) -> Vec<u8> {
+    let mut out: Vec<u8> = Vec::new();
     for c in cols {
         let v = &ctx[c][i];
-        s.push_str(&format!("{:?}|", v));
+        match v {
+            None => out.push(0),
+            Some(LiteralValue::Int(x)) => {
+                out.push(1);
+                out.extend_from_slice(&x.to_le_bytes());
+            }
+            Some(LiteralValue::Float(x)) => {
+                out.push(2);
+                out.extend_from_slice(&x.to_bits().to_le_bytes());
+            }
+            Some(LiteralValue::Bool(x)) => {
+                out.push(3);
+                out.push(u8::from(*x));
+            }
+            Some(LiteralValue::Str(s))
+            | Some(LiteralValue::Uuid(s))
+            | Some(LiteralValue::EnumStr(s)) => {
+                out.push(4);
+                let b = s.as_bytes();
+                out.extend_from_slice(&(b.len() as u32).to_le_bytes());
+                out.extend_from_slice(b);
+            }
+            Some(LiteralValue::Decimal(x)) => {
+                out.push(5);
+                out.extend_from_slice(&x.to_le_bytes());
+            }
+            Some(LiteralValue::DateTimeMicros(x))
+            | Some(LiteralValue::DurationMicros(x))
+            | Some(LiteralValue::TimeNanos(x)) => {
+                out.push(6);
+                out.extend_from_slice(&x.to_le_bytes());
+            }
+            Some(LiteralValue::DateDays(x)) => {
+                out.push(7);
+                out.extend_from_slice(&x.to_le_bytes());
+            }
+            Some(LiteralValue::Binary(b)) => {
+                out.push(8);
+                out.extend_from_slice(&(b.len() as u32).to_le_bytes());
+                out.extend_from_slice(b);
+            }
+        }
+        // per-column separator
+        out.push(255);
     }
-    s
+    out
 }
 
 fn compute_counts(
     ctx: &HashMap<String, Vec<Option<LiteralValue>>>,
     cols: &[String],
-) -> (HashMap<String, usize>, HashMap<String, Vec<Option<LiteralValue>>>) {
+) -> (HashMap<Vec<u8>, usize>, HashMap<Vec<u8>, Vec<Option<LiteralValue>>>) {
     let row_count = ctx.values().next().map_or(0, std::vec::Vec::len);
-    let mut counts: HashMap<String, usize> = HashMap::new();
-    let mut exemplar: HashMap<String, Vec<Option<LiteralValue>>> = HashMap::new();
+    let mut counts: HashMap<Vec<u8>, usize> = HashMap::new();
+    let mut exemplar: HashMap<Vec<u8>, Vec<Option<LiteralValue>>> = HashMap::new();
     for i in 0..row_count {
         let sig = signature_for_row(ctx, cols, i);
         *counts.entry(sig.clone()).or_insert(0) += 1;
@@ -64,9 +111,9 @@ fn compute_counts(
 fn multiset_emit<'py>(
     py: Python<'py>,
     cols: &[String],
-    left_counts: HashMap<String, usize>,
-    left_exemplar: HashMap<String, Vec<Option<LiteralValue>>>,
-    right_counts: HashMap<String, usize>,
+    left_counts: HashMap<Vec<u8>, usize>,
+    left_exemplar: HashMap<Vec<u8>, Vec<Option<LiteralValue>>>,
+    right_counts: HashMap<Vec<u8>, usize>,
     op: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
     let out = PyDict::new_bound(py);
@@ -74,7 +121,7 @@ fn multiset_emit<'py>(
         out.set_item(c, Vec::<PyObject>::new())?;
     }
     // We append in deterministic signature order for stable tests/output.
-    let mut sigs: Vec<String> = left_counts.keys().cloned().collect();
+    let mut sigs: Vec<Vec<u8>> = left_counts.keys().cloned().collect();
     sigs.sort();
 
     // Pre-extract mutable vectors from dict.

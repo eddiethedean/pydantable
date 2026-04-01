@@ -90,6 +90,7 @@ Core operations (`collect`, `join`, `group_by`, typed `filter`, …) behave like
 | `explain(...)` | Prints core logical plan string (**1.9.0+**) |
 | `toPandas()` | `to_dict()` → `pandas.DataFrame` (eager; requires **pandas**) (**1.9.0+**) |
 | `limit(num)` | `limit(num)` |
+| `sample(withReplacement=False, fraction=..., seed=None)` | Core `sample(fraction=..., seed=..., with_replacement=...)` (eager; materializes via `to_dict()`) |
 | `drop(*cols)` | `drop(*cols)` |
 | `distinct()` | All-column distinct rows |
 | `withColumnRenamed(existing, new)` | `with_column_renamed` |
