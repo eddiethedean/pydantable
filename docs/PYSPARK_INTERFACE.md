@@ -123,3 +123,12 @@ ops, joins/group-by, reshape (`melt`/`pivot`), rolling/dynamic windows, temporal
 columns/literals, **global `select` aggregates** (`F.sum`, `F.avg`, `F.count`, `F.min`,
 `F.max`), and **window** functions (`row_number`, `lag`, `lead`, …). Details:
 [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md).
+
+## Regression tests
+
+Automated coverage for `pydantable.pyspark` lives in:
+
+- `tests/test_pyspark_dataframe_coverage.py` — Spark-named `DataFrame` / `DataFrameModel` methods (including **1.9.0** additions such as `groupBy`, `count()`, `unionByName`, `fillna`/`dropna`, set-style helpers, `explain` / `printSchema`).
+- `tests/test_pyspark_interface_surface.py` — larger pipelines (join → `groupBy` → agg → melt/pivot, rolling/dynamic windows, temporal filters).
+
+Run selectively: `pytest tests/test_pyspark_dataframe_coverage.py tests/test_pyspark_interface_surface.py`.

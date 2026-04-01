@@ -224,3 +224,77 @@ def test_pyspark_model_groupby_and_cross_join() -> None:
         keys=["x"],
     )
     assert mx.crossJoin(my).count() == 2
+
+
+def test_pyspark_group_by_snake_case_returns_pyspark_grouped() -> None:
+    df = DataFrame[Row]({"id": [1, 1], "name": ["a", "b"], "age": [1, 2]})
+    g = df.group_by("id")
+    assert type(g).__name__ == "PySparkGroupedDataFrame"
+
+
+def test_pyspark_join_returns_pyspark_dataframe() -> None:
+    left = DataFrame[Row]({"id": [1, 2], "name": ["a", "b"], "age": [10, 20]})
+    right = DataFrame[Row]({"id": [1, 2], "name": ["a", "b"], "age": [10, 20]})
+    j = left.join(right, on="id", how="inner")
+    assert j.__class__.__module__ == "pydantable.pyspark.dataframe"
+
+
+def test_pyspark_except_all_matches_subtract() -> None:
+    df1 = DataFrame[Row]({"id": [1, 2], "name": ["a", "b"], "age": [1, 2]})
+    df2 = DataFrame[Row]({"id": [2, 3], "name": ["b", "c"], "age": [2, 3]})
+    assert df1.exceptAll(df2).to_dict() == df1.subtract(df2).to_dict()
+
+
+def test_pyspark_intersect_union_by_name_require_compatible_schemas() -> None:
+    df1 = DataFrame[Row]({"id": [1], "name": ["a"], "age": [1]})
+
+    class Other(Schema):
+        id: int
+        x: str
+
+    df_other = DataFrame[Other]({"id": [1], "x": ["z"]})
+    with pytest.raises(ValueError, match="identical schemas"):
+        df1.intersect(df_other)
+
+    class Extra(Schema):
+        id: int
+        name: str
+        age: int
+        z: int
+
+    df_extra = DataFrame[Extra]({"id": [2], "name": ["b"], "age": [2], "z": [0]})
+    with pytest.raises(ValueError, match="allowMissingColumns"):
+        df1.unionByName(df_extra)
+
+
+def test_pyspark_empty_dataframe_count_is_zero() -> None:
+    empty = DataFrame[Row]({"id": [], "name": [], "age": []})
+    assert empty.count() == 0
+
+
+def test_pyspark_explain_prints_non_empty(capsys: pytest.CaptureFixture[str]) -> None:
+    df = User({"id": [1], "name": ["a"], "age": [10]})
+    df.explain()
+    out = capsys.readouterr().out
+    assert len(out.strip()) > 0
+
+
+def test_pyspark_dataframe_model_count_print_schema_explain_na(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    m = User({"id": [1], "name": ["a"], "age": [10]})
+    assert m.count() == 1
+    m.printSchema()
+    assert "id" in capsys.readouterr().out
+    m.explain()
+    assert len(capsys.readouterr().out.strip()) > 0
+    dropped = m.na.drop(subset=["name"])
+    assert dropped.count() == 1
+
+
+def test_pyspark_dropna_with_thresh() -> None:
+    df = DataFrame[RowNA](
+        {"id": [1, 2, 3], "name": ["a", None, "c"], "age": [1, None, 3]}
+    )
+    out = df.dropna(thresh=2, subset=["name", "age"])
+    assert out.to_dict()["id"] == [1, 3]

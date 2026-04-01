@@ -49,7 +49,7 @@ For execution, the PySpark UI uses the same Rust/Polars path as the default expo
 
 **0.20.0:** **`DataFrame.show()`** / **`summary()`** rows above; core discovery helpers are shared with the default **`DataFrame`**. See [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.20.0**.
 
-**1.9.0:** PySpark-shaped **`groupBy`**, row-count **`count()`**, **`crossJoin`**, **`unionByName`**, join-layer **set ops**, **`fillna` / `dropna` / `.na`**, **`printSchema`**, **`explain`**, **`toPandas`**, and matching **`DataFrameModel`** methods — see table rows marked **1.9.0+** above.
+**1.9.0:** PySpark-shaped **`groupBy`**, row-count **`count()`**, **`crossJoin`**, **`unionByName`**, join-layer **set ops**, **`fillna` / `dropna` / `.na`**, **`printSchema`**, **`explain`**, **`toPandas`**, and matching **`DataFrameModel`** methods — see table rows marked **1.9.0+** above. Automated tests: `tests/test_pyspark_dataframe_coverage.py`, `tests/test_pyspark_interface_surface.py`
 
 ## Phase B status (expression surface)
 
