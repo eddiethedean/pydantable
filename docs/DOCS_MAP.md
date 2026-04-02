@@ -21,6 +21,7 @@ Use this page when you know **what you need to do**, but not **where it is docum
 - **Decision tree**: {doc}`IO_DECISION_TREE`
 - **Formats**: {doc}`IO_PARQUET`, {doc}`IO_CSV`, {doc}`IO_NDJSON`, {doc}`IO_JSON`, {doc}`IO_IPC`
 - **Transports**: {doc}`IO_HTTP`, {doc}`IO_SQL`, {doc}`IO_EXTRAS`
+- **SQLModel-first SQL I/O (v1.13 plan)**: {doc}`SQLMODEL_SQL_ROADMAP`
 - **Planning transports and async stacks**: {doc}`DATA_IO_SOURCES`
 
 ### Semantics and contracts
@@ -37,6 +38,7 @@ Use this page when you know **what you need to do**, but not **where it is docum
 ### Project & contribution
 
 - **Roadmap**: {doc}`ROADMAP`
+- **SQLModel-first SQL I/O roadmap (v1.13)**: {doc}`SQLMODEL_SQL_ROADMAP`
 - **Custom dtypes**: {doc}`CUSTOM_DTYPES` — semantic scalar types via Pydantic v2 CoreSchema + `pydantable.dtypes.register_scalar`.
 - **Strictness**: {doc}`STRICTNESS` — per-column and nested validation strictness (Phase 4).
 - **Service ergonomics**: {doc}`SERVICE_ERGONOMICS` — OpenAPI enrichments, alias ingestion, and redaction defaults (Phase 5).
