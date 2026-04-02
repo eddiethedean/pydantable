@@ -60,3 +60,14 @@ def test_profile_defaults_apply_when_inherit() -> None:
     with pytest.raises(Exception):
         DF({"x": ["1"], "inner": [{"n": "1"}]})
 
+
+def test_nested_strictness_strict_applies_to_list_and_dict_values() -> None:
+    class DF(DataFrameModel):
+        xs: list[int] = Field(json_schema_extra={"pydantable": {"nested_strictness": "strict"}})
+        m: dict[str, int] = Field(
+            json_schema_extra={"pydantable": {"nested_strictness": "strict"}}
+        )
+
+    with pytest.raises(Exception):
+        DF({"xs": [["1"]], "m": [{"a": "1"}]})
+

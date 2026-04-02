@@ -90,3 +90,20 @@ def test_json_schema_helpers_return_dicts() -> None:
     assert "properties" in row_schema
     assert "properties" in schema_schema
 
+
+def test_to_dicts_passthrough_exclude_defaults_and_async_ato_dicts() -> None:
+    class DF(DataFrameModel):
+        id: int
+        note: str | None = None
+
+    df = DF({"id": [1], "note": [None]})
+    assert df.to_dicts(exclude_defaults=True) == [{"id": 1}]
+
+    async def _run() -> None:
+        out = await df.ato_dicts(exclude_defaults=True)
+        assert out == [{"id": 1}]
+
+    import asyncio
+
+    asyncio.run(_run())
+

@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from pydantable import DataFrameModel
-from pydantable.validation_profiles import register_validation_profile
+from pydantable.validation_profiles import (
+    get_validation_profile,
+    register_validation_profile,
+    reset_validation_profiles_for_tests,
+)
 
 
 def test_pydantable_policy_merges_inheritance() -> None:
@@ -44,4 +48,13 @@ def test_validation_profile_registry_can_override() -> None:
 
     df = DF([{"id": 1}, {"id": "bad"}])
     assert df.to_dict() == {"id": [1]}
+
+
+def test_validation_profile_unknown_raises_keyerror() -> None:
+    reset_validation_profiles_for_tests()
+    try:
+        get_validation_profile("does_not_exist")
+        raise AssertionError("expected KeyError")
+    except KeyError:
+        pass
 

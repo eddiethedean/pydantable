@@ -103,6 +103,21 @@ Quick reference:
 
 See **`SUPPORTED_TYPES.md`** for the full matrix and practical notes (especially around `Expr` behavior for some types).
 
+#### Custom dtypes (semantic scalar types)
+
+If you want a domain-specific scalar type (e.g. `ULID`) that is validated/coerced by
+Pydantic v2 but treated as a supported scalar in pydantable schemas, see {doc}`CUSTOM_DTYPES`.
+
+#### Strictness and profiles
+
+For services, pydantable supports:
+
+- **Model policies** via `__pydantable__` (e.g. `validation_profile`)
+- **Validation profiles** (preset layer over `trusted_mode` / `ignore_errors` / etc.)
+- **Per-column and nested strictness** via field policies (opt-in)
+
+See {doc}`STRICTNESS` for the strictness keys and semantics.
+
 If you declare an unsupported annotation (for example `int | str`, or a `dict[...]` with non-`str` keys), pydantable raises **`TypeError` while the class body is executing**—before instances can be constructed—so bad schemas fail at import/definition time. Plain **`Schema`** subclasses used with **`DataFrame[Schema]`** do not get this early check; see **`SUPPORTED_TYPES.md`** (“When unsupported field types fail”).
 
 From this definition, `DataFrameModel` generates:

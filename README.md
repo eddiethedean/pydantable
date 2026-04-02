@@ -91,6 +91,8 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 - Strict by default on constructors.
 - Optional ingest controls: `trusted_mode`, `ignore_errors`, `on_validation_errors`.
 - Missing optional fields: `fill_missing_optional` (default `True`).
+- Validation presets: `validation_profile=...` (or `__pydantable__ = {"validation_profile": "..."}`).
+- Per-column and nested strictness: {doc}`STRICTNESS` (field policies + profile defaults).
 
 ## Documentation
 
@@ -104,6 +106,9 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 | I/O overview | [IO_OVERVIEW](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html) |
 | Pandas-like API | [PANDAS_UI](https://pydantable.readthedocs.io/en/latest/PANDAS_UI.html) |
 | FastAPI path | [GOLDEN_PATH_FASTAPI](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html) → [FASTAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) → [FASTAPI_ENHANCEMENTS](https://pydantable.readthedocs.io/en/latest/FASTAPI_ENHANCEMENTS.html) |
+| Service ergonomics (OpenAPI, aliases, redaction) | [SERVICE_ERGONOMICS](https://pydantable.readthedocs.io/en/latest/SERVICE_ERGONOMICS.html) |
+| Custom dtypes | [CUSTOM_DTYPES](https://pydantable.readthedocs.io/en/latest/CUSTOM_DTYPES.html) |
+| Strictness | [STRICTNESS](https://pydantable.readthedocs.io/en/latest/STRICTNESS.html) |
 | Cookbooks | [Cookbook index](https://pydantable.readthedocs.io/en/latest/cookbook/index.html) (FastAPI, lazy pipelines, JSON logs, …) |
 | Example multi-router app | `docs/examples/fastapi/service_layout/` in this repo |
 | Test helpers | `pydantable.testing.fastapi` — see [FASTAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) |

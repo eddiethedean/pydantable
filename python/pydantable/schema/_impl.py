@@ -514,6 +514,15 @@ def _trusted_scalar_compatible(annotation: Any, value: Any) -> bool:
         return True
     if inner is Any:
         return True
+    try:
+        from pydantable.dtypes import get_registered_scalar_base
+
+        if isinstance(inner, type):
+            base = get_registered_scalar_base(inner)
+            if base is not None:
+                inner = base
+    except Exception:
+        pass
     if isinstance(inner, type) and issubclass(inner, BaseModel):
         return isinstance(value, (Mapping, BaseModel))
     if isinstance(inner, type):

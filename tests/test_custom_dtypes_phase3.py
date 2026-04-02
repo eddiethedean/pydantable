@@ -71,3 +71,15 @@ def test_custom_scalar_identity_preserved_on_select() -> None:
     projected = df.select("id")
     assert projected.schema_fields()["id"] is ULID
 
+
+def test_custom_scalar_supported_under_strict_trusted_for_base_dtype() -> None:
+    reset_registry_for_tests()
+    register_scalar(ULID, base="str")
+
+    class DF(DataFrameModel):
+        id: ULID
+
+    # Strict trusted checks dtype compatibility; a string column should be accepted.
+    df = DF({"id": ["x"]}, trusted_mode="strict")
+    assert df.to_dict() == {"id": ["x"]}
+

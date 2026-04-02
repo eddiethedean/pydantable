@@ -15,6 +15,10 @@ class Users(DataFrameModel):
     email: str = Field(description="Email address", examples=["a@example.com"])
 
 
+class Numbers(DataFrameModel):
+    n: int = Field(description="N")
+
+
 def test_openapi_columnar_body_has_descriptions_and_examples() -> None:
     app = FastAPI()
 
@@ -60,4 +64,27 @@ def test_openapi_columnar_body_has_descriptions_and_examples() -> None:
     assert props["email"]["description"] == "Email address"
     assert props["user_id"]["examples"] == [1]
     assert props["email"]["examples"] == ["a@example.com"]
+
+
+def test_openapi_generate_examples_fallback_for_unset_examples() -> None:
+    app = FastAPI()
+
+    @app.post("/ingest")
+    def ingest(
+        df: Annotated[
+            Numbers,
+            Depends(columnar_dependency(Numbers, generate_examples=True)),
+        ]
+    ) -> dict:
+        return df.to_dict()
+
+    with TestClient(app) as client:
+        spec = client.get("/openapi.json").json()
+
+    schema = spec["paths"]["/ingest"]["post"]["requestBody"]["content"]["application/json"][
+        "schema"
+    ]
+    name = schema["$ref"].split("/")[-1]
+    props = spec["components"]["schemas"][name]["properties"]
+    assert props["n"]["examples"] == [1, 2]
 

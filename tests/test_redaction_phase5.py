@@ -24,3 +24,15 @@ def test_to_dicts_redact_default_from_policy() -> None:
     df = DF({"email": ["x"]})
     assert df.to_dicts() == [{"email": "***"}]
 
+
+def test_ato_dicts_redact_async() -> None:
+    df = Users({"user_id": [1], "email": ["a@example.com"]})
+
+    async def _run() -> None:
+        out = await df.ato_dicts(redact=True)
+        assert out == [{"user_id": 1, "email": "***"}]
+
+    import asyncio
+
+    asyncio.run(_run())
+
