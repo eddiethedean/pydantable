@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy.engine import Connection, Engine
 
-from pydantic import BaseModel, ValidationError, create_model
+from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
 from .awaitable_dataframe_model import AwaitableDataFrameModel, _short_repr_label
 from .dataframe import DataFrame, ExecutionHandle
@@ -293,20 +293,51 @@ class DataFrameModel(Generic[RowT]):
             annotations, fill_missing_optional=False, field_defaults=field_defaults
         )
 
+        row_base: type[BaseModel] = Schema
+        nested_row = class_dict.get("Row")
+        explicit_row_base = class_dict.get("__row_base__")
+        if nested_row is not None:
+            if not isinstance(nested_row, type) or not issubclass(nested_row, BaseModel):
+                raise TypeError(
+                    f"{cls.__name__}.Row must be a Pydantic BaseModel subclass "
+                    f"(got {type(nested_row).__name__})."
+                )
+            row_base = cast("type[BaseModel]", nested_row)
+        elif explicit_row_base is not None:
+            if not isinstance(explicit_row_base, type) or not issubclass(
+                explicit_row_base, BaseModel
+            ):
+                raise TypeError(
+                    f"{cls.__name__}.__row_base__ must be a Pydantic BaseModel subclass "
+                    f"(got {type(explicit_row_base).__name__})."
+                )
+            row_base = cast("type[BaseModel]", explicit_row_base)
+
+        base_cfg_raw = getattr(row_base, "model_config", None)
+        base_cfg: dict[str, Any] = (
+            dict(base_cfg_raw) if isinstance(base_cfg_raw, (dict, ConfigDict)) else {}
+        )
+        # PydanTable column dicts use Python field names; ensure models accept those
+        # even when users set `alias=` / `validation_alias=` on fields.
+        model_cfg = ConfigDict(**base_cfg, populate_by_name=True)
+
         cls._RowModel_fill_missing_optional = create_model(  # type: ignore[call-overload]
             f"{cls.__name__}RowModel",
-            __base__=Schema,
+            __base__=row_base,
+            __config__=model_cfg,
             **field_defs_fill,
         )
         cls._RowModel_require_optional = create_model(  # type: ignore[call-overload]
             f"{cls.__name__}RowModelRequireOptional",
-            __base__=Schema,
+            __base__=row_base,
+            __config__=model_cfg,
             **field_defs_require,
         )
         cls.RowModel = cls._RowModel_fill_missing_optional
         cls._SchemaModel = create_model(  # type: ignore[call-overload]
             f"{cls.__name__}Schema",
-            __base__=Schema,
+            __base__=row_base,
+            __config__=model_cfg,
             **field_defs_schema,
         )
 
@@ -1489,14 +1520,14 @@ class DataFrameModel(Generic[RowT]):
         """
         return cast("list[RowT]", self.collect())
 
-    def to_dicts(self) -> list[dict[str, Any]]:
+    def to_dicts(self, **model_dump_kwargs: Any) -> list[dict[str, Any]]:
         """
         Return JSON-friendly row dictionaries.
 
         Uses the generated `RowModel` so field aliases / defaults are
         respected consistently with Pydantic.
         """
-        return [row.model_dump() for row in self.rows()]
+        return [row.model_dump(**model_dump_kwargs) for row in self.rows()]
 
     async def acollect(
         self,
@@ -1607,19 +1638,31 @@ class DataFrameModel(Generic[RowT]):
     async def arows(
         self,
         *,
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         executor: Executor | None = None,
     ) -> list[RowT]:
         """Async :meth:`rows` (same as ``await acollect()``)."""
-        return cast("list[RowT]", await self.acollect(executor=executor))
+        return cast(
+            "list[RowT]",
+            await self.acollect(
+                streaming=streaming, engine_streaming=engine_streaming, executor=executor
+            ),
+        )
 
     async def ato_dicts(
         self,
         *,
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
         executor: Executor | None = None,
+        **model_dump_kwargs: Any,
     ) -> list[dict[str, Any]]:
         """Async :meth:`to_dicts`."""
-        rows = await self.arows(executor=executor)
-        return [row.model_dump() for row in rows]
+        rows = await self.arows(
+            streaming=streaming, engine_streaming=engine_streaming, executor=executor
+        )
+        return [row.model_dump(**model_dump_kwargs) for row in rows]
 
     def select(self, *cols: Any) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.select(*cols))
@@ -1998,6 +2041,39 @@ class DataFrameModel(Generic[RowT]):
     @classmethod
     def schema_model(cls) -> type[Schema]:
         return cls._SchemaModel
+
+    @classmethod
+    def row_json_schema(cls, **kwargs: Any) -> dict[str, Any]:
+        """Convenience wrapper for ``cls.row_model().model_json_schema(**kwargs)``."""
+        return cast("dict[str, Any]", cls.row_model().model_json_schema(**kwargs))
+
+    @classmethod
+    def schema_json_schema(cls, **kwargs: Any) -> dict[str, Any]:
+        """Convenience wrapper for ``cls.schema_model().model_json_schema(**kwargs)``."""
+        return cast("dict[str, Any]", cls.schema_model().model_json_schema(**kwargs))
+
+    @classmethod
+    def column_policies(cls) -> dict[str, dict[str, Any]]:
+        """
+        Return per-column policy dicts from ``Field(json_schema_extra={...})``.
+
+        Phase 1: shallow/top-level only. Values are read from
+        ``json_schema_extra['pydantable']`` on the generated schema model.
+        """
+        from .policies import column_policies as _cp
+
+        return _cp(cls.schema_model())
+
+    @classmethod
+    def column_policy(cls, name: str) -> dict[str, Any]:
+        """
+        Return one column's policy dict (empty if unset).
+
+        Raises ``KeyError`` if ``name`` is not a schema field.
+        """
+        from .policies import column_policy as _c1
+
+        return _c1(cls.schema_model(), name)
 
     @classmethod
     def concat(

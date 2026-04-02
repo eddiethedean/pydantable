@@ -337,6 +337,7 @@ class AwaitableDataFrameModel(Generic[RowT]):
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         executor: Executor | None = None,
+        **model_dump_kwargs: Any,
     ) -> Coroutine[Any, Any, Any]:
         async def _run() -> Any:
             df = await self._get_df()
@@ -344,6 +345,7 @@ class AwaitableDataFrameModel(Generic[RowT]):
                 streaming=streaming,
                 engine_streaming=engine_streaming,
                 executor=executor,
+                **model_dump_kwargs,
             )
 
         return _run()

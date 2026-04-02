@@ -313,10 +313,21 @@ Users.column_policies()
 
 ### Phase 1 — “Pydantic-first schema hooks”
 
-- A1 `__row_base__` support
-- A3 serialization kwargs on `to_dicts`/`ato_dicts`
-- B1 namespaced column metadata reading utilities
-- G1 introspection helpers
+Implemented (target: **1.12.0**):
+
+- **A1/A2 RowModel base hooks**: `DataFrameModel` supports both:
+  - `__row_base__ = SomePydanticModel`
+  - nested `class Row(Schema): ...`
+  with precedence **nested `Row` wins**, else `__row_base__`, else default `Schema`.
+- **A3 Serialization passthrough**:
+  - `df.to_dicts(**model_dump_kwargs)` forwards to `row.model_dump(**...)`
+  - `await df.ato_dicts(**model_dump_kwargs)` forwards similarly
+- **B1 Column metadata reading**:
+  - `MyDF.column_policies()` / `MyDF.column_policy(name)` read from
+    `Field(json_schema_extra={"pydantable": {...}})` on schema fields.
+- **G1 Introspection helpers**:
+  - `MyDF.row_json_schema(**kwargs)` / `MyDF.schema_json_schema(**kwargs)`
+    wrap Pydantic `model_json_schema`.
 
 ### Phase 2 — “Policies become behavior”
 

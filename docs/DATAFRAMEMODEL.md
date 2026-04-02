@@ -32,6 +32,56 @@ class UserDF(DataFrameModel):
 
 Defining the class does not print anything; it registers `UserDF.RowModel` and the schema model used by the internal `DataFrame`.
 
+### Customizing the generated RowModel (Pydantic hooks)
+
+`DataFrameModel` generates Pydantic model types for row validation and materialization.
+You can customize those generated models with **Pydantic v2 config and validators** in two ways:
+
+1) **Nested `Row`** (highest precedence)
+
+```python
+from pydantic import ConfigDict, field_validator
+
+from pydantable import DataFrameModel, Schema
+
+
+class Users(DataFrameModel):
+    class Row(Schema):
+        model_config = ConfigDict(str_strip_whitespace=True)
+
+        # Validators on a base model can target fields declared on the DataFrameModel.
+        # Use `check_fields=False` since the base class itself doesn't declare `email`.
+        @field_validator("email", check_fields=False)
+        @classmethod
+        def normalize_email(cls, v: str) -> str:
+            return v.lower()
+
+    id: int
+    email: str
+```
+
+2) **`__row_base__`** (used when no nested `Row` is present)
+
+```python
+class UsersRowBase(Schema):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class Users(DataFrameModel):
+    __row_base__ = UsersRowBase
+
+    id: int
+    email: str
+```
+
+**Precedence:** nested `Row` wins; else `__row_base__`; else the default `Schema` base.
+
+```{note}
+PydanTable uses **Python field names** as column keys (e.g. `"email"`), even when you set
+Pydantic `alias=` / `validation_alias=` on fields. Generated models are configured so
+they still accept Python field names during validation/materialization.
+```
+
 ### Field annotations (supported dtypes)
 
 Column fields must use types from **`SUPPORTED_TYPES.md`** (canonical list + notes).
@@ -486,8 +536,8 @@ produces:
 - `df.collect()` -> `Any` (shape depends on flags like `as_lists` / `as_numpy` / `as_polars`)
 - `df.rows()` -> `list[RowModel]` (typed materialization API; validated against the current schema)
 - `df.to_dict()` -> columnar `dict[str, list]` (use for column-shaped API responses)
-- `df.to_dicts()` -> list of dicts (JSON-friendly), derived from row models
-- `await df.acollect()`, `await df.ato_dict()`, `await df.ato_polars()`, `await df.arows()`, `await df.ato_dicts()` -> async counterparts (`arows()` is the typed row materialization)
+- `df.to_dicts(**model_dump_kwargs)` -> list of dicts (JSON-friendly), derived from row models via Pydantic `model_dump`
+- `await df.acollect()`, `await df.ato_dict()`, `await df.ato_polars()`, `await df.arows()`, `await df.ato_dicts(**model_dump_kwargs)` -> async counterparts (`arows()` is the typed row materialization)
 
 This is the “bridge” between columnar execution and Pydantic row semantics.
 
