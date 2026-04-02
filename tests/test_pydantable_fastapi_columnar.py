@@ -17,6 +17,7 @@ from pydantable.fastapi import (
     columnar_body_model_from_dataframe_model,
     columnar_dependency,
     get_executor,
+    ingest_error_response,
     register_exception_handlers,
     rows_dependency,
 )
@@ -104,6 +105,24 @@ def test_columnar_dependency_strict_mode_accepts_valid_integers() -> None:
         assert r.json() == {"id": [1], "age": [42]}
 
 
+def test_columnar_dependency_validation_profile_trusted_upstream() -> None:
+    app = FastAPI()
+
+    @app.post("/col")
+    def route(
+        df: Annotated[
+            UserDF,
+            Depends(columnar_dependency(UserDF, validation_profile="trusted_upstream")),
+        ],
+    ) -> dict[str, list]:
+        return df.to_dict()
+
+    with fastapi_test_client(app) as client:
+        # strict mode would reject strings; trusted_upstream (shape_only) should accept.
+        r = client.post("/col", json={"id": ["1"], "age": [None]})
+        assert r.status_code == 200
+
+
 def test_register_handlers_column_length_mismatch_from_direct_raise() -> None:
     app = FastAPI()
     register_exception_handlers(app)
@@ -116,6 +135,25 @@ def test_register_handlers_column_length_mismatch_from_direct_raise() -> None:
         r = client.get("/direct")
         assert r.status_code == 400
         assert r.json()["detail"] == "test detail"
+
+
+def test_ingest_error_response_returns_structured_payload() -> None:
+    failures = [
+        {
+            "row_index": 0,
+            "row": {"id": "bad"},
+            "errors": [{"type": "int_parsing", "loc": ("id",), "msg": "bad", "input": "bad"}],
+        }
+    ]
+    resp = ingest_error_response(failures, status_code=422, title="Bad rows")
+    assert resp.status_code == 422
+    # Starlette JSONResponse stores bytes body; decode to check shape.
+    import json
+
+    payload = json.loads(resp.body.decode("utf-8"))
+    assert payload["title"] == "Bad rows"
+    assert isinstance(payload["failures"], list)
+    assert payload["failures"][0]["row_index"] == 0
 
 
 def test_columnar_dependency_422_invalid_list_element_type() -> None:

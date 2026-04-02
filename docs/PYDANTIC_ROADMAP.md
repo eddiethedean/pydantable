@@ -166,6 +166,9 @@ class Users(DataFrameModel):
 
 - **Implementation notes**:
   - Keep this separate from `model_config` (Pydantic) to avoid collisions.
+- **Status (Phase 2)**:
+  - Implemented on `DataFrameModel` as `__pydantable__ = {...}` plus
+    `MyDF.pydantable_policy()` for merged inheritance.
 - **Test strategy**:
   - Verify policy is inherited by derived models where it makes sense (or explicitly not).
 
@@ -257,6 +260,14 @@ df = Users(data, validation_profile="batch_lenient")
     - serialization defaults (`exclude_none`, `mode="json"`)
 - **Implementation notes**:
   - Keep as a thin preset layer over existing knobs.
+- **Status (Phase 2)**:
+  - Implemented as built-in profiles plus a registry API:
+    `pydantable.validation_profiles.register_validation_profile(...)`.
+  - Supported entrypoints:
+    - `DataFrameModel(..., validation_profile=...)`
+    - `__pydantable__ = {"validation_profile": "..."}` defaults
+    - `pydantable.fastapi.columnar_dependency(..., validation_profile=...)`
+      / `rows_dependency(..., validation_profile=...)`
 - **Test strategy**:
   - Profiles map deterministically to existing behavior.
 
@@ -331,9 +342,19 @@ Implemented (target: **1.12.0**):
 
 ### Phase 2 — “Policies become behavior”
 
-- B2 schema-level policy sets
-- E1 validation profiles (preset layer)
-- F2 structured ingest error schema + FastAPI mapping helpers
+Implemented:
+
+- **B2 schema-level policy sets**:
+  - `DataFrameModel` subclasses can set `__pydantable__ = {...}` (forward-compatible keys).
+  - `MyDF.pydantable_policy()` returns the merged policy across inheritance.
+- **E1 validation profiles (preset layer + registry)**:
+  - `DataFrameModel(..., validation_profile="service_strict" | "batch_lenient" | "trusted_upstream")`
+  - Or set a default via `__pydantable__ = {"validation_profile": "..."}`.
+  - Custom profiles can be registered via `pydantable.validation_profiles.register_validation_profile(name, cfg)`.
+  - FastAPI `Depends` helpers accept `validation_profile=` (for `columnar_dependency` and `rows_dependency`).
+- **F2 structured ingest error schema + FastAPI mapping**:
+  - `pydantable.ingest_errors`: `IngestRowFailure`, `IngestValidationErrorDetail`, `coerce_validation_failures`.
+  - `pydantable.fastapi.ingest_error_response(failures, status_code=..., title=...)` returns a stable JSON payload.
 
 ### Phase 3 — “Custom dtypes as a first-class extension point”
 

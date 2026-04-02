@@ -15,6 +15,7 @@ from starlette.responses import StreamingResponse
 from pydantable._extension import MissingRustExtensionError
 from pydantable.dataframe_model import DataFrameModel
 from pydantable.errors import ColumnLengthMismatchError, PydantableUserError
+from pydantable.ingest_errors import IngestRowFailure, IngestValidationErrorDetail
 
 _DFM = TypeVar("_DFM", bound=DataFrameModel[Any])
 
@@ -54,6 +55,7 @@ def columnar_dependency(
     trusted_mode: Literal["off", "shape_only", "strict"] | None = ...,
     fill_missing_optional: bool = ...,
     ignore_errors: bool = ...,
+    validation_profile: str | None = ...,
     json_schema_extra: dict[str, Any] | None = ...,
     example: dict[str, list[Any]] | None = ...,
 ) -> Callable[..., _DFM]: ...
@@ -63,11 +65,21 @@ def rows_dependency(
     trusted_mode: Literal["off", "shape_only", "strict"] | None = ...,
     fill_missing_optional: bool = ...,
     ignore_errors: bool = ...,
+    validation_profile: str | None = ...,
     on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = ...,
 ) -> Callable[..., _DFM]: ...
 
+def ingest_error_response(
+    failures: object,
+    *,
+    status_code: int = ...,
+    title: str = ...,
+) -> Any: ...
+
 __all__ = [
     "ColumnLengthMismatchError",
+    "IngestRowFailure",
+    "IngestValidationErrorDetail",
     "MissingRustExtensionError",
     "PydantableUserError",
     "columnar_body_model",
@@ -75,6 +87,7 @@ __all__ = [
     "columnar_dependency",
     "executor_lifespan",
     "get_executor",
+    "ingest_error_response",
     "ndjson_chunk_bytes",
     "ndjson_streaming_response",
     "register_exception_handlers",

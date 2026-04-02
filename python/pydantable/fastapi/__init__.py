@@ -19,6 +19,11 @@ from starlette.responses import StreamingResponse
 
 from pydantable._extension import MissingRustExtensionError
 from pydantable.errors import ColumnLengthMismatchError, PydantableUserError
+from pydantable.ingest_errors import (
+    IngestRowFailure,
+    IngestValidationErrorDetail,
+    coerce_validation_failures,
+)
 
 from .columnar import (
     columnar_body_model,
@@ -29,6 +34,8 @@ from .columnar import (
 
 __all__ = [
     "ColumnLengthMismatchError",
+    "IngestRowFailure",
+    "IngestValidationErrorDetail",
     "MissingRustExtensionError",
     "PydantableUserError",
     "columnar_body_model",
@@ -36,11 +43,31 @@ __all__ = [
     "columnar_dependency",
     "executor_lifespan",
     "get_executor",
+    "ingest_error_response",
     "ndjson_chunk_bytes",
     "ndjson_streaming_response",
     "register_exception_handlers",
     "rows_dependency",
 ]
+
+
+def ingest_error_response(
+    failures: object,
+    *,
+    status_code: int = 422,
+    title: str = "Ingest validation failed",
+) -> JSONResponse:
+    """
+    Return a structured JSON response describing batch ingest validation failures.
+
+    Intended for use with `ignore_errors=True` and `on_validation_errors=...` where you
+    accept partial success but need a stable error payload for clients.
+    """
+    from fastapi.responses import JSONResponse
+
+    coerced = coerce_validation_failures(failures)
+    detail = IngestValidationErrorDetail(title=title, failures=coerced)
+    return JSONResponse(status_code=status_code, content=detail.model_dump(mode="json"))
 
 
 @asynccontextmanager

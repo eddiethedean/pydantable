@@ -269,6 +269,35 @@ Behavior contract:
 - Columnar input (`dict[str, list]`) also supports best-effort skipping in
   `ignore_errors=True` mode.
 
+## Validation profiles (Phase 2)
+
+For convenience, you can apply a **validation profile** (a preset for
+`trusted_mode`, `fill_missing_optional`, and `ignore_errors`).
+
+Profiles can be selected per call:
+
+```python
+df = UserDF(data, validation_profile="batch_lenient")
+```
+
+Or configured per model:
+
+```python
+class UserDF(DataFrameModel):
+    __pydantable__ = {"validation_profile": "service_strict"}
+
+    id: int
+    age: int | None
+```
+
+Built-in profiles include:
+
+- `service_strict`
+- `batch_lenient`
+- `trusted_upstream`
+
+You can also register your own profiles via `pydantable.validation_profiles`.
+
 ### Missing optional fields default to `None`
 
 When ingesting data, **optional schema fields** (`Optional[T]` / `T | None`) do **not** need to be present in the input when `fill_missing_optional=True`:

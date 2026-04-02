@@ -349,6 +349,7 @@ class DataFrameModel(Generic[RowT]):
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        validation_profile: str | None = None,
     ) -> None:
         """Load columnar data or rows.
 
@@ -375,6 +376,18 @@ class DataFrameModel(Generic[RowT]):
             self._RowModel_fill_missing_optional
             if fill_missing_optional
             else self._RowModel_require_optional
+        )
+        if validation_profile is None:
+            validation_profile = cast(
+                "str | None", self.pydantable_policy().get("validation_profile")
+            )
+        from .validation_profiles import apply_validation_profile
+
+        trusted_mode, fill_missing_optional, ignore_errors = apply_validation_profile(
+            profile_name=validation_profile,
+            current_trusted_mode=trusted_mode,
+            current_fill_missing_optional=fill_missing_optional,
+            current_ignore_errors=ignore_errors,
         )
         normalized, from_rows = _normalize_input(
             data=data,
@@ -2041,6 +2054,13 @@ class DataFrameModel(Generic[RowT]):
     @classmethod
     def schema_model(cls) -> type[Schema]:
         return cls._SchemaModel
+
+    @classmethod
+    def pydantable_policy(cls) -> dict[str, Any]:
+        """Return merged ``__pydantable__`` policy dict (Phase 2)."""
+        from .model_policies import merged_model_policy
+
+        return merged_model_policy(cls)
 
     @classmethod
     def row_json_schema(cls, **kwargs: Any) -> dict[str, Any]:

@@ -67,9 +67,10 @@ Then import `pydantable.fastapi` (not required for basic FastAPI usage):
 - **`executor_lifespan(app, max_workers=..., thread_name_prefix=...)`** — async context manager that attaches a `ThreadPoolExecutor` to **`app.state.executor`** for **`acollect(executor=...)`** and **`pydantable.io`** helpers.
 - **`get_executor(request)`** — for **`Depends(get_executor)`**, returning **`request.app.state.executor`** (or **`None`** if unset).
 - **`register_exception_handlers(app)`** — registers HTTP handlers for **`MissingRustExtensionError`** (**503**), **`ColumnLengthMismatchError`** (**400**), and in-handler **`pydantic.ValidationError`** (**422**); see {ref}`fastapi-errors`.
+- **`ingest_error_response(failures, status_code=..., title=...)`** — build a structured JSON payload for batch ingest failures (typically produced by `ignore_errors=True` + `on_validation_errors=...`). This is meant for *in-handler* validation failures, not request parsing errors (which remain FastAPI’s **422**).
 - **`ndjson_streaming_response(astream_iter)`** / **`ndjson_chunk_bytes(astream_iter)`** — build **`application/x-ndjson`** **`StreamingResponse`** from **`await df.astream(...)`** without duplicating JSON line encoding; see {doc}`/FASTAPI_ENHANCEMENTS`.
 - **`columnar_body_model`**, **`columnar_body_model_from_dataframe_model`** — build a Pydantic model whose fields are **`list[T]`** per column (OpenAPI-friendly **`dict[str, list]`**). Optional **`example=`** / **`json_schema_extra=`** for Swagger examples.
-- **`columnar_dependency(model_cls, ...)`**, **`rows_dependency(model_cls, ...)`** — **`Depends(...)`** factories that validate the request body and return a **`DataFrameModel`** instance (columnar JSON or **`list[RowModel]`**), forwarding **`trusted_mode`** and related **`DataFrameModel`** kwargs.
+- **`columnar_dependency(model_cls, ...)`**, **`rows_dependency(model_cls, ...)`** — **`Depends(...)`** factories that validate the request body and return a **`DataFrameModel`** instance (columnar JSON or **`list[RowModel]`**), forwarding **`trusted_mode`** and related **`DataFrameModel`** kwargs. `validation_profile=` is also supported as a preset layer over `trusted_mode` / `fill_missing_optional` / `ignore_errors`.
 
 Inbound request validation is still FastAPI’s default **`RequestValidationError`** (**422**) when the *request body* fails to parse.
 

@@ -113,6 +113,7 @@ def columnar_dependency(
     trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
     fill_missing_optional: bool = True,
     ignore_errors: bool = False,
+    validation_profile: str | None = None,
     json_schema_extra: dict[str, Any] | None = None,
     example: dict[str, list[Any]] | None = None,
 ) -> Any:
@@ -136,6 +137,7 @@ def columnar_dependency(
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
+            validation_profile=validation_profile,
         )
 
     dep.__annotations__ = {"body": Col, "return": model_cls}
@@ -148,6 +150,7 @@ def rows_dependency(
     trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
     fill_missing_optional: bool = True,
     ignore_errors: bool = False,
+    validation_profile: str | None = None,
     on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> Any:
     """Return a FastAPI dependency that parses a JSON array of rows into ``model_cls``.
@@ -164,6 +167,7 @@ def rows_dependency(
                 trusted_mode=trusted_mode,
                 fill_missing_optional=fill_missing_optional,
                 ignore_errors=ignore_errors,
+                validation_profile=validation_profile,
                 on_validation_errors=on_validation_errors,
             ),
         )
