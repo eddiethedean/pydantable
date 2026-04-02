@@ -18,6 +18,7 @@ from decimal import Decimal
 from typing import (
     Annotated,
     Any,
+    ClassVar,
     Literal,
     Union,
     cast,
@@ -261,6 +262,11 @@ def validate_dataframe_model_field_annotations(
     is defined with an unsupported column type (e.g. ``dict[...]``, bare ``list``).
     """
     for field_name, field_type in annotations.items():
+        # `DataFrameModel` subclasses may declare non-column configuration attributes
+        # as `ClassVar[...]` (e.g. `__pydantable__`). These are not dataframe columns.
+        origin = get_origin(field_type)
+        if origin is ClassVar:
+            continue
         if not is_supported_column_annotation(field_type):
             raise TypeError(
                 f"DataFrameModel {model_name!r} field {field_name!r} has unsupported "
