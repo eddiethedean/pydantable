@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.12.0] — 2026-04-02
+
+### Changed
+
+- **Version bump:** Align Python package metadata, Rust crate, and published `__version__` to **1.12.0**.
+
 ## [1.11.0] — 2026-04-01
 
 ### Added
