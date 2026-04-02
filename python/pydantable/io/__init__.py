@@ -166,7 +166,15 @@ def read_ndjson(
     columns: list[str] | None = None,
     **scan_kwargs: Any,
 ) -> Any:
-    """Lazy newline-delimited JSON read (local path); returns ``ScanFileRoot``."""
+    """Lazy newline-delimited JSON read (local path); returns ``ScanFileRoot``.
+
+    Extra keyword arguments are forwarded as Polars ``LazyJsonLineReader`` options (e.g.
+    ``low_memory``, ``rechunk``, ``ignore_errors``, ``n_rows``, ``infer_schema_length``,
+    ``glob``, ``include_file_paths``, ``row_index_name``, ``row_index_offset``). ``glob=False``
+    raises ``ValueError`` (Polars 0.53 NDJSON scans always expand paths). Unknown keys raise
+    ``ValueError`` from the Rust layer. Per-scan details: ``IO_NDJSON`` on the doc site; kwargs
+    matrix: ``DATA_IO_SOURCES`` (**Audit: Polars 0.53.x vs pydantable**).
+    """
     sk = scan_kwargs if scan_kwargs else None
     return _scan_file_root(path, "ndjson", columns=columns, scan_kwargs=sk)
 

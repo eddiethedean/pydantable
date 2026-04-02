@@ -369,13 +369,26 @@ fn lazy_ndjson_with_kwargs(
 ) -> PyResult<LazyJsonLineReader> {
     let mut r = LazyJsonLineReader::new(path);
     const ALLOWED: &[&str] = &[
+        "glob",
         "low_memory",
         "rechunk",
         "ignore_errors",
         "n_rows",
         "infer_schema_length",
+        "include_file_paths",
+        "row_index_name",
+        "row_index_offset",
     ];
     unknown_scan_keys(py, kw, ALLOWED)?;
+    // Polars 0.53: LazyJsonLineReader::finish hardcodes UnifiedScanArgs { glob: true, ... };
+    // there is no with_glob on the reader—disabling expansion is unsupported.
+    if let Some(v) = get_bool(kw, "glob")? {
+        if !v {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "ndjson scan: glob=False is not supported; Polars 0.53 NDJSON scans always expand paths (UnifiedScanArgs.glob is fixed to true)",
+            ));
+        }
+    }
     if let Some(v) = get_bool(kw, "low_memory")? {
         r = r.low_memory(v);
     }
@@ -403,6 +416,27 @@ fn lazy_ndjson_with_kwargs(
             }
         }
     }
+
+    if kw.contains("include_file_paths")? {
+        match kw.get_item("include_file_paths")? {
+            None => {}
+            Some(v) if v.is_none() => {
+                r = r.with_include_file_paths(None);
+            }
+            Some(v) => {
+                let s: String = v.extract()?;
+                r = r.with_include_file_paths(Some(PlSmallStr::from_str(&s)));
+            }
+        }
+    }
+
+    match row_index_update_from_kwargs(kw)? {
+        None => {}
+        Some(ri) => {
+            r = r.with_row_index(ri);
+        }
+    }
+
     Ok(r)
 }
 

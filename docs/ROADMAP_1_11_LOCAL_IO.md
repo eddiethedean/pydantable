@@ -68,8 +68,10 @@
 
 ### B3 — NDJSON / JSON Lines
 
-- [ ] If **`LazyJsonLineReader`** / **`LazyFileListReader`** supports **`with_glob`** (or equivalent), add **`glob`** (and any required siblings) to **`lazy_ndjson_with_kwargs`** and document in {doc}`IO_NDJSON`.
-- [ ] Tests: directory of **`.jsonl`** / **`.ndjson`** files; optional mixed extension policy (document if unsupported).
+**B3 shipped:** **`glob`** ( **`glob=False`** → **`ValueError`**; Polars 0.53 fixes **`UnifiedScanArgs.glob`** to **`true`** in **`LazyJsonLineReader::finish`**—no **`with_glob`** on the reader), **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** in **`lazy_ndjson_with_kwargs`** (`scan_kw.rs`); tests **`tests/test_ndjson_scan_directory_b3.py`** (directory + **`*.jsonl`**, hive path, unknown kw, **`glob=False`**, row index / include paths, mixed-extension glob).
+
+- [x] **`glob`** and lineage-style **`include_file_paths`** / **`row_index_*`** in **`lazy_ndjson_with_kwargs`**; document in {doc}`IO_NDJSON` (Polars does not expose disabling glob for NDJSON).
+- [x] Tests: directory of **`.jsonl`** files; mixed **`.jsonl`** / **`.ndjson`** + **`*.jsonl`** glob documents extension filtering.
 
 ### B4 — IPC / Feather
 
@@ -136,7 +138,7 @@
 
 ## Phase F — Quality bar
 
-- [ ] **Pytest:** fixtures for **flat directory**, **hive-partitioned**, **glob**, **NDJSON directory** (post Phase B3), regression tests for **kwargs** allowlists.
+- [ ] **Pytest:** fixtures for **flat directory**, **hive-partitioned**, **glob**, **NDJSON directory** (**`tests/test_ndjson_scan_directory_b3.py`** — Phase B3), regression tests for **kwargs** allowlists.
 - [ ] **Docs build:** Sphinx passes; new pages linked from {doc}`DOCS_MAP` and **`index`** toctree.
 - [ ] **Changelog:** {doc}`changelog` **1.11.0** section summarizes user-visible I/O changes (link this roadmap).
 - [ ] **Release hygiene:** version alignment (`pyproject.toml`, `Cargo.toml`, `__version__`, `rust_version()`), per {doc}`VERSIONING` and `tests/test_version_alignment.py`.

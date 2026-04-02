@@ -20,7 +20,7 @@ This document lists **common and useful** places applications read and write tab
 |--------|------------------------|--------------|
 | **Parquet** | **`n_rows`**, **`low_memory`**, **`rechunk`**, **`use_statistics`**, **`cache`**, **`glob`**, **`allow_missing_columns`**, **`parallel`**, **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** | **`compression`**, **`row_group_size`**, **`data_page_size`**, **`statistics`**, **`parallel`** |
 | **CSV** | **`has_header`**, **`separator`**, **`skip_rows`**, **`skip_lines`**, **`n_rows`**, **`infer_schema_length`**, **`ignore_errors`**, **`low_memory`**, **`rechunk`**, **`glob`**, **`cache`**, **`quote_char`**, **`eol_char`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`**, **`raise_if_empty`**, **`truncate_ragged_lines`**, **`decimal_comma`**, **`try_parse_dates`** | **`include_header`**, **`include_bom`** (plus top-level **`separator`**, **`compression`** where applicable) |
-| **NDJSON** | **`low_memory`**, **`rechunk`**, **`ignore_errors`**, **`n_rows`**, **`infer_schema_length`** | **`json_format`** (**`"lines"`** / **`"json"`**) |
+| **NDJSON** | **`low_memory`**, **`rechunk`**, **`ignore_errors`**, **`n_rows`**, **`infer_schema_length`**, **`glob`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** | **`json_format`** (**`"lines"`** / **`"json"`**) |
 | **IPC** | **`record_batch_statistics`** | Use top-level **`compression=`** only; extra **`write_kwargs`** are rejected. |
 
 For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **presets**, and how **`read_json`** relates to **`read_ndjson`**, see {doc}`IO_JSON` (**Large files**, **NDJSON scan kwargs**).
@@ -28,7 +28,7 @@ For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **preset
 (local-io-audit)=
 ### Audit: Polars 0.53.x vs pydantable (1.11.0 Phase A)
 
-**Scope:** Polars Rust **0.53.0** (the version pinned by **`pydantable-core`**) compared to the kwargs pydantable forwards from **`pydantable-core/src/plan/execute_polars/scan_kw.rs`** (`dispatch_file_scan`). **Parquet hive / lineage / row index** kwargs landed in {doc}`ROADMAP_1_11_LOCAL_IO` **Phase B1**; **CSV** directory/glob tests and extra **`LazyCsvReader`** kwargs in **Phase B2**; remaining gaps are tracked there (e.g. **`ScanArgsParquet.schema`**, **`HiveOptions.schema`**).
+**Scope:** Polars Rust **0.53.0** (the version pinned by **`pydantable-core`**) compared to the kwargs pydantable forwards from **`pydantable-core/src/plan/execute_polars/scan_kw.rs`** (`dispatch_file_scan`). **Parquet hive / lineage / row index** kwargs landed in {doc}`ROADMAP_1_11_LOCAL_IO` **Phase B1**; **CSV** directory/glob tests and extra **`LazyCsvReader`** kwargs in **Phase B2**; **NDJSON** **`glob`** / **`include_file_paths`** / **`row_index_*`** in **Phase B3**; remaining gaps are tracked there (e.g. **`ScanArgsParquet.schema`**, **`HiveOptions.schema`**).
 
 **Directory and glob semantics**
 
@@ -72,9 +72,12 @@ For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **preset
 | Polars / reader concern | pydantable `scan_kwargs` | Notes |
 |-------------------------|---------------------------|--------|
 | `low_memory`, `rechunk`, `ignore_errors`, `n_rows`, `infer_schema_length` | **mapped** | |
-| **`glob` (toggle)** | **not a Python kwarg** | Polars **`LazyJsonLineReader::finish`** builds **`UnifiedScanArgs { glob: true, … }`** internally; **glob expansion is on**; pydantable does not expose **`glob=False`**. |
+| **`glob` (toggle)** | **mapped** | **`glob=True`** or omitted: accepted (Polars **`LazyJsonLineReader::finish`** uses **`UnifiedScanArgs { glob: true, … }`**). **`glob=False`**: **`ValueError`** (cannot disable expansion in Polars 0.53). |
 | **`HiveOptions`** for NDJSON | **`HiveOptions::new_disabled()`** in Polars | Hive-style partition columns from paths are **disabled** for NDJSON scans in Polars 0.53. |
-| `schema`, `row_index`, `include_file_paths`, `cloud_options`, … | **not exposed** | |
+| `include_file_paths`, `row_index` | **mapped** | **`include_file_paths`** column name; **`row_index_name`** / **`row_index_offset`** (same pattern as Parquet/CSV). |
+| `schema`, `cloud_options`, … | **not exposed** | |
+
+**Tests:** multi-file directory, **`*.jsonl`** glob, hive path behavior, unknown kw, **`glob=False`**, row index / include paths, mixed-extension glob—**`tests/test_ndjson_scan_directory_b3.py`** (Phase B3).
 
 **IPC — `IpcScanOptions` + `UnifiedScanArgs` (Polars) vs pydantable `scan_kwargs`**
 
