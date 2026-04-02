@@ -395,8 +395,22 @@ Planned (target: 1.13.0+):
 
 ### Phase 5 — “Model-driven service ergonomics”
 
-- F1 richer OpenAPI generation + examples
-- Optional: schema-driven request/response transforms (aliases, redaction defaults)
+Planned (target: 1.13.0+):
+
+- **F1 richer OpenAPI generation + examples**
+  - Enrich `pydantable.fastapi.columnar_body_model(...)` to propagate
+    `Field(description=..., examples=...)` from `DataFrameModel` schema fields into the
+    generated OpenAPI request schema.
+  - Provide optional, lightweight example generation for columnar bodies when user
+    examples are not supplied (type-based defaults, optionally augmented by
+    `Field(examples=[...])`).
+  - Add deterministic OpenAPI tests asserting key schema fragments for columnar and
+    row-array request bodies.
+- **Schema-driven request/response transforms**
+  - **Alias-aware ingestion (columnar bodies)**: allow FastAPI dependencies to accept
+    alias keys and map them to python field names before constructing `DataFrameModel`.
+  - **Redaction defaults (responses)**: allow `to_dicts()` / `ato_dicts()` to apply
+    policy-driven redaction for flagged columns (opt-in), suitable for API responses.
 
 ## Non-goals / cautions
 

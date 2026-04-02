@@ -70,7 +70,7 @@ Then import `pydantable.fastapi` (not required for basic FastAPI usage):
 - **`ingest_error_response(failures, status_code=..., title=...)`** — build a structured JSON payload for batch ingest failures (typically produced by `ignore_errors=True` + `on_validation_errors=...`). This is meant for *in-handler* validation failures, not request parsing errors (which remain FastAPI’s **422**).
 - **`ndjson_streaming_response(astream_iter)`** / **`ndjson_chunk_bytes(astream_iter)`** — build **`application/x-ndjson`** **`StreamingResponse`** from **`await df.astream(...)`** without duplicating JSON line encoding; see {doc}`/FASTAPI_ENHANCEMENTS`.
 - **`columnar_body_model`**, **`columnar_body_model_from_dataframe_model`** — build a Pydantic model whose fields are **`list[T]`** per column (OpenAPI-friendly **`dict[str, list]`**). Optional **`example=`** / **`json_schema_extra=`** for Swagger examples.
-- **`columnar_dependency(model_cls, ...)`**, **`rows_dependency(model_cls, ...)`** — **`Depends(...)`** factories that validate the request body and return a **`DataFrameModel`** instance (columnar JSON or **`list[RowModel]`**), forwarding **`trusted_mode`** and related **`DataFrameModel`** kwargs. `validation_profile=` is also supported as a preset layer over `trusted_mode` / `fill_missing_optional` / `ignore_errors`.
+- **`columnar_dependency(model_cls, ...)`**, **`rows_dependency(model_cls, ...)`** — **`Depends(...)`** factories that validate the request body and return a **`DataFrameModel`** instance (columnar JSON or **`list[RowModel]`**), forwarding **`trusted_mode`** and related **`DataFrameModel`** kwargs. `validation_profile=` is also supported as a preset layer over `trusted_mode` / `fill_missing_optional` / `ignore_errors`. Phase 5 adds `generate_examples=` (OpenAPI enrichment) and `input_key_mode=` (alias-aware columnar ingestion).
 
 Inbound request validation is still FastAPI’s default **`RequestValidationError`** (**422**) when the *request body* fails to parse.
 
@@ -90,6 +90,14 @@ app = FastAPI()
 
 @app.post("/ingest")
 def ingest(df: Annotated[User, Depends(columnar_dependency(User, trusted_mode="strict"))]) -> dict:
+    return df.to_dict()
+```
+
+To accept alias keys in **columnar** request bodies, use `input_key_mode=`:
+
+```python
+@app.post("/ingest")
+def ingest(df: Annotated[User, Depends(columnar_dependency(User, input_key_mode="both"))]) -> dict:
     return df.to_dict()
 ```
 

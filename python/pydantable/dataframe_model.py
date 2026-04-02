@@ -1549,14 +1549,23 @@ class DataFrameModel(Generic[RowT]):
         """
         return cast("list[RowT]", self.collect())
 
-    def to_dicts(self, **model_dump_kwargs: Any) -> list[dict[str, Any]]:
+    def to_dicts(
+        self, *, redact: bool | None = None, **model_dump_kwargs: Any
+    ) -> list[dict[str, Any]]:
         """
         Return JSON-friendly row dictionaries.
 
         Uses the generated `RowModel` so field aliases / defaults are
         respected consistently with Pydantic.
         """
-        return [row.model_dump(**model_dump_kwargs) for row in self.rows()]
+        out = [row.model_dump(**model_dump_kwargs) for row in self.rows()]
+        if redact is None:
+            redact = cast("bool", self.pydantable_policy().get("redact", False))
+        if redact:
+            from .redaction import apply_redaction_to_row_dicts
+
+            out = apply_redaction_to_row_dicts(self._SchemaModel, out)
+        return out
 
     async def acollect(
         self,
@@ -1685,13 +1694,21 @@ class DataFrameModel(Generic[RowT]):
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         executor: Executor | None = None,
+        redact: bool | None = None,
         **model_dump_kwargs: Any,
     ) -> list[dict[str, Any]]:
         """Async :meth:`to_dicts`."""
         rows = await self.arows(
             streaming=streaming, engine_streaming=engine_streaming, executor=executor
         )
-        return [row.model_dump(**model_dump_kwargs) for row in rows]
+        out = [row.model_dump(**model_dump_kwargs) for row in rows]
+        if redact is None:
+            redact = cast("bool", self.pydantable_policy().get("redact", False))
+        if redact:
+            from .redaction import apply_redaction_to_row_dicts
+
+            out = apply_redaction_to_row_dicts(self._SchemaModel, out)
+        return out
 
     def select(self, *cols: Any) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.select(*cols))

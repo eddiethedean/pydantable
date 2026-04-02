@@ -3,20 +3,50 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast, get_origin
 
-from pydantic import BaseModel, ConfigDict, Field, create_model
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, create_model, model_validator
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from pydantable.dataframe_model import DataFrameModel
 
-_COLUMNAR_MODEL_CACHE: dict[tuple[int, str, str], type[BaseModel]] = {}
+_COLUMNAR_MODEL_CACHE: dict[tuple[int, str, str, bool, str], type[BaseModel]] = {}
 
 
 def _column_list_annotation(cell_annotation: Any) -> Any:
     return list[cell_annotation]
+
+
+def _example_list_for_annotation(annotation: Any) -> list[Any] | None:
+    """Best-effort example list for one column cell annotation."""
+    ann = annotation
+    origin = get_origin(ann)
+    if origin is not None:
+        return None
+    if ann is int:
+        return [1, 2]
+    if ann is float:
+        return [1.0, 2.0]
+    if ann is bool:
+        return [True, False]
+    if ann is str:
+        return ["a", "b"]
+    return None
+
+
+def _merge_column_examples(
+    *, finfo: Any, cell_annotation: Any
+) -> list[Any] | None:
+    """
+    Prefer explicit `Field(examples=[...])` values; otherwise use a small type-based
+    default catalog.
+    """
+    ex = getattr(finfo, "examples", None)
+    if isinstance(ex, (list, tuple)) and ex:
+        return list(ex)
+    return _example_list_for_annotation(cell_annotation)
 
 
 def columnar_body_model(
@@ -25,6 +55,8 @@ def columnar_body_model(
     model_name: str | None = None,
     json_schema_extra: dict[str, Any] | None = None,
     example: dict[str, list[Any]] | None = None,
+    generate_examples: bool = False,
+    input_key_mode: Literal["python", "aliases", "both"] = "aliases",
 ) -> type[BaseModel]:
     """Return a Pydantic model describing columnar JSON for ``row_model``.
 
@@ -53,38 +85,75 @@ def columnar_body_model(
         merged_extra.setdefault("example", example)
     name = model_name or f"{row_model.__name__}ColumnarBody"
     extra_key = json.dumps(merged_extra, sort_keys=True) if merged_extra else ""
-    key = (id(row_model), name, extra_key)
+    key = (id(row_model), name, extra_key, bool(generate_examples), str(input_key_mode))
     cached = _COLUMNAR_MODEL_CACHE.get(key)
     if cached is not None:
         return cached
 
     field_defs: dict[str, Any] = {}
+    alias_conflicts: dict[str, str] = {}
     for py_name, finfo in row_model.model_fields.items():
         ann: Any = finfo.annotation if finfo.annotation is not None else Any
         list_ann = _column_list_annotation(ann)
         desc = finfo.description
-        if finfo.validation_alias is not None:
+        examples = _merge_column_examples(finfo=finfo, cell_annotation=ann)
+        if finfo.validation_alias is not None and input_key_mode != "python":
+            validation_alias: Any
+            if input_key_mode == "aliases":
+                validation_alias = finfo.validation_alias
+            else:
+                validation_alias = AliasChoices(py_name, finfo.validation_alias)
+                if isinstance(finfo.validation_alias, str):
+                    alias_conflicts[py_name] = finfo.validation_alias
             field_defs[py_name] = (
                 list_ann,
                 Field(
                     ...,
-                    validation_alias=finfo.validation_alias,
+                    validation_alias=validation_alias,
                     description=desc,
+                    examples=examples if generate_examples else None,
                 ),
             )
         else:
-            field_defs[py_name] = (list_ann, Field(..., description=desc))
+            field_defs[py_name] = (
+                list_ann,
+                Field(
+                    ...,
+                    description=desc,
+                    examples=examples if generate_examples else None,
+                ),
+            )
 
     if merged_extra is not None:
         body_config = ConfigDict(json_schema_extra=merged_extra)
     else:
         body_config = ConfigDict()
 
+    class _ColumnarBodyBase(BaseModel):
+        __alias_conflicts__: dict[str, str] = {}
+
+        @model_validator(mode="before")
+        @classmethod
+        def _check_alias_conflicts(cls, data: Any) -> Any:
+            if not isinstance(data, dict):
+                return data
+            if not cls.__alias_conflicts__:
+                return data
+            keys = set(data.keys())
+            for py_name, alias in cls.__alias_conflicts__.items():
+                if py_name in keys and alias in keys:
+                    raise ValueError(
+                        "Columnar body includes both alias and python keys for the same field."
+                    )
+            return data
+
     model_cls = create_model(  # type: ignore[call-overload]
         name,
+        __base__=_ColumnarBodyBase,
         __config__=body_config,
         **field_defs,
     )
+    model_cls.__alias_conflicts__ = alias_conflicts
     _COLUMNAR_MODEL_CACHE[key] = model_cls
     return model_cls
 
@@ -95,6 +164,8 @@ def columnar_body_model_from_dataframe_model(
     model_name: str | None = None,
     json_schema_extra: dict[str, Any] | None = None,
     example: dict[str, list[Any]] | None = None,
+    generate_examples: bool = False,
+    input_key_mode: Literal["python", "aliases", "both"] = "aliases",
 ) -> type[BaseModel]:
     """Like :func:`columnar_body_model` but uses ``model_cls.RowModel``."""
     row_model: type[BaseModel] = model_cls.RowModel
@@ -104,6 +175,8 @@ def columnar_body_model_from_dataframe_model(
         model_name=name,
         json_schema_extra=json_schema_extra,
         example=example,
+        generate_examples=generate_examples,
+        input_key_mode=input_key_mode,
     )
 
 
@@ -116,6 +189,8 @@ def columnar_dependency(
     validation_profile: str | None = None,
     json_schema_extra: dict[str, Any] | None = None,
     example: dict[str, list[Any]] | None = None,
+    generate_examples: bool = False,
+    input_key_mode: Literal["python", "aliases", "both"] = "aliases",
 ) -> Any:
     """Return a FastAPI dependency that parses columnar JSON into ``model_cls``.
 
@@ -129,11 +204,14 @@ def columnar_dependency(
         model_cls,
         json_schema_extra=json_schema_extra,
         example=example,
+        generate_examples=generate_examples,
+        input_key_mode=input_key_mode,
     )
 
     def dep(body: Any) -> Any:
+        data = body.model_dump()
         return model_cls(
-            body.model_dump(),
+            data,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,

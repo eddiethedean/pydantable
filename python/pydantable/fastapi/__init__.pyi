@@ -41,6 +41,8 @@ def columnar_body_model(
     model_name: str | None = ...,
     json_schema_extra: dict[str, Any] | None = ...,
     example: dict[str, list[Any]] | None = ...,
+    generate_examples: bool = ...,
+    input_key_mode: Literal["python", "aliases", "both"] = ...,
 ) -> type[BaseModel]: ...
 def columnar_body_model_from_dataframe_model(
     model_cls: type[DataFrameModel[Any]],
@@ -48,6 +50,8 @@ def columnar_body_model_from_dataframe_model(
     model_name: str | None = ...,
     json_schema_extra: dict[str, Any] | None = ...,
     example: dict[str, list[Any]] | None = ...,
+    generate_examples: bool = ...,
+    input_key_mode: Literal["python", "aliases", "both"] = ...,
 ) -> type[BaseModel]: ...
 def columnar_dependency(
     model_cls: type[_DFM],
@@ -58,6 +62,8 @@ def columnar_dependency(
     validation_profile: str | None = ...,
     json_schema_extra: dict[str, Any] | None = ...,
     example: dict[str, list[Any]] | None = ...,
+    generate_examples: bool = ...,
+    input_key_mode: Literal["python", "aliases", "both"] = ...,
 ) -> Callable[..., _DFM]: ...
 def rows_dependency(
     model_cls: type[_DFM],
