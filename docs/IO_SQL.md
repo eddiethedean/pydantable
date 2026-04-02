@@ -1,10 +1,30 @@
 # SQL I/O (SQLAlchemy)
 
-**Primary:** **`pydantable.io.fetch_sql`**, **`afetch_sql`**, **`iter_sql`**, **`aiter_sql`** — they return **`dict[str, list]`** batches (or streaming containers). Wrap results in **`MyModel(cols, ...)`** for a typed **`DataFrameModel`**. **`DataFrameModel`** no longer exposes eager SQL loaders; use **`pydantable.io`** and the constructor (or **`collect`** / **`to_dict`** only after you have a frame).
+**Recommended for new code (SQLModel):** **`pydantable.io.fetch_sqlmodel`**, **`iter_sqlmodel`**, **`afetch_sqlmodel`**, **`aiter_sqlmodel`** — same column-dict / **`StreamingColumns`** behavior as the raw-SQL helpers, but you pass a **`SQLModel`** class with **`table=True`** instead of a SQL string. Install **`pydantable[sql]`** (includes **SQLModel** + SQLAlchemy).
+
+**Legacy / escape hatch:** **`pydantable.io.fetch_sql`**, **`afetch_sql`**, **`iter_sql`**, **`aiter_sql`** — they return **`dict[str, list]`** batches (or streaming containers) for a literal **`sql`** string. Wrap results in **`MyModel(cols, ...)`** for a typed **`DataFrameModel`**. **`DataFrameModel`** no longer exposes eager SQL loaders; use **`pydantable.io`** and the constructor (or **`collect`** / **`to_dict`** only after you have a frame).
 
 **Write path:** **`MyModel.write_sql`** / **`await MyModel.awrite_sql`** (same as **`pydantable.io.write_sql`** with a concrete model class for ergonomics).
 
 Install **`pydantable[sql]`** plus the **DB-API driver** your URL needs. SQLAlchemy supports many dialects; pydantable does not bundle drivers.
+
+## SQLModel-first reads
+
+Use a mapped table model and optional **`where`**, **`order_by`**, **`limit`**, **`columns`**, and bound **`parameters`** (for parameterized **`where`** clauses):
+
+```python
+from pydantable.io import fetch_sqlmodel
+from sqlmodel import Field, SQLModel
+
+class User(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+
+cols = fetch_sqlmodel(User, engine, order_by=[User.id])
+# MyUserModel(cols, trusted_mode=...)
+```
+
+**`iter_sqlmodel`** / **`aiter_sqlmodel`** stream **`dict[str, list]`** batches; **`fetch_sqlmodel`** / **`afetch_sqlmodel`** mirror **`fetch_sql`** for **`batch_size`**, **`auto_stream`**, and **`auto_stream_threshold_rows`**. Without SQLModel installed, these APIs raise **`MissingOptionalDependency`** — install **`pydantable[sql]`**.
 
 ## `DataFrameModel`
 

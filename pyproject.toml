@@ -27,7 +27,8 @@ arrow = ["pyarrow>=14.0"]
 polars = ["polars>=1.0.0,<2"]
 io = ["pyarrow>=14.0", "polars>=1.0.0,<2"]
 # read_sql / write_sql — SQLAlchemy 2.x; install DBAPI drivers for your URLs separately.
-sql = ["sqlalchemy>=2.0,<3"]
+# fetch_sqlmodel / iter_sqlmodel require SQLModel (install pydantable[sql]).
+sql = ["sqlalchemy>=2.0,<3", "sqlmodel>=0.0.22,<0.1"]
 cloud = ["fsspec>=2023.0"]
 excel = ["openpyxl>=3.1"]
 kafka = ["kafka-python>=2.0"]
@@ -40,6 +41,7 @@ dev = [
     "fastapi>=0.100",
     "httpx>=0.24",
     "sqlalchemy>=2.0,<3",
+    "sqlmodel>=0.0.22,<0.1",
     "python-multipart>=0.0.6",
     "hypothesis>=6.0",
     "numpy>=1.24",
@@ -79,6 +81,7 @@ docs = [
     # Optional at runtime, but required for Sphinx + sphinx-autodoc-typehints to resolve
     # SQLAlchemy forward refs on DataFrameModel I/O methods (matches CI docs job and RTD).
     "sqlalchemy>=2.0,<3",
+    "sqlmodel>=0.0.22,<0.1",
 ]
 
 [tool.maturin]
@@ -174,6 +177,14 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "sqlalchemy.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "sqlmodel"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "sqlmodel.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

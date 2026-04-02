@@ -8,13 +8,22 @@ SQLite, SQL Server, Oracle, etc.). Install the matching **DBAPI driver** for you
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Iterator
 
     from sqlalchemy.engine import Connection, Engine
+
+
+def mappings_rows_to_column_dict(rows: Sequence[Any]) -> dict[str, list[Any]]:
+    """Turn SQLAlchemy ``RowMapping`` rows into ``dict[column_name, list]``."""
+    if not rows:
+        return {}
+    first = rows[0]
+    keys = list(first.keys())
+    return {k: [row[k] for row in rows] for k in keys}
 
 
 _ENV_FETCH_BATCH_SIZE = "PYDANTABLE_SQL_FETCH_BATCH_SIZE"
@@ -193,20 +202,13 @@ def iter_sql(
 
     params = dict(parameters or {})
 
-    def _rows_to_cols(rows: Sequence[Any]) -> dict[str, list[Any]]:
-        if not rows:
-            return {}
-        first = rows[0]
-        keys = list(first.keys())
-        return {k: [row[k] for row in rows] for k in keys}
-
     if isinstance(bind, SAConnection):
         result = bind.execution_options(stream_results=True).execute(text(sql), params)
         while True:
             chunk = result.mappings().fetchmany(bs)
             if not chunk:
                 break
-            yield _rows_to_cols(chunk)
+            yield mappings_rows_to_column_dict(chunk)
         return
 
     eng = bind if isinstance(bind, SAEngine) else create_engine(bind)
@@ -216,7 +218,7 @@ def iter_sql(
             chunk = result.mappings().fetchmany(bs)
             if not chunk:
                 break
-            yield _rows_to_cols(chunk)
+            yield mappings_rows_to_column_dict(chunk)
 
 
 def _infer_columns(data: dict[str, list[Any]]) -> list[Any]:

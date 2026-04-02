@@ -26,4 +26,15 @@ class ColumnLengthMismatchError(PydantableUserError):
     """
 
 
-__all__ = ["ColumnLengthMismatchError", "PydantableUserError"]
+class MissingOptionalDependency(PydantableUserError):
+    """Raised when an optional dependency is required for the requested API.
+
+    Install the matching extra (for example ``pip install 'pydantable[sql]'``).
+    """
+
+
+__all__ = [
+    "ColumnLengthMismatchError",
+    "MissingOptionalDependency",
+    "PydantableUserError",
+]

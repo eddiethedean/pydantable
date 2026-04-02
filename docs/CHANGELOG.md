@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+### Added
+
+- **SQLModel read I/O (Phase 0–1):** **`pydantable[sql]`** now includes **sqlmodel**. New APIs **`fetch_sqlmodel`**, **`iter_sqlmodel`**, **`afetch_sqlmodel`**, and **`aiter_sqlmodel`** in **`pydantable.io`** (also re-exported from **`pydantable`**), sharing batching and **`StreamingColumns`** semantics with **`fetch_sql`** / **`iter_sql`**. **`MissingOptionalDependency`** when **sqlmodel** is required but not installed.
+
 ## [1.13.0] — 2026-04-02
 
 ### Changed

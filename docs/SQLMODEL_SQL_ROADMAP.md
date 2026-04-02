@@ -37,6 +37,8 @@ This document is the **plan and phased roadmap** for migrating pydantable’s SQ
 - Installing `pydantable[sql]` yields `import sqlmodel` success.
 - Importing `pydantable.io` does **not** require SQLModel unless SQL functions are used (keep optional deps optional).
 
+**Status (v1.13.0 dev): Implemented** — `sqlmodel` is listed under **`pydantable[sql]`** (and dev/docs extras where applicable); lazy import via **`pydantable.io.sqlmodel_read._require_sqlmodel()`** raises **`pydantable.errors.MissingOptionalDependency`** with an install hint.
+
 ---
 
 ## Phase 1 — New SQLModel-first read APIs (v1.13.0)
@@ -97,6 +99,8 @@ def iter_sqlmodel(
   - `cols = fetch_sqlmodel(UserTable, engine)`
   - `df = UsersDF(cols, trusted_mode=...)`
 - `iter_sqlmodel` yields rectangular batches with stable column keys.
+
+**Status (v1.13.0 dev): Implemented** — synchronous **`fetch_sqlmodel`** / **`iter_sqlmodel`** in **`python/pydantable/io/sqlmodel_read.py`**, async **`afetch_sqlmodel`** / **`aiter_sqlmodel`** in **`python/pydantable/io/__init__.py`**, re-exported from **`pydantable`**. Batching and **`StreamingColumns`** / **`auto_stream_threshold_rows`** match **`fetch_sql`**. Tests: **`tests/test_sqlmodel_io_phase01.py`**.
 
 ---
 

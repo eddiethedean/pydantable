@@ -64,6 +64,7 @@ from .iter_file import (
 )
 from .rap_support import aread_csv_rap, rap_csv_available
 from .sql import StreamingColumns, fetch_sql, iter_sql, write_sql
+from .sqlmodel_read import fetch_sqlmodel, iter_sqlmodel
 from .write_batches import (
     write_csv_batches,
     write_ipc_batches,
@@ -928,6 +929,120 @@ async def aiter_sql(
             loop.call_soon_threadsafe(q.put_nowait, sentinel)
 
 
+async def afetch_sqlmodel(
+    model: Any,
+    bind: str | Any,
+    *,
+    where: Any | None = None,
+    parameters: Mapping[str, Any] | None = None,
+    columns: list[Any] | None = None,
+    order_by: list[Any] | None = None,
+    limit: int | None = None,
+    batch_size: int | None = None,
+    auto_stream: bool = True,
+    auto_stream_threshold_rows: int | None = None,
+    executor: Executor | None = None,
+) -> dict[str, list[Any]] | StreamingColumns:
+    return await _run_io(
+        fetch_sqlmodel,
+        (model, bind),
+        {
+            "where": where,
+            "parameters": parameters,
+            "columns": columns,
+            "order_by": order_by,
+            "limit": limit,
+            "batch_size": batch_size,
+            "auto_stream": auto_stream,
+            "auto_stream_threshold_rows": auto_stream_threshold_rows,
+        },
+        executor=executor,
+    )
+
+
+async def aiter_sqlmodel(
+    model: Any,
+    bind: str | Any,
+    *,
+    where: Any | None = None,
+    parameters: Mapping[str, Any] | None = None,
+    columns: list[Any] | None = None,
+    order_by: list[Any] | None = None,
+    limit: int | None = None,
+    batch_size: int = 65_536,
+    executor: Executor | None = None,
+):
+    """
+    Async generator yielding batches from :func:`iter_sqlmodel` without blocking the loop.
+    """
+    import asyncio
+    import threading
+
+    if batch_size <= 0:
+        raise ValueError("batch_size must be a positive integer")
+
+    q: asyncio.Queue[object] = asyncio.Queue(maxsize=2)
+    sentinel = object()
+    stop = threading.Event()
+    loop = asyncio.get_running_loop()
+
+    def _put(item: object) -> None:
+        if stop.is_set():
+            return
+        fut = asyncio.run_coroutine_threadsafe(q.put(item), loop)
+        try:
+            while not stop.is_set():
+                try:
+                    fut.result(timeout=0.25)
+                    return
+                except TimeoutError:
+                    continue
+        except BaseException:
+            return
+        finally:
+            if stop.is_set():
+                with suppress(BaseException):
+                    fut.cancel()
+
+    def _runner() -> None:
+        try:
+            for batch in iter_sqlmodel(
+                model,
+                bind,
+                where=where,
+                parameters=parameters,
+                columns=columns,
+                order_by=order_by,
+                limit=limit,
+                batch_size=batch_size,
+            ):
+                if stop.is_set():
+                    return
+                _put(batch)
+        except BaseException as e:
+            _put(e)
+        finally:
+            _put(sentinel)
+
+    if executor is not None:
+        loop.run_in_executor(executor, _runner)
+    else:
+        threading.Thread(target=_runner, daemon=True).start()
+
+    try:
+        while True:
+            item = await q.get()
+            if item is sentinel:
+                return
+            if isinstance(item, BaseException):
+                raise item
+            yield item
+    finally:
+        stop.set()
+        with suppress(BaseException):
+            loop.call_soon_threadsafe(q.put_nowait, sentinel)
+
+
 async def _aiter_from_iter(
     it: Any,
     *,
@@ -1151,6 +1266,7 @@ __all__ = [
     "aexport_ndjson",
     "aexport_parquet",
     "afetch_sql",
+    "afetch_sqlmodel",
     "aiter_csv",
     "aiter_ipc",
     "aiter_json_array",
@@ -1158,6 +1274,7 @@ __all__ = [
     "aiter_ndjson",
     "aiter_parquet",
     "aiter_sql",
+    "aiter_sqlmodel",
     "amaterialize_csv",
     "amaterialize_ipc",
     "amaterialize_json",
@@ -1185,6 +1302,7 @@ __all__ = [
     "fetch_ndjson_url",
     "fetch_parquet_url",
     "fetch_sql",
+    "fetch_sqlmodel",
     "http",
     "iter_avro",
     "iter_bigquery",
@@ -1201,6 +1319,7 @@ __all__ = [
     "iter_parquet",
     "iter_snowflake",
     "iter_sql",
+    "iter_sqlmodel",
     "materialize_csv",
     "materialize_ipc",
     "materialize_json",
@@ -1245,7 +1364,9 @@ register_reader("materialize_ndjson", materialize_ndjson, stable=True)
 register_reader("materialize_ipc", materialize_ipc, stable=True)
 register_reader("materialize_json", materialize_json, stable=True)
 register_reader("fetch_sql", fetch_sql, requires_extra="sql", stable=True)
+register_reader("fetch_sqlmodel", fetch_sqlmodel, requires_extra="sql", stable=True)
 register_reader("iter_sql", iter_sql, requires_extra="sql", stable=True)
+register_reader("iter_sqlmodel", iter_sqlmodel, requires_extra="sql", stable=True)
 
 register_writer("export_parquet", export_parquet, stable=True)
 register_writer("export_csv", export_csv, stable=True)
