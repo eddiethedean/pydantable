@@ -37,7 +37,6 @@ Use this page when you know **what you need to do**, but not **where it is docum
 ### Project & contribution
 
 - **Roadmap**: {doc}`ROADMAP`
-- **Pydantic roadmap (ambitious)**: {doc}`PYDANTIC_ROADMAP` — deeper Pydantic v2 integration, model policies, custom dtypes, and service ergonomics.
 - **Custom dtypes**: {doc}`CUSTOM_DTYPES` — semantic scalar types via Pydantic v2 CoreSchema + `pydantable.dtypes.register_scalar`.
 - **Strictness**: {doc}`STRICTNESS` — per-column and nested validation strictness (Phase 4).
 - **Service ergonomics**: {doc}`SERVICE_ERGONOMICS` — OpenAPI enrichments, alias ingestion, and redaction defaults (Phase 5).
