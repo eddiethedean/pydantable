@@ -21,14 +21,14 @@ This document lists **common and useful** places applications read and write tab
 | **Parquet** | **`n_rows`**, **`low_memory`**, **`rechunk`**, **`use_statistics`**, **`cache`**, **`glob`**, **`allow_missing_columns`**, **`parallel`**, **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** | **`compression`**, **`row_group_size`**, **`data_page_size`**, **`statistics`**, **`parallel`** |
 | **CSV** | **`has_header`**, **`separator`**, **`skip_rows`**, **`skip_lines`**, **`n_rows`**, **`infer_schema_length`**, **`ignore_errors`**, **`low_memory`**, **`rechunk`**, **`glob`**, **`cache`**, **`quote_char`**, **`eol_char`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`**, **`raise_if_empty`**, **`truncate_ragged_lines`**, **`decimal_comma`**, **`try_parse_dates`** | **`include_header`**, **`include_bom`** (plus top-level **`separator`**, **`compression`** where applicable) |
 | **NDJSON** | **`low_memory`**, **`rechunk`**, **`ignore_errors`**, **`n_rows`**, **`infer_schema_length`**, **`glob`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** | **`json_format`** (**`"lines"`** / **`"json"`**) |
-| **IPC** | **`record_batch_statistics`** | Use top-level **`compression=`** only; extra **`write_kwargs`** are rejected. |
+| **IPC** | **`record_batch_statistics`**, **`glob`**, **`cache`**, **`rechunk`**, **`n_rows`**, **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** | Use top-level **`compression=`** only; extra **`write_kwargs`** are rejected. |
 
 For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **presets**, and how **`read_json`** relates to **`read_ndjson`**, see {doc}`IO_JSON` (**Large files**, **NDJSON scan kwargs**).
 
 (local-io-audit)=
 ### Audit: Polars 0.53.x vs pydantable (1.11.0 Phase A)
 
-**Scope:** Polars Rust **0.53.0** (the version pinned by **`pydantable-core`**) compared to the kwargs pydantable forwards from **`pydantable-core/src/plan/execute_polars/scan_kw.rs`** (`dispatch_file_scan`). **Parquet hive / lineage / row index** kwargs landed in {doc}`ROADMAP_1_11_LOCAL_IO` **Phase B1**; **CSV** directory/glob tests and extra **`LazyCsvReader`** kwargs in **Phase B2**; **NDJSON** **`glob`** / **`include_file_paths`** / **`row_index_*`** in **Phase B3**; remaining gaps are tracked there (e.g. **`ScanArgsParquet.schema`**, **`HiveOptions.schema`**).
+**Scope:** Polars Rust **0.53.0** (the version pinned by **`pydantable-core`**) compared to the kwargs pydantable forwards from **`pydantable-core/src/plan/execute_polars/scan_kw.rs`** (`dispatch_file_scan`). **Parquet hive / lineage / row index** kwargs landed in {doc}`ROADMAP_1_11_LOCAL_IO` **Phase B1**; **CSV** directory/glob tests and extra **`LazyCsvReader`** kwargs in **Phase B2**; **NDJSON** **`glob`** / **`include_file_paths`** / **`row_index_*`** in **Phase B3**; **IPC** **`IpcScanOptions`** + **`UnifiedScanArgs`** in **Phase B4**; remaining gaps are tracked there (e.g. **`ScanArgsParquet.schema`**, **`HiveOptions.schema`**).
 
 **Directory and glob semantics**
 
@@ -85,7 +85,12 @@ For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **preset
 |---------------------|---------------------------|--------|
 | `IpcScanOptions.record_batch_statistics` | **mapped** | |
 | `IpcScanOptions.checked` | **not exposed** | |
-| **`UnifiedScanArgs`** (`glob`, `hive_options`, `cache`, `include_file_paths`, …) | **not** tunable from Python | pydantable calls **`LazyFrame::scan_ipc(path, ipc_opts, UnifiedScanArgs::default())`**. Polars defaults: **`glob: true`**, **`hive_options`** **enabled** (see **`UnifiedScanArgs::default()`** in **`polars-plan`** 0.53). |
+| **`UnifiedScanArgs.glob`**, **`cache`**, **`rechunk`** | **mapped** | default **`glob: true`** in Polars **`Default`** |
+| **`UnifiedScanArgs.pre_slice`** | **mapped** via **`n_rows`** | positive slice from row 0 |
+| **`UnifiedScanArgs.hive_options`** | **mapped** | **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`** (same pattern as Parquet) |
+| **`UnifiedScanArgs.include_file_paths`**, **`row_index`** | **mapped** | **`include_file_paths`** column name; **`row_index_name`** / **`row_index_offset`** |
+
+**Tests:** multi-file directory, **`*.arrow`** glob, hive-style path layout, unknown kw, row index / include paths, **`glob=False`** on a single file—**`tests/test_ipc_scan_directory_b4.py`** (Phase B4).
 
 **`read_parquet_url`**: URL fetch still uses **`**kwargs`** for the HTTP path; avoid mixing fetch and scan options in one dict unless you split them in application code.
 

@@ -15,6 +15,7 @@ use polars_io::prelude::{CsvWriter, JsonFormat, JsonWriter, ParquetWriter};
 use polars_io::RowIndex;
 use polars_io::SerWriter;
 use polars_utils::pl_str::PlSmallStr;
+use polars_utils::slice_enum::Slice;
 use polars_utils::IdxSize;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyDictMethods};
@@ -349,17 +350,77 @@ fn lazy_csv_with_kwargs(
     Ok(r)
 }
 
-fn ipc_scan_options_from_kwargs(
+fn ipc_scan_from_kwargs(
     py: Python<'_>,
     kw: &Bound<'_, PyDict>,
-) -> PyResult<IpcScanOptions> {
-    let mut o = IpcScanOptions::default();
-    const ALLOWED: &[&str] = &["record_batch_statistics"];
+) -> PyResult<(IpcScanOptions, UnifiedScanArgs)> {
+    const ALLOWED: &[&str] = &[
+        "record_batch_statistics",
+        "glob",
+        "cache",
+        "rechunk",
+        "n_rows",
+        "hive_partitioning",
+        "hive_start_idx",
+        "try_parse_hive_dates",
+        "include_file_paths",
+        "row_index_name",
+        "row_index_offset",
+    ];
     unknown_scan_keys(py, kw, ALLOWED)?;
+
+    let mut ipc_opts = IpcScanOptions::default();
     if let Some(v) = get_bool(kw, "record_batch_statistics")? {
-        o.record_batch_statistics = v;
+        ipc_opts.record_batch_statistics = v;
     }
-    Ok(o)
+
+    let mut unified = UnifiedScanArgs::default();
+    if let Some(v) = get_bool(kw, "glob")? {
+        unified.glob = v;
+    }
+    if let Some(v) = get_bool(kw, "cache")? {
+        unified.cache = v;
+    }
+    if let Some(v) = get_bool(kw, "rechunk")? {
+        unified.rechunk = v;
+    }
+    if let Some(n) = get_usize(kw, "n_rows")? {
+        unified.pre_slice = Some(Slice::Positive { offset: 0, len: n });
+    }
+
+    if kw.contains("hive_partitioning")? {
+        match kw.get_item("hive_partitioning")? {
+            None => {}
+            Some(v) if v.is_none() => unified.hive_options.enabled = None,
+            Some(v) => unified.hive_options.enabled = Some(v.extract::<bool>()?),
+        }
+    }
+    if let Some(n) = get_usize(kw, "hive_start_idx")? {
+        unified.hive_options.hive_start_idx = n;
+    }
+    if let Some(v) = get_bool(kw, "try_parse_hive_dates")? {
+        unified.hive_options.try_parse_dates = v;
+    }
+
+    if kw.contains("include_file_paths")? {
+        match kw.get_item("include_file_paths")? {
+            None => {}
+            Some(v) if v.is_none() => unified.include_file_paths = None,
+            Some(v) => {
+                let s: String = v.extract()?;
+                unified.include_file_paths = Some(PlSmallStr::from_str(&s));
+            }
+        }
+    }
+
+    match row_index_update_from_kwargs(kw)? {
+        None => {}
+        Some(ri) => {
+            unified.row_index = ri;
+        }
+    }
+
+    Ok((ipc_opts, unified))
 }
 
 fn lazy_ndjson_with_kwargs(
@@ -480,17 +541,13 @@ pub(crate) fn dispatch_file_scan(
             py.allow_threads(move || reader.finish())
         }
         "ipc" => {
-            let ipc_opts = match scan_kwargs {
-                None => IpcScanOptions::default(),
-                Some(kw) => ipc_scan_options_from_kwargs(py, kw)?,
+            let (ipc_opts, unified_args) = match scan_kwargs {
+                None => (IpcScanOptions::default(), UnifiedScanArgs::default()),
+                Some(kw) => ipc_scan_from_kwargs(py, kw)?,
             };
             let p = path.clone();
             py.allow_threads(move || {
-                LazyFrame::scan_ipc(
-                    PlRefPath::new(p.as_str()),
-                    ipc_opts,
-                    UnifiedScanArgs::default(),
-                )
+                LazyFrame::scan_ipc(PlRefPath::new(p.as_str()), ipc_opts, unified_args)
             })
         }
         _ => {

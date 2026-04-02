@@ -13,7 +13,7 @@
 ## Goals
 
 1. **Directory & glob reads:** Users can point **`read_*` / `aread_*`** at a **directory**, a **glob**, or a **recursive glob** and get the same *shape* of behavior they expect from **`pl.scan_parquet`**, **`scan_csv`**, **`scan_ndjson`**, **`scan_ipc`**—with explicit defaults and docs.
-2. **NDJSON / IPC parity with Parquet & CSV:** Where Polars supports **file lists** / **glob** on JSON Lines and IPC, pydantable forwards **`scan_kwargs`** consistently (today **Parquet** and **CSV** already support **`glob`**; **NDJSON** does not yet in `scan_kw.rs`).
+2. **NDJSON / IPC parity with Parquet & CSV:** Where Polars supports **file lists** / **glob** on JSON Lines and IPC, pydantable forwards **`scan_kwargs`** consistently (**Phase B3** NDJSON, **Phase B4** IPC **`UnifiedScanArgs`** + **`IpcScanOptions`** in `scan_kw.rs`).
 3. **Parquet dataset reads:** Support **hive-partitioned** and related **scan** options exposed by Polars Rust for **`scan_parquet`** (e.g. **`hive_partitioning`**, schema / missing-column behavior already partially covered by **`allow_missing_columns`**).
 4. **Partitioned & multi-file writes:** Move beyond **single-file** sinks where Polars provides **partitioned** or **directory** lazy writes—starting with **Parquet** (highest demand), then evaluate **CSV** / **NDJSON** by cost and API fit.
 5. **Eager & batched paths:** Clarify or extend **`materialize_*`** and **`iter_*` / `aiter_*`** for **multi-file** workflows (concatenated batches, per-file batches, or explicit “use lazy `read_*` instead”).
@@ -75,8 +75,10 @@
 
 ### B4 — IPC / Feather
 
-- [ ] Inspect Polars **`scan_ipc`** + **`UnifiedScanArgs`** for **multi-file** / **glob**; thread supported options through **`dispatch_file_scan`** (today IPC scan kwargs are minimal).
-- [ ] Tests: multi-file IPC or documented limitation.
+**B4 shipped:** **`ipc_scan_from_kwargs`** in **`scan_kw.rs`** forwards **`record_batch_statistics`** (**`IpcScanOptions`**) and **`glob`**, **`cache`**, **`rechunk`**, **`n_rows`**, **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** (**`UnifiedScanArgs`**); tests **`tests/test_ipc_scan_directory_b4.py`** (directory + **`*.arrow`**, hive-style path, unknown kw, row index / include paths, **`glob=False`**).
+
+- [x] Polars **`scan_ipc`** + **`UnifiedScanArgs`** options threaded through **`dispatch_file_scan`**; documented in {doc}`IO_IPC`.
+- [x] Tests: multi-file IPC directory and glob.
 
 ### B5 — Lazy JSON array (`read_json`)
 

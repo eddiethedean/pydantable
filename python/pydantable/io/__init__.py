@@ -185,7 +185,15 @@ def read_ipc(
     columns: list[str] | None = None,
     **scan_kwargs: Any,
 ) -> Any:
-    """Lazy Arrow IPC **file** read (local path); returns ``ScanFileRoot``."""
+    """Lazy Arrow IPC **file** read (local path); returns ``ScanFileRoot``.
+
+    Extra keyword arguments are forwarded to the Rust layer: **``IpcScanOptions``**
+    (**``record_batch_statistics``**) and **``UnifiedScanArgs``** (**``glob``**, **``cache``**,
+    **``rechunk``**, **``n_rows``**, **``hive_partitioning``**, **``hive_start_idx``**,
+    **``try_parse_hive_dates``**, **``include_file_paths``**, **``row_index_name``**,
+    **``row_index_offset``**). Unknown keys raise ``ValueError``. Per-scan details: ``IO_IPC`` on
+    the doc site; kwargs matrix: ``DATA_IO_SOURCES`` (**Audit: Polars 0.53.x vs pydantable**).
+    """
     sk = scan_kwargs if scan_kwargs else None
     return _scan_file_root(path, "ipc", columns=columns, scan_kwargs=sk)
 

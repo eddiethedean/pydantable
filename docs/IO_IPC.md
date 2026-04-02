@@ -19,11 +19,11 @@ This covers **Arrow IPC file** (`.arrow` / `.feather`-style single file), not ar
 - **`read_ipc`**, **`aread_ipc`**
 - **`materialize_ipc`**, **`amaterialize_ipc`**
 
-**`scan_kwargs`:** **`record_batch_statistics`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
+**`scan_kwargs`:** forwarded to **`IpcScanOptions`** (**`record_batch_statistics`**) and **`UnifiedScanArgs`** (**`glob`**, **`cache`**, **`rechunk`**, **`n_rows`**, **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`**). Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
 
 ### Paths, directories, and multi-file
 
-**`read_ipc`** passes **`UnifiedScanArgs::default()`** from Polars (not tunable from Python); defaults include **`glob: true`** and **hive options enabled**. Only **`IpcScanOptions`** fields are forwarded today—see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`.
+Lazy **`read_ipc`** uses Polars **`LazyFrame::scan_ipc`** with pydantable-built **`IpcScanOptions`** and **`UnifiedScanArgs`** (defaults match Polars **`Default`**: **`glob: true`**, hive options **enabled**). Tune **`glob`** / hive / lineage kwargs like other **`read_*`** roots—see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`.
 
 **`as_stream=False`** (default): local file paths can use Rust; otherwise PyArrow. **`as_stream=True`** uses PyArrow stream decoding. Install **`pydantable[arrow]`** when the path goes through PyArrow.
 
