@@ -20,6 +20,8 @@
       ~DataFrameModel.aexport_json
       ~DataFrameModel.aexport_ndjson
       ~DataFrameModel.aexport_parquet
+      ~DataFrameModel.afetch_sqlmodel
+      ~DataFrameModel.aiter_sqlmodel
       ~DataFrameModel.aread_csv
       ~DataFrameModel.aread_ipc
       ~DataFrameModel.aread_json
@@ -29,12 +31,15 @@
       ~DataFrameModel.arows
       ~DataFrameModel.as_model
       ~DataFrameModel.assert_model
+      ~DataFrameModel.assert_sqlmodel_compatible
       ~DataFrameModel.astream
       ~DataFrameModel.ato_arrow
       ~DataFrameModel.ato_dict
       ~DataFrameModel.ato_dicts
       ~DataFrameModel.ato_polars
       ~DataFrameModel.awrite_sql
+      ~DataFrameModel.awrite_sqlmodel
+      ~DataFrameModel.awrite_sqlmodel_data
       ~DataFrameModel.clip
       ~DataFrameModel.collect
       ~DataFrameModel.collect_batches
@@ -54,6 +59,7 @@
       ~DataFrameModel.export_json
       ~DataFrameModel.export_ndjson
       ~DataFrameModel.export_parquet
+      ~DataFrameModel.fetch_sqlmodel
       ~DataFrameModel.fill_null
       ~DataFrameModel.filter
       ~DataFrameModel.group_by
@@ -64,6 +70,7 @@
       ~DataFrameModel.iter_ipc
       ~DataFrameModel.iter_ndjson
       ~DataFrameModel.iter_parquet
+      ~DataFrameModel.iter_sqlmodel
       ~DataFrameModel.join
       ~DataFrameModel.melt
       ~DataFrameModel.pipe
@@ -122,6 +129,8 @@
       ~DataFrameModel.write_parquet
       ~DataFrameModel.write_parquet_batches
       ~DataFrameModel.write_sql
+      ~DataFrameModel.write_sqlmodel
+      ~DataFrameModel.write_sqlmodel_data
    
    
 

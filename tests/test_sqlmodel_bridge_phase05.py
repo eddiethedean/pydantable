@@ -122,7 +122,7 @@ def test_assert_sqlmodel_compatible_write_duplicate_targets() -> None:
 
 def test_assert_sqlmodel_compatible_bad_direction() -> None:
     with pytest.raises(ValueError, match="direction must be"):
-        WidgetDF.assert_sqlmodel_compatible(_Widget, direction=cast(Any, "both"))
+        WidgetDF.assert_sqlmodel_compatible(_Widget, direction=cast(Any, "both"))  # noqa: TC006
 
 
 def test_sqlmodel_columns_requires_dependency(monkeypatch: pytest.MonkeyPatch) -> None:

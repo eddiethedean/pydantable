@@ -212,7 +212,7 @@ This project already has users of:
 
 ---
 
-## Phase 6 — Documentation + examples + testing gates (v1.13.0)
+## Phase 6 — Documentation + examples + testing gates (v1.16.0)
 
 **Docs**
 
@@ -235,12 +235,14 @@ This project already has users of:
 - `make check-full` green on the release commit
 - docs examples validated (if you keep example-verification tooling)
 
+**Status (v1.16.0): Implemented** — {doc}`IO_SQL` splits **raw string SQL** vs **SQLModel-first** runnable sections; examples **`docs/examples/io/sql_sqlite_sqlmodel_roundtrip.py`**, **`docs/examples/io/sql_sqlite_sqlmodel_streaming.py`** (plus existing **`sql_sqlite_*`** raw examples); **`tests/test_doc_io_examples.py`** runs **`sql_sqlite_streaming.py`** and the SQLModel scripts. SQLModel I/O behavior is covered by **`tests/test_sqlmodel_io_phase01.py`**, **`tests/test_sqlmodel_io_phase02.py`**, **`tests/test_sqlmodel_dataframe_model.py`**.
+
 ---
 
 ## Proposed milestone mapping (v1.13.0)
 
 - **M1 (core)**: Phase 0–2 (extras + SQLModel read/write APIs)
 - **M2 (DX)**: Phase 3 (DataFrameModel convenience wrappers)
-- **M3 (ship)**: Phase 6 (docs + examples + tests)
+- **M3 (ship)**: Phase 6 (docs + examples + tests) — **v1.16.0**
 - **Post-ship**: Phase 4 (legacy string-SQL deprecation in v1.14+) — shipped; Phase 5 (schema bridging) — **v1.15.0**
 

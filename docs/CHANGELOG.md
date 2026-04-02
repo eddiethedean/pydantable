@@ -17,7 +17,17 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Docs
 
-- **SQL I/O:** {doc}`IO_SQL`, {doc}`SQLMODEL_SQL_ROADMAP`, {doc}`VERSIONING` — SQLModel-first default, **`*_raw`** for explicit string SQL, deprecation policy. Runnable examples use **`*_raw`** (**`docs/examples/io/sql_sqlite_*.py`**).
+- **SQL I/O:** {doc}`IO_SQL`, {doc}`SQLMODEL_SQL_ROADMAP`, {doc}`VERSIONING` — SQLModel-first default, **`*_raw`** for explicit string SQL, deprecation policy. Runnable examples: raw **`sql_sqlite_roundtrip.py`** / **`sql_sqlite_streaming.py`** and SQLModel-first **`sql_sqlite_sqlmodel_*.py`** (see {doc}`IO_SQL`).
+
+## [1.16.0] — 2026-04-02
+
+### Added
+
+- **Phase 6 (SQL I/O ship gate):** SQLModel-first SQLite runnable examples **`docs/examples/io/sql_sqlite_sqlmodel_roundtrip.py`**, **`docs/examples/io/sql_sqlite_sqlmodel_streaming.py`**; {doc}`IO_SQL` sections for raw vs SQLModel-first examples; **`tests/test_doc_io_examples.py`** extended to execute **`sql_sqlite_streaming.py`** and the new scripts.
+
+### Changed
+
+- **Version bump:** Align Python package metadata, Rust crate, and published **`__version__`** to **1.16.0**.
 
 ## [1.15.0] — 2026-04-02
 

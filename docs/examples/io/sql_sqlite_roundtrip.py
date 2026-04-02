@@ -32,7 +32,9 @@ def main() -> None:
                 )
                 conn.execute(text("INSERT INTO order_lines VALUES (4999)"))
 
-            got = OrderLine(fetch_sql_raw("SELECT line_total_cents FROM order_lines", eng))
+            got = OrderLine(
+                fetch_sql_raw("SELECT line_total_cents FROM order_lines", eng)
+            )
             assert got.to_dict() == {"line_total_cents": [4999]}
 
             write_sql_raw(

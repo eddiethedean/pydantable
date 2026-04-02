@@ -151,9 +151,7 @@ def test_iter_sqlmodel_respects_fetch_batch_size_env(
 ) -> None:
     monkeypatch.setenv("PYDANTABLE_SQL_FETCH_BATCH_SIZE", "5")
     eng = _engine_with_widgets(tmp_path)
-    batches = list(
-        WidgetDF.iter_sqlmodel(_DfmWidget, eng, order_by=[_DfmWidget.id])
-    )
+    batches = list(WidgetDF.iter_sqlmodel(_DfmWidget, eng, order_by=[_DfmWidget.id]))
     assert len(batches) == 2
     assert sum(len(b.collect(as_lists=True)["id"]) for b in batches) == 10
 

@@ -112,9 +112,11 @@ Set these before importing callers if you want process-wide defaults (invalid va
 
 **`data`** is **`dict[str, list]`**. **`if_exists="append"`** requires the table to exist already. **`if_exists="replace"`** drops the table if present, recreates it with inferred column types, then inserts (**`table_name`** / **`schema`** must be trusted identifiers, not user-controlled strings).
 
-## Runnable example
+## Runnable examples (raw string SQL)
 
 Requires **`sqlalchemy`**. Run conventions: {doc}`IO_OVERVIEW` (**Runnable example**).
+
+### Round-trip (`fetch_sql_raw` / `write_sql_raw`)
 
 ```bash
 python docs/examples/io/sql_sqlite_roundtrip.py
@@ -124,13 +126,37 @@ python docs/examples/io/sql_sqlite_roundtrip.py
 :language: python
 ```
 
-## Runnable streaming example
+### Streaming (`iter_sql_raw`)
 
 ```bash
 python docs/examples/io/sql_sqlite_streaming.py
 ```
 
 ```{literalinclude} examples/io/sql_sqlite_streaming.py
+:language: python
+```
+
+## Runnable examples (SQLModel-first)
+
+Requires **`pydantable[sql]`** (SQLModel + SQLAlchemy). These use a **`SQLModel`** class with **`table=True`** and optional **`DataFrameModel`** helpers.
+
+### Round-trip (`fetch_sqlmodel` / `write_sqlmodel`)
+
+```bash
+python docs/examples/io/sql_sqlite_sqlmodel_roundtrip.py
+```
+
+```{literalinclude} examples/io/sql_sqlite_sqlmodel_roundtrip.py
+:language: python
+```
+
+### Streaming (`iter_sqlmodel`)
+
+```bash
+python docs/examples/io/sql_sqlite_sqlmodel_streaming.py
+```
+
+```{literalinclude} examples/io/sql_sqlite_sqlmodel_streaming.py
 :language: python
 ```
 

@@ -1,7 +1,7 @@
 """SQLite: streaming SQL batches with :func:`pydantable.io.iter_sql_raw`.
 
 For automatic fetch behavior, env-tunable batch sizes, and the **StreamingColumns**
-container returned by large **fetch_sql_raw** calls, see the **IO_SQL** documentation page.
+container returned by large **fetch_sql_raw** calls, see **IO_SQL**.
 
 Run::
 
