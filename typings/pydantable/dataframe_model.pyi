@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
+from collections.abc import (
+    AsyncIterator,
+    Callable,
+    Collection,
+    Iterator,
+    Mapping,
+    Sequence,
+)
 from concurrent.futures import Executor
 from typing import Any, Generic, Literal, TypeVar
 
@@ -314,6 +321,15 @@ class DataFrameModel(Generic[RowT]):
         validate_rows: bool = False,
         replace_ok: bool = False,
         executor: Executor | None = None,
+    ) -> None: ...
+    @classmethod
+    def assert_sqlmodel_compatible(
+        cls,
+        model: Any,
+        *,
+        direction: Literal["read", "write"] = "read",
+        column_map: Mapping[str, str] | None = None,
+        read_keys: Collection[str] | None = None,
     ) -> None: ...
     @classmethod
     def fetch_sqlmodel(

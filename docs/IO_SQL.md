@@ -38,6 +38,15 @@ Use a **`SQLModel`** class with **`table=True`** so DDL comes from **`model.__ta
 
 **`data`** keys must match the model’s table columns exactly (including nullable / autoincrement columns; **`None`** primary keys are omitted on insert where appropriate). With **`validate_rows=True`**, each row is checked with **`model.model_validate`**; failures include the row index.
 
+### Schema bridging (Phase 5)
+
+Use **`pydantable.io.sqlmodel_columns`** (re-exported from **`pydantable`**) to list ordered SQLAlchemy column keys for a **`table=True`** model—the same key set a full **`fetch_sqlmodel`** result uses and **`write_sqlmodel`** expects.
+
+**`MyModel.assert_sqlmodel_compatible(UserTable, *, direction='read'|'write', column_map=None, read_keys=None)`** checks that your **`DataFrameModel`** field names align with that table before I/O:
+
+- **`direction='write'`** — after applying **`column_map`** (dataframe field → SQL key), the mapped names must equal the table’s keys exactly (matches **`write_sqlmodel`** / **`to_dict()`**).
+- **`direction='read'`** — every mapped field must appear in the keys you expect from SQL (default: full table; pass **`read_keys`** when using **`fetch_sqlmodel(..., columns=(...))`**).
+
 ## `DataFrameModel`
 
 **Read (typed), SQLModel-first**

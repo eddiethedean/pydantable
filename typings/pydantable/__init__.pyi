@@ -53,6 +53,7 @@ from .io import (
     materialize_parquet,
     read_parquet,
     read_parquet_url,
+    sqlmodel_columns,
     write_csv_batches,
     write_ipc_batches,
     write_ndjson_batches,
@@ -65,7 +66,7 @@ from .observe import get_observer, set_observer
 from .schema import DtypeDriftWarning, Schema
 from .types import WKB
 
-__version__ = "1.13.0"
+__version__ = "1.15.0"
 
 __all__ = [
     "WKB",
@@ -130,6 +131,7 @@ __all__ = [
     "selectors",
     "set_display_options",
     "set_observer",
+    "sqlmodel_columns",
     "write_csv_batches",
     "write_ipc_batches",
     "write_ndjson_batches",

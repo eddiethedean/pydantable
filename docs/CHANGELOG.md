@@ -19,6 +19,16 @@ All notable changes to this project are documented here. The format is inspired 
 
 - **SQL I/O:** {doc}`IO_SQL`, {doc}`SQLMODEL_SQL_ROADMAP`, {doc}`VERSIONING` — SQLModel-first default, **`*_raw`** for explicit string SQL, deprecation policy. Runnable examples use **`*_raw`** (**`docs/examples/io/sql_sqlite_*.py`**).
 
+## [1.15.0] — 2026-04-02
+
+### Added
+
+- **SQLModel / `DataFrameModel` schema bridging (Phase 5):** **`sqlmodel_columns`** (**`pydantable.io`**, re-exported from **`pydantable`**) returns ordered SQLAlchemy column keys for a **`table=True`** SQLModel. **`DataFrameModel.assert_sqlmodel_compatible`** checks alignment before **`fetch_sqlmodel`** / **`write_sqlmodel`** (**`direction='read'`** or **`'write'`**, optional **`column_map`** for differing field names, **`read_keys`** for column projections). **`python/pydantable/io/sqlmodel_schema.py`**, **`python/pydantable/dataframe_model.py`**; tests **`tests/test_sqlmodel_bridge_phase05.py`**; docs {doc}`IO_SQL`, {doc}`DATAFRAMEMODEL`, {doc}`SQLMODEL_SQL_ROADMAP`.
+
+### Changed
+
+- **Version bump:** Align Python package metadata, Rust crate, and published **`__version__`** to **1.15.0**.
+
 ## [1.13.0] — 2026-04-02
 
 ### Changed

@@ -10,7 +10,7 @@ import contextlib
 import html
 import sys
 import typing
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast
 
 from typing_extensions import Self
@@ -978,6 +978,78 @@ class DataFrameModel(Generic[RowT]):
             replace_ok=replace_ok,
             executor=executor,
         )
+
+    @classmethod
+    def assert_sqlmodel_compatible(
+        cls,
+        model: Any,
+        *,
+        direction: Literal["read", "write"] = "read",
+        column_map: Mapping[str, str] | None = None,
+        read_keys: Collection[str] | None = None,
+    ) -> None:
+        """
+        Assert this ``DataFrameModel``'s columns align with a ``table=True`` SQLModel.
+
+        * ``direction='write'``: after ``column_map`` (dataframe field → SQL column
+          key), mapped names must match SQL table keys (same as
+          :func:`~pydantable.io.write_sqlmodel`).
+        * ``direction='read'``: every mapped name must appear in the expected result
+          keys (full table by default, or ``read_keys`` for
+          ``fetch_sqlmodel(..., columns=...)``).
+
+        ``column_map`` only needs entries where the dataframe field name differs from
+        the SQLAlchemy column key.
+        """
+        cls._dfm_require_subclass_with_schema()
+        from .io.sqlmodel_schema import sqlmodel_columns
+
+        table_keys = set(sqlmodel_columns(model))
+        df_fields = list(cls._expected_schema_fields(cls).keys())
+        cm = dict(column_map or ())
+        unknown_cm = set(cm) - set(df_fields)
+        if unknown_cm:
+            raise ValueError(
+                "assert_sqlmodel_compatible: column_map keys are not DataFrameModel "
+                f"fields: {sorted(unknown_cm)}"
+            )
+
+        mapped = [cm.get(f, f) for f in df_fields]
+
+        if direction == "write":
+            if len(mapped) != len(set(mapped)):
+                raise ValueError(
+                    "assert_sqlmodel_compatible(direction='write'): duplicate SQL "
+                    "column key (column_map maps multiple dataframe fields to one key)"
+                )
+            if set(mapped) != table_keys:
+                missing = sorted(table_keys - set(mapped))
+                extra = sorted(set(mapped) - table_keys)
+                parts: list[str] = []
+                if missing:
+                    parts.append(
+                        "missing SQL columns (no matching dataframe field after map): "
+                        f"{missing}"
+                    )
+                if extra:
+                    parts.append(f"extra keys vs SQL table: {extra}")
+                raise ValueError(
+                    "assert_sqlmodel_compatible(direction='write'): " + "; ".join(parts)
+                )
+            return
+
+        if direction == "read":
+            exp = set(read_keys) if read_keys is not None else table_keys
+            absent = sorted({k for k in mapped if k not in exp})
+            if absent:
+                raise ValueError(
+                    "assert_sqlmodel_compatible(direction='read'): dataframe fields "
+                    "map to keys not present in expected SQL result keys "
+                    f"{sorted(exp)}: {absent}"
+                )
+            return
+
+        raise ValueError("direction must be 'read' or 'write'")
 
     @classmethod
     def fetch_sqlmodel(

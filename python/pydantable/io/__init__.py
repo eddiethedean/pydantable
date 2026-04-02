@@ -74,6 +74,7 @@ from .sql import (
     write_sql_raw,
 )
 from .sqlmodel_read import fetch_sqlmodel, iter_sqlmodel
+from .sqlmodel_schema import sqlmodel_columns
 from .sqlmodel_write import write_sqlmodel
 from .write_batches import (
     write_csv_batches,
@@ -1544,6 +1545,7 @@ __all__ = [
     "read_parquet_url_ctx",
     "read_snowflake",
     "record_batch_to_column_dict",
+    "sqlmodel_columns",
     "write_csv_batches",
     "write_csv_stdout",
     "write_ipc_batches",

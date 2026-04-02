@@ -198,15 +198,17 @@ This project already has users of:
 
 ---
 
-## Phase 5 — Typed schema bridging helpers (stretch for v1.13.0, otherwise v1.14.0+)
+## Phase 5 — Typed schema bridging helpers (v1.15.0)
 
 **Goal:** reduce friction between SQLModel and `DataFrameModel` while preserving explicit ownership.
 
-Candidate helpers:
+**Deliverables**
 
-- `pydantable.io.sqlmodel_columns(model)` → list of SQL column names/keys
-- `MyDF.assert_sqlmodel_compatible(UserTable, *, direction="read|write")`
-- Optional name-mapping support (SQL column names vs python attributes) as an explicit mapping dict.
+- `pydantable.io.sqlmodel_columns(model)` → ordered list of SQLAlchemy column keys for `model.__table__` (same keys as full-table `fetch_sqlmodel` / `write_sqlmodel`).
+- `MyDF.assert_sqlmodel_compatible(UserTable, *, direction="read"|"write", column_map=None, read_keys=None)` — dev-time check; `direction="write"` enforces exact key parity with the table (after `column_map`); `direction="read"` requires every mapped dataframe field to appear in the expected result keys (default: full table, or pass `read_keys` for `fetch_sqlmodel(..., columns=...)`).
+- Optional `column_map: dict[str, str]` mapping **dataframe field name → SQL column key** when names differ.
+
+**Status (v1.15.0): Implemented** — `python/pydantable/io/sqlmodel_schema.py`, `DataFrameModel.assert_sqlmodel_compatible` in `python/pydantable/dataframe_model.py`; tests `tests/test_sqlmodel_bridge_phase05.py`; docs {doc}`IO_SQL`, {doc}`DATAFRAMEMODEL`.
 
 ---
 
@@ -240,5 +242,5 @@ Candidate helpers:
 - **M1 (core)**: Phase 0–2 (extras + SQLModel read/write APIs)
 - **M2 (DX)**: Phase 3 (DataFrameModel convenience wrappers)
 - **M3 (ship)**: Phase 6 (docs + examples + tests)
-- **Post-ship**: Phase 4/5 hardening (deprecation strategy + compatibility helpers)
+- **Post-ship**: Phase 4 (legacy string-SQL deprecation in v1.14+) — shipped; Phase 5 (schema bridging) — **v1.15.0**
 

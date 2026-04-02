@@ -20,7 +20,7 @@ Use this page when you know **what you need to do**, but not **where it is docum
 - **Overview**: {doc}`IO_OVERVIEW`
 - **Decision tree**: {doc}`IO_DECISION_TREE`
 - **Formats**: {doc}`IO_PARQUET`, {doc}`IO_CSV`, {doc}`IO_NDJSON`, {doc}`IO_JSON`, {doc}`IO_IPC`
-- **Transports**: {doc}`IO_SQL` (**SQLModel:** **`fetch_sqlmodel`** / **`write_sqlmodel`**; **string SQL:** **`fetch_sql_raw`** / **`write_sql_raw`**; deprecated **`fetch_sql`** / **`write_sql`**; **`DataFrameModel`** SQLModel helpers), {doc}`IO_HTTP`, {doc}`IO_EXTRAS`
+- **Transports**: {doc}`IO_SQL` (**SQLModel:** **`fetch_sqlmodel`** / **`write_sqlmodel`**, **`sqlmodel_columns`**, **`DataFrameModel.assert_sqlmodel_compatible`**; **string SQL:** **`fetch_sql_raw`** / **`write_sql_raw`**; deprecated **`fetch_sql`** / **`write_sql`**; **`DataFrameModel`** SQLModel helpers), {doc}`IO_HTTP`, {doc}`IO_EXTRAS`
 - **SQLModel-first SQL I/O (v1.13 plan)**: {doc}`SQLMODEL_SQL_ROADMAP`
 - **Planning transports and async stacks**: {doc}`DATA_IO_SOURCES`
 

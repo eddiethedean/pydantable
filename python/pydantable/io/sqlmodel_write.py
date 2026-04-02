@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from .sql import _to_engine, _write_chunk_size
 from .sqlmodel_read import _ensure_table_model, _require_sqlmodel
+from .sqlmodel_schema import table_column_key_set
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Connection, Engine
@@ -23,13 +24,9 @@ def _validate_if_exists(if_exists: str) -> None:
         raise ValueError("if_exists must be 'append' or 'replace'")
 
 
-def _table_column_keys(table: Table) -> set[str]:
-    return {c.key for c in table.columns}
-
-
 def _align_data_keys(data: dict[str, list[Any]], table: Table) -> None:
     data_keys = set(data.keys())
-    expected = _table_column_keys(table)
+    expected = table_column_key_set(table)
     if data_keys == expected:
         return
     missing = sorted(expected - data_keys)

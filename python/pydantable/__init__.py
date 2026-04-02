@@ -65,6 +65,7 @@ from .io import (
     materialize_parquet,
     read_parquet,
     read_parquet_url,
+    sqlmodel_columns,
     write_csv_batches,
     write_ipc_batches,
     write_ndjson_batches,
@@ -140,6 +141,7 @@ __all__ = [
     "selectors",
     "set_display_options",
     "set_observer",
+    "sqlmodel_columns",
     "write_csv_batches",
     "write_ipc_batches",
     "write_ndjson_batches",
@@ -147,4 +149,4 @@ __all__ = [
     "write_sqlmodel",
     "write_sqlmodel_batches",
 ]
-__version__ = "1.13.0"
+__version__ = "1.15.0"
