@@ -49,6 +49,14 @@ The temp file for **`read_parquet_url`** is **not** deleted automatically; see {
 
 Lazy **`read_parquet`** uses Polars **`scan_parquet`**; **`glob`** is forwarded via **`scan_kwargs`** (Polars **`ScanArgsParquet::default()`** uses **`glob: true`**). **Hive-style partitions** are tunable via **`hive_partitioning`** / **`hive_start_idx`** / **`try_parse_hive_dates`**; **`include_file_paths`** adds a source path column; **`row_index_name`** / **`row_index_offset`** add a row index. **`HiveOptions.schema`** (partition dtype overrides) and **`ScanArgsParquet.schema`** are still **not** exposed—see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>` and {doc}`ROADMAP_1_11_LOCAL_IO` Phase B1+.
 
+### Multi-file Parquet: columns, dtypes, and `allow_missing_columns`
+
+When **`path`** is a **directory** or **glob**, Polars **unifies** the Parquet schemas across files into one **lazy** schema. If some files omit a column that appears in others, the scan can **fail** unless you set **`allow_missing_columns=True`** in **`scan_kwargs`** (forwarded to Polars **`ScanArgsParquet.allow_missing_columns`**). With **`allow_missing_columns=True`**, missing physical columns are typically filled with **null** for rows coming from files that do not define that column.
+
+**Typed `DataFrameModel`:** Cell validation runs at **materialization** (**`to_dict()`**, **`collect()`**, …). Declare optional columns as **`T | None`** (or use **`Field(default=...)`**) when a column may be absent or null after the union. If the engine reports a **missing column** that is still optional in your model, pydantable may **retry** materialization after narrowing the plan—see {doc}`EXECUTION` and the **`_materialize_columns_with_missing_optional_fallback`** path in the implementation.
+
+**Normalizing dtypes** after a heterogeneous dataset: use **`Expr.cast(...)`**, **`strptime`**, and related helpers so the plan matches your schema; see {doc}`SUPPORTED_TYPES` (**Cast** and **Type-specific `Expr` methods**). pydantable does **not** emit cross-file **schema drift warnings** by default; behavior follows Polars for the pinned version—see {doc}`INTERFACE_CONTRACT` (**Local lazy file scans**). For application-level checks (e.g. compare PyArrow file schemas before building a lazy plan), use your own code or {doc}`PLAN_AND_PLUGINS` (**`pydantable.observe`**).
+
 ## Write (targets)
 
 ### `DataFrame[Schema]` and `DataFrameModel`

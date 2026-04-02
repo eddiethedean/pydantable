@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Added
 
+- **Tests (Phase E):** **`tests/test_parquet_allow_missing_columns_e.py`** — directory scan with mismatched Parquet columns and **`allow_missing_columns=True`**.
+- **Example (Phase E):** **`docs/examples/io/parquet_allow_missing_columns.py`** ( **`tests/test_doc_io_examples.py`** ).
 - **Parquet lazy `scan_kwargs` (1.11.0 Phase B1):** **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** forwarded to Polars **`ScanArgsParquet`** in **`pydantable-core`** (`scan_kw.rs`). Tests: **`tests/test_parquet_scan_hive_b1.py`**.
 - **CSV lazy `scan_kwargs` (1.11.0 Phase B2):** **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`**, **`raise_if_empty`**, **`truncate_ragged_lines`**, **`decimal_comma`**, **`try_parse_dates`** forwarded to Polars **`LazyCsvReader`** in **`pydantable-core`** (`lazy_csv_with_kwargs`); shared **`row_index_*`** parsing with Parquet. Tests: **`tests/test_csv_scan_directory_b2.py`** (directory / **`*.csv`** glob, hive path behavior, unknown kw).
 - **NDJSON lazy `scan_kwargs` (1.11.0 Phase B3):** **`glob`** ( **`glob=False`** raises **`ValueError`**; Polars 0.53 NDJSON scans always expand paths), **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** in **`lazy_ndjson_with_kwargs`** (`scan_kw.rs`). Tests: **`tests/test_ndjson_scan_directory_b3.py`**.
@@ -17,6 +19,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Docs
 
+- **Local I/O Phase E (1.11.0):** Multi-file Parquet — **`allow_missing_columns`**, Polars schema union, cast / optional-field patterns — {doc}`IO_PARQUET`; pointers in {doc}`DATA_IO_SOURCES`, {doc}`IO_DECISION_TREE`, {doc}`SUPPORTED_TYPES`, {doc}`INTERFACE_CONTRACT`, {doc}`PLAN_AND_PLUGINS`. Roadmap: {doc}`ROADMAP_1_11_LOCAL_IO` Phase E. Contributor note: `pydantable-core/.../scan_kw.rs`, {doc}`DEVELOPER`.
 - **Writes Phase D:** partitioned **`write_parquet`**, batch-writer file vs directory—{doc}`IO_PARQUET`, {doc}`IO_OVERVIEW`, {doc}`IO_DECISION_TREE`, {doc}`DATA_IO_SOURCES`, {doc}`INTERFACE_CONTRACT`; example **`docs/examples/io/parquet_partitioned_write.py`**. Roadmap: {doc}`ROADMAP_1_11_LOCAL_IO` Phase D.
 - **Eager / batched multi-file clarity (1.11.0 Phase C):** **`materialize_*`** single-file contract; **`iter_*` / `aiter_*`** one path per call and Python-side glob/directory expansion; **`iter_chain_batches`**; bounded-memory notes vs **`iter_concat_batches`** and lazy **`read_*`**—{doc}`IO_OVERVIEW`, {doc}`IO_DECISION_TREE`, {doc}`DATA_IO_SOURCES`, {doc}`INTERFACE_CONTRACT`; example **`docs/examples/io/iter_glob_parquet_batches.py`**. Roadmap: {doc}`ROADMAP_1_11_LOCAL_IO` Phase C.
 - **Local I/O audit (1.11.0 Phase A):** Polars **0.53.0** vs pydantable **`scan_kwargs`** matrix, directory/glob/hive notes—{ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`; multi-file entrypoint table—{doc}`IO_DECISION_TREE`; **Local lazy file scans**—{doc}`INTERFACE_CONTRACT`; path/glob subsections on {doc}`IO_PARQUET`, {doc}`IO_CSV`, {doc}`IO_NDJSON`, {doc}`IO_IPC`, {doc}`IO_JSON`; link from {doc}`IO_OVERVIEW`. Roadmap: {doc}`ROADMAP_1_11_LOCAL_IO`.

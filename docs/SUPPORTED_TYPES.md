@@ -247,6 +247,8 @@ Beyond generic arithmetic and comparisons, the following are supported (see
 - **Binary (`bytes`):** **`binary_len()`** (per-row byte length).
 - **Cast:** `cast(T)` supports the usual primitive conversions plus `datetime` → `date` / `str` and `date` → `str`, and **`str` → `date` / `datetime`** using Polars’ string parsing (ISO-8601-shaped strings; behavior follows Polars). For a **fixed format**, use **`strptime(format, ...)`** instead of `cast`.
 
+**Lazy Parquet vs model validation:** A **`read_parquet`** directory/glob scan builds a **Polars** lazy schema (including **`allow_missing_columns`** behavior for files that omit columns—see {doc}`IO_PARQUET`). **Pydantic** validation of cell values still happens when you **materialize** into a **`DataFrameModel`** / **`DataFrame`**; align dtypes with **`cast`** / **`strptime`** in the plan if files disagree on representations.
+
 Temporal part extraction and `dt_date()` on timezone-aware `datetime` values follow Polars’ interpretation of the stored dtype.
 
 ### Semantics: string predicates, regex, and `str_split`

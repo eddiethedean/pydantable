@@ -15,6 +15,7 @@ _EXAMPLES = [
     "docs/examples/io/overview_roundtrip.py",
     "docs/examples/io/iter_glob_parquet_batches.py",
     "docs/examples/io/parquet_partitioned_write.py",
+    "docs/examples/io/parquet_allow_missing_columns.py",
     "docs/examples/io/parquet_lazy_roundtrip.py",
     "docs/examples/io/csv_lazy_roundtrip.py",
     "docs/examples/io/ndjson_roundtrip.py",

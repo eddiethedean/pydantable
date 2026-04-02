@@ -138,9 +138,11 @@
 
 **Outcome:** Predictable behavior when files **disagree** on columns or dtypes.
 
-- [ ] Document **`allow_missing_columns`** and **cast** patterns for multi-file Parquet (link from {doc}`SUPPORTED_TYPES` if needed).
-- [ ] Optional: **warnings** (or structured hooks via {doc}`PLAN_AND_PLUGINS` / observe) when schema differs across files in a scan.
-- [ ] Error messages: continue **allowed keys** lists in **`ValueError`** for new **`scan_kwargs` / `write_kwargs`**.
+**Phase E shipped:** Multi-file Parquet narrative (**`allow_missing_columns`**, Polars schema union, optional model fields, **`Expr.cast`** pointers) in {doc}`IO_PARQUET`; cross-links from {doc}`DATA_IO_SOURCES`, {doc}`IO_DECISION_TREE`, {doc}`SUPPORTED_TYPES`, {doc}`INTERFACE_CONTRACT`, {doc}`PLAN_AND_PLUGINS` (observe / external schema checks; no built-in cross-file drift warning). Contributor note in `scan_kw.rs` + {doc}`DEVELOPER`. Test **`tests/test_parquet_allow_missing_columns_e.py`**; example **`docs/examples/io/parquet_allow_missing_columns.py`**.
+
+- [x] Document **`allow_missing_columns`** and **cast** patterns for multi-file Parquet (link from {doc}`SUPPORTED_TYPES` if needed).
+- [x] Optional: **warnings** (or structured hooks via {doc}`PLAN_AND_PLUGINS` / observe) when schema differs across files in a scan — **documented** (no automatic core warnings; use observe or external checks).
+- [x] Error messages: continue **allowed keys** lists in **`ValueError`** for new **`scan_kwargs` / `write_kwargs`** (invariant preserved; contributor note ties code to docs).
 
 ---
 

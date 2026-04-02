@@ -393,6 +393,7 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
   - Python tests for user-visible behavior and API compatibility
 - Preserve existing error contracts unless intentionally changing behavior.
 - Update docs (`README.md` + relevant docs in `docs/`) for any user-facing changes.
+- **Local I/O kwargs:** New `scan_kwargs` / `write_kwargs` keys belong in `pydantable-core/src/plan/execute_polars/scan_kw.rs` (`ALLOWED` slices) and in `docs/DATA_IO_SOURCES.md` (and the format page) so unknown-key errors match what users can pass.
 
 ## Common Pitfalls
 

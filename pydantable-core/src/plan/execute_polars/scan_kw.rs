@@ -1,4 +1,9 @@
 //! Optional scan/write kwargs as Python dicts mapped to Polars options.
+//!
+//! **Contributors:** Any new `scan_kwargs` / `write_kwargs` key must be added to the
+//! per-format `ALLOWED` slices *and* to user-facing docs (`docs/DATA_IO_SOURCES.md` and
+//! the relevant `IO_*` page). `unknown_scan_keys` / `unknown_write_keys` list allowed
+//! keys in `ValueError` messages; keep those lists and the docs in sync.
 
 use std::fs::File;
 use std::num::NonZeroUsize;
