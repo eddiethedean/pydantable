@@ -61,6 +61,7 @@ from .iter_file import (
     iter_ndjson,
     iter_parquet,
 )
+from .batches import iter_chain_batches
 from .rap_support import aread_csv_rap, rap_csv_available
 from .sql import StreamingColumns, fetch_sql, iter_sql, write_sql
 from .write_batches import (
@@ -315,6 +316,11 @@ def materialize_parquet(
     """
     Eagerly read Parquet into ``dict[str, list]`` (loads full data into Python).
 
+    **Single file:** one local path, buffer, or file-like per call. For **multiple** Parquet
+    files, use :func:`read_parquet` with ``glob=True`` / a directory and materialize via
+    :meth:`~pydantable.dataframe.DataFrame.to_dict`, or call ``materialize_parquet`` per file
+    and merge (mind schema alignment).
+
     * ``engine="auto"`` (default): Rust for local file paths when ``columns`` is ``None``;
       otherwise PyArrow.
     * ``engine="rust"`` / ``"pyarrow"``: force that implementation.
@@ -349,7 +355,11 @@ def materialize_ipc(
     as_stream: bool = False,
     engine: str | None = None,
 ) -> dict[str, list[Any]]:
-    """Read Arrow IPC (file or stream) into ``dict[str, list]``."""
+    """Read Arrow IPC (file or stream) into ``dict[str, list]``.
+
+    **Single file** per call. For multiple IPC files, prefer lazy :func:`read_ipc` + ``glob`` /
+    ``to_dict``, or iterate :func:`materialize_ipc` per path.
+    """
     eng = (engine or _default_engine()).lower()
     with span("io.materialize_ipc", engine=eng, as_stream=bool(as_stream)):
         if (
@@ -380,6 +390,9 @@ def materialize_csv(
 ) -> dict[str, list[Any]]:
     """
     Read CSV from a **local path** into ``dict[str, list]``.
+
+    **Single file** per call. For **multiple** CSVs, use :func:`read_csv` with ``glob=True`` /
+    ``to_dict``, or call ``materialize_csv`` per file and merge.
 
     * ``engine="auto"``: try Rust, then fall back to stdlib ``csv`` on failure.
     * ``use_rap=True``: load via :func:`aread_csv_rap` (only when no running event loop).
@@ -420,6 +433,11 @@ def materialize_csv(
 def materialize_ndjson(
     path: str | Path, *, engine: str | None = None
 ) -> dict[str, list[Any]]:
+    """Read newline-delimited JSON from a **single local path** into ``dict[str, list]``.
+
+    For **multiple** NDJSON files, use :func:`read_ndjson` with ``glob=True`` / ``to_dict``, or
+    call ``materialize_ndjson`` per file and merge.
+    """
     eng = (engine or _default_engine()).lower()
     with span("io.materialize_ndjson", engine=eng):
         if eng in ("auto", "rust"):
@@ -454,6 +472,9 @@ def materialize_json(
     path: str | Path, *, engine: str | None = None
 ) -> dict[str, list[Any]]:
     """Load a JSON file into ``dict[str, list]``: either a JSON array of objects or JSON Lines.
+
+    **Single file** per call. For **multiple** JSON files, use lazy :func:`read_json` /
+    ``read_ndjson`` with ``glob=True`` and ``to_dict``, or call ``materialize_json`` per path.
 
     If the first non-whitespace character is ``[``, the file is parsed as one JSON array.
     Otherwise the file is read as newline-delimited JSON (same as :func:`materialize_ndjson`).
@@ -1167,6 +1188,7 @@ __all__ = [
     "http",
     "iter_avro",
     "iter_bigquery",
+    "iter_chain_batches",
     "iter_csv",
     "iter_delta",
     "iter_excel",

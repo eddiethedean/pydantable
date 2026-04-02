@@ -13,6 +13,7 @@ REPO = Path(__file__).resolve().parents[1]
 
 _EXAMPLES = [
     "docs/examples/io/overview_roundtrip.py",
+    "docs/examples/io/iter_glob_parquet_batches.py",
     "docs/examples/io/parquet_lazy_roundtrip.py",
     "docs/examples/io/csv_lazy_roundtrip.py",
     "docs/examples/io/ndjson_roundtrip.py",

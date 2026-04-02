@@ -13,6 +13,7 @@ from .arrow import (
     arrow_table_to_column_dict,
     record_batch_to_column_dict,
 )
+from .batches import iter_chain_batches
 from .extras import (
     iter_avro,
     iter_bigquery,
@@ -386,6 +387,7 @@ __all__ = [
     "http",
     "iter_avro",
     "iter_bigquery",
+    "iter_chain_batches",
     "iter_csv",
     "iter_delta",
     "iter_excel",
@@ -475,6 +477,7 @@ __all__ = [
     "http",
     "iter_avro",
     "iter_bigquery",
+    "iter_chain_batches",
     "iter_csv",
     "iter_delta",
     "iter_excel",

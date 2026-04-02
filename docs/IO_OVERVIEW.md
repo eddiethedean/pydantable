@@ -74,6 +74,16 @@ For **bounded memory** pipelines in plain Python (outside the Rust **`LazyFrame`
 - **Extras:** **`iter_excel`**, **`iter_delta`**, **`iter_avro`**, **`iter_orc`**, **`iter_bigquery`**, **`iter_snowflake`**, **`iter_kafka_json`** — same column-dict batch shape where the underlying library allows streaming; see {doc}`IO_EXTRAS`.
 - **Top-level imports:** many of these names are also re-exported from **`pydantable`** alongside **`DataFrame`** / **`DataFrameModel`** for quick scripts.
 
+### Multi-file paths, globs, and memory
+
+**Single path per call:** **`iter_parquet`**, **`iter_csv`**, **`iter_ndjson`**, **`aiter_*`**, etc. each take **one** file path (or an open handle)—they do **not** accept a directory or glob string. To walk several files, expand paths yourself (**`pathlib.Path.glob`**, **`sorted(glob.glob(...))`**, or an explicit list), then call **`iter_*`** per file, or use **`iter_chain_batches`** from **`pydantable.io.batches`** (also re-exported as **`pydantable.io.iter_chain_batches`**) to **`yield from`** each file’s iterator in order.
+
+**Bounded memory:** Prefer yielding **per-file** batches in a loop. **`iter_concat_batches`** concatenates **all** batches into **one** column dict—fine for tests or small data; for many large files it can allocate a huge dict—often better to use lazy **`read_*`** (directory / **`glob=True`**) and **`to_dict()`**, **`stream`**, or **`write_*`**.
+
+**When to use lazy `read_*`:** Multi-file or hive-style datasets are usually clearer with **`MyModel.read_*`** + **`scan_kwargs`** (Polars-backed scan)—see {doc}`IO_DECISION_TREE` (**Multi-file, directories, and globs**) and the runnable example **`docs/examples/io/iter_glob_parquet_batches.py`** (per-file **`iter_parquet`** vs lazy **`read_parquet`**).
+
+**Async:** **`aiter_*`** mirror the same **single-path** contract as sync **`iter_*`** (thread offload); compose multiple paths the same way as in synchronous code.
+
 This layer is **orthogonal** to **lazy **`read_*`** / **`write_*`** on **`DataFrame`**: use **`read_*`** when you want the Rust engine and Polars planning; use **`iter_*`** when you already have a **pull**-style batch loop in Python or need a format PyArrow reads without building a **`ScanFileRoot`**.
 
 ## One page per source or target family

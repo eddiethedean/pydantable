@@ -24,7 +24,7 @@ Use this page to pick the right entry point. Execution semantics (lazy collect v
 |------|-----|--------|
 | **Typed lazy pipeline** over a **directory**, **glob**, or **hive-style dataset** | **`MyModel.read_*`** / **`DataFrame[Schema].read_*`** with **`**scan_kwargs`** (e.g. **`glob`** for Parquet/CSV) | Preferred for large data; scanning is delegated to Polars—see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`. |
 | **Eager `dict[str, list]`** from **multiple files** | **`materialize_*`** per file in a loop, or **defer** to lazy **`read_*`** | **`materialize_*`** is oriented to **single sources**; multi-file concat is often clearer as a lazy **`read_*`** then **`to_dict()`**. |
-| **Bounded-memory Python batches** without a **`DataFrame`** plan | **`iter_*` / `aiter_*`** over **one path per call** | Concatenating many files: prefer lazy **`read_*`** where supported; see {doc}`IO_OVERVIEW` (**Batched column dict I/O**). |
+| **Bounded-memory Python batches** without a **`DataFrame`** plan | **`iter_*` / `aiter_*`** over **one path per call** | Expand globs in Python, then one **`iter_*`** per file (or **`iter_chain_batches`**); for many files, lazy **`read_*`** is often simpler—see {doc}`IO_OVERVIEW` (**Batched column dict I/O** → **Multi-file paths, globs, and memory**) and **`docs/examples/io/iter_glob_parquet_batches.py`**. |
 
 ## Engine selection (`materialize_parquet` and friends)
 

@@ -97,16 +97,18 @@
 
 **Outcome:** Clear multi-file story without forcing full materialization through undocumented paths.
 
+**Phase C shipped:** **`iter_*` / `aiter_*`** documented as **one path per call**; multi-file via **`pathlib.Path.glob`**, sorted **`glob.glob`**, or **`iter_chain_batches`** (`pydantable.io`, also **`pydantable.io.batches`**). **`materialize_*`** docstrings state **single-file** eager reads; multi-file → lazy **`read_*`** + **`glob=True`** / **`to_dict()`**, or per-file **`materialize_*`** with schema care. **`IO_OVERVIEW`**, **`IO_DECISION_TREE`**, **`DATA_IO_SOURCES`**, **`INTERFACE_CONTRACT`** cross-links; runnable example **`docs/examples/io/iter_glob_parquet_batches.py`**. **`aiter_*`** unchanged (parity with sync contract only).
+
 | Item | Description | Status |
 |------|-------------|--------|
-| **`iter_*` over globs / dirs** | Helpers or documented patterns: yield **`dict[str, list]`** batches per file or concatenated, with bounded memory notes. | [ ] |
-| **`materialize_*`** | Either implement **multi-file** eager reads where engine supports it, or **explicitly defer** with a single doc pointer to **`read_*`**. | [ ] |
-| **Async** | **`aiter_*`** parity with any new sync capabilities (thread-pool behavior unchanged unless documented). | [ ] |
+| **`iter_*` over globs / dirs** | Helpers or documented patterns: yield **`dict[str, list]`** batches per file or concatenated, with bounded memory notes. | [x] |
+| **`materialize_*`** | Either implement **multi-file** eager reads where engine supports it, or **explicitly defer** with a single doc pointer to **`read_*`**. | [x] |
+| **Async** | **`aiter_*`** parity with any new sync capabilities (thread-pool behavior unchanged unless documented). | [x] |
 
 **Checklist**
 
-- [ ] Examples in `docs/examples/io/` (e.g. `glob_iter_roundtrip.py` or extend existing).
-- [ ] {doc}`IO_OVERVIEW` **Batched column dict I/O** subsection cross-links.
+- [x] Examples in `docs/examples/io/` (**`iter_glob_parquet_batches.py`**).
+- [x] {doc}`IO_OVERVIEW` **Batched column dict I/O** subsection cross-links.
 
 ---
 
