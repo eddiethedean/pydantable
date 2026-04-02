@@ -3,17 +3,14 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from pydantic_core import CoreSchema, core_schema
-
 from pydantable import DataFrameModel
 from pydantable.dtypes import register_scalar, reset_registry_for_tests
+from pydantic_core import CoreSchema, core_schema
 
 
 class ULID(str):
     @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source_type: Any, handler: Any
-    ) -> CoreSchema:
+    def __get_pydantic_core_schema__(cls, source_type: Any, handler: Any) -> CoreSchema:
         def coerce(v: object) -> ULID:
             if isinstance(v, ULID):
                 return v
@@ -82,4 +79,3 @@ def test_custom_scalar_supported_under_strict_trusted_for_base_dtype() -> None:
     # Strict trusted checks dtype compatibility; a string column should be accepted.
     df = DF({"id": ["x"]}, trusted_mode="strict")
     assert df.to_dict() == {"id": ["x"]}
-

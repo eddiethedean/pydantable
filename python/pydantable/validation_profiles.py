@@ -12,10 +12,9 @@ via model policy ``__pydantable__ = {"validation_profile": "..."}``.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, TypedDict
+from typing import Literal, TypedDict
 
-from pydantable.policies import Strictness
-
+Strictness = Literal["inherit", "coerce", "strict", "off"]
 
 TrustedMode = Literal["off", "shape_only", "strict"]
 
@@ -144,9 +143,15 @@ def apply_validation_profile(
         fill_missing_optional = False
     if ignore_errors is False and p.ignore_errors is True:
         ignore_errors = True
-    if column_strictness_default == "coerce" and p.column_strictness_default is not None:
+    if (
+        column_strictness_default == "coerce"
+        and p.column_strictness_default is not None
+    ):
         column_strictness_default = p.column_strictness_default
-    if nested_strictness_default == "inherit" and p.nested_strictness_default is not None:
+    if (
+        nested_strictness_default == "inherit"
+        and p.nested_strictness_default is not None
+    ):
         nested_strictness_default = p.nested_strictness_default
 
     return (
@@ -168,4 +173,3 @@ __all__ = [
     "register_validation_profile",
     "reset_validation_profiles_for_tests",
 ]
-

@@ -297,7 +297,9 @@ class DataFrameModel(Generic[RowT]):
         nested_row = class_dict.get("Row")
         explicit_row_base = class_dict.get("__row_base__")
         if nested_row is not None:
-            if not isinstance(nested_row, type) or not issubclass(nested_row, BaseModel):
+            if not isinstance(nested_row, type) or not issubclass(
+                nested_row, BaseModel
+            ):
                 raise TypeError(
                     f"{cls.__name__}.Row must be a Pydantic BaseModel subclass "
                     f"(got {type(nested_row).__name__})."
@@ -308,8 +310,8 @@ class DataFrameModel(Generic[RowT]):
                 explicit_row_base, BaseModel
             ):
                 raise TypeError(
-                    f"{cls.__name__}.__row_base__ must be a Pydantic BaseModel subclass "
-                    f"(got {type(explicit_row_base).__name__})."
+                    f"{cls.__name__}.__row_base__ must be a Pydantic BaseModel "
+                    f"subclass (got {type(explicit_row_base).__name__})."
                 )
             row_base = cast("type[BaseModel]", explicit_row_base)
 
@@ -391,17 +393,17 @@ class DataFrameModel(Generic[RowT]):
 
         trusted_mode, fill_missing_optional, ignore_errors, col_sd, nested_sd = (
             apply_validation_profile(
-            profile_name=validation_profile,
-            current_trusted_mode=trusted_mode,
-            current_fill_missing_optional=fill_missing_optional,
-            current_ignore_errors=ignore_errors,
-            current_column_strictness_default=cast(
-                "Any", column_strictness_default or "coerce"
-            ),
-            current_nested_strictness_default=cast(
-                "Any", nested_strictness_default or "inherit"
-            ),
-        )
+                profile_name=validation_profile,
+                current_trusted_mode=trusted_mode,
+                current_fill_missing_optional=fill_missing_optional,
+                current_ignore_errors=ignore_errors,
+                current_column_strictness_default=cast(
+                    "Any", column_strictness_default or "coerce"
+                ),
+                current_nested_strictness_default=cast(
+                    "Any", nested_strictness_default or "inherit"
+                ),
+            )
         )
         normalized, from_rows = _normalize_input(
             data=data,
@@ -1684,7 +1686,9 @@ class DataFrameModel(Generic[RowT]):
         return cast(
             "list[RowT]",
             await self.acollect(
-                streaming=streaming, engine_streaming=engine_streaming, executor=executor
+                streaming=streaming,
+                engine_streaming=engine_streaming,
+                executor=executor,
             ),
         )
 
@@ -2102,7 +2106,7 @@ class DataFrameModel(Generic[RowT]):
 
     @classmethod
     def schema_json_schema(cls, **kwargs: Any) -> dict[str, Any]:
-        """Convenience wrapper for ``cls.schema_model().model_json_schema(**kwargs)``."""
+        """Convenience wrapper for ``cls.schema_model().model_json_schema(...)``."""
         return cast("dict[str, Any]", cls.schema_model().model_json_schema(**kwargs))
 
     @classmethod

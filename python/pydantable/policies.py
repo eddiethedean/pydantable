@@ -7,10 +7,10 @@ Phase 1 scope (see docs/PYDANTIC_ROADMAP.md):
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel
-
+if TYPE_CHECKING:
+    from pydantic import BaseModel
 
 Strictness = Literal["inherit", "coerce", "strict", "off"]
 
@@ -77,4 +77,3 @@ __all__ = [
     "column_policy",
     "resolve_column_strictness",
 ]
-

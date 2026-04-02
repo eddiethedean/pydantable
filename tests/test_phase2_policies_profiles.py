@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 from pydantable import DataFrameModel
 from pydantable.validation_profiles import (
     get_validation_profile,
@@ -10,12 +12,15 @@ from pydantable.validation_profiles import (
 
 def test_pydantable_policy_merges_inheritance() -> None:
     class Base(DataFrameModel):
-        __pydantable__ = {"validation_profile": "trusted_upstream", "x": 1}
+        __pydantable__: ClassVar[dict[str, object]] = {
+            "validation_profile": "trusted_upstream",
+            "x": 1,
+        }
 
         id: int
 
     class Child(Base):
-        __pydantable__ = {"x": 2}
+        __pydantable__: ClassVar[dict[str, object]] = {"x": 2}
 
         name: str
 
@@ -26,11 +31,14 @@ def test_pydantable_policy_merges_inheritance() -> None:
 
 def test_validation_profile_from_model_policy_applies_defaults() -> None:
     class DF(DataFrameModel):
-        __pydantable__ = {"validation_profile": "batch_lenient"}
+        __pydantable__: ClassVar[dict[str, object]] = {
+            "validation_profile": "batch_lenient"
+        }
 
         id: int
 
-    # batch_lenient sets ignore_errors=True (profile defaults); constructor default is False
+    # batch_lenient sets ignore_errors=True (profile defaults); constructor default is
+    # False.
     df = DF([{"id": 1}, {"id": "bad"}])
     assert df.to_dict() == {"id": [1]}
 
@@ -42,7 +50,9 @@ def test_validation_profile_registry_can_override() -> None:
     )
 
     class DF(DataFrameModel):
-        __pydantable__ = {"validation_profile": "my_profile"}
+        __pydantable__: ClassVar[dict[str, object]] = {
+            "validation_profile": "my_profile"
+        }
 
         id: int
 
@@ -57,4 +67,3 @@ def test_validation_profile_unknown_raises_keyerror() -> None:
         raise AssertionError("expected KeyError")
     except KeyError:
         pass
-

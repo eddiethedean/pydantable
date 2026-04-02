@@ -528,8 +528,12 @@ class DataFrame(Generic[SchemaT]):
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
-        column_strictness_default: Literal["inherit", "coerce", "strict", "off"] = "coerce",
-        nested_strictness_default: Literal["inherit", "coerce", "strict", "off"] = "inherit",
+        column_strictness_default: Literal[
+            "inherit", "coerce", "strict", "off"
+        ] = "coerce",
+        nested_strictness_default: Literal[
+            "inherit", "coerce", "strict", "off"
+        ] = "inherit",
     ) -> None:
         if self._schema_type is None:
             raise TypeError(
@@ -590,7 +594,9 @@ class DataFrame(Generic[SchemaT]):
                 "Use DataFrame[SchemaType].read_* to construct from a lazy file read."
             )
         rust = _require_rust_core()
-        plan = rust.make_plan(field_types_for_rust(schema_field_types(cls._schema_type)))
+        plan = rust.make_plan(
+            field_types_for_rust(schema_field_types(cls._schema_type))
+        )
         df = cls._from_plan(
             root_data=root,
             root_schema_type=cls._schema_type,

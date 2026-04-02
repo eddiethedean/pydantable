@@ -6,7 +6,7 @@ success (e.g. `ignore_errors=True`) and the caller needs machine-readable detail
 
 from __future__ import annotations
 
-from typing import Any, Iterable
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -58,4 +58,3 @@ __all__ = [
     "IngestValidationErrorDetail",
     "coerce_validation_failures",
 ]
-

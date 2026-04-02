@@ -9,8 +9,7 @@ derived-schema identity preservation.
 
 from __future__ import annotations
 
-from typing import Any, Literal
-
+from typing import Literal
 
 ScalarBaseName = Literal[
     "int",
@@ -82,4 +81,3 @@ __all__ = [
     "register_scalar",
     "reset_registry_for_tests",
 ]
-

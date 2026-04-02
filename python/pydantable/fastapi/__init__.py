@@ -56,7 +56,7 @@ def ingest_error_response(
     *,
     status_code: int = 422,
     title: str = "Ingest validation failed",
-) -> JSONResponse:
+) -> Any:
     """
     Return a structured JSON response describing batch ingest validation failures.
 

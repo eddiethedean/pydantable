@@ -4,10 +4,9 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
-from pydantic import Field
-
 from pydantable import DataFrameModel
 from pydantable.fastapi import columnar_dependency, rows_dependency
+from pydantic import Field
 
 
 class Users(DataFrameModel):
@@ -32,7 +31,7 @@ def test_openapi_columnar_body_has_descriptions_and_examples() -> None:
                     generate_examples=True,
                 )
             ),
-        ]
+        ],
     ) -> dict:
         return df.to_dict()
 
@@ -41,7 +40,7 @@ def test_openapi_columnar_body_has_descriptions_and_examples() -> None:
         df: Annotated[
             Users,
             Depends(rows_dependency(Users)),
-        ]
+        ],
     ) -> dict:
         return {"ok": True}
 
@@ -50,11 +49,9 @@ def test_openapi_columnar_body_has_descriptions_and_examples() -> None:
 
     # Locate the request body schema for the columnar endpoint and assert
     # field-level description + examples were propagated.
-    req_schema = (
-        spec["paths"]["/ingest/columnar"]["post"]["requestBody"]["content"][
-            "application/json"
-        ]["schema"]
-    )
+    req_schema = spec["paths"]["/ingest/columnar"]["post"]["requestBody"]["content"][
+        "application/json"
+    ]["schema"]
     ref = req_schema["$ref"]
     name = ref.split("/")[-1]
     model_schema = spec["components"]["schemas"][name]
@@ -74,17 +71,16 @@ def test_openapi_generate_examples_fallback_for_unset_examples() -> None:
         df: Annotated[
             Numbers,
             Depends(columnar_dependency(Numbers, generate_examples=True)),
-        ]
+        ],
     ) -> dict:
         return df.to_dict()
 
     with TestClient(app) as client:
         spec = client.get("/openapi.json").json()
 
-    schema = spec["paths"]["/ingest"]["post"]["requestBody"]["content"]["application/json"][
-        "schema"
-    ]
+    schema = spec["paths"]["/ingest"]["post"]["requestBody"]["content"][
+        "application/json"
+    ]["schema"]
     name = schema["$ref"].split("/")[-1]
     props = spec["components"]["schemas"][name]["properties"]
     assert props["n"]["examples"] == [1, 2]
-

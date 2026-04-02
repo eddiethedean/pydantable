@@ -74,7 +74,6 @@ def rows_dependency(
     validation_profile: str | None = ...,
     on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = ...,
 ) -> Callable[..., _DFM]: ...
-
 def ingest_error_response(
     failures: object,
     *,

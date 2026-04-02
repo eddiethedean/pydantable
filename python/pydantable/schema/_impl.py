@@ -875,7 +875,9 @@ def validate_columns_strict(
     ignore_errors: bool = False,
     on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     column_strictness_default: Literal["inherit", "coerce", "strict", "off"] = "coerce",
-    nested_strictness_default: Literal["inherit", "coerce", "strict", "off"] = "inherit",
+    nested_strictness_default: Literal[
+        "inherit", "coerce", "strict", "off"
+    ] = "inherit",
 ) -> dict[str, Any] | Any:
     """
     Validate that `data` matches `schema_type` and return normalized columns.
@@ -1046,14 +1048,12 @@ def validate_columns_strict(
                 )
                 try:
                     origin = get_origin(_unwrap_annotated(field_types[name]))
-                    is_struct = (
-                        isinstance(_unwrap_annotated(field_types[name]), type)
-                        and issubclass(_unwrap_annotated(field_types[name]), BaseModel)
-                    )
+                    is_struct = isinstance(
+                        _unwrap_annotated(field_types[name]), type
+                    ) and issubclass(_unwrap_annotated(field_types[name]), BaseModel)
                     strict_flag = (
                         True
-                        if (origin in (list, dict) or is_struct)
-                        and ns == "strict"
+                        if (origin in (list, dict) or is_struct) and ns == "strict"
                         else s == "strict"
                     )
                     if s == "off":
@@ -1107,10 +1107,9 @@ def validate_columns_strict(
                 continue
             adapter = TypeAdapter(expected_type)
             origin = get_origin(_unwrap_annotated(expected_type))
-            is_struct = (
-                isinstance(_unwrap_annotated(expected_type), type)
-                and issubclass(_unwrap_annotated(expected_type), BaseModel)
-            )
+            is_struct = isinstance(
+                _unwrap_annotated(expected_type), type
+            ) and issubclass(_unwrap_annotated(expected_type), BaseModel)
             strict_flag = (
                 True
                 if (origin in (list, dict) or is_struct) and ns == "strict"

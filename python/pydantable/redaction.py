@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
-
-from pydantic import BaseModel
+from typing import TYPE_CHECKING, Any
 
 from pydantable.policies import column_policies
+
+if TYPE_CHECKING:
+    from pydantic import BaseModel
 
 
 def redaction_mask_for_value(v: Any) -> Any:
@@ -47,4 +48,3 @@ __all__ = [
     "apply_redaction_to_row_dicts",
     "redaction_mask_for_value",
 ]
-

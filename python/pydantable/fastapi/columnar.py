@@ -5,7 +5,15 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Literal, cast, get_origin
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, create_model, model_validator
+from pydantic import (
+    AliasChoices,
+    AliasPath,
+    BaseModel,
+    ConfigDict,
+    Field,
+    create_model,
+    model_validator,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -36,9 +44,7 @@ def _example_list_for_annotation(annotation: Any) -> list[Any] | None:
     return None
 
 
-def _merge_column_examples(
-    *, finfo: Any, cell_annotation: Any
-) -> list[Any] | None:
+def _merge_column_examples(*, finfo: Any, cell_annotation: Any) -> list[Any] | None:
     """
     Prefer explicit `Field(examples=[...])` values; otherwise use a small type-based
     default catalog.
@@ -102,7 +108,11 @@ def columnar_body_model(
             if input_key_mode == "aliases":
                 validation_alias = finfo.validation_alias
             else:
-                validation_alias = AliasChoices(py_name, finfo.validation_alias)
+                if isinstance(finfo.validation_alias, (str, AliasPath)):
+                    validation_alias = AliasChoices(py_name, finfo.validation_alias)
+                else:
+                    # Already a compound alias; preserve as-is.
+                    validation_alias = finfo.validation_alias
                 if isinstance(finfo.validation_alias, str):
                     alias_conflicts[py_name] = finfo.validation_alias
             field_defs[py_name] = (
@@ -143,7 +153,8 @@ def columnar_body_model(
             for py_name, alias in cls.__alias_conflicts__.items():
                 if py_name in keys and alias in keys:
                     raise ValueError(
-                        "Columnar body includes both alias and python keys for the same field."
+                        "Columnar body includes both alias and python keys for the "
+                        "same field."
                     )
             return data
 

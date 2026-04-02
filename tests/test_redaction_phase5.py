@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from pydantic import Field
+from typing import ClassVar
 
 from pydantable import DataFrameModel
+from pydantic import Field
 
 
 class Users(DataFrameModel):
@@ -18,7 +19,7 @@ def test_to_dicts_redact_applies_policy() -> None:
 
 def test_to_dicts_redact_default_from_policy() -> None:
     class DF(DataFrameModel):
-        __pydantable__ = {"redact": True}
+        __pydantable__: ClassVar[dict[str, object]] = {"redact": True}
         email: str = Field(json_schema_extra={"pydantable": {"redact": True}})
 
     df = DF({"email": ["x"]})
@@ -35,4 +36,3 @@ def test_ato_dicts_redact_async() -> None:
     import asyncio
 
     asyncio.run(_run())
-

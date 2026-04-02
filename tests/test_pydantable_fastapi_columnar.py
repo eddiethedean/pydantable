@@ -142,7 +142,9 @@ def test_ingest_error_response_returns_structured_payload() -> None:
         {
             "row_index": 0,
             "row": {"id": "bad"},
-            "errors": [{"type": "int_parsing", "loc": ("id",), "msg": "bad", "input": "bad"}],
+            "errors": [
+                {"type": "int_parsing", "loc": ("id",), "msg": "bad", "input": "bad"}
+            ],
         }
     ]
     resp = ingest_error_response(failures, status_code=422, title="Bad rows")

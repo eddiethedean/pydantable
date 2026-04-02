@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 import pytest
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-
 from pydantable import DataFrameModel, Schema
-
+from pydantic import ConfigDict, Field, field_validator
 
 Email = Annotated[str, Field(json_schema_extra={"pydantable": {"pii": True}})]
 
@@ -106,4 +104,3 @@ def test_to_dicts_passthrough_exclude_defaults_and_async_ato_dicts() -> None:
     import asyncio
 
     asyncio.run(_run())
-

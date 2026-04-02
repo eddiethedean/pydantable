@@ -38,6 +38,8 @@
       ~DataFrameModel.clip
       ~DataFrameModel.collect
       ~DataFrameModel.collect_batches
+      ~DataFrameModel.column_policies
+      ~DataFrameModel.column_policy
       ~DataFrameModel.concat
       ~DataFrameModel.describe
       ~DataFrameModel.distinct
@@ -70,6 +72,7 @@
       ~DataFrameModel.pivot_wider
       ~DataFrameModel.posexplode
       ~DataFrameModel.posexplode_outer
+      ~DataFrameModel.pydantable_policy
       ~DataFrameModel.read_csv
       ~DataFrameModel.read_ipc
       ~DataFrameModel.read_json
@@ -83,9 +86,11 @@
       ~DataFrameModel.rename_title
       ~DataFrameModel.rename_upper
       ~DataFrameModel.rolling_agg
+      ~DataFrameModel.row_json_schema
       ~DataFrameModel.row_model
       ~DataFrameModel.rows
       ~DataFrameModel.schema_fields
+      ~DataFrameModel.schema_json_schema
       ~DataFrameModel.schema_model
       ~DataFrameModel.select
       ~DataFrameModel.select_schema
