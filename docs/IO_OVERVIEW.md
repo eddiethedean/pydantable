@@ -86,6 +86,8 @@ For **bounded memory** pipelines in plain Python (outside the Rust **`LazyFrame`
 
 This layer is **orthogonal** to **lazy **`read_*`** / **`write_*`** on **`DataFrame`**: use **`read_*`** when you want the Rust engine and Polars planning; use **`iter_*`** when you already have a **pull**-style batch loop in Python or need a format PyArrow reads without building a **`ScanFileRoot`**.
 
+**Multi-file Parquet output:** **`write_parquet_batches`** always targets **one** output file. For a **hive-style partitioned** dataset (directory tree **`col=value/...`**), use **`DataFrame.write_parquet(..., partition_by=[...])`** ({doc}`IO_PARQUET`).
+
 ## One page per source or target family
 
 | Topic | Guide |

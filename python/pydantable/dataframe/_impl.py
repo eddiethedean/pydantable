@@ -3554,6 +3554,8 @@ class DataFrame(Generic[SchemaT]):
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         write_kwargs: dict[str, Any] | None = None,
+        partition_by: tuple[str, ...] | list[str] | None = None,
+        mkdir: bool = True,
     ) -> None:
         """Write this lazy plan to Parquet without a Python ``dict[str, list]``.
 
@@ -3562,6 +3564,11 @@ class DataFrame(Generic[SchemaT]):
 
         ``write_kwargs`` may include Polars writer options such as ``compression``,
         ``row_group_size``, ``data_page_size``, ``statistics``, ``parallel``.
+
+        ``partition_by`` is an optional list of column names; when set, ``path`` is a
+        **dataset root directory** and rows are written as hive-style
+        ``col=value/.../00000000.parquet`` shards (partition columns are omitted from
+        each file). Use ``mkdir=False`` only if the root directory already exists.
         """
         use_streaming = _resolve_engine_streaming(
             streaming=streaming,
@@ -3574,6 +3581,8 @@ class DataFrame(Generic[SchemaT]):
             str(path),
             streaming=use_streaming,
             write_kwargs=write_kwargs,
+            partition_by=partition_by,
+            mkdir=mkdir,
         )
 
     def write_csv(

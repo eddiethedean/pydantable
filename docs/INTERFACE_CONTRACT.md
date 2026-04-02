@@ -310,6 +310,7 @@ Rolling/dynamic contracts:
 ## Arrow interchange (0.16.0)
 
 - **`pydantable.io.materialize_*`** and **`iter_*`** / **`aiter_*`** are **single-source** by design (one file path per call unless you compose iterators in Python). **`pydantable.io.materialize_parquet`** / **`materialize_ipc`** feed **`dict[str, list]`** into **`DataFrameModel(...)`** / **`DataFrame(...)`** constructors. **`materialize_ipc(..., as_stream=True)`** selects the **streaming** IPC format; default is **file** IPC. For lazy local files use **`read_*`** + **`DataFrame.write_parquet`** ({doc}`EXECUTION`).
+- **Partitioned Parquet writes:** **`DataFrame.write_parquet(path, partition_by=[...])`** (and **`DataFrameModel`**) emit a **multi-file** hive-style layout under **`path`**. The dataset is **not** written atomically: failures can leave **partial** output (some **`col=value/.../00000000.parquet`** files present, others missing). There is **no** transactional “all-or-nothing” rename unless you implement it outside pydantable.
 - **`DataFrame.to_arrow`** / **`DataFrame.ato_arrow`:** same logical materialization as **`to_dict`**, then build a PyArrow **`Table`** in Python (**not** a zero-copy view of internal Polars buffers). **`DataFrameModel`** exposes the same methods by delegation.
 - **Constructors:** **`pyarrow.Table`** and **`RecordBatch`** are accepted when **`pyarrow`** is installed (converted to Python lists before validation); see {doc}`SUPPORTED_TYPES`.
 

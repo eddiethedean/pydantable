@@ -383,6 +383,8 @@ class DataFrameModel(Generic[RowT]):
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         write_kwargs: dict[str, Any] | None = None,
+        partition_by: tuple[str, ...] | list[str] | None = None,
+        mkdir: bool = True,
     ) -> None: ...
     def write_csv(
         self,

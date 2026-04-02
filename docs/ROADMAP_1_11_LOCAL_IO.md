@@ -116,19 +116,21 @@
 
 **Outcome:** Outputs can match **Polars-style partitioned datasets** where the engine allows.
 
+**Phase D shipped:** **D1 —** **`DataFrame.write_parquet`** / **`DataFrameModel.write_parquet`** accept **`partition_by`** (hive-style **`col=value/.../00000000.parquet`** under a dataset root) and **`mkdir`**, implemented in **`sink_parquet_polars`** via Polars **`DataFrame::partition_by_stable`** + existing **`write_parquet_file`** per shard (**`write_kwargs`** apply per file; no new Parquet writer keys). **D2 —** **`write_*_batches`** document **single-file** targets, **`mode`** for CSV/NDJSON append, and **reject** an existing **directory** path; tests **`tests/test_write_batches_phase_d2.py`**. **CSV / NDJSON partitioned** multi-file sinks remain **out of scope** (evaluate later). Docs: {doc}`IO_PARQUET`, {doc}`IO_OVERVIEW`, {doc}`IO_DECISION_TREE`, {doc}`DATA_IO_SOURCES`, {doc}`INTERFACE_CONTRACT`; example **`docs/examples/io/parquet_partitioned_write.py`**.
+
 ### D1 — Lazy pipeline sinks (Rust plan → disk)
 
-- [ ] **Partitioned Parquet:** directory output with **partition columns** and stable naming (hive-style layout), using Polars **sink** / write APIs available from the same execution stack as current **`write_parquet_file`**.
-- [ ] **`write_kwargs`** extended for new sink options (compression, statistics, row group sizing—align with existing single-file keys where possible).
-- [ ] Evaluate **CSV** / **NDJSON** partitioned or rolling multi-file writes (priority after Parquet).
+- [x] **Partitioned Parquet:** directory output with **partition columns** and stable naming (hive-style layout), using Polars **sink** / write APIs available from the same execution stack as current **`write_parquet_file`**.
+- [x] **`write_kwargs`** extended for new sink options (compression, statistics, row group sizing—align with existing single-file keys where possible). **(Same per-shard allowlist as single-file writes; no new keys in 1.11.0.)**
+- [ ] Evaluate **CSV** / **NDJSON** partitioned or rolling multi-file writes (priority after Parquet). **Deferred.**
 
 ### D2 — Batch writers
 
-- [ ] **`write_*_batches`**: semantics for **target directory** vs **single file**, **append** vs **overwrite**, documented and tested.
+- [x] **`write_*_batches`**: semantics for **target directory** vs **single file**, **append** vs **overwrite**, documented and tested.
 
 **Checklist**
 
-- [ ] {doc}`IO_PARQUET` (and related) describe **partitioned** usage; {doc}`INTERFACE_CONTRACT` notes guarantees (e.g. atomicity **not** promised unless stated).
+- [x] {doc}`IO_PARQUET` (and related) describe **partitioned** usage; {doc}`INTERFACE_CONTRACT` notes guarantees (e.g. atomicity **not** promised unless stated).
 
 ---
 
@@ -154,7 +156,7 @@
 ## Success criteria (1.11.0)
 
 1. A user can **read a directory or glob** of **Parquet** / **CSV** with documented **`scan_kwargs`**, and—where implemented—**NDJSON** / **`read_json`** (JSON Lines) / **IPC** with the same mental model as Polars.
-2. A user can **write a partitioned Parquet dataset** (or the doc explicitly states the minimum supported layout and follow-up work).
+2. A user can **write a partitioned Parquet dataset** via **`DataFrame.write_parquet(..., partition_by=[...])`** (hive-style layout; see {doc}`IO_PARQUET`).
 3. **Eager** and **iter** layers have **clear** multi-file guidance without contradictions across {doc}`IO_OVERVIEW`, {doc}`IO_DECISION_TREE`, and {doc}`DATA_IO_SOURCES`.
 4. **Tests and changelog** back the advertised surface; no undocumented kwargs in the allowlists.
 

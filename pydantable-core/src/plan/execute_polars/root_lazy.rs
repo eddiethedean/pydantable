@@ -1,6 +1,7 @@
 //! Lazy `LazyFrame` from `ScanFileRoot` or in-memory Python columns, plus file sinks.
 
 use std::fs::File;
+use std::path::{Path, PathBuf};
 
 use polars::prelude::{Engine, *};
 use polars_io::ipc::IpcCompression;
@@ -146,7 +147,25 @@ fn write_kw_as_dict<'py>(
     }
 }
 
+fn hive_value_str(av: AnyValue<'_>) -> String {
+    match av {
+        AnyValue::String(s) => s.to_string(),
+        AnyValue::StringOwned(s) => s.to_string(),
+        _ => format!("{av}"),
+    }
+}
+
+fn hive_segment_for_cell(av: AnyValue<'_>, col_name: &str) -> String {
+    let mut value = hive_value_str(av);
+    value = value.replace(['/', '\\'], "_");
+    format!("{col_name}={value}")
+}
+
 /// Execute plan and write Parquet without materializing to Python `dict[str, list]`.
+///
+/// When `partition_by` is non-empty, `path` is the **dataset root directory**; rows are split with
+/// [`DataFrame::partition_by_stable`], written under hive-style `col=value/.../00000000.parquet`
+/// shards (partition columns are omitted from each file, matching common hive layouts).
 pub(crate) fn sink_parquet_polars(
     py: Python<'_>,
     plan: &PlanInner,
@@ -154,11 +173,89 @@ pub(crate) fn sink_parquet_polars(
     path: String,
     streaming: bool,
     write_kw: Option<&Bound<'_, PyAny>>,
+    partition_by: Option<Vec<String>>,
+    mkdir: bool,
 ) -> PyResult<()> {
     let lf = plan_to_lazyframe(py, plan, root_data)?;
     let mut df = collect_lazyframe(py, lf, streaming)?;
     let d = write_kw_as_dict(write_kw)?;
-    write_parquet_file(py, path.as_str(), &mut df, d)
+
+    let cols: Vec<String> = partition_by
+        .into_iter()
+        .flatten()
+        .filter(|s| !s.is_empty())
+        .collect();
+    if cols.is_empty() {
+        return write_parquet_file(py, path.as_str(), &mut df, d);
+    }
+
+    let root = Path::new(path.as_str());
+    if root.exists() && root.is_file() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "sink_parquet with partition_by requires path to be a directory (or not yet existing), not an existing file",
+        ));
+    }
+    if mkdir {
+        std::fs::create_dir_all(root).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyOSError, _>(format!(
+                "sink_parquet partition root mkdir: {e}"
+            ))
+        })?;
+    } else if !root.exists() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "sink_parquet with partition_by and mkdir=False requires an existing directory path",
+        ));
+    }
+
+    let schema = df.schema();
+    for c in &cols {
+        if schema.get(c.as_str()).is_none() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "sink_parquet partition_by: unknown column {c:?}"
+            )));
+        }
+    }
+
+    let parts = df.partition_by_stable(cols.clone(), true).map_err(|e| {
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+            "sink_parquet partition_by: {e}"
+        ))
+    })?;
+
+    for part_df in parts {
+        let mut dir = PathBuf::from(path.as_str());
+        for c in &cols {
+            let col = part_df.column(c.as_str()).map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "sink_parquet partition shard: {e}"
+                ))
+            })?;
+            let av = col.as_materialized_series().get(0).map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "sink_parquet partition column {c:?}: {e}"
+                ))
+            })?;
+            let seg = hive_segment_for_cell(av, c);
+            dir.push(seg);
+        }
+        if mkdir {
+            std::fs::create_dir_all(&dir).map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyOSError, _>(format!(
+                    "sink_parquet partition shard mkdir: {e}"
+                ))
+            })?;
+        }
+        let out_path = dir.join("00000000.parquet");
+        let out_str = out_path.to_str().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "sink_parquet partition path is not valid UTF-8",
+            )
+        })?;
+        let mut to_write = part_df.drop_many(cols.iter().cloned());
+        write_parquet_file(py, out_str, &mut to_write, d)?;
+    }
+
+    Ok(())
 }
 
 pub(crate) fn sink_csv_polars(

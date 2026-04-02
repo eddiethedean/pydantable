@@ -18,6 +18,17 @@ _PathLike = str | Path
 _TextStream = TextIO | IO[str]
 
 
+def _reject_directory_file_path(path: _PathLike, api: str) -> None:
+    """Batch writers target one file; reject an existing directory path early."""
+    p = Path(path)
+    if p.exists() and p.is_dir():
+        raise ValueError(
+            f"{api} expects a single output file path, not a directory ({path!r}). "
+            "For hive-style partitioned Parquet output, use "
+            "``DataFrame.write_parquet(..., partition_by=[...])``."
+        )
+
+
 def write_csv_batches(
     path: _PathLike | _TextStream,
     batches: Iterable[dict[str, list[Any]]],
@@ -28,11 +39,16 @@ def write_csv_batches(
     write_header: bool = True,
 ) -> None:
     """
-    Write an iterator of rectangular column dict batches to a single CSV.
+    Write an iterator of rectangular column dict batches to a **single CSV file**.
+
+    ``path`` must be a file path (or open text stream), not a directory. ``mode="w"``
+    truncates or creates the file; ``mode="a"`` appends rows. With ``mode="a"``, a header
+    row is written only when the file is new and ``write_header`` is true (first batch).
     """
     if mode not in ("w", "a"):
         raise ValueError("mode must be 'w' or 'a'")
     if isinstance(path, (str, Path)):
+        _reject_directory_file_path(path, "write_csv_batches")
         with open(path, mode, newline=newline, encoding=encoding) as fh:
             write_csv_batches(
                 fh,
@@ -71,11 +87,15 @@ def write_ndjson_batches(
     encoding: str = "utf-8",
 ) -> None:
     """
-    Write an iterator of rectangular column dict batches to a single NDJSON file.
+    Write an iterator of rectangular column dict batches to a **single NDJSON file**.
+
+    ``path`` must be a file path (or open text stream), not a directory. ``mode="w"``
+    truncates or creates the file; ``mode="a"`` appends one JSON object per line.
     """
     if mode not in ("w", "a"):
         raise ValueError("mode must be 'w' or 'a'")
     if isinstance(path, (str, Path)):
+        _reject_directory_file_path(path, "write_ndjson_batches")
         with open(path, mode, encoding=encoding) as fh:
             write_ndjson_batches(fh, batches, mode=mode, encoding=encoding)
         return
@@ -98,9 +118,10 @@ def write_ipc_batches(
     as_stream: bool = True,
 ) -> None:
     """
-    Write batches to Arrow IPC.
+    Write batches to a **single Arrow IPC file or stream** (not a dataset directory).
 
-    Requires `pyarrow` (install `pydantable[arrow]`).
+    ``path`` must be a file path (or open binary stream). Requires `pyarrow` (install
+    ``pydantable[arrow]``).
     """
     try:
         import pyarrow as pa  # type: ignore[import-not-found]
@@ -111,6 +132,7 @@ def write_ipc_batches(
         ) from e
 
     if isinstance(path, (str, Path)):
+        _reject_directory_file_path(path, "write_ipc_batches")
         with open(path, "wb") as fh:
             write_ipc_batches(fh, batches, as_stream=as_stream)
         return
@@ -142,9 +164,11 @@ def write_parquet_batches(
     compression: str | None = None,
 ) -> None:
     """
-    Write batches to a single Parquet file (row groups per batch).
+    Write batches to a **single Parquet file** (one row group per non-empty batch).
 
-    Requires `pyarrow` (install `pydantable[arrow]`).
+    ``path`` must be a file path (or open binary stream), not a directory or hive
+    dataset root. For partitioned Parquet on disk, use :meth:`~pydantable.dataframe.DataFrame.write_parquet`
+    with ``partition_by``. Requires `pyarrow` (install ``pydantable[arrow]``).
     """
     try:
         import pyarrow as pa  # type: ignore[import-not-found]
@@ -155,6 +179,7 @@ def write_parquet_batches(
         ) from e
 
     if isinstance(path, (str, Path)):
+        _reject_directory_file_path(path, "write_parquet_batches")
         with open(path, "wb") as fh:
             write_parquet_batches(fh, batches, compression=compression)
         return

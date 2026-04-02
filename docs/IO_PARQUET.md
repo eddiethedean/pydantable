@@ -41,7 +41,7 @@ The temp file for **`read_parquet_url`** is **not** deleted automatically; see {
 **Batched (`dict[str, list]`, PyArrow)**
 
 - **`iter_parquet(path, *, batch_size=..., columns=None)`** / **`aiter_parquet`** — yield rectangular column dicts (optional **`columns`** projection).
-- **`write_parquet_batches(path, batches, *, compression=None)`** — append multiple batches as row groups in one file.
+- **`write_parquet_batches(path, batches, *, compression=None)`** — append multiple batches as row groups in **one** Parquet file (not a dataset directory; see {doc}`IO_OVERVIEW` **Batched column dict I/O**).
 
 **`scan_kwargs`:** for example **`n_rows`**, **`low_memory`**, **`rechunk`**, **`use_statistics`**, **`cache`**, **`glob`**, **`allow_missing_columns`**, **`parallel`**, **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
 
@@ -53,10 +53,14 @@ Lazy **`read_parquet`** uses Polars **`scan_parquet`**; **`glob`** is forwarded 
 
 ### `DataFrame[Schema]` and `DataFrameModel`
 
-- **`df.write_parquet(path, *, compression=None, write_kwargs=None, streaming=...)`**
+- **`df.write_parquet(path, *, compression=None, write_kwargs=None, streaming=..., partition_by=None, mkdir=True)`**
 - **`model.write_parquet(...)`** — same.
 
 **`write_kwargs`** may include **`compression`**, **`row_group_size`**, **`data_page_size`**, **`statistics`**, **`parallel`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
+
+### Partitioned (hive-style) Parquet output
+
+When **`partition_by`** is a non-empty list of column names, **`path`** is the **dataset root directory** (not a single `*.parquet` file). The lazy plan is collected once, then rows are split with Polars **`partition_by_stable`**; each group is written under **`col=value/.../00000000.parquet`**, and **partition columns are omitted** from the data files (read back with **`read_parquet(..., hive_partitioning=True)`** as usual). String partition values are sanitized for path segments (`/` and `\` replaced). **`mkdir=True`** creates the root directory (and shard directories) as needed; use **`mkdir=False`** only when the root directory already exists. This path **materializes** the full result before sharding (same as a non-partitioned **`write_parquet`**); it is not a streaming multi-file Polars sink. A failed run may leave a **partial** dataset on disk—see {doc}`INTERFACE_CONTRACT` (**Writes**).
 
 ### `pydantable.io`
 
@@ -76,6 +80,16 @@ python docs/examples/io/parquet_lazy_roundtrip.py
 ```
 
 ```{literalinclude} examples/io/parquet_lazy_roundtrip.py
+:language: python
+```
+
+**Partitioned write → hive read**:
+
+```bash
+python docs/examples/io/parquet_partitioned_write.py
+```
+
+```{literalinclude} examples/io/parquet_partitioned_write.py
 :language: python
 ```
 

@@ -155,6 +155,8 @@ def write_parquet(
     *,
     streaming: bool = False,
     write_kwargs: dict[str, Any] | None = None,
+    partition_by: list[str] | tuple[str, ...] | None = None,
+    mkdir: bool = True,
 ) -> None:
     """Write lazy plan + root to Parquet via Rust (no Python ``dict[str, list]``)."""
     rust = _require_rust_core()
@@ -162,8 +164,15 @@ def write_parquet(
         raise MissingRustExtensionError(
             f"{_MISSING_SYMBOL_PREFIX}`sink_parquet`. See docs/DEVELOPER.md."
         )
-    with span("sink_parquet", streaming=bool(streaming), path=str(path)):
-        rust.sink_parquet(plan, root_data, path, streaming, write_kwargs)
+    pb = list(partition_by) if partition_by else None
+    with span(
+        "sink_parquet",
+        streaming=bool(streaming),
+        path=str(path),
+        partition_by=pb,
+        mkdir=bool(mkdir),
+    ):
+        rust.sink_parquet(plan, root_data, path, streaming, write_kwargs, pb, mkdir)
 
 
 def write_csv(

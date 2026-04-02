@@ -1068,6 +1068,8 @@ class DataFrameModel(Generic[RowT]):
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         write_kwargs: dict[str, Any] | None = None,
+        partition_by: tuple[str, ...] | list[str] | None = None,
+        mkdir: bool = True,
     ) -> None:
         """Write the lazy plan to Parquet (no Python column dict materialization)."""
         self._df.write_parquet(
@@ -1075,6 +1077,8 @@ class DataFrameModel(Generic[RowT]):
             streaming=streaming,
             engine_streaming=engine_streaming,
             write_kwargs=write_kwargs,
+            partition_by=partition_by,
+            mkdir=mkdir,
         )
 
     def write_csv(
