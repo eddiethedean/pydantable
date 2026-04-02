@@ -161,6 +161,8 @@ def write_sqlmodel(
   - SQLModel defines the DB table
   - `DataFrameModel` defines the dataframe schema and Pydantic behavior
 
+**Status (v1.13.0 dev): Implemented** — **`DataFrameModel`** exposes SQLModel I/O alongside the **`pydantable.io`** functions: instance **`write_sqlmodel` / `awrite_sqlmodel`** (they call **`to_dict()`** then the dict writers); classmethods **`fetch_sqlmodel`**, **`afetch_sqlmodel`** (**`AwaitableDataFrameModel`**), **`iter_sqlmodel`**, **`aiter_sqlmodel`**, and dict-path **`write_sqlmodel_data` / `awrite_sqlmodel_data`** (the **`Async`** namespace **`write_sqlmodel`** delegates to **`awrite_sqlmodel_data`**). Implementation: **`python/pydantable/dataframe_model.py`**. Tests: **`tests/test_sqlmodel_dataframe_model.py`**.
+
 ---
 
 ## Phase 4 — Deprecate/reshape the legacy SQLAlchemy-string APIs (v1.13.0 → v1.14.0)
@@ -173,10 +175,10 @@ This project already has users of:
 
 **Deliverables (v1.13.0)**
 
-- Update docs to recommend **SQLModel-first**.
-- Keep legacy APIs for compatibility, but:
-  - either require SQLModel installed anyway (since `pydantable[sql]` now includes it), or
-  - move legacy APIs behind a separate extra (not recommended if you want one SQL story).
+- Update docs to recommend **SQLModel-first** and describe **raw SQL** as the advanced / migration path — see {doc}`IO_SQL`, {doc}`DATAFRAMEMODEL`, and this page.
+- Keep legacy string-SQL APIs (**`fetch_sql`**, **`iter_sql`**, **`write_sql`**, and async mirrors) for compatibility. **`pydantable[sql]`** remains the single extra for SQL I/O (it bundles **SQLModel**); there is no separate extra split for “raw SQL only.”
+
+**Status (v1.13.0 dev, documentation / policy): Complete** — positioning and **`DataFrameModel`** pointers are documented; **no** runtime **`DeprecationWarning`** on legacy APIs in the same release as Phase 3 conveniences.
 
 **Deliverables (v1.14.0 target)**
 

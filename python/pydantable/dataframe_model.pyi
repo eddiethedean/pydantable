@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
 from concurrent.futures import Executor
 from typing import Any, Generic, Literal, TypeVar
 
@@ -27,6 +27,7 @@ class DataFrameModelAsyncIO(Generic[RowT]):
     def read_json(self, *args: Any, **kwargs: Any) -> AwaitableDataFrameModel[RowT]: ...
     def read_parquet_url_ctx(self, *args: Any, **kwargs: Any) -> Any: ...
     def write_sql(self, *args: Any, **kwargs: Any) -> Any: ...
+    def write_sqlmodel(self, *args: Any, **kwargs: Any) -> Any: ...
     def export_parquet(self, *args: Any, **kwargs: Any) -> Any: ...
     def export_csv(self, *args: Any, **kwargs: Any) -> Any: ...
     def export_ndjson(self, *args: Any, **kwargs: Any) -> Any: ...
@@ -289,6 +290,107 @@ class DataFrameModel(Generic[RowT]):
         executor: Executor | None = None,
     ) -> None: ...
     @classmethod
+    def write_sqlmodel_data(
+        cls,
+        data: dict[str, list[Any]],
+        model: Any,
+        bind: Any,
+        *,
+        schema: str | None = None,
+        if_exists: str = "append",
+        chunk_size: int | None = None,
+        validate_rows: bool = False,
+        replace_ok: bool = False,
+    ) -> None: ...
+    @classmethod
+    async def awrite_sqlmodel_data(
+        cls,
+        data: dict[str, list[Any]],
+        model: Any,
+        bind: Any,
+        *,
+        schema: str | None = None,
+        if_exists: str = "append",
+        chunk_size: int | None = None,
+        validate_rows: bool = False,
+        replace_ok: bool = False,
+        executor: Executor | None = None,
+    ) -> None: ...
+    @classmethod
+    def fetch_sqlmodel(
+        cls,
+        model: Any,
+        bind: Any,
+        *,
+        where: Any | None = None,
+        parameters: Mapping[str, Any] | None = None,
+        columns: Sequence[Any] | None = None,
+        order_by: Sequence[Any] | None = None,
+        limit: int | None = None,
+        batch_size: int | None = None,
+        auto_stream: bool = True,
+        auto_stream_threshold_rows: int | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self: ...
+    @classmethod
+    def afetch_sqlmodel(
+        cls,
+        model: Any,
+        bind: Any,
+        *,
+        where: Any | None = None,
+        parameters: Mapping[str, Any] | None = None,
+        columns: Sequence[Any] | None = None,
+        order_by: Sequence[Any] | None = None,
+        limit: int | None = None,
+        batch_size: int | None = None,
+        auto_stream: bool = True,
+        auto_stream_threshold_rows: int | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> AwaitableDataFrameModel[RowT]: ...
+    @classmethod
+    def iter_sqlmodel(
+        cls,
+        model: Any,
+        bind: Any,
+        *,
+        where: Any | None = None,
+        parameters: Mapping[str, Any] | None = None,
+        columns: Sequence[Any] | None = None,
+        order_by: Sequence[Any] | None = None,
+        limit: int | None = None,
+        batch_size: int | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Iterator[Self]: ...
+    @classmethod
+    async def aiter_sqlmodel(
+        cls,
+        model: Any,
+        bind: Any,
+        *,
+        where: Any | None = None,
+        parameters: Mapping[str, Any] | None = None,
+        columns: list[Any] | None = None,
+        order_by: list[Any] | None = None,
+        limit: int | None = None,
+        batch_size: int = 65_536,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> AsyncIterator[Self]: ...
+    @classmethod
     def read_parquet_url_ctx(
         cls,
         url: str,
@@ -414,6 +516,29 @@ class DataFrameModel(Generic[RowT]):
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         write_kwargs: dict[str, Any] | None = None,
+    ) -> None: ...
+    def write_sqlmodel(
+        self,
+        model: Any,
+        bind: Any,
+        *,
+        schema: str | None = None,
+        if_exists: str = "append",
+        chunk_size: int | None = None,
+        validate_rows: bool = False,
+        replace_ok: bool = False,
+    ) -> None: ...
+    async def awrite_sqlmodel(
+        self,
+        model: Any,
+        bind: Any,
+        *,
+        schema: str | None = None,
+        if_exists: str = "append",
+        chunk_size: int | None = None,
+        validate_rows: bool = False,
+        replace_ok: bool = False,
+        executor: Executor | None = None,
     ) -> None: ...
     @classmethod
     def write_parquet_batches(

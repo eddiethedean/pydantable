@@ -205,6 +205,9 @@ class _AsyncIOMethods(Generic[RowT]):
     def write_sql(self, *args: Any, **kwargs: Any) -> Any:
         return self._cls.awrite_sql(*args, **kwargs)
 
+    def write_sqlmodel(self, *args: Any, **kwargs: Any) -> Any:
+        return self._cls.awrite_sqlmodel_data(*args, **kwargs)
+
     def export_parquet(self, *args: Any, **kwargs: Any) -> Any:
         return self._cls.aexport_parquet(*args, **kwargs)
 
@@ -235,9 +238,12 @@ class DataFrameModel(Generic[RowT]):
     (same as ``aread_parquet``) and unprefixed terminals on
     :class:`~pydantable.awaitable_dataframe_model.AwaitableDataFrameModel` (e.g.
     ``await …collect()``). Eager file/SQL column loads belong in
-    :mod:`pydantable.io` (``materialize_*``, ``fetch_sql``) — pass the resulting
-    ``dict[str, list]`` to the constructor if you need an in-memory table first.
+    :mod:`pydantable.io` (``materialize_*``, ``fetch_sql``, ``fetch_sqlmodel``) — pass
+    the resulting ``dict[str, list]`` to the constructor if you need an in-memory
+    table first.
     **``export_*``** / **``aexport_*``**, **``write_sql``** / **``awrite_sql``**,
+    **``write_sqlmodel_data``** / **``awrite_sqlmodel_data``**, **instance**
+    **``write_sqlmodel``** / **``awrite_sqlmodel``**,
     **``read_parquet_url_ctx``** / **``aread_parquet_url_ctx``** delegate to
     :mod:`pydantable.io`.
     """
@@ -433,6 +439,13 @@ class DataFrameModel(Generic[RowT]):
                 "subclass with annotated columns, not on the bridge "
                 f"{cls.__qualname__} base."
             )
+
+    @classmethod
+    def _dfm_normalize_empty_sql_fetch(cls, cols: Any) -> Any:
+        """Turn ``{}`` from ``fetch_sqlmodel`` into explicit empty lists per column."""
+        if isinstance(cols, dict) and not cols:
+            return {name: [] for name in cls.RowModel.model_fields}
+        return cols
 
     @classmethod
     def _wrap_inner_df(cls, inner: DataFrame[Any]) -> Self:
@@ -899,6 +912,246 @@ class DataFrameModel(Generic[RowT]):
         )
 
     @classmethod
+    def write_sqlmodel_data(
+        cls,
+        data: dict[str, list[Any]],
+        model: Any,
+        bind: str | Engine | Connection,
+        *,
+        schema: str | None = None,
+        if_exists: str = "append",
+        chunk_size: int | None = None,
+        validate_rows: bool = False,
+        replace_ok: bool = False,
+    ) -> None:
+        """Write a column dict via :func:`pydantable.io.write_sqlmodel`.
+
+        Requires the ``[sql]`` extra.
+        """
+        cls._dfm_require_subclass_with_schema()
+        from .io import write_sqlmodel as _w
+
+        _w(
+            data,
+            model,
+            bind,
+            schema=schema,
+            if_exists=if_exists,
+            chunk_size=chunk_size,
+            validate_rows=validate_rows,
+            replace_ok=replace_ok,
+        )
+
+    @classmethod
+    async def awrite_sqlmodel_data(
+        cls,
+        data: dict[str, list[Any]],
+        model: Any,
+        bind: str | Engine | Connection,
+        *,
+        schema: str | None = None,
+        if_exists: str = "append",
+        chunk_size: int | None = None,
+        validate_rows: bool = False,
+        replace_ok: bool = False,
+        executor: Executor | None = None,
+    ) -> None:
+        """Async :func:`pydantable.io.awrite_sqlmodel`."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import awrite_sqlmodel as _aw
+
+        await _aw(
+            data,
+            model,
+            bind,
+            schema=schema,
+            if_exists=if_exists,
+            chunk_size=chunk_size,
+            validate_rows=validate_rows,
+            replace_ok=replace_ok,
+            executor=executor,
+        )
+
+    @classmethod
+    def fetch_sqlmodel(
+        cls,
+        model: Any,
+        bind: str | Engine | Connection,
+        *,
+        where: Any | None = None,
+        parameters: Mapping[str, Any] | None = None,
+        columns: Sequence[Any] | None = None,
+        order_by: Sequence[Any] | None = None,
+        limit: int | None = None,
+        batch_size: int | None = None,
+        auto_stream: bool = True,
+        auto_stream_threshold_rows: int | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        """Load rows via :func:`pydantable.io.fetch_sqlmodel` into a typed model."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import fetch_sqlmodel as _fetch
+
+        cols = _fetch(
+            model,
+            bind,
+            where=where,
+            parameters=parameters,
+            columns=columns,
+            order_by=order_by,
+            limit=limit,
+            batch_size=batch_size,
+            auto_stream=auto_stream,
+            auto_stream_threshold_rows=auto_stream_threshold_rows,
+        )
+        cols = cls._dfm_normalize_empty_sql_fetch(cols)
+        return cls(
+            cols,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    @classmethod
+    def afetch_sqlmodel(
+        cls,
+        model: Any,
+        bind: str | Engine | Connection,
+        *,
+        where: Any | None = None,
+        parameters: Mapping[str, Any] | None = None,
+        columns: Sequence[Any] | None = None,
+        order_by: Sequence[Any] | None = None,
+        limit: int | None = None,
+        batch_size: int | None = None,
+        auto_stream: bool = True,
+        auto_stream_threshold_rows: int | None = None,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> AwaitableDataFrameModel[RowT]:
+        """Async :func:`pydantable.io.afetch_sqlmodel`."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import afetch_sqlmodel as _afetch
+
+        async def _load() -> Self:
+            cols = await _afetch(
+                model,
+                bind,
+                where=where,
+                parameters=parameters,
+                columns=columns,
+                order_by=order_by,
+                limit=limit,
+                batch_size=batch_size,
+                auto_stream=auto_stream,
+                auto_stream_threshold_rows=auto_stream_threshold_rows,
+                executor=executor,
+            )
+            cols = cls._dfm_normalize_empty_sql_fetch(cols)
+            return cls(
+                cols,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+
+        return AwaitableDataFrameModel(
+            _load,
+            repr_label=_short_repr_label(f"{cls.__name__}.afetch_sqlmodel({model!r})"),
+        )
+
+    @classmethod
+    def iter_sqlmodel(
+        cls,
+        model: Any,
+        bind: str | Engine | Connection,
+        *,
+        where: Any | None = None,
+        parameters: Mapping[str, Any] | None = None,
+        columns: Sequence[Any] | None = None,
+        order_by: Sequence[Any] | None = None,
+        limit: int | None = None,
+        batch_size: int | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ):
+        """Yield SQLModel query batches as typed instances.
+
+        See :func:`pydantable.io.iter_sqlmodel`.
+        """
+        cls._dfm_require_subclass_with_schema()
+        from .io import iter_sqlmodel as _iter
+
+        for cols_dict in _iter(
+            model,
+            bind,
+            where=where,
+            parameters=parameters,
+            columns=columns,
+            order_by=order_by,
+            limit=limit,
+            batch_size=batch_size,
+        ):
+            yield cls(
+                cols_dict,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+
+    @classmethod
+    async def aiter_sqlmodel(
+        cls,
+        model: Any,
+        bind: str | Any,
+        *,
+        where: Any | None = None,
+        parameters: Mapping[str, Any] | None = None,
+        columns: list[Any] | None = None,
+        order_by: list[Any] | None = None,
+        limit: int | None = None,
+        batch_size: int = 65_536,
+        executor: Executor | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ):
+        """Async batches from :func:`pydantable.io.aiter_sqlmodel`."""
+        cls._dfm_require_subclass_with_schema()
+        from .io import aiter_sqlmodel as _ait
+
+        async for cols_dict in _ait(
+            model,
+            bind,
+            where=where,
+            parameters=parameters,
+            columns=columns,
+            order_by=order_by,
+            limit=limit,
+            batch_size=batch_size,
+            executor=executor,
+        ):
+            yield cls(
+                cols_dict,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+
+    @classmethod
     @contextlib.contextmanager
     def read_parquet_url_ctx(
         cls,
@@ -1190,6 +1443,57 @@ class DataFrameModel(Generic[RowT]):
             streaming=streaming,
             engine_streaming=engine_streaming,
             write_kwargs=write_kwargs,
+        )
+
+    def write_sqlmodel(
+        self,
+        model: Any,
+        bind: str | Engine | Connection,
+        *,
+        schema: str | None = None,
+        if_exists: str = "append",
+        chunk_size: int | None = None,
+        validate_rows: bool = False,
+        replace_ok: bool = False,
+    ) -> None:
+        """Write :meth:`to_dict` via :func:`pydantable.io.write_sqlmodel`.
+
+        Requires the ``[sql]`` extra.
+        """
+        type(self).write_sqlmodel_data(
+            self.to_dict(),
+            model,
+            bind,
+            schema=schema,
+            if_exists=if_exists,
+            chunk_size=chunk_size,
+            validate_rows=validate_rows,
+            replace_ok=replace_ok,
+        )
+
+    async def awrite_sqlmodel(
+        self,
+        model: Any,
+        bind: str | Engine | Connection,
+        *,
+        schema: str | None = None,
+        if_exists: str = "append",
+        chunk_size: int | None = None,
+        validate_rows: bool = False,
+        replace_ok: bool = False,
+        executor: Executor | None = None,
+    ) -> None:
+        """Async variant of :meth:`write_sqlmodel`."""
+        await type(self).awrite_sqlmodel_data(
+            self.to_dict(),
+            model,
+            bind,
+            schema=schema,
+            if_exists=if_exists,
+            chunk_size=chunk_size,
+            validate_rows=validate_rows,
+            replace_ok=replace_ok,
+            executor=executor,
         )
 
     @classmethod

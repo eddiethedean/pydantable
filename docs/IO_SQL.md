@@ -1,10 +1,10 @@
 # SQL I/O (SQLAlchemy)
 
-**Recommended for new code (SQLModel):** **`pydantable.io.fetch_sqlmodel`**, **`iter_sqlmodel`**, **`afetch_sqlmodel`**, **`aiter_sqlmodel`** — same column-dict / **`StreamingColumns`** behavior as the raw-SQL helpers, but you pass a **`SQLModel`** class with **`table=True`** instead of a SQL string. Install **`pydantable[sql]`** (includes **SQLModel** + SQLAlchemy).
+**Recommended for new code (SQLModel):** **`pydantable.io.fetch_sqlmodel`**, **`iter_sqlmodel`**, **`afetch_sqlmodel`**, **`aiter_sqlmodel`** — same column-dict / **`StreamingColumns`** behavior as the raw-SQL helpers, but you pass a **`SQLModel`** class with **`table=True`** instead of a SQL string. Install **`pydantable[sql]`** (includes **SQLModel** + SQLAlchemy); that one extra covers both SQLModel-first APIs and legacy string-SQL entrypoints.
 
-**Legacy / escape hatch:** **`pydantable.io.fetch_sql`**, **`afetch_sql`**, **`iter_sql`**, **`aiter_sql`** — they return **`dict[str, list]`** batches (or streaming containers) for a literal **`sql`** string. Wrap results in **`MyModel(cols, ...)`** for a typed **`DataFrameModel`**. **`DataFrameModel`** no longer exposes eager SQL loaders; use **`pydantable.io`** and the constructor (or **`collect`** / **`to_dict`** only after you have a frame).
+**Legacy / escape hatch (raw SQL):** **`pydantable.io.fetch_sql`**, **`afetch_sql`**, **`iter_sql`**, **`aiter_sql`**, **`write_sql`**, **`awrite_sql`** (and batch variants). Use these when the query or destination is **not** a mapped **`SQLModel`** table — for example **dynamic SQL**, ad hoc reporting, migrations, or integrating with existing string-based SQL. They return **`dict[str, list]`** batches (or streaming containers) for a literal **`sql`** string (reads) or take a **`table_name`** string (writes). For **app / service** code with a stable table schema, prefer **`fetch_sqlmodel` / `iter_sqlmodel` / `write_sqlmodel`** and the **`DataFrameModel`** mirrors below.
 
-**Write path:** **`pydantable.io.write_sqlmodel`** / **`awrite_sqlmodel`** for schema-driven tables, or **`MyModel.write_sql`** / **`await MyModel.awrite_sql`** (same as **`pydantable.io.write_sql`** with a **`table_name`** string).
+**Write path:** **`pydantable.io.write_sqlmodel`** / **`awrite_sqlmodel`** for schema-driven tables, **`MyModel.write_sqlmodel_data`** / **`await MyModel.awrite_sqlmodel_data`** for dict payloads, **`my_frame.write_sqlmodel(...)`** / **`await my_frame.awrite_sqlmodel(...)`** using the frame’s **`to_dict()`**, or legacy **`MyModel.write_sql`** / **`await MyModel.awrite_sql`** when you only have a table name string.
 
 Install **`pydantable[sql]`** plus the **DB-API driver** your URL needs. SQLAlchemy supports many dialects; pydantable does not bundle drivers.
 
@@ -38,7 +38,13 @@ Use a **`SQLModel`** class with **`table=True`** so DDL comes from **`model.__ta
 
 ## `DataFrameModel`
 
-**Read (typed)**
+**Read (typed), SQLModel-first**
+
+- **`MyModel.fetch_sqlmodel(UserTable, bind, *, trusted_mode=..., ...)`** — same validation kwargs as lazy file readers (**`trusted_mode`**, **`fill_missing_optional`**, **`ignore_errors`**, **`on_validation_errors`**).
+- **`await MyModel.afetch_sqlmodel(UserTable, bind, ...)`** → **`AwaitableDataFrameModel`**: **`await …`** for a concrete frame (see {doc}`DATAFRAMEMODEL`).
+- **`MyModel.iter_sqlmodel(...)`** / **`async for batch in MyModel.aiter_sqlmodel(...)`** — typed batches.
+
+**Read (raw SQL)**
 
 - Call **`fetch_sql`** / **`await afetch_sql`** / **`iter_sql`** / **`aiter_sql`** from **`pydantable.io`**, then **`MyModel(cols, trusted_mode=...)`** (or **`MyModel(batch, ...)`** per batch from **`iter_sql`** / **`aiter_sql`**).
 
@@ -46,10 +52,10 @@ Use a **`SQLModel`** class with **`table=True`** so DDL comes from **`model.__ta
 
 **Write to a database**
 
-- **`MyModel.write_sql(data, table_name, bind, *, schema=None, if_exists="append")`**
-- **`await MyModel.awrite_sql(..., executor=None)`**
+- **SQLModel:** **`my_frame.write_sqlmodel(UserTable, bind, *, if_exists=..., ...)`** / **`await my_frame.awrite_sqlmodel(...)`**; or **`MyModel.write_sqlmodel_data(data, UserTable, bind, ...)`** / **`await MyModel.awrite_sqlmodel_data(...)`** for a column dict. **`MyModel.Async.write_sqlmodel`** matches **`awrite_sqlmodel_data`**.
+- **Legacy string table name:** **`MyModel.write_sql(data, table_name, bind, *, schema=None, if_exists="append")`** / **`await MyModel.awrite_sql(..., executor=None)`**.
 
-**`data`** is **`dict[str, list]`** — typically **`model.to_dict()`** or the column dict from **`pydantable.io.fetch_sql`**. Raw **`pydantable.io.write_sql`** is the same operation without a model class.
+**`data`** is **`dict[str, list]`** — typically **`model.to_dict()`** or the column dict from **`pydantable.io.fetch_sql`**. Raw **`pydantable.io.write_sql`** is the same operation without a **`DataFrameModel`** class.
 
 ## `pydantable.io`
 

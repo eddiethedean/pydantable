@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format is inspired 
 
 - **SQLModel read I/O (Phase 0–1):** **`pydantable[sql]`** now includes **sqlmodel**. New APIs **`fetch_sqlmodel`**, **`iter_sqlmodel`**, **`afetch_sqlmodel`**, and **`aiter_sqlmodel`** in **`pydantable.io`** (also re-exported from **`pydantable`**), sharing batching and **`StreamingColumns`** semantics with **`fetch_sql`** / **`iter_sql`**. **`MissingOptionalDependency`** when **sqlmodel** is required but not installed.
 - **SQLModel write I/O (Phase 2):** **`write_sqlmodel`**, **`write_sqlmodel_batches`**, **`awrite_sqlmodel`**, **`awrite_sqlmodel_batches`** — DDL from **`SQLModel.__table__`**, **`replace_ok`** guard for **`if_exists="replace"`**, optional **`validate_rows`**, strict column alignment. Implemented in **`python/pydantable/io/sqlmodel_write.py`**; tests **`tests/test_sqlmodel_io_phase02.py`**.
+- **SQLModel + `DataFrameModel` (Phase 3):** classmethods **`fetch_sqlmodel`**, **`afetch_sqlmodel`**, **`iter_sqlmodel`**, **`aiter_sqlmodel`**, **`write_sqlmodel_data` / `awrite_sqlmodel_data`**; instance **`write_sqlmodel` / `awrite_sqlmodel`**; **`MyModel.Async.write_sqlmodel`** → **`awrite_sqlmodel_data`**. **`python/pydantable/dataframe_model.py`**; stubs in **`python/pydantable/dataframe_model.pyi`** / **`typings/`**; tests **`tests/test_sqlmodel_dataframe_model.py`**.
+
+### Docs
+
+- **SQLModel-first vs raw SQL (Phase 4, v1.13 policy):** {doc}`IO_SQL`, {doc}`DATAFRAMEMODEL`, {doc}`SQLMODEL_SQL_ROADMAP` — default to SQLModel and **`DataFrameModel`** helpers; document when **`fetch_sql`** / **`iter_sql`** / **`write_sql`** remain appropriate. Runtime **`DeprecationWarning`** on legacy APIs is planned for a later release ({doc}`SQLMODEL_SQL_ROADMAP` **v1.14.0**), not **[Unreleased]**.
 
 ## [1.13.0] — 2026-04-02
 

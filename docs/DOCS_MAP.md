@@ -20,7 +20,7 @@ Use this page when you know **what you need to do**, but not **where it is docum
 - **Overview**: {doc}`IO_OVERVIEW`
 - **Decision tree**: {doc}`IO_DECISION_TREE`
 - **Formats**: {doc}`IO_PARQUET`, {doc}`IO_CSV`, {doc}`IO_NDJSON`, {doc}`IO_JSON`, {doc}`IO_IPC`
-- **Transports**: {doc}`IO_SQL` (**SQLModel:** **`fetch_sqlmodel`** / **`write_sqlmodel`** and batch + async variants), {doc}`IO_HTTP`, {doc}`IO_EXTRAS`
+- **Transports**: {doc}`IO_SQL` (**SQLModel:** **`pydantable.io`** **`fetch_sqlmodel`** / **`write_sqlmodel`** and batch + async variants; **`DataFrameModel`** **`fetch_sqlmodel`** / **`iter_sqlmodel`** / **`write_sqlmodel`** / **`Async.write_sqlmodel`**), {doc}`IO_HTTP`, {doc}`IO_EXTRAS`
 - **SQLModel-first SQL I/O (v1.13 plan)**: {doc}`SQLMODEL_SQL_ROADMAP`
 - **Planning transports and async stacks**: {doc}`DATA_IO_SOURCES`
 
