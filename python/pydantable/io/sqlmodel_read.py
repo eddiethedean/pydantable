@@ -28,8 +28,8 @@ def _require_sqlmodel() -> Any:
         import sqlmodel
     except ImportError as e:
         raise MissingOptionalDependency(
-            "sqlmodel is required for fetch_sqlmodel / iter_sqlmodel. "
-            "Install with: pip install 'pydantable[sql]'"
+            "sqlmodel is required for SQLModel SQL I/O (fetch_sqlmodel, iter_sqlmodel, "
+            "write_sqlmodel, …). Install with: pip install 'pydantable[sql]'"
         ) from e
     return sqlmodel
 

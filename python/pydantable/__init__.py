@@ -37,6 +37,8 @@ from .io import (
     amaterialize_parquet,
     aread_parquet,
     aread_parquet_url,
+    awrite_sqlmodel,
+    awrite_sqlmodel_batches,
     export_parquet,
     fetch_sql,
     fetch_sqlmodel,
@@ -63,6 +65,8 @@ from .io import (
     write_ipc_batches,
     write_ndjson_batches,
     write_parquet_batches,
+    write_sqlmodel,
+    write_sqlmodel_batches,
 )
 from .materialization import PlanMaterialization, plan_materialization_summary
 from .observe import get_observer, set_observer
@@ -94,6 +98,8 @@ __all__ = [
     "amaterialize_parquet",
     "aread_parquet",
     "aread_parquet_url",
+    "awrite_sqlmodel",
+    "awrite_sqlmodel_batches",
     "export_parquet",
     "fetch_sql",
     "fetch_sqlmodel",
@@ -130,5 +136,7 @@ __all__ = [
     "write_ipc_batches",
     "write_ndjson_batches",
     "write_parquet_batches",
+    "write_sqlmodel",
+    "write_sqlmodel_batches",
 ]
 __version__ = "1.13.0"

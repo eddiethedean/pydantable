@@ -4,7 +4,7 @@
 
 **Legacy / escape hatch:** **`pydantable.io.fetch_sql`**, **`afetch_sql`**, **`iter_sql`**, **`aiter_sql`** — they return **`dict[str, list]`** batches (or streaming containers) for a literal **`sql`** string. Wrap results in **`MyModel(cols, ...)`** for a typed **`DataFrameModel`**. **`DataFrameModel`** no longer exposes eager SQL loaders; use **`pydantable.io`** and the constructor (or **`collect`** / **`to_dict`** only after you have a frame).
 
-**Write path:** **`MyModel.write_sql`** / **`await MyModel.awrite_sql`** (same as **`pydantable.io.write_sql`** with a concrete model class for ergonomics).
+**Write path:** **`pydantable.io.write_sqlmodel`** / **`awrite_sqlmodel`** for schema-driven tables, or **`MyModel.write_sql`** / **`await MyModel.awrite_sql`** (same as **`pydantable.io.write_sql`** with a **`table_name`** string).
 
 Install **`pydantable[sql]`** plus the **DB-API driver** your URL needs. SQLAlchemy supports many dialects; pydantable does not bundle drivers.
 
@@ -25,6 +25,16 @@ cols = fetch_sqlmodel(User, engine, order_by=[User.id])
 ```
 
 **`iter_sqlmodel`** / **`aiter_sqlmodel`** stream **`dict[str, list]`** batches; **`fetch_sqlmodel`** / **`afetch_sqlmodel`** mirror **`fetch_sql`** for **`batch_size`**, **`auto_stream`**, and **`auto_stream_threshold_rows`**. Without SQLModel installed, these APIs raise **`MissingOptionalDependency`** — install **`pydantable[sql]`**.
+
+## SQLModel-first writes
+
+Use a **`SQLModel`** class with **`table=True`** so DDL comes from **`model.__table__`** (not from inferred types like legacy **`write_sql`** **`if_exists="replace"`**).
+
+- **`write_sqlmodel(data, model, bind, *, schema=None, if_exists="append", chunk_size=None, validate_rows=False, replace_ok=False)`** — insert a column dict. **`if_exists="append"`** requires the table to exist. **`if_exists="replace"`** drops and recreates the table from the model, then inserts; you must pass **`replace_ok=True`** (destructive).
+- **`write_sqlmodel_batches(batches, model, bind, …)`** — same pattern as **`write_sql_batches`**: first batch uses **`if_exists`**, later batches append.
+- **`await awrite_sqlmodel(..., executor=None)`** / **`awrite_sqlmodel_batches`** — **`asyncio.to_thread`** wrappers (same as **`awrite_sql`**).
+
+**`data`** keys must match the model’s table columns exactly (including nullable / autoincrement columns; **`None`** primary keys are omitted on insert where appropriate). With **`validate_rows=True`**, each row is checked with **`model.model_validate`**; failures include the row index.
 
 ## `DataFrameModel`
 

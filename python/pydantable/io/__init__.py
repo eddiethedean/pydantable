@@ -65,6 +65,7 @@ from .iter_file import (
 from .rap_support import aread_csv_rap, rap_csv_available
 from .sql import StreamingColumns, fetch_sql, iter_sql, write_sql
 from .sqlmodel_read import fetch_sqlmodel, iter_sqlmodel
+from .sqlmodel_write import write_sqlmodel
 from .write_batches import (
     write_csv_batches,
     write_ipc_batches,
@@ -1258,6 +1259,96 @@ async def awrite_sql_batches(
         first = False
 
 
+async def awrite_sqlmodel(
+    data: dict[str, list[Any]],
+    model: Any,
+    bind: str | Any,
+    *,
+    schema: str | None = None,
+    if_exists: str = "append",
+    chunk_size: int | None = None,
+    validate_rows: bool = False,
+    replace_ok: bool = False,
+    executor: Executor | None = None,
+) -> None:
+    await _run_io(
+        write_sqlmodel,
+        (data, model, bind),
+        {
+            "schema": schema,
+            "if_exists": if_exists,
+            "chunk_size": chunk_size,
+            "validate_rows": validate_rows,
+            "replace_ok": replace_ok,
+        },
+        executor=executor,
+    )
+
+
+def write_sqlmodel_batches(
+    batches: Any,
+    model: Any,
+    bind: str | Any,
+    *,
+    schema: str | None = None,
+    if_exists: str = "append",
+    chunk_size: int | None = None,
+    validate_rows: bool = False,
+    replace_ok: bool = False,
+) -> None:
+    """
+    Write an iterator of batch column dicts via :func:`write_sqlmodel`.
+
+    The first batch uses ``if_exists``; later batches always append.
+    """
+    first = True
+    for batch in batches:
+        cols = batch.to_dict() if hasattr(batch, "to_dict") else batch
+        mode = if_exists if first else "append"
+        write_sqlmodel(
+            cols,
+            model,
+            bind,
+            schema=schema,
+            if_exists=mode,
+            chunk_size=chunk_size,
+            validate_rows=validate_rows,
+            replace_ok=replace_ok if mode == "replace" else False,
+        )
+        first = False
+
+
+async def awrite_sqlmodel_batches(
+    batches: Any,
+    model: Any,
+    bind: str | Any,
+    *,
+    schema: str | None = None,
+    if_exists: str = "append",
+    chunk_size: int | None = None,
+    validate_rows: bool = False,
+    replace_ok: bool = False,
+    executor: Executor | None = None,
+) -> None:
+    first = True
+    async for batch in batches:
+        cols = batch.to_dict() if hasattr(batch, "to_dict") else batch
+        mode = if_exists if first else "append"
+        await _run_io(
+            write_sqlmodel,
+            (cols, model, bind),
+            {
+                "schema": schema,
+                "if_exists": mode,
+                "chunk_size": chunk_size,
+                "validate_rows": validate_rows,
+                "replace_ok": replace_ok if mode == "replace" else False,
+            },
+            executor=executor,
+        )
+        first = False
+
+
 __all__ = [
     "MissingRustExtensionError",
     "aexport_csv",
@@ -1291,6 +1382,8 @@ __all__ = [
     "arrow_table_to_column_dict",
     "awrite_sql",
     "awrite_sql_batches",
+    "awrite_sqlmodel",
+    "awrite_sqlmodel_batches",
     "export_csv",
     "export_ipc",
     "export_json",
@@ -1350,6 +1443,8 @@ __all__ = [
     "write_parquet_batches",
     "write_sql",
     "write_sql_batches",
+    "write_sqlmodel",
+    "write_sqlmodel_batches",
 ]
 
 # Built-in plugin registrations (additive)
@@ -1374,3 +1469,4 @@ register_writer("export_ndjson", export_ndjson, stable=True)
 register_writer("export_ipc", export_ipc, stable=True)
 register_writer("export_json", export_json, stable=True)
 register_writer("write_sql", write_sql, requires_extra="sql", stable=True)
+register_writer("write_sqlmodel", write_sqlmodel, requires_extra="sql", stable=True)

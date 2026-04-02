@@ -50,6 +50,7 @@ from .iter_file import (
 from .rap_support import aread_csv_rap, rap_csv_available
 from .sql import StreamingColumns, fetch_sql, iter_sql, write_sql
 from .sqlmodel_read import fetch_sqlmodel, iter_sqlmodel
+from .sqlmodel_write import write_sqlmodel
 from .write_batches import (
     write_csv_batches,
     write_ipc_batches,
@@ -368,6 +369,41 @@ async def awrite_sql_batches(
     chunk_size: int | None = None,
     executor: Executor | None = None,
 ) -> None: ...
+async def awrite_sqlmodel(
+    data: dict[str, list[Any]],
+    model: Any,
+    bind: str | Any,
+    *,
+    schema: str | None = None,
+    if_exists: str = "append",
+    chunk_size: int | None = None,
+    validate_rows: bool = False,
+    replace_ok: bool = False,
+    executor: Executor | None = None,
+) -> None: ...
+def write_sqlmodel_batches(
+    batches: Any,
+    model: Any,
+    bind: str | Any,
+    *,
+    schema: str | None = None,
+    if_exists: str = "append",
+    chunk_size: int | None = None,
+    validate_rows: bool = False,
+    replace_ok: bool = False,
+) -> None: ...
+async def awrite_sqlmodel_batches(
+    batches: Any,
+    model: Any,
+    bind: str | Any,
+    *,
+    schema: str | None = None,
+    if_exists: str = "append",
+    chunk_size: int | None = None,
+    validate_rows: bool = False,
+    replace_ok: bool = False,
+    executor: Executor | None = None,
+) -> None: ...
 
 __all__ = [
     "MissingRustExtensionError",
@@ -402,6 +438,8 @@ __all__ = [
     "arrow_table_to_column_dict",
     "awrite_sql",
     "awrite_sql_batches",
+    "awrite_sqlmodel",
+    "awrite_sqlmodel_batches",
     "export_csv",
     "export_ipc",
     "export_json",
@@ -461,4 +499,6 @@ __all__ = [
     "write_parquet_batches",
     "write_sql",
     "write_sql_batches",
+    "write_sqlmodel",
+    "write_sqlmodel_batches",
 ]

@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format is inspired 
 ### Added
 
 - **SQLModel read I/O (Phase 0–1):** **`pydantable[sql]`** now includes **sqlmodel**. New APIs **`fetch_sqlmodel`**, **`iter_sqlmodel`**, **`afetch_sqlmodel`**, and **`aiter_sqlmodel`** in **`pydantable.io`** (also re-exported from **`pydantable`**), sharing batching and **`StreamingColumns`** semantics with **`fetch_sql`** / **`iter_sql`**. **`MissingOptionalDependency`** when **sqlmodel** is required but not installed.
+- **SQLModel write I/O (Phase 2):** **`write_sqlmodel`**, **`write_sqlmodel_batches`**, **`awrite_sqlmodel`**, **`awrite_sqlmodel_batches`** — DDL from **`SQLModel.__table__`**, **`replace_ok`** guard for **`if_exists="replace"`**, optional **`validate_rows`**, strict column alignment. Implemented in **`python/pydantable/io/sqlmodel_write.py`**; tests **`tests/test_sqlmodel_io_phase02.py`**.
 
 ## [1.13.0] — 2026-04-02
 

@@ -40,6 +40,7 @@ fastapi = ["fastapi>=0.100"]
 dev = [
     "fastapi>=0.100",
     "httpx>=0.24",
+    # SQLAlchemy + SQLModel — same pins as ``[sql]``; needed for sql/sqlmodel I/O tests and dev workflows.
     "sqlalchemy>=2.0,<3",
     "sqlmodel>=0.0.22,<0.1",
     "python-multipart>=0.0.6",

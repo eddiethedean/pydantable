@@ -143,6 +143,8 @@ def write_sqlmodel(
 - `replace` uses the SQLModel schema (no inference).
 - Writes are chunked, transactional, and error messages include useful context (table name, offending column, row index if validation is enabled).
 
+**Status (v1.13.0 dev): Implemented** — **`write_sqlmodel`** in **`python/pydantable/io/sqlmodel_write.py`** (chunked inserts, **`schema=`** must match **`model.__table__.schema`**, strict column-key alignment with the table, **`replace_ok`** required for **`if_exists="replace"`**, optional **`validate_rows`** with row index on **`ValidationError`**). **`write_sqlmodel_batches`**, **`awrite_sqlmodel`**, and **`awrite_sqlmodel_batches`** in **`python/pydantable/io/__init__.py`**; **`write_sqlmodel`** registered as a built-in writer. Package re-exports match reads. Tests: **`tests/test_sqlmodel_io_phase02.py`**.
+
 ---
 
 ## Phase 3 — `DataFrameModel` conveniences (v1.13.0)
