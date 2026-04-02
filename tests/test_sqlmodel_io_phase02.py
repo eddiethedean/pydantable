@@ -28,6 +28,8 @@ if TYPE_CHECKING:
 
 
 class _Widget(SQLModel, table=True):
+    __tablename__ = "io_phase02_widget"
+
     id: int | None = Field(default=None, primary_key=True)
     label: str
 

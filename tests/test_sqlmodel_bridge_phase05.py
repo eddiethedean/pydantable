@@ -15,6 +15,8 @@ from sqlmodel import Field, SQLModel
 
 
 class _Widget(SQLModel, table=True):
+    __tablename__ = "bridge_phase05_widget"
+
     id: int | None = Field(default=None, primary_key=True)
     label: str
 
