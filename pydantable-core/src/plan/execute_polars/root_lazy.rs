@@ -166,6 +166,7 @@ fn hive_segment_for_cell(av: AnyValue<'_>, col_name: &str) -> String {
 /// When `partition_by` is non-empty, `path` is the **dataset root directory**; rows are split with
 /// [`DataFrame::partition_by_stable`], written under hive-style `col=value/.../00000000.parquet`
 /// shards (partition columns are omitted from each file, matching common hive layouts).
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn sink_parquet_polars(
     py: Python<'_>,
     plan: &PlanInner,
@@ -217,9 +218,7 @@ pub(crate) fn sink_parquet_polars(
     }
 
     let parts = df.partition_by_stable(cols.clone(), true).map_err(|e| {
-        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-            "sink_parquet partition_by: {e}"
-        ))
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("sink_parquet partition_by: {e}"))
     })?;
 
     for part_df in parts {

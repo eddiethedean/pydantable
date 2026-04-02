@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantable.io import export_ndjson, iter_chain_batches, iter_ndjson
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_iter_chain_batches_two_files(tmp_path: Path) -> None:

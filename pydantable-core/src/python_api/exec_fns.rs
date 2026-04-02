@@ -30,6 +30,7 @@ fn execute_plan(
 #[cfg(feature = "polars_engine")]
 #[pyfunction]
 #[pyo3(signature = (plan, root_data, path, streaming=false, write_kwargs=None, partition_by=None, mkdir=true))]
+#[allow(clippy::too_many_arguments)]
 fn sink_parquet(
     py: Python<'_>,
     plan: &PyPlan,
@@ -55,6 +56,8 @@ fn sink_parquet(
 #[cfg(not(feature = "polars_engine"))]
 #[pyfunction]
 #[pyo3(signature = (plan, root_data, path, streaming=false, write_kwargs=None, partition_by=None, mkdir=true))]
+#[allow(clippy::too_many_arguments)]
+#[allow(unused_variables)]
 fn sink_parquet(
     _py: Python<'_>,
     plan: &PyPlan,
@@ -62,8 +65,8 @@ fn sink_parquet(
     path: String,
     streaming: bool,
     write_kwargs: Option<Bound<'_, PyAny>>,
-    _partition_by: Option<Vec<String>>,
-    _mkdir: bool,
+    partition_by: Option<Vec<String>>,
+    mkdir: bool,
 ) -> PyResult<()> {
     Err(pyo3::exceptions::PyRuntimeError::new_err(
         "sink_parquet requires pydantable-core built with the `polars_engine` feature.",

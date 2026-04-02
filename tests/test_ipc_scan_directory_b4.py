@@ -50,7 +50,7 @@ def test_read_ipc_glob_star_arrow(tmp_path) -> None:
 
 
 def test_read_ipc_hive_style_path_does_not_add_partition_column(tmp_path) -> None:
-    """Same layout as CSV/NDJSON B-tests: hive-style dir does not inject a partition column here."""
+    """Hive-style dir: no partition column (same idea as CSV/NDJSON B-tests)."""
     part = tmp_path / "p=hello"
     part.mkdir(parents=True)
     export_ipc(part / "a.arrow", {"x": [1]})
@@ -93,7 +93,9 @@ def test_read_ipc_include_file_paths(tmp_path) -> None:
     d = df.to_dict()
     assert "path" in d
     assert len(d["path"]) == 1
-    assert str(tmp_path / "one.arrow") in d["path"][0] or d["path"][0].endswith("one.arrow")
+    assert str(tmp_path / "one.arrow") in d["path"][0] or d["path"][0].endswith(
+        "one.arrow"
+    )
 
 
 def test_read_ipc_row_index_offset_without_name_errors(tmp_path) -> None:

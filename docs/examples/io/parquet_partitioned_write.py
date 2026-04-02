@@ -1,4 +1,6 @@
-"""Hive-style partitioned Parquet: ``write_parquet(..., partition_by=...)`` → read with ``hive_partitioning``.
+"""Hive-style partitioned Parquet: ``write_parquet(..., partition_by=...)``.
+
+Read back with ``hive_partitioning=True`` on ``read_parquet``.
 
 Needs ``pydantable._core``. Run::
 

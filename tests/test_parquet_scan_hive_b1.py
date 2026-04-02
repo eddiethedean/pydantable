@@ -1,4 +1,4 @@
-"""Phase B1: Parquet lazy scan kwargs — hive partitioning, row index, include_file_paths."""
+"""Phase B1: Parquet lazy scan kwargs (hive, row index, include_file_paths)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import pytest
 pytest.importorskip("pydantable._core")
 
 from pydantable import DataFrameModel
-from pydantable.io import export_parquet, read_parquet
+from pydantable.io import export_parquet
 
 
 class HivePart(DataFrameModel):

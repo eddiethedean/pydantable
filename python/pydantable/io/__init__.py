@@ -28,6 +28,7 @@ from .arrow import (
     read_parquet_pyarrow,
     record_batch_to_column_dict,
 )
+from .batches import iter_chain_batches
 from .extras import (
     iter_avro,
     iter_bigquery,
@@ -61,7 +62,6 @@ from .iter_file import (
     iter_ndjson,
     iter_parquet,
 )
-from .batches import iter_chain_batches
 from .rap_support import aread_csv_rap, rap_csv_available
 from .sql import StreamingColumns, fetch_sql, iter_sql, write_sql
 from .write_batches import (

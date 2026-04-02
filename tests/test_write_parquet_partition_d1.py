@@ -34,7 +34,9 @@ def test_write_parquet_partition_by_requires_directory_not_file(tmp_path) -> Non
     f = tmp_path / "single.parquet"
     f.write_bytes(b"not parquet")
     df = HivePart({"p": ["x"], "x": [1]})
-    with pytest.raises(ValueError, match="partition_by requires path to be a directory"):
+    with pytest.raises(
+        ValueError, match="partition_by requires path to be a directory"
+    ):
         df.write_parquet(str(f), partition_by=["p"])
 
 

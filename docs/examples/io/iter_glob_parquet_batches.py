@@ -1,10 +1,10 @@
-"""Batched reads over several Parquet files: expand a glob, then ``iter_parquet`` per file.
+"""Batched reads over several Parquet files: glob, then ``iter_parquet`` per file.
 
-``iter_parquet`` accepts **one** path per call. For multiple files, expand paths in Python
-(``Path.glob``, ``glob.glob``, or a list) and iterate each file—or use
+``iter_parquet`` takes **one** path per call. For multiple files, expand paths in
+Python (``Path.glob``, ``glob.glob``, or a list) and iterate each file—or use
 :func:`pydantable.io.iter_chain_batches` to chain per-file iterators.
 
-For **lazy** multi-file concat (Polars scan), use :func:`pydantable.io.read_parquet` with
+For **lazy** multi-file concat, use :func:`pydantable.io.read_parquet` with
 ``glob=True`` and :meth:`~pydantable.dataframe.DataFrame.to_dict`.
 
 Needs ``pydantable._core`` and PyArrow. Run::
@@ -18,12 +18,7 @@ import tempfile
 from pathlib import Path
 
 from pydantable import DataFrameModel
-from pydantable.io import (
-    export_parquet,
-    iter_chain_batches,
-    iter_parquet,
-    read_parquet,
-)
+from pydantable.io import export_parquet, iter_chain_batches, iter_parquet
 
 
 class Row(DataFrameModel):
@@ -40,9 +35,7 @@ def main() -> None:
 
         paths = sorted(base.glob("part_*.parquet"))
         batch_count_loop = sum(1 for _ in iter_chain_batches(paths, iter_parquet))
-        batch_count_explicit = sum(
-            1 for p in paths for _ in iter_parquet(p)
-        )
+        batch_count_explicit = sum(1 for p in paths for _ in iter_parquet(p))
         assert batch_count_loop == batch_count_explicit
 
         lazy = Row.read_parquet(str(base), trusted_mode="shape_only", glob=True)

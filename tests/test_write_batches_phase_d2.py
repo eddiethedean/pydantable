@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-
 from pydantable.io.write_batches import (
     write_csv_batches,
     write_ndjson_batches,
     write_parquet_batches,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_write_csv_batches_append_trunc(tmp_path: Path) -> None:

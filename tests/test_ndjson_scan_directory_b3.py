@@ -102,7 +102,9 @@ def test_read_ndjson_include_file_paths(tmp_path) -> None:
     d = df.to_dict()
     assert "path" in d
     assert len(d["path"]) == 1
-    assert str(tmp_path / "one.jsonl") in d["path"][0] or d["path"][0].endswith("one.jsonl")
+    assert str(tmp_path / "one.jsonl") in d["path"][0] or d["path"][0].endswith(
+        "one.jsonl"
+    )
 
 
 def test_read_ndjson_row_index_offset_without_name_errors(tmp_path) -> None:
@@ -116,7 +118,7 @@ def test_read_ndjson_row_index_offset_without_name_errors(tmp_path) -> None:
 
 
 def test_read_ndjson_mixed_extension_glob_jsonl_only_sees_jsonl(tmp_path) -> None:
-    """A ``*.jsonl`` pattern does not match ``.ndjson`` files (Polars path expansion)."""
+    """``*.jsonl`` glob does not match ``.ndjson`` files (Polars expansion)."""
     export_ndjson(tmp_path / "a.jsonl", {"x": [1], "y": [2]})
     export_ndjson(tmp_path / "b.ndjson", {"x": [9], "y": [9]})
     df = XY.read_ndjson(str(tmp_path / "*.jsonl"), trusted_mode="shape_only", glob=True)
