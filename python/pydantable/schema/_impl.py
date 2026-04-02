@@ -141,6 +141,14 @@ def _unwrap_annotated(annotation: Any) -> Any:
 
 def _is_supported_non_null_scalar_type(tp: Any) -> bool:
     """True if ``tp`` is one allowed non-null scalar or enum (before ``| None``)."""
+    try:
+        from pydantable.dtypes import get_registered_scalar_base
+
+        if isinstance(tp, type) and get_registered_scalar_base(tp) is not None:
+            return True
+    except Exception:
+        # Registry is optional; unsupported should fail closed.
+        pass
     if tp in _SUPPORTED_NON_NULL_SCALAR_TYPES:
         return True
     if _is_wkb_type(tp):
@@ -286,6 +294,30 @@ def schema_field_types(schema_type: type[BaseModel]) -> dict[str, Any]:
         annotation = field.annotation
         field_types[name] = annotation
     return field_types
+
+
+def field_types_for_rust(field_types: Mapping[str, Any]) -> dict[str, Any]:
+    """
+    Normalize Python field annotations for the Rust dtype layer.
+
+    Phase 3: semantic custom scalar types are treated as their registered base
+    (`str`, `int`, `bytes`, ...) for planning/typing in Rust.
+    """
+    from pydantable.dtypes import get_registered_scalar_base
+
+    out: dict[str, Any] = {}
+    for name, annotation in field_types.items():
+        if annotation is None:
+            out[name] = annotation
+            continue
+        inner, nullable = _annotation_nullable_inner(annotation)
+        if get_origin(inner) is None and isinstance(inner, type):
+            base = get_registered_scalar_base(inner)
+            if base is not None:
+                out[name] = (base | None) if nullable else base
+                continue
+        out[name] = annotation
+    return out
 
 
 def _sequence_column_to_list(name: str, col: Any) -> list[Any]:
@@ -525,6 +557,15 @@ def _polars_float_dtype_classes(pl: Any) -> frozenset[type]:
 
 
 def _polars_scalar_dtype_matches(inner: Any, dt: Any, pl: Any) -> bool:
+    try:
+        from pydantable.dtypes import get_registered_scalar_base
+
+        if isinstance(inner, type):
+            base = get_registered_scalar_base(inner)
+            if base is not None:
+                inner = base
+    except Exception:
+        pass
     if inner is int:
         return dt.__class__ in _polars_integer_dtype_classes(pl)
     if inner is float:
@@ -682,6 +723,16 @@ def _trusted_pyarrow_strict_scalar(annotation_inner: Any, dt_low: str) -> bool:
     from datetime import date, datetime, time, timedelta
     from decimal import Decimal
 
+    try:
+        from pydantable.dtypes import get_registered_scalar_base
+
+        if isinstance(annotation_inner, type):
+            base = get_registered_scalar_base(annotation_inner)
+            if base is not None:
+                annotation_inner = base
+    except Exception:
+        pass
+
     if annotation_inner is int:
         if "decimal" in dt_low:
             return False
@@ -746,6 +797,15 @@ def _trusted_pyarrow_strict_scalar(annotation_inner: Any, dt_low: str) -> bool:
 def _trusted_column_strict_compatible(annotation: Any, col: Any) -> bool:
     inner, _nullable = _annotation_nullable_inner(annotation)
     origin = get_origin(inner)
+    try:
+        from pydantable.dtypes import get_registered_scalar_base
+
+        if origin is None and isinstance(inner, type):
+            base = get_registered_scalar_base(inner)
+            if base is not None:
+                inner = base
+    except Exception:
+        pass
 
     if isinstance(col, (list, tuple)):
         if origin is list or origin is dict:
@@ -1206,6 +1266,15 @@ def descriptor_matches_column_annotation(
     if not isinstance(descriptor, Mapping):
         return False
     inner, nullable = _annotation_nullable_inner(annotation)
+    try:
+        from pydantable.dtypes import get_registered_scalar_base
+
+        if get_origin(inner) is None and isinstance(inner, type):
+            base = get_registered_scalar_base(inner)
+            if base is not None:
+                inner = base
+    except Exception:
+        pass
     if bool(descriptor.get("nullable", False)) != nullable:
         return False
 

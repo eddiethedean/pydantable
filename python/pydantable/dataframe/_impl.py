@@ -81,6 +81,7 @@ from pydantable.rust_engine import (
 from pydantable.schema import (
     _annotation_nullable_inner,
     _is_polars_dataframe,
+    field_types_for_rust,
     make_derived_schema_type,
     merge_field_types_preserving_identity,
     previous_field_types_for_join,
@@ -547,7 +548,9 @@ class DataFrame(Generic[SchemaT]):
         self._current_schema_type: type[BaseModel] = self._schema_type
         self._current_field_types = schema_field_types(self._current_schema_type)
         # Rust owns expression typing, logical planning, and execution.
-        self._rust_plan = _require_rust_core().make_plan(self.schema_fields())
+        self._rust_plan = _require_rust_core().make_plan(
+            field_types_for_rust(self.schema_fields())
+        )
         # Optional validation options attached to lazy scan roots. These are applied
         # at materialization time (after the engine produces columns), because
         # scan roots are lazy and cannot validate rows up front.
@@ -583,7 +586,7 @@ class DataFrame(Generic[SchemaT]):
                 "Use DataFrame[SchemaType].read_* to construct from a lazy file read."
             )
         rust = _require_rust_core()
-        plan = rust.make_plan(schema_field_types(cls._schema_type))
+        plan = rust.make_plan(field_types_for_rust(schema_field_types(cls._schema_type)))
         df = cls._from_plan(
             root_data=root,
             root_schema_type=cls._schema_type,
@@ -1184,7 +1187,7 @@ class DataFrame(Generic[SchemaT]):
                         ) from e
                 # Drop the missing optional column from the temporary plan and retry.
                 field_types.pop(missing_col, None)
-                plan = _require_rust_core().make_plan(field_types)
+                plan = _require_rust_core().make_plan(field_types_for_rust(field_types))
 
     async def _materialize_columns_with_missing_optional_fallback_async(
         self, *, streaming: bool, executor: Executor | None
@@ -1234,7 +1237,7 @@ class DataFrame(Generic[SchemaT]):
                             f"{[missing_col]}"
                         ) from e
                 field_types.pop(missing_col, None)
-                plan = _require_rust_core().make_plan(field_types)
+                plan = _require_rust_core().make_plan(field_types_for_rust(field_types))
 
     async def _materialize_columns_async(
         self, *, streaming: bool, executor: Executor | None
@@ -2571,7 +2574,7 @@ class DataFrame(Generic[SchemaT]):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(derived_fields)
+        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
         return self._from_plan(
             root_data=out_data,
             root_schema_type=derived_schema_type,
@@ -2752,7 +2755,7 @@ class DataFrame(Generic[SchemaT]):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(derived_fields)
+        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
         return self._from_plan(
             root_data=out_data,
             root_schema_type=derived_schema_type,
@@ -2791,7 +2794,7 @@ class DataFrame(Generic[SchemaT]):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(derived_fields)
+        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
         return self._from_plan(
             root_data=out_data,
             root_schema_type=derived_schema_type,
@@ -2841,7 +2844,7 @@ class DataFrame(Generic[SchemaT]):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(derived_fields)
+        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
         return self._from_plan(
             root_data=out_data,
             root_schema_type=derived_schema_type,
@@ -2885,7 +2888,7 @@ class DataFrame(Generic[SchemaT]):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(derived_fields)
+        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
         return self._from_plan(
             root_data=out_data,
             root_schema_type=derived_schema_type,
@@ -3201,7 +3204,7 @@ class DataFrame(Generic[SchemaT]):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(derived_fields)
+        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
         return self._from_plan(
             root_data=joined_data,
             root_schema_type=derived_schema_type,
@@ -3346,7 +3349,7 @@ class DataFrame(Generic[SchemaT]):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, fields
         )
-        rust_plan = _require_rust_core().make_plan(fields)
+        rust_plan = _require_rust_core().make_plan(field_types_for_rust(fields))
         return self._from_plan(
             root_data=out_data,
             root_schema_type=derived_schema_type,
@@ -3496,7 +3499,7 @@ class DataFrame(Generic[SchemaT]):
                 out[k] = list(vs[q:]) + [None] * min(q, n)
         fields = dict(self._current_field_types)
         schema_t = make_derived_schema_type(self._current_schema_type, fields)
-        plan = _require_rust_core().make_plan(fields)
+        plan = _require_rust_core().make_plan(field_types_for_rust(fields))
         return self._from_plan(
             root_data=out,
             root_schema_type=schema_t,
@@ -3539,7 +3542,7 @@ class DataFrame(Generic[SchemaT]):
         out: dict[str, list[Any]] = {k: [vs[i] for i in idxs] for k, vs in d.items()}
         fields = dict(self._current_field_types)
         schema_t = make_derived_schema_type(self._current_schema_type, fields)
-        plan = _require_rust_core().make_plan(fields)
+        plan = _require_rust_core().make_plan(field_types_for_rust(fields))
         return self._from_plan(
             root_data=out,
             root_schema_type=schema_t,
@@ -4111,7 +4114,7 @@ class DataFrame(Generic[SchemaT]):
                 merged_ft, schema_descriptors, derived_fields
             )
             out_schema_type = make_derived_schema_type(out_schema_type, merged_ft)
-            out_plan = _require_rust_core().make_plan(merged_ft)
+            out_plan = _require_rust_core().make_plan(field_types_for_rust(merged_ft))
         return cls._from_plan(
             root_data=out_data,
             root_schema_type=out_schema_type,
@@ -4204,7 +4207,7 @@ class GroupedDataFrame:
         derived_schema_type = make_derived_schema_type(
             self._df._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(derived_fields)
+        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
         return self._df._from_plan(
             root_data=grouped_data,
             root_schema_type=derived_schema_type,
@@ -4335,7 +4338,7 @@ class DynamicGroupedDataFrame:
         derived_schema_type = make_derived_schema_type(
             self._df._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(derived_fields)
+        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
         return self._df._from_plan(
             root_data=out_data,
             root_schema_type=derived_schema_type,

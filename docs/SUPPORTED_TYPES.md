@@ -70,6 +70,20 @@ the Rust dtype (logical **`str`** / Polars **Utf8**), while **Pydantic** on
 **`Annotated[str, pydantic.HttpUrl]`**). Match other projects’ “newtype string” patterns
 without a separate Rust `base` type.
 
+## Custom semantic scalar types (Phase 3)
+
+If you want a domain-specific scalar type (e.g. `ULID`, `CountryCode`) that behaves
+like `str`/`int`/`bytes` but is validated/coerced by **Pydantic v2**, define a custom
+type with `__get_pydantic_core_schema__` and register it with pydantable:
+
+```python
+from pydantable.dtypes import register_scalar
+
+register_scalar(ULID, base="str")
+```
+
+See {doc}`CUSTOM_DTYPES` for the full guide.
+
 ### Practical notes (1.2.0 scalars)
 
 **`typing.Literal[...]`**

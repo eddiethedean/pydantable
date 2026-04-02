@@ -358,8 +358,16 @@ Implemented:
 
 ### Phase 3 — “Custom dtypes as a first-class extension point”
 
-- C2 dtype registry
-- C1 docs + a few blessed semantic types (very conservative)
+Implemented:
+
+- **C2 dtype registry**:
+  - `pydantable.dtypes.register_scalar(MyType, base="str" | "int" | ...)`
+  - Registry-backed support in schema validation and strict/trusted dtype checks.
+  - Derived schema reconstruction preserves the original custom Python type when the
+    underlying Rust dtype remains compatible (“semantic alias only”).
+- **C1 docs**:
+  - Added {doc}`CUSTOM_DTYPES` describing how to author semantic scalar types with
+    Pydantic v2 CoreSchema and register them with `pydantable`.
 
 ### Phase 4 — “Per-column and nested strictness”
 
