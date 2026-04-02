@@ -80,9 +80,11 @@
 - [x] Polars **`scan_ipc`** + **`UnifiedScanArgs`** options threaded through **`dispatch_file_scan`**; documented in {doc}`IO_IPC`.
 - [x] Tests: multi-file IPC directory and glob.
 
-### B5 — Lazy JSON array (`read_json`)
+### B5 — `read_json` (JSON Lines alias)
 
-- [ ] Align **path** behavior with Phase A semantics (single file vs glob); document limits vs **NDJSON** in {doc}`IO_JSON`.
+**B5 shipped:** **`read_json`** documented and tested as an alias of **`read_ndjson`** (JSON Lines only; same directory/glob/**`scan_kwargs`** as Phase B3); single-file JSON **array** remains **`materialize_json`** / **`iter_json_array`**; docs **`IO_JSON`**, **`DATA_IO_SOURCES`**, expanded **`read_json`** docstring in **`pydantable.io`**; tests **`tests/test_read_json_paths_b5.py`**.
+
+- [x] **Path** / **glob** semantics aligned with Phase A and **NDJSON**; limits vs lazy **array** documented in {doc}`IO_JSON`.
 
 **Checklist**
 
@@ -140,7 +142,7 @@
 
 ## Phase F — Quality bar
 
-- [ ] **Pytest:** fixtures for **flat directory**, **hive-partitioned**, **glob**, **NDJSON directory** (**`tests/test_ndjson_scan_directory_b3.py`** — Phase B3), regression tests for **kwargs** allowlists.
+- [ ] **Pytest:** fixtures for **flat directory**, **hive-partitioned**, **glob**, **NDJSON directory** (**`tests/test_ndjson_scan_directory_b3.py`** — Phase B3), **`read_json`** path alias (**`tests/test_read_json_paths_b5.py`** — Phase B5), regression tests for **kwargs** allowlists.
 - [ ] **Docs build:** Sphinx passes; new pages linked from {doc}`DOCS_MAP` and **`index`** toctree.
 - [ ] **Changelog:** {doc}`changelog` **1.11.0** section summarizes user-visible I/O changes (link this roadmap).
 - [ ] **Release hygiene:** version alignment (`pyproject.toml`, `Cargo.toml`, `__version__`, `rust_version()`), per {doc}`VERSIONING` and `tests/test_version_alignment.py`.
@@ -149,7 +151,7 @@
 
 ## Success criteria (1.11.0)
 
-1. A user can **read a directory or glob** of **Parquet** / **CSV** with documented **`scan_kwargs`**, and—where implemented—**NDJSON** / **IPC** with the same mental model as Polars.
+1. A user can **read a directory or glob** of **Parquet** / **CSV** with documented **`scan_kwargs`**, and—where implemented—**NDJSON** / **`read_json`** (JSON Lines) / **IPC** with the same mental model as Polars.
 2. A user can **write a partitioned Parquet dataset** (or the doc explicitly states the minimum supported layout and follow-up work).
 3. **Eager** and **iter** layers have **clear** multi-file guidance without contradictions across {doc}`IO_OVERVIEW`, {doc}`IO_DECISION_TREE`, and {doc}`DATA_IO_SOURCES`.
 4. **Tests and changelog** back the advertised surface; no undocumented kwargs in the allowlists.

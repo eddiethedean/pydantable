@@ -6,7 +6,7 @@ This document lists **common and useful** places applications read and write tab
 
 **Today (0.23.0+)**, pydantable ships **`pydantable.io`** with three layers:
 
-1. **`read_*` / `aread_*`** — lazy **local file** roots (**`ScanFileRoot`**) so **`DataFrame` / `DataFrameModel`** can plan on Polars **`LazyFrame`** without loading full columns into Python (**Parquet**, **CSV**, **NDJSON**, **IPC file**, **JSON array-of-objects** via **`read_json`**).
+1. **`read_*` / `aread_*`** — lazy **local file** roots (**`ScanFileRoot`**) so **`DataFrame` / `DataFrameModel`** can plan on Polars **`LazyFrame`** without loading full columns into Python (**Parquet**, **CSV**, **NDJSON** / **`read_json`** alias, **IPC file**). A JSON **array** of objects in one file is **not** read lazily—use **`materialize_json`** / **`iter_json_array`** (see {doc}`IO_JSON`).
 2. **`materialize_*` / `amaterialize_*`** — eager **`dict[str, list]`** reads (**Rust** on local paths where possible; **PyArrow** for bytes, HTTP bodies, column subsets, streaming IPC).
 3. **`DataFrame.write_parquet`**, **`write_csv`**, **`write_ipc`**, **`write_ndjson`** (and **`DataFrameModel`** mirrors) — write the lazy pipeline from Rust without a giant Python dict.
 
@@ -14,7 +14,7 @@ This document lists **common and useful** places applications read and write tab
 
 ## Lazy read **`**scan_kwargs`** and write **`write_kwargs`**
 
-**Reads** (**`read_parquet`**, **`read_csv`**, **`read_ndjson`**, **`read_ipc`**, and async **`aread_*`**) accept Polars scan options as keyword arguments; they are forwarded to the Rust layer as **`scan_kwargs`**. **Writes** accept an optional **`write_kwargs=dict`** (same idea for the Polars sink). Unknown keys raise **`ValueError`** with an **allowed:** list.
+**Reads** (**`read_parquet`**, **`read_csv`**, **`read_ndjson`**, **`read_json`** (alias of **`read_ndjson`**), **`read_ipc`**, and async **`aread_*`**) accept Polars scan options as keyword arguments; they are forwarded to the Rust layer as **`scan_kwargs`**. **Writes** accept an optional **`write_kwargs=dict`** (same idea for the Polars sink). Unknown keys raise **`ValueError`** with an **allowed:** list.
 
 | Format | Read kwargs (examples) | Write kwargs |
 |--------|------------------------|--------------|
@@ -28,7 +28,7 @@ For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **preset
 (local-io-audit)=
 ### Audit: Polars 0.53.x vs pydantable (1.11.0 Phase A)
 
-**Scope:** Polars Rust **0.53.0** (the version pinned by **`pydantable-core`**) compared to the kwargs pydantable forwards from **`pydantable-core/src/plan/execute_polars/scan_kw.rs`** (`dispatch_file_scan`). **Parquet hive / lineage / row index** kwargs landed in {doc}`ROADMAP_1_11_LOCAL_IO` **Phase B1**; **CSV** directory/glob tests and extra **`LazyCsvReader`** kwargs in **Phase B2**; **NDJSON** **`glob`** / **`include_file_paths`** / **`row_index_*`** in **Phase B3**; **IPC** **`IpcScanOptions`** + **`UnifiedScanArgs`** in **Phase B4**; remaining gaps are tracked there (e.g. **`ScanArgsParquet.schema`**, **`HiveOptions.schema`**).
+**Scope:** Polars Rust **0.53.0** (the version pinned by **`pydantable-core`**) compared to the kwargs pydantable forwards from **`pydantable-core/src/plan/execute_polars/scan_kw.rs`** (`dispatch_file_scan`). **Parquet hive / lineage / row index** kwargs landed in {doc}`ROADMAP_1_11_LOCAL_IO` **Phase B1**; **CSV** directory/glob tests and extra **`LazyCsvReader`** kwargs in **Phase B2**; **NDJSON** **`glob`** / **`include_file_paths`** / **`row_index_*`** in **Phase B3**; **IPC** **`IpcScanOptions`** + **`UnifiedScanArgs`** in **Phase B4**; **`read_json`** path/**`scan_kwargs`** semantics (alias of **`read_ndjson`**) in **Phase B5**; remaining gaps are tracked there (e.g. **`ScanArgsParquet.schema`**, **`HiveOptions.schema`**).
 
 **Directory and glob semantics**
 

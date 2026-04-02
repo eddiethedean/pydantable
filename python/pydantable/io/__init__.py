@@ -204,10 +204,18 @@ def read_json(
     columns: list[str] | None = None,
     **scan_kwargs: Any,
 ) -> Any:
-    """Lazy JSON Lines read (local path); same engine as :func:`read_ndjson`.
+    """Lazy **JSON Lines** read (local path); alias of :func:`read_ndjson` (same ``ScanFileRoot``).
 
-    For a JSON **array** of objects in one file, use :func:`materialize_json` and construct
-    a :class:`~pydantable.dataframe.DataFrame` from the column dict.
+    **Not** a lazy reader for a single-file JSON **array** ``[{...}, ...]`` — use
+    :func:`materialize_json` or :func:`iter_json_array` for array layout.
+
+    **Paths:** directory, glob, or a single file behave like :func:`read_ndjson` (Polars
+    ``LazyJsonLineReader``). Pass ``glob=True`` when using a directory or ``*.jsonl``-style
+    pattern so kwargs match other ``read_*`` APIs. **``scan_kwargs``** are the same as NDJSON
+    (e.g. ``low_memory``, ``rechunk``, ``ignore_errors``, ``n_rows``, ``infer_schema_length``,
+    ``glob``, ``include_file_paths``, ``row_index_name``, ``row_index_offset``); ``glob=False``
+    raises ``ValueError``. Unknown keys raise from the Rust layer. See ``IO_JSON`` and
+    ``DATA_IO_SOURCES`` (**Audit**).
     """
     return read_ndjson(path, columns=columns, **scan_kwargs)
 

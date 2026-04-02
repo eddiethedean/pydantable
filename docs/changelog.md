@@ -10,6 +10,7 @@ All notable changes to this project are documented here. The format is inspired 
 - **CSV lazy `scan_kwargs` (1.11.0 Phase B2):** **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`**, **`raise_if_empty`**, **`truncate_ragged_lines`**, **`decimal_comma`**, **`try_parse_dates`** forwarded to Polars **`LazyCsvReader`** in **`pydantable-core`** (`lazy_csv_with_kwargs`); shared **`row_index_*`** parsing with Parquet. Tests: **`tests/test_csv_scan_directory_b2.py`** (directory / **`*.csv`** glob, hive path behavior, unknown kw).
 - **NDJSON lazy `scan_kwargs` (1.11.0 Phase B3):** **`glob`** ( **`glob=False`** raises **`ValueError`**; Polars 0.53 NDJSON scans always expand paths), **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** in **`lazy_ndjson_with_kwargs`** (`scan_kw.rs`). Tests: **`tests/test_ndjson_scan_directory_b3.py`**.
 - **IPC lazy `scan_kwargs` (1.11.0 Phase B4):** **`record_batch_statistics`** plus **`UnifiedScanArgs`** fields (**`glob`**, **`cache`**, **`rechunk`**, **`n_rows`**, **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`**) via **`ipc_scan_from_kwargs`** (`scan_kw.rs`). Tests: **`tests/test_ipc_scan_directory_b4.py`**.
+- **`read_json` (1.11.0 Phase B5):** Confirmed alias of **`read_ndjson`** (JSON Lines lazy scan only); documentation for paths, **`glob`**, and **`scan_kwargs`** vs **`materialize_json`** for JSON **array** files. Tests: **`tests/test_read_json_paths_b5.py`**.
 
 ### Docs
 
@@ -18,6 +19,7 @@ All notable changes to this project are documented here. The format is inspired 
 - **CSV B2:** {doc}`DATA_IO_SOURCES` audit + summary table; {doc}`IO_CSV`; {doc}`INTERFACE_CONTRACT` (CSV **`include_file_paths`** / **`row_index_*`**); {doc}`ROADMAP_1_11_LOCAL_IO` Phase B2.
 - **NDJSON B3:** {doc}`DATA_IO_SOURCES` audit + summary table; {doc}`IO_NDJSON`; {doc}`INTERFACE_CONTRACT` (NDJSON **`glob`** / **`include_file_paths`** / **`row_index_*`**); {doc}`ROADMAP_1_11_LOCAL_IO` Phase B3.
 - **IPC B4:** {doc}`DATA_IO_SOURCES` audit + summary table; {doc}`IO_IPC`; {doc}`INTERFACE_CONTRACT` (IPC **`scan_kwargs`**); {doc}`ROADMAP_1_11_LOCAL_IO` Phase B4.
+- **JSON `read_json` B5:** {doc}`IO_JSON`; {doc}`DATA_IO_SOURCES` (lazy vs array); **`pydantable.io.read_json`** docstring; {doc}`ROADMAP_1_11_LOCAL_IO` Phase B5.
 
 ## [1.11.0] — 2026-04-01
 

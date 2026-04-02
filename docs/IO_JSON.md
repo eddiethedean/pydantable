@@ -6,14 +6,14 @@ How JSON values map to typed columns (including nested objects and maps) is summ
 
 | API | Role | Layout |
 |-----|------|--------|
-| :func:`pydantable.io.read_json` | Returns a raw :class:`~pydantable._core.ScanFileRoot` (lazy scan). | **JSON Lines** only — implemented as a call to :func:`~pydantable.io.read_ndjson`. |
+| :func:`pydantable.io.read_json` | Returns a raw :class:`~pydantable._core.ScanFileRoot` (lazy scan). | **JSON Lines** only — alias of :func:`~pydantable.io.read_ndjson` (same paths, **`glob`**, and **`scan_kwargs`**). |
 | :func:`pydantable.io.read_ndjson` | Same lazy **NDJSON** scan as ``read_json``. | One JSON object per line. |
 | :meth:`~pydantable.dataframe_model.DataFrameModel.read_json` / :meth:`~pydantable.dataframe_model.DataFrameModel.read_ndjson` | Typed lazy :class:`~pydantable.dataframe.DataFrame` / :class:`~pydantable.dataframe_model.DataFrameModel` (same Polars path). | JSON Lines. |
 | :func:`pydantable.io.materialize_json` | Eager **``dict[str, list]``** read. | Detects **array** ``[{...}, ...]`` **or** JSON Lines in one file. |
 
 There is **no** lazy scan for a single JSON **array** file in pydantable today — use :func:`materialize_json` (or :func:`~pydantable.io.iter_json_array` for batched array processing after a full parse).
 
-**Multi-file / directory:** lazy **`read_json`** / **`read_ndjson`** follow **JSON Lines** path semantics in Polars (see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`). **JSON array** datasets in directories are **not** lazily scanned—use per-file **`materialize_json`** / **`iter_json_array`**, or convert to NDJSON.
+**Multi-file / directory:** lazy **`read_json`** / **`read_ndjson`** follow the same **JSON Lines** path semantics (directories, **`*.jsonl`** globs, **`scan_kwargs`** including **`glob=True`** for API parity with **`read_csv`** / **`read_parquet`**). Polars uses **`LazyJsonLineReader`**; details and **`glob=False`** behavior: {doc}`IO_NDJSON`. **JSON array** files and **array** datasets in directories are **not** lazily scanned—use per-file **`materialize_json`** / **`iter_json_array`**, or convert to NDJSON (see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`).
 
 ## Large files, memory, and entrypoint choice
 
@@ -39,7 +39,7 @@ python docs/examples/io/large_ndjson_patterns.py
 
 ## NDJSON scan kwargs (presets)
 
-Typed and untyped lazy reads accept **``**scan_kwargs``** forwarded to Polars (see {doc}`DATA_IO_SOURCES`). For **NDJSON / JSON Lines**, allowed keys include:
+Typed and untyped lazy reads accept **``**scan_kwargs``** forwarded to Polars (see {doc}`DATA_IO_SOURCES`). **``read_json``** uses the same allowlist as **``read_ndjson``**. For **NDJSON / JSON Lines**, allowed keys include:
 
 - **``infer_schema_length``** — how many lines Polars uses to infer dtypes (or ``None`` for engine default). Increase if early lines are not representative of the full file (e.g. sparse optional fields appear later).
 - **``n_rows``** — cap rows read from the file (sampling / debugging).
