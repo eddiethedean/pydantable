@@ -8,10 +8,10 @@ Use this page to pick the right entry point. Execution semantics (lazy collect v
 |------|-----|-------------------|
 | **Scan a local file without loading full columns into Python** | **`MyModel.read_*`** or **`DataFrame[Schema].read_*`** (default) | **`ScanFileRoot`** → lazy plan |
 | **Run transforms on a big file, then write without a giant dict** | **`MyModel.read_*`** → … → **`DataFrame.write_parquet`** (or **`write_*`**) | File on disk |
-| **Load everything eagerly into a typed frame** | **`pydantable.io.materialize_*`**, **`fetch_sql`**, **`await afetch_sql`**, then **`MyModel(cols)`** | **`DataFrameModel`** / **`DataFrame`** |
-| **Raw `dict[str, list]` only** (utilities) | **`pydantable.io.materialize_*`**, **`fetch_sql`**, **`fetch_*_url`**, **`read_from_object_store`** | Column dict |
+| **Load everything eagerly into a typed frame** | **`pydantable.io.materialize_*`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`await afetch_sqlmodel`** / **`await afetch_sql_raw`**, then **`MyModel(cols)`** | **`DataFrameModel`** / **`DataFrame`** |
+| **Raw `dict[str, list]` only** (utilities) | **`pydantable.io.materialize_*`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`fetch_*_url`**, **`read_from_object_store`** | Column dict |
 | **Persist columns to a file** | **`MyModel.export_*`** / **`await MyModel.aexport_*`** | File on disk |
-| **Query or load from a database** | **`fetch_sql`** / **`await afetch_sql`** / **`iter_sql`** / **`aiter_sql`** + **`MyModel(...)`**; **`MyModel.write_sql`** / **`await MyModel.awrite_sql`** | Typed frame or none |
+| **Query or load from a database** | **`fetch_sqlmodel`** / **`fetch_sql_raw`** (async: **`afetch_*`**) / **`iter_sqlmodel`** / **`iter_sql_raw`** + **`MyModel(...)`**; **`MyModel.fetch_sqlmodel`** / **`write_sqlmodel`** (deprecated unprefixed SQL names: {doc}`IO_SQL`) | Typed frame or none |
 | **HTTP(S) download** | **`fetch_*_url`** (eager dicts) or **`MyModel.read_parquet_url`** / **`await MyModel.aread_parquet_url`** (lazy temp file — {doc}`IO_HTTP`) | Varies |
 | **Object-store URIs (`s3://`, …)** | **`read_from_object_store`** (**`[cloud]`**) | Column dict |
 | **Tier-2 readers (Excel, Delta, …)** | **`pydantable.io.extras`** | Column dict or helpers |
@@ -49,7 +49,7 @@ See implementation notes in **`pydantable.io`** module docstrings for edge cases
 
 ## Typed frame first vs `pydantable.io` only
 
-- **Default:** **`DataFrameModel`** / **`DataFrame[Schema]`** classmethods (**`read_*`**, **`materialize_*`**, **`fetch_sql`**, …) for **validation** and **typed** **`Expr`** pipelines.
+- **Default:** **`DataFrameModel`** / **`DataFrame[Schema]`** classmethods (**`read_*`**, **`materialize_*`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, …) for **validation** and **typed** **`Expr`** pipelines.
 - **`pydantable.io`** only when you need untyped **`dict[str, list]`**, **`ScanFileRoot`** without wrapping, or **`extras`** — scripts, tests, notebooks, internal glue.
 
 See {doc}`DATAFRAMEMODEL` and {doc}`IO_OVERVIEW`.

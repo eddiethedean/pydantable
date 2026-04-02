@@ -1,4 +1,4 @@
-"""Runtime deprecation of legacy string-SQL I/O (Phase 4 v1.14)."""
+"""Runtime deprecation of legacy string-SQL I/O (Phase 4, v1.13.0)."""
 
 from __future__ import annotations
 

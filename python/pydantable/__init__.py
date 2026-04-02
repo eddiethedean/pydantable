@@ -149,4 +149,4 @@ __all__ = [
     "write_sqlmodel",
     "write_sqlmodel_batches",
 ]
-__version__ = "1.16.0"
+__version__ = "1.13.0"

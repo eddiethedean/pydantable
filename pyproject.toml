@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "pydantable"
-version = "1.16.0"
+version = "1.13.0"
 description = "Strongly-typed DataFrames for Python, powered by Rust."
 readme = "README.md"
 license = { text = "MIT" }
@@ -254,7 +254,7 @@ pythonpath = ["python"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-# Legacy string-SQL I/O names warn with DeprecationWarning (Phase 4 v1.14); existing
+# Legacy string-SQL I/O names warn with DeprecationWarning (Phase 4, v1.13.0); existing
 # tests still exercise behavior via these entrypoints. See tests/test_sql_string_deprecation.py.
 filterwarnings = [
     "ignore:.*is deprecated and will be removed in a future major version:DeprecationWarning",

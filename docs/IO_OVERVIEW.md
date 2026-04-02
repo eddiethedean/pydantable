@@ -1,8 +1,8 @@
 # Data I/O by format (overview)
 
-**Default (application code):** use **`DataFrame[Schema]`** and **`DataFrameModel`** for **lazy** **`read_*`** / **`aread_*`**, **`export_*`**, **`write_sql`** / **`awrite_sql`**, and lazy **`write_*`** (Rust-backed where documented). For **eager** column dicts, call **`pydantable.io`** (**`materialize_*`**, **`fetch_sql`**, **`iter_sql`**, …) and pass **`dict[str, list]`** into **`MyModel(...)`** / **`DataFrame[Schema](...)`** — **`DataFrameModel`** does not wrap eager loaders anymore.
+**Default (application code):** use **`DataFrame[Schema]`** and **`DataFrameModel`** for **lazy** **`read_*`** / **`aread_*`**, **`export_*`**, SQL (**`write_sqlmodel`** / **`awrite_sqlmodel`**, or deprecated **`write_sql`** / **`awrite_sql`**), and lazy **`write_*`** (Rust-backed where documented). For **eager** column dicts, call **`pydantable.io`** (**`materialize_*`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`iter_sqlmodel`** / **`iter_sql_raw`**, …) and pass **`dict[str, list]`** into **`MyModel(...)`** / **`DataFrame[Schema](...)`** — **`DataFrameModel`** does not wrap eager loaders anymore. SQL naming and deprecations: {doc}`IO_SQL`.
 
-**Utilities (`pydantable.io`):** **`materialize_*`**, **`fetch_sql`**, **`iter_sql`**, URL helpers, and format-specific readers that return **`dict[str, list]`** or **`ScanFileRoot`** for **`DataFrame`** construction.
+**Utilities (`pydantable.io`):** **`materialize_*`**, **`fetch_sqlmodel`**, **`fetch_sql_raw`**, **`iter_sqlmodel`**, **`iter_sql_raw`**, URL helpers, and format-specific readers that return **`dict[str, list]`** or **`ScanFileRoot`** for **`DataFrame`** construction.
 
 For **execution semantics** (lazy vs collect, Rust engine), see {doc}`EXECUTION`. For **roadmap-style** “what to support next,” see {doc}`DATA_IO_SOURCES`. **Polars 0.53 scan kwargs vs pydantable** (paths, globs, hive): {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`. **Which API should I call?** See {doc}`IO_DECISION_TREE`.
 
@@ -19,7 +19,7 @@ All public I/O **symbols** are defined under **`pydantable.io`** (and re-exporte
 | **Lazy Parquet URL** | **`read_parquet_url`** | **`MyModel.read_parquet_url`** — **`**kwargs`** for **`fetch_bytes`** only |
 | **Temp Parquet URL cleanup** | Build frame inside **`read_parquet_url_ctx`** ( **`io`** ) or use **`DataFrameModel.read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** | Same — context managers unlink the download when the block exits ({doc}`IO_HTTP`) |
 | **Async lazy reads** | **`DataFrame[Schema].aread_*`** (mirrors **`MyModel.aread_*`**) | **`await MyModel.aread_parquet(...)`**, **`aread_csv`**, …, optional **`executor=`**; URL without ctx: **`aread_parquet_url`** (prefer **`aread_parquet_url_ctx`**) |
-| **Eager reads** | Constructor **`DataFrame[Schema](cols)`** from **`dict[str, list]`** | Use **`pydantable.io`** (**`materialize_*`**, **`fetch_sql`**, …) then **`MyModel(cols)`** |
+| **Eager reads** | Constructor **`DataFrame[Schema](cols)`** from **`dict[str, list]`** | Use **`pydantable.io`** (**`materialize_*`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, …) then **`MyModel(cols)`** |
 | **Lazy writes** | **`write_parquet`**, **`write_csv`**, **`write_ipc`**, **`write_ndjson`** | Same **instance** methods on **`model`** — **`streaming`**, **`write_kwargs`**, etc. |
 
 **Ingest validation options:** `trusted_mode`, `fill_missing_optional`, `ignore_errors`, `on_validation_errors` apply on **constructors** and on **typed lazy reads** (`DataFrame[Schema].read_*` / `aread_*`, `DataFrameModel.read_*` / `aread_*`) at **materialization time** (`to_dict()` / `collect()` / `to_arrow()` / `to_polars()`).
@@ -53,15 +53,15 @@ Details: {doc}`IO_DECISION_TREE` (**Engine selection**).
 
 ## Module functions (`pydantable.io`)
 
-Use **`pydantable.io`** when you need **`ScanFileRoot`**, raw column dicts, eager **`materialize_*`**, or **`fetch_sql`** / **`iter_sql`**. **Application code** typically uses **`MyModel.read_*`** / **`aread_*`** for lazy files and **`pydantable.io` + constructor** when an eager **`dict[str, list]`** is required.
+Use **`pydantable.io`** when you need **`ScanFileRoot`**, raw column dicts, eager **`materialize_*`**, or SQL (**`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`iter_sqlmodel`** / **`iter_sql_raw`**, …). **Application code** typically uses **`MyModel.read_*`** / **`aread_*`** for lazy files and **`pydantable.io` + constructor** when an eager **`dict[str, list]`** is required.
 
 | Layer | Role |
 |-------|------|
 | **`read_*` / `aread_*`** | Lazy **local file** scan → **`ScanFileRoot`** → Polars **`LazyFrame`** in the Rust plan (no full column lists in Python). |
 | **`read_parquet_url` / `aread_parquet_url`** | HTTP(S) download to a **temp Parquet file**, then same lazy root — prefer **`read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** for automatic cleanup ({doc}`IO_HTTP`). |
 | **`materialize_*` / `amaterialize_*`** | Eager **`dict[str, list]`** (Rust and/or PyArrow / stdlib, depending on path). |
-| **`fetch_*_url`**, **`fetch_sql`**, **`read_from_object_store`**, **`pydantable.io.extras`** | Other sources that return **`dict[str, list]`** (or build column dicts) for **`DataFrameModel`** / constructors. |
-| **`export_*` / `aexport_*`**, **`write_sql` / `awrite_sql`** | Eager writes from an in-memory column dict or your own pipeline. |
+| **`fetch_*_url`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`read_from_object_store`**, **`pydantable.io.extras`** | Other sources that return **`dict[str, list]`** (or build column dicts) for **`DataFrameModel`** / constructors. |
+| **`export_*` / `aexport_*`**, **`write_sqlmodel`** / **`write_sql_raw`** (deprecated: **`write_sql`**) | Eager writes from an in-memory column dict or your own pipeline. |
 
 ## Batched column dict I/O (`iter_*`, `write_*_batches`, `aiter_*`)
 
@@ -70,7 +70,7 @@ For **bounded memory** pipelines in plain Python (outside the Rust **`LazyFrame`
 - **Contract:** each yielded batch is **rectangular**: every column list has the same length. Helpers **`ensure_rectangular`** and **`iter_concat_batches`** live in **`pydantable.io.batches`**.
 - **Core formats:** **`iter_parquet`**, **`iter_ipc`**, **`iter_csv`**, **`iter_ndjson`** (**`iter_json_lines`** is an alias), **`iter_json_array`** — and **`write_parquet_batches`**, **`write_ipc_batches`**, **`write_csv_batches`**, **`write_ndjson_batches`**. **Parquet**, **IPC**, and **JSON-array** batch paths need **`pydantable[arrow]`** (PyArrow). **CSV** / **NDJSON** use the stdlib (plus **`json`**).
 - **IPC file vs stream:** **`iter_ipc`** / **`write_ipc_batches`** take **`as_stream=`**. Defaults differ (**reader** assumes on-disk **file** format; **writer** defaults to **stream** format). For a round-trip, pass the **same** flag on read and write (see {doc}`IO_IPC`).
-- **Async:** **`aiter_parquet`**, **`aiter_ipc`**, **`aiter_csv`**, **`aiter_ndjson`**, **`aiter_json_lines`**, **`aiter_json_array`** mirror the sync iterators (thread offload). **`aiter_sql`** streams SQL batches similarly ({doc}`IO_SQL`).
+- **Async:** **`aiter_parquet`**, **`aiter_ipc`**, **`aiter_csv`**, **`aiter_ndjson`**, **`aiter_json_lines`**, **`aiter_json_array`** mirror the sync iterators (thread offload). **`aiter_sqlmodel`** / **`aiter_sql_raw`** (deprecated: **`aiter_sql`**) stream SQL batches similarly ({doc}`IO_SQL`).
 - **Extras:** **`iter_excel`**, **`iter_delta`**, **`iter_avro`**, **`iter_orc`**, **`iter_bigquery`**, **`iter_snowflake`**, **`iter_kafka_json`** — same column-dict batch shape where the underlying library allows streaming; see {doc}`IO_EXTRAS`.
 - **Top-level imports:** many of these names are also re-exported from **`pydantable`** alongside **`DataFrame`** / **`DataFrameModel`** for quick scripts.
 
