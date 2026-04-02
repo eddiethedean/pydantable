@@ -1,7 +1,7 @@
-"""SQLite: streaming SQL batches with :func:`pydantable.io.iter_sql`.
+"""SQLite: streaming SQL batches with :func:`pydantable.io.iter_sql_raw`.
 
 For automatic fetch behavior, env-tunable batch sizes, and the **StreamingColumns**
-container returned by large **fetch_sql** calls, see the **IO_SQL** documentation page.
+container returned by large **fetch_sql_raw** calls, see **IO_SQL**.
 
 Run::
 
@@ -13,7 +13,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from pydantable.io import iter_sql
+from pydantable.io import iter_sql_raw
 from sqlalchemy import create_engine, text
 
 
@@ -34,7 +34,7 @@ def main() -> None:
                 )
 
             total = 0
-            for batch in iter_sql(
+            for batch in iter_sql_raw(
                 "SELECT n FROM t WHERE n >= :min_n ORDER BY n",
                 eng,
                 parameters={"min_n": 10},

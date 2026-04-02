@@ -1,4 +1,8 @@
-"""SQLAlchemy-backed ``fetch_sql`` / ``write_sql`` (optional ``[sql]`` extra).
+"""SQLAlchemy-backed raw string SQL I/O (optional ``[sql]`` extra).
+
+Use :func:`fetch_sql_raw`, :func:`iter_sql_raw`, and :func:`write_sql_raw` for explicit
+string-SQL access. The unprefixed names :func:`fetch_sql`, :func:`iter_sql`, and
+:func:`write_sql` remain as deprecated aliases.
 
 Works with **any database URL and dialect** SQLAlchemy supports (PostgreSQL, MySQL,
 SQLite, SQL Server, Oracle, etc.). Install the matching **DBAPI driver** for your URL
@@ -8,13 +12,21 @@ SQLite, SQL Server, Oracle, etc.). Install the matching **DBAPI driver** for you
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+import warnings
+from collections.abc import Iterator, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
-
     from sqlalchemy.engine import Connection, Engine
+
+
+def mappings_rows_to_column_dict(rows: Sequence[Any]) -> dict[str, list[Any]]:
+    """Turn SQLAlchemy ``RowMapping`` rows into ``dict[column_name, list]``."""
+    if not rows:
+        return {}
+    first = rows[0]
+    keys = list(first.keys())
+    return {k: [row[k] for row in rows] for k in keys}
 
 
 _ENV_FETCH_BATCH_SIZE = "PYDANTABLE_SQL_FETCH_BATCH_SIZE"
@@ -120,7 +132,60 @@ def _to_engine(bind: str | Engine | Connection) -> Engine:
     return create_engine(bind)
 
 
-def fetch_sql(
+def _warn_legacy_sql(name: str, *, raw: str, sqlmodel: str) -> None:
+    warnings.warn(
+        f"{name} is deprecated and will be removed in a future major version; "
+        f"for mapped tables use {sqlmodel}, for string SQL use {raw}.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
+def iter_sql_raw(
+    sql: str,
+    bind: str | Engine | Connection,
+    *,
+    parameters: Mapping[str, Any] | None = None,
+    batch_size: int | None = None,
+) -> Iterator[dict[str, list[Any]]]:
+    """
+    Execute ``sql`` and yield results in batches as ``dict[column_name, list]``.
+
+    Streaming alternative to :func:`fetch_sql_raw` for large result sets.
+
+    Notes:
+    - ``sql`` should be a ``SELECT`` (or other statement returning rows).
+    - Use **bound parameters** only — never interpolate untrusted input into ``sql``.
+    - ``bind`` may be a SQLAlchemy URL string, ``Engine``, or ``Connection``.
+    """
+    bs = _fetch_batch_size(batch_size)
+
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import Connection as SAConnection
+    from sqlalchemy.engine import Engine as SAEngine
+
+    params = dict(parameters or {})
+
+    if isinstance(bind, SAConnection):
+        result = bind.execution_options(stream_results=True).execute(text(sql), params)
+        while True:
+            chunk = result.mappings().fetchmany(bs)
+            if not chunk:
+                break
+            yield mappings_rows_to_column_dict(chunk)
+        return
+
+    eng = bind if isinstance(bind, SAEngine) else create_engine(bind)
+    with eng.connect() as conn:
+        result = conn.execution_options(stream_results=True).execute(text(sql), params)
+        while True:
+            chunk = result.mappings().fetchmany(bs)
+            if not chunk:
+                break
+            yield mappings_rows_to_column_dict(chunk)
+
+
+def fetch_sql_raw(
     sql: str,
     bind: str | Engine | Connection,
     *,
@@ -142,7 +207,7 @@ def fetch_sql(
     batches: list[dict[str, list[Any]]] = []
     total = 0
     streaming = False
-    for b in iter_sql(sql, bind, parameters=parameters, batch_size=bs):
+    for b in iter_sql_raw(sql, bind, parameters=parameters, batch_size=bs):
         if not b:
             continue
         batches.append(b)
@@ -174,49 +239,45 @@ def iter_sql(
     batch_size: int | None = None,
 ) -> Iterator[dict[str, list[Any]]]:
     """
+    Deprecated: use :func:`iter_sql_raw` or :func:`iter_sqlmodel`.
+
     Execute ``sql`` and yield results in batches as ``dict[column_name, list]``.
-
-    This is a streaming alternative to :func:`fetch_sql` for large result sets.
-    Each yielded batch is fully materialized in Python, but the full result set
-    is never loaded at once.
-
-    Notes:
-    - ``sql`` should be a ``SELECT`` (or other statement returning rows).
-    - Use **bound parameters** only — never interpolate untrusted input into ``sql``.
-    - ``bind`` may be a SQLAlchemy URL string, ``Engine``, or ``Connection``.
     """
-    bs = _fetch_batch_size(batch_size)
+    _warn_legacy_sql(
+        "iter_sql",
+        raw="iter_sql_raw(...)",
+        sqlmodel="iter_sqlmodel(...)",
+    )
+    return iter_sql_raw(sql, bind, parameters=parameters, batch_size=batch_size)
 
-    from sqlalchemy import create_engine, text
-    from sqlalchemy.engine import Connection as SAConnection
-    from sqlalchemy.engine import Engine as SAEngine
 
-    params = dict(parameters or {})
+def fetch_sql(
+    sql: str,
+    bind: str | Engine | Connection,
+    *,
+    parameters: Mapping[str, Any] | None = None,
+    batch_size: int | None = None,
+    auto_stream: bool = True,
+    auto_stream_threshold_rows: int | None = None,
+) -> dict[str, list[Any]] | StreamingColumns:
+    """
+    Deprecated: use :func:`fetch_sql_raw` or :func:`fetch_sqlmodel`.
 
-    def _rows_to_cols(rows: Sequence[Any]) -> dict[str, list[Any]]:
-        if not rows:
-            return {}
-        first = rows[0]
-        keys = list(first.keys())
-        return {k: [row[k] for row in rows] for k in keys}
-
-    if isinstance(bind, SAConnection):
-        result = bind.execution_options(stream_results=True).execute(text(sql), params)
-        while True:
-            chunk = result.mappings().fetchmany(bs)
-            if not chunk:
-                break
-            yield _rows_to_cols(chunk)
-        return
-
-    eng = bind if isinstance(bind, SAEngine) else create_engine(bind)
-    with eng.connect() as conn:
-        result = conn.execution_options(stream_results=True).execute(text(sql), params)
-        while True:
-            chunk = result.mappings().fetchmany(bs)
-            if not chunk:
-                break
-            yield _rows_to_cols(chunk)
+    Execute ``sql`` and return rows as ``dict[column_name, list]`` (materialized).
+    """
+    _warn_legacy_sql(
+        "fetch_sql",
+        raw="fetch_sql_raw(...)",
+        sqlmodel="fetch_sqlmodel(...)",
+    )
+    return fetch_sql_raw(
+        sql,
+        bind,
+        parameters=parameters,
+        batch_size=batch_size,
+        auto_stream=auto_stream,
+        auto_stream_threshold_rows=auto_stream_threshold_rows,
+    )
 
 
 def _infer_columns(data: dict[str, list[Any]]) -> list[Any]:
@@ -238,7 +299,7 @@ def _infer_columns(data: dict[str, list[Any]]) -> list[Any]:
     return cols
 
 
-def write_sql(
+def write_sql_raw(
     data: dict[str, list[Any]],
     table_name: str,
     bind: str | Engine | Connection,
@@ -254,7 +315,7 @@ def write_sql(
     * ``replace``: drops the table if it exists, recreates it with inferred column types, then inserts.
       ``table_name`` / ``schema`` must be **trusted** identifiers (not user-controlled).
 
-    ``bind`` is any SQLAlchemy-supported **URL** or **Engine** (same driver rules as ``fetch_sql``).
+    ``bind`` is any SQLAlchemy-supported **URL** or **Engine** (same driver rules as ``fetch_sql_raw``).
     ``if_exists="replace"`` uses generic DDL; exotic dialects may need app-specific migrations instead.
     """
     from sqlalchemy import MetaData, Table, insert, inspect
@@ -309,3 +370,32 @@ def write_sql(
         tbl = Table(table_name, md, schema=schema, autoload_with=conn)
         for chunk in _row_chunks():
             conn.execute(insert(tbl), chunk)
+
+
+def write_sql(
+    data: dict[str, list[Any]],
+    table_name: str,
+    bind: str | Engine | Connection,
+    *,
+    schema: str | None = None,
+    if_exists: str = "append",
+    chunk_size: int | None = None,
+) -> None:
+    """
+    Deprecated: use :func:`write_sql_raw` or :func:`write_sqlmodel`.
+
+    Insert ``data`` (column dict) into ``table_name``.
+    """
+    _warn_legacy_sql(
+        "write_sql",
+        raw="write_sql_raw(...)",
+        sqlmodel="write_sqlmodel(...)",
+    )
+    write_sql_raw(
+        data,
+        table_name,
+        bind,
+        schema=schema,
+        if_exists=if_exists,
+        chunk_size=chunk_size,
+    )

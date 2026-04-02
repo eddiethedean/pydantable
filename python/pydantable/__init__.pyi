@@ -13,6 +13,8 @@ from .errors import ColumnLengthMismatchError, PydantableUserError
 from .expressions import Expr
 from .io import (
     afetch_sql,
+    afetch_sql_raw,
+    afetch_sqlmodel,
     aiter_csv,
     aiter_ipc,
     aiter_json_array,
@@ -20,11 +22,18 @@ from .io import (
     aiter_ndjson,
     aiter_parquet,
     aiter_sql,
+    aiter_sql_raw,
+    aiter_sqlmodel,
     amaterialize_parquet,
     aread_parquet,
     aread_parquet_url,
+    awrite_sql_raw,
+    awrite_sqlmodel,
+    awrite_sqlmodel_batches,
     export_parquet,
     fetch_sql,
+    fetch_sql_raw,
+    fetch_sqlmodel,
     iter_avro,
     iter_bigquery,
     iter_csv,
@@ -38,22 +47,26 @@ from .io import (
     iter_orc,
     iter_parquet,
     iter_snowflake,
+    iter_sqlmodel,
     materialize_ipc,
     materialize_ndjson,
     materialize_parquet,
     read_parquet,
     read_parquet_url,
+    sqlmodel_columns,
     write_csv_batches,
     write_ipc_batches,
     write_ndjson_batches,
     write_parquet_batches,
+    write_sqlmodel,
+    write_sqlmodel_batches,
 )
 from .materialization import PlanMaterialization, plan_materialization_summary
 from .observe import get_observer, set_observer
 from .schema import DtypeDriftWarning, Schema
 from .types import WKB
 
-__version__ = "1.12.0"
+__version__ = "1.13.0"
 
 __all__ = [
     "WKB",
@@ -68,6 +81,8 @@ __all__ = [
     "PydantableUserError",
     "Schema",
     "afetch_sql",
+    "afetch_sql_raw",
+    "afetch_sqlmodel",
     "aiter_csv",
     "aiter_ipc",
     "aiter_json_array",
@@ -75,11 +90,18 @@ __all__ = [
     "aiter_ndjson",
     "aiter_parquet",
     "aiter_sql",
+    "aiter_sql_raw",
+    "aiter_sqlmodel",
     "amaterialize_parquet",
     "aread_parquet",
     "aread_parquet_url",
+    "awrite_sql_raw",
+    "awrite_sqlmodel",
+    "awrite_sqlmodel_batches",
     "export_parquet",
     "fetch_sql",
+    "fetch_sql_raw",
+    "fetch_sqlmodel",
     "get_observer",
     "get_repr_html_limits",
     "iter_avro",
@@ -95,6 +117,7 @@ __all__ = [
     "iter_orc",
     "iter_parquet",
     "iter_snowflake",
+    "iter_sqlmodel",
     "materialize_ipc",
     "materialize_ndjson",
     "materialize_parquet",
@@ -108,8 +131,11 @@ __all__ = [
     "selectors",
     "set_display_options",
     "set_observer",
+    "sqlmodel_columns",
     "write_csv_batches",
     "write_ipc_batches",
     "write_ndjson_batches",
     "write_parquet_batches",
+    "write_sqlmodel",
+    "write_sqlmodel_batches",
 ]

@@ -270,6 +270,8 @@ def _render_module_stub(
             # export constant aliases (e.g. TypeAlias-like variables) when requested
             if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
                 name = node.targets[0].id
+                if name == "__all__":
+                    continue
                 if name in all_names or (
                     include_all_public_defs
                     and include_private_defs
@@ -280,6 +282,8 @@ def _render_module_stub(
                         ordered.append(name)
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
             name = node.target.id
+            if name == "__all__":
+                continue
             if name in all_names or (
                 include_all_public_defs
                 and include_private_defs

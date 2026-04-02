@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "pydantable"
-version = "1.12.0"
+version = "1.13.0"
 description = "Strongly-typed DataFrames for Python, powered by Rust."
 readme = "README.md"
 license = { text = "MIT" }
@@ -27,7 +27,8 @@ arrow = ["pyarrow>=14.0"]
 polars = ["polars>=1.0.0,<2"]
 io = ["pyarrow>=14.0", "polars>=1.0.0,<2"]
 # read_sql / write_sql — SQLAlchemy 2.x; install DBAPI drivers for your URLs separately.
-sql = ["sqlalchemy>=2.0,<3"]
+# fetch_sqlmodel / iter_sqlmodel require SQLModel (install pydantable[sql]).
+sql = ["sqlalchemy>=2.0,<3", "sqlmodel>=0.0.22,<0.1"]
 cloud = ["fsspec>=2023.0"]
 excel = ["openpyxl>=3.1"]
 kafka = ["kafka-python>=2.0"]
@@ -39,7 +40,9 @@ fastapi = ["fastapi>=0.100"]
 dev = [
     "fastapi>=0.100",
     "httpx>=0.24",
+    # SQLAlchemy + SQLModel — same pins as ``[sql]``; needed for sql/sqlmodel I/O tests and dev workflows.
     "sqlalchemy>=2.0,<3",
+    "sqlmodel>=0.0.22,<0.1",
     "python-multipart>=0.0.6",
     "hypothesis>=6.0",
     "numpy>=1.24",
@@ -79,6 +82,7 @@ docs = [
     # Optional at runtime, but required for Sphinx + sphinx-autodoc-typehints to resolve
     # SQLAlchemy forward refs on DataFrameModel I/O methods (matches CI docs job and RTD).
     "sqlalchemy>=2.0,<3",
+    "sqlmodel>=0.0.22,<0.1",
 ]
 
 [tool.maturin]
@@ -177,6 +181,14 @@ module = "sqlalchemy.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = "sqlmodel"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "sqlmodel.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = "openpyxl"
 ignore_missing_imports = true
 
@@ -242,6 +254,11 @@ pythonpath = ["python"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+# Legacy string-SQL I/O names warn with DeprecationWarning (Phase 4, v1.13.0); existing
+# tests still exercise behavior via these entrypoints. See tests/test_sql_string_deprecation.py.
+filterwarnings = [
+    "ignore:.*is deprecated and will be removed in a future major version:DeprecationWarning",
+]
 markers = [
     "slow: performance guardrails (timing-based; exclude with -m 'not slow')",
     "network: uses loopback HTTP server or similar (exclude with -m 'not network')",

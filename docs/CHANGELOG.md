@@ -4,6 +4,30 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.13.0] — 2026-04-02
+
+### Added
+
+- **SQLModel read I/O (Phase 0–1):** **`pydantable[sql]`** includes **sqlmodel**. New APIs **`fetch_sqlmodel`**, **`iter_sqlmodel`**, **`afetch_sqlmodel`**, and **`aiter_sqlmodel`** in **`pydantable.io`** (also re-exported from **`pydantable`**), sharing batching and **`StreamingColumns`** semantics with **`fetch_sql_raw`** / **`iter_sql_raw`**. **`MissingOptionalDependency`** when **sqlmodel** is required but not installed.
+- **SQLModel write I/O (Phase 2):** **`write_sqlmodel`**, **`write_sqlmodel_batches`**, **`awrite_sqlmodel`**, **`awrite_sqlmodel_batches`** — DDL from **`SQLModel.__table__`**, **`replace_ok`** guard for **`if_exists="replace"`**, optional **`validate_rows`**, strict column alignment. **`python/pydantable/io/sqlmodel_write.py`**; tests **`tests/test_sqlmodel_io_phase02.py`**.
+- **SQLModel + `DataFrameModel` (Phase 3):** classmethods **`fetch_sqlmodel`**, **`afetch_sqlmodel`**, **`iter_sqlmodel`**, **`aiter_sqlmodel`**, **`write_sqlmodel_data` / `awrite_sqlmodel_data`**; instance **`write_sqlmodel` / `awrite_sqlmodel`**; **`MyModel.Async.write_sqlmodel`** → **`awrite_sqlmodel_data`**. **`python/pydantable/dataframe_model.py`**; stubs in **`python/pydantable/dataframe_model.pyi`** / **`typings/`**; tests **`tests/test_sqlmodel_dataframe_model.py`**.
+- **Explicit string SQL (Phase 4):** **`fetch_sql_raw`**, **`iter_sql_raw`**, **`write_sql_raw`**, **`afetch_sql_raw`**, **`aiter_sql_raw`**, **`awrite_sql_raw`** in **`pydantable.io`** (**`fetch_sql_raw`** / **`afetch_sql_raw`** also re-exported from **`pydantable`** root).
+- **Schema bridging (Phase 5):** **`sqlmodel_columns`**, **`DataFrameModel.assert_sqlmodel_compatible`** — **`python/pydantable/io/sqlmodel_schema.py`**; tests **`tests/test_sqlmodel_bridge_phase05.py`**; docs {doc}`IO_SQL`, {doc}`DATAFRAMEMODEL`, {doc}`SQLMODEL_SQL_ROADMAP`.
+- **Documentation + examples + testing gate (Phase 6):** SQLModel-first SQLite examples **`docs/examples/io/sql_sqlite_sqlmodel_roundtrip.py`**, **`docs/examples/io/sql_sqlite_sqlmodel_streaming.py`**; {doc}`IO_SQL` sections for raw vs SQLModel-first examples; **`tests/test_doc_io_examples.py`** runs **`sql_sqlite_streaming.py`** and the SQLModel scripts alongside existing **`sql_sqlite_*`** examples.
+
+### Deprecated
+
+- **Legacy string-SQL names (Phase 4):** **`fetch_sql`**, **`iter_sql`**, **`write_sql`**, **`afetch_sql`**, **`aiter_sql`**, **`awrite_sql`**, **`write_sql_batches`**, **`awrite_sql_batches`** — emit **`DeprecationWarning`**; migrate to **`*_raw`** or SQLModel helpers. **`DataFrameModel.write_sql`** / **`awrite_sql`** delegate to the same deprecated **`pydantable.io`** entrypoints. Removal no earlier than **`2.0.0`** ({doc}`VERSIONING`). Tests: **`tests/test_sql_string_deprecation.py`**; default test run filters these warnings in **`pyproject.toml`** for backward-compatible suites.
+
+### Docs
+
+- **README / site index / I/O guides:** align **current release** (**1.13.0**), SQL I/O naming (**`fetch_sqlmodel`**, **`fetch_sql_raw`**, deprecations), and pointers to {doc}`IO_SQL` / {doc}`SQLMODEL_SQL_ROADMAP` across **README**, {doc}`index`, {doc}`IO_OVERVIEW`, {doc}`IO_DECISION_TREE`, {doc}`EXECUTION`, {doc}`DATA_IO_SOURCES`, {doc}`DOCS_MAP`, {doc}`POLARS_TRANSFORMATIONS_ROADMAP`, {doc}`ROADMAP`, and the SQLModel roadmap introduction.
+- **SQL I/O:** {doc}`IO_SQL`, {doc}`SQLMODEL_SQL_ROADMAP`, {doc}`VERSIONING` — SQLModel-first default, **`*_raw`** for explicit string SQL, deprecation policy. Runnable examples: raw **`sql_sqlite_roundtrip.py`** / **`sql_sqlite_streaming.py`** and SQLModel-first **`sql_sqlite_sqlmodel_*.py`** (see {doc}`IO_SQL`).
+
+### Changed
+
+- **Version bump:** Align Python package metadata, Rust crate, and published **`__version__`** to **1.13.0**. (This release includes all SQLModel-first SQL I/O work since **v1.12.0** — Phases 0–6 of {doc}`SQLMODEL_SQL_ROADMAP` — in one minor version.)
+
 ## [1.12.0] — 2026-04-02
 
 ### Changed

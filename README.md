@@ -14,7 +14,7 @@
 - **Typed expressions:** `Expr` and transform chains are validated and lowered in Rust; many errors fail fast at build/plan time.
 - **Familiar operations:** `select`, `filter`, `join`, `group_by`, windows, melt/pivot, and pandas-flavored helpers where they help.
 - **Flexible materialization:** row models via `collect()` / `rows()`, columnar `dict[str, list]`, or Polars/PyArrow with the right extras.
-- **I/O:** lazy `read_*` / `aread_*`, streaming writes, NDJSON/JSON Lines, Parquet, CSV, IPC, HTTP, SQL — see the [I/O overview](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html) and [decision tree](https://pydantable.readthedocs.io/en/latest/IO_DECISION_TREE.html).
+- **I/O:** lazy `read_*` / `aread_*`, streaming writes, NDJSON/JSON Lines, Parquet, CSV, IPC, HTTP, SQL (SQLModel-first `fetch_sqlmodel` / `write_sqlmodel`, explicit string SQL `fetch_sql_raw` / `write_sql_raw`, or deprecated unprefixed names) — [I/O overview](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html), [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html), [SQLModel roadmap](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html), and [decision tree](https://pydantable.readthedocs.io/en/latest/IO_DECISION_TREE.html).
 - **JSON & struct columns:** struct expressions, JSON encode/decode helpers, unnest/nested models — [IO_JSON](https://pydantable.readthedocs.io/en/latest/IO_JSON.html), [SELECTORS](https://pydantable.readthedocs.io/en/latest/SELECTORS.html).
 - **FastAPI (optional):** shared executor lifespan, NDJSON streaming from `astream()`, OpenAPI-friendly columnar bodies, `register_exception_handlers` (**503** / **400** / **422**). Start with the [golden path](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html) and [FastAPI guide](https://pydantable.readthedocs.io/en/latest/FASTAPI.html).
 
@@ -30,7 +30,7 @@ Common extras:
 pip install "pydantable[polars]"   # to_polars
 pip install "pydantable[arrow]"    # to_arrow / Arrow constructors
 pip install "pydantable[io]"       # full file I/O convenience (arrow + polars)
-pip install "pydantable[sql]"      # fetch_sql / write_sql helpers
+pip install "pydantable[sql]"      # SQLModel + SQLAlchemy: fetch_sqlmodel, write_sqlmodel, *_raw, …
 pip install "pydantable[pandas]"   # pandas-flavored façade (pandas UI doc)
 pip install "pydantable[fastapi]"  # FastAPI integration (pydantable.fastapi)
 ```
@@ -82,8 +82,9 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 
 ## I/O at a glance
 
-- **`DataFrameModel` / `DataFrame[Schema]`:** lazy `read_*` / `aread_*`, `export_*`, `write_*`, SQL helpers; eager `materialize_*` / `fetch_*` patterns live on **`pydantable.io`** — pass `dict[str, list]` into constructors for typed frames.
+- **`DataFrameModel` / `DataFrame[Schema]`:** lazy `read_*` / `aread_*`, `export_*`, `write_*`, SQLModel I/O (`fetch_sqlmodel`, `write_sqlmodel`, …); eager `materialize_*` and SQL `fetch_*` / `iter_*` patterns live on **`pydantable.io`** — pass `dict[str, list]` into constructors for typed frames.
 - **Scripts:** raw helpers (`ScanFileRoot`, iterators) on **`pydantable.io`** for glue code.
+- **SQL details:** [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html) (recommended APIs, `*_raw`, deprecations) and [SQLMODEL_SQL_ROADMAP](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html) (phased migration).
 - Large files & NDJSON patterns: [IO_JSON](https://pydantable.readthedocs.io/en/latest/IO_JSON.html), [IO_NDJSON](https://pydantable.readthedocs.io/en/latest/IO_NDJSON.html), [EXECUTION](https://pydantable.readthedocs.io/en/latest/EXECUTION.html).
 
 ## Validation controls
@@ -104,6 +105,7 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 | `DataFrameModel` | [DATAFRAMEMODEL](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) |
 | Typing (mypy vs Pyright) | [TYPING](https://pydantable.readthedocs.io/en/latest/TYPING.html) |
 | I/O overview | [IO_OVERVIEW](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html) |
+| SQL (SQLModel, raw string SQL) | [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html) · [SQLMODEL_SQL_ROADMAP](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html) |
 | Pandas-like API | [PANDAS_UI](https://pydantable.readthedocs.io/en/latest/PANDAS_UI.html) |
 | FastAPI path | [GOLDEN_PATH_FASTAPI](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html) → [FASTAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) → [FASTAPI_ENHANCEMENTS](https://pydantable.readthedocs.io/en/latest/FASTAPI_ENHANCEMENTS.html) |
 | Service ergonomics (OpenAPI, aliases, redaction) | [SERVICE_ERGONOMICS](https://pydantable.readthedocs.io/en/latest/SERVICE_ERGONOMICS.html) |
