@@ -14,6 +14,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, TypedDict
 
+from pydantable.policies import Strictness
+
 
 TrustedMode = Literal["off", "shape_only", "strict"]
 
@@ -22,6 +24,8 @@ class ValidationProfileDict(TypedDict, total=False):
     trusted_mode: TrustedMode | None
     fill_missing_optional: bool
     ignore_errors: bool
+    column_strictness_default: Strictness
+    nested_strictness_default: Strictness
 
 
 @dataclass(frozen=True)
@@ -29,6 +33,8 @@ class ValidationProfile:
     trusted_mode: TrustedMode | None = None
     fill_missing_optional: bool | None = None
     ignore_errors: bool | None = None
+    column_strictness_default: Strictness | None = None
+    nested_strictness_default: Strictness | None = None
 
     @classmethod
     def from_dict(cls, d: ValidationProfileDict) -> ValidationProfile:
@@ -36,6 +42,8 @@ class ValidationProfile:
             trusted_mode=d.get("trusted_mode"),
             fill_missing_optional=d.get("fill_missing_optional"),
             ignore_errors=d.get("ignore_errors"),
+            column_strictness_default=d.get("column_strictness_default"),
+            nested_strictness_default=d.get("nested_strictness_default"),
         )
 
 
@@ -104,7 +112,9 @@ def apply_validation_profile(
     current_trusted_mode: TrustedMode | None,
     current_fill_missing_optional: bool,
     current_ignore_errors: bool,
-) -> tuple[TrustedMode | None, bool, bool]:
+    current_column_strictness_default: Strictness,
+    current_nested_strictness_default: Strictness,
+) -> tuple[TrustedMode | None, bool, bool, Strictness, Strictness]:
     """
     Apply a validation profile to current values.
 
@@ -113,12 +123,20 @@ def apply_validation_profile(
     default and the profile provides a different default.
     """
     if profile_name is None:
-        return current_trusted_mode, current_fill_missing_optional, current_ignore_errors
+        return (
+            current_trusted_mode,
+            current_fill_missing_optional,
+            current_ignore_errors,
+            current_column_strictness_default,
+            current_nested_strictness_default,
+        )
     p = get_validation_profile(profile_name)
 
     trusted_mode = current_trusted_mode
     fill_missing_optional = current_fill_missing_optional
     ignore_errors = current_ignore_errors
+    column_strictness_default = current_column_strictness_default
+    nested_strictness_default = current_nested_strictness_default
 
     if trusted_mode is None and p.trusted_mode is not None:
         trusted_mode = p.trusted_mode
@@ -126,8 +144,18 @@ def apply_validation_profile(
         fill_missing_optional = False
     if ignore_errors is False and p.ignore_errors is True:
         ignore_errors = True
+    if column_strictness_default == "coerce" and p.column_strictness_default is not None:
+        column_strictness_default = p.column_strictness_default
+    if nested_strictness_default == "inherit" and p.nested_strictness_default is not None:
+        nested_strictness_default = p.nested_strictness_default
 
-    return trusted_mode, fill_missing_optional, ignore_errors
+    return (
+        trusted_mode,
+        fill_missing_optional,
+        ignore_errors,
+        column_strictness_default,
+        nested_strictness_default,
+    )
 
 
 __all__ = [

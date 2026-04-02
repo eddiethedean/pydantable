@@ -7,9 +7,12 @@ Phase 1 scope (see docs/PYDANTIC_ROADMAP.md):
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
+
+
+Strictness = Literal["inherit", "coerce", "strict", "off"]
 
 
 def _pydantable_extra(field: Any) -> dict[str, Any]:
@@ -38,5 +41,40 @@ def column_policy(model: type[BaseModel], name: str) -> dict[str, Any]:
     return _pydantable_extra(finfo)
 
 
-__all__ = ["column_policies", "column_policy"]
+def _as_strictness(v: Any) -> Strictness | None:
+    if v in ("inherit", "coerce", "strict", "off"):
+        return v
+    return None
+
+
+def resolve_column_strictness(
+    model: type[BaseModel],
+    name: str,
+    *,
+    column_default: Strictness = "coerce",
+    nested_default: Strictness = "inherit",
+) -> tuple[Strictness, Strictness]:
+    """
+    Resolve (strictness, nested_strictness) for one top-level field.
+
+    - Field policy overrides win.
+    - `inherit` falls back to provided defaults.
+    """
+    p = column_policy(model, name)
+    s = _as_strictness(p.get("strictness")) or "inherit"
+    ns = _as_strictness(p.get("nested_strictness")) or "inherit"
+
+    if s == "inherit":
+        s = column_default
+    if ns == "inherit":
+        ns = nested_default
+    return s, ns
+
+
+__all__ = [
+    "Strictness",
+    "column_policies",
+    "column_policy",
+    "resolve_column_strictness",
+]
 

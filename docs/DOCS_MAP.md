@@ -39,6 +39,7 @@ Use this page when you know **what you need to do**, but not **where it is docum
 - **Roadmap**: {doc}`ROADMAP`
 - **Pydantic roadmap (ambitious)**: {doc}`PYDANTIC_ROADMAP` — deeper Pydantic v2 integration, model policies, custom dtypes, and service ergonomics.
 - **Custom dtypes**: {doc}`CUSTOM_DTYPES` — semantic scalar types via Pydantic v2 CoreSchema + `pydantable.dtypes.register_scalar`.
+- **Strictness**: {doc}`STRICTNESS` — per-column and nested validation strictness (Phase 4).
 - **JSON & structs (1.10.0) and local I/O (1.11.0):** release narratives in {doc}`CHANGELOG` **1.10.0** / **1.11.0**; ongoing work in {doc}`ROADMAP`; NDJSON cookbook {doc}`/cookbook/json_logs_unnest_export`; lazy scan audit {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`; entrypoints {doc}`IO_OVERVIEW`, {doc}`IO_DECISION_TREE`, {doc}`DATA_IO_SOURCES`.
 - **Developer guide**: {doc}`DEVELOPER`
 - **Performance notes**: {doc}`PERFORMANCE`

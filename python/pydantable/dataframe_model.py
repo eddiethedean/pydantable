@@ -381,13 +381,27 @@ class DataFrameModel(Generic[RowT]):
             validation_profile = cast(
                 "str | None", self.pydantable_policy().get("validation_profile")
             )
+        column_strictness_default = cast(
+            "str | None", self.pydantable_policy().get("column_strictness_default")
+        )
+        nested_strictness_default = cast(
+            "str | None", self.pydantable_policy().get("nested_strictness_default")
+        )
         from .validation_profiles import apply_validation_profile
 
-        trusted_mode, fill_missing_optional, ignore_errors = apply_validation_profile(
+        trusted_mode, fill_missing_optional, ignore_errors, col_sd, nested_sd = (
+            apply_validation_profile(
             profile_name=validation_profile,
             current_trusted_mode=trusted_mode,
             current_fill_missing_optional=fill_missing_optional,
             current_ignore_errors=ignore_errors,
+            current_column_strictness_default=cast(
+                "Any", column_strictness_default or "coerce"
+            ),
+            current_nested_strictness_default=cast(
+                "Any", nested_strictness_default or "inherit"
+            ),
+        )
         )
         normalized, from_rows = _normalize_input(
             data=data,
@@ -405,6 +419,8 @@ class DataFrameModel(Generic[RowT]):
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+            column_strictness_default=col_sd,
+            nested_strictness_default=nested_sd,
         )
 
     @classmethod

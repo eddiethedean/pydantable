@@ -371,8 +371,27 @@ Implemented:
 
 ### Phase 4 — “Per-column and nested strictness”
 
-- E2 column-specific strictness (careful: performance + semantics)
-- D1 deeper typed map/list validation options (opt-in)
+Planned (target: 1.13.0+):
+
+- **E2 column-specific strictness** (careful: performance + semantics)
+  - Allow schema authors to declare per-column validation behavior via field metadata:
+    `Field(json_schema_extra={"pydantable": {"strictness": ...}})`.
+  - `strictness` values:
+    - `"coerce"` (default): current behavior (Pydantic coercion under `trusted_mode="off"`).
+    - `"strict"`: use strict Pydantic validation for this column when element validation runs.
+    - `"off"`: skip per-element validation for this column (shape/nullability checks still apply).
+    - `"inherit"`: use model/profile defaults.
+- **D1 deeper typed map/list/struct validation options** (opt-in)
+  - Add `nested_strictness` policy that applies recursively to:
+    - nested `BaseModel` struct fields
+    - `list[T]` element validation
+    - `dict[str, T]` value validation
+  - `nested_strictness` defaults to `"inherit"` and resolves to a profile/model default.
+- **Validation profile defaults**
+  - Extend validation profiles with optional defaults:
+    - `column_strictness_default`
+    - `nested_strictness_default`
+  - Column policy overrides win over profile defaults.
 
 ### Phase 5 — “Model-driven service ergonomics”
 

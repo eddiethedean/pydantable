@@ -49,6 +49,8 @@ class DataFrameModel(Generic[RowT]):
         ignore_errors: bool = False,
         on_validation_errors: Any | None = None,
         validation_profile: str | None = None,
+        # Phase 4 strictness defaults are configured via validation profiles and/or
+        # `__pydantable__` model policy; no direct kwargs (yet).
     ) -> None: ...
     def schema_fields(self) -> dict[str, Any]: ...
 

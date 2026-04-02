@@ -865,6 +865,8 @@ def validate_columns_strict(
     fill_missing_optional: bool = True,
     ignore_errors: bool = False,
     on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    column_strictness_default: Literal["inherit", "coerce", "strict", "off"] = "coerce",
+    nested_strictness_default: Literal["inherit", "coerce", "strict", "off"] = "inherit",
 ) -> dict[str, Any] | Any:
     """
     Validate that `data` matches `schema_type` and return normalized columns.
@@ -1017,6 +1019,8 @@ def validate_columns_strict(
         n_rows = next(iter(lengths), 0)
 
     if mode == "off" and ignore_errors:
+        from pydantable.policies import resolve_column_strictness
+
         adapters = {name: TypeAdapter(field_types[name]) for name in field_types}
         valid_rows: list[dict[str, Any]] = []
         failures: list[dict[str, Any]] = []
@@ -1025,8 +1029,30 @@ def validate_columns_strict(
             typed_row: dict[str, Any] = {}
             row_errors: list[Any] = []
             for name, adapter in adapters.items():
+                s, ns = resolve_column_strictness(
+                    schema_type,
+                    name,
+                    column_default=cast("Any", column_strictness_default),
+                    nested_default=cast("Any", nested_strictness_default),
+                )
                 try:
-                    typed_row[name] = adapter.validate_python(row[name])
+                    origin = get_origin(_unwrap_annotated(field_types[name]))
+                    is_struct = (
+                        isinstance(_unwrap_annotated(field_types[name]), type)
+                        and issubclass(_unwrap_annotated(field_types[name]), BaseModel)
+                    )
+                    strict_flag = (
+                        True
+                        if (origin in (list, dict) or is_struct)
+                        and ns == "strict"
+                        else s == "strict"
+                    )
+                    if s == "off":
+                        typed_row[name] = row[name]
+                    else:
+                        typed_row[name] = adapter.validate_python(
+                            row[name], strict=bool(strict_flag)
+                        )
                 except ValidationError as exc:
                     row_errors.extend(exc.errors())
                 except (
@@ -1053,10 +1079,36 @@ def validate_columns_strict(
         return out
 
     if mode == "off":
+        from pydantable.policies import resolve_column_strictness
+
         for name, expected_type in field_types.items():
+            s, ns = resolve_column_strictness(
+                schema_type,
+                name,
+                column_default=cast("Any", column_strictness_default),
+                nested_default=cast("Any", nested_strictness_default),
+            )
+            if s == "off":
+                _inner, nullable = _annotation_nullable_inner(expected_type)
+                if not nullable and _trusted_column_has_nulls(normalized[name]):
+                    raise ValueError(
+                        f"Column '{name}' is non-nullable in schema "
+                        "but contains null values."
+                    )
+                continue
             adapter = TypeAdapter(expected_type)
+            origin = get_origin(_unwrap_annotated(expected_type))
+            is_struct = (
+                isinstance(_unwrap_annotated(expected_type), type)
+                and issubclass(_unwrap_annotated(expected_type), BaseModel)
+            )
+            strict_flag = (
+                True
+                if (origin in (list, dict) or is_struct) and ns == "strict"
+                else s == "strict"
+            )
             for v in normalized[name]:
-                adapter.validate_python(v)
+                adapter.validate_python(v, strict=bool(strict_flag))
     else:
         for name, annotation in field_types.items():
             _, nullable = _annotation_nullable_inner(annotation)

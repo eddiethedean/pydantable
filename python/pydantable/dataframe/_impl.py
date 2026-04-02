@@ -528,6 +528,8 @@ class DataFrame(Generic[SchemaT]):
         fill_missing_optional: bool = True,
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        column_strictness_default: Literal["inherit", "coerce", "strict", "off"] = "coerce",
+        nested_strictness_default: Literal["inherit", "coerce", "strict", "off"] = "inherit",
     ) -> None:
         if self._schema_type is None:
             raise TypeError(
@@ -542,6 +544,8 @@ class DataFrame(Generic[SchemaT]):
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+            column_strictness_default=column_strictness_default,
+            nested_strictness_default=nested_strictness_default,
         )
         self._root_data: Any = root_data
         self._root_schema_type: type[BaseModel] = self._schema_type
