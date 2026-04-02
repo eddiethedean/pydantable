@@ -31,6 +31,10 @@ from .schema import (
 )
 
 
+def _annotation_is_classvar(annotation: Any) -> bool:
+    return typing.get_origin(annotation) is typing.ClassVar
+
+
 def _field_defs_from_annotations(
     annotations: Mapping[str, Any],
     *,
@@ -273,9 +277,12 @@ class DataFrameModel(Generic[RowT]):
         annotations: dict[str, Any] = {}
         for field_name, field_type in raw_annotations.items():
             if isinstance(field_type, str):
-                annotations[field_name] = eval(field_type, eval_ns, eval_ns)
+                resolved = eval(field_type, eval_ns, eval_ns)
             else:
-                annotations[field_name] = field_type
+                resolved = field_type
+            if _annotation_is_classvar(resolved):
+                continue
+            annotations[field_name] = resolved
         if not annotations:
             raise TypeError("DataFrameModel subclasses must define annotated fields.")
 

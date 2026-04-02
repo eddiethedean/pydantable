@@ -1,7 +1,7 @@
 """SQLModel-first SQL reads (optional ``sqlmodel`` / ``pydantable[sql]``).
 
 Builds a :func:`sqlmodel.select` for a table model and returns column dicts like
-:func:`pydantable.io.fetch_sql` / :func:`pydantable.io.iter_sql`.
+:func:`pydantable.io.fetch_sql_raw` / :func:`pydantable.io.iter_sql_raw`.
 """
 
 from __future__ import annotations

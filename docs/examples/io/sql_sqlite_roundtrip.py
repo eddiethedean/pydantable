@@ -1,4 +1,4 @@
-"""SQLite: ``fetch_sql`` + model, and ``write_sql`` (:mod:`pydantable.io`).
+"""SQLite: ``fetch_sql_raw`` + model, and ``write_sql_raw`` (:mod:`pydantable.io`).
 
 Run::
 
@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 from pydantable import DataFrameModel
-from pydantable.io import fetch_sql, write_sql
+from pydantable.io import fetch_sql_raw, write_sql_raw
 from sqlalchemy import create_engine, text
 
 
@@ -32,17 +32,17 @@ def main() -> None:
                 )
                 conn.execute(text("INSERT INTO order_lines VALUES (4999)"))
 
-            got = OrderLine(fetch_sql("SELECT line_total_cents FROM order_lines", eng))
+            got = OrderLine(fetch_sql_raw("SELECT line_total_cents FROM order_lines", eng))
             assert got.to_dict() == {"line_total_cents": [4999]}
 
-            write_sql(
+            write_sql_raw(
                 {"line_total_cents": [12_50]},
                 "order_lines",
                 eng,
                 if_exists="append",
             )
             sql = "SELECT line_total_cents FROM order_lines ORDER BY line_total_cents"
-            got2 = OrderLine(fetch_sql(sql, eng))
+            got2 = OrderLine(fetch_sql_raw(sql, eng))
             assert got2.to_dict()["line_total_cents"] == [12_50, 4999]
         finally:
             # Windows file locks can block tempdir cleanup unless handles are released.

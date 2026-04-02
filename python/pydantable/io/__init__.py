@@ -2,7 +2,7 @@
 
 * **``read_*`` / ``aread_*``** return :class:`pydantable._core.ScanFileRoot` for lazy Polars scans
   (no full Python column lists).
-* **``materialize_*``** (and **``fetch_sql``** / **``fetch_*_url``**) return ``dict[str, list]``.
+* **``materialize_*``** (and **``fetch_sql_raw``** / **``fetch_sql``** / **``fetch_*_url``**) return ``dict[str, list]``.
 * **``export_*`` / ``aexport_*``** write column dicts to files. **``amaterialize_*``** uses :class:`asyncio.to_thread`.
 """
 
@@ -13,6 +13,7 @@ import csv
 import json
 import os
 import tempfile
+import warnings
 from contextlib import asynccontextmanager, contextmanager, suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO
@@ -63,7 +64,15 @@ from .iter_file import (
     iter_parquet,
 )
 from .rap_support import aread_csv_rap, rap_csv_available
-from .sql import StreamingColumns, fetch_sql, iter_sql, write_sql
+from .sql import (
+    StreamingColumns,
+    fetch_sql,
+    fetch_sql_raw,
+    iter_sql,
+    iter_sql_raw,
+    write_sql,
+    write_sql_raw,
+)
 from .sqlmodel_read import fetch_sqlmodel, iter_sqlmodel
 from .sqlmodel_write import write_sqlmodel
 from .write_batches import (
@@ -834,8 +843,14 @@ async def afetch_sql(
     auto_stream_threshold_rows: int | None = None,
     executor: Executor | None = None,
 ) -> dict[str, list[Any]] | StreamingColumns:
+    warnings.warn(
+        "afetch_sql is deprecated and will be removed in a future major version; "
+        "for mapped tables use afetch_sqlmodel(...), for string SQL use afetch_sql_raw(...).",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return await _run_io(
-        fetch_sql,
+        fetch_sql_raw,
         (sql, bind),
         {
             "parameters": parameters,
@@ -847,7 +862,31 @@ async def afetch_sql(
     )
 
 
-async def aiter_sql(
+async def afetch_sql_raw(
+    sql: str,
+    bind: str | Any,
+    *,
+    parameters: Mapping[str, Any] | None = None,
+    batch_size: int | None = None,
+    auto_stream: bool = True,
+    auto_stream_threshold_rows: int | None = None,
+    executor: Executor | None = None,
+) -> dict[str, list[Any]] | StreamingColumns:
+    """Async :func:`fetch_sql_raw` via :func:`asyncio.to_thread` (optional ``Executor``)."""
+    return await _run_io(
+        fetch_sql_raw,
+        (sql, bind),
+        {
+            "parameters": parameters,
+            "batch_size": batch_size,
+            "auto_stream": auto_stream,
+            "auto_stream_threshold_rows": auto_stream_threshold_rows,
+        },
+        executor=executor,
+    )
+
+
+async def aiter_sql_raw(
     sql: str,
     bind: str | Any,
     *,
@@ -856,7 +895,7 @@ async def aiter_sql(
     executor: Executor | None = None,
 ):
     """
-    Async generator yielding batches from :func:`iter_sql` without blocking the event loop.
+    Async generator yielding batches from :func:`iter_sql_raw` without blocking the loop.
 
     This runs the synchronous SQLAlchemy cursor in a background thread and streams
     batch dicts through an ``asyncio.Queue``.
@@ -897,7 +936,7 @@ async def aiter_sql(
 
     def _runner() -> None:
         try:
-            for batch in iter_sql(
+            for batch in iter_sql_raw(
                 sql,
                 bind,
                 parameters=parameters,
@@ -928,6 +967,31 @@ async def aiter_sql(
         stop.set()
         with suppress(BaseException):
             loop.call_soon_threadsafe(q.put_nowait, sentinel)
+
+
+async def aiter_sql(
+    sql: str,
+    bind: str | Any,
+    *,
+    parameters: Mapping[str, Any] | None = None,
+    batch_size: int = 65_536,
+    executor: Executor | None = None,
+):
+    """Deprecated: use :func:`aiter_sql_raw` or :func:`aiter_sqlmodel`."""
+    warnings.warn(
+        "aiter_sql is deprecated and will be removed in a future major version; "
+        "for mapped tables use aiter_sqlmodel(...), for string SQL use aiter_sql_raw(...).",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    async for batch in aiter_sql_raw(
+        sql,
+        bind,
+        parameters=parameters,
+        batch_size=batch_size,
+        executor=executor,
+    ):
+        yield batch
 
 
 async def afetch_sqlmodel(
@@ -1198,8 +1262,33 @@ async def awrite_sql(
     chunk_size: int | None = None,
     executor: Executor | None = None,
 ) -> None:
+    warnings.warn(
+        "awrite_sql is deprecated and will be removed in a future major version; "
+        "for mapped tables use awrite_sqlmodel(...), for string SQL use awrite_sql_raw(...).",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     await _run_io(
-        write_sql,
+        write_sql_raw,
+        (data, table_name, bind),
+        {"schema": schema, "if_exists": if_exists, "chunk_size": chunk_size},
+        executor=executor,
+    )
+
+
+async def awrite_sql_raw(
+    data: dict[str, list[Any]],
+    table_name: str,
+    bind: str | Any,
+    *,
+    schema: str | None = None,
+    if_exists: str = "append",
+    chunk_size: int | None = None,
+    executor: Executor | None = None,
+) -> None:
+    """Async :func:`write_sql_raw` via :func:`asyncio.to_thread` (optional ``Executor``)."""
+    await _run_io(
+        write_sql_raw,
         (data, table_name, bind),
         {"schema": schema, "if_exists": if_exists, "chunk_size": chunk_size},
         executor=executor,
@@ -1218,14 +1307,22 @@ def write_sql_batches(
     """
     Write an iterator of batch column dicts to SQL.
 
-    Each batch is a ``dict[str, list]`` (e.g. from :func:`iter_sql` or a
+    Deprecated: prefer calling :func:`write_sql_raw` per batch.
+
+    Each batch is a ``dict[str, list]`` (e.g. from :func:`iter_sql_raw` or a
     :class:`~pydantable.DataFrameModel` batch via ``.to_dict()``).
     """
+    warnings.warn(
+        "write_sql_batches is deprecated and will be removed in a future major version; "
+        "call write_sql_raw once per batch or use write_sqlmodel_batches for table models.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     first = True
     for batch in batches:
         cols = batch.to_dict() if hasattr(batch, "to_dict") else batch
         mode = if_exists if first else "append"
-        write_sql(
+        write_sql_raw(
             cols,
             table_name,
             bind,
@@ -1246,12 +1343,18 @@ async def awrite_sql_batches(
     chunk_size: int | None = None,
     executor: Executor | None = None,
 ) -> None:
+    warnings.warn(
+        "awrite_sql_batches is deprecated and will be removed in a future major version; "
+        "call awrite_sql_raw per batch or use awrite_sqlmodel_batches for table models.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     first = True
     async for batch in batches:
         cols = batch.to_dict() if hasattr(batch, "to_dict") else batch
         mode = if_exists if first else "append"
         await _run_io(
-            write_sql,
+            write_sql_raw,
             (cols, table_name, bind),
             {"schema": schema, "if_exists": mode, "chunk_size": chunk_size},
             executor=executor,
@@ -1357,6 +1460,7 @@ __all__ = [
     "aexport_ndjson",
     "aexport_parquet",
     "afetch_sql",
+    "afetch_sql_raw",
     "afetch_sqlmodel",
     "aiter_csv",
     "aiter_ipc",
@@ -1365,6 +1469,7 @@ __all__ = [
     "aiter_ndjson",
     "aiter_parquet",
     "aiter_sql",
+    "aiter_sql_raw",
     "aiter_sqlmodel",
     "amaterialize_csv",
     "amaterialize_ipc",
@@ -1382,6 +1487,7 @@ __all__ = [
     "arrow_table_to_column_dict",
     "awrite_sql",
     "awrite_sql_batches",
+    "awrite_sql_raw",
     "awrite_sqlmodel",
     "awrite_sqlmodel_batches",
     "export_csv",
@@ -1395,6 +1501,7 @@ __all__ = [
     "fetch_ndjson_url",
     "fetch_parquet_url",
     "fetch_sql",
+    "fetch_sql_raw",
     "fetch_sqlmodel",
     "http",
     "iter_avro",
@@ -1412,6 +1519,7 @@ __all__ = [
     "iter_parquet",
     "iter_snowflake",
     "iter_sql",
+    "iter_sql_raw",
     "iter_sqlmodel",
     "materialize_csv",
     "materialize_ipc",
@@ -1443,6 +1551,7 @@ __all__ = [
     "write_parquet_batches",
     "write_sql",
     "write_sql_batches",
+    "write_sql_raw",
     "write_sqlmodel",
     "write_sqlmodel_batches",
 ]
@@ -1458,9 +1567,11 @@ register_reader("materialize_csv", materialize_csv, stable=True)
 register_reader("materialize_ndjson", materialize_ndjson, stable=True)
 register_reader("materialize_ipc", materialize_ipc, stable=True)
 register_reader("materialize_json", materialize_json, stable=True)
-register_reader("fetch_sql", fetch_sql, requires_extra="sql", stable=True)
+register_reader("fetch_sql", fetch_sql, requires_extra="sql", stable=False)
+register_reader("fetch_sql_raw", fetch_sql_raw, requires_extra="sql", stable=True)
 register_reader("fetch_sqlmodel", fetch_sqlmodel, requires_extra="sql", stable=True)
-register_reader("iter_sql", iter_sql, requires_extra="sql", stable=True)
+register_reader("iter_sql", iter_sql, requires_extra="sql", stable=False)
+register_reader("iter_sql_raw", iter_sql_raw, requires_extra="sql", stable=True)
 register_reader("iter_sqlmodel", iter_sqlmodel, requires_extra="sql", stable=True)
 
 register_writer("export_parquet", export_parquet, stable=True)
@@ -1468,5 +1579,6 @@ register_writer("export_csv", export_csv, stable=True)
 register_writer("export_ndjson", export_ndjson, stable=True)
 register_writer("export_ipc", export_ipc, stable=True)
 register_writer("export_json", export_json, stable=True)
-register_writer("write_sql", write_sql, requires_extra="sql", stable=True)
+register_writer("write_sql", write_sql, requires_extra="sql", stable=False)
+register_writer("write_sql_raw", write_sql_raw, requires_extra="sql", stable=True)
 register_writer("write_sqlmodel", write_sqlmodel, requires_extra="sql", stable=True)

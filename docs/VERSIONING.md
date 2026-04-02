@@ -71,6 +71,10 @@ The following deprecated parameters are scheduled for removal in **`2.0.0`** (a 
 
 - **`as_polars=`** on **`DataFrame.collect`**, **`DataFrame.acollect`**, and the **`DataFrameModel`** collection shims — use **`to_polars()`** / **`ato_polars()`** (and **`collect(as_lists=True)`** / **`to_dict()`** for columnar dicts).
 
+The following **legacy string-SQL I/O** names are **deprecated** as of the v1.14 line; they emit **`DeprecationWarning`** at runtime. Use **`fetch_sql_raw`**, **`iter_sql_raw`**, **`write_sql_raw`**, **`afetch_sql_raw`**, **`aiter_sql_raw`**, **`awrite_sql_raw`**, or SQLModel-first **`fetch_sqlmodel`** / **`iter_sqlmodel`** / **`write_sqlmodel`** (and **`DataFrameModel`** mirrors) instead. These aliases are scheduled for removal in **`2.0.0`** (exact timeline subject to {doc}`SQLMODEL_SQL_ROADMAP`):
+
+- **`fetch_sql`**, **`iter_sql`**, **`write_sql`**, **`afetch_sql`**, **`aiter_sql`**, **`awrite_sql`**, **`write_sql_batches`**, **`awrite_sql_batches`**
+
 ## Related documentation
 
 - {doc}`INTERFACE_CONTRACT` — guaranteed behavior for the typed API.

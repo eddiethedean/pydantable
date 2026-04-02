@@ -48,7 +48,15 @@ from .iter_file import (
     iter_parquet,
 )
 from .rap_support import aread_csv_rap, rap_csv_available
-from .sql import StreamingColumns, fetch_sql, iter_sql, write_sql
+from .sql import (
+    StreamingColumns,
+    fetch_sql,
+    fetch_sql_raw,
+    iter_sql,
+    iter_sql_raw,
+    write_sql,
+    write_sql_raw,
+)
 from .sqlmodel_read import fetch_sqlmodel, iter_sqlmodel
 from .sqlmodel_write import write_sqlmodel
 from .write_batches import (
@@ -263,6 +271,24 @@ async def afetch_sql(
     auto_stream_threshold_rows: int | None = None,
     executor: Executor | None = None,
 ) -> dict[str, list[Any]] | StreamingColumns: ...
+async def afetch_sql_raw(
+    sql: str,
+    bind: str | Any,
+    *,
+    parameters: Mapping[str, Any] | None = None,
+    batch_size: int | None = None,
+    auto_stream: bool = True,
+    auto_stream_threshold_rows: int | None = None,
+    executor: Executor | None = None,
+) -> dict[str, list[Any]] | StreamingColumns: ...
+async def aiter_sql_raw(
+    sql: str,
+    bind: str | Any,
+    *,
+    parameters: Mapping[str, Any] | None = None,
+    batch_size: int = 65536,
+    executor: Executor | None = None,
+): ...
 async def aiter_sql(
     sql: str,
     bind: str | Any,
@@ -350,6 +376,16 @@ async def awrite_sql(
     chunk_size: int | None = None,
     executor: Executor | None = None,
 ) -> None: ...
+async def awrite_sql_raw(
+    data: dict[str, list[Any]],
+    table_name: str,
+    bind: str | Any,
+    *,
+    schema: str | None = None,
+    if_exists: str = "append",
+    chunk_size: int | None = None,
+    executor: Executor | None = None,
+) -> None: ...
 def write_sql_batches(
     batches: Any,
     table_name: str,
@@ -413,6 +449,7 @@ __all__ = [
     "aexport_ndjson",
     "aexport_parquet",
     "afetch_sql",
+    "afetch_sql_raw",
     "afetch_sqlmodel",
     "aiter_csv",
     "aiter_ipc",
@@ -421,6 +458,7 @@ __all__ = [
     "aiter_ndjson",
     "aiter_parquet",
     "aiter_sql",
+    "aiter_sql_raw",
     "aiter_sqlmodel",
     "amaterialize_csv",
     "amaterialize_ipc",
@@ -438,6 +476,7 @@ __all__ = [
     "arrow_table_to_column_dict",
     "awrite_sql",
     "awrite_sql_batches",
+    "awrite_sql_raw",
     "awrite_sqlmodel",
     "awrite_sqlmodel_batches",
     "export_csv",
@@ -451,6 +490,7 @@ __all__ = [
     "fetch_ndjson_url",
     "fetch_parquet_url",
     "fetch_sql",
+    "fetch_sql_raw",
     "fetch_sqlmodel",
     "http",
     "iter_avro",
@@ -468,6 +508,7 @@ __all__ = [
     "iter_parquet",
     "iter_snowflake",
     "iter_sql",
+    "iter_sql_raw",
     "iter_sqlmodel",
     "materialize_csv",
     "materialize_ipc",
@@ -499,6 +540,7 @@ __all__ = [
     "write_parquet_batches",
     "write_sql",
     "write_sql_batches",
+    "write_sql_raw",
     "write_sqlmodel",
     "write_sqlmodel_batches",
 ]

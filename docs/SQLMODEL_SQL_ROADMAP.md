@@ -178,17 +178,23 @@ This project already has users of:
 - Update docs to recommend **SQLModel-first** and describe **raw SQL** as the advanced / migration path — see {doc}`IO_SQL`, {doc}`DATAFRAMEMODEL`, and this page.
 - Keep legacy string-SQL APIs (**`fetch_sql`**, **`iter_sql`**, **`write_sql`**, and async mirrors) for compatibility. **`pydantable[sql]`** remains the single extra for SQL I/O (it bundles **SQLModel**); there is no separate extra split for “raw SQL only.”
 
-**Status (v1.13.0 dev, documentation / policy): Complete** — positioning and **`DataFrameModel`** pointers are documented; **no** runtime **`DeprecationWarning`** on legacy APIs in the same release as Phase 3 conveniences.
+**Status (v1.13.0 dev, documentation / policy): Complete** — positioning and **`DataFrameModel`** pointers are documented; runtime warnings were intentionally deferred until the v1.14 implementation below.
 
 **Deliverables (v1.14.0 target)**
 
-- Deprecation warnings on legacy APIs pointing to SQLModel equivalents.
-- Optional: introduce `fetch_sql_raw(...)` naming to make “raw SQL” an explicit escape hatch.
+- Deprecation warnings on legacy string-SQL APIs, with replacements **`fetch_sql_raw`**, **`iter_sql_raw`**, **`write_sql_raw`**, **`afetch_sql_raw`**, **`aiter_sql_raw`**, **`awrite_sql_raw`** (and deprecation of **`write_sql_batches`** / **`awrite_sql_batches`**).
+- Explicit **`*_raw`** naming for string-SQL I/O (see {doc}`IO_SQL`).
+
+**Status (v1.14.0 dev): Implemented** — warnings in **`python/pydantable/io/sql.py`** and **`python/pydantable/io/__init__.py`**; tests **`tests/test_sql_string_deprecation.py`**; suite-wide **`DeprecationWarning`** filter in **`pyproject.toml`** for existing tests; plugin registry marks legacy readers/writers **`stable=False`** and **`*_raw`** as **`stable=True`**.
+
+**Removal policy**
+
+- Legacy names remain until a **major** release (no earlier than **`2.0.0`**); see {doc}`VERSIONING`.
 
 **Acceptance criteria**
 
 - Users can migrate without losing streaming/batching behavior.
-- Docs clearly state the “two-tier” story: SQLModel-first APIs are the default; raw SQL is advanced.
+- Docs clearly state the “two-tier” story: SQLModel-first APIs are the default; explicit **`*_raw`** string-SQL is advanced; deprecated unprefixed names warn.
 
 ---
 

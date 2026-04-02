@@ -254,6 +254,11 @@ pythonpath = ["python"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+# Legacy string-SQL I/O names warn with DeprecationWarning (Phase 4 v1.14); existing
+# tests still exercise behavior via these entrypoints. See tests/test_sql_string_deprecation.py.
+filterwarnings = [
+    "ignore:.*is deprecated and will be removed in a future major version:DeprecationWarning",
+]
 markers = [
     "slow: performance guardrails (timing-based; exclude with -m 'not slow')",
     "network: uses loopback HTTP server or similar (exclude with -m 'not network')",
