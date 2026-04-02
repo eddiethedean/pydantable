@@ -22,6 +22,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Docs
 
+- **Changelog page:** source file is **`docs/CHANGELOG.md`**; Sphinx / Read the Docs page is **`CHANGELOG`** (**`CHANGELOG.html`**). Update any bookmarks from **`changelog.html`**.
 - **Local I/O (1.11.0) — release narrative:** Directory/glob/hive lazy reads, **`scan_kwargs`** / **`write_kwargs`** allowlists, eager **`iter_*`** / **`materialize_*`** guidance, partitioned Parquet writes, multi-file Parquet **`allow_missing_columns`** and observability — details in this **1.11.0** section; ongoing I/O work in {doc}`ROADMAP`. **`pydantable.__version__`** / **`rust_version()`** alignment per {doc}`VERSIONING` (**`tests/test_version_alignment.py`**).
 - **Local I/O Phase E (1.11.0):** Multi-file Parquet — **`allow_missing_columns`**, Polars schema union, cast / optional-field patterns — {doc}`IO_PARQUET`; pointers in {doc}`DATA_IO_SOURCES`, {doc}`IO_DECISION_TREE`, {doc}`SUPPORTED_TYPES`, {doc}`INTERFACE_CONTRACT`, {doc}`PLAN_AND_PLUGINS`. Contributor note: `pydantable-core/.../scan_kw.rs`, {doc}`DEVELOPER`.
 - **Writes Phase D:** partitioned **`write_parquet`**, batch-writer file vs directory—{doc}`IO_PARQUET`, {doc}`IO_OVERVIEW`, {doc}`IO_DECISION_TREE`, {doc}`DATA_IO_SOURCES`, {doc}`INTERFACE_CONTRACT`; example **`docs/examples/io/parquet_partitioned_write.py`**.
