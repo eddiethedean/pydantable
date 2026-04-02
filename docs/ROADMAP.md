@@ -341,21 +341,21 @@ Practical inputs that feed that phase:
 
 ## Shipped in 1.10.0 (JSON processing & struct ergonomics)
 
-- [x] **Struct expressions (Polars):** **`Expr.struct_json_encode`**, **`struct_json_path_match`**, **`struct_rename_fields`**, **`struct_with_fields`**; PySpark **`struct_json_encode`** / **`struct_json_path_match`**. See {doc}`changelog` **1.10.0**, {doc}`ROADMAP_1_10_JSON_STRUCT` Phases B–E.
+- [x] **Struct expressions (Polars):** **`Expr.struct_json_encode`**, **`struct_json_path_match`**, **`struct_rename_fields`**, **`struct_with_fields`**; PySpark **`struct_json_encode`** / **`struct_json_path_match`**. See {doc}`changelog` **1.10.0**.
 - [x] **JSON decode:** **`Expr.str_json_decode`** (string → struct or homogeneous map).
 - [x] **I/O & tests:** nested **`materialize_json`**, **`export_json`** round-trip; **`tests/test_json_io_phase_a.py`** and related coverage.
-- [x] **Docs:** {doc}`IO_JSON`, {doc}`SUPPORTED_TYPES`, {doc}`SELECTORS`, NDJSON cookbook, Phase D/E narrative in {doc}`ROADMAP_1_10_JSON_STRUCT`.
+- [x] **Docs:** {doc}`IO_JSON`, {doc}`SUPPORTED_TYPES`, {doc}`SELECTORS`, NDJSON cookbook; Phase D/E narrative in {doc}`changelog` **1.10.0**.
 
 ---
 
-## Planned for 1.11.0 (local I/O ↔ Polars parity)
+## Shipped in 1.11.0 (local I/O ↔ Polars parity)
 
-- [ ] **Multi-file & directory reads:** extend **`scan_kwargs`** and behavior for **Parquet** (incl. hive-style partitions — **Phase B1** shipped in {doc}`ROADMAP_1_11_LOCAL_IO`), **CSV** directory/glob + extra scan kwargs (**Phase B2** shipped in {doc}`ROADMAP_1_11_LOCAL_IO`), **NDJSON** (**`glob`** and related where Polars supports it), **IPC** multi-file where supported; align **`read_json`** path semantics with documented defaults.
-- [ ] **Partitioned / dataset writes:** **Parquet** partitioned (directory) sinks first; clarify **`write_*_batches`** vs directory targets.
-- [ ] **Eager & iterators:** **`materialize_*`** and **`iter_*` / `aiter_*`** multi-file story (helpers or explicit deferral to lazy **`read_*`**).
-- [ ] **Docs & tests:** golden-path narrative, examples under **`docs/examples/io/`**, changelog, **kwargs** allowlist tests.
+- [x] **Multi-file & directory reads:** **`scan_kwargs`** for **Parquet** (hive-style partitions, lineage, row index), **CSV** directory/glob + **`LazyCsvReader`** options, **NDJSON** (**`glob`** and related), **IPC** multi-file, **`read_json`** path semantics — see {doc}`changelog` **1.11.0**, {doc}`IO_OVERVIEW`, {doc}`DATA_IO_SOURCES`, {doc}`IO_DECISION_TREE`, {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`.
+- [x] **Partitioned / dataset writes:** **Parquet** **`partition_by`** hive-style layout; **`write_*_batches`** directory vs single-file semantics — see {doc}`changelog` **1.11.0**, {doc}`IO_PARQUET`.
+- [x] **Eager & iterators:** **`materialize_*`** single-file contract; **`iter_*`** patterns and **`iter_chain_batches`** — see {doc}`changelog` **1.11.0**, {doc}`IO_OVERVIEW`.
+- [x] **Docs & tests:** examples under **`docs/examples/io/`**, {doc}`changelog` **1.11.0**, **kwargs** allowlist tests.
 
-**Full phased checklist:** {doc}`ROADMAP_1_11_LOCAL_IO`.
+**Summary:** {doc}`changelog` **1.11.0** documents user-visible local I/O changes.
 
 ---
 
@@ -453,7 +453,7 @@ contract tests. Order is **not** priority order.
   name).
 - [x] **`struct_json_encode`** / **`struct_json_path_match`** symmetry with string JSON
   helpers.
-- [x] **`str_json_decode`** (string JSON → struct / **`dict[str, T]`**; see {doc}`ROADMAP_1_10_JSON_STRUCT` Phase C).
+- [x] **`str_json_decode`** (string JSON → struct / **`dict[str, T]`**; see {doc}`changelog` **1.10.0**).
 - [ ] **Map transforms:** **`map_filter`**, **`map_entries_sorted`**, **`map_zip`** where
   Polars exposes stable operations and our schema story stays **`dict[str, T]`**.
 

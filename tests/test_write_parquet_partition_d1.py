@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 pytest.importorskip("pydantable._core")
@@ -51,3 +53,13 @@ def test_write_parquet_mkdir_false_missing_root(tmp_path) -> None:
     df = HivePart({"p": ["a"], "x": [1]})
     with pytest.raises(ValueError, match="mkdir=False"):
         df.write_parquet(str(root), partition_by=["p"], mkdir=False)
+
+
+def test_write_parquet_unknown_write_kw_raises(tmp_path) -> None:
+    path = tmp_path / "out.parquet"
+    df = HivePart({"p": ["a"], "x": [1]})
+    with pytest.raises(ValueError, match=re.escape("unknown write_kw key")):
+        df.write_parquet(
+            str(path),
+            write_kwargs={"not_a_valid_parquet_write_kw": True},
+        )

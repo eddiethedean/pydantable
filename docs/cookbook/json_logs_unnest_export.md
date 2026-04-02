@@ -31,4 +31,4 @@ json_logs_unnest_export: ok
 
 ## See also
 
-{doc}`/IO_JSON` · {doc}`/IO_NDJSON` · {doc}`/SELECTORS` · {doc}`/ROADMAP_1_10_JSON_STRUCT`
+{doc}`/IO_JSON` · {doc}`/IO_NDJSON` · {doc}`/SELECTORS` · {doc}`/changelog` (**1.10.0**)

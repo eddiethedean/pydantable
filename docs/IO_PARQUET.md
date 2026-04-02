@@ -47,7 +47,7 @@ The temp file for **`read_parquet_url`** is **not** deleted automatically; see {
 
 ### Paths, directories, and `glob`
 
-Lazy **`read_parquet`** uses Polars **`scan_parquet`**; **`glob`** is forwarded via **`scan_kwargs`** (Polars **`ScanArgsParquet::default()`** uses **`glob: true`**). **Hive-style partitions** are tunable via **`hive_partitioning`** / **`hive_start_idx`** / **`try_parse_hive_dates`**; **`include_file_paths`** adds a source path column; **`row_index_name`** / **`row_index_offset`** add a row index. **`HiveOptions.schema`** (partition dtype overrides) and **`ScanArgsParquet.schema`** are still **not** exposed—see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>` and {doc}`ROADMAP_1_11_LOCAL_IO` Phase B1+.
+Lazy **`read_parquet`** uses Polars **`scan_parquet`**; **`glob`** is forwarded via **`scan_kwargs`** (Polars **`ScanArgsParquet::default()`** uses **`glob: true`**). **Hive-style partitions** are tunable via **`hive_partitioning`** / **`hive_start_idx`** / **`try_parse_hive_dates`**; **`include_file_paths`** adds a source path column; **`row_index_name`** / **`row_index_offset`** add a row index. **`HiveOptions.schema`** (partition dtype overrides) and **`ScanArgsParquet.schema`** are still **not** exposed—see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`.
 
 ### Multi-file Parquet: columns, dtypes, and `allow_missing_columns`
 

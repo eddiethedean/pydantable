@@ -15,7 +15,7 @@
 - **Familiar operations:** `select`, `filter`, `join`, `group_by`, windows, melt/pivot, and pandas-flavored helpers where they help.
 - **Flexible materialization:** row models via `collect()` / `rows()`, columnar `dict[str, list]`, or Polars/PyArrow with the right extras.
 - **I/O:** lazy `read_*` / `aread_*`, streaming writes, NDJSON/JSON Lines, Parquet, CSV, IPC, HTTP, SQL — see the [I/O overview](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html) and [decision tree](https://pydantable.readthedocs.io/en/latest/IO_DECISION_TREE.html).
-- **JSON & struct columns:** struct expressions, JSON encode/decode helpers, unnest/nested models — [IO_JSON](https://pydantable.readthedocs.io/en/latest/IO_JSON.html), [SELECTORS](https://pydantable.readthedocs.io/en/latest/SELECTORS.html), [roadmap story](https://pydantable.readthedocs.io/en/latest/ROADMAP_1_10_JSON_STRUCT.html).
+- **JSON & struct columns:** struct expressions, JSON encode/decode helpers, unnest/nested models — [IO_JSON](https://pydantable.readthedocs.io/en/latest/IO_JSON.html), [SELECTORS](https://pydantable.readthedocs.io/en/latest/SELECTORS.html), [changelog 1.10.0](https://pydantable.readthedocs.io/en/latest/changelog.html).
 - **FastAPI (optional):** shared executor lifespan, NDJSON streaming from `astream()`, OpenAPI-friendly columnar bodies, `register_exception_handlers` (**503** / **400** / **422**). Start with the [golden path](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html) and [FastAPI guide](https://pydantable.readthedocs.io/en/latest/FASTAPI.html).
 
 ## Install

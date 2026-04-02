@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.11.0] — 2026-04-01
+
 ### Added
 
 - **Tests (Phase E):** **`tests/test_parquet_allow_missing_columns_e.py`** — directory scan with mismatched Parquet columns and **`allow_missing_columns=True`**.
@@ -16,20 +18,20 @@ All notable changes to this project are documented here. The format is inspired 
 - **`iter_chain_batches`** (`pydantable.io` / `pydantable.io.batches`): chain per-file **`iter_*`** iterators over an explicit path list. Test: **`tests/test_batches_chain.py`**.
 - **Partitioned Parquet writes (1.11.0 Phase D1):** **`DataFrame.write_parquet`** / **`DataFrameModel.write_parquet`** — **`partition_by`** (column names), **`mkdir`**, hive-style **`col=value/.../00000000.parquet`** shards via **`pydantable-core`** (`sink_parquet_polars`, Polars **`partition_by_stable`**). Tests: **`tests/test_write_parquet_partition_d1.py`**.
 - **`write_*_batches` (Phase D2):** reject an existing **directory** path; CSV/NDJSON **`mode`** documented. Tests: **`tests/test_write_batches_phase_d2.py`**.
+- **Tests (Phase F):** **`test_write_parquet_unknown_write_kw_raises`** in **`tests/test_write_parquet_partition_d1.py`** — invalid **`write_kwargs`** keys raise **`ValueError`** with **`unknown write_kw key`** (parity with **`scan_kwargs`** allowlist tests).
 
 ### Docs
 
-- **Local I/O Phase E (1.11.0):** Multi-file Parquet — **`allow_missing_columns`**, Polars schema union, cast / optional-field patterns — {doc}`IO_PARQUET`; pointers in {doc}`DATA_IO_SOURCES`, {doc}`IO_DECISION_TREE`, {doc}`SUPPORTED_TYPES`, {doc}`INTERFACE_CONTRACT`, {doc}`PLAN_AND_PLUGINS`. Roadmap: {doc}`ROADMAP_1_11_LOCAL_IO` Phase E. Contributor note: `pydantable-core/.../scan_kw.rs`, {doc}`DEVELOPER`.
-- **Writes Phase D:** partitioned **`write_parquet`**, batch-writer file vs directory—{doc}`IO_PARQUET`, {doc}`IO_OVERVIEW`, {doc}`IO_DECISION_TREE`, {doc}`DATA_IO_SOURCES`, {doc}`INTERFACE_CONTRACT`; example **`docs/examples/io/parquet_partitioned_write.py`**. Roadmap: {doc}`ROADMAP_1_11_LOCAL_IO` Phase D.
-- **Eager / batched multi-file clarity (1.11.0 Phase C):** **`materialize_*`** single-file contract; **`iter_*` / `aiter_*`** one path per call and Python-side glob/directory expansion; **`iter_chain_batches`**; bounded-memory notes vs **`iter_concat_batches`** and lazy **`read_*`**—{doc}`IO_OVERVIEW`, {doc}`IO_DECISION_TREE`, {doc}`DATA_IO_SOURCES`, {doc}`INTERFACE_CONTRACT`; example **`docs/examples/io/iter_glob_parquet_batches.py`**. Roadmap: {doc}`ROADMAP_1_11_LOCAL_IO` Phase C.
-- **Local I/O audit (1.11.0 Phase A):** Polars **0.53.0** vs pydantable **`scan_kwargs`** matrix, directory/glob/hive notes—{ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`; multi-file entrypoint table—{doc}`IO_DECISION_TREE`; **Local lazy file scans**—{doc}`INTERFACE_CONTRACT`; path/glob subsections on {doc}`IO_PARQUET`, {doc}`IO_CSV`, {doc}`IO_NDJSON`, {doc}`IO_IPC`, {doc}`IO_JSON`; link from {doc}`IO_OVERVIEW`. Roadmap: {doc}`ROADMAP_1_11_LOCAL_IO`.
+- **Local I/O (1.11.0) — release narrative:** Directory/glob/hive lazy reads, **`scan_kwargs`** / **`write_kwargs`** allowlists, eager **`iter_*`** / **`materialize_*`** guidance, partitioned Parquet writes, multi-file Parquet **`allow_missing_columns`** and observability — details in this **1.11.0** section; ongoing I/O work in {doc}`ROADMAP`. **`pydantable.__version__`** / **`rust_version()`** alignment per {doc}`VERSIONING` (**`tests/test_version_alignment.py`**).
+- **Local I/O Phase E (1.11.0):** Multi-file Parquet — **`allow_missing_columns`**, Polars schema union, cast / optional-field patterns — {doc}`IO_PARQUET`; pointers in {doc}`DATA_IO_SOURCES`, {doc}`IO_DECISION_TREE`, {doc}`SUPPORTED_TYPES`, {doc}`INTERFACE_CONTRACT`, {doc}`PLAN_AND_PLUGINS`. Contributor note: `pydantable-core/.../scan_kw.rs`, {doc}`DEVELOPER`.
+- **Writes Phase D:** partitioned **`write_parquet`**, batch-writer file vs directory—{doc}`IO_PARQUET`, {doc}`IO_OVERVIEW`, {doc}`IO_DECISION_TREE`, {doc}`DATA_IO_SOURCES`, {doc}`INTERFACE_CONTRACT`; example **`docs/examples/io/parquet_partitioned_write.py`**.
+- **Eager / batched multi-file clarity (1.11.0 Phase C):** **`materialize_*`** single-file contract; **`iter_*` / `aiter_*`** one path per call and Python-side glob/directory expansion; **`iter_chain_batches`**; bounded-memory notes vs **`iter_concat_batches`** and lazy **`read_*`**—{doc}`IO_OVERVIEW`, {doc}`IO_DECISION_TREE`, {doc}`DATA_IO_SOURCES`, {doc}`INTERFACE_CONTRACT`; example **`docs/examples/io/iter_glob_parquet_batches.py`**.
+- **Local I/O audit (1.11.0 Phase A):** Polars **0.53.0** vs pydantable **`scan_kwargs`** matrix, directory/glob/hive notes—{ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`; multi-file entrypoint table—{doc}`IO_DECISION_TREE`; **Local lazy file scans**—{doc}`INTERFACE_CONTRACT`; path/glob subsections on {doc}`IO_PARQUET`, {doc}`IO_CSV`, {doc}`IO_NDJSON`, {doc}`IO_IPC`, {doc}`IO_JSON`; link from {doc}`IO_OVERVIEW`.
 - **Parquet B1:** {doc}`DATA_IO_SOURCES` audit + summary table; {doc}`IO_PARQUET`; {doc}`INTERFACE_CONTRACT` (Parquet lineage / hive kwargs).
-- **CSV B2:** {doc}`DATA_IO_SOURCES` audit + summary table; {doc}`IO_CSV`; {doc}`INTERFACE_CONTRACT` (CSV **`include_file_paths`** / **`row_index_*`**); {doc}`ROADMAP_1_11_LOCAL_IO` Phase B2.
-- **NDJSON B3:** {doc}`DATA_IO_SOURCES` audit + summary table; {doc}`IO_NDJSON`; {doc}`INTERFACE_CONTRACT` (NDJSON **`glob`** / **`include_file_paths`** / **`row_index_*`**); {doc}`ROADMAP_1_11_LOCAL_IO` Phase B3.
-- **IPC B4:** {doc}`DATA_IO_SOURCES` audit + summary table; {doc}`IO_IPC`; {doc}`INTERFACE_CONTRACT` (IPC **`scan_kwargs`**); {doc}`ROADMAP_1_11_LOCAL_IO` Phase B4.
-- **JSON `read_json` B5:** {doc}`IO_JSON`; {doc}`DATA_IO_SOURCES` (lazy vs array); **`pydantable.io.read_json`** docstring; {doc}`ROADMAP_1_11_LOCAL_IO` Phase B5.
-
-## [1.11.0] — 2026-04-01
+- **CSV B2:** {doc}`DATA_IO_SOURCES` audit + summary table; {doc}`IO_CSV`; {doc}`INTERFACE_CONTRACT` (CSV **`include_file_paths`** / **`row_index_*`**).
+- **NDJSON B3:** {doc}`DATA_IO_SOURCES` audit + summary table; {doc}`IO_NDJSON`; {doc}`INTERFACE_CONTRACT` (NDJSON **`glob`** / **`include_file_paths`** / **`row_index_*`**).
+- **IPC B4:** {doc}`DATA_IO_SOURCES` audit + summary table; {doc}`IO_IPC`; {doc}`INTERFACE_CONTRACT` (IPC **`scan_kwargs`**).
+- **JSON `read_json` B5:** {doc}`IO_JSON`; {doc}`DATA_IO_SOURCES` (lazy vs array); **`pydantable.io.read_json`** docstring.
 
 ### Changed
 
@@ -49,9 +51,9 @@ All notable changes to this project are documented here. The format is inspired 
 - **I/O:** **Eager `export_json` serialization** in {doc}`IO_JSON`; extended **`export_json`** docstring in **`pydantable.io`** (`json.dump` + `default=str`); struct → JSON text pointer (**`struct_json_encode`**).
 - **Structs:** **`SUPPORTED_TYPES`** and **`INTERFACE_CONTRACT`** — struct JSON / **`with_fields`** / **`rename_fields`** semantics and row-wise limits.
 - **FastAPI:** columnar **map** / nested field notes with links to {doc}`SUPPORTED_TYPES` and {doc}`IO_JSON`.
-- **Roadmap:** Phase A + B + C checklists completed in {doc}`ROADMAP_1_10_JSON_STRUCT`; **`str_json_decode`** / error semantics in {doc}`SUPPORTED_TYPES` and {doc}`INTERFACE_CONTRACT`; {doc}`IO_JSON` cross-link.
+- **Roadmap:** Phase A + B + C JSON/struct work summarized in this **1.10.0** section and {doc}`ROADMAP` (**Shipped in 1.10.0**); **`str_json_decode`** / error semantics in {doc}`SUPPORTED_TYPES` and {doc}`INTERFACE_CONTRACT`; {doc}`IO_JSON` cross-link.
 - **Phase D (I/O):** {doc}`IO_JSON` — **`read_json`** vs **`read_ndjson`** vs **`materialize_json`**, large-file / **`streaming`** patterns, NDJSON **`scan_kwargs`** presets; example **`docs/examples/io/large_ndjson_patterns.py`**; cross-links from {doc}`DATA_IO_SOURCES`, {doc}`EXECUTION`, {doc}`IO_NDJSON`.
-- **Phase E (UX) & 1.10.0 JSON/struct summary:** {doc}`SELECTORS` — **`s.structs()`**, **`unnest`**, **`struct_field`** pipeline; cookbook {doc}`/cookbook/json_logs_unnest_export` (NDJSON → unnest → **`export_json`**); {doc}`DOCS_MAP` link. **Release narrative:** Phases A–E of {doc}`ROADMAP_1_10_JSON_STRUCT` — JSON ↔ schema matrix and I/O tests; struct expressions (**`struct_json_encode`**, path/rename/with-fields); **`str_json_decode`**; Phase D large-file NDJSON docs; Phase E selectors + cookbook + this changelog index.
+- **Phase E (UX) & 1.10.0 JSON/struct summary:** {doc}`SELECTORS` — **`s.structs()`**, **`unnest`**, **`struct_field`** pipeline; cookbook {doc}`/cookbook/json_logs_unnest_export` (NDJSON → unnest → **`export_json`**); {doc}`DOCS_MAP` link. **Release narrative:** JSON ↔ schema matrix and I/O tests; struct expressions (**`struct_json_encode`**, path/rename/with-fields); **`str_json_decode`**; Phase D large-file NDJSON docs; Phase E selectors + cookbook + this changelog index.
 
 ### Changed
 
