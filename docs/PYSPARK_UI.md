@@ -6,7 +6,7 @@ Execution uses pydantable’s Rust/Polars core (see [Execution](EXECUTION.md)).
 
 ## Release context (1.8.0 vs 1.9.0)
 
-- **1.8.0** focused on **core** ergonomics (selectors, joins, `drop_nulls`, reshape parity, etc.)—the same engine every import style uses; see the {doc}`changelog` **1.8.0** section.
+- **1.8.0** focused on **core** ergonomics (selectors, joins, `drop_nulls`, reshape parity, etc.)—the same engine every import style uses; see the {doc}`CHANGELOG` **1.8.0** section.
 - **1.9.0** adds the **Spark-shaped `DataFrame` / `DataFrameModel` surface** in this document: `groupBy`, frame `count()`, `crossJoin`, `unionByName`, set-style helpers, `fillna` / `dropna` / `.na`, `printSchema`, `explain`, `toPandas`, **`F.dayofyear`** / **`F.from_unixtime`**, and related typing/stubs. Core **`describe()`** (and PySpark **`summary()`**) include **`date`** / **`datetime`** summary lines when those columns exist. Behavior and limitations are summarized in [PySpark parity](PYSPARK_PARITY.md) and [Interface contract](INTERFACE_CONTRACT.md).
 
 ## Tests

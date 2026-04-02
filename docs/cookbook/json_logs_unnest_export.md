@@ -31,4 +31,4 @@ json_logs_unnest_export: ok
 
 ## See also
 
-{doc}`/IO_JSON` · {doc}`/IO_NDJSON` · {doc}`/SELECTORS` · {doc}`/changelog` (**1.10.0**)
+{doc}`/IO_JSON` · {doc}`/IO_NDJSON` · {doc}`/SELECTORS` · {doc}`/CHANGELOG` (**1.10.0**)

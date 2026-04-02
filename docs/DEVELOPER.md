@@ -121,7 +121,7 @@ When adding a feature, touch the minimal set in order:
 1. **Expr / dtype (Rust):** `expr/ir.rs`, `expr/typing.rs`, `expr/lower_polars.rs` (and PyO3 builders in `python_api/expr_fns.rs` if exposed to Python).
 2. **Plan step (Rust):** `plan/ir.rs` (`PlanStep`), `plan/build.rs`, `plan/serialize.rs`, `plan/execute_polars/runner.rs` (or the relevant `execute_polars/*` module), plus tests under `pydantable-core`.
 3. **Python `DataFrame` API:** `python/pydantable/dataframe/_impl.py` (and `rust_engine.py` if a new `_core` entry point is required).
-4. **Docs / changelog:** user-visible behavior belongs in the docs site and `docs/changelog.md`.
+4. **Docs / changelog:** user-visible behavior belongs in the docs site and `docs/CHANGELOG.md`.
 
 ### Optional: narrow `Protocol` for tests (Python)
 
@@ -155,7 +155,7 @@ Phase 4 boundary contract:
 
 ### Release ↔ tests map (0.15.0–0.20.0)
 
-Use this table to locate **Python tests and doc-example smoke** that back shipped minors (see `docs/changelog.md` for narrative highlights). It is not a substitute for line coverage.
+Use this table to locate **Python tests and doc-example smoke** that back shipped minors (see `docs/CHANGELOG.md` for narrative highlights). It is not a substitute for line coverage.
 
 | Release | Highlights (summary) | Primary test modules |
 | --- | --- | --- |
@@ -170,7 +170,7 @@ Use this table to locate **Python tests and doc-example smoke** that back shippe
 
 #### Changelog-driven audit (0.15.0–0.20.0)
 
-Cross-check each bullet in `docs/changelog.md` for recent minors against tests or `verify_doc_examples.py`.
+Cross-check each bullet in `docs/CHANGELOG.md` for recent minors against tests or `verify_doc_examples.py`.
 
 **0.15.0**
 
@@ -404,7 +404,7 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 ## Release Notes Checklist (for contributors)
 
 - [ ] Version matches everywhere: `pyproject.toml`, `pydantable-core/Cargo.toml`, `python/pydantable/__init__.py`, and `rust_version()` in `pydantable-core/src/python_api/expr_fns.rs` (`env!("CARGO_PKG_VERSION")`) (CI also runs `tests/test_version_alignment.py`, which asserts `__version__ == _core.rust_version()`)
-- [ ] `docs/changelog.md` has a section for the release with highlights
+- [ ] `docs/CHANGELOG.md` has a section for the release with highlights
 - [ ] `make check-full` passes (Ruff, mypy, `cargo fmt --check`, `clippy -D warnings`, `cargo test --all-features`)
 - [ ] Python tests pass in `.venv` (`pytest`)
 - [ ] `scripts/verify_doc_examples.py` passes (requires a built `pydantable._core`)
@@ -434,7 +434,7 @@ For 1.x maintenance:
   - reason for temporary acceptance,
   - owner,
   - review/expiry target.
-- Exceptions must be tracked in docs/changelog or workflow comments so they are visible during release review.
+- Exceptions must be tracked in docs/CHANGELOG.md or workflow comments so they are visible during release review.
 
 ### Publishing (PyPI)
 

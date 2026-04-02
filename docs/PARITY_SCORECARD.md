@@ -10,7 +10,7 @@ Status definitions:
 
 ## 1.8.0 parity targets (reference)
 
-**1.8.0** shipped the selector/ergonomics work below (see {doc}`POLARS_PARITY_1_8` and {doc}`changelog` **1.8.0**). This table remains the checklist-style reference for what landed in that minor.
+**1.8.0** shipped the selector/ergonomics work below (see {doc}`POLARS_PARITY_1_8` and {doc}`CHANGELOG` **1.8.0**). This table remains the checklist-style reference for what landed in that minor.
 
 | Area | Target | Status | Notes |
 |---|---|---|---|

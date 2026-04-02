@@ -25,7 +25,7 @@ Cancelling an **`await acollect()`** (etc.) does **not** cancel in-flight native
 - **`materialize_*` / `amaterialize_*`:** **`pydantable.io`** returns **`dict[str, list]`** (**Rust** / **PyArrow** / stdlib; **PyArrow** for bytes and streaming IPC). Wrap with **`MyModel(cols, ...)`** for a typed model. See **`materialize_json`** for JSON array-of-objects files ({doc}`IO_JSON`). Async: **`await amaterialize_parquet(...)`** or **`executor=`**.
 - **`fetch_sql` / `afetch_sql` / `iter_sql` / `aiter_sql`:** SQLAlchemy **`SELECT`** → **`dict[str, list]`** (or batches) via **`pydantable.io`**; **`MyModel(cols)`** for typed frames. **`write_sql` / `awrite_sql`** on **`DataFrameModel`** delegate to **`pydantable.io`** — {doc}`IO_SQL`.
 - **`export_*` / `aexport_*`:** take column dicts and write files eagerly; install **`pydantable[polars]`** for the Rust-backed export path where documented.
-- **Extension present:** lazy scans, lazy sinks, and **`execute_plan`** require a built **`pydantable._core`**. If the extension is missing, those paths may raise **`MissingRustExtensionError`** (**`NotImplementedError`** subclass) — {doc}`changelog`.
+- **Extension present:** lazy scans, lazy sinks, and **`execute_plan`** require a built **`pydantable._core`**. If the extension is missing, those paths may raise **`MissingRustExtensionError`** (**`NotImplementedError`** subclass) — {doc}`CHANGELOG`.
 
 Service patterns: {doc}`FASTAPI` and {doc}`ROADMAP`. Transport table: {doc}`DATA_IO_SOURCES`.
 
@@ -121,7 +121,7 @@ execution engine.
 (`ExprNode`), then lowered to Polars inside the extension. The expression and window surface
 has grown across releases (globals, framed windows, maps, temporal helpers, multi-key
 **`rangeBetween`**, etc.). The authoritative feature list and semantics are {doc}`INTERFACE_CONTRACT`,
-{doc}`WINDOW_SQL_SEMANTICS`, {doc}`SUPPORTED_TYPES`, and {doc}`changelog`.
+{doc}`WINDOW_SQL_SEMANTICS`, {doc}`SUPPORTED_TYPES`, and {doc}`CHANGELOG`.
 
 Use the default package exports for Polars-style names:
 

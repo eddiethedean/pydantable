@@ -37,10 +37,10 @@ Use this page when you know **what you need to do**, but not **where it is docum
 ### Project & contribution
 
 - **Roadmap**: {doc}`ROADMAP`
-- **JSON & structs (1.10.0) and local I/O (1.11.0):** release narratives in {doc}`changelog` **1.10.0** / **1.11.0**; ongoing work in {doc}`ROADMAP`; NDJSON cookbook {doc}`/cookbook/json_logs_unnest_export`; lazy scan audit {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`; entrypoints {doc}`IO_OVERVIEW`, {doc}`IO_DECISION_TREE`, {doc}`DATA_IO_SOURCES`.
+- **JSON & structs (1.10.0) and local I/O (1.11.0):** release narratives in {doc}`CHANGELOG` **1.10.0** / **1.11.0**; ongoing work in {doc}`ROADMAP`; NDJSON cookbook {doc}`/cookbook/json_logs_unnest_export`; lazy scan audit {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`; entrypoints {doc}`IO_OVERVIEW`, {doc}`IO_DECISION_TREE`, {doc}`DATA_IO_SOURCES`.
 - **Developer guide**: {doc}`DEVELOPER`
 - **Performance notes**: {doc}`PERFORMANCE`
-- **Changelog**: {doc}`changelog`
+- **Changelog**: {doc}`CHANGELOG`
 - **Troubleshooting / FAQ**: {doc}`TROUBLESHOOTING`
 
 ### Errors and HTTP mapping (services)

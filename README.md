@@ -111,7 +111,7 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 | Behavioral contract | [INTERFACE_CONTRACT](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) |
 | Troubleshooting | [TROUBLESHOOTING](https://pydantable.readthedocs.io/en/latest/TROUBLESHOOTING.html) |
 | Versioning | [VERSIONING](https://pydantable.readthedocs.io/en/latest/VERSIONING.html) |
-| Changelog | [changelog](https://pydantable.readthedocs.io/en/latest/changelog.html) |
+| Changelog | [CHANGELOG](https://pydantable.readthedocs.io/en/latest/CHANGELOG.html) |
 
 ## Development
 
