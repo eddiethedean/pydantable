@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
-## [1.14.1] — 2026-04-04
+## [1.14.1] — 2026-04-03
 
 ### Changed
 

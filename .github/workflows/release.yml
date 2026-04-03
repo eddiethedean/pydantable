@@ -42,10 +42,12 @@ jobs:
           python -m twine upload --skip-existing dist/pydantable_protocol-*
 
   # Main Python package (setuptools); depends only on protocol on PyPI.
+  # After protocol: wait for native sdist + manylinux x86_64 wheels so
+  # ``pip install pydantable`` can resolve ``pydantable-native==…`` immediately.
   publish-pypi-pydantable:
     name: PyPI pydantable (sdist + wheel)
     runs-on: ubuntu-latest
-    needs: [shared-ci, publish-pypi-protocol]
+    needs: [shared-ci, publish-pypi-protocol, publish-pypi-manylinux-x86_64]
     steps:
       - uses: actions/checkout@v5
 
