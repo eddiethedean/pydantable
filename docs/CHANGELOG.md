@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.14.0] — 2026-04-03
+
 ### Added
 
 - **Documentation:** {doc}`CUSTOM_ENGINE_PACKAGE` — guide for authors publishing a separate engine package (dependencies, protocol implementation, wiring, expressions, I/O boundaries, testing, PyPI).
@@ -13,6 +15,7 @@ All notable changes to this project are documented here. The format is inspired 
 ### Changed
 
 - **Internal:** Introduced `pydantable.engine` (`NativePolarsEngine`, `get_default_engine`, `get_expression_runtime`) so execution is routed through a single abstraction; `rust_engine` remains a thin delegating module. See {doc}`ADR-engines` and {doc}`DEVELOPER`.
+- **Version bump:** Align Python package metadata ( **`pydantable`**, **`pydantable-protocol`**, **`pydantable-native`**, **`pydantable-meta`**), Rust crate **`pydantable-core`**, and published **`__version__`** values to **1.14.0**.
 
 ## [1.13.0] — 2026-04-02
 
