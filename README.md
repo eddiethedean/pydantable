@@ -8,6 +8,8 @@
 
 **Strongly typed DataFrames for Python, powered by Rust** — Pydantic schemas, Polars-backed execution in the native extension, and an API built for services (including optional FastAPI integration).
 
+**Current release: 1.14.0** — highlights in the [changelog](https://pydantable.readthedocs.io/en/latest/CHANGELOG.html).
+
 ## Why PydanTable
 
 - **One schema, many surfaces:** define columns with Pydantic models; use `DataFrameModel` (SQLModel-style) or `DataFrame[YourSchema]`.
