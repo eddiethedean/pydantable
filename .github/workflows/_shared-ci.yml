@@ -113,6 +113,7 @@ jobs:
       - name: Install docs dependencies
         run: |
           python -m pip install -U pip
+          python -m pip install -e ./pydantable-protocol
           python -m pip install -e ".[docs]"
 
       - name: Build docs (warnings as errors)
@@ -381,8 +382,11 @@ jobs:
             "rapcsv>=0.2" "rapfiles>=0.1" "rapsqlite>=0.1"
           $PY -m pip install pyright
 
-      - name: Build and install extension
-        run: $PY -m maturin develop --release
+      - name: Install local packages and native extension
+        run: |
+          $PY -m pip install -e ./pydantable-protocol
+          $PY -m pip install -e .
+          (cd pydantable-native && $PY -m maturin develop --release)
         env:
           VIRTUAL_ENV: ${{ github.workspace }}/.venv
 

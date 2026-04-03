@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "pydantable-meta"
 version = "1.14.0"
 description = "Meta-package that installs pydantable plus the native engine."
-readme = "../README.md"
+readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = [
