@@ -4,8 +4,10 @@ MYPY ?= $(PYTHON) -m mypy
 PYRIGHT ?= $(PYTHON) -m pyright
 
 CARGO_MANIFEST ?= pydantable-core/Cargo.toml
+NATIVE_PYPROJECT ?= pydantable-native/pyproject.toml
 
 .PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check engine-bypass-check mypy-check pyright-check sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
+.PHONY: native-develop native-wheel
 .PHONY: gen-typing check-typing
 .PHONY: mypy-check-minimal
 
@@ -35,7 +37,7 @@ mypy-check-minimal:
 	fi
 	@.venv-mypy-min/bin/python -m pip -q install -U pip >/dev/null
 	@.venv-mypy-min/bin/python -m pip -q install mypy pydantic >/dev/null
-	@MYPYPATH=python .venv-mypy-min/bin/python -m mypy python/pydantable
+	@MYPYPATH="python:pydantable-protocol/python" .venv-mypy-min/bin/python -m mypy python/pydantable
 
 pyright-check:
 	$(PYRIGHT) --project pyrightconfig.json
@@ -73,4 +75,7 @@ rust-test:
 	PYO3_PYTHON=$(CURDIR)/.venv/bin/python \
 	PYTHONPATH=$$($(CURDIR)/.venv/bin/python -c "import site; print(site.getsitepackages()[0])") \
 	cargo test --manifest-path $(CARGO_MANIFEST) --all-features
+
+native-develop:
+	cd pydantable-native && $(CURDIR)/$(PYTHON) -m maturin develop --release
 

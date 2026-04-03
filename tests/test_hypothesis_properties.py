@@ -362,7 +362,7 @@ def test_group_by_dynamic_rejects_zero_step(every: str) -> None:
 @given(threshold=st.integers(min_value=1, max_value=3))
 @settings(max_examples=5, deadline=None)
 def test_lazy_parquet_filter_collect_matches_expected_rows(threshold: int) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     import tempfile
     from pathlib import Path
 

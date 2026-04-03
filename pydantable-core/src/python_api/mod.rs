@@ -12,7 +12,7 @@ mod types;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
-/// Register all classes and functions on the `pydantable._core` extension module.
+/// Register all classes and functions on the `pydantable_native._core` extension module.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     types::register_classes(m)?;
     async_fns::register_functions(m)?;

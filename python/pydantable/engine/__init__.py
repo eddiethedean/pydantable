@@ -1,12 +1,12 @@
-"""Execution engine abstraction (default: native Rust + Polars)."""
+"""Execution engine abstraction (native engine lives in ``pydantable-native``)."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
+from pydantable._extension import MissingRustExtensionError
 from pydantable.errors import UnsupportedEngineOperationError
 
-from .native import NativePolarsEngine
 from .protocols import (
     EngineCapabilities,
     ExecutionEngine,
@@ -34,10 +34,27 @@ _default_engine: ExecutionEngine | None = None
 _expression_runtime_supplier: Callable[[], Any] | None = None
 
 
+NativePolarsEngine: Any = None
+try:
+    from pydantable_native.native import (  # type: ignore[import-not-found]
+        NativePolarsEngine as _NativePolarsEngine,
+    )
+except Exception:  # pragma: no cover
+    pass
+else:
+    NativePolarsEngine = _NativePolarsEngine
+
+
 def get_default_engine() -> ExecutionEngine:
     """Return the process-wide default engine (lazily constructed)."""
     global _default_engine
     if _default_engine is None:
+        if NativePolarsEngine is None:
+            raise MissingRustExtensionError(
+                "Native execution is not installed. Install `pydantable-native` "
+                "(or `pydantable-meta`) or call set_default_engine(...) with a custom "
+                "backend."
+            )
         _default_engine = cast("ExecutionEngine", NativePolarsEngine())
     return _default_engine
 
@@ -51,7 +68,7 @@ def set_default_engine(engine: ExecutionEngine | None) -> None:
 def get_expression_runtime() -> Any:
     """Return the object used to build :class:`~pydantable.expressions.Expr` trees.
 
-    Defaults to :attr:`NativePolarsEngine.rust_core` (``pydantable._core``) when the
+    Defaults to :attr:`NativePolarsEngine.rust_core` (native extension) when the
     default engine is native. Non-native defaults must call
     :func:`set_expression_runtime` or operations that build expressions will raise
     :exc:`~pydantable.errors.UnsupportedEngineOperationError`.
@@ -59,10 +76,10 @@ def get_expression_runtime() -> Any:
     if _expression_runtime_supplier is not None:
         return _expression_runtime_supplier()
     eng = get_default_engine()
-    if isinstance(eng, NativePolarsEngine):
-        return eng.rust_core
+    if NativePolarsEngine is not None and isinstance(eng, NativePolarsEngine):
+        return eng.rust_core  # type: ignore[attr-defined]
     raise UnsupportedEngineOperationError(
-        "Expression building requires NativePolarsEngine or "
+        "Expression building requires the native engine (pydantable-native) or "
         "set_expression_runtime(...); "
         f"current default engine is {type(eng).__name__!r}."
     )

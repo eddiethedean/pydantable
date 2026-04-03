@@ -120,7 +120,7 @@ def test_export_json_default_str_for_datetime_decimal_uuid(tmp_path: Path) -> No
 
 
 def test_read_json_alias_matches_ndjson_nested(tmp_path: Path) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     p = tmp_path / "nested.ndjson"
     p.write_text(
         json.dumps({"id": 1, "meta": {"k": 1}, "nums": [1]}) + "\n",
@@ -134,7 +134,7 @@ def test_read_json_alias_matches_ndjson_nested(tmp_path: Path) -> None:
 
 def test_lazy_read_ndjson_nested_collect_shape_only(tmp_path: Path) -> None:
     """Lazy NDJSON → struct + list; map JSON uses materialize_json path."""
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     path = tmp_path / "n.ndjson"
     path.write_text(
         json.dumps(

@@ -3,7 +3,6 @@
 
 See docs/ADR-engines.md. Allowed locations:
   - ``python/pydantable/engine/`` (entire package)
-  - ``python/pydantable/io/_core_io.py``
   - ``python/pydantable/_extension.py``
   - ``python/pydantable/rust_engine.py``
 """
@@ -21,7 +20,6 @@ FORBIDDEN_SUBSTRINGS = (
 
 ALLOWLIST_FILES = frozenset(
     {
-        "io/_core_io.py",
         "_extension.py",
         "rust_engine.py",
     }

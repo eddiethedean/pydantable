@@ -1,0 +1,23 @@
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pydantable-native"
+version = "1.13.0"
+description = "Native execution engine for pydantable (Rust + Polars)."
+readme = "../README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+  "pydantable-protocol==1.13.0",
+]
+
+[tool.maturin]
+manifest-path = "../pydantable-core/Cargo.toml"
+module-name = "pydantable_native._core"
+python-source = "python"
+features = ["pyo3/extension-module", "polars_engine"]
+include = [
+  "python/pydantable_native/py.typed",
+]

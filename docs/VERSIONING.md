@@ -11,7 +11,7 @@ PydanTable is **1.x** today. This page states how maintainers use **semver** on 
 
 ## Python package and Rust extension
 
-`pydantable.__version__` and `pydantable._core.rust_version()` are kept equal to **`pyproject.toml`** / **`pydantable-core/Cargo.toml`** on every release (see `tests/test_version_alignment.py`). Wheels and sdist versions come from **`pyproject.toml`** via Maturin.
+`pydantable.__version__`, **`pydantable_protocol.__version__`**, and `pydantable_native._core.rust_version()` are kept equal to **`pyproject.toml`** / **`pydantable-protocol/pyproject.toml`** / **`pydantable-core/Cargo.toml`** on every release (see `tests/test_version_alignment.py`). The core package is pure Python; engine protocols ship in **`pydantable-protocol`** (no dependencies); the native extension ships in the **`pydantable-native`** distribution, which pins **`pydantable-protocol`** but does **not** depend on **`pydantable`**.
 
 ## Path to 1.0
 
@@ -53,11 +53,11 @@ Major releases are required for breaking changes, including:
 - Changing default behavior in a way that can alter outputs or errors for existing code.
 - Changing documented semantics in {doc}`INTERFACE_CONTRACT` incompatibly.
 
-### Rust extension boundary (`pydantable._core`)
+### Rust extension boundary (`pydantable_native._core`)
 
-- `pydantable._core` internals are not a stable API for direct user imports.
+- `pydantable_native._core` internals are not a stable API for direct user imports.
 - Stability commitments apply to documented Python-facing APIs in `pydantable`.
-- `pydantable.__version__` and `pydantable._core.rust_version()` remain aligned on releases.
+- `pydantable.__version__` and `pydantable_native._core.rust_version()` remain aligned on releases.
 
 ### Practical examples
 

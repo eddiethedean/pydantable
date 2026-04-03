@@ -6,7 +6,7 @@ import re
 
 import pytest
 
-pytest.importorskip("pydantable._core")
+pytest.importorskip("pydantable_native._core")
 
 from pydantable import DataFrameModel
 

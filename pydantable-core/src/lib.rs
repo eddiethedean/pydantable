@@ -12,7 +12,7 @@ mod python_api;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
-/// PyO3 extension module `pydantable._core` (built via maturin).
+/// PyO3 extension module `pydantable_native._core` (built via maturin).
 #[pymodule]
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Optional: customize Tokio multi-thread pool before first `pyo3_async_runtimes` use.

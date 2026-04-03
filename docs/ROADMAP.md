@@ -307,7 +307,7 @@ Practical inputs that feed that phase:
 
 ## Shipped in 0.22.0 (comprehensive `pydantable.io`)
 
-- [x] **Rust readers/writers:** **`pydantable._core`** **`io_read_*_path`** / **`io_write_*_path`** for **Parquet**, **IPC**, **CSV**, **NDJSON** ( **`Python::allow_threads`** on reads).
+- [x] **Rust readers/writers:** **`pydantable_native._core`** **`io_read_*_path`** / **`io_write_*_path`** for **Parquet**, **IPC**, **CSV**, **NDJSON** ( **`Python::allow_threads`** on reads).
 - [x] **Python façade:** **`pydantable.io`** sync/async API, **`PYDANTABLE_IO_ENGINE`**, PyArrow fallbacks, **`[io]`** / **`[sql]`** / **`[cloud]`** / **`[excel]`** / **`[kafka]`** / **`[bq]`** / **`[snowflake]`** / **`[rap]`** extras in **`pyproject.toml`**.
 - [x] **SQLAlchemy:** **`read_sql`** / **`write_sql`** (any SQLAlchemy URL/dialect; parameterized SQL; drivers installed separately). **Renamed** to **`fetch_sql`** in **0.23.0**.
 - [x] **Experimental transports:** **`fetch_bytes`**, URL readers, **`fsspec`** object-store helper behind **`PYDANTABLE_IO_EXPERIMENTAL`**.

@@ -1,6 +1,6 @@
 """Unified data I/O: lazy ``read_*`` roots, ``materialize_*`` column dicts, and ``export_*``.
 
-* **``read_*`` / ``aread_*``** return :class:`pydantable._core.ScanFileRoot` for lazy Polars scans
+* **``read_*`` / ``aread_*``** return :class:`pydantable_native._core.ScanFileRoot` for lazy Polars scans
   (no full Python column lists).
 * **``materialize_*``** (and **``fetch_sql_raw``** / **``fetch_sql``** / **``fetch_*_url``**) return ``dict[str, list]``.
 * **``export_*`` / ``aexport_*``** write column dicts to files. **``amaterialize_*``** uses :class:`asyncio.to_thread`.
@@ -19,7 +19,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO
 
 from pydantable._extension import MissingRustExtensionError
-from pydantable.engine._binding import require_rust_core
 from pydantable.observe import span
 
 from . import extras as extras
@@ -124,6 +123,12 @@ def _scan_file_root(
     columns: list[str] | None = None,
     scan_kwargs: dict[str, Any] | None = None,
 ) -> Any:
+    try:
+        from pydantable_native import (  # type: ignore[import-not-found]
+            require_rust_core,
+        )
+    except ImportError as e:
+        raise MissingRustExtensionError() from e
     rust = require_rust_core()
     if not hasattr(rust, "ScanFileRoot"):
         raise MissingRustExtensionError(
@@ -343,7 +348,9 @@ def materialize_parquet(
             eng in ("auto", "rust") and columns is None and _is_local_path(source)
         )
         if use_rust and eng != "pyarrow":
-            from ._core_io import rust_read_parquet_path
+            from pydantable_native.io_core import (  # type: ignore[import-not-found]
+                rust_read_parquet_path,
+            )
 
             path = str(source)
             if os.path.isfile(path):
@@ -378,7 +385,9 @@ def materialize_ipc(
             and _is_local_path(source)
             and os.path.isfile(str(source))
         ):
-            from ._core_io import rust_read_ipc_path
+            from pydantable_native.io_core import (  # type: ignore[import-not-found]
+                rust_read_ipc_path,
+            )
 
             try:
                 return rust_read_ipc_path(str(source))
@@ -423,7 +432,9 @@ def materialize_csv(
 
         eng = (engine or _default_engine()).lower()
         if eng in ("auto", "rust"):
-            from ._core_io import rust_read_csv_path
+            from pydantable_native.io_core import (  # type: ignore[import-not-found]
+                rust_read_csv_path,
+            )
 
             try:
                 return rust_read_csv_path(str(path))
@@ -451,7 +462,9 @@ def materialize_ndjson(
     eng = (engine or _default_engine()).lower()
     with span("io.materialize_ndjson", engine=eng):
         if eng in ("auto", "rust"):
-            from ._core_io import rust_read_ndjson_path
+            from pydantable_native.io_core import (  # type: ignore[import-not-found]
+                rust_read_ndjson_path,
+            )
 
             try:
                 return rust_read_ndjson_path(str(path))
@@ -545,7 +558,9 @@ def export_parquet(
     eng = (engine or _default_engine()).lower()
     with span("io.export_parquet", engine=eng, path=str(path)):
         if eng in ("auto", "rust"):
-            from ._core_io import rust_write_parquet_path
+            from pydantable_native.io_core import (  # type: ignore[import-not-found]
+                rust_write_parquet_path,
+            )
 
             try:
                 rust_write_parquet_path(str(path), data)
@@ -570,7 +585,9 @@ def export_csv(
     eng = (engine or _default_engine()).lower()
     with span("io.export_csv", engine=eng, path=str(path)):
         if eng in ("auto", "rust"):
-            from ._core_io import rust_write_csv_path
+            from pydantable_native.io_core import (  # type: ignore[import-not-found]
+                rust_write_csv_path,
+            )
 
             try:
                 rust_write_csv_path(str(path), data)
@@ -594,7 +611,9 @@ def export_ndjson(
     eng = (engine or _default_engine()).lower()
     with span("io.export_ndjson", engine=eng, path=str(path)):
         if eng in ("auto", "rust"):
-            from ._core_io import rust_write_ndjson_path
+            from pydantable_native.io_core import (  # type: ignore[import-not-found]
+                rust_write_ndjson_path,
+            )
 
             try:
                 rust_write_ndjson_path(str(path), data)
@@ -618,7 +637,9 @@ def export_ipc(
     eng = (engine or _default_engine()).lower()
     with span("io.export_ipc", engine=eng, path=str(path)):
         if eng in ("auto", "rust"):
-            from ._core_io import rust_write_ipc_path
+            from pydantable_native.io_core import (  # type: ignore[import-not-found]
+                rust_write_ipc_path,
+            )
 
             try:
                 rust_write_ipc_path(str(path), data)

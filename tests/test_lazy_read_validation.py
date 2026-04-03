@@ -69,7 +69,7 @@ def test_lazy_read_ignore_errors_applies_on_materialize_dataframe_and_model(
     df_read: str,
     dfm_read: str,
 ) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
 
     path = tmp_path / f"in.{fmt}"
     writer(path)  # type: ignore[misc]
@@ -113,7 +113,7 @@ def test_lazy_read_ignore_errors_applies_on_materialize_dataframe_and_model(
 def test_lazy_read_strict_raises_on_bad_row(
     tmp_path: Path, fmt: str, writer: object, df_read: str
 ) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
 
     path = tmp_path / f"strict.{fmt}"
     writer(path)  # type: ignore[misc]
@@ -137,7 +137,7 @@ def test_lazy_read_strict_raises_on_bad_row(
 async def test_aread_lazy_read_ignore_errors_applies_on_materialize(
     tmp_path: Path, fmt: str, writer: object, model_aread: str
 ) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
 
     path = tmp_path / f"ain.{fmt}"
     writer(path)  # type: ignore[misc]
@@ -173,7 +173,7 @@ async def test_dataframe_aread_ignore_errors_applies_on_materialize(
     writer: object,
     df_aread: str,
 ) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
 
     path = tmp_path / f"df_aread.{fmt}"
     writer(path)  # type: ignore[misc]
@@ -209,7 +209,7 @@ async def test_dataframe_aread_strict_raises_on_bad_row(
     writer: object,
     df_aread: str,
 ) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
 
     path = tmp_path / f"df_aread_strict.{fmt}"
     writer(path)  # type: ignore[misc]
@@ -224,7 +224,7 @@ def test_trusted_mode_shape_only_warns_and_does_not_filter(tmp_path: Path) -> No
     trusted_mode='shape_only' does not do per-element validation, but still enforces
     nullability/shape constraints.
     """
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
 
     path = tmp_path / "shape_only.parquet"
     _write_bad_parquet(path)
@@ -235,7 +235,7 @@ def test_trusted_mode_shape_only_warns_and_does_not_filter(tmp_path: Path) -> No
 
 
 def test_trusted_mode_strict_raises(tmp_path: Path) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
 
     path = tmp_path / "strict_mode.parquet"
     _write_bad_parquet(path)
@@ -250,7 +250,7 @@ def test_ignore_errors_is_only_effective_in_off_mode(tmp_path: Path) -> None:
     ignore_errors/on_validation_errors are only honored when element validation runs
     (trusted_mode='off'). In trusted modes, we do not skip rows.
     """
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
 
     path = tmp_path / "trusted_ignore.parquet"
     _write_bad_parquet(path)
@@ -273,7 +273,7 @@ def test_ignore_errors_is_only_effective_in_off_mode(tmp_path: Path) -> None:
 
 
 def test_lazy_read_collect_honors_ignore_errors(tmp_path: Path) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
 
     path = tmp_path / "collect.csv"
     _write_bad_csv(path)
@@ -304,7 +304,7 @@ def test_lazy_read_collect_honors_ignore_errors(tmp_path: Path) -> None:
 def test_lazy_read_to_polars_and_to_arrow_reflect_filtered_output(
     tmp_path: Path,
 ) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
 
     path = tmp_path / "interop.csv"
     _write_bad_csv(path)
@@ -322,7 +322,7 @@ def test_lazy_read_to_polars_and_to_arrow_reflect_filtered_output(
 
 @pytest.mark.network
 def test_read_parquet_url_ignore_errors_applies_on_materialize(tmp_path: Path) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     pytest.importorskip("pyarrow")
 
     pq_path = tmp_path / "in.parquet"
@@ -361,7 +361,7 @@ def test_read_parquet_url_ignore_errors_applies_on_materialize(tmp_path: Path) -
 def test_read_parquet_url_fill_missing_optional_false_with_explicit_default(
     tmp_path: Path,
 ) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     pytest.importorskip("pyarrow")
 
     pq_path = tmp_path / "in_default.parquet"
@@ -396,7 +396,7 @@ def test_read_parquet_url_fill_missing_optional_false_with_explicit_default(
 async def test_dataframe_aread_csv_fill_missing_optional_false_with_explicit_default(
     tmp_path: Path,
 ) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     path = tmp_path / "default_aread.csv"
     path.write_text("id\n1\n2\n", encoding="utf-8")
 
@@ -410,7 +410,7 @@ async def test_dataframe_aread_csv_fill_missing_optional_false_with_explicit_def
 def test_fill_missing_optional_false_with_default_does_not_trigger_error_callback(
     tmp_path: Path,
 ) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     path = tmp_path / "default_callback.csv"
     path.write_text("id\n1\n2\n", encoding="utf-8")
 

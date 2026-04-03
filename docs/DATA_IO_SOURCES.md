@@ -32,7 +32,7 @@ For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **preset
 
 **Directory and glob semantics**
 
-- Lazy reads pass the path string to Polars **`PlRefPath`** and use **`LazyFrame::scan_*`** (or equivalent) inside **`pydantable._core`**. **Glob expansion, directory listing, and hive-style path parsing** follow **Polars** for the options pydantable sets on the Rust side.
+- Lazy reads pass the path string to Polars **`PlRefPath`** and use **`LazyFrame::scan_*`** (or equivalent) inside the native extension (**`pydantable_native._core`**). **Glob expansion, directory listing, and hive-style path parsing** follow **Polars** for the options pydantable sets on the Rust side.
 - **`ScanArgsParquet::default()`** in Polars uses **`glob: true`** (so a directory or glob pattern is expanded unless **`glob=False`** is passed through **`scan_kwargs`** where supported).
 - **Typed validation** (`trusted_mode`, per-cell checks, etc.) runs at **materialization** (**`collect()`**, **`to_dict()`**, …), not when constructing the lazy root—see {doc}`DATAFRAMEMODEL` and {doc}`INTERFACE_CONTRACT` (**Local lazy file scans**).
 
@@ -143,7 +143,7 @@ Pydantable already executes typed plans in **Rust** (Polars-backed). Putting **f
 ### Async Rust ↔ FastAPI
 
 - **Option A (simplest):** Rust exposes **sync** `read_*` / `write_*` that release the GIL; Python **`aread_*`** = **`asyncio.to_thread`** (same as **`acollect`** today).
-- **Option B (deeper):** **`pyo3-async-runtimes`** + Tokio inside **`pydantable._core`** for **`async_execute_plan`** / **`async_collect_plan_batches`** (see {doc}`EXECUTION`). File and SQL **`aread_*`** / **`afetch_*`** still use thread offload by default.
+- **Option B (deeper):** **`pyo3-async-runtimes`** + Tokio inside **`pydantable_native._core`** for **`async_execute_plan`** / **`async_collect_plan_batches`** (see {doc}`EXECUTION`). File and SQL **`aread_*`** / **`afetch_*`** still use thread offload by default.
 
 ### Tradeoffs to accept
 
@@ -250,7 +250,7 @@ Contrast with common stacks:
 
 ## Implemented API shape (0.23.0+)
 
-**`pydantable.io`** delegates read/materialize/write paths to **`pydantable._core`** where documented, with **SQLAlchemy** as an optional Python extra:
+**`pydantable.io`** delegates read/materialize/write paths to the native extension where documented, with **SQLAlchemy** as an optional Python extra:
 
 - **Lazy file roots:** **`read_parquet`**, **`read_csv`**, **`read_ndjson`**, **`read_ipc`** (+ async **`aread_*`**).
 - **Eager columns:** **`materialize_*` / `amaterialize_*`** → **`dict[str, list]`** for constructors and tests.

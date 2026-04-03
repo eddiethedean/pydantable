@@ -8,6 +8,10 @@ Prefer catching specific types in new code and map them to HTTP status codes in 
 
 from __future__ import annotations
 
+from pydantable_protocol.exceptions import (
+    UnsupportedEngineOperationError as _UnsupportedEngineOperationProtocol,
+)
+
 
 class PydantableUserError(ValueError):
     """Base class for predictable validation and contract failures.
@@ -33,10 +37,16 @@ class MissingOptionalDependency(PydantableUserError):
     """
 
 
-class UnsupportedEngineOperationError(PydantableUserError):
-    """Raised when the active execution engine cannot perform a requested operation."""
+class UnsupportedEngineOperationError(
+    PydantableUserError, _UnsupportedEngineOperationProtocol
+):
+    """Raised when the active execution engine cannot perform a requested operation.
 
-    pass
+    Inherits from
+    :class:`pydantable_protocol.exceptions.UnsupportedEngineOperationError` so
+    ``isinstance(exc, pydantable_protocol.UnsupportedEngineOperationError)``
+    matches errors raised by ``pydantable`` and by third-party engines.
+    """
 
 
 __all__ = [

@@ -74,7 +74,7 @@ def _is_scan_file_root(obj: Any) -> bool:
     t = type(obj)
     return (
         t.__name__ == "ScanFileRoot"
-        and getattr(t, "__module__", "") == "pydantable._core"
+        and getattr(t, "__module__", "") == "pydantable_native._core"
     )
 
 
@@ -560,7 +560,7 @@ class DataFrame(Generic[SchemaT]):
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ) -> DataFrame[Any]:
-        """Build a lazy frame from :class:`pydantable._core.ScanFileRoot`.
+        """Build a lazy frame from :class:`pydantable_native._core.ScanFileRoot`.
 
         Column validation is not applied yet.
         """

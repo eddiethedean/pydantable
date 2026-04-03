@@ -4,7 +4,7 @@
 
 **Symptom:** you see `MissingRustExtensionError` (a `NotImplementedError` subclass).
 
-**Meaning:** `pydantable._core` (the native extension) is missing or does not export a required symbol.
+**Meaning:** the native extension (`pydantable-native`, module `pydantable_native._core`) is missing or does not export a required symbol.
 
 **Common causes**
 

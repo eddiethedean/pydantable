@@ -15,13 +15,15 @@ From repo root:
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip setuptools wheel
+# Editable protocol (same repo; satisfies the ``pydantable-protocol`` pin for local work):
+.venv/bin/python -m pip install -e ./pydantable-protocol
 # Editable install + test/lint/docs extras (matches CI-ish dev env):
 .venv/bin/python -m pip install -e ".[dev,docs]"
 # Build the extension (required for lazy I/O tests and accurate doc version):
-maturin develop --manifest-path pydantable-core/Cargo.toml
+(cd pydantable-native && maturin develop --manifest-path ../pydantable-core/Cargo.toml)
 ```
 
-Minimal alternative (narrower deps): **`pip install maturin pytest pytest-asyncio ruff`** then **`pip install -e .`** — you still need **`maturin develop`** (or **`pip install .`**) for **`pydantable._core`**.
+Minimal alternative (narrower deps): **`pip install maturin pytest pytest-asyncio ruff`** then **`pip install -e .`** — you still need **`maturin develop`** from `pydantable-native` (or to install a published `pydantable-native` wheel) for native execution.
 
 Activate when working interactively:
 
@@ -42,15 +44,20 @@ The crate’s `[features]` block in `pydantable-core/Cargo.toml` gates the Polar
 
 ## Repository Layout
 
+- `pydantable-protocol/python/pydantable_protocol/`: **`ExecutionEngine`**, shared exceptions (**`MissingRustExtensionError`**, **`UnsupportedEngineOperationError`**), and related types with **no runtime dependencies** (for third-party backends that should not install **`pydantable`**).
 - `python/pydantable/`: thin Python API layer + Pydantic integration (`dataframe/`, `schema/` packages with `_impl.py` bodies)
-- `python/pydantable/engine/`: execution engine abstraction; `NativePolarsEngine` wraps `pydantable._core` (use `get_default_engine()`). `rust_engine.py` remains a thin compatibility shim delegating to the default engine.
+- `python/pydantable/engine/`: execution engine abstraction; the native backend ships in **`pydantable-native`**, which depends **only** on **`pydantable-protocol`** and wraps **`pydantable_native._core`** (use **`get_default_engine()`** after installing **`pydantable` + `pydantable-native`**, or **`pydantable-meta`**). **`rust_engine.py`** remains a thin compatibility shim delegating to the default engine.
 - `pydantable-core/src/`: Rust core (`dtype`, `expr`, `plan`, PyO3 exports)
 - `tests/`: Python integration/unit tests for behavior contracts
 - `docs/`: product docs + roadmap/spec docs (built with **Sphinx** + MyST; see below)
 
 ### Adding another execution engine
 
-Implement **`ExecutionEngine`** in `python/pydantable/engine/protocols.py` (plan transforms, **`execute_plan`** / async variants, sinks, **`capabilities`**). Raise **`UnsupportedEngineOperationError`** for operations the backend cannot support. Set **`EngineCapabilities.backend`** to **`"custom"`** (or **`"stub"`** for test doubles) and populate feature flags honestly.
+Authoritative guide for **separate PyPI packages**: {doc}`CUSTOM_ENGINE_PACKAGE`.
+
+Implement **`ExecutionEngine`** from **`pydantable_protocol`** (also re-exported as **`pydantable.engine.protocols`**): plan transforms, **`execute_plan`** / async variants, sinks, **`capabilities`**. Raise **`pydantable_protocol.UnsupportedEngineOperationError`** (or **`pydantable.errors.UnsupportedEngineOperationError`**, which inherits from it) when the backend cannot support a call. Set **`EngineCapabilities.backend`** to **`"custom"`** (or **`"stub"`** for test doubles) and populate feature flags honestly.
+
+**Dependency shape:** a separate PyPI project can **`pip install pydantable-protocol`** only — no **`pydantable`** dependency — and still type-check against **`ExecutionEngine`**. End users combine your engine with **`pydantable`** at the application layer (for example **`DataFrameModel(..., engine=...)`**).
 
 **Checklist**
 
@@ -62,18 +69,18 @@ Implement **`ExecutionEngine`** in `python/pydantable/engine/protocols.py` (plan
 
 **Tests:** Prefer patching **`NativePolarsEngine`** on the class when replacing engine behavior for frames that use the default engine. See **`StubExecutionEngine`** and **`tests/test_engine_stub.py`**.
 
-**Guardrail:** Run **`python scripts/check_engine_bypass.py`** (included in **`make check-python`** as **`engine-bypass-check`**) after changes under **`python/pydantable/`**. It rejects direct **`pydantable._core`** imports and **`get_default_engine().rust_core`** outside the allowlist documented in {doc}`ADR-engines`.
+**Guardrail:** Run **`python scripts/check_engine_bypass.py`** (included in **`make check-python`** as **`engine-bypass-check`**) after changes under **`python/pydantable/`**. It rejects direct native-extension imports and **`get_default_engine().rust_core`** outside the allowlist documented in {doc}`ADR-engines`.
 
-- **Protocols:** `PlanExecutor`, `SinkWriter`, and **`ExecutionEngine`** in `python/pydantable/engine/protocols.py`. **`EngineCapabilities`** includes **`backend`** and optional-feature flags.
+- **Protocols:** `PlanExecutor`, `SinkWriter`, and **`ExecutionEngine`** in **`pydantable_protocol`** (thin re-export in `python/pydantable/engine/protocols.py`). **`EngineCapabilities`** includes **`backend`** and optional-feature flags.
 - **ADR:** See {doc}`ADR-engines` for design notes and Track B (portable IR).
 
 (docs-sphinx-build)=
 
 ## Documentation builds (Sphinx)
 
-**Read the Docs** (configured via `.readthedocs.yaml` at the repository root) uses **Sphinx only**, not MkDocs. The published site is the single source of truth for navigation and cross-links. RTD installs **Sphinx + theme deps only** (not `pip install .[docs]`), because installing the package would compile the Rust extension and typically **exceeds** RTD memory/time limits. `docs/conf.py` puts `python/` on `sys.path`, so autodoc and `import pydantable` work without `pydantable._core`.
+**Read the Docs** (configured via `.readthedocs.yaml` at the repository root) uses **Sphinx only**, not MkDocs. The published site is the single source of truth for navigation and cross-links. RTD installs **Sphinx + theme deps only** (not `pip install .[docs]`), because installing the native extension typically **exceeds** RTD memory/time limits. `docs/conf.py` puts `python/` on `sys.path`, so autodoc and `import pydantable` work without `pydantable-native`.
 
-Local HTML build (from repo root, after `pip install -e ".[docs]"` and a working `pydantable._core` for correct `version` in `conf.py`):
+Local HTML build (from repo root, after `pip install -e ".[docs]"`):
 
 ```bash
 sphinx-build -b html docs docs/_build/html
@@ -97,7 +104,7 @@ User-facing doc changes should keep the repository `README.md` and `docs/` align
 
 Canonical walkthrough: {doc}`QUICKSTART` and **`notebooks/five_minute_tour.ipynb`** at the repo root.
 
-Open the repo’s notebook or a scratch **`.ipynb`** with the venv that has **`pip install -e ".[dev]"`** and a built **`pydantable._core`**. In a cell:
+Open the repo’s notebook or a scratch **`.ipynb`** with the venv that has **`pip install -e ".[dev]"`** and `pydantable-native` installed/built. In a cell:
 
 ```python
 from pydantable import DataFrame
@@ -154,7 +161,7 @@ class RustCorePlan(Protocol):
     def execute_plan(self, plan: Any, data: Any, *, as_python_lists: bool = False) -> Any: ...
 ```
 
-Use this only where it reduces brittle monkeypatching; production code keeps importing `pydantable._core` via `rust_engine._require_rust_core()`.
+Use this only where it reduces brittle monkeypatching; production code reaches the extension via `pydantable-native` and `get_default_engine()`.
 
 Phase 4 boundary contract:
 
@@ -323,7 +330,7 @@ See [Documentation builds (Sphinx)](#docs-sphinx-build) for `sphinx-build -W` an
 
 ### Verify runnable doc snippets (README + `docs/`)
 
-After a normal editable install (so `pydantable._core` is built), run from repo root:
+After a normal editable install (so `pydantable-native` is built), run from repo root:
 
 ```bash
 PYTHONPATH=python .venv/bin/python scripts/verify_doc_examples.py
@@ -331,7 +338,7 @@ PYTHONPATH=python .venv/bin/python scripts/verify_doc_examples.py
 
 This executes the same patterns as the Quick Start and several doc examples (no network). Fix failures before merging user-facing doc changes.
 
-**`docs/examples/**/*.py`:** `tests/test_docs_example_scripts.py` subprocess-runs each example script (skips `docs/examples/fastapi/service_layout/`, which is meant to be run with `uvicorn` from that directory). Keeps runnable files under `docs/examples/` in sync with the API; requires a built `pydantable._core`.
+**`docs/examples/**/*.py`:** `tests/test_docs_example_scripts.py` subprocess-runs each example script (skips `docs/examples/fastapi/service_layout/`, which is meant to be run with `uvicorn` from that directory). Keeps runnable files under `docs/examples/` in sync with the API; requires a built `pydantable-native`.
 
 **CI** runs `scripts/verify_doc_examples.py` on **Ubuntu + Python 3.11** after tests (see `.github/workflows/_shared-ci.yml` via `ci.yml`).
 
@@ -345,10 +352,10 @@ Optional Python **`polars`** for local `to_polars()` / benchmark comparisons: `p
 
 ### Benchmarks (use a **release** Rust build)
 
-Editable installs (`pip install -e .`) often compile `pydantable._core` in **debug** mode. That is fine for development but **not** comparable to production performance. Before running any benchmark that exercises the extension, build the optimized library:
+Editable installs often compile the native extension in **debug** mode. That is fine for development but **not** comparable to production performance. Before running any benchmark that exercises the extension, build the optimized library:
 
 ```bash
-.venv/bin/python -m maturin develop --release
+(cd pydantable-native && .venv/bin/python -m maturin develop --release --manifest-path ../pydantable-core/Cargo.toml)
 ```
 
 Then run the benchmark scripts (after `pip install -e ".[benchmark]"` for Polars/pandas).
@@ -375,7 +382,7 @@ Install the optional benchmark extra (pulls in Polars for the comparison side):
 
 ```bash
 .venv/bin/python -m pip install -e ".[benchmark]"
-.venv/bin/python -m maturin develop --release
+(cd pydantable-native && .venv/bin/python -m maturin develop --release --manifest-path ../pydantable-core/Cargo.toml)
 .venv/bin/python benchmarks/pydantable_vs_polars.py
 ```
 
@@ -389,7 +396,7 @@ Uses the same optional `benchmark` extra (installs pandas alongside Polars):
 
 ```bash
 .venv/bin/python -m pip install -e ".[benchmark]"
-.venv/bin/python -m maturin develop --release
+(cd pydantable-native && .venv/bin/python -m maturin develop --release --manifest-path ../pydantable-core/Cargo.toml)
 .venv/bin/python benchmarks/pydantable_vs_pandas.py
 ```
 
@@ -426,7 +433,7 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 - [ ] `docs/CHANGELOG.md` has a section for the release with highlights
 - [ ] `make check-full` passes (Ruff, mypy, `cargo fmt --check`, `clippy -D warnings`, `cargo test --all-features`)
 - [ ] Python tests pass in `.venv` (`pytest`)
-- [ ] `scripts/verify_doc_examples.py` passes (requires a built `pydantable._core`)
+- [ ] `scripts/verify_doc_examples.py` passes (requires native installed/built)
 - [ ] Rust changes compile in package build path (`maturin build --release`)
 - [ ] Docs updated for behavior/contract changes
 - [ ] `sphinx-build -W -b html docs docs/_build/html` succeeds (matches Read the Docs `fail_on_warning`)

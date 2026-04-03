@@ -103,7 +103,7 @@ This layer is **orthogonal** to **lazy **`read_*`** / **`write_*`** on **`DataFr
 
 ## Runnable example
 
-From the repository root, with **`pydantable._core`** built (**`maturin develop`**, **`pip install -e .`**, or a wheel):
+From the repository root, with **`pydantable-native`** built (**`maturin develop`** in `pydantable-native`, or a wheel):
 
 ```bash
 python docs/examples/io/overview_roundtrip.py

@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+### Added
+
+- **Documentation:** {doc}`CUSTOM_ENGINE_PACKAGE` — guide for authors publishing a separate engine package (dependencies, protocol implementation, wiring, expressions, I/O boundaries, testing, PyPI).
+- **`pydantable-protocol`:** zero-dependency distribution defining **`ExecutionEngine`** / **`PlanExecutor`** / **`SinkWriter`**, **`EngineCapabilities`**, **`UnsupportedEngineOperationError`**, and **`MissingRustExtensionError`**. Third-party engines (for example SQL backends) can **`pip install pydantable-protocol`** for typing and shared errors without depending on **`pydantable`**. **`pydantable`** pins the same version and re-exports protocols from **`pydantable.engine.protocols`** (and **`MissingRustExtensionError`** from **`pydantable._extension`**).
+- **`pydantable-native`** now depends only on **`pydantable-protocol`** (not **`pydantable`**). **`native_engine_capabilities`** lives in **`pydantable_native.capabilities`**. Tracing in the native engine uses **`pydantable.observe.span`** when **`pydantable`** is installed, otherwise a local **`pydantable_native._trace`** implementation (**`PYDANTABLE_TRACE`** behaves the same).
+
 ### Changed
 
 - **Internal:** Introduced `pydantable.engine` (`NativePolarsEngine`, `get_default_engine`, `get_expression_runtime`) so execution is routed through a single abstraction; `rust_engine` remains a thin delegating module. See {doc}`ADR-engines` and {doc}`DEVELOPER`.
@@ -168,7 +174,7 @@ Summary: **FastAPI** helpers (columnar OpenAPI bodies, NDJSON, **`register_excep
 - **`pydantable.typing.SupportsLazyAsyncMaterialize`:** structural ``Protocol`` for objects with async terminal materialization via **`acollect`** (``DataFrameModel`` and ``AwaitableDataFrameModel``).
 - **`AwaitableDataFrameModel`:** **`aread_parquet`**, **`aread_ipc`**, **`aread_csv`**, **`aread_ndjson`**, and **`aread_json`** return a chainable awaitable (``select`` / ``filter`` / … then ``await …acollect()``) so async routes avoid nested ``await`` on the read. **Lazy metadata:** ``await …columns`` / ``shape`` / ``empty`` / ``dtypes``; **`then`** for custom sync/async steps; **`concat`** to merge multiple pending chains or concrete models. **Async-first names:** unprefixed terminals on the chain — **`collect`**, **`to_dict`**, **`to_polars`**, **`to_arrow`**, **`rows`**, **`to_dicts`**, **`stream`** (aliases of the ``a*`` methods); **`DataFrameModel.Async.read_*`** / **`Async.write_sql`** / **`Async.export_*`** mirror **`aread_*`** / **`awrite_sql`** / **`aexport_*`** without the ``a`` prefix (``read_parquet`` cannot replace **`aread_parquet`** on the class itself because **`read_parquet`** is the sync lazy reader). Pending chains show a **descriptive ``repr``** (read path + chained transforms).
 - **`DataFrameModel.aexport_parquet`**, **`aexport_csv`**, **`aexport_ndjson`**, **`aexport_ipc`**, **`aexport_json`**: async eager exports via **`pydantable.io`** **`aexport_*`**.
-- **Rust async bridge:** **`async_execute_plan`** and **`async_collect_plan_batches`** on **`pydantable._core`** (Tokio + **`pyo3-async-runtimes`**); **`acollect`** / **`ato_*`** prefer this awaitable when present.
+- **Rust async bridge:** **`async_execute_plan`** and **`async_collect_plan_batches`** on **`pydantable_native._core`** (Tokio + **`pyo3-async-runtimes`**); **`acollect`** / **`ato_*`** prefer this awaitable when present.
 - **`DataFrame.submit`** / **`DataFrameModel.submit`** and **`ExecutionHandle`** (**`result`**, **`done`**, **`cancel`**) for background **`collect`**.
 - **`DataFrame.astream`** / **`DataFrameModel.astream`**: async iteration of column **`dict`** chunks after one engine collect (see {doc}`EXECUTION`).
 - **`DataFrame.stream`** / **`DataFrameModel.stream`**: synchronous **`dict[str, list]`** chunk iterator (same semantics as **`astream`**); **`PlanMaterialization`** and **`plan_materialization_summary()`** label the four terminal modes (blocking, async, deferred, chunked).
@@ -300,7 +306,7 @@ Summary: **FastAPI** helpers (columnar OpenAPI bodies, NDJSON, **`register_excep
 - **JSON (array of objects):** **`read_json`**, **`materialize_json`**, **`export_json`**, **`aread_json`**, **`amaterialize_json`**, **`aexport_json`** — local lazy scan and eager column dicts (see {doc}`IO_JSON`).
 - **`read_parquet_url_ctx` / `aread_parquet_url_ctx`:** context managers that delete the temporary Parquet file when the block exits (see {doc}`IO_HTTP`).
 - **`DataFrameModel`:** classmethods **`export_*`**, **`write_sql`** / **`awrite_sql`**, **`from_sql`** / **`afrom_sql`** delegating to **`pydantable.io`**.
-- **`MissingRustExtensionError`:** subclass of **`NotImplementedError`** when **`pydantable._core`** is missing or incomplete on lazy scan/sink paths and **`execute_plan`** (still catchable as **`NotImplementedError`**).
+- **`MissingRustExtensionError`:** subclass of **`NotImplementedError`** when the native extension is missing or incomplete on lazy scan/sink paths and **`execute_plan`** (still catchable as **`NotImplementedError`**).
 - **HTTP / object store safety:** **`max_bytes`** on **`fetch_bytes`** and **`read_from_object_store`**; chunked reads with **`ValueError`** when exceeded.
 - **Docs:** {doc}`IO_DECISION_TREE`, {doc}`IO_JSON`, {doc}`IO_HTTP` updates, engine matrix in {doc}`IO_OVERVIEW`, FASTAPI executor guidance; README and manual pages refreshed for **0.23.x** I/O.
 
@@ -336,7 +342,7 @@ Summary: **FastAPI** helpers (columnar OpenAPI bodies, NDJSON, **`register_excep
 
 ### Details
 
-- **Rust:** new **`pydantable._core`** exports **`io_read_*_path`** / **`io_write_*_path`**; column-dict writes round-trip through Python **`polars.DataFrame`** → IPC → Rust writers (install **`pydantable[polars]`** for writes).
+- **Rust:** new **`pydantable_native._core`** exports **`io_read_*_path`** / **`io_write_*_path`**; column-dict writes round-trip through Python **`polars.DataFrame`** → IPC → Rust writers (install **`pydantable[polars]`** for writes).
 - **Tests:** **`tests/test_io_comprehensive.py`** (round-trips, SQLite SQL, local HTTP server for URL Parquet).
 - **CI:** Python test job installs **`sqlalchemy`** with other dev deps.
 

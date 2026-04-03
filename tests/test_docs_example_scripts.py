@@ -1,4 +1,4 @@
-"""Run every ``docs/examples/**/*.py`` script (built ``pydantable._core`` required).
+"""Run every ``docs/examples/**/*.py`` script (built native extension required).
 
 Skips ``fastapi/service_layout`` (uvicorn app package; run manually from that folder).
 """
@@ -34,7 +34,7 @@ def _iter_example_scripts() -> list[Path]:
     ids=lambda p: str(p.relative_to(REPO)),
 )
 def test_example_script_exits_zero(script_path: Path) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     if "sqlmodel" in script_path.parts or "sqlmodel" in script_path.name:
         pytest.importorskip("sqlmodel")
     env = {**os.environ, "PYTHONPATH": str(PY)}

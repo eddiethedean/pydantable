@@ -9,7 +9,8 @@ def render_plan_text(plan: dict[str, Any]) -> str:
     """
     Render a compact, stable string for a plan dict.
 
-    The `plan` dict is expected to match `pydantable._core.PyPlan.to_serializable()`,
+    The `plan` dict is expected to match
+    `pydantable_native._core.PyPlan.to_serializable()`,
     optionally with extra top-level keys added by the Python layer.
     """
     version = plan.get("version", "?")
@@ -80,7 +81,7 @@ def explain(
     """
     Convert a Rust plan object to a stable representation.
 
-    `plan` is typically `pydantable._core.PyPlan`.
+    `plan` is typically `pydantable_native._core.PyPlan`.
     """
     d: dict[str, Any] = plan.to_serializable()  # type: ignore[attr-defined]
     if engine_streaming is not None:

@@ -33,7 +33,7 @@ impl PyExpr {
 }
 
 /// Lazy on-disk table root (Parquet, CSV, NDJSON, IPC); avoids materializing to Python lists.
-#[pyclass(module = "pydantable._core", name = "ScanFileRoot")]
+#[pyclass(module = "pydantable_native._core", name = "ScanFileRoot")]
 pub struct ScanFileRoot {
     #[pyo3(get)]
     pub path: String,

@@ -12,6 +12,7 @@ This **documentation site** is the detailed manual. The repository **README** on
 - **Services (FastAPI)**: {doc}`GOLDEN_PATH_FASTAPI` (shortest runnable path), then {doc}`FASTAPI` (common patterns), {doc}`FASTAPI_ADVANCED` (less common patterns), {doc}`FASTAPI_ENHANCEMENTS` (roadmap + “when to use what”), {doc}`DATAFRAMEMODEL`, and {doc}`EXECUTION`. Use **`register_exception_handlers`** for HTTP **503** / **400** / **422** (`ColumnLengthMismatchError` → **400**). Cookbooks: {doc}`/cookbook/fastapi_columnar_bodies`, {doc}`/cookbook/fastapi_observability`, {doc}`/cookbook/fastapi_background_tasks`, {doc}`/cookbook/async_lazy_pipeline`. Copy layout from `docs/examples/fastapi/service_layout/`. Tests: **`pydantable.testing.fastapi`**. Troubleshooting: {doc}`TROUBLESHOOTING`.
 - **Data workflows**: start with {doc}`DATAFRAMEMODEL`, then {doc}`IO_DECISION_TREE` and {doc}`IO_OVERVIEW`. Optional pandas-like names: {doc}`PANDAS_UI`.
 - **Library/interop**: start with {doc}`INTERFACE_CONTRACT` and {doc}`VERSIONING`, then {doc}`PLAN_AND_PLUGINS`.
+- **Third-party execution backends**: {doc}`CUSTOM_ENGINE_PACKAGE` (ship your own `ExecutionEngine` package with `pydantable-protocol`).
 - `DataFrameModel` transform chains can return typed after-schema models directly (no `to_dict()` materialization step). For pyright/Pylance, use `as_model(...)` (see {doc}`DATAFRAMEMODEL`).
 - Typing guide: {doc}`TYPING` (mypy plugin vs pyright/Pylance, inferred vs explicit patterns).
 
@@ -120,6 +121,7 @@ README
 pydantable_plan
 ARCHITECTURE
 ADR-engines
+CUSTOM_ENGINE_PACKAGE
 DEVELOPER
 DOCS_STYLE_GUIDE
 PERFORMANCE

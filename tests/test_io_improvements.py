@@ -126,7 +126,7 @@ def test_missing_rust_extension_is_notimplemented_subclass() -> None:
 
 
 def test_subprocess_read_parquet_raises_missing_rust_when_core_incomplete() -> None:
-    """Fresh interpreter with a stub ``pydantable._core`` (no ``ScanFileRoot``)."""
+    """Fresh interpreter with a stub native extension (no ``ScanFileRoot``)."""
     repo_root = Path(__file__).resolve().parents[1]
     code = """
 import os, sys, tempfile, types
@@ -134,7 +134,7 @@ from pathlib import Path
 
 root = Path(os.environ["PYDANTABLE_TEST_ROOT"])
 sys.path.insert(0, str(root / "python"))
-sys.modules["pydantable._core"] = types.ModuleType("pydantable._core")
+sys.modules["pydantable_native._core"] = types.ModuleType("pydantable_native._core")
 
 from pydantable.io import read_parquet
 from pydantable import MissingRustExtensionError
@@ -166,7 +166,7 @@ def test_read_parquet_url_ctx_cleans_temp(
     tmp_path: Path,
     http_serve: Callable[[type[BaseHTTPRequestHandler]], str],
 ) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     pq = tmp_path / "in.pq"
     export_parquet(pq, {"k": [1]})
     blob = pq.read_bytes()
@@ -198,7 +198,7 @@ async def test_aread_parquet_url_ctx_cleans_temp(
     tmp_path: Path,
     http_serve: Callable[[type[BaseHTTPRequestHandler]], str],
 ) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     pq = tmp_path / "in.pq"
     export_parquet(pq, {"k": [1]})
     blob = pq.read_bytes()

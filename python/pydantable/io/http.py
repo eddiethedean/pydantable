@@ -102,7 +102,9 @@ def fetch_csv_url(
     **kwargs: Any,
 ) -> dict[str, list[Any]]:
     """Download CSV from ``url`` to a temp file and read via the Rust CSV path when possible."""
-    from ._core_io import rust_read_csv_path
+    from pydantable_native.io_core import (  # type: ignore[import-not-found]
+        rust_read_csv_path,
+    )
 
     _require_experimental(experimental)
     data = fetch_bytes(url, experimental=True, **kwargs)
@@ -133,7 +135,9 @@ def fetch_ndjson_url(
     experimental: bool = True,
     **kwargs: Any,
 ) -> dict[str, list[Any]]:
-    from ._core_io import rust_read_ndjson_path
+    from pydantable_native.io_core import (  # type: ignore[import-not-found]
+        rust_read_ndjson_path,
+    )
 
     _require_experimental(experimental)
     data = fetch_bytes(url, experimental=True, **kwargs)
@@ -181,7 +185,10 @@ def read_from_object_store(
         raise OSError(
             f"failed to open or read {uri!r} via fsspec (check URI and backend drivers): {e}"
         ) from e
-    from ._core_io import rust_read_csv_path, rust_read_ndjson_path
+    from pydantable_native.io_core import (  # type: ignore[import-not-found]  # noqa: I001
+        rust_read_csv_path,
+        rust_read_ndjson_path,
+    )
     from .arrow import read_parquet_pyarrow
 
     if fmt == "parquet":

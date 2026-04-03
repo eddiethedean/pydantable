@@ -18,7 +18,7 @@ use super::scan_kw::{dispatch_file_scan, write_csv_file, write_ndjson_file, writ
 
 pub(crate) const SCAN_FILE_ROOT_NAME: &str = "ScanFileRoot";
 
-/// True if `obj` is `pydantable._core.ScanFileRoot`.
+/// True if `obj` is `pydantable_native._core.ScanFileRoot`.
 pub(crate) fn is_scan_file_root(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
     let cls = obj.get_type();
     let name: String = cls.getattr("__name__")?.extract()?;
@@ -26,7 +26,7 @@ pub(crate) fn is_scan_file_root(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
         return Ok(false);
     }
     let module: String = cls.getattr("__module__")?.extract()?;
-    Ok(module == "pydantable._core")
+    Ok(module == "pydantable_native._core")
 }
 
 fn scan_kw_from_root(root_data: &Bound<'_, PyAny>) -> PyResult<Option<Py<PyDict>>> {

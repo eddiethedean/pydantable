@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-pytest.importorskip("pydantable._core")
+pytest.importorskip("pydantable_native._core")
 
 from pydantable import DataFrameModel
 from pydantable.io import export_parquet

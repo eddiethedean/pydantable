@@ -1,14 +1,14 @@
 # Execution (Rust engine)
 
 All materialization — `collect()`, joins, group-by, reshape, etc. — runs through the
-**compiled Rust extension** (`pydantable._core`), which uses Polars for physical execution
+**compiled Rust extension** (`pydantable_native._core`, shipped by `pydantable-native`), which uses Polars for physical execution
 inside the native extension. Python does **not** require the `polars` package for core use.
 
 **Four materialization modes** (blocking sync, async await, deferred **`submit`**, chunked **`stream`** / **`astream`**) are the main ways to run terminal work on the same logical plan. See {doc}`MATERIALIZATION` for the overview table and the **`PlanMaterialization`** enum.
 
 **Synchronous materialization (default):** **`collect()`**, **`to_dict()`**, **`collect(as_lists=True)`**, **`collect(as_numpy=True)`**, optional **`to_polars()`**, and optional **`to_arrow()`** run **blocking** Rust + Polars work on the **current thread** ( **`to_arrow()`** then builds a PyArrow **`Table`** from the materialized columnar **`dict`** in Python).
 
-**Async materialization (0.15.0+):** **`await acollect()`**, **`await ato_dict()`**, **`await ato_polars()`**, and **`await ato_arrow()`** on **`DataFrame`** run the same logic as sync materialization. When **`pydantable._core`** exposes **`async_execute_plan`**, the engine call is awaited as a **Rust coroutine** built with **`pyo3-async-runtimes`** and **Tokio** (`spawn_blocking` around **`execute_plan`**). If that symbol is absent (older wheels), work falls back to **`asyncio.to_thread`** or a **`concurrent.futures.Executor`** passed as **`executor=`**. **`DataFrameModel`** mirrors **`acollect`**, **`ato_dict`**, **`ato_polars`**, **`ato_arrow`**, **`arows`**, and **`ato_dicts`**. For a diagram of **sync lazy vs async lazy vs eager I/O**, see {doc}`/DATAFRAMEMODEL` **Three layers**.
+**Async materialization (0.15.0+):** **`await acollect()`**, **`await ato_dict()`**, **`await ato_polars()`**, and **`await ato_arrow()`** on **`DataFrame`** run the same logic as sync materialization. When **`pydantable_native._core`** exposes **`async_execute_plan`**, the engine call is awaited as a **Rust coroutine** built with **`pyo3-async-runtimes`** and **Tokio** (`spawn_blocking` around **`execute_plan`**). If that symbol is absent (older wheels), work falls back to **`asyncio.to_thread`** or a **`concurrent.futures.Executor`** passed as **`executor=`**. **`DataFrameModel`** mirrors **`acollect`**, **`ato_dict`**, **`ato_polars`**, **`ato_arrow`**, **`arows`**, and **`ato_dicts`**. For a diagram of **sync lazy vs async lazy vs eager I/O**, see {doc}`/DATAFRAMEMODEL` **Three layers**.
 
 **`aread_*`** returns **`AwaitableDataFrameModel`**: **`return await MyModel.aread_parquet(path).select(...).acollect()`** — one **`await`** on the terminal async method; transforms chain before the read is resolved. Alternatively **`df = await MyModel.aread_parquet(path)`** then **`await df.acollect()`**, or the older nested form **`await (await MyModel.aread_parquet(path)).select(...).acollect()`** (parentheses required; see {doc}`FASTAPI_ADVANCED`).
 
@@ -25,7 +25,7 @@ Cancelling an **`await acollect()`** (etc.) does **not** cancel in-flight native
 - **`materialize_*` / `amaterialize_*`:** **`pydantable.io`** returns **`dict[str, list]`** (**Rust** / **PyArrow** / stdlib; **PyArrow** for bytes and streaming IPC). Wrap with **`MyModel(cols, ...)`** for a typed model. See **`materialize_json`** for JSON array-of-objects files ({doc}`IO_JSON`). Async: **`await amaterialize_parquet(...)`** or **`executor=`**.
 - **SQL (`fetch_sqlmodel` / `fetch_sql_raw`, `iter_sqlmodel` / `iter_sql_raw`, async mirrors; deprecated unprefixed names):** SQLAlchemy → **`dict[str, list]`** (or batches) via **`pydantable.io`**; **`MyModel(cols)`** for typed frames. **`write_sqlmodel`** / deprecated **`write_sql`** on **`DataFrameModel`** delegate to **`pydantable.io`** — {doc}`IO_SQL`.
 - **`export_*` / `aexport_*`:** take column dicts and write files eagerly; install **`pydantable[polars]`** for the Rust-backed export path where documented.
-- **Extension present:** lazy scans, lazy sinks, and **`execute_plan`** require a built **`pydantable._core`**. If the extension is missing, those paths may raise **`MissingRustExtensionError`** (**`NotImplementedError`** subclass) — {doc}`CHANGELOG`.
+- **Extension present:** lazy scans, lazy sinks, and **`execute_plan`** require a built `pydantable-native` extension. If the extension is missing, those paths may raise **`MissingRustExtensionError`** (**`NotImplementedError`** subclass) — {doc}`CHANGELOG`.
 
 Service patterns: {doc}`FASTAPI` and {doc}`ROADMAP`. Transport table: {doc}`DATA_IO_SOURCES`.
 

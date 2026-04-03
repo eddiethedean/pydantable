@@ -1,6 +1,6 @@
 [build-system]
-requires = ["maturin>=1.4,<2.0"]
-build-backend = "maturin"
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "pydantable"
@@ -19,6 +19,7 @@ classifiers = [
 ]
 dependencies = [
     "pydantic>=2.0,<3",
+    "pydantable-protocol==1.13.0",
     "typing-extensions>=4.7",
 ]
 
@@ -85,39 +86,12 @@ docs = [
     "sqlmodel>=0.0.22,<0.1",
 ]
 
-[tool.maturin]
-# Builds `pydantable._core` from the Rust crate in `pydantable-core/`.
-manifest-path = "pydantable-core/Cargo.toml"
-module-name = "pydantable._core"
-python-source = "python"
-include = [
-    "python/pydantable/py.typed",
-    "python/pydantable/types.pyi",
-    "python/pydantable/__init__.pyi",
-    "python/pydantable/dataframe_model.pyi",
-    "python/pydantable/awaitable_dataframe_model.pyi",
-    "python/pydantable/display.pyi",
-    "python/pydantable/observe.pyi",
-    "python/pydantable/window_spec.pyi",
-    "python/pydantable/expressions.pyi",
-    "python/pydantable/pandas.pyi",
-    "python/pydantable/dataframe/__init__.pyi",
-    "python/pydantable/io/__init__.pyi",
-    "python/pydantable/schema/__init__.pyi",
-    "python/pydantable/pyspark/__init__.pyi",
-    "python/pydantable/pyspark/sql/__init__.pyi",
-    "python/pydantable/pyspark/sql/column.pyi",
-    "python/pydantable/pyspark/sql/functions.pyi",
-    "python/pydantable/pyspark/sql/window.pyi",
-    "python/pydantable/fastapi/__init__.pyi",
-]
-features = ["pyo3/extension-module", "polars_engine"]
-exclude = [
-    "docs/_build",
-    "docs/_build/**",
-    "site",
-    "site/**",
-]
+[tool.setuptools]
+package-dir = {"" = "python"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["python"]
 
 [tool.ruff]
 target-version = "py310"
@@ -139,7 +113,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 
 [tool.mypy]
 python_version = "3.10"
-mypy_path = "python"
+mypy_path = ["python", "pydantable-protocol/python"]
 explicit_package_bases = true
 # Mypy plugin enables automatic schema-evolving return typing for DataFrameModel
 # transform chains. Pyright/Pylance relies on the shipped stubs + `as_model(...)`.
@@ -250,7 +224,7 @@ module = "starlette.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-pythonpath = ["python"]
+pythonpath = ["python", "pydantable-protocol/python"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"

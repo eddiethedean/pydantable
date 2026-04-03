@@ -27,7 +27,7 @@ class _OptionalColWithDefault(BaseModel):
 
 
 def test_lazy_read_missing_required_column_raises_csv(tmp_path: Path) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     path = tmp_path / "missing.csv"
     path.write_text("age\n10\n", encoding="utf-8")
 
@@ -37,7 +37,7 @@ def test_lazy_read_missing_required_column_raises_csv(tmp_path: Path) -> None:
 
 
 def test_lazy_read_missing_required_column_raises_ndjson(tmp_path: Path) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     path = tmp_path / "missing.ndjson"
     path.write_text(json.dumps({"age": 10}) + "\n", encoding="utf-8")
 
@@ -51,7 +51,7 @@ def test_lazy_read_ignore_errors_payload_includes_full_row_dict(tmp_path: Path) 
     When ignore_errors=True, the failure payload should include the full row dict,
     including other columns besides the invalid one.
     """
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     path = tmp_path / "two_cols.csv"
     path.write_text("id,age\n1,10\nbad,20\n2,30\n", encoding="utf-8")
 
@@ -74,7 +74,7 @@ def test_lazy_read_ignore_errors_payload_includes_full_row_dict(tmp_path: Path) 
 
 
 def test_lazy_read_missing_optional_column_fills_none_csv(tmp_path: Path) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     path = tmp_path / "opt.csv"
     path.write_text("id\n1\n2\n", encoding="utf-8")
 
@@ -83,7 +83,7 @@ def test_lazy_read_missing_optional_column_fills_none_csv(tmp_path: Path) -> Non
 
 
 def test_lazy_read_missing_optional_column_can_error_csv(tmp_path: Path) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     path = tmp_path / "opt_err.csv"
     path.write_text("id\n1\n2\n", encoding="utf-8")
 
@@ -95,7 +95,7 @@ def test_lazy_read_missing_optional_column_can_error_csv(tmp_path: Path) -> None
 def test_lazy_read_missing_optional_column_with_default_allows_fill_false_csv(
     tmp_path: Path,
 ) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     path = tmp_path / "opt_default.csv"
     path.write_text("id\n1\n2\n", encoding="utf-8")
 
@@ -108,7 +108,7 @@ def test_lazy_read_missing_optional_column_with_default_allows_fill_false_csv(
 def test_lazy_read_missing_optional_column_with_default_allows_fill_false_strict_mode(
     tmp_path: Path,
 ) -> None:
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     path = tmp_path / "opt_default_strict.csv"
     path.write_text("id\n1\n2\n", encoding="utf-8")
 
@@ -125,11 +125,11 @@ def test_lazy_read_missing_optional_column_error_message_variants_are_parsed(
     The missing-optional recovery for scan roots should not depend on a single
     brittle engine error string.
     """
-    pytest.importorskip("pydantable._core")
+    pytest.importorskip("pydantable_native._core")
     from pydantable.engine.native import NativePolarsEngine
 
     class ScanFileRoot:
-        __module__ = "pydantable._core"
+        __module__ = "pydantable_native._core"
 
     root = ScanFileRoot()
     df = DataFrame[_OptionalCol]._from_scan_root(root)

@@ -6,7 +6,7 @@ How JSON values map to typed columns (including nested objects and maps) is summ
 
 | API | Role | Layout |
 |-----|------|--------|
-| :func:`pydantable.io.read_json` | Returns a raw :class:`~pydantable._core.ScanFileRoot` (lazy scan). | **JSON Lines** only — alias of :func:`~pydantable.io.read_ndjson` (same paths, **`glob`**, and **`scan_kwargs`**). |
+| :func:`pydantable.io.read_json` | Returns a raw :class:`~pydantable_native._core.ScanFileRoot` (lazy scan). | **JSON Lines** only — alias of :func:`~pydantable.io.read_ndjson` (same paths, **`glob`**, and **`scan_kwargs`**). |
 | :func:`pydantable.io.read_ndjson` | Same lazy **NDJSON** scan as ``read_json``. | One JSON object per line. |
 | :meth:`~pydantable.dataframe_model.DataFrameModel.read_json` / :meth:`~pydantable.dataframe_model.DataFrameModel.read_ndjson` | Typed lazy :class:`~pydantable.dataframe.DataFrame` / :class:`~pydantable.dataframe_model.DataFrameModel` (same Polars path). | JSON Lines. |
 | :func:`pydantable.io.materialize_json` | Eager **``dict[str, list]``** read. | Detects **array** ``[{...}, ...]`` **or** JSON Lines in one file. |

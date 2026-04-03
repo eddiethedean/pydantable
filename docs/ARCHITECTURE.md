@@ -42,7 +42,7 @@ flowchart LR
 
 ## Execution engine seam
 
-Lazy transforms and materialization go through **`DataFrame._engine`** (**`ExecutionEngine`**); the default is **`NativePolarsEngine`**, which wraps **`pydantable._core`**. Alternate backends implement the same protocol. **`scripts/check_engine_bypass.py`** (see {doc}`ADR-engines` and {doc}`DEVELOPER`) rejects new direct **`_core`** imports outside the documented allowlist.
+Lazy transforms and materialization go through **`DataFrame._engine`** (**`ExecutionEngine`**); the default engine is provided by the optional **`pydantable-native`** distribution (it pins **`pydantable-protocol`** only, not **`pydantable`**) and wraps **`pydantable_native._core`**. Alternate backends implement the same protocol. **`scripts/check_engine_bypass.py`** (see {doc}`ADR-engines` and {doc}`DEVELOPER`) rejects new direct native-extension imports from the core package.
 
 ## Notes
 

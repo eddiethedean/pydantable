@@ -7,7 +7,9 @@ import sys
 DOCS_ROOT = os.path.abspath(os.path.dirname(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(DOCS_ROOT, ".."))
 PYTHON_SRC = os.path.join(PROJECT_ROOT, "python")
+PROTOCOL_SRC = os.path.join(PROJECT_ROOT, "pydantable-protocol", "python")
 sys.path.insert(0, PYTHON_SRC)
+sys.path.insert(0, PROTOCOL_SRC)
 
 project = "pydantable"
 

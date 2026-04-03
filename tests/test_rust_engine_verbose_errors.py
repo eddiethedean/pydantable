@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import pydantable.engine._binding as engine_binding
 import pydantable.rust_engine as rust_engine
+import pydantable_native._binding as engine_binding  # type: ignore[import-not-found]
 import pytest
 
 

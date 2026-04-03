@@ -1,4 +1,4 @@
-"""Compatibility shims for ``pydantable._core`` (Rust + Polars).
+"""Compatibility shims for the native extension (Rust + Polars).
 
 Implementation lives on :class:`~pydantable.engine.native.NativePolarsEngine`.
 Import :func:`~pydantable.engine.get_default_engine` for new code.
@@ -8,26 +8,47 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+try:
+    from pydantable_native._binding import (  # type: ignore[import-not-found]
+        MISSING_SYMBOL_PREFIX as _MISSING_SYMBOL_PREFIX,
+    )
+    from pydantable_native._binding import (
+        load_rust_core as _load_rust_core,
+    )
+    from pydantable_native._binding import (
+        require_rust_core as _require_rust_core,
+    )
+    from pydantable_native._binding import (
+        rust_core_loaded,
+        rust_has_async_collect_plan_batches,
+        rust_has_async_execute_plan,
+    )
+except Exception:  # pragma: no cover
+    _MISSING_SYMBOL_PREFIX = (
+        "The pydantable native extension is present but does not implement "
+    )
+
+    def _load_rust_core() -> Any | None:  # type: ignore[no-redef]
+        return None
+
+    _require_rust_core = None  # type: ignore[assignment]
+
+    def rust_core_loaded() -> Any | None:  # type: ignore[no-redef]
+        return None
+
+    def rust_has_async_collect_plan_batches() -> bool:  # type: ignore[no-redef]
+        return False
+
+    def rust_has_async_execute_plan() -> bool:  # type: ignore[no-redef]
+        return False
+
+
 from pydantable.engine import get_default_engine
-from pydantable.engine._binding import (
-    MISSING_SYMBOL_PREFIX as _MISSING_SYMBOL_PREFIX,
-)
-from pydantable.engine._binding import (
-    load_rust_core as _load_rust_core,
-)
-from pydantable.engine._binding import (
-    require_rust_core as _require_rust_core,
-)
-from pydantable.engine._binding import (
-    rust_core_loaded,
-    rust_has_async_collect_plan_batches,
-    rust_has_async_execute_plan,
-)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-# Legacy alias: same reference as ``pydantable.engine._binding._RUST_CORE``.
+# Legacy alias: mirrors ``pydantable_native._binding`` load state at import time.
 _RUST_CORE = rust_core_loaded()
 
 

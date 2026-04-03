@@ -1290,7 +1290,7 @@ async def test_concurrent_aread_parquet_chains_acollect_integration(
 ) -> None:
     """Real lazy file roots in parallel when the extension supports ``ScanFileRoot``."""
     try:
-        from pydantable import _core as rust
+        import pydantable_native._core as rust  # type: ignore[import-not-found]
     except ImportError:
         pytest.skip("native extension not importable")
     if not hasattr(rust, "ScanFileRoot"):
