@@ -14,7 +14,8 @@ class MissingRustExtensionError(NotImplementedError):
     """Raised when the compiled native extension is missing or too old for the API.
 
     Subclasses :exc:`NotImplementedError` so broad handlers keep matching.
-    Install **pydantable-native** (normally installed with **pydantable**) or build from source.
+    Install **pydantable-native** (normally installed with **pydantable**) or build
+    from source.
     """
 
     def __init__(self, detail: str | None = None) -> None:
