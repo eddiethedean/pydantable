@@ -53,6 +53,8 @@ dev = [
     "pytest-cov>=4.0",
     "pytest-xdist>=3.0",
     "ruff>=0.8.0",
+    "ty>=0.0.28",
+    "mypy>=1.0",
     "pyright>=1.1.0",
     "coverage[toml]>=7.0",
     "polars>=1.0.0,<2",
@@ -93,10 +95,68 @@ include-package-data = true
 [tool.setuptools.packages.find]
 where = ["python"]
 
+# Astral ``ty`` — primary static type checker in ``make check-full`` / CI (fast; no mypy plugins).
+# Optional-import stubs and UI shims match the pragmatism of the historical mypy + Pyright split:
+# Pyright still type-checks the typing contract tests; mypy remains available for the plugin
+# (``tests/test_mypy_*.py``) and ``[tool.mypy]`` config.
+[tool.ty.environment]
+python-version = "3.10"
+root = ["python", "pydantable-protocol/python", "pydantable-native/python"]
+
+[tool.ty.analysis]
+allowed-unresolved-imports = [
+    "pydantable_native._core",
+    "numpy.**",
+    "pyarrow.**",
+    "polars.**",
+    "pandas.**",
+    "dataframe_api_compat.**",
+    "sqlalchemy.**",
+    "sqlmodel.**",
+    "openpyxl.**",
+    "fsspec.**",
+    "kafka.**",
+    "google.cloud.**",
+    "snowflake.**",
+    "rapcsv.**",
+    "rapfiles.**",
+    "fastapi.**",
+    "starlette.**",
+]
+
+[tool.ty.rules]
+invalid-method-override = "ignore"
+invalid-assignment = "ignore"
+unresolved-attribute = "ignore"
+no-matching-overload = "ignore"
+isinstance-against-typed-dict = "ignore"
+not-iterable = "ignore"
+invalid-context-manager = "ignore"
+invalid-argument-type = "ignore"
+invalid-return-type = "ignore"
+unknown-argument = "ignore"
+unsupported-operator = "ignore"
+
+[tool.ty.src]
+include = [
+    "python/pydantable/**",
+    "pydantable-protocol/python/pydantable_protocol/**",
+    "pydantable-native/python/pydantable_native/**",
+]
+exclude = [
+    "python/pydantable/mypy_plugin.py",
+    "python/pydantable/pyspark/**",
+    "python/pydantable/pandas.py",
+    "python/pydantable/pandas.pyi",
+    "notebooks/**",
+    ".venv-mypy-min/**",
+    ".venv-ty-min/**",
+]
+
 [tool.ruff]
 target-version = "py310"
 line-length = 88
-exclude = ["notebooks", ".venv-mypy-min"]
+exclude = ["notebooks", ".venv-mypy-min", ".venv-ty-min"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]

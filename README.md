@@ -125,7 +125,7 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 Use a virtual environment at **`.venv`** in the repo root (the `Makefile` defaults to `.venv/bin/python`). Full contributor setup, Maturin/Rust builds, and release notes: [DEVELOPER](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html).
 
 ```bash
-make check-full      # ruff, mypy, pyright, typing snippet tests, Sphinx, Rust
+make check-full      # ruff, ty, pyright, typing snippet tests, Sphinx, Rust
 ```
 
 ## License

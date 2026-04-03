@@ -7,9 +7,8 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-_SpanCtor: type[Any]
 try:
-    from pydantable.observe import span as _SpanCtor
+    from pydantable.observe import span
 except ImportError:  # pydantable not installed — standalone native wheel / tests
     Observer = Callable[[dict[str, Any]], None]
 
@@ -63,6 +62,4 @@ except ImportError:  # pydantable not installed — standalone native wheel / te
                 event["error_type"] = getattr(exc_type, "__name__", str(exc_type))
             emit(event)
 
-    _SpanCtor = _FallbackSpan
-
-span = _SpanCtor
+    span = _FallbackSpan

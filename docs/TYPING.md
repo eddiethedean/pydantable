@@ -144,7 +144,7 @@ PydanTable ships `py.typed` and `.pyi` stubs for the public surface. In the repo
 
 - `scripts/generate_typing_artifacts.py` regenerates committed typing artifacts.
 - `scripts/generate_typing_artifacts.py --check` fails if stubs are out of date.
-- `make check-typing` runs: generator drift check → mypy → typing snippet tests.
+- `make check-typing` runs: generator drift check → ty → typing snippet tests.
 
 ## Related docs
 

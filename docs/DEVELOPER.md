@@ -25,7 +25,7 @@ python3 -m venv .venv
 
 Minimal alternative (narrower deps): **`pip install maturin pytest pytest-asyncio ruff`** then **`pip install -e .`** — you still need **`maturin develop`** from `pydantable-native` (or to install a published `pydantable-native` wheel) for native execution.
 
-**`make check-full`** (from repo root) runs Ruff on the whole tree, **mypy** on **`python/pydantable`**, **`pydantable-protocol/python/pydantable_protocol`**, and **`pydantable-native/python/pydantable_native`**, a minimal mypy venv, Pyright, typing-artifact checks, Sphinx, and Rust **`cargo fmt` / clippy / test**. **`make rust-test`** prepends **`python/`**, **`pydantable-protocol/python`**, and **`pydantable-native/python`** to **`PYTHONPATH`** (then the venv’s **`site-packages`**) so PyO3 tests resolve **`pydantable`**, **`pydantable_protocol`**, and **`polars`** consistently without relying on editable installs alone. **`make native-develop`** runs **`pip install -e ./pydantable-protocol`** before **`maturin develop`**.
+**`make check-full`** (from repo root) runs Ruff on the whole tree, Astral **`ty`** on the three first-party trees (see **`[tool.ty]`** in **`pyproject.toml`**), a minimal **`ty`** venv (no NumPy/PyArrow), Pyright, typing-artifact checks, Sphinx, and Rust **`cargo fmt` / clippy / test**. **`make rust-test`** prepends **`python/`**, **`pydantable-protocol/python`**, and **`pydantable-native/python`** to **`PYTHONPATH`** (then the venv’s **`site-packages`**) so PyO3 tests resolve **`pydantable`**, **`pydantable_protocol`**, and **`polars`** consistently without relying on editable installs alone. **`make native-develop`** runs **`pip install -e ./pydantable-protocol`** before **`maturin develop`**. **`mypy`** remains in **`[dev]`** for the optional schema-evolving plugin and **`tests/test_mypy_*.py`** subprocess checks.
 
 Activate when working interactively:
 
@@ -302,7 +302,7 @@ XML for tooling: **`--cov-report=xml`** (writes **`coverage.xml`**; gitignored).
 .venv/bin/basedpyright
 ```
 
-Typing-focused checks (generator drift + mypy + typing snippet tests):
+Typing-focused checks (generator drift + ty + typing snippet tests):
 
 ```bash
 make check-typing
@@ -433,7 +433,7 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 
 - [ ] Version matches everywhere: `pyproject.toml`, `pydantable-core/Cargo.toml`, `python/pydantable/__init__.py`, and `rust_version()` in `pydantable-core/src/python_api/expr_fns.rs` (`env!("CARGO_PKG_VERSION")`) (CI also runs `tests/test_version_alignment.py`, which asserts `__version__ == _core.rust_version()`)
 - [ ] `docs/CHANGELOG.md` has a section for the release with highlights
-- [ ] `make check-full` passes (Ruff, mypy, `cargo fmt --check`, `clippy -D warnings`, `cargo test --all-features`)
+- [ ] `make check-full` passes (Ruff, ty, `cargo fmt --check`, `clippy -D warnings`, `cargo test --all-features`)
 - [ ] Python tests pass in `.venv` (`pytest`)
 - [ ] `scripts/verify_doc_examples.py` passes (requires native installed/built)
 - [ ] Rust changes compile in package build path (`maturin build --release`)

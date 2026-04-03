@@ -10,6 +10,7 @@ venv/
 .venv/
 .venv-mypy/
 .venv-mypy-min/
+.venv-ty-min/
 build/
 dist/
 *.egg-info/

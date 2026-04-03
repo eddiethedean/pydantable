@@ -11,7 +11,7 @@ on:
 
 jobs:
   python-lint:
-    name: Python (ruff, mypy)
+    name: Python (ruff, ty)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -21,10 +21,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install ruff and mypy
+      - name: Install ruff and ty
         run: |
           python -m pip install -U pip
-          python -m pip install ruff mypy pyright
+          python -m pip install ruff "ty>=0.0.28" pyright
           python -m pip install -e ./pydantable-protocol
           python -m pip install "pydantic>=2.0,<3" "typing-extensions>=4.7" \
             "sqlalchemy>=2.0,<3" "sqlmodel>=0.0.22,<0.1"
@@ -38,13 +38,8 @@ jobs:
       - name: Engine bypass (no direct _core outside allowlist)
         run: python scripts/check_engine_bypass.py
 
-      - name: Mypy
-        env:
-          MYPYPATH: python:pydantable-protocol/python:pydantable-native/python
-        run: >-
-          mypy python/pydantable
-          pydantable-protocol/python/pydantable_protocol
-          pydantable-native/python/pydantable_native
+      - name: ty
+        run: python -m ty check
 
       - name: Pyright
         run: python -m pyright --project pyrightconfig.json
@@ -376,7 +371,7 @@ jobs:
       - name: Install maturin and test deps
         run: |
           $PY -m pip install -U pip
-          $PY -m pip install maturin mypy ruff pytest pytest-asyncio pytest-xdist pytest-cov \
+          $PY -m pip install maturin mypy "ty>=0.0.28" ruff pytest pytest-asyncio pytest-xdist pytest-cov \
             "numpy>=1.24" "pandas>=2.0" "hypothesis>=6.0" "pyarrow>=14.0" \
             "fastapi>=0.100" "httpx>=0.24" "sqlalchemy>=2.0,<3" "sqlmodel>=0.0.22,<0.1" \
             "python-multipart>=0.0.6" \

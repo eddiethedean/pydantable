@@ -22,8 +22,9 @@ if TYPE_CHECKING:
 
 from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
-from .awaitable_dataframe_model import AwaitableDataFrameModel, _short_repr_label
+from .awaitable_dataframe_model import AwaitableDataFrameModel
 from .dataframe import DataFrame, ExecutionHandle
+from .repr_label import short_repr_label as _short_repr_label
 from .schema import (
     Schema,
     _is_polars_dataframe,

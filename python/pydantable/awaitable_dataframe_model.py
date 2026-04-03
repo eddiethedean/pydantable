@@ -22,24 +22,14 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
+from .repr_label import short_repr_label
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine, Sequence
     from concurrent.futures import Executor
 
 GroupedT = TypeVar("GroupedT")
 RowT = TypeVar("RowT")
-
-_REPR_LABEL_MAX = 200
-
-
-def _short_repr_label(text: str, *, max_len: int = _REPR_LABEL_MAX) -> str:
-    """Single-line label for :meth:`AwaitableDataFrameModel.__repr__`."""
-
-    collapsed = " ".join(text.split())
-    if len(collapsed) <= max_len:
-        return collapsed
-    return collapsed[: max_len - 3] + "..."
-
 
 # Methods that return another lazy DataFrameModel (chainable).
 _CHAIN: frozenset[str] = frozenset(
@@ -115,7 +105,7 @@ class AwaitableDataFrameModel(Generic[RowT]):
 
     def _chain_repr(self, suffix: str) -> str:
         base = self._repr_label or "AwaitableDataFrameModel"
-        return _short_repr_label(f"{base}{suffix}")
+        return short_repr_label(f"{base}{suffix}")
 
     def __await__(self) -> Any:
         return self._get_df().__await__()
@@ -153,9 +143,7 @@ class AwaitableDataFrameModel(Generic[RowT]):
 
         return AwaitableDataFrameModel(
             _inner,
-            repr_label=_short_repr_label(
-                f"AwaitableDataFrameModel.concat(how={how!r})"
-            ),
+            repr_label=short_repr_label(f"AwaitableDataFrameModel.concat(how={how!r})"),
         )
 
     def then(
@@ -498,7 +486,7 @@ class AwaitableGroupedDataFrameModel(Generic[GroupedT]):
         base = self._repr_label or "AwaitableGroupedDataFrameModel"
         return AwaitableDataFrameModel(
             _inner,
-            repr_label=_short_repr_label(f"{base}.agg(...)"),
+            repr_label=short_repr_label(f"{base}.agg(...)"),
         )
 
 
@@ -529,5 +517,5 @@ class AwaitableDynamicGroupedDataFrameModel(Generic[GroupedT]):
         base = self._repr_label or "AwaitableDynamicGroupedDataFrameModel"
         return AwaitableDataFrameModel(
             _inner,
-            repr_label=_short_repr_label(f"{base}.agg(...)"),
+            repr_label=short_repr_label(f"{base}.agg(...)"),
         )
