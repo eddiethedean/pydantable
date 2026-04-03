@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO
 
 from pydantable._extension import MissingRustExtensionError
+from pydantable.engine._binding import require_rust_core
 from pydantable.observe import span
 
 from . import extras as extras
@@ -123,10 +124,7 @@ def _scan_file_root(
     columns: list[str] | None = None,
     scan_kwargs: dict[str, Any] | None = None,
 ) -> Any:
-    try:
-        from pydantable import _core as rust
-    except ImportError as e:
-        raise MissingRustExtensionError() from e
+    rust = require_rust_core()
     if not hasattr(rust, "ScanFileRoot"):
         raise MissingRustExtensionError(
             "The native extension does not export ScanFileRoot. Reinstall or rebuild pydantable. "

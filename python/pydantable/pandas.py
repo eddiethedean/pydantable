@@ -2668,9 +2668,8 @@ class PandasDataFrame(CoreDataFrame):
             if not isinstance(column, str):
                 raise TypeError("rolling op requires column as str.")
             name = out_name or f"{column}_{op}"
-            rust = get_default_engine().rust_core
             part = self._partition_by if self._partition_by else None
-            rust_plan = rust.plan_rolling_agg(
+            rust_plan = self._df._engine.plan_rolling_agg(
                 self._df._rust_plan,
                 column,
                 self._window,

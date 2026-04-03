@@ -40,6 +40,12 @@ flowchart LR
   materialize2 --> validateLater[OptionalValidationAtMaterialization]
 ```
 
+## Execution engine seam
+
+Lazy transforms and materialization go through **`DataFrame._engine`** (**`ExecutionEngine`**); the default is **`NativePolarsEngine`**, which wraps **`pydantable._core`**. Alternate backends implement the same protocol. **`scripts/check_engine_bypass.py`** (see {doc}`ADR-engines` and {doc}`DEVELOPER`) rejects new direct **`_core`** imports outside the documented allowlist.
+
 ## Notes
 
-- **`read_*`** returns a lazy scan root (`ScanFileRoot`) and defers ingest validation until materialization.\n+- **`materialize_*`** returns a Python column dict immediately and can be validated on construction.\n+- **Row order is not a stable guarantee** unless explicitly documented; compare on keys when testing (see {doc}`INTERFACE_CONTRACT`).\n+
+- **`read_*`** returns a lazy scan root (`ScanFileRoot`) and defers ingest validation until materialization.
+- **`materialize_*`** returns a Python column dict immediately and can be validated on construction.
+- **Row order is not a stable guarantee** unless explicitly documented; compare on keys when testing (see {doc}`INTERFACE_CONTRACT`).

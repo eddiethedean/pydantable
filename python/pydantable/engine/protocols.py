@@ -410,3 +410,14 @@ class ExecutionEngine(PlanExecutor, SinkWriter, Protocol):
         how: str,
         threshold: int | None,
     ) -> Any: ...
+
+    def plan_rolling_agg(
+        self,
+        plan: Any,
+        column: str,
+        window_size: int,
+        min_periods: int,
+        op: str,
+        out_name: str,
+        partition_by: Sequence[str] | None = None,
+    ) -> Any: ...

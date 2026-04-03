@@ -34,6 +34,9 @@ jobs:
       - name: Ruff check
         run: ruff check .
 
+      - name: Engine bypass (no direct _core outside allowlist)
+        run: python scripts/check_engine_bypass.py
+
       - name: Mypy
         run: mypy python/pydantable
 

@@ -62,6 +62,8 @@ Implement **`ExecutionEngine`** in `python/pydantable/engine/protocols.py` (plan
 
 **Tests:** Prefer patching **`NativePolarsEngine`** on the class when replacing engine behavior for frames that use the default engine. See **`StubExecutionEngine`** and **`tests/test_engine_stub.py`**.
 
+**Guardrail:** Run **`python scripts/check_engine_bypass.py`** (included in **`make check-python`** as **`engine-bypass-check`**) after changes under **`python/pydantable/`**. It rejects direct **`pydantable._core`** imports and **`get_default_engine().rust_core`** outside the allowlist documented in {doc}`ADR-engines`.
+
 - **Protocols:** `PlanExecutor`, `SinkWriter`, and **`ExecutionEngine`** in `python/pydantable/engine/protocols.py`. **`EngineCapabilities`** includes **`backend`** and optional-feature flags.
 - **ADR:** See {doc}`ADR-engines` for design notes and Track B (portable IR).
 

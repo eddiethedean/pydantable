@@ -53,3 +53,17 @@ def test_expression_runtime_requires_native_or_override() -> None:
         set_expression_runtime(None)
 
     assert get_expression_runtime() is not None
+
+
+def test_pandas_rolling_routes_plan_rolling_agg_through_frame_engine() -> None:
+    from pydantable.pandas import DataFrame as PandasDF
+    from pydantable.schema import Schema
+
+    class V(Schema):
+        x: int
+
+    stub = StubExecutionEngine()
+    df = PandasDF[V]({"x": [1, 2, 3]}, engine=stub)
+    assert df._engine is stub
+    with pytest.raises(UnsupportedEngineOperationError, match="plan_rolling_agg"):
+        df.rolling(window=2, min_periods=1).sum("x")

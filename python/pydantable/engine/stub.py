@@ -28,6 +28,7 @@ _RAISE_METHODS = (
     "plan_drop_duplicate_groups",
     "plan_drop",
     "plan_rename",
+    "plan_rolling_agg",
     "plan_slice",
     "plan_with_row_count",
     "plan_fill_null",

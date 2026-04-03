@@ -8,6 +8,8 @@ from pydantable.engine import (
     native_engine_capabilities,
 )
 from pydantable.engine.protocols import ExecutionEngine, PlanExecutor, SinkWriter
+from pydantable.engine.stub import StubExecutionEngine
+from typing_extensions import get_protocol_members
 
 
 def test_get_default_engine_is_native_singleton() -> None:
@@ -31,3 +33,17 @@ def test_capabilities_match_engine_surface() -> None:
     assert eng.capabilities == caps
     if caps.extension_loaded:
         assert caps.has_execute_plan
+
+
+def test_native_engine_exposes_all_execution_engine_members() -> None:
+    names = get_protocol_members(ExecutionEngine)
+    eng = NativePolarsEngine()
+    for name in names:
+        assert hasattr(eng, name), f"NativePolarsEngine missing {name!r}"
+
+
+def test_stub_engine_exposes_all_execution_engine_members() -> None:
+    names = get_protocol_members(ExecutionEngine)
+    stub = StubExecutionEngine()
+    for name in names:
+        assert hasattr(stub, name), f"StubExecutionEngine missing {name!r}"

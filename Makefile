@@ -5,13 +5,13 @@ PYRIGHT ?= $(PYTHON) -m pyright
 
 CARGO_MANIFEST ?= pydantable-core/Cargo.toml
 
-.PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check mypy-check pyright-check sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
+.PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check engine-bypass-check mypy-check pyright-check sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 .PHONY: gen-typing check-typing
 .PHONY: mypy-check-minimal
 
 check-full: check-python check-docs check-rust
 
-check-python: ruff-format-check ruff-check mypy-check mypy-check-minimal pyright-check check-typing
+check-python: ruff-format-check ruff-check engine-bypass-check mypy-check mypy-check-minimal pyright-check check-typing
 
 check-docs: sphinx-check
 
@@ -20,6 +20,9 @@ ruff-format-check:
 
 ruff-check:
 	$(RUFF) check .
+
+engine-bypass-check:
+	$(PYTHON) scripts/check_engine_bypass.py
 
 mypy-check:
 	$(MYPY) python/pydantable

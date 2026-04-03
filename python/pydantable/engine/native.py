@@ -121,6 +121,26 @@ class NativePolarsEngine:
     ) -> Any:
         return self.rust_core.plan_drop_nulls(plan, subset, how, threshold)
 
+    def plan_rolling_agg(
+        self,
+        plan: Any,
+        column: str,
+        window_size: int,
+        min_periods: int,
+        op: str,
+        out_name: str,
+        partition_by: list[str] | None = None,
+    ) -> Any:
+        return self.rust_core.plan_rolling_agg(
+            plan,
+            column,
+            window_size,
+            min_periods,
+            op,
+            out_name,
+            partition_by,
+        )
+
     def execute_plan(
         self,
         plan: Any,
