@@ -5,6 +5,10 @@ on:
     tags:
       - "v*"
 
+# Least privilege: checkout + OIDC none; PyPI uses repository secret.
+permissions:
+  contents: read
+
 jobs:
   shared-ci:
     uses: ./.github/workflows/_shared-ci.yml
@@ -66,13 +70,17 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # ``setup-python`` does not affect the manylinux container; pass interpreters explicitly.
+      # https://github.com/PyO3/maturin-action#manylinux-docker-container
       - name: Build wheels and sdist (maturin)
         uses: PyO3/maturin-action@v1
         with:
           working-directory: pydantable-native
           target: x86_64-unknown-linux-gnu
           command: build
-          args: --release --sdist -o ../dist
+          args: >-
+            --release --sdist --compatibility pypi -o ../dist
+            -i python3.10 -i python3.11 -i python3.12 -i python3.13
           manylinux: "2_17"
 
       - name: Publish to PyPI (twine)
@@ -97,7 +105,9 @@ jobs:
           working-directory: pydantable-native
           target: aarch64-unknown-linux-gnu
           command: build
-          args: --release -o ../dist
+          args: >-
+            --release --compatibility pypi -o ../dist
+            -i python3.10 -i python3.11 -i python3.12 -i python3.13
           manylinux: "2_28"
 
       - name: Publish to PyPI (twine)
@@ -126,7 +136,9 @@ jobs:
           working-directory: pydantable-native
           target: ${{ matrix.target }}
           command: build
-          args: --release -i 3.11 -i 3.12 -i 3.13 -o ../dist
+          args: >-
+            --release --compatibility pypi
+            -i 3.10 -i 3.11 -i 3.12 -i 3.13 -o ../dist
 
       - name: Publish to PyPI (twine)
         shell: bash
@@ -155,7 +167,9 @@ jobs:
           working-directory: pydantable-native
           target: x86_64-unknown-linux-musl
           command: build
-          args: --release --zig --compatibility musllinux_1_2 -i 3.12 -o ../dist
+          args: >-
+            --release --zig --compatibility musllinux_1_2 -o ../dist
+            -i python3.10 -i python3.11 -i python3.12 -i python3.13
 
       - name: Publish to PyPI (twine)
         shell: bash
@@ -184,7 +198,9 @@ jobs:
           working-directory: pydantable-native
           target: aarch64-unknown-linux-musl
           command: build
-          args: --release --zig --compatibility musllinux_1_2 -i 3.12 -o ../dist
+          args: >-
+            --release --zig --compatibility musllinux_1_2 -o ../dist
+            -i python3.10 -i python3.11 -i python3.12 -i python3.13
 
       - name: Publish to PyPI (twine)
         shell: bash
@@ -196,11 +212,20 @@ jobs:
           python -m twine upload --skip-existing dist/pydantable_native-*.whl
 
   publish-pypi-windows-x86_64:
-    name: PyPI Windows x86_64 (pydantable-native)
+    name: PyPI Windows x86_64 py${{ matrix.python-version }} (pydantable-native)
     runs-on: windows-latest
     needs: [shared-ci, publish-pypi-protocol]
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: Build wheels (maturin)
         uses: PyO3/maturin-action@v1
@@ -208,7 +233,7 @@ jobs:
           working-directory: pydantable-native
           target: x86_64-pc-windows-msvc
           command: build
-          args: --release -o ../dist
+          args: --release --compatibility pypi -o ../dist
 
       - name: Publish to PyPI (twine)
         shell: bash
@@ -220,11 +245,20 @@ jobs:
           python -m twine upload --skip-existing dist/pydantable_native-*.whl
 
   publish-pypi-windows-arm64:
-    name: PyPI Windows aarch64 (pydantable-native)
+    name: PyPI Windows aarch64 py${{ matrix.python-version }} (pydantable-native)
     runs-on: windows-11-arm
     needs: [shared-ci, publish-pypi-protocol]
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: Build wheels (maturin)
         uses: PyO3/maturin-action@v1
@@ -232,7 +266,7 @@ jobs:
           working-directory: pydantable-native
           target: aarch64-pc-windows-msvc
           command: build
-          args: --release -o ../dist
+          args: --release --compatibility pypi -o ../dist
 
       - name: Publish to PyPI (twine)
         shell: bash
