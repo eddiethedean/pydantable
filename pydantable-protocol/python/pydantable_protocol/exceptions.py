@@ -6,7 +6,7 @@ _MISSING_CORE = (
     "The pydantable native extension (pydantable-native) is required for this "
     "operation. Build from source with: maturin develop --manifest-path "
     "pydantable-core/Cargo.toml — or install a published wheel "
-    "(pip install pydantable-native or pydantable-meta). See docs/DEVELOPER.md."
+    "(pip install pydantable-native; included with pydantable). See docs/DEVELOPER.md."
 )
 
 
@@ -14,7 +14,7 @@ class MissingRustExtensionError(NotImplementedError):
     """Raised when the compiled native extension is missing or too old for the API.
 
     Subclasses :exc:`NotImplementedError` so broad handlers keep matching.
-    Install **pydantable-native** (or **pydantable-meta**) or build from source.
+    Install **pydantable-native** (normally installed with **pydantable**) or build from source.
     """
 
     def __init__(self, detail: str | None = None) -> None:

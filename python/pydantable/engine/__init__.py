@@ -51,8 +51,8 @@ def get_default_engine() -> ExecutionEngine:
     if _default_engine is None:
         if NativePolarsEngine is None:
             raise MissingRustExtensionError(
-                "Native execution is not installed. Install `pydantable-native` "
-                "(or `pydantable-meta`) or call set_default_engine(...) with a custom "
+                "Native execution is not installed. Reinstall `pydantable` (it should "
+                "pull `pydantable-native`) or call set_default_engine(...) with a custom "
                 "backend."
             )
         _default_engine = cast("ExecutionEngine", NativePolarsEngine())

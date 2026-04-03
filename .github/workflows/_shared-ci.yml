@@ -66,12 +66,11 @@ jobs:
           python -m pip install "build>=1.2"
           python -m pip install "maturin>=1.4,<2.0"
 
-      - name: Build sdists (protocol + core + native + meta)
+      - name: Build sdists (protocol + core + native)
         run: |
           (cd pydantable-protocol && python -m build --sdist -o ../dist)
           python -m build --sdist -o dist
           (cd pydantable-native && maturin build --sdist -o ../dist)
-          (cd pydantable-meta && python -m build --sdist -o ../dist)
 
       - name: Verify sdist excludes generated docs
         run: |
@@ -79,7 +78,7 @@ jobs:
           import glob
           import tarfile
 
-          # Core ``pydantable`` sdist only (not ``pydantable_protocol`` / native / meta).
+          # Core ``pydantable`` sdist only (not ``pydantable_protocol`` / native).
           sdists = sorted(glob.glob("dist/pydantable-*.tar.gz"))
           if not sdists:
             raise SystemExit("No pydantable sdist in dist/pydantable-*.tar.gz")

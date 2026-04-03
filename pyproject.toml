@@ -20,6 +20,7 @@ classifiers = [
 dependencies = [
     "pydantic>=2.0,<3",
     "pydantable-protocol==1.14.0",
+    "pydantable-native==1.14.0",
     "typing-extensions>=4.7",
 ]
 
