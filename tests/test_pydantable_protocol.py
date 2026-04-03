@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
-import tomllib
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 from pydantable import MissingRustExtensionError as PydantableMissingRust
 from pydantable.errors import UnsupportedEngineOperationError as PydantableEngineOpError
 from pydantable_protocol import ExecutionEngine

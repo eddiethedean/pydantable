@@ -39,6 +39,7 @@ rap = ["rapcsv>=0.2", "rapfiles>=0.1", "rapsqlite>=0.1"]
 # FastAPI integration helpers (pydantable.fastapi); optional at runtime.
 fastapi = ["fastapi>=0.100"]
 dev = [
+    "tomli>=1.2.0; python_version < '3.11'",
     "fastapi>=0.100",
     "httpx>=0.24",
     # SQLAlchemy + SQLModel — same pins as ``[sql]``; needed for sql/sqlmodel I/O tests and dev workflows.

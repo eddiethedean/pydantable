@@ -374,6 +374,7 @@ jobs:
         run: |
           $PY -m pip install -U pip
           $PY -m pip install maturin mypy "ty>=0.0.28" ruff pytest pytest-asyncio pytest-xdist pytest-cov \
+            "tomli>=1.2.0" \
             "numpy>=1.24" "pandas>=2.0" "hypothesis>=6.0" "pyarrow>=14.0" \
             "fastapi>=0.100" "httpx>=0.24" "sqlalchemy>=2.0,<3" "sqlmodel>=0.0.22,<0.1" \
             "python-multipart>=0.0.6" \
