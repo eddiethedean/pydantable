@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+### Changed
+
+- **Internal:** Introduced `pydantable.engine` (`NativePolarsEngine`, `get_default_engine`, `get_expression_runtime`) so execution is routed through a single abstraction; `rust_engine` remains a thin delegating module. See {doc}`ADR-engines` and {doc}`DEVELOPER`.
+
 ## [1.13.0] — 2026-04-02
 
 ### Added

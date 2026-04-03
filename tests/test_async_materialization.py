@@ -9,7 +9,8 @@ that another asyncio task runs *before* the slow step finishes (ordering on a
 shared ``order`` list). They cover:
 
 - ``acollect`` / ``ato_dict`` / ``ato_polars`` / ``ato_arrow`` / ``arows`` (native
-  ``async_execute_plan`` when present; else skipped)
+  ``async_execute_plan`` on :class:`~pydantable.engine.native.NativePolarsEngine`
+  when present; else skipped)
 - ``acollect`` thread fallback (``asyncio.to_thread``)
 - ``AwaitableDataFrameModel.acollect`` after ``aread_parquet``
 - ``astream`` (native ``async_collect_plan_batches`` or thread fallback)
@@ -26,6 +27,10 @@ result matches its own frame/source (no cross-talk). This is distinct from
 ``_astream_collect_batches_mock_for_concurrent_tests`` so they run without a matching
 native ``execute_plan`` binary; ``ScanFileRoot`` integration is optional (skipped when
 unavailable).
+
+**Monkeypatching:** frames materialize via ``self._engine``; tests that replace
+execution patch :class:`~pydantable.engine.native.NativePolarsEngine` at class scope
+(or pass a custom ``engine=``).
 
 **Concurrency (deterministic):** avoid wall-clock overlap assertions, which are
 flaky on CI due to OS scheduling jitter. Prefer event-based synchronization
@@ -48,6 +53,12 @@ from unittest import mock
 import pydantable.io as io_mod
 import pytest
 from pydantable import DataFrame, DataFrameModel
+from pydantable.engine import get_default_engine
+from pydantable.engine.native import NativePolarsEngine
+from pydantable.rust_engine import (
+    rust_has_async_collect_plan_batches,
+    rust_has_async_execute_plan,
+)
 from pydantable.awaitable_dataframe_model import AwaitableDataFrameModel
 from pydantable.schema import Schema
 
@@ -61,6 +72,18 @@ class TwoCol(DataFrameModel):
     b: int
 
 
+def _native_bound_async_execute_plan() -> Any:
+    eng = get_default_engine()
+    assert isinstance(eng, NativePolarsEngine)
+    return eng.async_execute_plan
+
+
+def _native_bound_async_collect_plan_batches() -> Any:
+    eng = get_default_engine()
+    assert isinstance(eng, NativePolarsEngine)
+    return eng.async_collect_plan_batches
+
+
 @contextmanager
 def _in_memory_engine_mock_for_concurrent_tests() -> Any:
     """Sync ``execute_plan`` in a thread; return column dict from in-memory root.
@@ -72,6 +95,7 @@ def _in_memory_engine_mock_for_concurrent_tests() -> Any:
     impl = importlib.import_module("pydantable.dataframe._impl")
 
     def fake_execute(
+        self: object,
         plan: object,
         data: Any,
         *,
@@ -86,8 +110,10 @@ def _in_memory_engine_mock_for_concurrent_tests() -> Any:
         return {str(k): list(v) for k, v in data.items()}
 
     with (
-        mock.patch.object(impl, "rust_has_async_execute_plan", return_value=False),
-        mock.patch.object(impl, "execute_plan", fake_execute),
+        mock.patch.object(
+            NativePolarsEngine, "has_async_execute_plan", return_value=False
+        ),
+        mock.patch.object(NativePolarsEngine, "execute_plan", fake_execute),
     ):
         yield impl
 
@@ -96,9 +122,10 @@ def _delayed_async_execute_plan_with_order(
     real: Any,
     order: list[str],
 ) -> Any:
-    """Wrap ``async_execute_plan`` with an await so other tasks can interleave."""
+    """Wrap a bound ``NativePolarsEngine.async_execute_plan`` (see ``real``)."""
 
     async def delayed(
+        self: object,
         plan: object,
         data: object,
         *,
@@ -126,9 +153,10 @@ def _delayed_async_collect_plan_batches_with_order(
     real: Any,
     order: list[str],
 ) -> Any:
-    """Wrap ``async_collect_plan_batches`` with an await for ``astream`` tests."""
+    """Wrap a bound ``NativePolarsEngine.async_collect_plan_batches``."""
 
     async def delayed(
+        self: object,
         plan: object,
         root_data: object,
         *,
@@ -148,6 +176,22 @@ def _delayed_async_collect_plan_batches_with_order(
         return out
 
     return delayed
+
+
+async def _wait_threading_event(ev: threading.Event, *, timeout: float) -> None:
+    """Wait for a ``threading.Event`` without ``asyncio.to_thread(ev.wait)``.
+
+    Using the default thread pool to block on ``Event.wait`` can starve the same
+    pool that ``acollect`` uses for ``asyncio.to_thread(materialize)``, deadlocking
+    when the pool is small (e.g. under load or xdist).
+    """
+
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while not ev.is_set():
+        if loop.time() >= deadline:
+            raise TimeoutError
+        await asyncio.sleep(0.01)
 
 
 def _delayed_run_io_with_order(real: Any, order: list[str]) -> Any:
@@ -575,9 +619,8 @@ async def test_ato_arrow_matches_sync() -> None:
 @pytest.mark.asyncio
 async def test_acollect_when_async_execute_plan_disabled_uses_thread_fallback() -> None:
     df = Tiny({"x": [1, 2, 3]})
-    with mock.patch(
-        "pydantable.dataframe._impl.rust_has_async_execute_plan",
-        return_value=False,
+    with mock.patch.object(
+        NativePolarsEngine, "has_async_execute_plan", return_value=False
     ):
         col = await df.acollect(as_lists=True)
     assert col == {"x": [1, 2, 3]}
@@ -587,9 +630,8 @@ async def test_acollect_when_async_execute_plan_disabled_uses_thread_fallback() 
 async def test_astream_when_async_batches_disabled_uses_thread_fallback() -> None:
     pytest.importorskip("polars")
     df = TwoCol({"a": [1, 2], "b": [3, 4]})
-    with mock.patch(
-        "pydantable.dataframe._impl.rust_has_async_collect_plan_batches",
-        return_value=False,
+    with mock.patch.object(
+        NativePolarsEngine, "has_async_collect_plan_batches", return_value=False
     ):
         chunks = [c async for c in df.astream(batch_size=1)]
     assert len(chunks) == 2
@@ -630,9 +672,8 @@ async def test_acollect_thread_fallback_matches_sync_after_filter() -> None:
     """When async_execute_plan is unavailable, ato_dict still matches to_dict."""
     df = TwoCol({"a": [1, 2, 3], "b": [10, 20, 30]})
     chained = df.filter(df.a >= 2)
-    with mock.patch(
-        "pydantable.dataframe._impl.rust_has_async_execute_plan",
-        return_value=False,
+    with mock.patch.object(
+        NativePolarsEngine, "has_async_execute_plan", return_value=False
     ):
         async_d = await chained.ato_dict()
     assert async_d == chained.to_dict()
@@ -641,19 +682,20 @@ async def test_acollect_thread_fallback_matches_sync_after_filter() -> None:
 @pytest.mark.asyncio
 async def test_acollect_yields_event_loop_native_async_execute_plan() -> None:
     """Other asyncio tasks must run while ``await async_execute_plan`` is in flight."""
-    impl = importlib.import_module("pydantable.dataframe._impl")
-    if not impl.rust_has_async_execute_plan():
+    if not rust_has_async_execute_plan():
         pytest.skip("Rust extension has no async_execute_plan (Tokio bridge)")
 
     order: list[str] = []
-    delayed = _delayed_async_execute_plan_with_order(impl.async_execute_plan, order)
+    delayed = _delayed_async_execute_plan_with_order(
+        _native_bound_async_execute_plan(), order
+    )
 
     async def observer() -> None:
         await asyncio.sleep(0)
         order.append("observer")
 
     df = Tiny({"x": list(range(50))})
-    with mock.patch.object(impl, "async_execute_plan", delayed):
+    with mock.patch.object(NativePolarsEngine, "async_execute_plan", delayed):
         await asyncio.wait_for(
             asyncio.gather(df.acollect(as_lists=True), observer()),
             timeout=30.0,
@@ -693,10 +735,12 @@ async def test_acollect_yields_event_loop_thread_fallback() -> None:
 
     df = Tiny({"x": [1, 2, 3]})
     with (
-        mock.patch.object(impl, "rust_has_async_execute_plan", return_value=False),
+        mock.patch.object(
+            NativePolarsEngine, "has_async_execute_plan", return_value=False
+        ),
         mock.patch.object(impl, "_materialize_in_thread", mit_with_slow_sync),
         mock.patch.object(
-            impl,
+            NativePolarsEngine,
             "execute_plan",
             lambda *_a, **_k: {"x": [1, 2, 3]},
         ),
@@ -712,19 +756,20 @@ async def test_acollect_yields_event_loop_thread_fallback() -> None:
 @pytest.mark.asyncio
 async def test_ato_dict_yields_event_loop_native_async_execute_plan() -> None:
     """``ato_dict`` uses the same async materialization path as ``acollect``."""
-    impl = importlib.import_module("pydantable.dataframe._impl")
-    if not impl.rust_has_async_execute_plan():
+    if not rust_has_async_execute_plan():
         pytest.skip("Rust extension has no async_execute_plan (Tokio bridge)")
 
     order: list[str] = []
-    delayed = _delayed_async_execute_plan_with_order(impl.async_execute_plan, order)
+    delayed = _delayed_async_execute_plan_with_order(
+        _native_bound_async_execute_plan(), order
+    )
 
     async def observer() -> None:
         await asyncio.sleep(0)
         order.append("observer")
 
     df = TwoCol({"a": [1], "b": [2]})
-    with mock.patch.object(impl, "async_execute_plan", delayed):
+    with mock.patch.object(NativePolarsEngine, "async_execute_plan", delayed):
         got = await asyncio.wait_for(
             asyncio.gather(df.ato_dict(), observer()),
             timeout=30.0,
@@ -740,12 +785,13 @@ async def test_aread_chain_acollect_yields_event_loop_native_async(
     """``AwaitableDataFrameModel.acollect`` must not monopolize the event loop."""
     from pydantable.io import export_parquet
 
-    impl = importlib.import_module("pydantable.dataframe._impl")
-    if not impl.rust_has_async_execute_plan():
+    if not rust_has_async_execute_plan():
         pytest.skip("Rust extension has no async_execute_plan (Tokio bridge)")
 
     order: list[str] = []
-    delayed = _delayed_async_execute_plan_with_order(impl.async_execute_plan, order)
+    delayed = _delayed_async_execute_plan_with_order(
+        _native_bound_async_execute_plan(), order
+    )
 
     async def observer() -> None:
         await asyncio.sleep(0)
@@ -758,7 +804,7 @@ async def test_aread_chain_acollect_yields_event_loop_native_async(
         x: int
 
     adf = UserDF.aread_parquet(path, trusted_mode="shape_only")
-    with mock.patch.object(impl, "async_execute_plan", delayed):
+    with mock.patch.object(NativePolarsEngine, "async_execute_plan", delayed):
         await asyncio.wait_for(
             asyncio.gather(adf.acollect(as_lists=True), observer()),
             timeout=30.0,
@@ -770,19 +816,20 @@ async def test_aread_chain_acollect_yields_event_loop_native_async(
 @pytest.mark.asyncio
 async def test_ato_polars_yields_event_loop_native_async_execute_plan() -> None:
     pytest.importorskip("polars")
-    impl = importlib.import_module("pydantable.dataframe._impl")
-    if not impl.rust_has_async_execute_plan():
+    if not rust_has_async_execute_plan():
         pytest.skip("Rust extension has no async_execute_plan (Tokio bridge)")
 
     order: list[str] = []
-    delayed = _delayed_async_execute_plan_with_order(impl.async_execute_plan, order)
+    delayed = _delayed_async_execute_plan_with_order(
+        _native_bound_async_execute_plan(), order
+    )
 
     async def observer() -> None:
         await asyncio.sleep(0)
         order.append("observer")
 
     df = Tiny({"x": [1, 2]})
-    with mock.patch.object(impl, "async_execute_plan", delayed):
+    with mock.patch.object(NativePolarsEngine, "async_execute_plan", delayed):
         got = await asyncio.wait_for(
             asyncio.gather(df.ato_polars(), observer()),
             timeout=30.0,
@@ -794,19 +841,20 @@ async def test_ato_polars_yields_event_loop_native_async_execute_plan() -> None:
 @pytest.mark.asyncio
 async def test_ato_arrow_yields_event_loop_native_async_execute_plan() -> None:
     pytest.importorskip("pyarrow")
-    impl = importlib.import_module("pydantable.dataframe._impl")
-    if not impl.rust_has_async_execute_plan():
+    if not rust_has_async_execute_plan():
         pytest.skip("Rust extension has no async_execute_plan (Tokio bridge)")
 
     order: list[str] = []
-    delayed = _delayed_async_execute_plan_with_order(impl.async_execute_plan, order)
+    delayed = _delayed_async_execute_plan_with_order(
+        _native_bound_async_execute_plan(), order
+    )
 
     async def observer() -> None:
         await asyncio.sleep(0)
         order.append("observer")
 
     df = Tiny({"x": [3]})
-    with mock.patch.object(impl, "async_execute_plan", delayed):
+    with mock.patch.object(NativePolarsEngine, "async_execute_plan", delayed):
         got = await asyncio.wait_for(
             asyncio.gather(df.ato_arrow(), observer()),
             timeout=30.0,
@@ -817,19 +865,20 @@ async def test_ato_arrow_yields_event_loop_native_async_execute_plan() -> None:
 
 @pytest.mark.asyncio
 async def test_arows_yields_event_loop_native_async_execute_plan() -> None:
-    impl = importlib.import_module("pydantable.dataframe._impl")
-    if not impl.rust_has_async_execute_plan():
+    if not rust_has_async_execute_plan():
         pytest.skip("Rust extension has no async_execute_plan (Tokio bridge)")
 
     order: list[str] = []
-    delayed = _delayed_async_execute_plan_with_order(impl.async_execute_plan, order)
+    delayed = _delayed_async_execute_plan_with_order(
+        _native_bound_async_execute_plan(), order
+    )
 
     async def observer() -> None:
         await asyncio.sleep(0)
         order.append("observer")
 
     df = Tiny({"x": [1]})
-    with mock.patch.object(impl, "async_execute_plan", delayed):
+    with mock.patch.object(NativePolarsEngine, "async_execute_plan", delayed):
         rows, _ = await asyncio.wait_for(
             asyncio.gather(df.arows(), observer()),
             timeout=30.0,
@@ -841,13 +890,12 @@ async def test_arows_yields_event_loop_native_async_execute_plan() -> None:
 @pytest.mark.asyncio
 async def test_astream_yields_event_loop_native_async_collect_batches() -> None:
     pytest.importorskip("polars")
-    impl = importlib.import_module("pydantable.dataframe._impl")
-    if not impl.rust_has_async_collect_plan_batches():
+    if not rust_has_async_collect_plan_batches():
         pytest.skip("Rust extension has no async_collect_plan_batches")
 
     order: list[str] = []
     delayed = _delayed_async_collect_plan_batches_with_order(
-        impl.async_collect_plan_batches,
+        _native_bound_async_collect_plan_batches(),
         order,
     )
 
@@ -861,7 +909,7 @@ async def test_astream_yields_event_loop_native_async_collect_batches() -> None:
         async for _ in df.astream(batch_size=1):
             break
 
-    with mock.patch.object(impl, "async_collect_plan_batches", delayed):
+    with mock.patch.object(NativePolarsEngine, "async_collect_plan_batches", delayed):
         await asyncio.wait_for(
             asyncio.gather(first_chunk(), observer()),
             timeout=30.0,
@@ -908,14 +956,14 @@ async def test_astream_yields_event_loop_thread_fallback() -> None:
 
     with (
         mock.patch.object(
-            impl,
-            "rust_has_async_collect_plan_batches",
+            NativePolarsEngine,
+            "has_async_collect_plan_batches",
             return_value=False,
         ),
         mock.patch.object(impl, "_materialize_in_thread", mit_with_slow_sync),
         mock.patch.object(
-            impl,
-            "rust_collect_batches",
+            NativePolarsEngine,
+            "collect_batches",
             lambda *_a, **_k: [fake_batch],
         ),
     ):
@@ -930,7 +978,6 @@ async def test_astream_yields_event_loop_thread_fallback() -> None:
 @pytest.mark.asyncio
 async def test_submit_result_yields_event_loop_while_background_collect() -> None:
     """``await handle.result()`` must not spin the GIL; other tasks can run."""
-    impl = importlib.import_module("pydantable.dataframe._impl")
     order: list[str] = []
 
     def slow_execute(
@@ -946,7 +993,7 @@ async def test_submit_result_yields_event_loop_while_background_collect() -> Non
         order.append("observer")
 
     df = Tiny({"x": [1]})
-    with mock.patch.object(impl, "execute_plan", slow_execute):
+    with mock.patch.object(NativePolarsEngine, "execute_plan", slow_execute):
         h = df.submit(as_lists=True)
         await asyncio.wait_for(
             asyncio.gather(h.result(), observer()),
@@ -993,7 +1040,8 @@ def _astream_collect_batches_mock_for_concurrent_tests() -> Any:
     impl = importlib.import_module("pydantable.dataframe._impl")
     pl = pytest.importorskip("polars")
 
-    def fake_rust_collect_batches(
+    def fake_collect_batches(
+        self: object,
         plan: object,
         root_data: Any,
         *,
@@ -1004,11 +1052,13 @@ def _astream_collect_batches_mock_for_concurrent_tests() -> Any:
 
     with (
         mock.patch.object(
-            impl,
-            "rust_has_async_collect_plan_batches",
+            NativePolarsEngine,
+            "has_async_collect_plan_batches",
             return_value=False,
         ),
-        mock.patch.object(impl, "rust_collect_batches", fake_rust_collect_batches),
+        mock.patch.object(
+            NativePolarsEngine, "collect_batches", fake_collect_batches
+        ),
     ):
         yield impl
 
@@ -1021,7 +1071,6 @@ async def test_concurrent_acollect_runs_engine_work_in_parallel_threads() -> Non
     to threads. Two concurrent `acollect()` calls should be able to enter the
     patched engine function before either returns (subject to executor capacity).
     """
-    impl = importlib.import_module("pydantable.dataframe._impl")
     started = threading.Event()
     both_started = threading.Event()
     release = threading.Event()
@@ -1029,6 +1078,7 @@ async def test_concurrent_acollect_runs_engine_work_in_parallel_threads() -> Non
     n_started = 0
 
     def slow_execute(
+        self: object,
         plan: object,
         data: Any,
         *,
@@ -1052,14 +1102,23 @@ async def test_concurrent_acollect_runs_engine_work_in_parallel_threads() -> Non
     d1 = Tiny({"x": [1]})
     d2 = Tiny({"x": [2]})
     with (
-        mock.patch.object(impl, "rust_has_async_execute_plan", return_value=False),
-        mock.patch.object(impl, "execute_plan", slow_execute),
+        mock.patch.object(
+            NativePolarsEngine, "has_async_execute_plan", return_value=False
+        ),
+        mock.patch.object(NativePolarsEngine, "execute_plan", slow_execute),
     ):
-        t = asyncio.gather(d1.acollect(as_lists=True), d2.acollect(as_lists=True))
+        # Schedule work before waiting on ``started``: a bare ``gather`` object is
+        # not run until awaited, so nothing would enter ``slow_execute`` otherwise.
+        async def _both() -> tuple[Any, Any]:
+            return await asyncio.gather(
+                d1.acollect(as_lists=True), d2.acollect(as_lists=True)
+            )
+
+        t = asyncio.create_task(_both())
         try:
             # Wait until at least one call entered, then until both entered.
-            await asyncio.wait_for(asyncio.to_thread(started.wait), timeout=2.0)
-            await asyncio.wait_for(asyncio.to_thread(both_started.wait), timeout=2.0)
+            await asyncio.wait_for(_wait_threading_event(started, timeout=2.0), 2.5)
+            await asyncio.wait_for(_wait_threading_event(both_started, timeout=2.0), 2.5)
         finally:
             release.set()
         c1, c2 = await asyncio.wait_for(t, timeout=5.0)
@@ -1069,16 +1128,16 @@ async def test_concurrent_acollect_runs_engine_work_in_parallel_threads() -> Non
 @pytest.mark.asyncio
 async def test_concurrent_native_async_execute_plan_overlaps() -> None:
     """Keep a small overlap check for native async, but avoid strict wall ratios."""
-    impl = importlib.import_module("pydantable.dataframe._impl")
-    if not impl.rust_has_async_execute_plan():
+    if not rust_has_async_execute_plan():
         pytest.skip("Rust extension has no async_execute_plan (Tokio bridge)")
 
-    real = impl.async_execute_plan
+    real = _native_bound_async_execute_plan()
     gate = asyncio.Event()
     entered = 0
     lock = asyncio.Lock()
 
     async def gated_async_execute_plan(
+        self: object,
         plan: object,
         data: object,
         *,
@@ -1103,7 +1162,9 @@ async def test_concurrent_native_async_execute_plan_overlaps() -> None:
 
     d1 = Tiny({"x": [1]})
     d2 = Tiny({"x": [2]})
-    with mock.patch.object(impl, "async_execute_plan", gated_async_execute_plan):
+    with mock.patch.object(
+        NativePolarsEngine, "async_execute_plan", gated_async_execute_plan
+    ):
         c1, c2 = await asyncio.wait_for(
             asyncio.gather(d1.acollect(as_lists=True), d2.acollect(as_lists=True)),
             timeout=10.0,

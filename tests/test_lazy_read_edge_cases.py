@@ -126,7 +126,7 @@ def test_lazy_read_missing_optional_column_error_message_variants_are_parsed(
     brittle engine error string.
     """
     pytest.importorskip("pydantable._core")
-    from pydantable.dataframe import _impl as impl
+    from pydantable.engine.native import NativePolarsEngine
 
     class ScanFileRoot:
         __module__ = "pydantable._core"
@@ -136,11 +136,19 @@ def test_lazy_read_missing_optional_column_error_message_variants_are_parsed(
 
     calls = {"n": 0}
 
-    def fake_execute_plan(*_args: object, **_kwargs: object) -> dict[str, list[object]]:
+    def fake_execute_plan(
+        self: object,
+        plan: object,
+        data: object,
+        *,
+        as_python_lists: bool = False,
+        streaming: bool = False,
+        error_context: str | None = None,
+    ) -> dict[str, list[object]]:
         calls["n"] += 1
         if calls["n"] == 1:
             raise ValueError("ColumnNotFoundError: 'note'")
         return {"id": [1, 2]}
 
-    monkeypatch.setattr(impl, "execute_plan", fake_execute_plan)
+    monkeypatch.setattr(NativePolarsEngine, "execute_plan", fake_execute_plan)
     assert df.to_dict() == {"id": [1, 2], "note": [None, None]}

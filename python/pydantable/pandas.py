@@ -21,7 +21,7 @@ from .dataframe import GroupedDataFrame as CoreGroupedDataFrame
 from .dataframe_model import DataFrameModel as CoreDataFrameModel
 from .dataframe_model import GroupedDataFrameModel as CoreGroupedDataFrameModel
 from .expressions import ColumnRef, Expr, Literal, coalesce, dense_rank, rank, when
-from .rust_engine import _require_rust_core
+from pydantable.engine import get_default_engine
 from .schema import Schema
 from .schema._impl import make_derived_schema_type, schema_field_types
 from .selectors import Selector
@@ -362,13 +362,13 @@ class PandasDataFrame(CoreDataFrame):
                 root_data=left_data2,
                 root_schema_type=left_schema,
                 current_schema_type=left_schema,
-                rust_plan=_require_rust_core().make_plan(left_fields),
+                rust_plan=get_default_engine().make_plan(left_fields),
             )
             right_df = other._from_plan(
                 root_data=right_data2,
                 root_schema_type=right_schema,
                 current_schema_type=right_schema,
-                rust_plan=_require_rust_core().make_plan(right_fields),
+                rust_plan=get_default_engine().make_plan(right_fields),
             )
 
             joined = left_df.join(
@@ -391,7 +391,7 @@ class PandasDataFrame(CoreDataFrame):
                 root_data=out_data,
                 root_schema_type=out_schema,
                 current_schema_type=out_schema,
-                rust_plan=_require_rust_core().make_plan(out_fields),
+                rust_plan=get_default_engine().make_plan(out_fields),
             )
             if indicator:
                 if "_merge" in set(self.schema_fields()) | set(other.schema_fields()):
@@ -529,7 +529,7 @@ class PandasDataFrame(CoreDataFrame):
                         root_data=out_data,
                         root_schema_type=out_schema,
                         current_schema_type=out_schema,
-                        rust_plan=_require_rust_core().make_plan(out_fields),
+                        rust_plan=get_default_engine().make_plan(out_fields),
                     )
                 out = joined.with_columns(
                     _merge=(
@@ -1271,7 +1271,7 @@ class PandasDataFrame(CoreDataFrame):
             nrows = len(next(iter(data.values())))
             take = max(0, min(int(n), nrows))
             sliced = {k: v[:take] for k, v in data.items()}
-        rust = _require_rust_core().make_plan(self.schema_fields())
+        rust = get_default_engine().make_plan(self.schema_fields())
         return self._from_plan(
             root_data=sliced,
             root_schema_type=self._current_schema_type,
@@ -1294,7 +1294,7 @@ class PandasDataFrame(CoreDataFrame):
             take = max(0, min(int(n), nrows))
             start = max(0, nrows - take)
             sliced = {k: v[start:] for k, v in data.items()}
-        rust = _require_rust_core().make_plan(self.schema_fields())
+        rust = get_default_engine().make_plan(self.schema_fields())
         return self._from_plan(
             root_data=sliced,
             root_schema_type=self._current_schema_type,
@@ -1977,7 +1977,7 @@ class PandasDataFrame(CoreDataFrame):
             root_data=sub,
             root_schema_type=self._root_schema_type,
             current_schema_type=self._current_schema_type,
-            rust_plan=_require_rust_core().make_plan(fields),
+            rust_plan=get_default_engine().make_plan(fields),
         )
 
     def take(self, indices):  # type: ignore[no-untyped-def]
@@ -1998,7 +1998,7 @@ class PandasDataFrame(CoreDataFrame):
             root_data=sub,
             root_schema_type=self._root_schema_type,
             current_schema_type=self._current_schema_type,
-            rust_plan=_require_rust_core().make_plan(fields),
+            rust_plan=get_default_engine().make_plan(fields),
         )
 
     def sort_index(self, *args: Any, **kwargs: Any) -> CoreDataFrame:
@@ -2263,7 +2263,7 @@ class PandasDataFrame(CoreDataFrame):
             root_data=out,
             root_schema_type=self._root_schema_type,
             current_schema_type=self._current_schema_type,
-            rust_plan=_require_rust_core().make_plan(self.schema_fields()),
+            rust_plan=get_default_engine().make_plan(self.schema_fields()),
         )
 
     def dot(self, other: CoreDataFrame) -> CoreDataFrame:  # type: ignore[override]
@@ -2667,7 +2667,7 @@ class PandasDataFrame(CoreDataFrame):
             if not isinstance(column, str):
                 raise TypeError("rolling op requires column as str.")
             name = out_name or f"{column}_{op}"
-            rust = _require_rust_core()
+            rust = get_default_engine().rust_core
             part = self._partition_by if self._partition_by else None
             rust_plan = rust.plan_rolling_agg(
                 self._df._rust_plan,

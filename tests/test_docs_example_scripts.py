@@ -35,6 +35,8 @@ def _iter_example_scripts() -> list[Path]:
 )
 def test_example_script_exits_zero(script_path: Path) -> None:
     pytest.importorskip("pydantable._core")
+    if "sqlmodel" in script_path.parts or "sqlmodel" in script_path.name:
+        pytest.importorskip("sqlmodel")
     env = {**os.environ, "PYTHONPATH": str(PY)}
     proc = subprocess.run(
         [sys.executable, str(script_path)],

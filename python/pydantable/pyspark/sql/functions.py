@@ -68,7 +68,7 @@ from pydantable.expressions import (
 from pydantable.expressions import (
     window_sum as window_sum_expr,
 )
-from pydantable.rust_engine import _require_rust_core as _rust_core
+from pydantable.engine import get_expression_runtime as _expr_rt
 
 
 class _GroupedAggSpec:
@@ -700,7 +700,7 @@ def sum(column: Expr | str) -> Expr | _GroupedAggSpec:
         raise TypeError(
             "functions.sum() expects a typed column Expr (use col(..., dtype=...))."
         )
-    return Expr(rust_expr=_rust_core().expr_global_sum(column._rust_expr))
+    return Expr(rust_expr=_expr_rt().expr_global_sum(column._rust_expr))
 
 
 def avg(column: Expr | str) -> Expr | _GroupedAggSpec:
@@ -709,7 +709,7 @@ def avg(column: Expr | str) -> Expr | _GroupedAggSpec:
         return _GroupedAggSpec(op="mean", col=column)
     if not isinstance(column, Expr):
         raise TypeError("functions.avg() expects a typed column Expr.")
-    return Expr(rust_expr=_rust_core().expr_global_mean(column._rust_expr))
+    return Expr(rust_expr=_expr_rt().expr_global_mean(column._rust_expr))
 
 
 def mean(column: Expr | str) -> Expr | _GroupedAggSpec:
@@ -723,7 +723,7 @@ def max(column: Expr | str) -> Expr | _GroupedAggSpec:
         return _GroupedAggSpec(op="max", col=column)
     if not isinstance(column, Expr):
         raise TypeError("functions.max() expects a typed column Expr.")
-    return Expr(rust_expr=_rust_core().expr_global_max(column._rust_expr))
+    return Expr(rust_expr=_expr_rt().expr_global_max(column._rust_expr))
 
 
 def min(column: Expr | str) -> Expr | _GroupedAggSpec:
@@ -732,18 +732,18 @@ def min(column: Expr | str) -> Expr | _GroupedAggSpec:
         return _GroupedAggSpec(op="min", col=column)
     if not isinstance(column, Expr):
         raise TypeError("functions.min() expects a typed column Expr.")
-    return Expr(rust_expr=_rust_core().expr_global_min(column._rust_expr))
+    return Expr(rust_expr=_expr_rt().expr_global_min(column._rust_expr))
 
 
 def count(column: Expr | str | None = None) -> Expr | _GroupedAggSpec:
     """Non-null count of *column*, or row count if omitted (``count(*)``)."""
     if column is None:
-        return Expr(rust_expr=_rust_core().expr_global_row_count())
+        return Expr(rust_expr=_expr_rt().expr_global_row_count())
     if isinstance(column, str):
         return _GroupedAggSpec(op="count", col=column)
     if not isinstance(column, Expr):
         raise TypeError("functions.count() expects a typed column Expr or None.")
-    return Expr(rust_expr=_rust_core().expr_global_count(column._rust_expr))
+    return Expr(rust_expr=_expr_rt().expr_global_count(column._rust_expr))
 
 
 def lag(column: Expr, n: int = 1) -> Any:

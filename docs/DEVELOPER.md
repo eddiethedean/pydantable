@@ -43,10 +43,27 @@ The crate’s `[features]` block in `pydantable-core/Cargo.toml` gates the Polar
 ## Repository Layout
 
 - `python/pydantable/`: thin Python API layer + Pydantic integration (`dataframe/`, `schema/` packages with `_impl.py` bodies)
-- `python/pydantable/rust_engine.py`: calls into `pydantable._core` for execution (single engine)
+- `python/pydantable/engine/`: execution engine abstraction; `NativePolarsEngine` wraps `pydantable._core` (use `get_default_engine()`). `rust_engine.py` remains a thin compatibility shim delegating to the default engine.
 - `pydantable-core/src/`: Rust core (`dtype`, `expr`, `plan`, PyO3 exports)
 - `tests/`: Python integration/unit tests for behavior contracts
 - `docs/`: product docs + roadmap/spec docs (built with **Sphinx** + MyST; see below)
+
+### Adding another execution engine
+
+Implement **`ExecutionEngine`** in `python/pydantable/engine/protocols.py` (plan transforms, **`execute_plan`** / async variants, sinks, **`capabilities`**). Raise **`UnsupportedEngineOperationError`** for operations the backend cannot support. Set **`EngineCapabilities.backend`** to **`"custom"`** (or **`"stub"`** for test doubles) and populate feature flags honestly.
+
+**Checklist**
+
+1. **`make_plan`** / **`plan_*`** — logical plan transforms used by **`DataFrame`** (mirror **`NativePolarsEngine`**).
+2. **Execution** — **`execute_plan`**, **`async_execute_plan`**, **`collect_batches`**, **`async_collect_plan_batches`**, and **`execute_*`** helpers as needed.
+3. **Sinks** — **`write_parquet`**, **`write_csv`**, **`write_ipc`**, **`write_ndjson`** or raise **`UnsupportedEngineOperationError`**.
+4. **Async flags** — **`has_async_execute_plan`**, **`has_async_collect_plan_batches`** must reflect real support.
+5. **Expressions (Track A):** **`get_expression_runtime()`** only works automatically for **`NativePolarsEngine`**; other defaults need **`set_expression_runtime(...)`** or a parallel API until a portable expression IR exists.
+
+**Tests:** Prefer patching **`NativePolarsEngine`** on the class when replacing engine behavior for frames that use the default engine. See **`StubExecutionEngine`** and **`tests/test_engine_stub.py`**.
+
+- **Protocols:** `PlanExecutor`, `SinkWriter`, and **`ExecutionEngine`** in `python/pydantable/engine/protocols.py`. **`EngineCapabilities`** includes **`backend`** and optional-feature flags.
+- **ADR:** See {doc}`ADR-engines` for design notes and Track B (portable IR).
 
 (docs-sphinx-build)=
 

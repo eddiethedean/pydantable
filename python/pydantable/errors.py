@@ -33,8 +33,15 @@ class MissingOptionalDependency(PydantableUserError):
     """
 
 
+class UnsupportedEngineOperationError(PydantableUserError):
+    """Raised when the active execution engine cannot perform a requested operation."""
+
+    pass
+
+
 __all__ = [
     "ColumnLengthMismatchError",
     "MissingOptionalDependency",
     "PydantableUserError",
+    "UnsupportedEngineOperationError",
 ]

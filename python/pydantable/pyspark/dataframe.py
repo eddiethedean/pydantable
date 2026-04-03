@@ -16,11 +16,6 @@ from pydantable.dataframe import DataFrame as CoreDataFrame
 from pydantable.dataframe import GroupedDataFrame as CoreGroupedDataFrame
 from pydantable.dataframe_model import DataFrameModel as CoreDataFrameModel
 from pydantable.expressions import ColumnRef, Expr, Literal, global_row_count
-from pydantable.rust_engine import (
-    _require_rust_core,
-    execute_except_all,
-    execute_intersect_all,
-)
 from pydantable.schema import make_derived_schema_type
 
 from .sql.types import (
@@ -959,7 +954,7 @@ class DataFrame(CoreDataFrame):
             if self._engine_streaming_default is not None
             else False
         )
-        out_data, schema_desc = execute_except_all(
+        out_data, schema_desc = self._engine.execute_except_all(
             self._rust_plan,
             self._root_data,
             other._rust_plan,
@@ -971,13 +966,14 @@ class DataFrame(CoreDataFrame):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(derived_fields)
+        rust_plan = self._engine.make_plan(derived_fields)
         return self._as_pyspark_df(
             self._from_plan(
                 root_data=out_data,
                 root_schema_type=derived_schema_type,
                 current_schema_type=derived_schema_type,
                 rust_plan=rust_plan,
+                engine=self._engine,
             )
         )
 
@@ -990,7 +986,7 @@ class DataFrame(CoreDataFrame):
             if self._engine_streaming_default is not None
             else False
         )
-        out_data, schema_desc = execute_intersect_all(
+        out_data, schema_desc = self._engine.execute_intersect_all(
             self._rust_plan,
             self._root_data,
             other._rust_plan,
@@ -1002,13 +998,14 @@ class DataFrame(CoreDataFrame):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(derived_fields)
+        rust_plan = self._engine.make_plan(derived_fields)
         return self._as_pyspark_df(
             self._from_plan(
                 root_data=out_data,
                 root_schema_type=derived_schema_type,
                 current_schema_type=derived_schema_type,
                 rust_plan=rust_plan,
+                engine=self._engine,
             )
         )
 

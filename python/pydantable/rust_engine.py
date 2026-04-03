@@ -1,62 +1,34 @@
-"""Thin Python entry points into ``pydantable._core`` (Rust + Polars).
+"""Compatibility shims for ``pydantable._core`` (Rust + Polars).
 
-Each ``execute_*`` runs a logical plan fragment against in-memory data. The
-extension may be absent in a source checkout until the module is built with Maturin.
+Implementation lives on :class:`~pydantable.engine.native.NativePolarsEngine`.
+Import :func:`~pydantable.engine.get_default_engine` for new code.
 """
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING, Any
 
-from ._extension import MissingRustExtensionError
-from .observe import span
-
-_MISSING_SYMBOL_PREFIX = (
-    "The pydantable native extension is present but does not implement "
+from pydantable.engine import get_default_engine
+from pydantable.engine._binding import (
+    MISSING_SYMBOL_PREFIX as _MISSING_SYMBOL_PREFIX,
+)
+from pydantable.engine._binding import (
+    load_rust_core as _load_rust_core,
+)
+from pydantable.engine._binding import (
+    require_rust_core as _require_rust_core,
+)
+from pydantable.engine._binding import (
+    rust_core_loaded,
+    rust_has_async_collect_plan_batches,
+    rust_has_async_execute_plan,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-
-def _load_rust_core() -> Any | None:
-    """
-    Import the compiled Rust extension module (if available).
-
-    The package must remain importable without building Rust extensions.
-    """
-    try:
-        from . import _core as rust_core  # type: ignore
-
-        return rust_core
-    except ImportError:
-        return None
-
-
-_RUST_CORE = _load_rust_core()
-
-
-def _require_rust_core() -> Any:
-    """Return the loaded extension module or raise :exc:`MissingRustExtensionError`."""
-    if _RUST_CORE is None:
-        raise MissingRustExtensionError()
-    return _RUST_CORE
-
-
-def rust_has_async_execute_plan() -> bool:
-    """True if ``_core`` was built with :func:`async_execute_plan` (Tokio bridge)."""
-    return _RUST_CORE is not None and hasattr(_RUST_CORE, "async_execute_plan")
-
-
-def rust_has_async_collect_plan_batches() -> bool:
-    """True if ``_core`` exposes :func:`async_collect_plan_batches`."""
-    return _RUST_CORE is not None and hasattr(_RUST_CORE, "async_collect_plan_batches")
-
-
-def _verbose_plan_errors_enabled() -> bool:
-    v = os.environ.get("PYDANTABLE_VERBOSE_ERRORS", "").strip().lower()
-    return v in ("1", "true", "yes")
+# Legacy alias: same reference as ``pydantable.engine._binding._RUST_CORE``.
+_RUST_CORE = rust_core_loaded()
 
 
 def execute_plan(
@@ -67,32 +39,13 @@ def execute_plan(
     streaming: bool = False,
     error_context: str | None = None,
 ) -> Any:
-    """Run a full plan to materialized columns (lists or native, per flag).
-
-    ``streaming=True`` requests Polars' streaming collect engine where supported.
-
-    If ``PYDANTABLE_VERBOSE_ERRORS`` is set to a truthy value and
-    ``error_context`` is provided, :exc:`ValueError` from the engine is
-    re-raised with the context string appended (helps debugging in notebooks).
-    """
-    rust = _require_rust_core()
-    if not hasattr(rust, "execute_plan"):
-        raise MissingRustExtensionError(
-            f"{_MISSING_SYMBOL_PREFIX}`execute_plan`. "
-            "Reinstall or rebuild pydantable. See docs/DEVELOPER.md."
-        )
-    with span(
-        "execute_plan",
-        as_python_lists=bool(as_python_lists),
-        streaming=bool(streaming),
+    return get_default_engine().execute_plan(
+        plan,
+        data,
+        as_python_lists=as_python_lists,
+        streaming=streaming,
         error_context=error_context,
-    ):
-        try:
-            return rust.execute_plan(plan, data, as_python_lists, streaming)
-        except ValueError as e:
-            if _verbose_plan_errors_enabled() and error_context:
-                raise ValueError(f"{e}\n[context: {error_context}]") from e
-            raise
+    )
 
 
 async def async_execute_plan(
@@ -103,25 +56,13 @@ async def async_execute_plan(
     streaming: bool = False,
     error_context: str | None = None,
 ) -> Any:
-    """Awaitable engine materialization (Rust pyo3-async-runtimes + Tokio pool)."""
-    rust = _require_rust_core()
-    if not hasattr(rust, "async_execute_plan"):
-        raise MissingRustExtensionError(
-            f"{_MISSING_SYMBOL_PREFIX}`async_execute_plan`. "
-            "Rebuild pydantable from source. See docs/DEVELOPER.md."
-        )
-    with span(
-        "async_execute_plan",
-        as_python_lists=bool(as_python_lists),
-        streaming=bool(streaming),
+    return await get_default_engine().async_execute_plan(
+        plan,
+        data,
+        as_python_lists=as_python_lists,
+        streaming=streaming,
         error_context=error_context,
-    ):
-        try:
-            return await rust.async_execute_plan(plan, data, as_python_lists, streaming)
-        except ValueError as e:
-            if _verbose_plan_errors_enabled() and error_context:
-                raise ValueError(f"{e}\n[context: {error_context}]") from e
-            raise
+    )
 
 
 async def async_collect_plan_batches(
@@ -131,21 +72,9 @@ async def async_collect_plan_batches(
     batch_size: int = 65_536,
     streaming: bool = False,
 ) -> list[Any]:
-    """Async wrapper for :func:`collect_batches` (full collect, then row slices)."""
-    rust = _require_rust_core()
-    if not hasattr(rust, "async_collect_plan_batches"):
-        raise MissingRustExtensionError(
-            f"{_MISSING_SYMBOL_PREFIX}`async_collect_plan_batches`. "
-            "Rebuild pydantable from source. See docs/DEVELOPER.md."
-        )
-    with span(
-        "async_collect_plan_batches",
-        batch_size=int(batch_size),
-        streaming=bool(streaming),
-    ):
-        return await rust.async_collect_plan_batches(
-            plan, root_data, batch_size, streaming
-        )
+    return await get_default_engine().async_collect_plan_batches(
+        plan, root_data, batch_size=batch_size, streaming=streaming
+    )
 
 
 def write_parquet(
@@ -158,21 +87,15 @@ def write_parquet(
     partition_by: list[str] | tuple[str, ...] | None = None,
     mkdir: bool = True,
 ) -> None:
-    """Write lazy plan + root to Parquet via Rust (no Python ``dict[str, list]``)."""
-    rust = _require_rust_core()
-    if not hasattr(rust, "sink_parquet"):
-        raise MissingRustExtensionError(
-            f"{_MISSING_SYMBOL_PREFIX}`sink_parquet`. See docs/DEVELOPER.md."
-        )
-    pb = list(partition_by) if partition_by else None
-    with span(
-        "sink_parquet",
-        streaming=bool(streaming),
-        path=str(path),
-        partition_by=pb,
-        mkdir=bool(mkdir),
-    ):
-        rust.sink_parquet(plan, root_data, path, streaming, write_kwargs, pb, mkdir)
+    return get_default_engine().write_parquet(
+        plan,
+        root_data,
+        path,
+        streaming=streaming,
+        write_kwargs=write_kwargs,
+        partition_by=partition_by,
+        mkdir=mkdir,
+    )
 
 
 def write_csv(
@@ -184,14 +107,14 @@ def write_csv(
     separator: int = ord(","),
     write_kwargs: dict[str, Any] | None = None,
 ) -> None:
-    """Write lazy plan + root to CSV via Rust."""
-    rust = _require_rust_core()
-    if not hasattr(rust, "sink_csv"):
-        raise MissingRustExtensionError(
-            f"{_MISSING_SYMBOL_PREFIX}`sink_csv`. See docs/DEVELOPER.md."
-        )
-    with span("sink_csv", streaming=bool(streaming), path=str(path)):
-        rust.sink_csv(plan, root_data, path, streaming, separator & 0xFF, write_kwargs)
+    return get_default_engine().write_csv(
+        plan,
+        root_data,
+        path,
+        streaming=streaming,
+        separator=separator,
+        write_kwargs=write_kwargs,
+    )
 
 
 def write_ipc(
@@ -203,16 +126,14 @@ def write_ipc(
     compression: str | None = None,
     write_kwargs: dict[str, Any] | None = None,
 ) -> None:
-    """Write lazy plan + root to Arrow IPC file via Rust."""
-    rust = _require_rust_core()
-    if not hasattr(rust, "sink_ipc"):
-        raise MissingRustExtensionError(
-            f"{_MISSING_SYMBOL_PREFIX}`sink_ipc`. See docs/DEVELOPER.md."
-        )
-    with span(
-        "sink_ipc", streaming=bool(streaming), path=str(path), compression=compression
-    ):
-        rust.sink_ipc(plan, root_data, path, streaming, compression, write_kwargs)
+    return get_default_engine().write_ipc(
+        plan,
+        root_data,
+        path,
+        streaming=streaming,
+        compression=compression,
+        write_kwargs=write_kwargs,
+    )
 
 
 def write_ndjson(
@@ -223,14 +144,9 @@ def write_ndjson(
     streaming: bool = False,
     write_kwargs: dict[str, Any] | None = None,
 ) -> None:
-    """Write lazy plan + root as newline-delimited JSON via Rust."""
-    rust = _require_rust_core()
-    if not hasattr(rust, "sink_ndjson"):
-        raise MissingRustExtensionError(
-            f"{_MISSING_SYMBOL_PREFIX}`sink_ndjson`. See docs/DEVELOPER.md."
-        )
-    with span("sink_ndjson", streaming=bool(streaming), path=str(path)):
-        rust.sink_ndjson(plan, root_data, path, streaming, write_kwargs)
+    return get_default_engine().write_ndjson(
+        plan, root_data, path, streaming=streaming, write_kwargs=write_kwargs
+    )
 
 
 def collect_batches(
@@ -240,20 +156,9 @@ def collect_batches(
     batch_size: int = 65_536,
     streaming: bool = False,
 ) -> list[Any]:
-    """Materialize the plan and return a list of Polars ``DataFrame`` chunks (via IPC).
-
-    The engine performs a full collect first, then slices rows—this is not Polars'
-    native lazy batch iterator.
-    """
-    rust = _require_rust_core()
-    if not hasattr(rust, "collect_plan_batches"):
-        raise MissingRustExtensionError(
-            f"{_MISSING_SYMBOL_PREFIX}`collect_plan_batches`. See docs/DEVELOPER.md."
-        )
-    with span(
-        "collect_plan_batches", batch_size=int(batch_size), streaming=bool(streaming)
-    ):
-        return list(rust.collect_plan_batches(plan, root_data, batch_size, streaming))
+    return get_default_engine().collect_batches(
+        plan, root_data, batch_size=batch_size, streaming=streaming
+    )
 
 
 def execute_join(
@@ -275,43 +180,24 @@ def execute_join(
     as_python_lists: bool = False,
     streaming: bool = False,
 ) -> tuple[Any, Any]:
-    """Join two plan/data roots; returns ``(new_data, schema_descriptors)``."""
-    rust = _require_rust_core()
-    if not hasattr(rust, "execute_join"):
-        raise MissingRustExtensionError(
-            f"{_MISSING_SYMBOL_PREFIX}`execute_join`. See docs/DEVELOPER.md."
-        )
-    with span(
-        "execute_join",
-        how=how,
-        suffix=suffix,
+    return get_default_engine().execute_join(
+        left_plan,
+        left_root_data,
+        right_plan,
+        right_root_data,
+        left_on,
+        right_on,
+        how,
+        suffix,
         validate=validate,
         coalesce=coalesce,
         join_nulls=join_nulls,
         maintain_order=maintain_order,
         allow_parallel=allow_parallel,
         force_parallel=force_parallel,
-        as_python_lists=bool(as_python_lists),
-        streaming=bool(streaming),
-    ):
-        return rust.execute_join(
-            left_plan,
-            left_root_data,
-            right_plan,
-            right_root_data,
-            list(left_on),
-            list(right_on),
-            how,
-            suffix,
-            validate,
-            coalesce,
-            join_nulls,
-            maintain_order,
-            allow_parallel,
-            force_parallel,
-            as_python_lists,
-            streaming,
-        )
+        as_python_lists=as_python_lists,
+        streaming=streaming,
+    )
 
 
 def execute_groupby_agg(
@@ -325,30 +211,16 @@ def execute_groupby_agg(
     as_python_lists: bool = False,
     streaming: bool = False,
 ) -> tuple[Any, Any]:
-    """Group and aggregate; returns materialized data and output schema descriptors."""
-    rust = _require_rust_core()
-    if not hasattr(rust, "execute_groupby_agg"):
-        raise MissingRustExtensionError(
-            f"{_MISSING_SYMBOL_PREFIX}`execute_groupby_agg`. See docs/DEVELOPER.md."
-        )
-    with span(
-        "execute_groupby_agg",
-        by=list(by),
-        maintain_order=bool(maintain_order),
-        drop_nulls=bool(drop_nulls),
-        as_python_lists=bool(as_python_lists),
-        streaming=bool(streaming),
-    ):
-        return rust.execute_groupby_agg(
-            plan,
-            root_data,
-            list(by),
-            aggregations,
-            bool(maintain_order),
-            bool(drop_nulls),
-            as_python_lists,
-            streaming,
-        )
+    return get_default_engine().execute_groupby_agg(
+        plan,
+        root_data,
+        by,
+        aggregations,
+        maintain_order=maintain_order,
+        drop_nulls=drop_nulls,
+        as_python_lists=as_python_lists,
+        streaming=streaming,
+    )
 
 
 def execute_concat(
@@ -361,23 +233,15 @@ def execute_concat(
     as_python_lists: bool = False,
     streaming: bool = False,
 ) -> tuple[Any, Any]:
-    """Concatenate two frames (e.g. vertical stack)."""
-    rust = _require_rust_core()
-    with span(
-        "execute_concat",
-        how=how,
-        as_python_lists=bool(as_python_lists),
-        streaming=bool(streaming),
-    ):
-        return rust.execute_concat(
-            left_plan,
-            left_root_data,
-            right_plan,
-            right_root_data,
-            how,
-            as_python_lists,
-            streaming,
-        )
+    return get_default_engine().execute_concat(
+        left_plan,
+        left_root_data,
+        right_plan,
+        right_root_data,
+        how,
+        as_python_lists=as_python_lists,
+        streaming=streaming,
+    )
 
 
 def execute_except_all(
@@ -389,20 +253,14 @@ def execute_except_all(
     as_python_lists: bool = False,
     streaming: bool = False,
 ) -> tuple[Any, Any]:
-    rust = _require_rust_core()
-    with span(
-        "execute_except_all",
-        as_python_lists=bool(as_python_lists),
-        streaming=bool(streaming),
-    ):
-        return rust.execute_except_all(
-            left_plan,
-            left_root_data,
-            right_plan,
-            right_root_data,
-            as_python_lists,
-            streaming,
-        )
+    return get_default_engine().execute_except_all(
+        left_plan,
+        left_root_data,
+        right_plan,
+        right_root_data,
+        as_python_lists=as_python_lists,
+        streaming=streaming,
+    )
 
 
 def execute_intersect_all(
@@ -414,20 +272,14 @@ def execute_intersect_all(
     as_python_lists: bool = False,
     streaming: bool = False,
 ) -> tuple[Any, Any]:
-    rust = _require_rust_core()
-    with span(
-        "execute_intersect_all",
-        as_python_lists=bool(as_python_lists),
-        streaming=bool(streaming),
-    ):
-        return rust.execute_intersect_all(
-            left_plan,
-            left_root_data,
-            right_plan,
-            right_root_data,
-            as_python_lists,
-            streaming,
-        )
+    return get_default_engine().execute_intersect_all(
+        left_plan,
+        left_root_data,
+        right_plan,
+        right_root_data,
+        as_python_lists=as_python_lists,
+        streaming=streaming,
+    )
 
 
 def execute_melt(
@@ -441,21 +293,16 @@ def execute_melt(
     as_python_lists: bool = False,
     streaming: bool = False,
 ) -> tuple[Any, Any]:
-    """Unpivot to long format (melt)."""
-    rust = _require_rust_core()
-    with span(
-        "execute_melt", as_python_lists=bool(as_python_lists), streaming=bool(streaming)
-    ):
-        return rust.execute_melt(
-            plan,
-            root_data,
-            list(id_vars),
-            None if value_vars is None else list(value_vars),
-            variable_name,
-            value_name,
-            as_python_lists,
-            streaming,
-        )
+    return get_default_engine().execute_melt(
+        plan,
+        root_data,
+        id_vars,
+        value_vars,
+        variable_name,
+        value_name,
+        as_python_lists=as_python_lists,
+        streaming=streaming,
+    )
 
 
 def execute_pivot(
@@ -472,27 +319,19 @@ def execute_pivot(
     as_python_lists: bool = False,
     streaming: bool = False,
 ) -> tuple[Any, Any]:
-    """Pivot with aggregation."""
-    rust = _require_rust_core()
-    with span(
-        "execute_pivot",
-        aggregate_function=aggregate_function,
-        as_python_lists=bool(as_python_lists),
-        streaming=bool(streaming),
-    ):
-        return rust.execute_pivot(
-            plan,
-            root_data,
-            list(index),
-            columns,
-            list(values),
-            aggregate_function,
-            None if pivot_values is None else list(pivot_values),
-            bool(sort_columns),
-            str(separator),
-            as_python_lists,
-            streaming,
-        )
+    return get_default_engine().execute_pivot(
+        plan,
+        root_data,
+        index,
+        columns,
+        values,
+        aggregate_function,
+        pivot_values=pivot_values,
+        sort_columns=sort_columns,
+        separator=separator,
+        as_python_lists=as_python_lists,
+        streaming=streaming,
+    )
 
 
 def execute_explode(
@@ -503,15 +342,9 @@ def execute_explode(
     streaming: bool = False,
     outer: bool = False,
 ) -> tuple[Any, Any]:
-    """Explode list columns to one row per element."""
-    rust = _require_rust_core()
-    with span(
-        "execute_explode",
-        columns=list(columns),
-        streaming=bool(streaming),
-        outer=bool(outer),
-    ):
-        return rust.execute_explode(plan, root_data, list(columns), streaming, outer)
+    return get_default_engine().execute_explode(
+        plan, root_data, columns, streaming=streaming, outer=outer
+    )
 
 
 def execute_posexplode(
@@ -524,25 +357,15 @@ def execute_posexplode(
     streaming: bool = False,
     outer: bool = False,
 ) -> tuple[Any, Any]:
-    """Explode one list column with 0-based positions (Spark posexplode)."""
-    rust = _require_rust_core()
-    with span(
-        "execute_posexplode",
-        list_column=list_column,
-        pos_name=pos_name,
-        value_name=value_name,
-        streaming=bool(streaming),
-        outer=bool(outer),
-    ):
-        return rust.execute_posexplode(
-            plan,
-            root_data,
-            str(list_column),
-            str(pos_name),
-            str(value_name),
-            streaming,
-            outer,
-        )
+    return get_default_engine().execute_posexplode(
+        plan,
+        root_data,
+        list_column,
+        pos_name,
+        value_name,
+        streaming=streaming,
+        outer=outer,
+    )
 
 
 def execute_unnest(
@@ -552,10 +375,9 @@ def execute_unnest(
     *,
     streaming: bool = False,
 ) -> tuple[Any, Any]:
-    """Unnest struct columns into top-level fields."""
-    rust = _require_rust_core()
-    with span("execute_unnest", columns=list(columns), streaming=bool(streaming)):
-        return rust.execute_unnest(plan, root_data, list(columns), streaming)
+    return get_default_engine().execute_unnest(
+        plan, root_data, columns, streaming=streaming
+    )
 
 
 def execute_rolling_agg(
@@ -569,20 +391,17 @@ def execute_rolling_agg(
     by: Sequence[str] | None,
     min_periods: int,
 ) -> tuple[Any, Any]:
-    """Rolling window aggregation along a time or index column."""
-    rust = _require_rust_core()
-    with span(
-        "execute_rolling_agg",
-        on=on,
-        column=column,
-        window_size=window_size,
-        agg_op=op,
-        out_name=out_name,
-        min_periods=int(min_periods),
-    ):
-        return rust.execute_rolling_agg(
-            plan, root_data, on, column, window_size, op, out_name, by, min_periods
-        )
+    return get_default_engine().execute_rolling_agg(
+        plan,
+        root_data,
+        on,
+        column,
+        window_size,
+        op,
+        out_name,
+        by,
+        min_periods,
+    )
 
 
 def execute_groupby_dynamic_agg(
@@ -597,24 +416,44 @@ def execute_groupby_dynamic_agg(
     as_python_lists: bool = False,
     streaming: bool = False,
 ) -> tuple[Any, Any]:
-    """Time-bucket group-by with aggregations."""
-    rust = _require_rust_core()
-    with span(
-        "execute_groupby_dynamic_agg",
-        index_column=index_column,
-        every=every,
-        period=period,
-        as_python_lists=bool(as_python_lists),
-        streaming=bool(streaming),
-    ):
-        return rust.execute_groupby_dynamic_agg(
-            plan,
-            root_data,
-            index_column,
-            every,
-            period,
-            by,
-            aggregations,
-            as_python_lists,
-            streaming,
-        )
+    return get_default_engine().execute_groupby_dynamic_agg(
+        plan,
+        root_data,
+        index_column,
+        every,
+        period,
+        by,
+        aggregations,
+        as_python_lists=as_python_lists,
+        streaming=streaming,
+    )
+
+
+__all__ = [
+    "_MISSING_SYMBOL_PREFIX",
+    "_RUST_CORE",
+    "_load_rust_core",
+    "_require_rust_core",
+    "async_collect_plan_batches",
+    "async_execute_plan",
+    "collect_batches",
+    "execute_concat",
+    "execute_except_all",
+    "execute_explode",
+    "execute_groupby_agg",
+    "execute_groupby_dynamic_agg",
+    "execute_intersect_all",
+    "execute_join",
+    "execute_melt",
+    "execute_pivot",
+    "execute_plan",
+    "execute_posexplode",
+    "execute_rolling_agg",
+    "execute_unnest",
+    "rust_has_async_collect_plan_batches",
+    "rust_has_async_execute_plan",
+    "write_csv",
+    "write_ipc",
+    "write_ndjson",
+    "write_parquet",
+]

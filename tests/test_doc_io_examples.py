@@ -40,6 +40,8 @@ def _env_with_pythonpath() -> dict[str, str]:
 
 @pytest.mark.parametrize("rel", _EXAMPLES)
 def test_doc_io_example_script(rel: str) -> None:
+    if "sqlmodel" in rel:
+        pytest.importorskip("sqlmodel")
     script = REPO / rel
     assert script.is_file(), f"missing {script}"
     r = subprocess.run(

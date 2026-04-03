@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-from .rust_engine import _require_rust_core
+from pydantable.engine import get_expression_runtime
 
 # Public surface for stubs and docs.
 __all__ = [
@@ -109,7 +109,7 @@ class Expr:  # type: ignore[override]
 
     def _binary(self, op_symbol: str, other: Any) -> Expr:
         other_expr = self._coerce_other(other)
-        rust_expr = _require_rust_core().binary_op(
+        rust_expr = get_expression_runtime().binary_op(
             op_symbol, self._rust_expr, other_expr._rust_expr
         )
         return BinaryOp(rust_expr=rust_expr)
@@ -117,28 +117,28 @@ class Expr:  # type: ignore[override]
     def _binary_reflected(self, op_symbol: str, other: Any) -> Expr:
         # `other <op> self`
         left_expr = self._coerce_other(other)
-        rust_expr = _require_rust_core().binary_op(
+        rust_expr = get_expression_runtime().binary_op(
             op_symbol, left_expr._rust_expr, self._rust_expr
         )
         return BinaryOp(rust_expr=rust_expr)
 
     def _compare(self, op_symbol: str, other: Any) -> Expr:
         other_expr = self._coerce_other(other)
-        rust_expr = _require_rust_core().compare_op(
+        rust_expr = get_expression_runtime().compare_op(
             op_symbol, self._rust_expr, other_expr._rust_expr
         )
         return CompareOp(rust_expr=rust_expr)
 
     def cast(self, dtype: Any) -> Expr:
-        rust_expr = _require_rust_core().cast_expr(self._rust_expr, dtype)
+        rust_expr = get_expression_runtime().cast_expr(self._rust_expr, dtype)
         return Expr(rust_expr=rust_expr)
 
     def is_null(self) -> Expr:
-        rust_expr = _require_rust_core().is_null_expr(self._rust_expr)
+        rust_expr = get_expression_runtime().is_null_expr(self._rust_expr)
         return Expr(rust_expr=rust_expr)
 
     def is_not_null(self) -> Expr:
-        rust_expr = _require_rust_core().is_not_null_expr(self._rust_expr)
+        rust_expr = get_expression_runtime().is_not_null_expr(self._rust_expr)
         return Expr(rust_expr=rust_expr)
 
     def over(
@@ -203,7 +203,7 @@ class Expr:  # type: ignore[override]
             vals = list(values[0])
         else:
             vals = list(values)
-        rust_expr = _require_rust_core().expr_in_list(self._rust_expr, vals)
+        rust_expr = get_expression_runtime().expr_in_list(self._rust_expr, vals)
         return Expr(rust_expr=rust_expr)
 
     def is_in(self, *values: Any) -> Expr:
@@ -231,14 +231,14 @@ class Expr:  # type: ignore[override]
     def between(self, low: Any, high: Any) -> Expr:
         lo = self._coerce_other(low)
         hi = self._coerce_other(high)
-        rust_expr = _require_rust_core().expr_between(
+        rust_expr = get_expression_runtime().expr_between(
             self._rust_expr, lo._rust_expr, hi._rust_expr
         )
         return Expr(rust_expr=rust_expr)
 
     def substr(self, start: Any, length: Any | None = None) -> Expr:
         st = self._coerce_other(start)
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         if length is None:
             rust_expr = rust.expr_substring(self._rust_expr, st._rust_expr, None)
         else:
@@ -249,16 +249,16 @@ class Expr:  # type: ignore[override]
         return Expr(rust_expr=rust_expr)
 
     def char_length(self) -> Expr:
-        rust_expr = _require_rust_core().expr_string_length(self._rust_expr)
+        rust_expr = get_expression_runtime().expr_string_length(self._rust_expr)
         return Expr(rust_expr=rust_expr)
 
     def struct_field(self, name: str) -> Expr:
-        rust_expr = _require_rust_core().expr_struct_field(self._rust_expr, name)
+        rust_expr = get_expression_runtime().expr_struct_field(self._rust_expr, name)
         return Expr(rust_expr=rust_expr)
 
     def struct_json_encode(self) -> Expr:
         """Encode struct cells as JSON text (Polars ``struct.json_encode``)."""
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_struct_json_encode(self._rust_expr))
 
     def struct_json_path_match(self, path: str) -> Expr:
@@ -267,14 +267,14 @@ class Expr:  # type: ignore[override]
         Same null/match semantics as :meth:`str_json_path_match` on strings.
         Empty ``path`` raises ``ValueError``.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_struct_json_path_match(self._rust_expr, str(path)),
         )
 
     def struct_rename_fields(self, names: Sequence[str]) -> Expr:
         """Rename struct subfields in order (one new name per existing field)."""
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_struct_rename_fields(
                 self._rust_expr, [str(x) for x in names]
@@ -290,7 +290,7 @@ class Expr:  # type: ignore[override]
             raise TypeError(
                 "struct_with_fields() requires at least one keyword field=Expr."
             )
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         updates: list[tuple[str, Any]] = []
         for k, v in fields.items():
             if not isinstance(v, Expr):
@@ -304,43 +304,43 @@ class Expr:  # type: ignore[override]
 
     # Numeric
     def abs(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_abs(self._rust_expr))
 
     def round(self, decimals: int = 0) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_round(self._rust_expr, int(decimals)))
 
     def floor(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_floor(self._rust_expr))
 
     def ceil(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_ceil(self._rust_expr))
 
     def cumsum(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_row_accum_cum_sum(self._rust_expr))
 
     def cumprod(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_row_accum_cum_prod(self._rust_expr))
 
     def cummin(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_row_accum_cum_min(self._rust_expr))
 
     def cummax(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_row_accum_cum_max(self._rust_expr))
 
     def diff(self, periods: int = 1) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_row_accum_diff(self._rust_expr, int(periods)))
 
     def pct_change(self, periods: int = 1) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_row_accum_pct_change(self._rust_expr, int(periods))
         )
@@ -368,15 +368,15 @@ class Expr:  # type: ignore[override]
 
     # Strings
     def strip(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_string_unary(self._rust_expr, "strip"))
 
     def upper(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_string_unary(self._rust_expr, "upper"))
 
     def lower(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_string_unary(self._rust_expr, "lower"))
 
     def str_replace(
@@ -391,7 +391,7 @@ class Expr:  # type: ignore[override]
         Invalid regex patterns may yield null cells at execution (Polars) rather
         than raise.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_string_replace(
                 self._rust_expr,
@@ -402,7 +402,7 @@ class Expr:  # type: ignore[override]
         )
 
     def starts_with(self, prefix: str) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_string_predicate(
                 self._rust_expr, "starts_with", str(prefix)
@@ -410,7 +410,7 @@ class Expr:  # type: ignore[override]
         )
 
     def ends_with(self, suffix: str) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_string_predicate(
                 self._rust_expr, "ends_with", str(suffix)
@@ -423,7 +423,7 @@ class Expr:  # type: ignore[override]
         The empty substring matches every non-null string (Polars substring
         ``contains`` semantics).
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_string_predicate(
                 self._rust_expr, "contains", str(substring), literal=True
@@ -438,7 +438,7 @@ class Expr:  # type: ignore[override]
         Malformed regex may yield null per row at execution; see
         ``SUPPORTED_TYPES`` docs.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_string_predicate(
                 self._rust_expr, "contains", str(pattern), literal=bool(literal)
@@ -473,7 +473,7 @@ class Expr:  # type: ignore[override]
         Null string cells stay null. Edge cases are documented in
         ``SUPPORTED_TYPES``.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_string_split(self._rust_expr, str(delimiter)))
 
     def str_reverse(self) -> Expr:
@@ -482,7 +482,7 @@ class Expr:  # type: ignore[override]
         Unicode edge cases (e.g. combining marks) follow Polars, not naive
         codepoint reversal. See ``SUPPORTED_TYPES``.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_str_reverse(self._rust_expr))
 
     def str_pad_start(self, length: int, fill_char: str = " ") -> Expr:
@@ -491,7 +491,7 @@ class Expr:  # type: ignore[override]
         ``fill_char`` must be exactly one non-empty character; otherwise
         ``ValueError`` at build time.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_str_pad_start(
                 self._rust_expr, int(length), str(fill_char)
@@ -503,7 +503,7 @@ class Expr:  # type: ignore[override]
 
         Same ``fill_char`` rules as :meth:`str_pad_start`.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_str_pad_end(
                 self._rust_expr, int(length), str(fill_char)
@@ -512,7 +512,7 @@ class Expr:  # type: ignore[override]
 
     def str_zfill(self, length: int) -> Expr:
         """Zero-pad strings to ``length`` (sign handled like Polars ``str.zfill``)."""
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_str_zfill(self._rust_expr, int(length)))
 
     def str_extract_regex(self, pattern: str, group_index: int = 1) -> Expr:
@@ -522,7 +522,7 @@ class Expr:  # type: ignore[override]
         ``pattern`` raises ``ValueError``. No match or invalid regex may yield
         null; see ``SUPPORTED_TYPES``.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_str_extract_regex(
                 self._rust_expr, str(pattern), int(group_index)
@@ -536,7 +536,7 @@ class Expr:  # type: ignore[override]
         match often yields null at execution time. Empty ``path`` raises
         ``ValueError``.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_str_json_path_match(self._rust_expr, str(path)))
 
     def str_json_decode(self, dtype: Any) -> Expr:
@@ -550,11 +550,11 @@ class Expr:  # type: ignore[override]
         be an **array** such as ``[{"key":"a","value":1}]``, not a bare JSON
         object. Polars execution only; see ``INTERFACE_CONTRACT``.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_str_json_decode(self._rust_expr, dtype))
 
     def strip_prefix(self, prefix: str) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_string_unary(
                 self._rust_expr, "strip_prefix", str(prefix)
@@ -562,7 +562,7 @@ class Expr:  # type: ignore[override]
         )
 
     def strip_suffix(self, suffix: str) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_string_unary(
                 self._rust_expr, "strip_suffix", str(suffix)
@@ -570,7 +570,7 @@ class Expr:  # type: ignore[override]
         )
 
     def strip_chars(self, chars: str) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_string_unary(self._rust_expr, "strip_chars", str(chars))
         )
@@ -578,56 +578,56 @@ class Expr:  # type: ignore[override]
     # Boolean logic (typed; operands must be boolean expressions)
     def __and__(self, other: Any) -> Expr:
         right = other if isinstance(other, Expr) else self._coerce_other(other)
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_logical_and(self._rust_expr, right._rust_expr))
 
     def __rand__(self, other: Any) -> Expr:
         left = self._coerce_other(other)
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_logical_and(left._rust_expr, self._rust_expr))
 
     def __or__(self, other: Any) -> Expr:
         right = other if isinstance(other, Expr) else self._coerce_other(other)
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_logical_or(self._rust_expr, right._rust_expr))
 
     def __ror__(self, other: Any) -> Expr:
         left = self._coerce_other(other)
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_logical_or(left._rust_expr, self._rust_expr))
 
     def __invert__(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_logical_not(self._rust_expr))
 
     # Datetime / date parts (Rust validates column type)
     def dt_year(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "year"))
 
     def dt_month(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "month"))
 
     def dt_day(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "day"))
 
     def dt_hour(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "hour"))
 
     def dt_minute(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "minute"))
 
     def dt_second(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "second"))
 
     def dt_nanosecond(self) -> Expr:
         """Sub-second nanoseconds component (``datetime`` or ``time`` columns)."""
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "nanosecond"))
 
     def dt_weekday(self) -> Expr:
@@ -635,7 +635,7 @@ class Expr:  # type: ignore[override]
 
         Not valid on ``time`` columns (``TypeError`` at build time).
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "weekday"))
 
     def dt_quarter(self) -> Expr:
@@ -643,7 +643,7 @@ class Expr:  # type: ignore[override]
 
         Not valid on ``time`` columns (``TypeError`` at build time).
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "quarter"))
 
     def dt_week(self) -> Expr:
@@ -653,7 +653,7 @@ class Expr:  # type: ignore[override]
         Polars ``dt.week()`` (weeks start Monday; week 1 contains the first
         Thursday of the year). Not valid on ``time`` columns.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "week"))
 
     def dt_dayofyear(self) -> Expr:
@@ -661,16 +661,16 @@ class Expr:  # type: ignore[override]
 
         Matches Polars ``dt.ordinal_day()``. Not valid on ``time`` columns.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_temporal_part(self._rust_expr, "dayofyear"))
 
     def dt_date(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_datetime_to_date(self._rust_expr))
 
     def strptime(self, format: str, *, to_datetime: bool = False) -> Expr:
         """Parse strings to ``date`` or ``datetime`` (``strftime`` format string)."""
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_strptime(
                 self._rust_expr, str(format), bool(to_datetime)
@@ -679,7 +679,7 @@ class Expr:  # type: ignore[override]
 
     def unix_timestamp(self, unit: str = "seconds") -> Expr:
         """Unix epoch from ``date``/``datetime``; ``unit`` is ``seconds`` or ``ms``."""
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_unix_timestamp(self._rust_expr, str(unit)))
 
     def from_unix_time(self, unit: str = "seconds") -> Expr:
@@ -687,47 +687,47 @@ class Expr:  # type: ignore[override]
 
         Inverse of :meth:`unix_timestamp` for typical non-null numeric input.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_from_unix_time(self._rust_expr, str(unit)))
 
     def binary_len(self) -> Expr:
         """Byte length of a ``bytes`` column."""
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_binary_length(self._rust_expr))
 
     def map_len(self) -> Expr:
         """Number of entries in a ``dict[str, T]`` map column."""
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_map_len(self._rust_expr))
 
     def map_get(self, key: str) -> Expr:
         """Value for a string key (missing key → null)."""
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_map_get(self._rust_expr, str(key)))
 
     def map_contains_key(self, key: str) -> Expr:
         """Whether the map contains the given string key."""
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_map_contains_key(self._rust_expr, str(key)))
 
     def map_keys(self) -> Expr:
         """List of keys for each map cell."""
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_map_keys(self._rust_expr))
 
     def map_values(self) -> Expr:
         """List of values for each map cell."""
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_map_values(self._rust_expr))
 
     def map_entries(self) -> Expr:
         """List of ``{key, value}`` entry structs for each map cell."""
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_map_entries(self._rust_expr))
 
     def map_from_entries(self) -> Expr:
         """Build ``dict[str, T]`` map cells from ``list[{key, value}]`` entries."""
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_map_from_entries(self._rust_expr))
 
     def element_at(self, key: str) -> Expr:
@@ -736,18 +736,18 @@ class Expr:  # type: ignore[override]
 
     # List columns
     def list_len(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_list_len(self._rust_expr))
 
     def list_get(self, index: Any) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         idx = index if isinstance(index, Expr) else Literal(value=index)
         return Expr(
             rust_expr=rust.expr_list_get(self._rust_expr, idx._rust_expr),
         )
 
     def list_contains(self, value: Any) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         v = value if isinstance(value, Expr) else Literal(value=value)
         return Expr(
             rust_expr=rust.expr_list_contains(self._rust_expr, v._rust_expr),
@@ -812,15 +812,15 @@ class Expr:  # type: ignore[override]
         return expr
 
     def list_min(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_list_min(self._rust_expr))
 
     def list_max(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_list_max(self._rust_expr))
 
     def list_sum(self) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_list_sum(self._rust_expr))
 
     def list_mean(self) -> Expr:
@@ -829,7 +829,7 @@ class Expr:  # type: ignore[override]
         Requires ``list[int]`` or ``list[float]``. Empty lists and null list cells
         yield null.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_list_mean(self._rust_expr))
 
     def list_join(self, separator: str, *, ignore_nulls: bool = False) -> Expr:
@@ -838,7 +838,7 @@ class Expr:  # type: ignore[override]
         Empty lists yield empty strings. ``ignore_nulls`` skips null list
         elements when ``True``. See ``SUPPORTED_TYPES``.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_list_join(
                 self._rust_expr, str(separator), ignore_nulls=bool(ignore_nulls)
@@ -857,7 +857,7 @@ class Expr:  # type: ignore[override]
         ``descending``, ``nulls_last``, and ``maintain_order`` map to Polars
         ``list.sort`` options. Element-type rules are in ``SUPPORTED_TYPES``.
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_list_sort(
                 self._rust_expr,
@@ -873,7 +873,7 @@ class Expr:  # type: ignore[override]
         With ``stable=True``, first-seen order is preserved (Polars
         ``unique_stable``).
         """
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         return Expr(
             rust_expr=rust.expr_list_unique(self._rust_expr, stable=bool(stable))
         )
@@ -900,7 +900,7 @@ class WhenChain:
     def otherwise(self, value: Expr) -> Expr:
         if not isinstance(value, Expr):
             raise TypeError("otherwise() expects an Expr.")
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         conds = [c._rust_expr for c, _ in self._branches]
         thens = [v._rust_expr for _, v in self._branches]
         return Expr(rust_expr=rust.expr_case_when(conds, thens, value._rust_expr))
@@ -916,7 +916,7 @@ class ColumnRef(Expr):  # type: ignore[override]
 
     def __init__(self, *, name: str, dtype: Any):
         self._column_name = name
-        rust_expr = _require_rust_core().make_column_ref(
+        rust_expr = get_expression_runtime().make_column_ref(
             name=name, dtype_annotation=dtype
         )
         super().__init__(rust_expr=rust_expr)
@@ -932,7 +932,7 @@ class Literal(Expr):  # type: ignore[override]
         # `dtype` is accepted for backwards compatibility with the old skeleton.
         # Rust derives the actual dtype from the provided scalar value.
         _ = dtype
-        rust_expr = _require_rust_core().make_literal(value=value)
+        rust_expr = get_expression_runtime().make_literal(value=value)
         super().__init__(rust_expr=rust_expr)
 
 
@@ -954,7 +954,7 @@ def coalesce(*exprs: Expr) -> Expr:
     """SQL ``coalesce``: first non-null among compatible typed expressions."""
     if not exprs:
         raise TypeError("coalesce() requires at least one expression.")
-    rust = _require_rust_core()
+    rust = get_expression_runtime()
     return Expr(
         rust_expr=rust.coalesce_exprs([e._rust_expr for e in exprs]),
     )
@@ -967,7 +967,7 @@ def concat(*exprs: Expr) -> Expr:
     for e in exprs:
         if not isinstance(e, Expr):
             raise TypeError("concat() arguments must be Expr instances.")
-    rust = _require_rust_core()
+    rust = get_expression_runtime()
     return Expr(rust_expr=rust.expr_string_concat([e._rust_expr for e in exprs]))
 
 
@@ -981,7 +981,7 @@ class _WindowFnPending:
         return f"_WindowFnPending({self._kind!r})"
 
     def over(self, window: WindowSpec) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         part = list(window.partition_by)
         order = list(window.order_by)
         frame_kind = window.frame_kind
@@ -1032,7 +1032,7 @@ class _WindowValuePending:
         return f"_WindowValuePending({self._kind!r}, n={self._n!r})"
 
     def over(self, window: WindowSpec) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         part = list(window.partition_by)
         order = list(window.order_by)
         frame_kind = window.frame_kind
@@ -1086,7 +1086,7 @@ class _WindowNtilePending:
         return f"_WindowNtilePending({self._n!r})"
 
     def over(self, window: WindowSpec) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         part = list(window.partition_by)
         order = list(window.order_by)
         return Expr(
@@ -1112,7 +1112,7 @@ class _WindowAggPending:
         return f"_WindowAggPending({self._kind!r}, {self._inner!r})"
 
     def over(self, window: WindowSpec) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         part = list(window.partition_by)
         order = list(window.order_by)
         frame_kind = window.frame_kind
@@ -1177,7 +1177,7 @@ class _WindowShiftPending:
         return f"_WindowShiftPending({self._kind!r}, n={self._n}, {self._inner!r})"
 
     def over(self, window: WindowSpec) -> Expr:
-        rust = _require_rust_core()
+        rust = get_expression_runtime()
         part = list(window.partition_by)
         order = list(window.order_by)
         frame_kind = window.frame_kind
@@ -1301,37 +1301,37 @@ def global_sum(column: Expr) -> Expr:
     """Whole-frame ``sum`` for :meth:`~pydantable.dataframe.DataFrame.select`."""
     if not isinstance(column, Expr):
         raise TypeError("global_sum() expects an Expr.")
-    return Expr(rust_expr=_require_rust_core().expr_global_sum(column._rust_expr))
+    return Expr(rust_expr=get_expression_runtime().expr_global_sum(column._rust_expr))
 
 
 def global_mean(column: Expr) -> Expr:
     """Whole-frame mean for :meth:`~pydantable.dataframe.DataFrame.select`."""
     if not isinstance(column, Expr):
         raise TypeError("global_mean() expects an Expr.")
-    return Expr(rust_expr=_require_rust_core().expr_global_mean(column._rust_expr))
+    return Expr(rust_expr=get_expression_runtime().expr_global_mean(column._rust_expr))
 
 
 def global_count(column: Expr) -> Expr:
     """Whole-frame non-null ``count`` for ``DataFrame.select``."""
     if not isinstance(column, Expr):
         raise TypeError("global_count() expects an Expr.")
-    return Expr(rust_expr=_require_rust_core().expr_global_count(column._rust_expr))
+    return Expr(rust_expr=get_expression_runtime().expr_global_count(column._rust_expr))
 
 
 def global_min(column: Expr) -> Expr:
     """Whole-frame minimum for :meth:`~pydantable.dataframe.DataFrame.select`."""
     if not isinstance(column, Expr):
         raise TypeError("global_min() expects an Expr.")
-    return Expr(rust_expr=_require_rust_core().expr_global_min(column._rust_expr))
+    return Expr(rust_expr=get_expression_runtime().expr_global_min(column._rust_expr))
 
 
 def global_max(column: Expr) -> Expr:
     """Whole-frame maximum for :meth:`~pydantable.dataframe.DataFrame.select`."""
     if not isinstance(column, Expr):
         raise TypeError("global_max() expects an Expr.")
-    return Expr(rust_expr=_require_rust_core().expr_global_max(column._rust_expr))
+    return Expr(rust_expr=get_expression_runtime().expr_global_max(column._rust_expr))
 
 
 def global_row_count() -> Expr:
     """Row count for the current frame (Spark ``count(*)``); global ``select`` only."""
-    return Expr(rust_expr=_require_rust_core().expr_global_row_count())
+    return Expr(rust_expr=get_expression_runtime().expr_global_row_count())

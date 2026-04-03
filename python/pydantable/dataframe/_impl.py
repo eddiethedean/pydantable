@@ -45,39 +45,8 @@ from pydantic import BaseModel, TypeAdapter
 from pydantic_core import PydanticUndefined
 
 from pydantable.display import get_repr_html_limits
+from pydantable.engine import get_default_engine
 from pydantable.expressions import AliasedExpr, ColumnRef, Expr
-from pydantable.rust_engine import (
-    _require_rust_core,
-    async_collect_plan_batches,
-    async_execute_plan,
-    execute_concat,
-    execute_explode,
-    execute_groupby_agg,
-    execute_groupby_dynamic_agg,
-    execute_join,
-    execute_melt,
-    execute_pivot,
-    execute_plan,
-    execute_posexplode,
-    execute_unnest,
-    rust_has_async_collect_plan_batches,
-    rust_has_async_execute_plan,
-)
-from pydantable.rust_engine import (
-    collect_batches as rust_collect_batches,
-)
-from pydantable.rust_engine import (
-    write_csv as rust_write_csv,
-)
-from pydantable.rust_engine import (
-    write_ipc as rust_write_ipc,
-)
-from pydantable.rust_engine import (
-    write_ndjson as rust_write_ndjson,
-)
-from pydantable.rust_engine import (
-    write_parquet as rust_write_parquet,
-)
 from pydantable.schema import (
     _annotation_nullable_inner,
     _is_polars_dataframe,
@@ -503,10 +472,13 @@ def _resolve_engine_streaming(
 class DataFrame(Generic[SchemaT]):
     """Strongly typed lazy table: schema at construction, transforms, then ``collect``.
 
-    Construct with ``DataFrame[SchemaSubclass](data)``. Column types come from the
-    schema model; expressions are built with :class:`~pydantable.expressions.Expr`
-    or attribute access (``df.colname``). The Rust core validates operators and
-    lowers plans to Polars for execution.
+    Construct with ``DataFrame[SchemaSubclass](data)``. Pass ``engine=`` to use a
+    custom :class:`~pydantable.engine.protocols.ExecutionEngine` instance; the
+    default is :func:`~pydantable.engine.get_default_engine` (native Polars/Rust).
+
+    Column types come from the schema model; expressions are built with
+    :class:`~pydantable.expressions.Expr` or attribute access (``df.colname``). The
+    native engine validates operators and lowers plans to Polars for execution.
     """
 
     _schema_type: type[BaseModel] | None = None
@@ -534,6 +506,7 @@ class DataFrame(Generic[SchemaT]):
         nested_strictness_default: Literal[
             "inherit", "coerce", "strict", "off"
         ] = "inherit",
+        engine: Any | None = None,
     ) -> None:
         if self._schema_type is None:
             raise TypeError(
@@ -555,8 +528,10 @@ class DataFrame(Generic[SchemaT]):
         self._root_schema_type: type[BaseModel] = self._schema_type
         self._current_schema_type: type[BaseModel] = self._schema_type
         self._current_field_types = schema_field_types(self._current_schema_type)
-        # Rust owns expression typing, logical planning, and execution.
-        self._rust_plan = _require_rust_core().make_plan(
+        # Execution engine owns logical planning and materialization
+        # (native Polars by default). Pass ``engine=`` to use a custom backend.
+        self._engine = engine if engine is not None else get_default_engine()
+        self._rust_plan = self._engine.make_plan(
             field_types_for_rust(self.schema_fields())
         )
         # Optional validation options attached to lazy scan roots. These are applied
@@ -593,8 +568,8 @@ class DataFrame(Generic[SchemaT]):
             raise TypeError(
                 "Use DataFrame[SchemaType].read_* to construct from a lazy file read."
             )
-        rust = _require_rust_core()
-        plan = rust.make_plan(
+        eng = get_default_engine()
+        plan = eng.make_plan(
             field_types_for_rust(schema_field_types(cls._schema_type))
         )
         df = cls._from_plan(
@@ -602,6 +577,7 @@ class DataFrame(Generic[SchemaT]):
             root_schema_type=cls._schema_type,
             current_schema_type=cls._schema_type,
             rust_plan=plan,
+            engine=eng,
         )
         df._io_validation_enabled = True
         df._io_validation_trusted_mode = trusted_mode
@@ -1089,8 +1065,10 @@ class DataFrame(Generic[SchemaT]):
         root_schema_type: type[BaseModel],
         current_schema_type: type[BaseModel],
         rust_plan: Any,
+        engine: Any | None = None,
     ) -> DataFrame[Any]:
         obj = cls.__new__(cls)
+        obj._engine = engine if engine is not None else get_default_engine()
         obj._root_data = root_data
         obj._root_schema_type = root_schema_type
         obj._current_schema_type = current_schema_type
@@ -1163,7 +1141,7 @@ class DataFrame(Generic[SchemaT]):
 
         while True:
             try:
-                return execute_plan(
+                return self._engine.execute_plan(
                     plan,
                     self._root_data,
                     as_python_lists=True,
@@ -1197,12 +1175,12 @@ class DataFrame(Generic[SchemaT]):
                         ) from e
                 # Drop the missing optional column from the temporary plan and retry.
                 field_types.pop(missing_col, None)
-                plan = _require_rust_core().make_plan(field_types_for_rust(field_types))
+                plan = self._engine.make_plan(field_types_for_rust(field_types))
 
     async def _materialize_columns_with_missing_optional_fallback_async(
         self, *, streaming: bool, executor: Executor | None
     ) -> dict[str, list[Any]]:
-        if not rust_has_async_execute_plan():
+        if not self._engine.has_async_execute_plan():
             return await _materialize_in_thread(
                 functools.partial(
                     self._materialize_columns_with_missing_optional_fallback,
@@ -1215,7 +1193,7 @@ class DataFrame(Generic[SchemaT]):
 
         while True:
             try:
-                return await async_execute_plan(
+                return await self._engine.async_execute_plan(
                     plan,
                     self._root_data,
                     as_python_lists=True,
@@ -1247,7 +1225,7 @@ class DataFrame(Generic[SchemaT]):
                             f"{[missing_col]}"
                         ) from e
                 field_types.pop(missing_col, None)
-                plan = _require_rust_core().make_plan(field_types_for_rust(field_types))
+                plan = self._engine.make_plan(field_types_for_rust(field_types))
 
     async def _materialize_columns_async(
         self, *, streaming: bool, executor: Executor | None
@@ -1605,7 +1583,6 @@ class DataFrame(Generic[SchemaT]):
 
         Values are :class:`~pydantable.expressions.Expr` or plain literals.
         """
-        rust = _require_rust_core()
         rust_columns: dict[str, Any] = {}
 
         for item in exprs:
@@ -1624,9 +1601,9 @@ class DataFrame(Generic[SchemaT]):
             if isinstance(value, Expr):
                 rust_columns[name] = value._rust_expr
             else:
-                rust_columns[name] = rust.make_literal(value=value)
+                rust_columns[name] = self._engine.make_literal(value=value)
 
-        rust_plan = rust.plan_with_columns(self._rust_plan, rust_columns)
+        rust_plan = self._engine.plan_with_columns(self._rust_plan, rust_columns)
         desc = rust_plan.schema_descriptors()
         derived_fields = self._field_types_from_descriptors(desc)
         derived_schema_type = make_derived_schema_type(
@@ -1638,6 +1615,7 @@ class DataFrame(Generic[SchemaT]):
             root_schema_type=self._root_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def with_columns_cast(
@@ -1698,8 +1676,6 @@ class DataFrame(Generic[SchemaT]):
         as :func:`~pydantable.expressions.global_sum`. Keyword arguments are only for
         named global aggregates. Plain projections and globals cannot be mixed.
         """
-        rust = _require_rust_core()
-
         named_items: list[tuple[str, Any]] = []
         for name, e in named.items():
             if not isinstance(e, Expr):
@@ -1737,8 +1713,8 @@ class DataFrame(Generic[SchemaT]):
                 computed[col.name] = col.expr._rust_expr
                 projects.append(col.name)
             elif isinstance(col, Expr):
-                if rust.expr_is_global_agg(col._rust_expr):
-                    alias = rust.expr_global_default_alias(col._rust_expr)
+                if self._engine.expr_is_global_agg(col._rust_expr):
+                    alias = self._engine.expr_global_default_alias(col._rust_expr)
                     if alias is None:
                         raise TypeError(
                             "global aggregate in select() is missing a default "
@@ -1775,9 +1751,9 @@ class DataFrame(Generic[SchemaT]):
                 "select(exclude=...) cannot be used with global aggregates."
             )
         if named_items:
-            rust_plan = rust.plan_global_select(self._rust_plan, named_items)
+            rust_plan = self._engine.plan_global_select(self._rust_plan, named_items)
         elif aggs:
-            rust_plan = rust.plan_global_select(self._rust_plan, aggs)
+            rust_plan = self._engine.plan_global_select(self._rust_plan, aggs)
         else:
             if not projects:
                 if not exclude_set:
@@ -1791,8 +1767,8 @@ class DataFrame(Generic[SchemaT]):
                 raise ValueError("select(...) produced an empty projection.")
             rust_plan = self._rust_plan
             if computed:
-                rust_plan = rust.plan_with_columns(rust_plan, computed)
-            rust_plan = rust.plan_select(rust_plan, projects)
+                rust_plan = self._engine.plan_with_columns(rust_plan, computed)
+            rust_plan = self._engine.plan_select(rust_plan, projects)
         desc = rust_plan.schema_descriptors()
         derived_fields = self._field_types_from_descriptors(desc)
         # Preserve order: for plain projections, match call order.
@@ -1811,6 +1787,7 @@ class DataFrame(Generic[SchemaT]):
             root_schema_type=self._root_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def select_all(self) -> DataFrame[Any]:
@@ -1912,17 +1889,16 @@ class DataFrame(Generic[SchemaT]):
 
     def filter(self, condition: Expr) -> DataFrame[Any]:
         """Keep rows where the boolean ``condition`` is true."""
-        rust = _require_rust_core()
-
         if not isinstance(condition, Expr):
             raise TypeError("filter(condition) expects an Expr.")
 
-        rust_plan = rust.plan_filter(self._rust_plan, condition._rust_expr)
+        rust_plan = self._engine.plan_filter(self._rust_plan, condition._rust_expr)
         return self._from_plan(
             root_data=self._root_data,
             root_schema_type=self._root_schema_type,
             current_schema_type=self._current_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def sort(
@@ -1933,7 +1909,6 @@ class DataFrame(Generic[SchemaT]):
         maintain_order: bool = False,
     ) -> DataFrame[Any]:
         """Sort by one or more columns (names or single-column expressions)."""
-        rust = _require_rust_core()
         keys: list[str] = []
         for key in by:
             if isinstance(key, str):
@@ -1963,7 +1938,7 @@ class DataFrame(Generic[SchemaT]):
             nl = list(nulls_last)
         if nl and len(nl) != len(keys):
             raise ValueError("sort(nulls_last=...) length must match sort keys.")
-        rust_plan = rust.plan_sort(
+        rust_plan = self._engine.plan_sort(
             self._rust_plan, keys, desc, nl, bool(maintain_order)
         )
         return self._from_plan(
@@ -1971,6 +1946,7 @@ class DataFrame(Generic[SchemaT]):
             root_schema_type=self._root_schema_type,
             current_schema_type=self._current_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def unique(
@@ -1980,8 +1956,7 @@ class DataFrame(Generic[SchemaT]):
         keep: str = "first",
         maintain_order: bool = False,
     ) -> DataFrame[Any]:
-        rust = _require_rust_core()
-        rust_plan = rust.plan_unique(
+        rust_plan = self._engine.plan_unique(
             self._rust_plan,
             None if subset is None else list(subset),
             keep,
@@ -1992,6 +1967,7 @@ class DataFrame(Generic[SchemaT]):
             root_schema_type=self._root_schema_type,
             current_schema_type=self._current_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def duplicated(
@@ -2001,7 +1977,6 @@ class DataFrame(Generic[SchemaT]):
         keep: str | bool = "first",
     ) -> DataFrame[Any]:
         """Single-column boolean frame ``duplicated`` (row-wise duplicate mask)."""
-        rust = _require_rust_core()
         if keep is True:
             raise ValueError("duplicated(keep=True) is invalid; use 'first' or 'last'.")
         keep_s = "none" if keep is False else str(keep)
@@ -2010,7 +1985,7 @@ class DataFrame(Generic[SchemaT]):
                 "duplicated(keep=...) must be 'first', 'last', or False "
                 "(pandas parity)."
             )
-        rust_plan = rust.plan_duplicate_mask(
+        rust_plan = self._engine.plan_duplicate_mask(
             self._rust_plan,
             None if subset is None else list(subset),
             keep_s,
@@ -2025,6 +2000,7 @@ class DataFrame(Generic[SchemaT]):
             root_schema_type=self._root_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def drop_duplicate_groups(
@@ -2036,8 +2012,7 @@ class DataFrame(Generic[SchemaT]):
         ``subset`` selects key columns; if omitted, all columns participate.
         Same filter as pandas ``drop_duplicates(keep=False)``.
         """
-        rust = _require_rust_core()
-        rust_plan = rust.plan_drop_duplicate_groups(
+        rust_plan = self._engine.plan_drop_duplicate_groups(
             self._rust_plan,
             None if subset is None else list(subset),
         )
@@ -2046,6 +2021,7 @@ class DataFrame(Generic[SchemaT]):
             root_schema_type=self._root_schema_type,
             current_schema_type=self._current_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def distinct(
@@ -2059,7 +2035,6 @@ class DataFrame(Generic[SchemaT]):
     def drop(
         self, *columns: str | ColumnRef | Selector, strict: bool = True
     ) -> DataFrame[Any]:
-        rust = _require_rust_core()
         selected: list[str] = []
         for col in columns:
             if isinstance(col, str):
@@ -2079,7 +2054,7 @@ class DataFrame(Generic[SchemaT]):
             selected = [c for c in selected if c in self._current_field_types]
         if not selected:
             return self
-        rust_plan = rust.plan_drop(self._rust_plan, selected)
+        rust_plan = self._engine.plan_drop(self._rust_plan, selected)
         desc = rust_plan.schema_descriptors()
         derived_fields = self._field_types_from_descriptors(desc)
         # Preserve order: keep existing column order minus dropped columns.
@@ -2097,18 +2072,18 @@ class DataFrame(Generic[SchemaT]):
             root_schema_type=self._root_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def rename(
         self, columns: Mapping[str, str], *, strict: bool = True
     ) -> DataFrame[Any]:
-        rust = _require_rust_core()
         rename_map = dict(columns)
         if not strict:
             rename_map = {
                 k: v for k, v in rename_map.items() if k in self._current_field_types
             }
-        rust_plan = rust.plan_rename(self._rust_plan, rename_map)
+        rust_plan = self._engine.plan_rename(self._rust_plan, rename_map)
         desc = rust_plan.schema_descriptors()
         rename_prev: dict[str, Any] = dict(self._current_field_types)
         for old_name, new_name in rename_map.items():
@@ -2134,6 +2109,7 @@ class DataFrame(Generic[SchemaT]):
             root_schema_type=self._root_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def rename_with_selector(
@@ -2346,23 +2322,22 @@ class DataFrame(Generic[SchemaT]):
         return self.rename(rename_map, strict=strict)
 
     def slice(self, offset: int, length: int) -> DataFrame[Any]:
-        rust = _require_rust_core()
-        rust_plan = rust.plan_slice(self._rust_plan, int(offset), int(length))
+        rust_plan = self._engine.plan_slice(self._rust_plan, int(offset), int(length))
         return self._from_plan(
             root_data=self._root_data,
             root_schema_type=self._root_schema_type,
             current_schema_type=self._current_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def with_row_count(
         self, name: str = "row_nr", *, offset: int = 0
     ) -> DataFrame[Any]:
         """Add a deterministic row number column (Polars-style `with_row_count`)."""
-        rust = _require_rust_core()
         if not isinstance(name, str) or not name:
             raise TypeError("with_row_count(name=...) expects a non-empty string.")
-        rust_plan = rust.plan_with_row_count(self._rust_plan, str(name), int(offset))
+        rust_plan = self._engine.plan_with_row_count(self._rust_plan, str(name), int(offset))
         desc = rust_plan.schema_descriptors()
         derived_fields = self._field_types_from_descriptors(desc)
         derived_schema_type = make_derived_schema_type(
@@ -2373,6 +2348,7 @@ class DataFrame(Generic[SchemaT]):
             root_schema_type=self._root_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def head(self, n: int = 5) -> DataFrame[Any]:
@@ -2470,7 +2446,6 @@ class DataFrame(Generic[SchemaT]):
         strategy: str | None = None,
         subset: str | Sequence[str] | Selector | None = None,
     ) -> DataFrame[Any]:
-        rust = _require_rust_core()
         if isinstance(subset, str):
             subset = [subset]
         if isinstance(subset, Selector):
@@ -2486,7 +2461,7 @@ class DataFrame(Generic[SchemaT]):
             raise ValueError("fill_null() requires either value or strategy.")
         if value is not None and strategy is not None:
             raise ValueError("fill_null() accepts value or strategy, not both.")
-        rust_plan = rust.plan_fill_null(
+        rust_plan = self._engine.plan_fill_null(
             self._rust_plan,
             None if subset is None else list(subset),
             value,
@@ -2502,6 +2477,7 @@ class DataFrame(Generic[SchemaT]):
             root_schema_type=self._root_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def drop_nulls(
@@ -2511,7 +2487,6 @@ class DataFrame(Generic[SchemaT]):
         how: str = "any",
         threshold: int | None = None,
     ) -> DataFrame[Any]:
-        rust = _require_rust_core()
         if isinstance(subset, str):
             subset = [subset]
         if isinstance(subset, Selector):
@@ -2523,7 +2498,7 @@ class DataFrame(Generic[SchemaT]):
                     f"Available columns: [{available}]"
                 )
             subset = subset_cols
-        rust_plan = rust.plan_drop_nulls(
+        rust_plan = self._engine.plan_drop_nulls(
             self._rust_plan,
             None if subset is None else list(subset),
             str(how),
@@ -2534,6 +2509,7 @@ class DataFrame(Generic[SchemaT]):
             root_schema_type=self._root_schema_type,
             current_schema_type=self._current_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def melt(
@@ -2570,7 +2546,7 @@ class DataFrame(Generic[SchemaT]):
                     f"Available columns: [{available}]"
                 )
             value_vars = resolved
-        out_data, schema_descriptors = execute_melt(
+        out_data, schema_descriptors = self._engine.execute_melt(
             self._rust_plan,
             self._root_data,
             [] if id_vars is None else list(id_vars),
@@ -2584,12 +2560,13 @@ class DataFrame(Generic[SchemaT]):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
+        rust_plan = self._engine.make_plan(field_types_for_rust(derived_fields))
         return self._from_plan(
             root_data=out_data,
             root_schema_type=derived_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def unpivot(
@@ -2748,7 +2725,7 @@ class DataFrame(Generic[SchemaT]):
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
         )
-        out_data, schema_descriptors = execute_pivot(
+        out_data, schema_descriptors = self._engine.execute_pivot(
             self._rust_plan,
             self._root_data,
             index_cols,
@@ -2765,12 +2742,13 @@ class DataFrame(Generic[SchemaT]):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
+        rust_plan = self._engine.make_plan(field_types_for_rust(derived_fields))
         return self._from_plan(
             root_data=out_data,
             root_schema_type=derived_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def explode(
@@ -2793,7 +2771,7 @@ class DataFrame(Generic[SchemaT]):
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
         )
-        out_data, schema_descriptors = execute_explode(
+        out_data, schema_descriptors = self._engine.execute_explode(
             self._rust_plan,
             self._root_data,
             cols,
@@ -2804,12 +2782,13 @@ class DataFrame(Generic[SchemaT]):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
+        rust_plan = self._engine.make_plan(field_types_for_rust(derived_fields))
         return self._from_plan(
             root_data=out_data,
             root_schema_type=derived_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def explode_outer(
@@ -2841,7 +2820,7 @@ class DataFrame(Generic[SchemaT]):
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
         )
-        out_data, schema_descriptors = execute_posexplode(
+        out_data, schema_descriptors = self._engine.execute_posexplode(
             self._rust_plan,
             self._root_data,
             column,
@@ -2854,12 +2833,13 @@ class DataFrame(Generic[SchemaT]):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
+        rust_plan = self._engine.make_plan(field_types_for_rust(derived_fields))
         return self._from_plan(
             root_data=out_data,
             root_schema_type=derived_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def posexplode_outer(
@@ -2891,19 +2871,20 @@ class DataFrame(Generic[SchemaT]):
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
         )
-        out_data, schema_descriptors = execute_unnest(
+        out_data, schema_descriptors = self._engine.execute_unnest(
             self._rust_plan, self._root_data, cols, streaming=use_streaming
         )
         derived_fields = self._field_types_from_descriptors(schema_descriptors)
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
+        rust_plan = self._engine.make_plan(field_types_for_rust(derived_fields))
         return self._from_plan(
             root_data=out_data,
             root_schema_type=derived_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def explode_all(self, *, streaming: bool | None = None) -> DataFrame[Any]:
@@ -3184,7 +3165,7 @@ class DataFrame(Generic[SchemaT]):
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
         )
-        joined_data, schema_descriptors = execute_join(
+        joined_data, schema_descriptors = self._engine.execute_join(
             self._rust_plan,
             self._root_data,
             other._rust_plan,
@@ -3214,12 +3195,13 @@ class DataFrame(Generic[SchemaT]):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
+        rust_plan = self._engine.make_plan(field_types_for_rust(derived_fields))
         return self._from_plan(
             root_data=joined_data,
             root_schema_type=derived_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def group_by(
@@ -3359,12 +3341,13 @@ class DataFrame(Generic[SchemaT]):
         derived_schema_type = make_derived_schema_type(
             self._current_schema_type, fields
         )
-        rust_plan = _require_rust_core().make_plan(field_types_for_rust(fields))
+        rust_plan = self._engine.make_plan(field_types_for_rust(fields))
         return self._from_plan(
             root_data=out_data,
             root_schema_type=derived_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._engine,
         )
 
     def group_by_dynamic(
@@ -3509,12 +3492,13 @@ class DataFrame(Generic[SchemaT]):
                 out[k] = list(vs[q:]) + [None] * min(q, n)
         fields = dict(self._current_field_types)
         schema_t = make_derived_schema_type(self._current_schema_type, fields)
-        plan = _require_rust_core().make_plan(field_types_for_rust(fields))
+        plan = self._engine.make_plan(field_types_for_rust(fields))
         return self._from_plan(
             root_data=out,
             root_schema_type=schema_t,
             current_schema_type=schema_t,
             rust_plan=plan,
+            engine=self._engine,
         )
 
     def sample(
@@ -3552,12 +3536,13 @@ class DataFrame(Generic[SchemaT]):
         out: dict[str, list[Any]] = {k: [vs[i] for i in idxs] for k, vs in d.items()}
         fields = dict(self._current_field_types)
         schema_t = make_derived_schema_type(self._current_schema_type, fields)
-        plan = _require_rust_core().make_plan(field_types_for_rust(fields))
+        plan = self._engine.make_plan(field_types_for_rust(fields))
         return self._from_plan(
             root_data=out,
             root_schema_type=schema_t,
             current_schema_type=schema_t,
             rust_plan=plan,
+            engine=self._engine,
         )
 
     def write_parquet(
@@ -3588,7 +3573,7 @@ class DataFrame(Generic[SchemaT]):
             engine_streaming=engine_streaming,
             default=self._engine_streaming_default,
         )
-        rust_write_parquet(
+        self._engine.write_parquet(
             self._rust_plan,
             self._root_data,
             str(path),
@@ -3615,7 +3600,7 @@ class DataFrame(Generic[SchemaT]):
             engine_streaming=engine_streaming,
             default=self._engine_streaming_default,
         )
-        rust_write_csv(
+        self._engine.write_csv(
             self._rust_plan,
             self._root_data,
             str(path),
@@ -3642,7 +3627,7 @@ class DataFrame(Generic[SchemaT]):
             engine_streaming=engine_streaming,
             default=self._engine_streaming_default,
         )
-        rust_write_ipc(
+        self._engine.write_ipc(
             self._rust_plan,
             self._root_data,
             str(path),
@@ -3668,7 +3653,7 @@ class DataFrame(Generic[SchemaT]):
             engine_streaming=engine_streaming,
             default=self._engine_streaming_default,
         )
-        rust_write_ndjson(
+        self._engine.write_ndjson(
             self._rust_plan,
             self._root_data,
             str(path),
@@ -3692,7 +3677,7 @@ class DataFrame(Generic[SchemaT]):
             engine_streaming=engine_streaming,
             default=self._engine_streaming_default,
         )
-        return rust_collect_batches(
+        return self._engine.collect_batches(
             self._rust_plan,
             self._root_data,
             batch_size=batch_size,
@@ -3730,7 +3715,7 @@ class DataFrame(Generic[SchemaT]):
             engine_streaming=engine_streaming,
             default=self._engine_streaming_default,
         )
-        pl_batches = rust_collect_batches(
+        pl_batches = self._engine.collect_batches(
             self._rust_plan,
             self._root_data,
             batch_size=batch_size,
@@ -3844,9 +3829,10 @@ class DataFrame(Generic[SchemaT]):
         """
         Async version of :meth:`collect`: same semantics.
 
-        When the native extension exposes ``async_execute_plan``, engine work is
-        awaited via a Rust/Tokio coroutine; otherwise the same logic runs in
-        :func:`asyncio.to_thread` or in ``executor``.
+        When :meth:`~pydantable.engine.protocols.ExecutionEngine.has_async_execute_plan`
+        is true on this frame's engine, work is awaited via a native async path
+        (Rust/Tokio when using :class:`~pydantable.engine.native.NativePolarsEngine`);
+        otherwise the same logic runs in :func:`asyncio.to_thread` or in ``executor``.
 
         Cancelling the awaiting task does **not** cancel in-flight Rust/Polars
         execution.
@@ -4030,8 +4016,8 @@ class DataFrame(Generic[SchemaT]):
             engine_streaming=engine_streaming,
             default=self._engine_streaming_default,
         )
-        if rust_has_async_collect_plan_batches():
-            pl_batches = await async_collect_plan_batches(
+        if self._engine.has_async_collect_plan_batches():
+            pl_batches = await self._engine.async_collect_plan_batches(
                 self._rust_plan,
                 self._root_data,
                 batch_size=batch_size,
@@ -4110,7 +4096,7 @@ class DataFrame(Generic[SchemaT]):
             streaming=streaming, default=base._engine_streaming_default
         )
         for df in dfs[1:]:
-            out_data, schema_descriptors = execute_concat(
+            out_data, schema_descriptors = base._engine.execute_concat(
                 out_plan,
                 out_data,
                 df._rust_plan,
@@ -4124,12 +4110,13 @@ class DataFrame(Generic[SchemaT]):
                 merged_ft, schema_descriptors, derived_fields
             )
             out_schema_type = make_derived_schema_type(out_schema_type, merged_ft)
-            out_plan = _require_rust_core().make_plan(field_types_for_rust(merged_ft))
+            out_plan = base._engine.make_plan(field_types_for_rust(merged_ft))
         return cls._from_plan(
             root_data=out_data,
             root_schema_type=out_schema_type,
             current_schema_type=out_schema_type,
             rust_plan=out_plan,
+            engine=base._engine,
         )
 
 
@@ -4203,7 +4190,7 @@ class GroupedDataFrame:
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._df._engine_streaming_default
         )
-        grouped_data, schema_descriptors = execute_groupby_agg(
+        grouped_data, schema_descriptors = self._df._engine.execute_groupby_agg(
             self._df._rust_plan,
             self._df._root_data,
             self._keys,
@@ -4217,12 +4204,13 @@ class GroupedDataFrame:
         derived_schema_type = make_derived_schema_type(
             self._df._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
+        rust_plan = self._df._engine.make_plan(field_types_for_rust(derived_fields))
         return self._df._from_plan(
             root_data=grouped_data,
             root_schema_type=derived_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._df._engine,
         )
 
     def sum(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
@@ -4333,7 +4321,7 @@ class DynamicGroupedDataFrame:
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._df._engine_streaming_default
         )
-        out_data, schema_descriptors = execute_groupby_dynamic_agg(
+        out_data, schema_descriptors = self._df._engine.execute_groupby_dynamic_agg(
             self._df._rust_plan,
             self._df._root_data,
             self._index,
@@ -4348,10 +4336,11 @@ class DynamicGroupedDataFrame:
         derived_schema_type = make_derived_schema_type(
             self._df._current_schema_type, derived_fields
         )
-        rust_plan = _require_rust_core().make_plan(field_types_for_rust(derived_fields))
+        rust_plan = self._df._engine.make_plan(field_types_for_rust(derived_fields))
         return self._df._from_plan(
             root_data=out_data,
             root_schema_type=derived_schema_type,
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
+            engine=self._df._engine,
         )
