@@ -4,9 +4,12 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.14.1] — 2026-04-04
+
 ### Changed
 
 - **`pydantable`** now requires **`pydantable-native`** at the same version, so **`pip install pydantable`** installs the Rust engine. **Removed** the **`pydantable-meta`** package and its release job.
+- **Version bump:** Align Python package metadata (**`pydantable`**, **`pydantable-protocol`**, **`pydantable-native`**), Rust crate **`pydantable-core`**, and published **`__version__`** values to **1.14.1**.
 
 ## [1.14.0] — 2026-04-03
 
