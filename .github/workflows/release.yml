@@ -11,6 +11,9 @@ permissions:
   contents: read
   actions: write
 
+# PyPI targets: pydantable-protocol, pydantable, pydantable-native only.
+# Do not add a pydantable-meta job — that metapackage was removed from the repo.
+
 jobs:
   shared-ci:
     uses: ./.github/workflows/_shared-ci.yml
