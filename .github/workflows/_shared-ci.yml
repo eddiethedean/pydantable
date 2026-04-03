@@ -40,8 +40,11 @@ jobs:
 
       - name: Mypy
         env:
-          MYPYPATH: python:pydantable-protocol/python
-        run: mypy python/pydantable
+          MYPYPATH: python:pydantable-protocol/python:pydantable-native/python
+        run: >-
+          mypy python/pydantable
+          pydantable-protocol/python/pydantable_protocol
+          pydantable-native/python/pydantable_native
 
       - name: Pyright
         run: python -m pyright --project pyrightconfig.json

@@ -7,8 +7,9 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+_SpanCtor: type[Any]
 try:
-    from pydantable.observe import span as span
+    from pydantable.observe import span as _SpanCtor
 except ImportError:  # pydantable not installed — standalone native wheel / tests
     Observer = Callable[[dict[str, Any]], None]
 
@@ -37,13 +38,13 @@ except ImportError:  # pydantable not installed — standalone native wheel / te
         if trace_enabled():
             print(f"pydantable.trace {event}")
 
-    class span:
+    class _FallbackSpan:
         def __init__(self, op: str, **fields: Any) -> None:
             self._op = op
             self._fields = fields
             self._t0: float | None = None
 
-        def __enter__(self) -> span:
+        def __enter__(self) -> _FallbackSpan:
             self._t0 = _now()
             return self
 
@@ -61,3 +62,7 @@ except ImportError:  # pydantable not installed — standalone native wheel / te
             if exc_type is not None:
                 event["error_type"] = getattr(exc_type, "__name__", str(exc_type))
             emit(event)
+
+    _SpanCtor = _FallbackSpan
+
+span = _SpanCtor

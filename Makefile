@@ -1,3 +1,7 @@
+# Local checks span three Python trees: core ``python/pydantable``, ``pydantable-protocol``,
+# and ``pydantable-native`` (plus Rust in check-rust). Before ``native-develop`` or first
+# ``check-full``, install deps from repo root, for example:
+#   pip install -e ./pydantable-protocol && pip install -e ".[dev]" && make native-develop
 PYTHON ?= .venv/bin/python
 RUFF ?= $(PYTHON) -m ruff
 MYPY ?= $(PYTHON) -m mypy
@@ -5,6 +9,9 @@ PYRIGHT ?= $(PYTHON) -m pyright
 
 CARGO_MANIFEST ?= pydantable-core/Cargo.toml
 NATIVE_PYPROJECT ?= pydantable-native/pyproject.toml
+
+# Source roots on PYTHONPATH for Rust ``cargo test`` (Polars in venv + editable packages).
+RUST_PYTHONPATH ?= $(CURDIR)/python:$(CURDIR)/pydantable-protocol/python:$(CURDIR)/pydantable-native/python
 
 .PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check engine-bypass-check mypy-check pyright-check sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 .PHONY: native-develop native-wheel
@@ -26,8 +33,9 @@ ruff-check:
 engine-bypass-check:
 	$(PYTHON) scripts/check_engine_bypass.py
 
+# Uses ``mypy_path`` from repo ``pyproject.toml`` (``python/`` + ``pydantable-protocol/python``).
 mypy-check:
-	$(MYPY) python/pydantable
+	$(MYPY) python/pydantable pydantable-protocol/python/pydantable_protocol pydantable-native/python/pydantable_native
 
 # Mirror CI's mypy environment (no optional deps like numpy installed).
 # This catches missing ``# type: ignore[import-not-found]`` on optional imports.
@@ -36,8 +44,8 @@ mypy-check-minimal:
 		if [ -x .venv/bin/python ]; then .venv/bin/python -m venv .venv-mypy-min; else python3 -m venv .venv-mypy-min; fi; \
 	fi
 	@.venv-mypy-min/bin/python -m pip -q install -U pip >/dev/null
-	@.venv-mypy-min/bin/python -m pip -q install mypy pydantic >/dev/null
-	@MYPYPATH="python:pydantable-protocol/python" .venv-mypy-min/bin/python -m mypy python/pydantable
+	@.venv-mypy-min/bin/python -m pip -q install "mypy>=1.0" "pydantic>=2.0,<3" "typing-extensions>=4.7" >/dev/null
+	@MYPYPATH="python:pydantable-protocol/python:pydantable-native/python" .venv-mypy-min/bin/python -m mypy python/pydantable pydantable-protocol/python/pydantable_protocol pydantable-native/python/pydantable_native
 
 pyright-check:
 	$(PYRIGHT) --project pyrightconfig.json
@@ -51,7 +59,7 @@ gen-typing:
 
 check-typing:
 	$(PYTHON) scripts/generate_typing_artifacts.py --check
-	$(MYPY) python/pydantable
+	$(MYPY) python/pydantable pydantable-protocol/python/pydantable_protocol pydantable-native/python/pydantable_native
 	$(PYTHON) -m pytest -q \
 		tests/test_mypy_dataframe_model_return_types.py \
 		tests/test_mypy_typing_contracts.py \
@@ -69,13 +77,14 @@ rust-clippy:
 rust-check-no-default-features:
 	cargo check --manifest-path $(CARGO_MANIFEST) --no-default-features
 
-# PyO3's embedded interpreter does not always load site-packages; point PYTHONPATH at the venv
-# so optional deps like `polars` resolve for plan tests that import Python.
+# PyO3's embedded interpreter does not always load site-packages; prepend repo source
+# trees plus venv site-packages so ``polars``, ``pydantable``, and ``pydantable_protocol`` resolve.
 rust-test:
 	PYO3_PYTHON=$(CURDIR)/.venv/bin/python \
-	PYTHONPATH=$$($(CURDIR)/.venv/bin/python -c "import site; print(site.getsitepackages()[0])") \
+	PYTHONPATH=$(RUST_PYTHONPATH):$$($(CURDIR)/.venv/bin/python -c "import site; print(site.getsitepackages()[0])") \
 	cargo test --manifest-path $(CARGO_MANIFEST) --all-features
 
 native-develop:
+	$(PYTHON) -m pip install -q -e ./pydantable-protocol
 	cd pydantable-native && $(CURDIR)/$(PYTHON) -m maturin develop --release
 

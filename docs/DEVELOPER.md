@@ -25,6 +25,8 @@ python3 -m venv .venv
 
 Minimal alternative (narrower deps): **`pip install maturin pytest pytest-asyncio ruff`** then **`pip install -e .`** — you still need **`maturin develop`** from `pydantable-native` (or to install a published `pydantable-native` wheel) for native execution.
 
+**`make check-full`** (from repo root) runs Ruff on the whole tree, **mypy** on **`python/pydantable`**, **`pydantable-protocol/python/pydantable_protocol`**, and **`pydantable-native/python/pydantable_native`**, a minimal mypy venv, Pyright, typing-artifact checks, Sphinx, and Rust **`cargo fmt` / clippy / test**. **`make rust-test`** prepends **`python/`**, **`pydantable-protocol/python`**, and **`pydantable-native/python`** to **`PYTHONPATH`** (then the venv’s **`site-packages`**) so PyO3 tests resolve **`pydantable`**, **`pydantable_protocol`**, and **`polars`** consistently without relying on editable installs alone. **`make native-develop`** runs **`pip install -e ./pydantable-protocol`** before **`maturin develop`**.
+
 Activate when working interactively:
 
 ```bash
