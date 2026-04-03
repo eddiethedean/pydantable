@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any, NoReturn
 
+from pydantable.engine import get_expression_runtime as _expr_rt
 from pydantable.expressions import (
     ColumnRef,
     Expr,
@@ -68,7 +69,6 @@ from pydantable.expressions import (
 from pydantable.expressions import (
     window_sum as window_sum_expr,
 )
-from pydantable.engine import get_expression_runtime as _expr_rt
 
 
 class _GroupedAggSpec:

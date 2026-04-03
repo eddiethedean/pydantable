@@ -369,8 +369,9 @@ class DataFrameModel(Generic[RowT]):
     ) -> None:
         """Load columnar data or rows.
 
-        Optional ``engine=`` selects a :class:`~pydantable.engine.protocols.ExecutionEngine`
-        for the inner :class:`~pydantable.dataframe.DataFrame`; the default is
+        Optional ``engine=`` selects a
+        :class:`~pydantable.engine.protocols.ExecutionEngine` for the inner
+        :class:`~pydantable.dataframe.DataFrame`; the default is
         :func:`~pydantable.engine.get_default_engine`.
 
         Use ``trusted_mode='shape_only'`` or ``'strict'`` for trusted bulk input

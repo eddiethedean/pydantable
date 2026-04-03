@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantable.errors import UnsupportedEngineOperationError
 
@@ -14,6 +13,9 @@ from .protocols import (
     native_engine_capabilities,
     stub_engine_capabilities,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 __all__ = [
     "EngineCapabilities",
@@ -36,7 +38,7 @@ def get_default_engine() -> ExecutionEngine:
     """Return the process-wide default engine (lazily constructed)."""
     global _default_engine
     if _default_engine is None:
-        _default_engine = NativePolarsEngine()
+        _default_engine = cast("ExecutionEngine", NativePolarsEngine())
     return _default_engine
 
 
@@ -60,7 +62,8 @@ def get_expression_runtime() -> Any:
     if isinstance(eng, NativePolarsEngine):
         return eng.rust_core
     raise UnsupportedEngineOperationError(
-        "Expression building requires NativePolarsEngine or set_expression_runtime(...); "
+        "Expression building requires NativePolarsEngine or "
+        "set_expression_runtime(...); "
         f"current default engine is {type(eng).__name__!r}."
     )
 

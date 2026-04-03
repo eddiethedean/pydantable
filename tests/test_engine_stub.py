@@ -1,11 +1,9 @@
-"""Registry and protocol checks for :class:`~pydantable.engine.stub.StubExecutionEngine`."""
+"""Registry and protocol checks for StubExecutionEngine."""
 
 from __future__ import annotations
 
 import pytest
-
 from pydantable import DataFrameModel
-from pydantable.errors import UnsupportedEngineOperationError
 from pydantable.engine import (
     ExecutionEngine,
     NativePolarsEngine,
@@ -13,6 +11,7 @@ from pydantable.engine import (
     set_default_engine,
 )
 from pydantable.engine.stub import StubExecutionEngine
+from pydantable.errors import UnsupportedEngineOperationError
 
 
 class _Row(DataFrameModel):

@@ -48,5 +48,3 @@ def rust_has_async_execute_plan() -> bool:
 def rust_has_async_collect_plan_batches() -> bool:
     """True if ``_core`` exposes ``async_collect_plan_batches``."""
     return _RUST_CORE is not None and hasattr(_RUST_CORE, "async_collect_plan_batches")
-
-

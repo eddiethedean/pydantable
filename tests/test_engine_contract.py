@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from pydantable.engine import NativePolarsEngine, get_default_engine, native_engine_capabilities
+from pydantable.engine import (
+    NativePolarsEngine,
+    get_default_engine,
+    native_engine_capabilities,
+)
 from pydantable.engine.protocols import ExecutionEngine, PlanExecutor, SinkWriter
 
 

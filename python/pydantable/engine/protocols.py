@@ -9,8 +9,10 @@ for unsupported operations.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from collections.abc import Mapping, Sequence
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 
 @dataclass(frozen=True, slots=True)
@@ -354,9 +356,7 @@ class ExecutionEngine(PlanExecutor, SinkWriter, Protocol):
 
     def expr_global_default_alias(self, expr: Any) -> Any: ...
 
-    def plan_global_select(
-        self, plan: Any, items: list[tuple[str, Any]]
-    ) -> Any: ...
+    def plan_global_select(self, plan: Any, items: list[tuple[str, Any]]) -> Any: ...
 
     def plan_select(self, plan: Any, projects: list[str]) -> Any: ...
 

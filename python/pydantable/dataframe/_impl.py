@@ -569,9 +569,7 @@ class DataFrame(Generic[SchemaT]):
                 "Use DataFrame[SchemaType].read_* to construct from a lazy file read."
             )
         eng = get_default_engine()
-        plan = eng.make_plan(
-            field_types_for_rust(schema_field_types(cls._schema_type))
-        )
+        plan = eng.make_plan(field_types_for_rust(schema_field_types(cls._schema_type)))
         df = cls._from_plan(
             root_data=root,
             root_schema_type=cls._schema_type,
@@ -2337,7 +2335,9 @@ class DataFrame(Generic[SchemaT]):
         """Add a deterministic row number column (Polars-style `with_row_count`)."""
         if not isinstance(name, str) or not name:
             raise TypeError("with_row_count(name=...) expects a non-empty string.")
-        rust_plan = self._engine.plan_with_row_count(self._rust_plan, str(name), int(offset))
+        rust_plan = self._engine.plan_with_row_count(
+            self._rust_plan, str(name), int(offset)
+        )
         desc = rust_plan.schema_descriptors()
         derived_fields = self._field_types_from_descriptors(desc)
         derived_schema_type = make_derived_schema_type(

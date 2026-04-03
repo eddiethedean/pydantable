@@ -109,7 +109,7 @@ async def _async_collect_plan_batches(
     return _raise("async_collect_plan_batches")
 
 
-StubExecutionEngine.async_execute_plan = _async_execute_plan  # type: ignore[method-assign]
-StubExecutionEngine.async_collect_plan_batches = (  # type: ignore[method-assign]
+StubExecutionEngine.async_execute_plan = _async_execute_plan  # type: ignore[attr-defined, method-assign]
+StubExecutionEngine.async_collect_plan_batches = (  # type: ignore[attr-defined, method-assign]
     _async_collect_plan_batches
 )

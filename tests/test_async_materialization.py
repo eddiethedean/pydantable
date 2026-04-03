@@ -53,13 +53,13 @@ from unittest import mock
 import pydantable.io as io_mod
 import pytest
 from pydantable import DataFrame, DataFrameModel
+from pydantable.awaitable_dataframe_model import AwaitableDataFrameModel
 from pydantable.engine import get_default_engine
 from pydantable.engine.native import NativePolarsEngine
 from pydantable.rust_engine import (
     rust_has_async_collect_plan_batches,
     rust_has_async_execute_plan,
 )
-from pydantable.awaitable_dataframe_model import AwaitableDataFrameModel
 from pydantable.schema import Schema
 
 
@@ -1056,9 +1056,7 @@ def _astream_collect_batches_mock_for_concurrent_tests() -> Any:
             "has_async_collect_plan_batches",
             return_value=False,
         ),
-        mock.patch.object(
-            NativePolarsEngine, "collect_batches", fake_collect_batches
-        ),
+        mock.patch.object(NativePolarsEngine, "collect_batches", fake_collect_batches),
     ):
         yield impl
 
@@ -1118,7 +1116,9 @@ async def test_concurrent_acollect_runs_engine_work_in_parallel_threads() -> Non
         try:
             # Wait until at least one call entered, then until both entered.
             await asyncio.wait_for(_wait_threading_event(started, timeout=2.0), 2.5)
-            await asyncio.wait_for(_wait_threading_event(both_started, timeout=2.0), 2.5)
+            await asyncio.wait_for(
+                _wait_threading_event(both_started, timeout=2.0), 2.5
+            )
         finally:
             release.set()
         c1, c2 = await asyncio.wait_for(t, timeout=5.0)

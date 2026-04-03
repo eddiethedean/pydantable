@@ -16,12 +16,13 @@ from typing import Any
 from pydantic import create_model
 from typing_extensions import Self
 
+from pydantable.engine import get_default_engine
+
 from .dataframe import DataFrame as CoreDataFrame
 from .dataframe import GroupedDataFrame as CoreGroupedDataFrame
 from .dataframe_model import DataFrameModel as CoreDataFrameModel
 from .dataframe_model import GroupedDataFrameModel as CoreGroupedDataFrameModel
 from .expressions import ColumnRef, Expr, Literal, coalesce, dense_rank, rank, when
-from pydantable.engine import get_default_engine
 from .schema import Schema
 from .schema._impl import make_derived_schema_type, schema_field_types
 from .selectors import Selector

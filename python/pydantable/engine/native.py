@@ -72,9 +72,7 @@ class NativePolarsEngine:
         nulls_last: list[bool],
         maintain_order: bool,
     ) -> Any:
-        return self.rust_core.plan_sort(
-            plan, keys, desc, nulls_last, maintain_order
-        )
+        return self.rust_core.plan_sort(plan, keys, desc, nulls_last, maintain_order)
 
     def plan_unique(
         self,
@@ -90,9 +88,7 @@ class NativePolarsEngine:
     ) -> Any:
         return self.rust_core.plan_duplicate_mask(plan, subset, keep)
 
-    def plan_drop_duplicate_groups(
-        self, plan: Any, subset: list[str] | None
-    ) -> Any:
+    def plan_drop_duplicate_groups(self, plan: Any, subset: list[str] | None) -> Any:
         return self.rust_core.plan_drop_duplicate_groups(plan, subset)
 
     def plan_drop(self, plan: Any, columns: list[str]) -> Any:
@@ -230,9 +226,7 @@ class NativePolarsEngine:
             partition_by=pb,
             mkdir=bool(mkdir),
         ):
-            rust.sink_parquet(
-                plan, root_data, path, streaming, write_kwargs, pb, mkdir
-            )
+            rust.sink_parquet(plan, root_data, path, streaming, write_kwargs, pb, mkdir)
 
     def write_csv(
         self,
