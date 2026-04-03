@@ -11,20 +11,68 @@ jobs:
     with:
       python-versions: '["3.10", "3.11", "3.12", "3.13"]'
 
-  publish-pypi-manylinux-x86_64:
-    name: PyPI manylinux x86_64 + sdist
+  # Pure-Python protocol must land first (pins in pydantable / native / meta).
+  publish-pypi-protocol:
+    name: PyPI pydantable-protocol (sdist + wheel)
     runs-on: ubuntu-latest
     needs: [shared-ci]
     steps:
       - uses: actions/checkout@v5
 
-      # Default manylinux Docker image (no `container: off`, no `--zig` on host).
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Build and publish
+        shell: bash
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          python -m pip install -U pip "build>=1.2" "twine>=5,<6" "pkginfo>=1.12.1.2"
+          mkdir -p dist
+          (cd pydantable-protocol && python -m build --sdist --wheel -o ../dist)
+          python -m twine upload --skip-existing dist/pydantable_protocol-*
+
+  # Main Python package (setuptools); depends only on protocol on PyPI.
+  publish-pypi-pydantable:
+    name: PyPI pydantable (sdist + wheel)
+    runs-on: ubuntu-latest
+    needs: [shared-ci, publish-pypi-protocol]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Build and publish
+        shell: bash
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          python -m pip install -U pip "build>=1.2" "twine>=5,<6" "pkginfo>=1.12.1.2"
+          mkdir -p dist
+          python -m build --sdist --wheel -o dist
+          python -m twine upload --skip-existing dist/pydantable-*
+
+  publish-pypi-manylinux-x86_64:
+    name: PyPI manylinux x86_64 + sdist (pydantable-native)
+    runs-on: ubuntu-latest
+    needs: [shared-ci, publish-pypi-protocol]
+    steps:
+      - uses: actions/checkout@v5
+
       - name: Build wheels and sdist (maturin)
         uses: PyO3/maturin-action@v1
         with:
+          working-directory: pydantable-native
           target: x86_64-unknown-linux-gnu
           command: build
-          args: --release --sdist -o dist
+          args: --release --sdist -o ../dist
           manylinux: "2_17"
 
       - name: Publish to PyPI (twine)
@@ -34,21 +82,22 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m pip install --upgrade pip "twine>=5,<6" "pkginfo>=1.12.1.2"
-          python -m twine upload --skip-existing dist/*.whl dist/*.tar.gz
+          python -m twine upload --skip-existing dist/pydantable_native-*.whl dist/pydantable_native-*.tar.gz
 
   publish-pypi-manylinux-aarch64:
-    name: PyPI manylinux aarch64
+    name: PyPI manylinux aarch64 (pydantable-native)
     runs-on: ubuntu-24.04-arm
-    needs: [shared-ci]
+    needs: [shared-ci, publish-pypi-protocol]
     steps:
       - uses: actions/checkout@v5
 
       - name: Build wheels (maturin)
         uses: PyO3/maturin-action@v1
         with:
+          working-directory: pydantable-native
           target: aarch64-unknown-linux-gnu
           command: build
-          args: --release -o dist
+          args: --release -o ../dist
           manylinux: "2_28"
 
       - name: Publish to PyPI (twine)
@@ -58,12 +107,12 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m pip install --upgrade pip "twine>=5,<6" "pkginfo>=1.12.1.2"
-          python -m twine upload --skip-existing dist/*.whl
+          python -m twine upload --skip-existing dist/pydantable_native-*.whl
 
   publish-pypi-mac:
-    name: PyPI macOS ${{ matrix.target }}
+    name: PyPI macOS ${{ matrix.target }} (pydantable-native)
     runs-on: macos-latest
-    needs: [shared-ci]
+    needs: [shared-ci, publish-pypi-protocol]
     strategy:
       fail-fast: false
       matrix:
@@ -74,9 +123,10 @@ jobs:
       - name: Build wheels (maturin)
         uses: PyO3/maturin-action@v1
         with:
+          working-directory: pydantable-native
           target: ${{ matrix.target }}
           command: build
-          args: --release -i 3.11 -i 3.12 -i 3.13 -o dist
+          args: --release -i 3.11 -i 3.12 -i 3.13 -o ../dist
 
       - name: Publish to PyPI (twine)
         shell: bash
@@ -85,12 +135,12 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m pip install --upgrade pip "twine>=5,<6" "pkginfo>=1.12.1.2"
-          python -m twine upload --skip-existing dist/*.whl
+          python -m twine upload --skip-existing dist/pydantable_native-*.whl
 
   publish-pypi-musllinux-x86_64:
-    name: PyPI musllinux x86_64
+    name: PyPI musllinux x86_64 (pydantable-native)
     runs-on: ubuntu-latest
-    needs: [shared-ci]
+    needs: [shared-ci, publish-pypi-protocol]
     steps:
       - uses: actions/checkout@v5
 
@@ -102,9 +152,10 @@ jobs:
       - name: Build wheels (maturin)
         uses: PyO3/maturin-action@v1
         with:
+          working-directory: pydantable-native
           target: x86_64-unknown-linux-musl
           command: build
-          args: --release --zig --compatibility musllinux_1_2 -i 3.12 -o dist
+          args: --release --zig --compatibility musllinux_1_2 -i 3.12 -o ../dist
 
       - name: Publish to PyPI (twine)
         shell: bash
@@ -113,12 +164,12 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m pip install --upgrade pip "twine>=5,<6" "pkginfo>=1.12.1.2"
-          python -m twine upload --skip-existing dist/*.whl
+          python -m twine upload --skip-existing dist/pydantable_native-*.whl
 
   publish-pypi-musllinux-aarch64:
-    name: PyPI musllinux aarch64
+    name: PyPI musllinux aarch64 (pydantable-native)
     runs-on: ubuntu-24.04-arm
-    needs: [shared-ci]
+    needs: [shared-ci, publish-pypi-protocol]
     steps:
       - uses: actions/checkout@v5
 
@@ -130,9 +181,10 @@ jobs:
       - name: Build wheels (maturin)
         uses: PyO3/maturin-action@v1
         with:
+          working-directory: pydantable-native
           target: aarch64-unknown-linux-musl
           command: build
-          args: --release --zig --compatibility musllinux_1_2 -i 3.12 -o dist
+          args: --release --zig --compatibility musllinux_1_2 -i 3.12 -o ../dist
 
       - name: Publish to PyPI (twine)
         shell: bash
@@ -141,21 +193,22 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m pip install --upgrade pip "twine>=5,<6" "pkginfo>=1.12.1.2"
-          python -m twine upload --skip-existing dist/*.whl
+          python -m twine upload --skip-existing dist/pydantable_native-*.whl
 
   publish-pypi-windows-x86_64:
-    name: PyPI Windows x86_64
+    name: PyPI Windows x86_64 (pydantable-native)
     runs-on: windows-latest
-    needs: [shared-ci]
+    needs: [shared-ci, publish-pypi-protocol]
     steps:
       - uses: actions/checkout@v5
 
       - name: Build wheels (maturin)
         uses: PyO3/maturin-action@v1
         with:
+          working-directory: pydantable-native
           target: x86_64-pc-windows-msvc
           command: build
-          args: --release -o dist
+          args: --release -o ../dist
 
       - name: Publish to PyPI (twine)
         shell: bash
@@ -164,21 +217,22 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m pip install --upgrade pip "twine>=5,<6" "pkginfo>=1.12.1.2"
-          python -m twine upload --skip-existing dist/*.whl
+          python -m twine upload --skip-existing dist/pydantable_native-*.whl
 
   publish-pypi-windows-arm64:
-    name: PyPI Windows aarch64
+    name: PyPI Windows aarch64 (pydantable-native)
     runs-on: windows-11-arm
-    needs: [shared-ci]
+    needs: [shared-ci, publish-pypi-protocol]
     steps:
       - uses: actions/checkout@v5
 
       - name: Build wheels (maturin)
         uses: PyO3/maturin-action@v1
         with:
+          working-directory: pydantable-native
           target: aarch64-pc-windows-msvc
           command: build
-          args: --release -o dist
+          args: --release -o ../dist
 
       - name: Publish to PyPI (twine)
         shell: bash
@@ -187,5 +241,38 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           python -m pip install --upgrade pip "twine>=5,<6" "pkginfo>=1.12.1.2"
-          python -m twine upload --skip-existing dist/*.whl
+          python -m twine upload --skip-existing dist/pydantable_native-*.whl
 
+  # Meta-package last so ``pip install pydantable-meta`` resolves core + native on PyPI.
+  publish-pypi-meta:
+    name: PyPI pydantable-meta (sdist + wheel)
+    runs-on: ubuntu-latest
+    needs:
+      - shared-ci
+      - publish-pypi-protocol
+      - publish-pypi-pydantable
+      - publish-pypi-manylinux-x86_64
+      - publish-pypi-manylinux-aarch64
+      - publish-pypi-mac
+      - publish-pypi-musllinux-x86_64
+      - publish-pypi-musllinux-aarch64
+      - publish-pypi-windows-x86_64
+      - publish-pypi-windows-arm64
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Build and publish
+        shell: bash
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          python -m pip install -U pip "build>=1.2" "twine>=5,<6" "pkginfo>=1.12.1.2"
+          mkdir -p dist
+          (cd pydantable-meta && python -m build --sdist --wheel -o ../dist)
+          python -m twine upload --skip-existing dist/pydantable_meta-*
