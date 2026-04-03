@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from pydantable import DataFrameModel
 from pydantable.errors import UnsupportedEngineOperationError
 from pydantable.engine import (
     ExecutionEngine,
@@ -12,6 +13,16 @@ from pydantable.engine import (
     set_default_engine,
 )
 from pydantable.engine.stub import StubExecutionEngine
+
+
+class _Row(DataFrameModel):
+    x: int
+
+
+def test_dataframe_model_passes_engine_to_inner_dataframe() -> None:
+    eng = NativePolarsEngine()
+    m = _Row({"x": [1, 2]}, engine=eng)
+    assert m._df._engine is eng
 
 
 def test_stub_engine_capabilities_and_protocol() -> None:

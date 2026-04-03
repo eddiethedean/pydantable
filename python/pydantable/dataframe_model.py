@@ -365,8 +365,13 @@ class DataFrameModel(Generic[RowT]):
         ignore_errors: bool = False,
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         validation_profile: str | None = None,
+        engine: Any | None = None,
     ) -> None:
         """Load columnar data or rows.
+
+        Optional ``engine=`` selects a :class:`~pydantable.engine.protocols.ExecutionEngine`
+        for the inner :class:`~pydantable.dataframe.DataFrame`; the default is
+        :func:`~pydantable.engine.get_default_engine`.
 
         Use ``trusted_mode='shape_only'`` or ``'strict'`` for trusted bulk input
         (layout still validated; ``strict`` adds dtype checks). Default is full
@@ -436,6 +441,7 @@ class DataFrameModel(Generic[RowT]):
             on_validation_errors=on_validation_errors,
             column_strictness_default=col_sd,
             nested_strictness_default=nested_sd,
+            engine=engine,
         )
 
     @classmethod
