@@ -359,12 +359,13 @@ jobs:
       - name: Create venv
         run: python -m venv .venv
 
+      # Absolute path so ``cd`` in later steps (e.g. maturin in ``pydantable-native/``) still works.
       - name: Set Python path
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
-            echo "PY=.venv/Scripts/python" >> $GITHUB_ENV
+            echo "PY=$GITHUB_WORKSPACE/.venv/Scripts/python.exe" >> $GITHUB_ENV
           else
-            echo "PY=.venv/bin/python" >> $GITHUB_ENV
+            echo "PY=$GITHUB_WORKSPACE/.venv/bin/python" >> $GITHUB_ENV
           fi
 
       # Keep in sync with ``pyproject.toml`` ``[project.optional-dependencies]`` dev + pandas + polars
