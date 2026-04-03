@@ -280,7 +280,10 @@ jobs:
           python -m pip install --upgrade pip "twine>=5,<6" "pkginfo>=1.12.1.2"
           python -m twine upload --skip-existing dist/pydantable_native-*.whl
 
-  # Meta-package last so ``pip install pydantable-meta`` resolves core + native on PyPI.
+  # Meta after protocol + core + the native job that uploads the sdist and primary manylinux
+  # wheels. Other native matrix jobs run in parallel and do not gate this job — a single
+  # failing platform must not block ``pydantable-meta`` or leave the workflow without a
+  # successful meta upload when Linux/sdist already succeeded.
   publish-pypi-meta:
     name: PyPI pydantable-meta (sdist + wheel)
     runs-on: ubuntu-latest
@@ -289,12 +292,6 @@ jobs:
       - publish-pypi-protocol
       - publish-pypi-pydantable
       - publish-pypi-manylinux-x86_64
-      - publish-pypi-manylinux-aarch64
-      - publish-pypi-mac
-      - publish-pypi-musllinux-x86_64
-      - publish-pypi-musllinux-aarch64
-      - publish-pypi-windows-x86_64
-      - publish-pypi-windows-arm64
     steps:
       - uses: actions/checkout@v5
 
