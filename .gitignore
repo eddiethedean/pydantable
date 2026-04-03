@@ -13,6 +13,7 @@ venv/
 .venv-ty-min/
 build/
 dist/
+dist_test_sdist/
 *.egg-info/
 .pytest_cache/
 .hypothesis/
