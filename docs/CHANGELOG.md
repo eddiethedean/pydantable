@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.15.0] — 2026-04-04
+
+### Added
+
+- **Optional Moltres integration:** extra **`pydantable[moltres]`** pulls [**moltres-core**](https://pypi.org/project/moltres-core/). New **`SqlDataFrame`** and **`SqlDataFrameModel`** in **`pydantable.sql_moltres`** (also available as **`pydantable.SqlDataFrame`** / **`SqlDataFrameModel`** via lazy import) bind **`moltres_core.MoltresPydantableEngine`** using **`sql_config=`** (**`moltres_core.EngineConfig`**) or **`moltres_engine=`**. Helper **`moltres_engine_from_sql_config`**. User guide: {doc}`MOLTRES_SQL`; protocol story: {doc}`CUSTOM_ENGINE_PACKAGE`.
+
+### Changed
+
+- **Version bump:** Align Python package metadata (**`pydantable`**, **`pydantable-protocol`**, **`pydantable-native`**), Rust crate **`pydantable-core`**, and published **`__version__`** values to **1.15.0**.
+
 ## [1.14.1] — 2026-04-03
 
 ### Changed

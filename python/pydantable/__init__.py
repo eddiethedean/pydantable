@@ -12,6 +12,8 @@ subclasses :class:`Schema`.
 
 from __future__ import annotations
 
+from typing import Any
+
 from . import pandas as pandas
 from . import plugins as plugins
 from . import pyspark as pyspark
@@ -78,6 +80,19 @@ from .observe import get_observer, set_observer
 from .schema import DtypeDriftWarning, Schema
 from .types import WKB
 
+
+def __getattr__(name: str) -> Any:
+    if name == "SqlDataFrame":
+        from pydantable.sql_moltres import SqlDataFrame
+
+        return SqlDataFrame
+    if name == "SqlDataFrameModel":
+        from pydantable.sql_moltres import SqlDataFrameModel
+
+        return SqlDataFrameModel
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
     "WKB",
     "AwaitableDataFrameModel",
@@ -90,6 +105,8 @@ __all__ = [
     "PlanMaterialization",
     "PydantableUserError",
     "Schema",
+    "SqlDataFrame",
+    "SqlDataFrameModel",
     "afetch_sql",
     "afetch_sql_raw",
     "afetch_sqlmodel",
@@ -149,4 +166,4 @@ __all__ = [
     "write_sqlmodel",
     "write_sqlmodel_batches",
 ]
-__version__ = "1.14.1"
+__version__ = "1.15.0"

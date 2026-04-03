@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pydantable"
-version = "1.14.1"
+version = "1.15.0"
 description = "Strongly-typed DataFrames for Python, powered by Rust."
 readme = "README.md"
 license = { text = "MIT" }
@@ -19,8 +19,8 @@ classifiers = [
 ]
 dependencies = [
     "pydantic>=2.0,<3",
-    "pydantable-protocol==1.14.1",
-    "pydantable-native==1.14.1",
+    "pydantable-protocol==1.15.0",
+    "pydantable-native==1.15.0",
     "typing-extensions>=4.7",
 ]
 
@@ -39,6 +39,8 @@ snowflake = ["snowflake-connector-python>=3.0"]
 rap = ["rapcsv>=0.2", "rapfiles>=0.1", "rapsqlite>=0.1"]
 # FastAPI integration helpers (pydantable.fastapi); optional at runtime.
 fastapi = ["fastapi>=0.100"]
+# Moltres SQL engine (moltres-core) — SqlDataFrame / SqlDataFrameModel
+moltres = ["moltres-core>=1.0.0,<2"]
 dev = [
     "tomli>=1.2.0; python_version < '3.11'",
     "fastapi>=0.100",
@@ -71,6 +73,7 @@ dev = [
     "rapfiles>=0.1",
     "rapsqlite>=0.1",
     "snowflake-connector-python>=3.0",
+    "moltres-core>=1.0.0,<2",
 ]
 benchmark = [
     "maturin>=1.4,<2.0",
@@ -124,6 +127,7 @@ allowed-unresolved-imports = [
     "rapfiles.**",
     "fastapi.**",
     "starlette.**",
+    "moltres_core.**",
 ]
 
 [tool.ty.rules]
@@ -171,6 +175,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 "tests/test_typing_module_runtime.py" = ["TC003"]
 "tests/test_async_materialization.py" = ["TC003"]
 "python/pydantable/testing/**/*.py" = ["TC003"]
+"python/pydantable/sql_moltres.py" = ["TC003"]
 "tests/test_pydantable_fastapi_columnar.py" = ["TC003"]
 
 [tool.mypy]
@@ -283,6 +288,15 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "starlette.*"
+ignore_missing_imports = true
+
+# Optional: ``pydantable[moltres]`` / ``moltres-core``.
+[[tool.mypy.overrides]]
+module = "moltres_core"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "moltres_core.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

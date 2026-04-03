@@ -46,6 +46,7 @@ Use this page when you know **what you need to do**, but not **where it is docum
 - **Developer guide**: {doc}`DEVELOPER`
 - **Execution engine abstraction (ADR)**: {doc}`ADR-engines`
 - **Custom engine package (third-party backends)**: {doc}`CUSTOM_ENGINE_PACKAGE`
+- **Moltres SQL engine (`SqlDataFrame` / `SqlDataFrameModel`, optional `pydantable[moltres]`)**: {doc}`MOLTRES_SQL`
 - **Performance notes**: {doc}`PERFORMANCE`
 - **Changelog**: {doc}`CHANGELOG`
 - **Troubleshooting / FAQ**: {doc}`TROUBLESHOOTING`

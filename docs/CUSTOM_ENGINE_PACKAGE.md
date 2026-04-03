@@ -76,6 +76,11 @@ time, static checkers and :func:`isinstance` (with
 - **`NativePolarsEngine`** in **`pydantable-native`**: full implementation over
   **`pydantable_native._core`**.
 
+- **Third-party:** [**moltres-core**](https://pypi.org/project/moltres-core/) (PyPI)
+  ships **`MoltresPydantableEngine`** for SQL-backed execution in the Moltres stack;
+  see the upstream repository’s **`docs/PYDANTABLE_ENGINE.md`**. PydanTable user guide:
+  {doc}`MOLTRES_SQL` (**`SqlDataFrame`**, **`SqlDataFrameModel`**, **`pydantable[moltres]`**).
+
 When **PydanTable** adds new protocol members, contract tests in this project
 (exercising **`typing_extensions.get_protocol_members`**) and release notes
 will flag required updates — pin **`pydantable-protocol`** accordingly.
@@ -170,6 +175,7 @@ typically expose your own ingestion APIs and **then** construct
 
 ## See also
 
+- {doc}`MOLTRES_SQL` — **`SqlDataFrame`** / **`SqlDataFrameModel`** with **moltres-core** (**`pydantable[moltres]`**).
 - {doc}`ADR-engines` — architecture decisions and extension checklist.
 - {doc}`DEVELOPER` — repository layout and native packaging.
 - {doc}`EXECUTION` — how materialization uses the engine.
