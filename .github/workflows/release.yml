@@ -246,6 +246,7 @@ jobs:
           python -m pip install --upgrade pip "twine>=5,<6" "pkginfo>=1.12.1.2"
           python -m twine upload --skip-existing dist/pydantable_native-*.whl
 
+  # ``actions/setup-python`` does not ship CPython 3.10 for Windows ARM64 (see versions-manifest).
   publish-pypi-windows-arm64:
     name: PyPI Windows aarch64 py${{ matrix.python-version }} (pydantable-native)
     runs-on: windows-11-arm
@@ -253,7 +254,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v5
 
