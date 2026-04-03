@@ -5,9 +5,11 @@ on:
     tags:
       - "v*"
 
-# Least privilege: checkout + OIDC none; PyPI uses repository secret.
+# Explicit permissions: unspecified scopes default to ``none``. ``shared-ci`` uses
+# ``actions/cache`` and ``actions/upload-artifact``, which need ``actions: write``.
 permissions:
   contents: read
+  actions: write
 
 jobs:
   shared-ci:
