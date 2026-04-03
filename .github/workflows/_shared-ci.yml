@@ -109,10 +109,15 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Install docs dependencies
         run: |
           python -m pip install -U pip
+          python -m pip install "maturin>=1.4,<2.0"
           python -m pip install -e ./pydantable-protocol
+          (cd pydantable-native && python -m maturin develop --release)
           python -m pip install -e ".[docs]"
 
       - name: Build docs (warnings as errors)
@@ -386,8 +391,8 @@ jobs:
       - name: Install local packages and native extension
         run: |
           $PY -m pip install -e ./pydantable-protocol
-          $PY -m pip install -e .
           (cd pydantable-native && $PY -m maturin develop --release)
+          $PY -m pip install -e .
         env:
           VIRTUAL_ENV: ${{ github.workspace }}/.venv
 
