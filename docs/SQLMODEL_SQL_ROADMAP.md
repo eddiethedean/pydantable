@@ -59,7 +59,7 @@ This document records the **plan and phased roadmap** for pydantable’s **SQLMo
 
 ```python
 from sqlmodel import SQLModel
-from sqlalchemy.engine import Engine, Connection
+from sqlalchemy.engine import Connection, Engine  # bind types (SQLModel uses SQLAlchemy engines under the hood)
 
 def fetch_sqlmodel(
     model: type[SQLModel],

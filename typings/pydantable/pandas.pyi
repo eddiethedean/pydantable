@@ -557,4 +557,11 @@ class DataFrame(PandasDataFrame): ...
 class DataFrameModel(PandasDataFrameModel):
     _dataframe_cls = DataFrame
 
-__all__ = ["DataFrame", "DataFrameModel", "Expr", "Schema"]
+__all__ = [
+    "DataFrame",
+    "DataFrameModel",
+    "Expr",
+    "Schema",
+    "SqlDataFrame",
+    "SqlDataFrameModel",
+]

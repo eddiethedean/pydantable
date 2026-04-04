@@ -3148,4 +3148,23 @@ class DataFrameModel(PandasDataFrameModel):
     _dataframe_cls = DataFrame
 
 
-__all__ = ["DataFrame", "DataFrameModel", "Expr", "Schema"]
+def __getattr__(name: str) -> Any:
+    if name == "SqlDataFrame":
+        from pydantable.pandas_moltres import SqlDataFrame as _SqlDataFrame
+
+        return _SqlDataFrame
+    if name == "SqlDataFrameModel":
+        from pydantable.pandas_moltres import SqlDataFrameModel as _SqlDataFrameModel
+
+        return _SqlDataFrameModel
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+__all__ = [
+    "DataFrame",
+    "DataFrameModel",
+    "Expr",
+    "Schema",
+    "SqlDataFrame",
+    "SqlDataFrameModel",
+]

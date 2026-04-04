@@ -14,8 +14,7 @@ import tempfile
 from pathlib import Path
 
 from pydantable import DataFrameModel, fetch_sqlmodel, write_sqlmodel
-from sqlalchemy import create_engine
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, create_engine
 
 
 class Widget(SQLModel, table=True):

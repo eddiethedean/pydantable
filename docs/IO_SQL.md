@@ -16,12 +16,13 @@ Use a mapped table model and optional **`where`**, **`order_by`**, **`limit`**, 
 
 ```python
 from pydantable import fetch_sqlmodel
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, create_engine
 
 class User(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str
 
+engine = create_engine("sqlite:///./app.db")
 cols = fetch_sqlmodel(User, engine, order_by=[User.id])
 # MyUserModel(cols, trusted_mode=...)
 ```

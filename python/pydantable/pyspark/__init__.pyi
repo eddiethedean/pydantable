@@ -6,4 +6,12 @@ from pydantable.schema import Schema
 from . import sql
 from .dataframe import DataFrame, DataFrameModel
 
-__all__ = ["DataFrame", "DataFrameModel", "Expr", "Schema", "sql"]
+__all__ = [
+    "DataFrame",
+    "DataFrameModel",
+    "Expr",
+    "Schema",
+    "SqlDataFrame",
+    "SqlDataFrameModel",
+    "sql",
+]

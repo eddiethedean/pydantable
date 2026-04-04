@@ -27,7 +27,7 @@ core **pydantable** package does not import **moltres-core** at import time;
 | Goal | Use |
 | ---- | --- |
 | Default Polars/Rust execution for in-memory or file-backed workflows | `DataFrame` / `DataFrameModel` (see {doc}`DATAFRAMEMODEL`, {doc}`EXECUTION`). |
-| **Eager** SQL I/O: load columns from a DB into a frame, or write tables | **`from pydantable import …`** — {doc}`IO_SQL` (**`fetch_sqlmodel`**, **`fetch_sql_raw`**, **`write_sql_raw`**, …). |
+| **Eager** SQL I/O: load columns from a DB into a frame, or write tables | **`from pydantable import …`** — {doc}`IO_SQL` (**SQLModel-first:** **`fetch_sqlmodel`**, **`write_sqlmodel`**, …; **string SQL:** **`fetch_sql_raw`**, **`write_sql_raw`**, …). |
 | **Lazy execution** of transforms via a **SQL** backend (Moltres compiles plans to SQL) | **`SqlDataFrame`** / **`SqlDataFrameModel`** with **`sql_config=`** or **`moltres_engine=`**. |
 
 The SQL I/O helpers materialize **column dicts** in Python; they do not replace
@@ -51,6 +51,19 @@ from pydantable.sql_moltres import (
 
 If **moltres-core** is missing, constructing these classes raises **ImportError**
 with an install hint (`pydantable[moltres]`).
+
+**pandas- or PySpark-shaped SQL frames** (same Moltres engine; lazy-loaded so
+`import pydantable.pandas` does not pull **moltres-core** until you access the
+names):
+
+```python
+from pydantable.pandas import SqlDataFrame, SqlDataFrameModel  # pandas-style API
+from pydantable.pyspark import SqlDataFrame, SqlDataFrameModel  # PySpark-style API
+
+# Or explicitly:
+from pydantable.pandas_moltres import SqlDataFrame, SqlDataFrameModel
+from pydantable.pyspark.sql_moltres import SqlDataFrame, SqlDataFrameModel
+```
 
 ## `EngineConfig` and constructing an engine
 
@@ -89,37 +102,51 @@ Precedence is **exactly** that order: explicit **`engine=`** wins.
 
 ### Lazy read from a SQL table
 
-Use **`SqlDataFrame[Schema].from_sql_table(table, sql_config=…)`** (or **`moltres_engine=`**) so the frame holds a Moltres **`SqlRootData`** root: **no `SELECT` runs** until you call **`to_dict()`**, **`collect()`**, **`head()`**, etc. For **`SqlDataFrameModel`**, use **`MyModel.read_sql_table(table, …)`**.
+Use **`SqlDataFrame[Schema].from_sql_table(table, sql_config=…)`** (or **`moltres_engine=`**) so the frame holds a Moltres **`SqlRootData`** root: **no `SELECT` runs** until you call **`to_dict()`**, **`collect()`**, **`head()`**, etc. The **`table`** argument is a SQLAlchemy **`Table`** / **`FromClause`** — with **SQLModel**, pass **`YourModel.__table__`**. Column **names** must match the Pydantic **schema** fields on **`SqlDataFrame`**. For **`SqlDataFrameModel`**, use **`MyModel.read_sql_table(table, …)`**.
 
 For **SQLite in-memory** (`sqlite:///:memory:`), each new SQLAlchemy / Moltres connection pool is an **empty** database unless you share one **`moltres_engine`** for both DDL and the frame. Prefer a **file** URL (`sqlite:///…/app.db`) while wiring this up, or build tables using the same **`ConnectionManager`** / engine you pass as **`moltres_engine=`**.
 
 ```python
+from pathlib import Path
+import tempfile
+
 from pydantic import BaseModel
-from sqlalchemy import Column, Integer, MetaData, String, Table, insert
 from moltres_core import ConnectionManager, EngineConfig
+from sqlmodel import Field, SQLModel, Session
 
 from pydantable.sql_moltres import SqlDataFrame, moltres_engine_from_sql_config
 
 
 class Row(BaseModel):
+    """Pydantable row schema; field names align with the SQL table."""
+
     id: int
     name: str
 
 
-# File-backed SQLite so DDL and the lazy frame see the same DB
-cfg = EngineConfig(dsn="sqlite:////tmp/app.db")
-eng = moltres_engine_from_sql_config(cfg)
-cm = ConnectionManager(cfg)
-md = MetaData()
-items = Table("items", md, Column("id", Integer, primary_key=True), Column("name", String(40)))
-md.create_all(cm.engine)
-with cm.engine.connect() as conn:
-    conn.execute(insert(items).values(id=1, name="a"))
-    conn.commit()
+class Item(SQLModel, table=True):
+    """Physical table; use ``Item.__table__`` for ``from_sql_table``."""
 
-df = SqlDataFrame[Row].from_sql_table(items, moltres_engine=eng)  # lazy
-cols = df.to_dict()  # runs SELECT here
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(max_length=40)
+
+
+with tempfile.TemporaryDirectory() as td:
+    db_file = Path(td) / "app.db"
+    cfg = EngineConfig(dsn=f"sqlite:///{db_file}")
+    eng = moltres_engine_from_sql_config(cfg)
+    cm = ConnectionManager(cfg)
+
+    SQLModel.metadata.create_all(cm.engine)
+    with Session(cm.engine) as session:
+        session.add(Item(id=1, name="a"))
+        session.commit()
+
+    df = SqlDataFrame[Row].from_sql_table(Item.__table__, moltres_engine=eng)  # lazy
+    cols = df.to_dict()  # runs SELECT here
 ```
+
+You can define a single **SQLModel** class and use it both as the **table** definition and as the **dataframe** schema type (**`SqlDataFrame[ThatModel]`**) when the shapes match; the split above shows how **`Row`** (view schema) and **`Item`** (DDL) line up by column name.
 
 Eager in-memory columns (no SQL root) — same constructor as **`DataFrame`**:
 
@@ -136,6 +163,44 @@ df = SqlDataFrame[Row](
 
 Constructor flags (`trusted_mode`, `fill_missing_optional`, validation hooks,
 etc.) match `DataFrame` — see {doc}`DATAFRAMEMODEL` and {doc}`STRICTNESS`.
+
+### DataFrame transformations (Moltres engine)
+
+`SqlDataFrame` / `SqlDataFrameModel` use the same **method names** as {doc}`DATAFRAMEMODEL` / {doc}`EXECUTION`, but **Moltres** only implements a subset of the full Polars/Rust pipeline.
+
+**Generally work** (Moltres can execute or fold these into the SQL plan where supported):
+
+- **Projection:** `select`, `drop`
+- **Row windows:** `head`, `slice`
+- **Order:** `sort` (and related ordering helpers your **moltres-core** version exposes)
+- **Terminals:** `collect`, `to_dict`, `to_dicts` (materialize rows or column dicts)
+- **Async terminals:** `ato_dict`, `acollect`, `ato_dicts`, … (SQL work may run on a thread pool; see {doc}`EXECUTION`)
+
+**Example (sync):**
+
+```python
+from pydantic import BaseModel
+from moltres_core import EngineConfig
+
+from pydantable.sql_moltres import SqlDataFrame
+
+
+class Row(BaseModel):
+    id: int
+    name: str
+
+
+cfg = EngineConfig(dsn="sqlite:///:memory:")
+df = SqlDataFrame[Row](
+    {"id": [3, 1, 2], "name": ["c", "a", "b"]},
+    sql_config=cfg,
+)
+assert df.select("name").to_dict() == {"name": ["c", "a", "b"]}
+assert df.head(2).to_dict() == {"id": [3, 1], "name": ["c", "a"]}
+assert df.sort("id").to_dict() == {"id": [1, 2, 3], "name": ["a", "b", "c"]}
+```
+
+**Not supported today:** `filter` / `with_columns` / other paths that require the **native** `Expr` runtime raise **`UnsupportedEngineOperationError`** (see **Expressions** below). For **Expr**-heavy work, use the default **Polars/Rust** engine or materialize with {doc}`IO_SQL` helpers first.
 
 ## `SqlDataFrameModel`
 
@@ -156,6 +221,46 @@ class Users(SqlDataFrameModel):
 
 cfg = EngineConfig(dsn="sqlite:///:memory:")
 users = Users({"id": [1], "name": ["Ada"]}, sql_config=cfg)
+```
+
+## FastAPI: shared engine and async terminals
+
+Install **`pydantable[fastapi,moltres]`** (or your project’s equivalent). Build **one** `MoltresPydantableEngine` per process (or pool) and reuse **`moltres_engine=`** on frames — do **not** create a fresh `EngineConfig(dsn="sqlite:///:memory:")` per request, or each handler would see an **empty** database.
+
+The pattern below stores the engine on **`app.state`** at startup and returns columnar JSON with **`await …ato_dict()`** (async terminal). Sync routes can call **`to_dict()`** directly. See {doc}`FASTAPI` and {doc}`EXECUTION` for wider FastAPI + pydantable guidance.
+
+```python
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from moltres_core import EngineConfig
+
+from pydantable.sql_moltres import SqlDataFrameModel, moltres_engine_from_sql_config
+
+
+class AppUser(SqlDataFrameModel):
+    id: int
+    name: str
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    cfg = EngineConfig(dsn="sqlite:///:memory:")  # use a file DSN or pooled URL in production
+    app.state.moltres_engine = moltres_engine_from_sql_config(cfg)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+@app.get("/users/names")
+async def user_names():
+    df = AppUser(
+        {"id": [1, 2], "name": ["Ada", "Bob"]},
+        moltres_engine=app.state.moltres_engine,
+    )
+    names = df.select("name")
+    return await names.ato_dict()
 ```
 
 ## Expressions (`Expr`) and the native runtime
@@ -186,7 +291,9 @@ and **moltres-core** on mutually supported combinations (see {doc}`VERSIONING`).
 ## See also
 
 - {doc}`CUSTOM_ENGINE_PACKAGE` — third-party `ExecutionEngine` packages (includes **moltres-core** as a reference).
-- {doc}`IO_SQL` — eager SQL **I/O** (`fetch_sqlmodel`, `write_sqlmodel`, …).
+- {doc}`IO_SQL` — eager SQL **I/O** (**SQLModel-first:** `fetch_sqlmodel`, `write_sqlmodel`, …; **string SQL:** `*_raw` helpers).
+- {doc}`SQLMODEL_SQL_ROADMAP` — SQLModel-first API history and design notes.
+- {doc}`FASTAPI` — columnar bodies, NDJSON, and service patterns (works alongside **`SqlDataFrameModel`**).
 - {doc}`ADR-engines` — engine abstraction and extension points.
 - {doc}`EXECUTION` — materialization and engines.
 - {doc}`DATAFRAMEMODEL` — `DataFrameModel` patterns shared by `SqlDataFrameModel`.
