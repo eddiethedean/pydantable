@@ -15,6 +15,8 @@ from pydantable.pyspark.dataframe import DataFrameModel as PySparkDataFrameModel
 from pydantable.schema import make_derived_schema_type
 from pydantable.sql_moltres import (
     SqlDataFrame as CoreSqlDataFrame,
+)
+from pydantable.sql_moltres import (
     SqlDataFrameModel as CoreSqlDataFrameModel,
 )
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pydantable.sql_moltres import SqlDataFrame, SqlDataFrameModel
+
 from . import pandas as pandas
 from . import plugins as plugins
 from . import pyspark as pyspark

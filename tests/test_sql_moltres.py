@@ -340,7 +340,7 @@ async def test_sql_dataframe_model_async_chain_select(tmp_path: Path) -> None:
 def test_sqlmodel_table_lazy_read_sql_dataframe(tmp_path: Path) -> None:
     """``SQLModel.__table__`` with ``from_sql_table`` (same idea as MOLTRES_SQL.md)."""
     pytest.importorskip("sqlmodel")
-    from sqlmodel import Field, SQLModel, Session
+    from sqlmodel import Field, Session, SQLModel
 
     class Item(SQLModel, table=True):
         id: int | None = Field(default=None, primary_key=True)
@@ -405,7 +405,6 @@ def test_sql_dataframe_from_sql_table_then_select_preserves_engine(
 
 def test_pandas_module_lazy_sql_exports() -> None:
     import pydantable.pandas as pd
-
     from pydantable.pandas_moltres import SqlDataFrame as PandasSqlDF
 
     assert pd.SqlDataFrame is PandasSqlDF
@@ -413,7 +412,6 @@ def test_pandas_module_lazy_sql_exports() -> None:
 
 def test_pyspark_module_lazy_sql_exports() -> None:
     from pydantable import pyspark as ps
-
     from pydantable.pyspark.sql_moltres import SqlDataFrame as SparkSqlDF
 
     assert ps.SqlDataFrame is SparkSqlDF
@@ -431,8 +429,10 @@ def test_pandas_moltres_sql_dataframe_sort_values(tmp_path: Path) -> None:
     assert out.to_dict() == {"id": [1, 2]}
 
 
-def test_pyspark_moltres_sql_dataframe_order_by_preserves_engine(tmp_path: Path) -> None:
-    """``_as_pyspark_df`` keeps :class:`moltres_core.MoltresPydantableEngine` on the frame."""
+def test_pyspark_moltres_sql_dataframe_order_by_preserves_engine(
+    tmp_path: Path,
+) -> None:
+    """``_as_pyspark_df`` keeps Moltres engine on the frame."""
     from pydantable.pyspark.sql_moltres import SqlDataFrame as SparkSqlDF
 
     eng = moltres_engine_from_sql_config(
@@ -447,7 +447,7 @@ def test_pyspark_moltres_sql_dataframe_order_by_preserves_engine(tmp_path: Path)
 
 
 def test_pyspark_moltres_sql_dataframe_to_df_preserves_engine(tmp_path: Path) -> None:
-    """``toDF`` passes ``engine=`` through (materialize only if root columns match names)."""
+    """``toDF`` passes ``engine=`` through; materialize needs matching root columns."""
     from pydantable.pyspark.sql_moltres import SqlDataFrame as SparkSqlDF
 
     eng = moltres_engine_from_sql_config(

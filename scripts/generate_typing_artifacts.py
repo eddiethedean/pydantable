@@ -94,6 +94,15 @@ def _render_init_stub(init_py: Path) -> str:
                 continue
             import_nodes.append(node)
             continue
+        if (
+            isinstance(node, ast.If)
+            and isinstance(node.test, ast.Name)
+            and node.test.id == "TYPE_CHECKING"
+        ):
+            for inner in node.body:
+                if isinstance(inner, (ast.Import, ast.ImportFrom)):
+                    import_nodes.append(inner)
+            continue
         if isinstance(node, ast.Assign) and len(node.targets) == 1:
             target = node.targets[0]
             if isinstance(target, ast.Name) and target.id == "__all__":
@@ -361,6 +370,24 @@ def main(argv: list[str] | None = None) -> int:
         include_private_defs=True,
     )
     pandas_stub = _render_module_stub(pkg / "pandas.py", include_all_public_defs=True)
+    # ``pandas.py`` lazy-exports SQL facades via ``__getattr__`` (no TYPE_CHECKING
+    # import: circular with ``pandas_moltres``). Stub needs explicit symbols for
+    # ``__all__`` / Ruff F822.
+    _pandas_src = (pkg / "pandas.py").read_text(encoding="utf-8")
+    _pandas_all = _parse_all_names(ast.parse(_pandas_src))
+    if (
+        _pandas_all
+        and "SqlDataFrame" in _pandas_all
+        and "from .pandas_moltres import SqlDataFrame" not in pandas_stub
+    ):
+        _marker = "def wide_to_long("
+        _pos = pandas_stub.find(_marker)
+        if _pos != -1:
+            pandas_stub = (
+                pandas_stub[:_pos]
+                + "from .pandas_moltres import SqlDataFrame, SqlDataFrameModel\n\n"
+                + pandas_stub[_pos:]
+            )
     pyspark_sql_functions_stub = _render_module_stub(
         pkg / "pyspark" / "sql" / "functions.py"
     )

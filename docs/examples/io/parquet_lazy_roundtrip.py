@@ -1,7 +1,8 @@
 """Lazy Parquet: snapshot in → rewrite with ``write_kwargs`` (Snappy) → read back.
 
-Typical for archiving daily aggregates: read yesterday's lazy scan, optionally re-write with
-explicit compression for downstream consumers, then materialize with ``to_dict()`` only at the end.
+Typical for archiving daily aggregates: read yesterday's lazy scan, optionally
+re-write with explicit compression for downstream consumers, then materialize
+with ``to_dict()`` only at the end.
 
 Needs ``pydantable._core``. Run::
 

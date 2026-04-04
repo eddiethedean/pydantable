@@ -178,8 +178,12 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 "tests/test_async_materialization.py" = ["TC003"]
 "python/pydantable/testing/**/*.py" = ["TC003"]
 "python/pydantable/sql_moltres.py" = ["TC003"]
+"python/pydantable/pandas_moltres.py" = ["TC003"]
+"python/pydantable/pyspark/sql_moltres.py" = ["TC003", "TC001"]
 "tests/test_pydantable_fastapi_columnar.py" = ["TC003"]
 "tests/test_sql_moltres.py" = ["TC003"]
+# ``__all__`` lists lazy ``SqlDataFrame`` / ``SqlDataFrameModel`` from ``__getattr__``.
+"python/pydantable/pandas.py" = ["F822"]
 
 [tool.mypy]
 python_version = "3.10"

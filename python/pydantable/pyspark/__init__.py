@@ -7,13 +7,16 @@ and :class:`~pydantable.window_spec.Window`.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantable.expressions import Expr
 from pydantable.schema import Schema
 
 from . import sql
 from .dataframe import DataFrame, DataFrameModel
+
+if TYPE_CHECKING:
+    from pydantable.pyspark.sql_moltres import SqlDataFrame, SqlDataFrameModel
 
 
 def __getattr__(name: str) -> Any:

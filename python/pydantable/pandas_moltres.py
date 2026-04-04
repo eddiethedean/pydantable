@@ -12,6 +12,8 @@ from pydantable.dataframe_model import DataFrameModel as CoreDataFrameModel
 from pydantable.pandas import PandasDataFrame, PandasDataFrameModel
 from pydantable.sql_moltres import (
     SqlDataFrame as CoreSqlDataFrame,
+)
+from pydantable.sql_moltres import (
     SqlDataFrameModel as CoreSqlDataFrameModel,
 )
 

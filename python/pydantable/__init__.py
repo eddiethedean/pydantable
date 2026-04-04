@@ -7,12 +7,14 @@ subclasses :class:`Schema`.
 **Facades:** :mod:`pydantable.pandas` (pandas-like names) and
 :mod:`pydantable.pyspark` (PySpark-like names) wrap the same engine.
 
-**I/O:** eager loaders, iterators, and SQL helpers are imported from this package (``from pydantable import fetch_sqlmodel, materialize_parquet, materialize_json, iter_sql_raw, write_sql_raw, …``); :mod:`pydantable.io` is the implementation module.
+**I/O:** eager loaders, iterators, and SQL helpers are imported from this package
+(``from pydantable import fetch_sqlmodel, materialize_parquet, materialize_json,
+iter_sql_raw, write_sql_raw, …``); :mod:`pydantable.io` is the implementation module.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from . import pandas as pandas
 from . import plugins as plugins
@@ -83,6 +85,9 @@ from .materialization import PlanMaterialization, plan_materialization_summary
 from .observe import get_observer, set_observer
 from .schema import DtypeDriftWarning, Schema
 from .types import WKB
+
+if TYPE_CHECKING:
+    from pydantable.sql_moltres import SqlDataFrame, SqlDataFrameModel
 
 
 def __getattr__(name: str) -> Any:
