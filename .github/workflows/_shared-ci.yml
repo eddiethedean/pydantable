@@ -386,7 +386,8 @@ jobs:
             "polars>=1.0.0,<2" "streamlit>=1.30,<2" "dataframe-api-compat>=0.2.7" \
             "fsspec>=2023.0" "openpyxl>=3.1" \
             "kafka-python>=2.0" "google-cloud-bigquery>=3.0" "snowflake-connector-python>=3.0" \
-            "rapcsv>=0.2" "rapfiles>=0.1" "rapsqlite>=0.1"
+            "rapcsv>=0.2" "rapfiles>=0.1" "rapsqlite>=0.1" \
+            "greenlet>=3.0"
           $PY -m pip install pyright
 
       - name: Install local packages and native extension

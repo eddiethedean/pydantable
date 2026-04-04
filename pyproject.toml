@@ -40,7 +40,7 @@ rap = ["rapcsv>=0.2", "rapfiles>=0.1", "rapsqlite>=0.1"]
 # FastAPI integration helpers (pydantable.fastapi); optional at runtime.
 fastapi = ["fastapi>=0.100"]
 # Moltres SQL engine (moltres-core) — SqlDataFrame / SqlDataFrameModel; rapsqlite for async SQLAlchemy URLs
-moltres = ["moltres-core>=1.0.0,<2", "rapsqlite>=0.1"]
+moltres = ["moltres-core>=1.0.0,<2", "rapsqlite>=0.1", "greenlet>=3.0"]
 dev = [
     "tomli>=1.2.0; python_version < '3.11'",
     "fastapi>=0.100",
@@ -75,6 +75,8 @@ dev = [
     "snowflake-connector-python>=3.0",
     # SqlDataFrame / SqlDataFrameModel tests (same pin as optional ``[moltres]``).
     "moltres-core>=1.0.0,<2",
+    # SQLAlchemy ``create_async_engine`` (rapsqlite smoke test in ``tests/test_sql_moltres.py``).
+    "greenlet>=3.0",
 ]
 benchmark = [
     "maturin>=1.4,<2.0",

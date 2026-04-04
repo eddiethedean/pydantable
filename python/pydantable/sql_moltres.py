@@ -4,7 +4,7 @@ Install with ``pip install "pydantable[moltres]"``. Requires a
 :class:`moltres_core.EngineConfig` (or a pre-built
 :class:`moltres_core.MoltresPydantableEngine`).
 
-``EngineConfig`` / :func:`moltres_engine_from_sql_config` use moltres’ **sync**
+``EngineConfig`` / :func:`moltres_engine_from_sql_config` use moltres' **sync**
 :class:`~moltres_core.sql.connection.ConnectionManager` (sync SQLAlchemy
 ``Engine``). Async-style DSNs and ``AsyncEngine`` are not supported for this
 path until moltres-core wires :class:`~moltres_core.engine.MoltresPydantableEngine`
