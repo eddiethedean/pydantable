@@ -26,7 +26,7 @@ def test_protocol_package_version_matches_core() -> None:
 
 
 def test_packaging_metadata_and_pins_match_release_version() -> None:
-    """``pyproject.toml`` / ``Cargo.toml`` versions and ``==`` pins align on every tag."""
+    """Packaging TOMLs and strict dependency pins match the release version."""
     v = pydantable.__version__
 
     root = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
@@ -37,13 +37,25 @@ def test_packaging_metadata_and_pins_match_release_version() -> None:
     assert proto_pin in deps, f"expected {proto_pin} in pydantable dependencies"
     assert native_pin in deps, f"expected {native_pin} in pydantable dependencies"
 
-    proto_pkg = tomllib.loads((_REPO_ROOT / "pydantable-protocol" / "pyproject.toml").read_text(encoding="utf-8"))
+    proto_pkg = tomllib.loads(
+        (_REPO_ROOT / "pydantable-protocol" / "pyproject.toml").read_text(
+            encoding="utf-8"
+        )
+    )
     assert proto_pkg["project"]["version"] == v
 
-    native_pkg = tomllib.loads((_REPO_ROOT / "pydantable-native" / "pyproject.toml").read_text(encoding="utf-8"))
+    native_pkg = tomllib.loads(
+        (_REPO_ROOT / "pydantable-native" / "pyproject.toml").read_text(
+            encoding="utf-8"
+        )
+    )
     assert native_pkg["project"]["version"] == v
     ndeps: list[str] = native_pkg["project"]["dependencies"]
-    assert ndeps == [proto_pin], f"expected native to depend only on {proto_pin}, got {ndeps}"
+    assert ndeps == [proto_pin], (
+        f"expected native to depend only on {proto_pin}, got {ndeps}"
+    )
 
-    cargo = tomllib.loads((_REPO_ROOT / "pydantable-core" / "Cargo.toml").read_text(encoding="utf-8"))
+    cargo = tomllib.loads(
+        (_REPO_ROOT / "pydantable-core" / "Cargo.toml").read_text(encoding="utf-8")
+    )
     assert cargo["package"]["version"] == v
