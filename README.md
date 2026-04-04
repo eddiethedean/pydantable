@@ -36,7 +36,7 @@ pip install "pydantable[io]"       # full file I/O convenience (arrow + polars)
 pip install "pydantable[sql]"      # SQLModel + SQLAlchemy: fetch_sqlmodel, write_sqlmodel, *_raw, …
 pip install "pydantable[pandas]"   # pandas-flavored façade (pandas UI doc)
 pip install "pydantable[fastapi]"  # FastAPI integration (pydantable.fastapi)
-pip install "pydantable[moltres]"   # SqlDataFrame / SqlDataFrameModel + moltres-core
+pip install "pydantable[moltres]"   # SqlDataFrame / SqlDataFrameModel + moltres-core + rapsqlite
 ```
 
 ## Quick start
@@ -87,8 +87,7 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 
 ## I/O at a glance
 
-- **`DataFrameModel` / `DataFrame[Schema]`:** lazy `read_*` / `aread_*`, `export_*`, `write_*`, SQLModel I/O (`fetch_sqlmodel`, `write_sqlmodel`, …); eager `materialize_*` and SQL `fetch_*` / `iter_*` patterns live on **`pydantable.io`** — pass `dict[str, list]` into constructors for typed frames.
-- **Scripts:** raw helpers (`ScanFileRoot`, iterators) on **`pydantable.io`** for glue code.
+- **`DataFrameModel` / `DataFrame[Schema]`:** lazy `read_*` / `aread_*`, `export_*`, `write_*`, and SQLModel helpers (`fetch_sqlmodel`, `write_sqlmodel`, …). For eager column loads, import **`materialize_*`**, **`fetch_sqlmodel`**, **`iter_sqlmodel`**, … from **`pydantable`** (same entrypoints as the internal `pydantable.io` package) and pass `dict[str, list]` into constructors.
 - **SQL details:** [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html) (recommended APIs, `*_raw`, deprecations) and [SQLMODEL_SQL_ROADMAP](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html) (phased migration).
 - Large files & NDJSON patterns: [IO_JSON](https://pydantable.readthedocs.io/en/latest/IO_JSON.html), [IO_NDJSON](https://pydantable.readthedocs.io/en/latest/IO_NDJSON.html), [EXECUTION](https://pydantable.readthedocs.io/en/latest/EXECUTION.html).
 

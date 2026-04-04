@@ -11,7 +11,6 @@ import tempfile
 from pathlib import Path
 
 from pydantable import DataFrameModel
-from pydantable.io import materialize_csv
 
 
 class InventorySnapshot(DataFrameModel):
@@ -31,8 +30,7 @@ def main() -> None:
         df = InventorySnapshot.read_csv(str(erp_export), separator=";")
         df.write_csv(str(normalized))
 
-        got = InventorySnapshot(materialize_csv(normalized))
-        d = got.to_dict()
+        d = InventorySnapshot.read_csv(str(normalized)).to_dict()
         assert [int(x) for x in d["sku"]] == [1001]
         assert [int(x) for x in d["qty_on_hand"]] == [42]
 

@@ -127,7 +127,7 @@ Otherwise PydanTable raises **`UnsupportedEngineOperationError`** when building 
 
 ## File I/O vs execution engine
 
-Many **`pydantable.io.read_*`** entry points can use **pydantable-native** for
+Many **lazy `read_*`** entry points (see {doc}`IO_OVERVIEW`) can use **pydantable-native** for
 fast local scans. That path is **separate** from **`DataFrame._engine`**: shipping
 a custom **`ExecutionEngine`** does not automatically redirect Parquet/CSV reads
 through your backend. If your product needs “everything goes to SQL”, you

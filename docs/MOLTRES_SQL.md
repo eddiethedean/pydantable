@@ -9,19 +9,25 @@ This guide covers the **optional** integration between PydanTable and
 see {doc}`CUSTOM_ENGINE_PACKAGE`).
 
 ```{note}
-**Install:** ``pip install "pydantable[moltres]"`` (adds **moltres-core**). The
+**Install:** ``pip install "pydantable[moltres]"`` (adds **moltres-core** and **rapsqlite**). The
 core **pydantable** package does not import **moltres-core** at import time;
 ``SqlDataFrame`` / ``SqlDataFrameModel`` are loaded lazily from the root package
 (``from pydantable import SqlDataFrame``) or imported explicitly from
 ``pydantable.sql_moltres``.
 ```
 
+## SQLite: sync (Moltres) vs async (rapsqlite)
+
+**Moltres** builds a **synchronous** SQLAlchemy engine from ``EngineConfig``. For SQLite, use a normal URL such as ``sqlite:///:memory:`` or ``sqlite:///path/to.db``.
+
+**rapsqlite** registers the ``sqlite+rapsqlite`` dialect for **async** SQLAlchemy (``sqlalchemy.ext.asyncio.create_async_engine``). Moltres’ current ``MoltresPydantableEngine`` uses the sync connection stack, so pass **sync** DSNs to ``sql_config=``. Use ``sqlite+rapsqlite://...`` in your own async SQLAlchemy code (or future Moltres async wiring); ``ato_dict`` / ``acollect`` on ``SqlDataFrame`` still delegate to Moltres’ async entrypoints, which may run sync work on a thread pool — see {doc}`EXECUTION`.
+
 ## When to use this
 
 | Goal | Use |
 | ---- | --- |
 | Default Polars/Rust execution for in-memory or file-backed workflows | `DataFrame` / `DataFrameModel` (see {doc}`DATAFRAMEMODEL`, {doc}`EXECUTION`). |
-| **Eager** SQL I/O: load columns from a DB into a frame, or write tables | `pydantable.io` — {doc}`IO_SQL` (**`fetch_sqlmodel`**, **`fetch_sql_raw`**, …). |
+| **Eager** SQL I/O: load columns from a DB into a frame, or write tables | **`from pydantable import …`** — {doc}`IO_SQL` (**`fetch_sqlmodel`**, **`fetch_sql_raw`**, **`write_sql_raw`**, …). |
 | **Lazy execution** of transforms via a **SQL** backend (Moltres compiles plans to SQL) | **`SqlDataFrame`** / **`SqlDataFrameModel`** with **`sql_config=`** or **`moltres_engine=`**. |
 
 The SQL I/O helpers materialize **column dicts** in Python; they do not replace
@@ -81,17 +87,45 @@ but you **must** provide a SQL execution backend via one of:
 
 Precedence is **exactly** that order: explicit **`engine=`** wins.
 
+### Lazy read from a SQL table
+
+Use **`SqlDataFrame[Schema].from_sql_table(table, sql_config=…)`** (or **`moltres_engine=`**) so the frame holds a Moltres **`SqlRootData`** root: **no `SELECT` runs** until you call **`to_dict()`**, **`collect()`**, **`head()`**, etc. For **`SqlDataFrameModel`**, use **`MyModel.read_sql_table(table, …)`**.
+
+For **SQLite in-memory** (`sqlite:///:memory:`), each new SQLAlchemy / Moltres connection pool is an **empty** database unless you share one **`moltres_engine`** for both DDL and the frame. Prefer a **file** URL (`sqlite:///…/app.db`) while wiring this up, or build tables using the same **`ConnectionManager`** / engine you pass as **`moltres_engine=`**.
+
 ```python
 from pydantic import BaseModel
+from sqlalchemy import Column, Integer, MetaData, String, Table, insert
+from moltres_core import ConnectionManager, EngineConfig
 
-from moltres_core import EngineConfig
-from pydantable import SqlDataFrame
+from pydantable.sql_moltres import SqlDataFrame, moltres_engine_from_sql_config
 
 
 class Row(BaseModel):
     id: int
     name: str
 
+
+# File-backed SQLite so DDL and the lazy frame see the same DB
+cfg = EngineConfig(dsn="sqlite:////tmp/app.db")
+eng = moltres_engine_from_sql_config(cfg)
+cm = ConnectionManager(cfg)
+md = MetaData()
+items = Table("items", md, Column("id", Integer, primary_key=True), Column("name", String(40)))
+md.create_all(cm.engine)
+with cm.engine.connect() as conn:
+    conn.execute(insert(items).values(id=1, name="a"))
+    conn.commit()
+
+df = SqlDataFrame[Row].from_sql_table(items, moltres_engine=eng)  # lazy
+cols = df.to_dict()  # runs SELECT here
+```
+
+Eager in-memory columns (no SQL root) — same constructor as **`DataFrame`**:
+
+```python
+from moltres_core import EngineConfig
+from pydantable import SqlDataFrame
 
 cfg = EngineConfig(dsn="sqlite:///:memory:")
 df = SqlDataFrame[Row](

@@ -59,7 +59,7 @@ export MYAPP_EXECUTOR_MAX_WORKERS=8
 ```
 
 Tune **`executor_max_workers`** from CPU count, expected concurrent long-running
-**`acollect`** / **`pydantable.io`** calls, and process memory — not “as high as possible.”
+**`acollect`** / eager **`pydantable`** I/O calls, and process memory — not “as high as possible.”
 
 ## Pitfalls
 

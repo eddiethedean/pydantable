@@ -1,4 +1,4 @@
-"""Cookbook: NDJSON logs → filter → unnest → ``export_json`` (see RTD cookbook).
+"""Cookbook: NDJSON logs → filter → unnest → lazy ``write_ndjson`` (see RTD cookbook).
 
 Run from repo root::
 
@@ -13,7 +13,6 @@ import tempfile
 from pathlib import Path
 
 from pydantable import DataFrameModel, Schema
-from pydantable.io import export_json
 
 
 class Meta(Schema):
@@ -42,11 +41,11 @@ def main() -> None:
         df = LogLine.read_ndjson(str(src))
         us_only = df.filter(df.meta.struct_field("region") == "us")
         flat = us_only.unnest("meta")
-        out_path = Path(tmp) / "flat.json"
-        export_json(out_path, flat.collect(as_lists=True))
+        out_path = Path(tmp) / "flat.ndjson"
+        flat.write_ndjson(str(out_path))
 
         text = out_path.read_text(encoding="utf-8")
-        assert '"meta_region": "us"' in text or "meta_region" in text
+        assert "us" in text and ("meta_region" in text or "region" in text)
 
     print("json_logs_unnest_export: ok")
 

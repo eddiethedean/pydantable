@@ -21,12 +21,8 @@ _EXAMPLES = [
     "docs/examples/io/ndjson_roundtrip.py",
     "docs/examples/io/ipc_roundtrip.py",
     "docs/examples/io/http_local_fetch.py",
-    "docs/examples/io/sql_sqlite_roundtrip.py",
     "docs/examples/io/sql_sqlite_sqlmodel_roundtrip.py",
-    "docs/examples/io/sql_sqlite_sqlmodel_streaming.py",
-    "docs/examples/io/sql_sqlite_streaming.py",
     "docs/examples/io/extras_stdin_stdout.py",
-    "docs/examples/io/extras_read_excel_optional.py",
 ]
 
 

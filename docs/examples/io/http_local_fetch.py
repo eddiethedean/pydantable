@@ -17,7 +17,6 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 from pydantable import DataFrameModel
-from pydantable.io import materialize_csv, materialize_ndjson, materialize_parquet
 
 
 class ProductMetric(DataFrameModel):
@@ -67,9 +66,6 @@ def main() -> None:
     try:
         assert urllib.request.urlopen(parquet_url).read() == parquet_blob
 
-        eager = ProductMetric(materialize_parquet(parquet_blob))
-        assert eager.to_dict()["units_sold"] == [10, 25, 3]
-
         df = ProductMetric.read_parquet_url(parquet_url, experimental=True)
         try:
             assert [r.units_sold for r in df.collect()] == [10, 25, 3]
@@ -87,8 +83,7 @@ def main() -> None:
             f.write(data)
             csv_path = f.name
         try:
-            tbl = LegacyCsvRow(materialize_csv(csv_path))
-            d = tbl.to_dict()
+            d = LegacyCsvRow.read_csv(csv_path).to_dict()
             assert [int(x) for x in d["region_id"]] == [3]
             assert [int(x) for x in d["revenue_usd"]] == [45000]
         finally:
@@ -105,8 +100,8 @@ def main() -> None:
             f.write(data)
             nd_path = f.name
         try:
-            tbl = LogLine(materialize_ndjson(nd_path))
-            assert [int(x) for x in tbl.to_dict()["trace_id"]] == [9001, 9002]
+            d = LogLine.read_ndjson(nd_path).to_dict()
+            assert [int(x) for x in d["trace_id"]] == [9001, 9002]
         finally:
             os.unlink(nd_path)
     finally:

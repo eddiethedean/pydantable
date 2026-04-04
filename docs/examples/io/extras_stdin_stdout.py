@@ -1,6 +1,7 @@
-"""CSV round-trip with :func:`pydantable.io.materialize_csv` + model / ``write_csv``.
+"""CSV round-trip with lazy :meth:`~pydantable.dataframe_model.DataFrameModel.read_csv`
++ :meth:`~pydantable.dataframe.DataFrame.to_dict` and ``write_csv``.
 
-For **true** stdin/stdout streaming helpers, use :mod:`pydantable.io.extras`.
+For **true** stdin/stdout streaming helpers, see :doc:`IO_EXTRAS` (optional extras).
 
 Run::
 
@@ -14,7 +15,6 @@ import tempfile
 from pathlib import Path
 
 from pydantable import DataFrameModel
-from pydantable.io import materialize_csv
 
 
 class Shipment(DataFrameModel):
@@ -38,8 +38,7 @@ def main() -> None:
         f.write("order_id,carton_id\n44021,90001\n")
         path = f.name
     try:
-        tbl = Shipment(materialize_csv(path))
-        d = tbl.to_dict()
+        d = Shipment.read_csv(path).to_dict()
         assert [int(x) for x in d["order_id"]] == [44021]
         assert [int(x) for x in d["carton_id"]] == [90001]
     finally:

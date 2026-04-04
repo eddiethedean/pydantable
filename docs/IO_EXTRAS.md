@@ -57,13 +57,7 @@ python docs/examples/io/extras_stdin_stdout.py
 
 ### Optional: Excel (`pydantable[excel]`)
 
-```bash
-python docs/examples/io/extras_read_excel_optional.py
-```
-
-```{literalinclude} examples/io/extras_read_excel_optional.py
-:language: python
-```
+Install **`pydantable[excel]`** (openpyxl). **`read_excel`** / **`iter_excel`** live in **`pydantable.io.extras`**; they return **`dict[str, list]`** batches (not a Polars lazy scan). Wrap with **`DataFrameModel(...)`** for typed rows. See the module docstrings for **`experimental=True`** and **`batch_size`**.
 
 Other helpers follow the same pattern: install the matching extra, then call the function and wrap with **`DataFrame` / `DataFrameModel`**.
 

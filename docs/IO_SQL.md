@@ -1,12 +1,12 @@
 # SQL I/O (SQLAlchemy)
 
-**Recommended for new code (SQLModel):** **`pydantable.io.fetch_sqlmodel`**, **`iter_sqlmodel`**, **`afetch_sqlmodel`**, **`aiter_sqlmodel`** — same column-dict / **`StreamingColumns`** behavior as the raw-SQL helpers, but you pass a **`SQLModel`** class with **`table=True`** instead of a SQL string. Install **`pydantable[sql]`** (includes **SQLModel** + SQLAlchemy); that one extra covers SQLModel-first APIs, explicit string-SQL helpers, and the deprecated legacy names.
+**Recommended for new code (SQLModel):** **`fetch_sqlmodel`**, **`iter_sqlmodel`**, **`afetch_sqlmodel`**, **`aiter_sqlmodel`** (**``from pydantable import …``**) — same column-dict / **`StreamingColumns`** behavior as the raw-SQL helpers, but you pass a **`SQLModel`** class with **`table=True`** instead of a SQL string. Install **`pydantable[sql]`** (includes **SQLModel** + SQLAlchemy); that one extra covers SQLModel-first APIs, explicit string-SQL helpers, and the deprecated legacy names.
 
 **Explicit raw string SQL:** **`fetch_sql_raw`**, **`iter_sql_raw`**, **`write_sql_raw`**, **`afetch_sql_raw`**, **`aiter_sql_raw`**, **`awrite_sql_raw`** — use these when the query or destination is **not** a mapped **`SQLModel`** table (dynamic SQL, ad hoc reporting, migrations, string **`table_name`** writes). Same semantics as the deprecated unprefixed names, without **`DeprecationWarning`**.
 
 **Deprecated (compatibility):** **`fetch_sql`**, **`afetch_sql`**, **`iter_sql`**, **`aiter_sql`**, **`write_sql`**, **`awrite_sql`**, **`write_sql_batches`**, **`awrite_sql_batches`** emit **`DeprecationWarning`** (see {doc}`VERSIONING`); migrate to **`*_raw`** or SQLModel APIs. For **app / service** code with a stable table schema, prefer **`fetch_sqlmodel` / `iter_sqlmodel` / `write_sqlmodel`** and the **`DataFrameModel`** mirrors below.
 
-**Write path:** **`pydantable.io.write_sqlmodel`** / **`awrite_sqlmodel`** for schema-driven tables, **`MyModel.write_sqlmodel_data`** / **`await MyModel.awrite_sqlmodel_data`** for dict payloads, **`my_frame.write_sqlmodel(...)`** / **`await my_frame.awrite_sqlmodel(...)`** using the frame’s **`to_dict()`**, **`write_sql_raw`** / **`await awrite_sql_raw`** for string table names, or deprecated **`MyModel.write_sql`** / **`await MyModel.awrite_sql`** (same warning as **`pydantable.io`**).
+**Write path:** **`write_sqlmodel`** / **`awrite_sqlmodel`** for schema-driven tables, **`MyModel.write_sqlmodel_data`** / **`await MyModel.awrite_sqlmodel_data`** for dict payloads, **`my_frame.write_sqlmodel(...)`** / **`await my_frame.awrite_sqlmodel(...)`** using the frame’s **`to_dict()`**, **`write_sql_raw`** / **`await awrite_sql_raw`** for string table names, or deprecated **`MyModel.write_sql`** / **`await MyModel.awrite_sql`** (same warning as the legacy **`pydantable.io`** entrypoints).
 
 Install **`pydantable[sql]`** plus the **DB-API driver** your URL needs. SQLAlchemy supports many dialects; pydantable does not bundle drivers.
 
@@ -15,7 +15,7 @@ Install **`pydantable[sql]`** plus the **DB-API driver** your URL needs. SQLAlch
 Use a mapped table model and optional **`where`**, **`order_by`**, **`limit`**, **`columns`**, and bound **`parameters`** (for parameterized **`where`** clauses):
 
 ```python
-from pydantable.io import fetch_sqlmodel
+from pydantable import fetch_sqlmodel
 from sqlmodel import Field, SQLModel
 
 class User(SQLModel, table=True):
@@ -40,7 +40,7 @@ Use a **`SQLModel`** class with **`table=True`** so DDL comes from **`model.__ta
 
 ### Schema bridging (Phase 5)
 
-Use **`pydantable.io.sqlmodel_columns`** (re-exported from **`pydantable`**) to list ordered SQLAlchemy column keys for a **`table=True`** model—the same key set a full **`fetch_sqlmodel`** result uses and **`write_sqlmodel`** expects.
+Use **`sqlmodel_columns`** (**``from pydantable import sqlmodel_columns``**) to list ordered SQLAlchemy column keys for a **`table=True`** model—the same key set a full **`fetch_sqlmodel`** result uses and **`write_sqlmodel`** expects.
 
 **`MyModel.assert_sqlmodel_compatible(UserTable, *, direction='read'|'write', column_map=None, read_keys=None)`** checks that your **`DataFrameModel`** field names align with that table before I/O:
 
@@ -57,18 +57,20 @@ Use **`pydantable.io.sqlmodel_columns`** (re-exported from **`pydantable`**) to 
 
 **Read (raw SQL)**
 
-- Call **`fetch_sql_raw`** / **`await afetch_sql_raw`** / **`iter_sql_raw`** / **`aiter_sql_raw`** from **`pydantable.io`**, then **`MyModel(cols, trusted_mode=...)`** (or **`MyModel(batch, ...)`** per batch). Deprecated unprefixed names still work but warn.
+- Call **`fetch_sql_raw`** / **`await afetch_sql_raw`** / **`iter_sql_raw`** / **`aiter_sql_raw`** (**``from pydantable import …``**), then **`MyModel(cols, trusted_mode=...)`** (or **`MyModel(batch, ...)`** per batch). Deprecated unprefixed names still work but warn.
 
 **`bind`** may be a SQLAlchemy **URL string**, **`Engine`**, or **`Connection`**. Use **bound parameters** only; never interpolate untrusted input into **`sql`**.
 
 **Write to a database**
 
 - **SQLModel:** **`my_frame.write_sqlmodel(UserTable, bind, *, if_exists=..., ...)`** / **`await my_frame.awrite_sqlmodel(...)`**; or **`MyModel.write_sqlmodel_data(data, UserTable, bind, ...)`** / **`await MyModel.awrite_sqlmodel_data(...)`** for a column dict. **`MyModel.Async.write_sqlmodel`** matches **`awrite_sqlmodel_data`**.
-- **String table name:** **`MyModel.write_sql(...)`** / **`await MyModel.awrite_sql(...)`** (deprecated; forwards to **`pydantable.io`**) or prefer **`write_sql_raw`** / **`awrite_sql_raw`** from **`pydantable.io`** in new code.
+- **String table name:** **`MyModel.write_sql(...)`** / **`await MyModel.awrite_sql(...)`** (deprecated) or prefer **`write_sql_raw`** / **`awrite_sql_raw`** (**``from pydantable import …``**) in new code.
 
-**`data`** is **`dict[str, list]`** — typically **`model.to_dict()`** or the column dict from **`pydantable.io.fetch_sql_raw`**. **`write_sql_raw`** is the same write path without a **`DataFrameModel`** class.
+**`data`** is **`dict[str, list]`** — typically **`model.to_dict()`** or the column dict from **`fetch_sql_raw`**. **`write_sql_raw`** is the same write path without a **`DataFrameModel`** class.
 
-## `pydantable.io`
+## Reference (implementation module `pydantable.io`)
+
+The following signatures are defined on **`pydantable.io`** for Sphinx and extension authors. **Application code** imports the same names **from `pydantable`** (see the root **`__init__.py`**).
 
 **Read**
 
@@ -112,33 +114,11 @@ Set these before importing callers if you want process-wide defaults (invalid va
 
 **`data`** is **`dict[str, list]`**. **`if_exists="append"`** requires the table to exist already. **`if_exists="replace"`** drops the table if present, recreates it with inferred column types, then inserts (**`table_name`** / **`schema`** must be trusted identifiers, not user-controlled strings).
 
-## Runnable examples (raw string SQL)
+## Runnable example (SQLModel-first)
 
-Requires **`sqlalchemy`**. Run conventions: {doc}`IO_OVERVIEW` (**Runnable example**).
+Doc examples focus on **lazy file execution** ({doc}`IO_OVERVIEW`); SQL I/O does not use a Polars **`LazyFrame`**, but the runnable script below follows the same **SQLModel-first** style as application code.
 
-### Round-trip (`fetch_sql_raw` / `write_sql_raw`)
-
-```bash
-python docs/examples/io/sql_sqlite_roundtrip.py
-```
-
-```{literalinclude} examples/io/sql_sqlite_roundtrip.py
-:language: python
-```
-
-### Streaming (`iter_sql_raw`)
-
-```bash
-python docs/examples/io/sql_sqlite_streaming.py
-```
-
-```{literalinclude} examples/io/sql_sqlite_streaming.py
-:language: python
-```
-
-## Runnable examples (SQLModel-first)
-
-Requires **`pydantable[sql]`** (SQLModel + SQLAlchemy). These use a **`SQLModel`** class with **`table=True`** and optional **`DataFrameModel`** helpers.
+Requires **`pydantable[sql]`** (SQLModel + SQLAlchemy). Uses a **`SQLModel`** class with **`table=True`** and **`DataFrameModel`** helpers.
 
 ### Round-trip (`fetch_sqlmodel` / `write_sqlmodel`)
 
@@ -150,15 +130,7 @@ python docs/examples/io/sql_sqlite_sqlmodel_roundtrip.py
 :language: python
 ```
 
-### Streaming (`iter_sqlmodel`)
-
-```bash
-python docs/examples/io/sql_sqlite_sqlmodel_streaming.py
-```
-
-```{literalinclude} examples/io/sql_sqlite_sqlmodel_streaming.py
-:language: python
-```
+**Raw string SQL** (**`fetch_sql_raw`**, **`iter_sql_raw`**, **`write_sql_raw`**) and **streaming batches** are documented in the reference sections above; they are not duplicated as separate runnable snippets here.
 
 ## See also
 

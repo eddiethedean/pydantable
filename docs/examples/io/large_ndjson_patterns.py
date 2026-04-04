@@ -1,7 +1,6 @@
-"""Large NDJSON: lazy scan vs chunked ``iter_ndjson`` (Phase D patterns).
+"""Large NDJSON: typed lazy ``read_ndjson`` → filter → ``collect()``.
 
-Demonstrates (1) typed lazy ``read_ndjson`` → filter → ``collect()`` and
-(2) batched ``iter_ndjson`` without a full ``LazyFrame`` plan.
+Transforms stay on the Polars :class:`~polars.LazyFrame` until ``collect``/``to_dict``.
 
 Needs ``pydantable._core``. Run::
 
@@ -14,7 +13,6 @@ import tempfile
 from pathlib import Path
 
 from pydantable import DataFrameModel
-from pydantable.io import iter_ndjson
 
 
 class LogLine(DataFrameModel):
@@ -40,11 +38,6 @@ def main() -> None:
         rows = errs.collect()
         assert len(rows) == 1
         assert rows[0].msg == "bad"
-
-        # Chunked eager batches: bounded dict[str, list] slices (no lazy plan).
-        batches = list(iter_ndjson(str(path), batch_size=2))
-        assert len(batches) == 2
-        assert batches[0]["level"] == ["info", "error"]
 
     print("large_ndjson_patterns: ok")
 

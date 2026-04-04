@@ -8,10 +8,11 @@ Install with ``pip install "pydantable[moltres]"``. Requires a
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
+from .schema import field_types_for_rust, schema_field_types
 
 
 def _import_moltres_engine_types() -> tuple[Any, Any]:
@@ -59,6 +60,54 @@ class SqlDataFrame(DataFrame):
     if you already constructed :class:`moltres_core.MoltresPydantableEngine`, or
     ``engine=`` for any compatible :class:`~pydantable.engine.ExecutionEngine`.
     """
+
+    @classmethod
+    def from_sql_table(
+        cls,
+        table: Any,
+        *,
+        sql_config: Any | None = None,
+        moltres_engine: Any | None = None,
+        engine: Any | None = None,
+        name: str = "root",
+    ) -> Any:
+        """Lazy frame from a SQLAlchemy ``Table`` / ``FromClause`` (no fetch yet).
+
+        *table* must expose columns whose **names** match the schema model fields.
+        Materialization runs ``SELECT`` via Moltres when you call ``to_dict()``,
+        ``collect()``, ``head()``, etc.
+
+        **SQLite ``:memory:``:** each new :class:`moltres_core.ConnectionManager`
+        opens a separate empty in-memory DB. Create DDL and pass the **same**
+        ``moltres_engine=`` (from :func:`moltres_engine_from_sql_config`) you use for
+        the frame, or use a **file** URL (``sqlite:///path/to.db``) so distinct
+        pools still see one database file.
+
+        Use ``SqlDataFrame[YourSchema].from_sql_table(...)``.
+        """
+        if getattr(cls, "_schema_type", None) is None:
+            raise TypeError(
+                "Use SqlDataFrame[YourSchema].from_sql_table(table, ...) "
+                "with a concrete schema type."
+            )
+        _import_moltres_engine_types()
+        from moltres_core import SqlRootData
+
+        resolved = _resolve_sql_execution_engine(
+            sql_config=sql_config,
+            moltres_engine=moltres_engine,
+            engine=engine,
+        )
+        root = SqlRootData(table=table, name=name)
+        fts = schema_field_types(cls._schema_type)
+        plan = resolved.make_plan(field_types_for_rust(fts))
+        return cls._from_plan(
+            root_data=root,
+            root_schema_type=cls._schema_type,
+            current_schema_type=cls._schema_type,
+            rust_plan=plan,
+            engine=resolved,
+        )
 
     def __init__(
         self,
@@ -127,6 +176,28 @@ class SqlDataFrameModel(DataFrameModel):
             validation_profile=validation_profile,
             engine=resolved,
         )
+
+    @classmethod
+    def read_sql_table(
+        cls,
+        table: Any,
+        *,
+        sql_config: Any | None = None,
+        moltres_engine: Any | None = None,
+        engine: Any | None = None,
+        name: str = "root",
+    ) -> Any:
+        """Lazy read from a SQLAlchemy table — same engine rules as the constructor."""
+        cls._dfm_require_subclass_with_schema()
+        dataframe_cls = cast("Any", cls._dataframe_cls)
+        inner = dataframe_cls[cls._SchemaModel].from_sql_table(
+            table,
+            sql_config=sql_config,
+            moltres_engine=moltres_engine,
+            engine=engine,
+            name=name,
+        )
+        return cls._wrap_inner_df(inner)
 
 
 __all__ = [

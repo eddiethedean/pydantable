@@ -1,6 +1,6 @@
 """SQLite: SQLModel table + :class:`~pydantable.DataFrameModel` round-trip.
 
-Uses :func:`pydantable.io.write_sqlmodel` / :func:`pydantable.io.fetch_sqlmodel` and
+Uses :func:`write_sqlmodel` / :func:`fetch_sqlmodel` and
 :class:`~pydantable.DataFrameModel` classmethods. Install **pydantable[sql]**.
 
 Run::
@@ -13,8 +13,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from pydantable import DataFrameModel
-from pydantable.io import fetch_sqlmodel, write_sqlmodel
+from pydantable import DataFrameModel, fetch_sqlmodel, write_sqlmodel
 from sqlalchemy import create_engine
 from sqlmodel import Field, SQLModel
 

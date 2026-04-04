@@ -178,11 +178,11 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [1.6.0] — 2026-03-30
 
-Summary: **FastAPI** helpers (columnar OpenAPI bodies, NDJSON, **`register_exception_handlers`**), **`pydantable.errors`**, **`submit` / `stream` / `astream`**, **`PlanMaterialization`**, awaitable lazy reads (**`AwaitableDataFrameModel`**), Rust **async** plan execution when available, and docs/cookbooks for services. **Breaking:** removed legacy **`DataFrameModel`** eager SQL / **`materialize_*`** shims—use **`pydantable.io`** and **`read_*` / `aread_*`** as described under **Removed** below.
+Summary: **FastAPI** helpers (columnar OpenAPI bodies, NDJSON, **`register_exception_handlers`**), **`pydantable.errors`**, **`submit` / `stream` / `astream`**, **`PlanMaterialization`**, awaitable lazy reads (**`AwaitableDataFrameModel`**), Rust **async** plan execution when available, and docs/cookbooks for services. **Breaking:** removed legacy **`DataFrameModel`** eager SQL / **`materialize_*`** shims—use **`from pydantable import …`** (eager SQL / **`materialize_*`**) and **`read_*` / `aread_*`** as described under **Removed** below.
 
 ### Removed
 
-- **`DataFrameModel`** eager I/O shims: **`materialize_*`**, **`amaterialize_*`**, **`fetch_sql`**, **`afetch_sql`**, **`iter_sql`**, **`aiter_sql`**, **`from_sql`**, **`afrom_sql`**. Use **`pydantable.io`** for eager **`dict[str, list]`** loads and **`SQL`** streaming, then **`MyModel(cols, ...)`**; keep lazy scans on **`read_*`** / **`aread_*`**.
+- **`DataFrameModel`** eager I/O shims: **`materialize_*`**, **`amaterialize_*`**, **`fetch_sql`**, **`afetch_sql`**, **`iter_sql`**, **`aiter_sql`**, **`from_sql`**, **`afrom_sql`**. Use **`from pydantable import …`** for eager **`dict[str, list]`** loads and **`SQL`** streaming, then **`MyModel(cols, ...)`**; keep lazy scans on **`read_*`** / **`aread_*`**.
 
 ### Added
 
@@ -193,7 +193,7 @@ Summary: **FastAPI** helpers (columnar OpenAPI bodies, NDJSON, **`register_excep
 - **`pydantable.fastapi`** (optional **`pip install 'pydantable[fastapi]'`**): **`executor_lifespan`**, **`get_executor`** (``Depends``), **`register_exception_handlers`** for **`MissingRustExtensionError`** / **`pydantic.ValidationError`**. See {doc}`/GOLDEN_PATH_FASTAPI` and {doc}`/FASTAPI`.
 - **`pydantable.typing.SupportsLazyAsyncMaterialize`:** structural ``Protocol`` for objects with async terminal materialization via **`acollect`** (``DataFrameModel`` and ``AwaitableDataFrameModel``).
 - **`AwaitableDataFrameModel`:** **`aread_parquet`**, **`aread_ipc`**, **`aread_csv`**, **`aread_ndjson`**, and **`aread_json`** return a chainable awaitable (``select`` / ``filter`` / … then ``await …acollect()``) so async routes avoid nested ``await`` on the read. **Lazy metadata:** ``await …columns`` / ``shape`` / ``empty`` / ``dtypes``; **`then`** for custom sync/async steps; **`concat`** to merge multiple pending chains or concrete models. **Async-first names:** unprefixed terminals on the chain — **`collect`**, **`to_dict`**, **`to_polars`**, **`to_arrow`**, **`rows`**, **`to_dicts`**, **`stream`** (aliases of the ``a*`` methods); **`DataFrameModel.Async.read_*`** / **`Async.write_sql`** / **`Async.export_*`** mirror **`aread_*`** / **`awrite_sql`** / **`aexport_*`** without the ``a`` prefix (``read_parquet`` cannot replace **`aread_parquet`** on the class itself because **`read_parquet`** is the sync lazy reader). Pending chains show a **descriptive ``repr``** (read path + chained transforms).
-- **`DataFrameModel.aexport_parquet`**, **`aexport_csv`**, **`aexport_ndjson`**, **`aexport_ipc`**, **`aexport_json`**: async eager exports via **`pydantable.io`** **`aexport_*`**.
+- **`DataFrameModel.aexport_parquet`**, **`aexport_csv`**, **`aexport_ndjson`**, **`aexport_ipc`**, **`aexport_json`**: async eager exports via the same **`aexport_*`** implementation module as **`pydantable.io`** (prefer **`DataFrameModel`** classmethods in application code).
 - **Rust async bridge:** **`async_execute_plan`** and **`async_collect_plan_batches`** on **`pydantable_native._core`** (Tokio + **`pyo3-async-runtimes`**); **`acollect`** / **`ato_*`** prefer this awaitable when present.
 - **`DataFrame.submit`** / **`DataFrameModel.submit`** and **`ExecutionHandle`** (**`result`**, **`done`**, **`cancel`**) for background **`collect`**.
 - **`DataFrame.astream`** / **`DataFrameModel.astream`**: async iteration of column **`dict`** chunks after one engine collect (see {doc}`EXECUTION`).

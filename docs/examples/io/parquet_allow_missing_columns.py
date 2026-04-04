@@ -14,7 +14,6 @@ import tempfile
 from pathlib import Path
 
 from pydantable import DataFrameModel
-from pydantable.io import export_parquet
 
 
 class Row(DataFrameModel):
@@ -25,8 +24,8 @@ class Row(DataFrameModel):
 def main() -> None:
     with tempfile.TemporaryDirectory() as d:
         base = Path(d)
-        export_parquet(base / "a.parquet", {"x": [1], "y": [10]})
-        export_parquet(base / "b.parquet", {"x": [2]})
+        Row({"x": [1], "y": [10]}).write_parquet(str(base / "a.parquet"))
+        Row({"x": [2]}).write_parquet(str(base / "b.parquet"))
         df = Row.read_parquet(
             str(base),
             trusted_mode="shape_only",

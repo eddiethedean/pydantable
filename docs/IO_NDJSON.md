@@ -53,7 +53,7 @@ python docs/examples/io/ndjson_roundtrip.py
 :language: python
 ```
 
-Large-file patterns (lazy scan vs **`iter_ndjson`** batches): {doc}`IO_JSON` and **`python docs/examples/io/large_ndjson_patterns.py`**.
+Large-file patterns (lazy scan; optional **`iter_ndjson`** batches in {doc}`IO_JSON`): **`python docs/examples/io/large_ndjson_patterns.py`**.
 
 ## See also
 

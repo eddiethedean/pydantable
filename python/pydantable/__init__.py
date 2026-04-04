@@ -7,7 +7,7 @@ subclasses :class:`Schema`.
 **Facades:** :mod:`pydantable.pandas` (pandas-like names) and
 :mod:`pydantable.pyspark` (PySpark-like names) wrap the same engine.
 
-**I/O:** many helpers are re-exported from :mod:`pydantable.io` for convenience.
+**I/O:** eager loaders, iterators, and SQL helpers are imported from this package (``from pydantable import fetch_sqlmodel, materialize_parquet, materialize_json, iter_sql_raw, write_sql_raw, …``); :mod:`pydantable.io` is the implementation module.
 """
 
 from __future__ import annotations
@@ -38,6 +38,7 @@ from .io import (
     aiter_sql,
     aiter_sql_raw,
     aiter_sqlmodel,
+    amaterialize_json,
     amaterialize_parquet,
     aread_parquet,
     aread_parquet_url,
@@ -61,8 +62,10 @@ from .io import (
     iter_orc,
     iter_parquet,
     iter_snowflake,
+    iter_sql_raw,
     iter_sqlmodel,
     materialize_ipc,
+    materialize_json,
     materialize_ndjson,
     materialize_parquet,
     read_parquet,
@@ -72,6 +75,7 @@ from .io import (
     write_ipc_batches,
     write_ndjson_batches,
     write_parquet_batches,
+    write_sql_raw,
     write_sqlmodel,
     write_sqlmodel_batches,
 )
@@ -119,6 +123,7 @@ __all__ = [
     "aiter_sql",
     "aiter_sql_raw",
     "aiter_sqlmodel",
+    "amaterialize_json",
     "amaterialize_parquet",
     "aread_parquet",
     "aread_parquet_url",
@@ -144,8 +149,10 @@ __all__ = [
     "iter_orc",
     "iter_parquet",
     "iter_snowflake",
+    "iter_sql_raw",
     "iter_sqlmodel",
     "materialize_ipc",
+    "materialize_json",
     "materialize_ndjson",
     "materialize_parquet",
     "pandas",
@@ -163,6 +170,7 @@ __all__ = [
     "write_ipc_batches",
     "write_ndjson_batches",
     "write_parquet_batches",
+    "write_sql_raw",
     "write_sqlmodel",
     "write_sqlmodel_batches",
 ]

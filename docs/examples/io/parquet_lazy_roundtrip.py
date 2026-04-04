@@ -1,7 +1,7 @@
-"""Lazy Parquet: snapshot in → rewrite with ``write_kwargs`` (Snappy) → materialize.
+"""Lazy Parquet: snapshot in → rewrite with ``write_kwargs`` (Snappy) → read back.
 
-Typical for archiving daily aggregates: read yesterday's file, optionally re-write with
-explicit compression for downstream consumers.
+Typical for archiving daily aggregates: read yesterday's lazy scan, optionally re-write with
+explicit compression for downstream consumers, then materialize with ``to_dict()`` only at the end.
 
 Needs ``pydantable._core``. Run::
 
@@ -14,7 +14,6 @@ import tempfile
 from pathlib import Path
 
 from pydantable import DataFrameModel
-from pydantable.io import materialize_parquet
 
 
 class DailyRevenue(DataFrameModel):
@@ -33,7 +32,7 @@ def main() -> None:
         df = DailyRevenue.read_parquet(str(incoming))
         df.write_parquet(str(outgoing), write_kwargs={"compression": "snappy"})
 
-        got = DailyRevenue(materialize_parquet(outgoing))
+        got = DailyRevenue.read_parquet(str(outgoing))
         assert got.to_dict()["revenue_cents"] == [125_000_000]
 
     print("parquet_lazy_roundtrip: ok")

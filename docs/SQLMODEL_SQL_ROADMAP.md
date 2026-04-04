@@ -4,7 +4,7 @@ This document records the **plan and phased roadmap** for pydantable’s **SQLMo
 
 ## Goals (what “SQLModel-first” means)
 
-- **SQLModel is required for SQL I/O**: if you want to read/write from a database using `pydantable.io`, you install **`pydantable[sql]`**, which includes **SQLModel + SQLAlchemy** (drivers remain user-installed).
+- **SQLModel is required for SQL I/O**: if you want to read/write from a database using **`from pydantable import …`** (SQL helpers) or **`DataFrameModel`**, you install **`pydantable[sql]`**, which includes **SQLModel + SQLAlchemy** (drivers remain user-installed).
 - **User defines table schema explicitly** via a `SQLModel` class with `table=True`. pydantable does **not** infer SQL DDL from column dict samples.
 - **Reads return column dict batches** (`dict[str, list]`) and can be wrapped into a typed `DataFrameModel` (`MyDF(cols, ...)`) just like today.
 - **Writes are schema-driven**: `if_exists="replace"` is supported, but it requires a fully defined SQLModel table class for the new schema.
@@ -233,7 +233,7 @@ This project already has users of:
 - `make check-full` green on the release commit
 - docs examples validated (if you keep example-verification tooling)
 
-**Status (v1.13.0): Implemented** — {doc}`IO_SQL` splits **raw string SQL** vs **SQLModel-first** runnable sections; examples **`docs/examples/io/sql_sqlite_sqlmodel_roundtrip.py`**, **`docs/examples/io/sql_sqlite_sqlmodel_streaming.py`** (plus existing **`sql_sqlite_*`** raw examples); **`tests/test_doc_io_examples.py`** runs **`sql_sqlite_streaming.py`** and the SQLModel scripts. SQLModel I/O behavior is covered by **`tests/test_sqlmodel_io_phase01.py`**, **`tests/test_sqlmodel_io_phase02.py`**, **`tests/test_sqlmodel_dataframe_model.py`**.
+**Status (v1.13.0): Implemented** — {doc}`IO_SQL` documents **raw string SQL** vs **SQLModel-first** APIs; the runnable doc example is **`docs/examples/io/sql_sqlite_sqlmodel_roundtrip.py`** (**`tests/test_doc_io_examples.py`**). SQLModel I/O behavior is covered by **`tests/test_sqlmodel_io_phase01.py`**, **`tests/test_sqlmodel_io_phase02.py`**, **`tests/test_sqlmodel_dataframe_model.py`**.
 
 ---
 

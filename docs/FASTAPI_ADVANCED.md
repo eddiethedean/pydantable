@@ -12,18 +12,17 @@ The same lazy plan can be materialized in **four** ways; see {doc}`MATERIALIZATI
 
 Below, routes read **Parquet** from a **server-local path** (shared volume, artifact from an upstream job, or a temp file you wrote after **`await upload.read()`**). In production, **validate and sandbox** paths (allowlist directories, reject `..`, etc.). **`trusted_mode="shape_only"`** matches typical “file already matches our schema” pipelines; use default **`trusted_mode`** when you need full cell validation.
 
-Row-list JSON bodies are covered in {doc}`/FASTAPI` and {doc}`/cookbook/fastapi_columnar_bodies`; **async file routes** should **`await MyModel.aread_*`** (lazy scan, blocking open/read off the event loop) rather than **`await amaterialize_*`**, which builds a full **`dict[str, list]`** first. SQL: **`await afetch_sql`** / **`aiter_sql`** from **`pydantable.io`** ({doc}`IO_OVERVIEW`).
+Row-list JSON bodies are covered in {doc}`/FASTAPI` and {doc}`/cookbook/fastapi_columnar_bodies`; **async file routes** should **`await MyModel.aread_*`** (lazy scan, blocking open/read off the event loop) rather than **`await amaterialize_*`**, which builds a full **`dict[str, list]`** first. SQL: **`await afetch_sqlmodel`** / **`await afetch_sql_raw`** as needed ({doc}`IO_SQL`).
 
-### 1. Blocking — sync `def` + `collect()` / `to_dict()`
+### 1. Blocking — sync `def` + lazy `read_parquet` + `collect()` / `to_dict()`
 
-**Sync** **`pydantable.io.materialize_parquet`** blocks the worker thread while Rust/PyArrow read the file; **`UserDF(cols)`** then **`collect()`** / **`to_dict()`** run the lazy plan (often trivial if the “plan” is just the scan root).
+**Sync** **`read_parquet`** keeps work on a Polars **`LazyFrame`** until **`collect()`** / **`to_dict()`** (see {doc}`EXECUTION`).
 
 ```python
 from fastapi import FastAPI, Query
 from pydantic import BaseModel
 
 from pydantable import DataFrameModel
-from pydantable.io import materialize_parquet
 
 app = FastAPI()
 
@@ -40,13 +39,13 @@ class UserRow(BaseModel):
 
 @app.get("/users-blocking", response_model=list[UserRow])
 def report_from_parquet_blocking(path: str = Query(..., description="Readable Parquet path on server")):
-    df = UserDF(materialize_parquet(path), trusted_mode="shape_only").select("id", "age")
+    df = UserDF.read_parquet(path, trusted_mode="shape_only").select("id", "age")
     return df.collect()
 
 
 @app.get("/users-columnar-blocking")
 def columnar_from_parquet_blocking(path: str = Query(...)):
-    df = UserDF(materialize_parquet(path), trusted_mode="shape_only")
+    df = UserDF.read_parquet(path, trusted_mode="shape_only")
     return df.to_dict()
 ```
 
@@ -172,7 +171,7 @@ These are **chunked replay** responses, not out-of-core Polars streaming; very l
 
 ## `DataFrameModel` I/O in `async def` routes
 
-Prefer **`await MyModel.aread_*`**, **`await amaterialize_*`** / **`await afetch_sql`** from **`pydantable.io`** (then **`MyModel(cols)`**), **`await MyModel.aexport_*`**, and **`await MyModel.awrite_sql`**.
+Prefer **`await MyModel.aread_*`**, **`await afetch_sqlmodel`** / **`await afetch_sql_raw`** when you need SQL (**``from pydantable import …``**), **`await MyModel.aexport_*`**, and **`await MyModel.awrite_sql`** / **`await MyModel.awrite_sqlmodel`**.
 
 Install what you need:
 
