@@ -19,7 +19,7 @@
 - **I/O:** lazy `read_*` / `aread_*`, streaming writes, NDJSON/JSON Lines, Parquet, CSV, IPC, HTTP, SQL (SQLModel-first `fetch_sqlmodel` / `write_sqlmodel`, explicit string SQL `fetch_sql_raw` / `write_sql_raw`, or deprecated unprefixed names) — [I/O overview](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html), [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html), [SQLModel roadmap](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html), and [decision tree](https://pydantable.readthedocs.io/en/latest/IO_DECISION_TREE.html).
 - **JSON & struct columns:** struct expressions, JSON encode/decode helpers, unnest/nested models — [IO_JSON](https://pydantable.readthedocs.io/en/latest/IO_JSON.html), [SELECTORS](https://pydantable.readthedocs.io/en/latest/SELECTORS.html).
 - **FastAPI (optional):** shared executor lifespan, NDJSON streaming from `astream()`, OpenAPI-friendly columnar bodies, `register_exception_handlers` (**503** / **400** / **422**). Start with the [golden path](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html) and [FastAPI guide](https://pydantable.readthedocs.io/en/latest/FASTAPI.html).
-- **Moltres SQL engine (optional):** install **`pydantable[moltres]`** to use **`SqlDataFrame`** / **`SqlDataFrameModel`** with [moltres-core](https://pypi.org/project/moltres-core/)’s **`MoltresPydantableEngine`** ([`pydantable-protocol`](https://pypi.org/project/pydantable-protocol/) `ExecutionEngine`). User guide: [MOLTRES_SQL](https://pydantable.readthedocs.io/en/latest/MOLTRES_SQL.html); protocol authors: [Custom engine packages](https://pydantable.readthedocs.io/en/latest/CUSTOM_ENGINE_PACKAGE.html).
+- **Moltres SQL engine (optional):** install **`pydantable[moltres]`** for **`SqlDataFrame`** / **`SqlDataFrameModel`** backed by [moltres-core](https://pypi.org/project/moltres-core/)’s **`MoltresPydantableEngine`** ([`pydantable-protocol`](https://pypi.org/project/pydantable-protocol/) `ExecutionEngine`). The goal is to **keep transforms on the SQL side** (plans compiled to SQL) instead of loading whole tables into Python—especially when you **write results back to the same database**. Guide: [MOLTRES_SQL](https://pydantable.readthedocs.io/en/latest/MOLTRES_SQL.html); protocol authors: [Custom engine packages](https://pydantable.readthedocs.io/en/latest/CUSTOM_ENGINE_PACKAGE.html).
 
 ## Install
 
@@ -72,7 +72,7 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 | ----- | ---- |
 | `DataFrameModel` | Table class with annotated columns (`class Orders(DataFrameModel): ...`). |
 | `DataFrame[Schema]` | Generic API over your own Pydantic `BaseModel`. |
-| `SqlDataFrame` / `SqlDataFrameModel` | Same shapes with **`pydantable[moltres]`** — Moltres SQL execution (`sql_config=` / `moltres_engine=`). |
+| `SqlDataFrame` / `SqlDataFrameModel` | Same shapes with **`pydantable[moltres]`** — Moltres compiles plans to SQL so transforms can stay **in the database** (`sql_config=` / `moltres_engine=`); prefer when you are not round-tripping full tables through Python (e.g. write back to the same DB). |
 | `Expr` | Typed expressions in `with_columns`, `filter`, etc. |
 | **Errors** | Ingest issues such as column length mismatch raise `ColumnLengthMismatchError` (`ValueError` subclass) from `pydantable.errors` — map to HTTP **400** in FastAPI via `register_exception_handlers`. |
 

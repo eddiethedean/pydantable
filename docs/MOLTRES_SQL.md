@@ -8,6 +8,14 @@ This guide covers the **optional** integration between PydanTable and
 [**pydantable-protocol**](https://pypi.org/project/pydantable-protocol/) on PyPI;
 see {doc}`CUSTOM_ENGINE_PACKAGE`).
 
+The reason to use a **SQL** execution engine is to keep **transformations on the
+database side** for as long as possible: Moltres compiles the typed plan to SQL
+so you are not forced to **pull entire result sets into Python memory** just to
+`select`, `sort`, `join`, and similar steps. That matters most when the **end of
+the pipeline writes back to the same database** — there is little benefit in
+round-tripping the full dataset through the app when the work can stay in the
+server.
+
 ```{note}
 **Install:** ``pip install "pydantable[moltres]"`` (adds **moltres-core** and **rapsqlite**). The
 core **pydantable** package does not import **moltres-core** at import time;
@@ -20,7 +28,26 @@ core **pydantable** package does not import **moltres-core** at import time;
 
 **Moltres** builds a **synchronous** SQLAlchemy engine from ``EngineConfig``. For SQLite, use a normal URL such as ``sqlite:///:memory:`` or ``sqlite:///path/to.db``.
 
-**rapsqlite** registers the ``sqlite+rapsqlite`` dialect for **async** SQLAlchemy (``sqlalchemy.ext.asyncio.create_async_engine``). Moltres’ current ``MoltresPydantableEngine`` uses the sync connection stack, so pass **sync** DSNs to ``sql_config=``. Use ``sqlite+rapsqlite://...`` in your own async SQLAlchemy code (or future Moltres async wiring); ``ato_dict`` / ``acollect`` on ``SqlDataFrame`` still delegate to Moltres’ async entrypoints, which may run sync work on a thread pool — see {doc}`EXECUTION`.
+**rapsqlite** registers the ``sqlite+rapsqlite`` dialect for **async** SQLAlchemy (``create_async_engine``). That stack is for **your** async SQLAlchemy application code, not for the current **Pydantable** wiring described below.
+
+### Async drivers and ``SqlDataFrame`` (today)
+
+**moltres-core** ships both **sync** and **async** connection helpers (``ConnectionManager`` vs ``AsyncConnectionManager``), and the latter can build an ``AsyncEngine`` from an async-style DSN (including normalizing ``sqlite://`` → ``sqlite+aiosqlite`` where applicable).
+
+However, **``MoltresPydantableEngine``** — the class PydanTable uses for ``sql_config=`` / ``moltres_engine_from_sql_config()`` — is implemented on top of the **sync** stack only: it uses ``QueryExecutor`` with a **synchronous** ``ConnectionManager``. Its ``async_execute_plan`` coroutine **offloads** the synchronous ``execute_plan`` to a worker thread (``asyncio.to_thread``), so the event loop stays responsive, but **database I/O is still sync SQLAlchemy** under the hood.
+
+So **you cannot** point ``sql_config=`` at an async-only URL and expect PydanTable to construct ``create_async_engine`` today: ``EngineConfig`` passed through ``ConnectionManager`` must resolve to a **sync** ``Engine`` (see moltres-core’s ``sql/connection.py``).
+
+### If you need async SQLAlchemy today
+
+- Use **sync** DSNs with ``SqlDataFrame`` / ``moltres_engine=`` as documented here.
+- Use **async** engines and sessions (e.g. ``sqlite+rapsqlite://…``, ``postgresql+asyncpg://…``) in **FastAPI / SQLAlchemy** code paths that **do not** go through ``MoltresPydantableEngine``, or use the eager SQL I/O helpers in {doc}`IO_SQL` with your own session/engine.
+
+### Roadmap (upstream)
+
+**Native** async driver support for the **Pydantable** Moltres engine would require **moltres-core** to expose a variant of ``MoltresPydantableEngine`` (or extend the existing one) so plan execution uses ``AsyncQueryExecutor`` + ``AsyncConnectionManager`` and ``async_execute_plan`` awaits real async I/O. When that exists, PydanTable can add matching constructors (e.g. async ``sql_config`` resolution) without duplicating SQL logic here.
+
+Until then, ``ato_dict`` / ``acollect`` on ``SqlDataFrame`` still use the engine’s ``async_execute_plan`` entrypoint (thread offload for Moltres) — see {doc}`EXECUTION`.
 
 ## When to use this
 
@@ -28,7 +55,7 @@ core **pydantable** package does not import **moltres-core** at import time;
 | ---- | --- |
 | Default Polars/Rust execution for in-memory or file-backed workflows | `DataFrame` / `DataFrameModel` (see {doc}`DATAFRAMEMODEL`, {doc}`EXECUTION`). |
 | **Eager** SQL I/O: load columns from a DB into a frame, or write tables | **`from pydantable import …`** — {doc}`IO_SQL` (**SQLModel-first:** **`fetch_sqlmodel`**, **`write_sqlmodel`**, …; **string SQL:** **`fetch_sql_raw`**, **`write_sql_raw`**, …). |
-| **Lazy execution** of transforms via a **SQL** backend (Moltres compiles plans to SQL) | **`SqlDataFrame`** / **`SqlDataFrameModel`** with **`sql_config=`** or **`moltres_engine=`**. |
+| **Lazy execution** with transforms staying **in SQL** where the engine supports it (plans compiled to SQL; avoid full-table pulls when you only need a terminal write or small materialization) | **`SqlDataFrame`** / **`SqlDataFrameModel`** with **`sql_config=`** or **`moltres_engine=`**. |
 
 The SQL I/O helpers materialize **column dicts** in Python; they do not replace
 `DataFrame._engine`. **`SqlDataFrame`** wires Moltres as that engine so
