@@ -67,7 +67,7 @@ from ._materialize_scan_fallback import (
 from ._repr_display import _REPR_MAX_COLUMNS, _dataframe_to_html_fragment
 from ._scan import _is_scan_file_root
 from ._streaming import _resolve_engine_streaming
-from .grouped import DynamicGroupedDataFrame, GroupedDataFrame
+from .grouped import DynamicGroupedDataFrame, GroupedDataFrame, _DataFrameForGroupBy
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -78,7 +78,7 @@ SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
 
 
-class DataFrame(Generic[SchemaT]):
+class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
     """Strongly typed lazy table: schema at construction, transforms, then ``collect``.
 
     Construct with ``DataFrame[SchemaSubclass](data)``. Pass ``engine=`` to use a

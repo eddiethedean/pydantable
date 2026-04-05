@@ -18,7 +18,7 @@ NATIVE_PYPROJECT ?= pydantable-native/pyproject.toml
 # Source roots on PYTHONPATH for Rust ``cargo test`` (Polars in venv + editable packages).
 RUST_PYTHONPATH ?= $(CURDIR)/python:$(CURDIR)/pydantable-protocol/python:$(CURDIR)/pydantable-native/python
 
-.PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check engine-bypass-check ty-check ty-check-minimal pyright-check sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
+.PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check engine-bypass-check ty-check ty-check-minimal pyright-check pyright-check-strict sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 .PHONY: native-develop native-develop-fast native-wheel install-editable dev-setup install-dev help
 .PHONY: gen-typing check-typing
 
@@ -52,6 +52,11 @@ ty-check-minimal:
 
 pyright-check:
 	$(PYRIGHT) --project pyrightconfig.json
+
+# Optional: type-check the full ``python/pydantable`` tree under Pyright (noisier than
+# contract tests; does not replace Astral ``ty`` in ``make check-python``).
+pyright-check-strict:
+	$(PYRIGHT) --project pyrightconfig-strict.json
 
 # Matches CI "Docs (sphinx -W)" check.
 sphinx-check:
@@ -101,6 +106,7 @@ help:
 	@echo "  native-wheel       Build a release wheel (does not pip-install)"
 	@echo ""
 	@echo "Checks: check-full, check-python, check-rust, check-docs"
+	@echo "  pyright-check-strict  Optional Pyright over python/pydantable (maintainers)"
 
 # Install editable Python packages only (assumes pydantable-native already built/installed).
 install-editable:

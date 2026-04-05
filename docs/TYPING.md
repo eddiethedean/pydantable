@@ -148,6 +148,40 @@ PydanTable ships `py.typed` and `.pyi` stubs for the public surface. In the repo
 - `scripts/generate_typing_artifacts.py --check` fails if stubs are out of date.
 - `make check-typing` runs: generator drift check → ty → typing snippet tests.
 
+## Contributor workflow (static typing)
+
+### Which checker does what
+
+| Tool | Role |
+|------|------|
+| **Astral `ty`** | Primary checker for `python/pydantable`, `pydantable-protocol`, and `pydantable-native` (see `[tool.ty]` in `pyproject.toml`). Used in `make check-python` / CI. |
+| **mypy** + `pydantable.mypy_plugin` | Schema-evolving `DataFrameModel` chains; run via `tests/test_mypy_*.py` or `mypy` with the repo config. `tests.*` is ignored by mypy by design. |
+| **Pyright** | Narrow config (`pyrightconfig.json`) targets typing **contract** tests under `tests/` plus `typings/`. Optional `pyrightconfig-strict.json` type-checks the full `python/pydantable` tree for maintainers (`make pyright-check-strict`); expect noise and optional deps. |
+
+### Public vs internal API (pragmatic `Any`)
+
+- **Public surface** — imports from `pydantable`, `pydantable.dataframe`, and documented I/O helpers: prefer concrete types, `Protocol`s, `PathLike`, `Mapping`/`Sequence`, and `TYPE_CHECKING` imports for types that would create cycles.
+- **Internal modules** — engine plans, Rust handles, and dynamic adapters may keep `Any` where the runtime type is opaque or checker-specific; narrow with `NewType` / small `Protocol`s only when it reduces real bugs without lying.
+
+### Phased strictness (`ty`)
+
+`[tool.ty.rules]` in `pyproject.toml` enables some rule families gradually (for example `unknown-argument` and `invalid-argument-type` are enforced where clean). When tightening a rule, fix callsites or add a **narrow** suppression with a short comment; prefer fixing types over broad `[tool.ty.analysis]` overrides.
+
+Hotspots for future annotation work (rough counts in `python/pydantable/**/*.py`, subject to churn): `Any` appears most often in `dataframe/_impl.py`, `dataframe_model.py`, `pandas.py`, `rust_engine.py`, and `io/__init__.py`; `# type: ignore` is concentrated in `io/extras.py`, `pandas.py`, and `schema/_impl.py`; `cast(` is common in `pyspark/dataframe.py` and `dataframe_model.py`.
+
+### Local commands
+
+```bash
+make ty-check              # Astral ty (matches main CI config)
+make ty-check-minimal      # ty in a minimal venv (optional imports stay sound)
+make check-typing          # stub drift check + ty + mypy/pyright contract tests
+make pyright-check-strict  # optional full-package Pyright (see pyrightconfig-strict.json)
+```
+
+### Environment notes
+
+Use a **single-Python** virtualenv for local runs (for example only `lib/python3.10` under `.venv`). If `ty` reports unresolved imports for core deps like `pydantic`, recreate the venv or align the interpreter `ty` resolves with the one that has your dependencies installed (`make ty-check-minimal` uses a dedicated minimal venv).
+
 ## Related docs
 
 - `DATAFRAMEMODEL.md`: end-user guide with typing examples.

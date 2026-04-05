@@ -1,0 +1,9 @@
+{
+  "include": ["python/pydantable"],
+  "extraPaths": ["python", "pydantable-protocol/python", "pydantable-native/python"],
+  "stubPath": "typings",
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.10",
+  "typeCheckingMode": "standard"
+}

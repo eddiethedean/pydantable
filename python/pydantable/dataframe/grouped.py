@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import html
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Protocol
 
 from pydantable.expressions import Expr
 from pydantable.schema import field_types_for_rust, make_derived_schema_type
@@ -12,18 +12,55 @@ from pydantable.schema import field_types_for_rust, make_derived_schema_type
 from ._streaming import _resolve_engine_streaming
 
 
+class _DataFrameForGroupBy(Protocol):
+    """Frame API used by grouped handles (:class:`GroupedDataFrame`, etc.)."""
+
+    _engine_streaming_default: bool | None
+    _rust_plan: Any
+    _root_data: Any
+    _engine: Any
+    _current_schema_type: Any
+
+    def __repr__(self) -> str: ...
+
+    def _repr_html_(self) -> str: ...
+
+    def _field_types_from_descriptors(self, schema_descriptors: Any) -> Any: ...
+
+    def _from_plan(
+        self,
+        *,
+        root_data: Any,
+        root_schema_type: Any,
+        current_schema_type: Any,
+        rust_plan: Any,
+        engine: Any,
+    ) -> Any: ...
+
+    def with_columns(self, **kwargs: Any) -> Any: ...
+
+    def group_by(
+        self,
+        *keys: Any,
+        maintain_order: bool = False,
+        drop_nulls: bool = True,
+    ) -> Any: ...
+
+    def drop(self, *columns: Any, strict: bool = True) -> Any: ...
+
+
 class GroupedDataFrame:
     """Result of :meth:`DataFrame.group_by`; call :meth:`agg` to finalize."""
 
     def __init__(
         self,
-        df: Any,
+        df: _DataFrameForGroupBy,
         keys: Sequence[str],
         *,
         maintain_order: bool = False,
         drop_nulls: bool = True,
     ):
-        self._df = df
+        self._df: _DataFrameForGroupBy = df
         self._keys = list(keys)
         self._maintain_order = bool(maintain_order)
         self._drop_nulls = bool(drop_nulls)
@@ -153,14 +190,14 @@ class DynamicGroupedDataFrame:
 
     def __init__(
         self,
-        df: Any,
+        df: _DataFrameForGroupBy,
         *,
         index_column: str,
         every: str,
         period: str | None,
         by: Sequence[str],
     ):
-        self._df = df
+        self._df: _DataFrameForGroupBy = df
         self._index = index_column
         self._every = every
         self._period = period or every

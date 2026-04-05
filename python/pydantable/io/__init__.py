@@ -84,7 +84,7 @@ from .write_batches import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
     from concurrent.futures import Executor
 
 from pydantable.plugins import register_reader, register_writer
@@ -1020,8 +1020,8 @@ async def afetch_sqlmodel(
     *,
     where: Any | None = None,
     parameters: Mapping[str, Any] | None = None,
-    columns: list[Any] | None = None,
-    order_by: list[Any] | None = None,
+    columns: Sequence[Any] | None = None,
+    order_by: Sequence[Any] | None = None,
     limit: int | None = None,
     batch_size: int | None = None,
     auto_stream: bool = True,
@@ -1051,8 +1051,8 @@ async def aiter_sqlmodel(
     *,
     where: Any | None = None,
     parameters: Mapping[str, Any] | None = None,
-    columns: list[Any] | None = None,
-    order_by: list[Any] | None = None,
+    columns: Sequence[Any] | None = None,
+    order_by: Sequence[Any] | None = None,
     limit: int | None = None,
     batch_size: int = 65_536,
     executor: Executor | None = None,

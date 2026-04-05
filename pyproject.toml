@@ -142,9 +142,9 @@ no-matching-overload = "ignore"
 isinstance-against-typed-dict = "ignore"
 not-iterable = "ignore"
 invalid-context-manager = "ignore"
-invalid-argument-type = "ignore"
+invalid-argument-type = "error"
 invalid-return-type = "ignore"
-unknown-argument = "ignore"
+unknown-argument = "error"
 unsupported-operator = "ignore"
 
 [tool.ty.src]
