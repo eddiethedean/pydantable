@@ -20,7 +20,7 @@ RUST_PYTHONPATH ?= $(CURDIR)/python:$(CURDIR)/pydantable-protocol/python:$(CURDI
 
 .PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check engine-bypass-check ty-check ty-check-minimal pyright-check pyright-check-strict sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 .PHONY: native-develop native-develop-fast native-wheel install-editable dev-setup install-dev help
-.PHONY: test test-fast test-cov test-moltres
+.PHONY: test test-fast test-cov test-moltres diff-cover
 .PHONY: gen-typing check-typing
 
 check-full: check-python check-docs check-rust
@@ -85,7 +85,13 @@ test-fast:
 # Match CI coverage gate (Ubuntu + Python 3.11 only in Actions).
 test-cov:
 	$(PYTHON) -m pytest -q -n auto \
-		--cov=pydantable --cov-report=xml --cov-report=term-missing:skip-covered --cov-fail-under=78
+		--cov=pydantable --cov-report=xml --cov-report=term-missing:skip-covered --cov-fail-under=80
+
+# Requires ``coverage.xml`` from ``make test-cov`` and ``pip install -e ".[dev]"`` (diff-cover).
+DIFF_COVER ?= $(dir $(PYTHON))diff-cover
+diff-cover:
+	@test -f coverage.xml || (echo "Run make test-cov first to generate coverage.xml"; exit 1)
+	$(DIFF_COVER) coverage.xml --compare-branch origin/main --fail-under=85
 
 test-moltres:
 	$(PYTHON) -m pytest -q -n auto tests/sql/test_sql_moltres.py
@@ -123,6 +129,7 @@ help:
 	@echo ""
 	@echo "Checks: check-full, check-python, check-rust, check-docs"
 	@echo "Tests: test, test-fast (-m \"not slow\"), test-cov (CI coverage args), test-moltres (sql/)"
+	@echo "Coverage: diff-cover (needs test-cov + origin/main)"
 	@echo "  pyright-check-strict  Optional Pyright over python/pydantable (maintainers)"
 
 # Install editable Python packages only (assumes pydantable-native already built/installed).

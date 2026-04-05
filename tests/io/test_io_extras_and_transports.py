@@ -15,6 +15,8 @@ from pydantable.io import (
     write_csv_stdout,
 )
 from pydantable.io.extras import (
+    iter_delta,
+    iter_excel,
     read_avro,
     read_bigquery,
     read_delta,
@@ -372,3 +374,63 @@ async def test_aread_csv_rap_header_only_no_data_rows(tmp_path: Path) -> None:
     path = tmp_path / "headers.csv"
     path.write_text("p,q\n", encoding="utf-8")
     assert await aread_csv_rap(str(path)) == {}
+
+
+def test_iter_excel_batch_size_invalid(tmp_path: Path) -> None:
+    pytest.importorskip("openpyxl")
+    from openpyxl import Workbook
+
+    path = tmp_path / "b.xlsx"
+    Workbook().save(path)
+    with pytest.raises(ValueError, match="batch_size"):
+        next(iter_excel(path, batch_size=0, experimental=True))
+
+
+def test_iter_excel_yields_row_batches(tmp_path: Path) -> None:
+    pytest.importorskip("openpyxl")
+    from openpyxl import Workbook
+
+    path = tmp_path / "batched.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["a", "b"])
+    for i in range(5):
+        ws.append([i, i * 10])
+    wb.save(path)
+
+    batches = list(iter_excel(path, batch_size=2, experimental=True))
+    assert len(batches) >= 1
+    assert batches[0]["a"] == [0, 1]
+
+
+def test_iter_delta_yields_batches(tmp_path: Path) -> None:
+    pytest.importorskip("pyarrow")
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    root = tmp_path / "delta_iter"
+    root.mkdir()
+    pq.write_table(
+        pa.table({"u": list(range(20))}),
+        root / "p.parquet",
+    )
+    parts = list(iter_delta(root, batch_size=8, experimental=True))
+    assert len(parts) >= 1
+    assert sum(len(p["u"]) for p in parts) == 20
+
+
+def test_read_excel_allows_experimental_false_when_env_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pytest.importorskip("openpyxl")
+    from openpyxl import Workbook
+
+    monkeypatch.setenv("PYDANTABLE_IO_EXPERIMENTAL", "1")
+    path = tmp_path / "env.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["c"])
+    ws.append([1])
+    wb.save(path)
+    got = read_excel(path, experimental=False)
+    assert got["c"] == [1]
