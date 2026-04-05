@@ -9,6 +9,8 @@ import sys
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 from pydantable import DataFrame, DataFrameModel, MissingRustExtensionError
@@ -20,11 +22,13 @@ from pydantable.io import (
     export_json,
     export_parquet,
     fetch_bytes,
+    materialize_csv,
     materialize_json,
     materialize_parquet,
     read_from_object_store,
     read_json,
     read_ndjson,
+    read_parquet_url,
     read_parquet_url_ctx,
 )
 
@@ -277,3 +281,76 @@ async def test_afetch_sql_awrite_sql_sqlite(tmp_path: Path) -> None:
     with eng.connect() as c:
         rows = c.execute(text("SELECT k FROM t_async ORDER BY k")).fetchall()
     assert [r[0] for r in rows] == [5, 6]
+
+
+def test_read_parquet_url_fdopen_failure_propagates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import pydantable.io as io_mod
+
+    monkeypatch.setattr(io_mod, "fetch_bytes", lambda *a, **k: b"pq")
+
+    def boom(*a: object, **k: object) -> object:
+        raise OSError("fdopen failed")
+
+    monkeypatch.setattr(io_mod.os, "fdopen", boom)
+    with pytest.raises(OSError, match="fdopen failed"):
+        read_parquet_url("http://example.com/f", experimental=True)
+
+
+def test_read_parquet_url_scan_failure_unlinks_temp(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("pydantable_native._core")
+    import pydantable.io as io_mod
+
+    monkeypatch.setattr(io_mod, "fetch_bytes", lambda *a, **k: b"pq")
+
+    def bad_scan(*a: object, **k: object) -> object:
+        raise RuntimeError("no scan")
+
+    monkeypatch.setattr(io_mod, "_scan_file_root", bad_scan)
+    with pytest.raises(RuntimeError, match="no scan"):
+        read_parquet_url("http://example.com/f", experimental=True)
+
+
+def test_read_parquet_url_ctx_requires_nonempty_scan_path() -> None:
+    with (
+        patch(
+            "pydantable.io.read_parquet_url",
+            return_value=SimpleNamespace(path=""),
+        ),
+        pytest.raises(RuntimeError, match="path is empty"),
+        read_parquet_url_ctx(
+            DataFrame[_Mini._SchemaModel], "http://x", experimental=True
+        ),
+    ):
+        pass
+
+
+@pytest.mark.asyncio
+async def test_aread_parquet_url_ctx_requires_nonempty_scan_path() -> None:
+    import pydantable.io as io_mod
+
+    async def fake_aread(*a: object, **k: object) -> object:
+        return SimpleNamespace(path="")
+
+    with (
+        patch.object(io_mod, "aread_parquet_url", fake_aread),
+        pytest.raises(RuntimeError, match="path is empty"),
+    ):
+        async with aread_parquet_url_ctx(
+            DataFrame[_Mini._SchemaModel], "http://x", experimental=True
+        ):
+            pass
+
+
+@pytest.mark.asyncio
+async def test_materialize_csv_use_rap_rejects_when_event_loop_running(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("rapcsv")
+    path = tmp_path / "rap.csv"
+    path.write_text("a\n1\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="aread_csv_rap"):
+        materialize_csv(path, use_rap=True, engine="auto")

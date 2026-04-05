@@ -268,6 +268,23 @@ async def test_awaitable_concat_requires_two_frames() -> None:
         await AwaitableDataFrameModel.concat(UserDF({"id": [1], "age": [2]}))
 
 
+@pytest.mark.asyncio
+async def test_awaitable_chain_rejects_sync_export_methods(tmp_path) -> None:
+    path = tmp_path / "sync_block.pq"
+    export_parquet(path, {"id": [1], "age": [2]})
+    adf = UserDF.aread_parquet(path, trusted_mode="shape_only")
+    with pytest.raises(TypeError, match="cannot call export_parquet"):
+        adf.export_parquet(tmp_path / "out.pq")  # type: ignore[call-arg]
+
+
+def test_awaitable_dataframe_model_default_repr_without_label() -> None:
+    async def _get():
+        return UserDF({"id": [1], "age": [2]})
+
+    plain = AwaitableDataFrameModel(_get)
+    assert "pending lazy DataFrameModel" in repr(plain)
+
+
 def test_dataframe_model_constructor_from_io_materialize_ndjson(tmp_path) -> None:
     path = tmp_path / "m.ndjson"
     export_ndjson(path, {"id": [3], "age": [None]})

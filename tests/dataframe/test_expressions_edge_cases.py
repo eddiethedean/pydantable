@@ -51,6 +51,12 @@ def test_expr_repr_ast_snippet_on_serializable_error() -> None:
     assert "ast=?" in r
 
 
+def test_expr_over_with_no_partition_or_order_is_identity_in_pipeline() -> None:
+    df = DataFrame[R]({"flag": [True], "s": ["a"]})
+    out = df.with_columns(same=df.flag.over()).collect(as_lists=True)
+    assert out["same"] == [True]
+
+
 def test_logical_rand_ror_and_invert() -> None:
     df = DataFrame[R]({"flag": [True, False], "s": ["a", "b"]})
     a = True & df.flag
@@ -106,3 +112,47 @@ def test_expr_leq_and_isin_with_list_singleton() -> None:
     ).collect(as_lists=True)
     assert out["ok"] == [True, True, False]
     assert out["bag"] == [True, False, True]
+
+
+class _Tags(Schema):
+    tags: list[str]
+
+
+class _MapCol(Schema):
+    meta: dict[str, int]
+
+
+def test_expr_alias_rejects_empty_name() -> None:
+    df = DataFrame[N]({"a": [1], "s": ["x"]})
+    with pytest.raises(TypeError, match="non-empty string"):
+        df.a.alias("")
+
+
+def test_list_contains_any_rejects_expr_values() -> None:
+    df = DataFrame[_Tags]({"tags": [["a", "b"]]})
+    with pytest.raises(TypeError, match="literal"):
+        df.tags.contains_any(df.tags)
+
+
+def test_list_contains_any_requires_at_least_one_literal() -> None:
+    df = DataFrame[_Tags]({"tags": [["a"]]})
+    with pytest.raises(TypeError, match="at least one"):
+        df.tags.contains_any([])
+
+
+def test_list_contains_all_rejects_expr_values() -> None:
+    df = DataFrame[_Tags]({"tags": [["a", "b"]]})
+    with pytest.raises(TypeError, match="literal"):
+        df.tags.contains_all(df.tags)
+
+
+def test_map_has_any_key_rejects_expr_keys() -> None:
+    df = DataFrame[_MapCol]({"meta": [{"k": 1}]})
+    with pytest.raises(TypeError, match="literal"):
+        df.meta.map_has_any_key(df.meta)
+
+
+def test_map_has_any_key_requires_at_least_one_key() -> None:
+    df = DataFrame[_MapCol]({"meta": [{"k": 1}]})
+    with pytest.raises(TypeError, match="at least one key"):
+        df.meta.map_has_any_key([])

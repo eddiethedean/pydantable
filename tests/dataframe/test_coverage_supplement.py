@@ -36,6 +36,14 @@ def test_apply_redaction_to_row_dicts_no_policy() -> None:
     assert apply_redaction_to_row_dicts(Row, rows) is rows
 
 
+def test_apply_redaction_skips_columns_absent_from_row_dict() -> None:
+    class Row(BaseModel):
+        email: str = Field(json_schema_extra={"pydantable": {"redact": True}})
+
+    rows = [{"other": "keep"}]
+    assert apply_redaction_to_row_dicts(Row, rows) == [{"other": "keep"}]
+
+
 def test_short_repr_label_truncates() -> None:
     long = "a " * 150
     s = short_repr_label(long, max_len=20)

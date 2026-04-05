@@ -4,11 +4,23 @@ This document snapshots **statement-line gaps** by area and complements [Testing
 
 ## Baseline (full suite, `--cov-fail-under=0`)
 
-Typical totals are around **~80%** statements with **`branch = true`**; exact numbers drift as tests change. Regenerate:
+Last regeneration (full `pytest` with branch coverage): **~82%** on the `TOTAL` line in the terminal report (combined statement/branch-style percentage; exact value drifts). CI **`--cov-fail-under`** is **81** (see `Makefile` / `_shared-ci.yml`). Regenerate:
 
 ```bash
 .venv/bin/python -m pytest -q -n auto --cov=pydantable --cov-report=term-missing:skip-covered --cov-fail-under=0
 ```
+
+### Top files by missed statements (typical run)
+
+Rough ordering by **Miss** column in `term-missing` (largest gaps first):
+
+| Rank | Module | Miss (stmts) | Notes |
+|------|--------|----------------|------|
+| 1 | `pandas.py` | ~346 | Façade; extend `tests/third_party/` |
+| 2 | `dataframe/_impl.py` | ~220 | Core engine paths + errors |
+| 3 | `schema/_impl.py` | ~166 | Unions / narrowing edge cases |
+| 4 | `pyspark/dataframe.py` | ~140 | Parity smoke tests |
+| 5 | `io/extras.py` | ~139 | Optional SDKs + mocks |
 
 ## Per-package focus (highest missing lines first)
 
