@@ -78,4 +78,5 @@ def test_fetch_sql_raw_no_deprecation_warning(tmp_path) -> None:
         warnings.simplefilter("always")
         out = fetch_sql_raw("SELECT 1 AS x", eng)
     assert out == {"x": [1]}
-    assert not recorded
+    deprecations = [w for w in recorded if issubclass(w.category, DeprecationWarning)]
+    assert not deprecations, deprecations

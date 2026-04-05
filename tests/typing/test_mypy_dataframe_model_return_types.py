@@ -20,11 +20,25 @@ _MYPY_WINDOWS_CRASH_CODES = {
 def _run_mypy_snippet(tmp_path: Path, code: str) -> subprocess.CompletedProcess[str]:
     snippet = tmp_path / "snippet.py"
     snippet.write_text(textwrap.dedent(code), encoding="utf-8")
+    root = repo_root()
+    config = root / "pyproject.toml"
+    # Snippets live under pytest tmp dirs (often outside the repo). Without an explicit
+    # config file, mypy may not discover [tool.mypy] (plugins, mypy_path). Isolated
+    # cache avoids pytest-xdist races on the default ~/.mypy_cache.
     env = dict(os.environ)
     env.setdefault("MYPYPATH", "python")
     return subprocess.run(
-        [sys.executable, "-m", "mypy", str(snippet)],
-        cwd=repo_root(),
+        [
+            sys.executable,
+            "-m",
+            "mypy",
+            "--config-file",
+            str(config),
+            "--cache-dir",
+            str(tmp_path / ".mypy_cache"),
+            str(snippet),
+        ],
+        cwd=root,
         env=env,
         capture_output=True,
         text=True,
