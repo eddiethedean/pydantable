@@ -14,7 +14,7 @@ _REPR_HTML_MAX_COLS = 40
 _REPR_HTML_MAX_CELL_LEN = 500
 
 
-def _html_cell_text(value: Any, *, max_cell_len: int) -> str:
+def _html_cell_text(value: object, *, max_cell_len: int) -> str:
     """Format a single cell for HTML tables; output must be HTML-escaped."""
     if value is None:
         return ""
@@ -33,6 +33,7 @@ def _html_cell_text(value: Any, *, max_cell_len: int) -> str:
 
 def _dataframe_to_html_fragment(
     *,
+    # Per-cell values are heterogeneous scalars (see policy in docs/TYPING.md).
     column_dict: dict[str, list[Any]],
     column_order: list[str],
     caption: str | None = None,

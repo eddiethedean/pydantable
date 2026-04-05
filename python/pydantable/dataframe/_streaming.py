@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Union, get_args, get_origin
+from typing import Union, get_args, get_origin
 
 _ENGINE_STREAMING_ENV = "PYDANTABLE_ENGINE_STREAMING"
 
@@ -35,7 +35,7 @@ def _resolve_engine_streaming(
     return v in ("1", "true", "yes")
 
 
-def _is_bool_or_nullable_bool(dtype: Any) -> bool:
+def _is_bool_or_nullable_bool(dtype: object) -> bool:
     """True if ``dtype`` is ``bool`` or optional bool (``| None`` / ``Union``)."""
     if dtype is bool:
         return True

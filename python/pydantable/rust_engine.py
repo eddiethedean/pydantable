@@ -2,6 +2,12 @@
 
 Implementation lives on :class:`~pydantable.engine.native.NativePolarsEngine`.
 Import :func:`~pydantable.engine.get_default_engine` for new code.
+
+Type annotations use :class:`typing.Any` for plan handles and columnar data because
+those objects are produced and consumed by Rust/PyO3; they mirror
+:class:`pydantable_protocol.protocols.ExecutionEngine` and are not replaced with
+shallow Python types without a portable plan IR (see docs/TYPING.md, policy for
+``Any``).
 """
 
 from __future__ import annotations

@@ -173,6 +173,30 @@ PydanTable ships `py.typed` and `.pyi` stubs for the public surface. In the repo
 - **Public surface** — imports from `pydantable`, `pydantable.dataframe`, and documented I/O helpers: prefer concrete types, `Protocol`s, `PathLike`, `Mapping`/`Sequence`, and `TYPE_CHECKING` imports for types that would create cycles.
 - **Internal modules** — engine plans, Rust handles, and dynamic adapters may keep `Any` where the runtime type is opaque or checker-specific; narrow with `NewType` / small `Protocol`s only when it reduces real bugs without lying.
 
+### Policy: `typing.Any` must be justified
+
+`Any` disables static checking for that value. **Do not use it because a precise type is merely inconvenient.** Prefer, in order:
+
+1. **Concrete types** (`str`, `Path`, `bytes`, models, `DataFrame[...]`).
+2. **`TypeVar` / `Generic`** when the same function is polymorphic in a known way.
+3. **`Protocol`** for structural APIs (duck typing with a name).
+4. **`object`** when the code only needs identity, `repr`, or a few `isinstance` branches (unknown cell values, opaque scan objects).
+5. **`Mapping[str, ...]` / `Sequence[...]`** instead of untyped `dict` / `list`.
+
+**When `Any` *is* justified** (document the category in PRs for new hotspots; legacy code is covered by the table below):
+
+| Category | Where it shows up | Why `Any` instead of lying |
+|----------|-------------------|----------------------------|
+| **Opaque Rust / PyO3** | `rust_engine.py`, `pydantable_native/*`, plan handles, `execute_plan(plan, data, …)` | Runtime objects are defined in Rust; Python sees untyped or generated bindings. Mirrors `ExecutionEngine` in `pydantable_protocol` (which uses `Any` for plan/data until a portable IR exists). |
+| **Optional / heavy deps** | `io/extras.py`, SQL, Kafka, cloud clients | Third-party libraries may be absent or thinly stubbed; signatures stay permissive at boundaries. |
+| **Dynamic adapters** | `pandas.py`, `pyspark/*`, plugin surfaces | APIs mimic other ecosystems; parameters are intentionally wide. |
+| **Schema / Pydantic internals** | `schema/_impl.py`, `dataframe_model.py` | `TypeAdapter`, `create_model`, and validation hooks use dynamic types from Pydantic. |
+| **Mypy plugin** | `mypy_plugin.py` | Operates on mypy’s internal IR (`Any` is required by the plugin API). |
+| **Public “column dict”** | `dict[str, list[Any]]` for materialized columns | Column element types vary by dtype; a precise `Union` would be enormous and still incomplete. Prefer documenting invariants in `SUPPORTED_TYPES.md`. |
+| **Explicit escape hatch** | Rare | Only with a **short comment** at the definition site: why a `Protocol` or `TypeVar` is not yet possible (e.g. circular import, pending refactor). |
+
+**Review rule:** If you add new `Any` on a **public** symbol, add a sentence in the docstring or link to this section. If you can use `object` or a `Protocol` without changing behavior, use that instead.
+
 ### Phased strictness (`ty`)
 
 `[tool.ty.rules]` in `pyproject.toml` enables some rule families gradually (for example `unknown-argument` and `invalid-argument-type` are enforced where clean). When tightening a rule, fix callsites or add a **narrow** suppression with a short comment; prefer fixing types over broad `[tool.ty.analysis]` overrides.

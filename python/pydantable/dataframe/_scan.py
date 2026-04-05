@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import re
-from typing import Any
 
 
-def _is_scan_file_root(obj: Any) -> bool:
+def _is_scan_file_root(obj: object) -> bool:
     t = type(obj)
     return (
         t.__name__ == "ScanFileRoot"
