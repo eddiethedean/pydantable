@@ -9,7 +9,6 @@ from .window_spec import WindowSpec
 _MAX_EXPR_REPR_AST = 200
 
 def _rust_expr_ast_snippet(rust_expr: Any) -> str: ...
-
 @dataclass(frozen=True, slots=True)
 class AliasedExpr:
     name: str
