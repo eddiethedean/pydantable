@@ -707,8 +707,8 @@ async def test_acollect_yields_event_loop_native_async_execute_plan() -> None:
 @pytest.mark.asyncio
 async def test_acollect_yields_event_loop_thread_fallback() -> None:
     """Blocking engine work runs in a thread; the loop can still run other tasks."""
-    impl = importlib.import_module("pydantable.dataframe._impl")
-    real_mit = impl._materialize_in_thread
+    msf = importlib.import_module("pydantable.dataframe._materialize_scan_fallback")
+    real_mit = msf._materialize_in_thread
     order: list[str] = []
 
     async def mit_with_slow_sync(
@@ -738,7 +738,7 @@ async def test_acollect_yields_event_loop_thread_fallback() -> None:
         mock.patch.object(
             NativePolarsEngine, "has_async_execute_plan", return_value=False
         ),
-        mock.patch.object(impl, "_materialize_in_thread", mit_with_slow_sync),
+        mock.patch.object(msf, "_materialize_in_thread", mit_with_slow_sync),
         mock.patch.object(
             NativePolarsEngine,
             "execute_plan",
