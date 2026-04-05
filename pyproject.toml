@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pydantable"
-version = "1.15.1"
+version = "1.15.2"
 description = "Strongly-typed DataFrames for Python, powered by Rust."
 readme = "README.md"
 license = { text = "MIT" }
@@ -19,8 +19,8 @@ classifiers = [
 ]
 dependencies = [
     "pydantic>=2.0,<3",
-    "pydantable-protocol==1.15.1",
-    "pydantable-native==1.15.1",
+    "pydantable-protocol==1.15.2",
+    "pydantable-native==1.15.2",
     "typing-extensions>=4.7",
 ]
 
@@ -56,6 +56,7 @@ dev = [
     "pytest-asyncio>=0.23",
     "pytest-cov>=4.0",
     "pytest-xdist>=3.0",
+    "pytest-timeout>=2.0",
     "ruff>=0.8.0",
     "ty>=0.0.28",
     "mypy>=1.0",
@@ -75,7 +76,7 @@ dev = [
     "snowflake-connector-python>=3.0",
     # SqlDataFrame / SqlDataFrameModel tests (same pin as optional ``[moltres]``).
     "moltres-core>=1.0.0,<2",
-    # SQLAlchemy ``create_async_engine`` (rapsqlite smoke test in ``tests/test_sql_moltres.py``).
+    # SQLAlchemy ``create_async_engine`` (rapsqlite smoke test in ``tests/sql/test_sql_moltres.py``).
     "greenlet>=3.0",
 ]
 benchmark = [
@@ -173,11 +174,11 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
 "python/pydantable/io/**/*.py" = ["E501"]
-"tests/test_io_comprehensive.py" = ["TC003"]
-"tests/test_io_extras_and_transports.py" = ["TC003", "E501", "RUF012"]
-"tests/test_io_improvements.py" = ["TC003", "E501"]
-"tests/test_typing_module_runtime.py" = ["TC003"]
-"tests/test_async_materialization.py" = ["TC003"]
+"tests/io/test_io_comprehensive.py" = ["TC003"]
+"tests/io/test_io_extras_and_transports.py" = ["TC003", "E501", "RUF012"]
+"tests/io/test_io_improvements.py" = ["TC003", "E501"]
+"tests/typing/test_typing_module_runtime.py" = ["TC003"]
+"tests/dataframe/test_async_materialization.py" = ["TC003"]
 "python/pydantable/testing/**/*.py" = ["TC003"]
 "python/pydantable/sql_moltres.py" = ["TC003"]
 "python/pydantable/pandas_moltres.py" = ["TC003"]
@@ -185,10 +186,17 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 "python/pydantable/dataframe/_execution_handle.py" = ["TC003"]
 "python/pydantable/dataframe/_materialize_scan_fallback.py" = ["TC003"]
 "python/pydantable/dataframe/grouped.py" = ["TC003"]
-"tests/test_pydantable_fastapi_columnar.py" = ["TC003"]
-"tests/test_sql_moltres.py" = ["TC003"]
+"tests/fastapi/test_pydantable_fastapi_columnar.py" = ["TC003"]
+"tests/sql/test_sql_moltres.py" = ["TC003"]
 # ``__all__`` lists lazy ``SqlDataFrame`` / ``SqlDataFrameModel`` from ``__getattr__``.
 "python/pydantable/pandas.py" = ["F822"]
+"tests/conftest.py" = ["TC003"]
+"tests/io/test_docs_example_scripts.py" = ["TC003"]
+"tests/io/test_scan_column_error_parsing.py" = ["E501"]
+"tests/typing/test_mypy_dataframe_model_return_types.py" = ["TC003"]
+"tests/typing/test_mypy_typing_contracts.py" = ["TC003"]
+"tests/typing/test_pyright_dataframe_model_return_types.py" = ["TC003"]
+"tests/typing/test_pyright_typing_contracts.py" = ["TC003"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -325,8 +333,10 @@ pythonpath = ["python", "pydantable-protocol/python"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+addopts = "--strict-markers"
+timeout = 300
 # Legacy string-SQL I/O names warn with DeprecationWarning (Phase 4, v1.13.0); existing
-# tests still exercise behavior via these entrypoints. See tests/test_sql_string_deprecation.py.
+# tests still exercise behavior via these entrypoints. See tests/sql/test_sql_string_deprecation.py.
 filterwarnings = [
     "ignore:.*is deprecated and will be removed in a future major version:DeprecationWarning",
 ]
@@ -334,6 +344,7 @@ markers = [
     "slow: performance guardrails (timing-based; exclude with -m 'not slow')",
     "network: uses loopback HTTP server or similar (exclude with -m 'not network')",
     "optional_cloud: requires optional cloud/extra deps (may skip via importorskip)",
+    "asyncio: async tests (pytest-asyncio)",
 ]
 
 [tool.coverage.run]

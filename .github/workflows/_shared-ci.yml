@@ -373,12 +373,11 @@ jobs:
             echo "PY=$GITHUB_WORKSPACE/.venv/bin/python" >> $GITHUB_ENV
           fi
 
-      # Keep in sync with ``pyproject.toml`` ``[project.optional-dependencies]`` dev + pandas + polars
-      # (includes sqlalchemy + sqlmodel for SQL / SQLModel I/O tests).
+      # Keep in sync with ``pyproject.toml`` ``[project.optional-dependencies] dev`` (see ``scripts/ci_print_dev_extras.py``).
       - name: Install maturin and test deps
         run: |
           $PY -m pip install -U pip
-          $PY -m pip install maturin mypy "ty>=0.0.28" ruff pytest pytest-asyncio pytest-xdist pytest-cov \
+          $PY -m pip install maturin mypy "ty>=0.0.28" ruff pytest pytest-asyncio pytest-xdist pytest-cov pytest-timeout \
             "tomli>=1.2.0" \
             "numpy>=1.24" "pandas>=2.0" "hypothesis>=6.0" "pyarrow>=14.0" \
             "fastapi>=0.100" "httpx>=0.24" "sqlalchemy>=2.0,<3" "sqlmodel>=0.0.22,<0.1" \
@@ -387,6 +386,7 @@ jobs:
             "fsspec>=2023.0" "openpyxl>=3.1" \
             "kafka-python>=2.0" "google-cloud-bigquery>=3.0" "snowflake-connector-python>=3.0" \
             "rapcsv>=0.2" "rapfiles>=0.1" "rapsqlite>=0.1" \
+            "moltres-core>=1.0.0,<2" \
             "greenlet>=3.0"
           $PY -m pip install pyright
 
@@ -420,3 +420,67 @@ jobs:
       - name: Verify doc examples (Ubuntu Python 3.11)
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
         run: PYTHONPATH=python $PY scripts/verify_doc_examples.py
+
+  # Weekly (``schedule`` in ``ci.yml``): full suite with pytest-randomly after main ``python-tests`` succeeds.
+  python-tests-random-order:
+    name: Python tests (random order, ubuntu py3.11)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    needs: [python-tests]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            pydantable-core/target
+          key: ${{ runner.os }}-cargo-py-${{ hashFiles('pydantable-core/Cargo.lock') }}-3.11
+          restore-keys: |
+            ${{ runner.os }}-cargo-py-
+
+      - name: Create venv
+        run: python -m venv .venv
+
+      - name: Set Python path
+        run: echo "PY=$GITHUB_WORKSPACE/.venv/bin/python" >> $GITHUB_ENV
+
+      - name: Install maturin and test deps
+        run: |
+          $PY -m pip install -U pip
+          $PY -m pip install maturin mypy "ty>=0.0.28" ruff pytest pytest-asyncio pytest-xdist pytest-cov pytest-timeout pytest-randomly \
+            "tomli>=1.2.0" \
+            "numpy>=1.24" "pandas>=2.0" "hypothesis>=6.0" "pyarrow>=14.0" \
+            "fastapi>=0.100" "httpx>=0.24" "sqlalchemy>=2.0,<3" "sqlmodel>=0.0.22,<0.1" \
+            "python-multipart>=0.0.6" \
+            "polars>=1.0.0,<2" "streamlit>=1.30,<2" "dataframe-api-compat>=0.2.7" \
+            "fsspec>=2023.0" "openpyxl>=3.1" \
+            "kafka-python>=2.0" "google-cloud-bigquery>=3.0" "snowflake-connector-python>=3.0" \
+            "rapcsv>=0.2" "rapfiles>=0.1" "rapsqlite>=0.1" \
+            "moltres-core>=1.0.0,<2" \
+            "greenlet>=3.0"
+          $PY -m pip install pyright
+
+      - name: Install local packages and native extension
+        run: |
+          $PY -m pip install -e ./pydantable-protocol
+          (cd pydantable-native && $PY -m maturin develop --release)
+          $PY -m pip install -e .
+        env:
+          VIRTUAL_ENV: ${{ github.workspace }}/.venv
+
+      - name: Pytest (randomized order)
+        run: $PY -m pytest -q -n auto

@@ -20,6 +20,7 @@ RUST_PYTHONPATH ?= $(CURDIR)/python:$(CURDIR)/pydantable-protocol/python:$(CURDI
 
 .PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check engine-bypass-check ty-check ty-check-minimal pyright-check pyright-check-strict sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 .PHONY: native-develop native-develop-fast native-wheel install-editable dev-setup install-dev help
+.PHONY: test test-fast test-cov test-moltres
 .PHONY: gen-typing check-typing
 
 check-full: check-python check-docs check-rust
@@ -69,10 +70,25 @@ check-typing:
 	$(PYTHON) scripts/generate_typing_artifacts.py --check
 	$(TY) check
 	$(PYTHON) -m pytest -q \
-		tests/test_mypy_dataframe_model_return_types.py \
-		tests/test_mypy_typing_contracts.py \
-		tests/test_pyright_dataframe_model_return_types.py \
-		tests/test_pyright_typing_contracts.py
+		tests/typing/test_mypy_dataframe_model_return_types.py \
+		tests/typing/test_mypy_typing_contracts.py \
+		tests/typing/test_pyright_dataframe_model_return_types.py \
+		tests/typing/test_pyright_typing_contracts.py
+
+# Match CI ``python-tests`` (Ubuntu matrix); requires ``pip install -e ".[dev]"`` and native build.
+test:
+	$(PYTHON) -m pytest -q -n auto
+
+test-fast:
+	$(PYTHON) -m pytest -q -n auto -m "not slow"
+
+# Match CI coverage gate (Ubuntu + Python 3.11 only in Actions).
+test-cov:
+	$(PYTHON) -m pytest -q -n auto \
+		--cov=pydantable --cov-report=xml --cov-report=term-missing:skip-covered --cov-fail-under=78
+
+test-moltres:
+	$(PYTHON) -m pytest -q -n auto tests/sql/test_sql_moltres.py
 
 check-rust: rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 
@@ -106,6 +122,7 @@ help:
 	@echo "  native-wheel       Build a release wheel (does not pip-install)"
 	@echo ""
 	@echo "Checks: check-full, check-python, check-rust, check-docs"
+	@echo "Tests: test, test-fast (-m \"not slow\"), test-cov (CI coverage args), test-moltres (sql/)"
 	@echo "  pyright-check-strict  Optional Pyright over python/pydantable (maintainers)"
 
 # Install editable Python packages only (assumes pydantable-native already built/installed).

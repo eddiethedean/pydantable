@@ -1,6 +1,6 @@
 # PydanTable roadmap (shipped → v1.0.0)
 
-**Latest release: `1.15.1`.** The **Planned v1.0.0** checklist (below) is **complete** for that tag. **Shipped in 0.23.0** adds **lazy `read_*` / `aread_*` file roots** (Parquet, CSV, NDJSON, IPC, **JSON**), **`DataFrame.write_*`** lazy pipeline output, **`export_*`** for eager dict→file, **`DataFrameModel`** glue (**`from_sql`**, **`write_sql`**, **`read_parquet_url_ctx`**), **HTTP/object-store `max_bytes`**, **`MissingRustExtensionError`**, and **breaking renames** (**`materialize_*`**, **`fetch_sql`**, **`fetch_*_url`**)—see **Shipped in 0.23.0** below and {doc}`IO_OVERVIEW`. **0.22.0** introduced the **`pydantable.io`** package (vocabulary evolved in **0.23.0**; see {doc}`CHANGELOG`). Earlier **0.20.0** / **0.21.0** items (**UX** docs, **Streamlit** interchange, …) remain in their sections. **ipywidgets** / interactive explorers remain **Later** unless promoted. This document also summarizes shipped history and **Later** / **After v1.0.0** backlogs.
+**Latest release: `1.15.2`.** The **Planned v1.0.0** checklist (below) is **complete** for that tag. **Shipped in 0.23.0** adds **lazy `read_*` / `aread_*` file roots** (Parquet, CSV, NDJSON, IPC, **JSON**), **`DataFrame.write_*`** lazy pipeline output, **`export_*`** for eager dict→file, **`DataFrameModel`** glue (**`from_sql`**, **`write_sql`**, **`read_parquet_url_ctx`**), **HTTP/object-store `max_bytes`**, **`MissingRustExtensionError`**, and **breaking renames** (**`materialize_*`**, **`fetch_sql`**, **`fetch_*_url`**)—see **Shipped in 0.23.0** below and {doc}`IO_OVERVIEW`. **0.22.0** introduced the **`pydantable.io`** package (vocabulary evolved in **0.23.0**; see {doc}`CHANGELOG`). Earlier **0.20.0** / **0.21.0** items (**UX** docs, **Streamlit** interchange, …) remain in their sections. **ipywidgets** / interactive explorers remain **Later** unless promoted. This document also summarizes shipped history and **Later** / **After v1.0.0** backlogs.
 
 Release history (high level): [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -277,7 +277,7 @@ Practical inputs that feed that phase:
 - [x] **Execution guide:** materialization cost table, import-style table, copy-as / interchange in [`EXECUTION.md`](EXECUTION.md).
 - [x] **Naming map:** core ↔ pandas ↔ PySpark in [`PANDAS_UI.md`](PANDAS_UI.md) and [`PYSPARK_UI.md`](PYSPARK_UI.md).
 - [x] **`value_counts(column)`** on **`DataFrame`** / **`DataFrameModel`**; **`_repr_mimebundle_`** for Jupyter; **`PYDANTABLE_VERBOSE_ERRORS`** for **`execute_plan`** **`ValueError`** context.
-- [x] **Tests:** [`tests/test_display_options.py`](../tests/test_display_options.py), [`tests/test_rust_engine_verbose_errors.py`](../tests/test_rust_engine_verbose_errors.py).
+- [x] **Tests:** [`tests/dataframe/test_display_options.py`](../tests/dataframe/test_display_options.py), [`tests/dataframe/test_rust_engine_verbose_errors.py`](../tests/dataframe/test_rust_engine_verbose_errors.py).
 
 ### Quality and release
 

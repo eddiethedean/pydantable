@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.15.2] — 2026-04-05
+
+### Changed
+
+- **Docs:** Typing guide (`ty` vs mypy/Pyright, `Any` policy), troubleshooting (`engine="auto"` Rust fallback, async cancellation), I/O overview callouts, FASTAPI/DATAFRAMEMODEL non-deprecated SQL examples; DEVELOPER Rust `unwrap` note.
+- **Typing:** Astral `ty` rules (`invalid-return-type`, `unsupported-operator` at error); grouped-frame protocol; SQL `afetch_sqlmodel` / `aiter_sqlmodel` `Sequence` signatures; optional `pyrightconfig-strict.json`.
+- **Tests:** Scan-column engine-error regex regression tests; remove flaky wall-clock skip stub in async materialization tests.
+
+### Version bump
+
+- Align **pydantable**, **pydantable-protocol**, **pydantable-native**, **pydantable-core**, and published **`__version__`** values to **1.15.2**.
+
 ## [1.15.1] — 2026-04-04
 
 ### Fixed

@@ -8,7 +8,7 @@
 
 **Strongly typed DataFrames for Python, powered by Rust** — Pydantic schemas, Polars-backed execution in the native extension, and an API built for services (including optional FastAPI integration).
 
-**Current release: 1.15.1** — highlights in the [changelog](https://pydantable.readthedocs.io/en/latest/CHANGELOG.html).
+**Current release: 1.15.2** — highlights in the [changelog](https://pydantable.readthedocs.io/en/latest/CHANGELOG.html).
 
 ## Why PydanTable
 
