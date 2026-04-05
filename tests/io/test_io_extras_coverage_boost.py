@@ -18,7 +18,9 @@ from pydantable.io.extras import (
     iter_kafka_json,
     iter_orc,
     iter_snowflake,
+    read_avro,
     read_csv_stdin,
+    read_delta,
     read_excel,
     read_kafka_json_batch,
     write_csv_stdout,
@@ -108,6 +110,27 @@ def test_iter_delta_batch_size_zero_raises(tmp_path: Path) -> None:
     root.mkdir()
     with pytest.raises(ValueError, match="batch_size"):
         next(iter_delta(root, batch_size=0, experimental=True))
+
+
+def test_read_delta_experimental_false_without_env_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("PYDANTABLE_IO_EXPERIMENTAL", raising=False)
+    with pytest.raises(ValueError, match="experimental"):
+        read_delta(tmp_path / "delta", experimental=False)
+
+
+def test_read_avro_attribute_error_when_pyarrow_avro_missing(
+    tmp_path: Path,
+) -> None:
+    pa = pytest.importorskip("pyarrow")
+    path = tmp_path / "m.avro"
+    path.write_bytes(b"")
+    with (
+        patch.object(pa, "avro", SimpleNamespace(), create=True),
+        pytest.raises(ImportError, match=r"pyarrow\.avro"),
+    ):
+        read_avro(path, experimental=True)
 
 
 def test_iter_orc_batches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

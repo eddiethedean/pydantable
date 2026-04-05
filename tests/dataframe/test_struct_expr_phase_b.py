@@ -66,3 +66,11 @@ def test_struct_json_encode_rejects_non_struct() -> None:
     df = DataFrame[_Row]({"id": [1], "s": [{"x": 1, "y": None}]})
     with pytest.raises(TypeError, match="struct_json_encode"):
         _ = df.with_columns(bad=df.id.struct_json_encode())
+
+
+def test_struct_with_fields_requires_fields_and_expr_values() -> None:
+    df = DataFrame[_Row]({"id": [1], "s": [{"x": 1, "y": None}]})
+    with pytest.raises(TypeError, match="at least one keyword"):
+        df.with_columns(bad=df.s.struct_with_fields())
+    with pytest.raises(TypeError, match="expects Expr"):
+        df.with_columns(bad=df.s.struct_with_fields(z=3))  # type: ignore[arg-type]

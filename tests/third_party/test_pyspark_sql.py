@@ -143,6 +143,39 @@ def test_sql_functions_list_wrappers_reject_non_expr() -> None:
         F.list_sum([1, 2])  # type: ignore[arg-type]
 
 
+def test_sql_functions_starts_ends_contains_split_pad_regex_helpers() -> None:
+    class S(Schema):
+        s: str
+
+    df = DataFrame[S]({"s": ["hello world", "ab"]})
+    cs = F.col("s", dtype=str)
+    out = (
+        df.withColumn("sw", F.starts_with(cs, "he"))
+        .withColumn("ew", F.ends_with(cs, "ld"))
+        .withColumn("ct", F.contains(cs, "lo"))
+        .withColumn("scp", F.str_contains_pat(cs, "lo", literal=True))
+        .withColumn("sp", F.split(cs, " "))
+        .withColumn("rev", F.reverse(cs))
+        .withColumn("lp", F.lpad(cs, 10))
+        .withColumn("rp", F.rpad(cs, 10))
+        .withColumn("lz", F.lpad_zero(cs, 4))
+        .withColumn("rex", F.regexp_extract(cs, r"(he)", 1))
+        .withColumn("rl", F.rlike(cs, r"he.."))
+        .withColumn("rsubs", F.regexp_substr(cs, r"(he)", 0))
+        .withColumn("rlike_alias", F.regexp_like(cs, r"he.."))
+        .collect(as_lists=True)
+    )
+    assert out["sw"] == [True, False]
+    assert out["ew"] == [True, False]
+    assert out["ct"] == [True, False]
+    assert out["sp"][0] == ["hello", "world"]
+    assert out["rev"][0] == "dlrow olleh"
+    assert out["lz"][1] == "00ab"
+    assert len(out["rex"][0]) >= 1
+    assert out["rl"][0] is True
+    assert out["rlike_alias"][0] is True
+
+
 def test_sql_functions_str_replace_nullable_string_column() -> None:
     class S(Schema):
         s: str | None

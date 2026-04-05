@@ -4,7 +4,7 @@ This document snapshots **statement-line gaps** by area and complements [Testing
 
 ## Baseline (full suite, `--cov-fail-under=0`)
 
-Last regeneration (full `pytest` with branch coverage): **~82%** on the `TOTAL` line in the terminal report (combined statement/branch-style percentage; exact value drifts). CI **`--cov-fail-under`** is **82** (see `Makefile` / `_shared-ci.yml`). Regenerate:
+Last regeneration (full `pytest` with branch coverage): **~82.8%** total (`pytest-cov` reports **82.77%** on the same run; the terminal `TOTAL` line may round to **83%**). About **`1428`** statements still missed (of `10084`; branch coverage enabled). CI **`--cov-fail-under`** remains **82** until the suite consistently clears **≥ 83.0%** on the combined metric (see `Makefile` / `_shared-ci.yml`). Regenerate:
 
 ```bash
 .venv/bin/python -m pytest -q -n auto --cov=pydantable --cov-report=term-missing:skip-covered --cov-fail-under=0
@@ -16,16 +16,16 @@ Rough ordering by **Miss** column (largest gaps first; numbers drift each run):
 
 | Rank | Module | Miss (stmts) | Notes |
 |------|--------|----------------|------|
-| 1 | `pandas.py` | ~300–350 | Façade; extend `tests/third_party/` |
-| 2 | `dataframe/_impl.py` | ~210–230 | Core engine paths + errors |
-| 3 | `schema/_impl.py` | ~150–170 | Unions / narrowing edge cases |
-| 4 | `pyspark/dataframe.py` | ~130–150 | Parity smoke tests |
-| 5 | `io/__init__.py` | ~75–90 | Materialize/export branches |
-| 6 | `io/extras.py` | ~40–55 | Optional SDKs + mocks (improved) |
-| 7 | `dataframe_model.py` | ~120–135 | I/O and async helpers |
-| 8 | `awaitable_dataframe_model.py` | ~70–80 | Async chains / group_by / join |
-| 9 | `pyspark/sql/functions.py` | ~65–75 | Representative calls only |
-| 10 | `expressions.py` | ~40–50 | Public `Expr` surfaces |
+| 1 | `pandas.py` | ~346 | Façade; extend `tests/third_party/` |
+| 2 | `dataframe/_impl.py` | ~219 | Core engine paths + errors |
+| 3 | `schema/_impl.py` | ~163 | Unions / narrowing edge cases |
+| 4 | `pyspark/dataframe.py` | ~140 | Parity smoke tests |
+| 5 | `dataframe_model.py` | ~131 | I/O and async helpers |
+| 6 | `io/__init__.py` | ~80 | Materialize/export branches |
+| 7 | `awaitable_dataframe_model.py` | ~55 | Async terminals / `__getattr__` |
+| 8 | `io/extras.py` | ~44 | Optional SDKs + mocks |
+| 9 | `pyspark/sql/functions.py` | ~71 | Representative calls only |
+| 10 | `expressions.py` | ~36 | Public `Expr` surfaces |
 
 ## Per-package focus (highest missing lines first)
 
@@ -43,3 +43,5 @@ Rough ordering by **Miss** column (largest gaps first; numbers drift each run):
 
 - Prefer **`# pragma: no cover`** only for truly unreachable defensive code.
 - Raise **`--cov-fail-under`** in CI only after the full suite is green at the new floor (see [`.github/workflows/_shared-ci.yml`](../.github/workflows/_shared-ci.yml)).
+- **Next numeric gate:** increase **`82` → `83`** once **`pytest-cov` total coverage is ≥ 83.0%** on the Ubuntu + Python 3.11 leg (local macOS/Linux numbers may differ slightly from the rounded `TOTAL` column).
+- **Large PRs:** run **`make test-cov`** (or download **`coverage.xml`** from CI), then **`make diff-cover`** so new/changed lines stay covered vs **`origin/main`** (see [Testing](TESTING.md)).

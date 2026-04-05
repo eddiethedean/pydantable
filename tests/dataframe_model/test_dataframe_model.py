@@ -320,6 +320,96 @@ async def test_awaitable_join_with_other_awaitable(tmp_path) -> None:
     assert rows[0].id == 1
 
 
+@pytest.mark.asyncio
+async def test_awaitable_eager_model_async_terminals() -> None:
+    pytest.importorskip("polars")
+    pytest.importorskip("pyarrow")
+
+    async def _get() -> UserDF:
+        return UserDF({"id": [1], "age": [2]})
+
+    adf = AwaitableDataFrameModel(_get, repr_label="test_eager")
+    assert await adf.ato_dict() == {"id": [1], "age": [2]}
+    assert await adf.to_dict() == {"id": [1], "age": [2]}
+    pl_out = await adf.ato_polars()
+    assert pl_out is not None
+    assert await adf.to_polars() is not None
+    assert await adf.ato_arrow() is not None
+    assert await adf.to_arrow() is not None
+    rows = await adf.arows()
+    assert [r.id for r in rows] == [1]
+    dicts = await adf.ato_dicts()
+    assert dicts == [{"id": 1, "age": 2}]
+    assert await adf.to_dicts() == dicts
+    handle = await adf.submit(as_lists=True)
+    got = await handle.result()
+    assert got == {"id": [1], "age": [2]}
+    batches: list[object] = []
+    async for b in adf.astream(batch_size=1):
+        batches.append(b)
+    assert batches
+    info = await adf.info()
+    assert isinstance(info, str)
+    desc = await adf.describe()
+    assert isinstance(desc, str)
+
+
+@pytest.mark.asyncio
+async def test_awaitable_chain_collect_alias_matches_acollect(tmp_path) -> None:
+    path = tmp_path / "alias.pq"
+    export_parquet(path, {"id": [1], "age": [2]})
+    adf = UserDF.aread_parquet(path, trusted_mode="shape_only")
+    r1 = await adf.collect(as_lists=True)
+    r2 = await adf.acollect(as_lists=True)
+    assert r1 == r2 == {"id": [1], "age": [2]}
+
+
+@pytest.mark.asyncio
+async def test_awaitable_chain_rejects_write_parquet(tmp_path) -> None:
+    path = tmp_path / "wp.pq"
+    export_parquet(path, {"id": [1], "age": [2]})
+    adf = UserDF.aread_parquet(path, trusted_mode="shape_only")
+    with pytest.raises(TypeError, match="cannot call write_parquet"):
+        adf.write_parquet(tmp_path / "out.pq")  # type: ignore[call-arg]
+
+
+def test_awaitable_getattr_private_raises() -> None:
+    async def _get() -> UserDF:
+        return UserDF({"id": [1], "age": [2]})
+
+    adf = AwaitableDataFrameModel(_get)
+    with pytest.raises(AttributeError, match="no attribute '_x'"):
+        _ = adf._x  # type: ignore[attr-defined]
+
+
+def test_awaitable_grouped_repr_default() -> None:
+    from pydantable.awaitable_dataframe_model import AwaitableGroupedDataFrameModel
+
+    async def _g():
+        return object()
+
+    g = AwaitableGroupedDataFrameModel(_g)
+    assert "pending" in repr(g)
+
+
+def test_awaitable_dynamic_grouped_repr_and_agg() -> None:
+    from pydantable.awaitable_dataframe_model import (
+        AwaitableDynamicGroupedDataFrameModel,
+    )
+
+    class _G:
+        def agg(self, **kwargs: object) -> UserDF:
+            return UserDF({"id": [1], "age": [2]})
+
+    async def _get() -> _G:
+        return _G()
+
+    dg = AwaitableDynamicGroupedDataFrameModel(_get)
+    assert "AwaitableDynamicGroupedDataFrameModel" in repr(dg)
+    out = dg.agg(m=("max", "age"))
+    assert isinstance(out, AwaitableDataFrameModel)
+
+
 def test_dataframe_model_constructor_from_io_materialize_ndjson(tmp_path) -> None:
     path = tmp_path / "m.ndjson"
     export_ndjson(path, {"id": [3], "age": [None]})

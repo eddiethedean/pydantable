@@ -25,3 +25,10 @@ def test_grouped_sum_requires_column_name() -> None:
     g = df.group_by("id")
     with pytest.raises(ValueError, match="at least one column"):
         g.sum()
+
+
+def test_grouped_dataframe_repr_html_includes_keys() -> None:
+    df = DataFrame[_G]({"id": [1], "a": [1], "b": [2]})
+    g = df.group_by("id")
+    html = g._repr_html_()
+    assert "GroupedDataFrame" in html and "id" in html

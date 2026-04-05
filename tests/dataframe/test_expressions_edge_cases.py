@@ -158,6 +158,25 @@ def test_map_has_any_key_requires_at_least_one_key() -> None:
         df.meta.map_has_any_key([])
 
 
+def test_contains_any_and_all_scalar_wraps_single_value() -> None:
+    df = DataFrame[_Tags]({"tags": [["a", "b"], ["c"]]})
+    out = (
+        df.with_columns(
+            any_a=df.tags.contains_any("a"),
+            all_ab=df.tags.contains_all(("a", "b")),
+        )
+        .collect(as_lists=True)
+    )
+    assert out["any_a"] == [True, False]
+    assert out["all_ab"] == [True, False]
+
+
+def test_map_has_any_key_scalar_wraps_single_key() -> None:
+    df = DataFrame[_MapCol]({"meta": [{"x": 1, "y": 2}, {"z": 3}]})
+    out = df.with_columns(ok=df.meta.map_has_any_key("x")).collect(as_lists=True)
+    assert out["ok"] == [True, False]
+
+
 def test_matches_rejects_empty_pattern() -> None:
     df = DataFrame[N]({"a": [1], "s": ["x"]})
     with pytest.raises(TypeError, match="non-empty string"):
@@ -176,3 +195,32 @@ def test_str_contains_pat_empty_pattern_regex_raises() -> None:
     df = DataFrame[N]({"a": [1], "s": ["hi"]})
     with pytest.raises(ValueError, match="empty"):
         df.s.str_contains_pat("", literal=False)
+
+
+def test_expr_len_and_is_in_alias() -> None:
+    df = DataFrame[N]({"a": [1], "s": ["ab"]})
+    out = df.with_columns(
+        n=df.s.len(),
+        ok=df.a.is_in(1),
+    ).collect(as_lists=True)
+    assert out["n"] == [2]
+    assert out["ok"] == [True]
+
+
+def test_expr_len_rejects_non_string_column() -> None:
+    df = DataFrame[N]({"a": [1], "s": ["x"]})
+    with pytest.raises(TypeError, match="len"):
+        df.with_columns(bad=df.a.len())
+
+
+def test_expr_replace_too_many_mappings_raises() -> None:
+    df = DataFrame[N]({"a": [1], "s": ["x"]})
+    big = {i: i for i in range(65)}
+    with pytest.raises(ValueError, match="64"):
+        df.with_columns(r=df.a.replace(big))
+
+
+def test_expr_clip_lower_and_upper() -> None:
+    df = DataFrame[N]({"a": [0, 20], "s": ["a", "b"]})
+    out = df.with_columns(c=df.a.clip(5, 10)).collect(as_lists=True)
+    assert out["c"] == [5, 10]
