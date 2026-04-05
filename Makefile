@@ -1,7 +1,12 @@
 # Local checks span three Python trees: core ``python/pydantable``, ``pydantable-protocol``,
-# and ``pydantable-native`` (plus Rust in check-rust). Before ``native-develop`` or first
-# ``check-full``, install deps from repo root, for example:
-#   pip install -e ./pydantable-protocol && pip install -e ".[dev]" && make native-develop
+# and ``pydantable-native`` (plus Rust in check-rust).
+#
+# Quick start (from repo root, with a venv activated or ``.venv`` present):
+#   make dev-setup              # protocol + maturin develop + editable pydantable
+#   make install-dev            # same as dev-setup but with pip install -e ".[dev]"
+#
+# Or step by step:
+#   pip install -e ./pydantable-protocol && make native-develop && pip install -e .
 PYTHON ?= .venv/bin/python
 RUFF ?= $(PYTHON) -m ruff
 TY ?= $(PYTHON) -m ty
@@ -14,7 +19,7 @@ NATIVE_PYPROJECT ?= pydantable-native/pyproject.toml
 RUST_PYTHONPATH ?= $(CURDIR)/python:$(CURDIR)/pydantable-protocol/python:$(CURDIR)/pydantable-native/python
 
 .PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check engine-bypass-check ty-check ty-check-minimal pyright-check sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
-.PHONY: native-develop native-wheel
+.PHONY: native-develop native-develop-fast native-wheel install-editable dev-setup install-dev help
 .PHONY: gen-typing check-typing
 
 check-full: check-python check-docs check-rust
@@ -82,7 +87,46 @@ rust-test:
 	PYTHONPATH=$(RUST_PYTHONPATH):$$($(CURDIR)/.venv/bin/python -c "import site; print(site.getsitepackages()[0])") \
 	cargo test --manifest-path $(CARGO_MANIFEST) --all-features
 
+# --- Editable installs & native extension (maturin) ---
+
+help:
+	@echo "PydanTable Makefile"
+	@echo ""
+	@echo "Setup:"
+	@echo "  dev-setup          Install protocol, build native (release), pip install -e ."
+	@echo "  install-dev        Like dev-setup but pip install -e \".[dev]\""
+	@echo "  install-editable   pip install -e protocol + root package (no Rust build)"
+	@echo "  native-develop     pip install -e protocol + maturin develop --release"
+	@echo "  native-develop-fast  maturin develop without --release (faster iteration)"
+	@echo "  native-wheel       Build a release wheel (does not pip-install)"
+	@echo ""
+	@echo "Checks: check-full, check-python, check-rust, check-docs"
+
+# Install editable Python packages only (assumes pydantable-native already built/installed).
+install-editable:
+	$(PYTHON) -m pip install -q -e ./pydantable-protocol
+	$(PYTHON) -m pip install -q -e .
+
+# Full local dev: native extension + editable main package (matches typical contributor flow).
+dev-setup: native-develop install-editable
+
+# Same as dev-setup but with test/lint/docs extras from pyproject.toml.
+install-dev: native-develop
+	$(PYTHON) -m pip install -q -e ".[dev]"
+
 native-develop:
+	$(PYTHON) -m pip install -q "maturin>=1.4,<2.0"
 	$(PYTHON) -m pip install -q -e ./pydantable-protocol
 	cd pydantable-native && $(CURDIR)/$(PYTHON) -m maturin develop --release
+
+native-develop-fast:
+	$(PYTHON) -m pip install -q "maturin>=1.4,<2.0"
+	$(PYTHON) -m pip install -q -e ./pydantable-protocol
+	cd pydantable-native && $(CURDIR)/$(PYTHON) -m maturin develop
+
+# Build wheel under pydantable-native/target/wheels/ (install with pip install <wheel>).
+native-wheel:
+	$(PYTHON) -m pip install -q "maturin>=1.4,<2.0"
+	$(PYTHON) -m pip install -q -e ./pydantable-protocol
+	cd pydantable-native && $(CURDIR)/$(PYTHON) -m maturin build --release
 

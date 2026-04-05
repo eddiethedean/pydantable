@@ -13,21 +13,15 @@ Non-blocking variants :meth:`DataFrame.acollect`, :meth:`DataFrame.ato_dict`,
 
 from __future__ import annotations
 
-import asyncio
 import concurrent.futures
-import enum
 import functools
 import html
 import importlib
 import logging
-import os
 import random
-import re
 import statistics
 import threading
-import types
 import warnings
-from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import (
     TYPE_CHECKING,
@@ -35,20 +29,17 @@ from typing import (
     Generic,
     Literal,
     TypeVar,
-    Union,
     cast,
     get_args,
     get_origin,
 )
 
-from pydantic import BaseModel, TypeAdapter
-from pydantic_core import PydanticUndefined
+from pydantic import BaseModel
 
 from pydantable.display import get_repr_html_limits
 from pydantable.engine import get_default_engine
 from pydantable.expressions import AliasedExpr, ColumnRef, Expr
 from pydantable.schema import (
-    _annotation_nullable_inner,
     _is_polars_dataframe,
     field_types_for_rust,
     make_derived_schema_type,
@@ -60,6 +51,24 @@ from pydantable.schema import (
 )
 from pydantable.selectors import Selector
 
+from ._column_rows import _coerce_enum_columns, _rows_from_column_dict
+from ._describe_dtype import (
+    _dtype_repr,
+    _is_describe_bool,
+    _is_describe_numeric,
+    _is_describe_str,
+    _is_describe_temporal,
+)
+from ._execution_handle import ExecutionHandle, _materialize_in_thread
+from ._materialize_scan_fallback import (
+    materialize_with_optional_scan_fallback_async,
+    materialize_with_optional_scan_fallback_sync,
+)
+from ._repr_display import _REPR_MAX_COLUMNS, _dataframe_to_html_fragment
+from ._scan import _is_scan_file_root
+from ._streaming import _resolve_engine_streaming
+from .grouped import DynamicGroupedDataFrame, GroupedDataFrame
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping, Sequence
     from concurrent.futures import Executor
@@ -67,406 +76,6 @@ if TYPE_CHECKING:
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
-_NoneType = type(None)
-
-
-def _is_scan_file_root(obj: Any) -> bool:
-    t = type(obj)
-    return (
-        t.__name__ == "ScanFileRoot"
-        and getattr(t, "__module__", "") == "pydantable_native._core"
-    )
-
-
-def _extract_missing_scan_column_from_engine_error(msg: str) -> str | None:
-    """
-    Best-effort parse of engine error strings for missing columns in Polars scans.
-
-    Polars error messages vary across versions and execution paths. This parser is
-    intentionally tolerant: it only runs on scan roots and only affects recovery
-    for *optional* schema fields.
-    """
-    s = (msg or "").strip()
-    if not s:
-        return None
-    patterns = (
-        # Current/legacy Rust error string used in tests/docs.
-        r'not found: "([^"]+)" not found',
-        # Common Polars Python error variants.
-        r"ColumnNotFoundError: '([^']+)'",
-        r'ColumnNotFoundError: "([^"]+)"',
-        r"ColumnNotFoundError: ([A-Za-z_][A-Za-z0-9_]*)\b",
-        r"column ['\"]([^'\"]+)['\"] not found",
-    )
-    for pat in patterns:
-        m = re.search(pat, s)
-        if m:
-            return m.group(1)
-    return None
-
-
-# Cap column listing in :meth:`DataFrame.__repr__` for very wide schemas.
-_REPR_MAX_COLUMNS = 32
-_REPR_DTYPE_MAX_LEN = 72
-# Default Jupyter / IPython preview limits; overridden by :mod:`pydantable.display`.
-_REPR_HTML_MAX_ROWS = 20
-_REPR_HTML_MAX_COLS = 40
-_REPR_HTML_MAX_CELL_LEN = 500
-_UNION_ORIGINS = (types.UnionType, Union)
-
-
-def _is_describe_numeric(annotation: Any) -> bool:
-    inner, _ = _annotation_nullable_inner(annotation)
-    return inner is int or inner is float
-
-
-def _is_describe_bool(annotation: Any) -> bool:
-    inner, _ = _annotation_nullable_inner(annotation)
-    return inner is bool
-
-
-def _is_describe_str(annotation: Any) -> bool:
-    inner, _ = _annotation_nullable_inner(annotation)
-    return inner is str
-
-
-def _is_describe_temporal(annotation: Any) -> bool:
-    inner, _ = _annotation_nullable_inner(annotation)
-    return inner is date or inner is datetime
-
-
-def _dtype_repr(annotation: Any) -> str:
-    """Stable, readable dtype string for schema annotations (repr / logging)."""
-    if annotation is None:
-        return "Any"
-    if isinstance(annotation, type):
-        if annotation is _NoneType:
-            return "None"
-        return getattr(annotation, "__qualname__", annotation.__name__)
-
-    args = get_args(annotation)
-    origin = get_origin(annotation)
-
-    if origin is Literal:
-        inner = ", ".join(repr(a) for a in args)
-        return f"Literal[{inner}]"
-
-    if origin is not None and origin in _UNION_ORIGINS:
-        if (
-            len(args) == 2
-            and _NoneType in args
-            and not all(a is _NoneType for a in args)
-        ):
-            other = args[0] if args[1] is _NoneType else args[1]
-            return f"{_dtype_repr(other)} | None"
-        return " | ".join(_dtype_repr(a) for a in args)
-
-    if origin is not None:
-        oname = getattr(
-            origin, "__qualname__", getattr(origin, "__name__", repr(origin))
-        )
-        if args:
-            inner = ", ".join(_dtype_repr(a) for a in args)
-            return f"{oname}[{inner}]"
-        return oname
-
-    s = repr(annotation)
-    if len(s) > _REPR_DTYPE_MAX_LEN:
-        return f"{s[: _REPR_DTYPE_MAX_LEN - 1]}…"
-    return s
-
-
-def _html_cell_text(value: Any, *, max_cell_len: int) -> str:
-    """Format a single cell for HTML tables; output must be HTML-escaped."""
-    if value is None:
-        return ""
-    if isinstance(value, bool):
-        return "True" if value else "False"
-    if isinstance(value, (int, float)):
-        s = str(value)
-    elif isinstance(value, str):
-        s = value
-    else:
-        s = repr(value)
-    if len(s) > max_cell_len:
-        return f"{s[: max_cell_len - 1]}…"
-    return s
-
-
-def _dataframe_to_html_fragment(
-    *,
-    column_dict: dict[str, list[Any]],
-    column_order: list[str],
-    caption: str | None = None,
-    note: str | None = None,
-    max_cell_len: int = _REPR_HTML_MAX_CELL_LEN,
-) -> str:
-    """Build a styled HTML table fragment (card layout, Jupyter-friendly)."""
-    rows = len(next(iter(column_dict.values()))) if column_dict else 0
-    # Modern palette: slate neutrals, soft shadow, zebra rows (no external CSS).
-    css = """
-<style scoped>
-.pydantable-render {
-  --pt-bg: #ffffff;
-  --pt-border: #e2e8f0;
-  --pt-header-fg: #0f172a;
-  --pt-muted: #64748b;
-  --pt-row-alt: #f8fafc;
-  --pt-cell-fg: #1e293b;
-  --pt-index-bg: #f1f5f9;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--pt-cell-fg);
-  max-width: 100%;
-  margin: 0;
-  box-sizing: border-box;
-}
-.pydantable-render *, .pydantable-render *::before, .pydantable-render *::after {
-  box-sizing: border-box;
-}
-.pydantable-render .pydantable-surface {
-  border-radius: 12px;
-  border: 1px solid var(--pt-border);
-  background: var(--pt-bg);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.06);
-  overflow: hidden;
-  overflow-x: auto;
-}
-.pydantable-render table.pydantable-df {
-  width: 100%;
-  min-width: min-content;
-  border-collapse: collapse;
-  border-spacing: 0;
-}
-.pydantable-render caption {
-  caption-side: top;
-  text-align: left;
-  padding: 12px 14px 10px;
-  font-weight: 600;
-  font-size: 12px;
-  letter-spacing: 0.02em;
-  color: var(--pt-header-fg);
-  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-  border-bottom: 1px solid var(--pt-border);
-}
-.pydantable-render thead th {
-  text-align: left;
-  padding: 8px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--pt-muted);
-  background: #f8fafc;
-  border-bottom: 1px solid var(--pt-border);
-  white-space: nowrap;
-}
-.pydantable-render thead th.pt-index-head {
-  width: 3.25rem;
-  text-align: right;
-  padding-right: 10px;
-  font-variant-numeric: tabular-nums;
-}
-.pydantable-render tbody th[scope="row"] {
-  text-align: right;
-  padding: 6px 10px 6px 12px;
-  font-weight: 500;
-  font-size: 12px;
-  font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
-  font-variant-numeric: tabular-nums;
-  color: var(--pt-muted);
-  background: var(--pt-index-bg);
-  border-bottom: 1px solid var(--pt-border);
-  border-right: 1px solid var(--pt-border);
-  vertical-align: top;
-}
-.pydantable-render tbody td {
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--pt-border);
-  vertical-align: top;
-  word-break: break-word;
-}
-.pydantable-render tbody tr:nth-child(even) td {
-  background: var(--pt-row-alt);
-}
-.pydantable-render tbody tr:nth-child(even) th[scope="row"] {
-  background: #e8edf3;
-}
-.pydantable-render tbody tr:last-child td,
-.pydantable-render tbody tr:last-child th {
-  border-bottom: none;
-}
-.pydantable-render .pydantable-note {
-  margin: 12px 4px 16px;
-  padding: 0 4px;
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--pt-muted);
-}
-</style>
-"""
-    parts: list[str] = [
-        '<div class="pydantable-render">',
-        css,
-        '<div class="pydantable-surface">',
-        '<table class="pydantable-df">',
-    ]
-    if caption:
-        parts.append(f"<caption>{html.escape(caption)}</caption>")
-    parts.append("<thead><tr>")
-    parts.append('<th scope="col" class="pt-index-head"></th>')
-    for name in column_order:
-        parts.append(f'<th scope="col">{html.escape(name)}</th>')
-    parts.append("</tr></thead><tbody>")
-    for i in range(rows):
-        parts.append("<tr>")
-        parts.append(f'<th scope="row">{i}</th>')
-        for name in column_order:
-            raw = column_dict[name][i]
-            text = _html_cell_text(raw, max_cell_len=max_cell_len)
-            parts.append(f"<td>{html.escape(text)}</td>")
-        parts.append("</tr>")
-    parts.extend(["</tbody></table>", "</div>"])
-    if note:
-        parts.append(f'<p class="pydantable-note">{html.escape(note)}</p>')
-    parts.append("</div>")
-    return "\n".join(parts)
-
-
-def _coerce_enum_columns(
-    data: dict[str, list[Any]],
-    field_types: Mapping[str, Any],
-) -> dict[str, list[Any]]:
-    """Rehydrate Rust Utf8 enum cells into concrete ``enum.Enum`` field types."""
-    if not data or not field_types:
-        return data
-    out = dict(data)
-    for name, ann in field_types.items():
-        if name not in out:
-            continue
-        inner, _nullable = _annotation_nullable_inner(ann)
-        origin = get_origin(inner)
-        if origin is list:
-            continue
-        if not isinstance(inner, type):
-            continue
-        if issubclass(inner, BaseModel):
-            continue
-        if not (issubclass(inner, enum.Enum) and inner is not enum.Enum):
-            continue
-        adapter = TypeAdapter(ann)
-        out[name] = [adapter.validate_python(v) for v in out[name]]
-    return out
-
-
-def _rows_from_column_dict(
-    data: dict[str, list[Any]], row_type: type[BaseModel]
-) -> list[BaseModel]:
-    """Build validated row models from aligned column lists (same length per column)."""
-    if not data:
-        return []
-    n = len(next(iter(data.values())))
-    out: list[BaseModel] = []
-    for i in range(n):
-        row_dict = {name: col[i] for name, col in data.items()}
-        out.append(row_type.model_validate(row_dict))
-    return out
-
-
-async def _materialize_in_thread(
-    fn: Callable[[], Any],
-    *,
-    executor: Executor | None,
-) -> Any:
-    """Run a no-arg callable for blocking Rust/Polars work off the event loop."""
-    loop = asyncio.get_running_loop()
-    if executor is not None:
-        return await loop.run_in_executor(executor, fn)
-    return await asyncio.to_thread(fn)
-
-
-class ExecutionHandle:
-    """Background :meth:`DataFrame.submit` job; await :meth:`result`."""
-
-    __slots__ = ("_fut",)
-
-    def __init__(self, fut: concurrent.futures.Future[Any]) -> None:
-        self._fut = fut
-
-    def done(self) -> bool:
-        return self._fut.done()
-
-    def cancel(self) -> bool:
-        """Cancel the wait only; in-flight engine work may still complete."""
-        return self._fut.cancel()
-
-    async def result(self) -> Any:
-        # Cancellation of the awaiting task should *not* cancel the underlying
-        # concurrent future (and therefore should not attempt to cancel engine work).
-        return await asyncio.shield(asyncio.wrap_future(self._fut))
-
-
-def _is_bool_or_nullable_bool(dtype: Any) -> bool:
-    """True if ``dtype`` is ``bool`` or optional bool (``| None`` / ``Union``)."""
-    if dtype is bool:
-        return True
-    origin = get_origin(dtype)
-    if origin is Union:
-        args = tuple(get_args(dtype))
-        if len(args) == 2 and _NoneType in args and bool in args:
-            return True
-    return False
-
-
-@dataclass(frozen=True)
-class SelectStep:
-    """Internal: plain column projection step (names only)."""
-
-    columns: list[str]
-
-
-@dataclass(frozen=True)
-class FilterStep:
-    """Internal: boolean mask step."""
-
-    condition: Expr
-
-
-@dataclass(frozen=True)
-class WithColumnsStep:
-    """Internal: add or replace columns from expressions."""
-
-    columns: dict[str, Expr]
-
-
-_ENGINE_STREAMING_ENV = "PYDANTABLE_ENGINE_STREAMING"
-
-
-def _resolve_engine_streaming(
-    *,
-    streaming: bool | None = None,
-    engine_streaming: bool | None = None,
-    default: bool | None = None,
-) -> bool:
-    """Resolve Polars collect engine streaming flag.
-
-    Resolution order:
-    - explicit `engine_streaming=` (preferred alias)
-    - explicit `streaming=` (legacy name used throughout the API)
-    - `default=` (per-object default, e.g. set on scan roots)
-    - env `PYDANTABLE_ENGINE_STREAMING` (truthy: 1/true/yes)
-    """
-    if streaming is not None and engine_streaming is not None:
-        raise TypeError("Pass either streaming= or engine_streaming=, not both.")
-    explicit = engine_streaming if engine_streaming is not None else streaming
-    if explicit is not None:
-        return bool(explicit)
-    if default is not None:
-        return bool(default)
-    v = os.environ.get(_ENGINE_STREAMING_ENV, "").strip().lower()
-    return v in ("1", "true", "yes")
 
 
 class DataFrame(Generic[SchemaT]):
@@ -1134,96 +743,31 @@ class DataFrame(Generic[SchemaT]):
         schema fields, we treat missing columns as all-null and retry execution
         with those columns omitted, then fill them with `None` during validation.
         """
-        plan = self._rust_plan
-        field_types = dict(self._current_field_types)
-
-        while True:
-            try:
-                return self._engine.execute_plan(
-                    plan,
-                    self._root_data,
-                    as_python_lists=True,
-                    streaming=streaming,
-                    error_context=self._materialize_error_context(),
-                )
-            except ValueError as e:
-                # Only attempt this recovery on lazy scan roots.
-                if not _is_scan_file_root(self._root_data):
-                    raise
-                missing_col = _extract_missing_scan_column_from_engine_error(str(e))
-                if not missing_col:
-                    raise
-                ann = field_types.get(missing_col)
-                if ann is None:
-                    raise
-                _inner, nullable = _annotation_nullable_inner(ann)
-                if not nullable:
-                    raise
-                if not self._io_validation_fill_missing_optional:
-                    fi = self._current_schema_type.model_fields.get(missing_col)
-                    default = (
-                        getattr(fi, "default", PydanticUndefined)
-                        if fi is not None
-                        else PydanticUndefined
-                    )
-                    if default is PydanticUndefined:
-                        raise ValueError(
-                            "Missing optional columns (configured as error): "
-                            f"{[missing_col]}"
-                        ) from e
-                # Drop the missing optional column from the temporary plan and retry.
-                field_types.pop(missing_col, None)
-                plan = self._engine.make_plan(field_types_for_rust(field_types))
+        return materialize_with_optional_scan_fallback_sync(
+            self._engine,
+            plan=self._rust_plan,
+            root_data=self._root_data,
+            field_types=dict(self._current_field_types),
+            current_schema_type=self._current_schema_type,
+            io_validation_fill_missing_optional=self._io_validation_fill_missing_optional,
+            streaming=streaming,
+            error_context=self._materialize_error_context(),
+        )
 
     async def _materialize_columns_with_missing_optional_fallback_async(
         self, *, streaming: bool, executor: Executor | None
     ) -> dict[str, list[Any]]:
-        if not self._engine.has_async_execute_plan():
-            return await _materialize_in_thread(
-                functools.partial(
-                    self._materialize_columns_with_missing_optional_fallback,
-                    streaming=streaming,
-                ),
-                executor=executor,
-            )
-        plan = self._rust_plan
-        field_types = dict(self._current_field_types)
-
-        while True:
-            try:
-                return await self._engine.async_execute_plan(
-                    plan,
-                    self._root_data,
-                    as_python_lists=True,
-                    streaming=streaming,
-                    error_context=self._materialize_error_context(),
-                )
-            except ValueError as e:
-                if not _is_scan_file_root(self._root_data):
-                    raise
-                missing_col = _extract_missing_scan_column_from_engine_error(str(e))
-                if not missing_col:
-                    raise
-                ann = field_types.get(missing_col)
-                if ann is None:
-                    raise
-                _, nullable = _annotation_nullable_inner(ann)
-                if not nullable:
-                    raise
-                if not self._io_validation_fill_missing_optional:
-                    fi = self._current_schema_type.model_fields.get(missing_col)
-                    default = (
-                        getattr(fi, "default", PydanticUndefined)
-                        if fi is not None
-                        else PydanticUndefined
-                    )
-                    if default is PydanticUndefined:
-                        raise ValueError(
-                            "Missing optional columns (configured as error): "
-                            f"{[missing_col]}"
-                        ) from e
-                field_types.pop(missing_col, None)
-                plan = self._engine.make_plan(field_types_for_rust(field_types))
+        return await materialize_with_optional_scan_fallback_async(
+            self._engine,
+            plan=self._rust_plan,
+            root_data=self._root_data,
+            field_types=dict(self._current_field_types),
+            current_schema_type=self._current_schema_type,
+            io_validation_fill_missing_optional=self._io_validation_fill_missing_optional,
+            streaming=streaming,
+            error_context=self._materialize_error_context(),
+            executor=executor,
+        )
 
     async def _materialize_columns_async(
         self, *, streaming: bool, executor: Executor | None
@@ -4125,227 +3669,3 @@ class DataFrame(Generic[SchemaT]):
         )
 
 
-class GroupedDataFrame:
-    """Result of :meth:`DataFrame.group_by`; call :meth:`agg` to finalize."""
-
-    def __init__(
-        self,
-        df: DataFrame[Any],
-        keys: Sequence[str],
-        *,
-        maintain_order: bool = False,
-        drop_nulls: bool = True,
-    ):
-        self._df = df
-        self._keys = list(keys)
-        self._maintain_order = bool(maintain_order)
-        self._drop_nulls = bool(drop_nulls)
-
-    def __repr__(self) -> str:
-        inner = "\n".join(f"  {line}" for line in repr(self._df).split("\n"))
-        return f"GroupedDataFrame(by={self._keys!r})\n{inner}"
-
-    def _repr_html_(self) -> str:
-        inner = self._df._repr_html_()
-        keys_s = html.escape(repr(self._keys))
-        return (
-            '<div class="pydantable-render pydantable-render--context" '
-            'style="margin:0 0 1rem 0;">'
-            '<p style="margin:0 0 10px 0;padding:8px 12px;border-radius:8px;'
-            "font:600 12px ui-sans-serif,system-ui,sans-serif;"
-            "color:#334155;background:#eef2ff;border:1px solid #c7d2fe;"
-            'letter-spacing:0.02em;">'
-            f"<b>GroupedDataFrame</b> (by={keys_s})</p>{inner}</div>"
-        )
-
-    def agg(
-        self,
-        *,
-        streaming: bool | None = None,
-        **aggregations: tuple[str, str] | tuple[str, Expr],
-    ) -> DataFrame[Any]:
-        """One output column per kwarg: ``name=(op, column_or_expr)``."""
-        agg_specs: dict[str, tuple[str, str]] = {}
-        for out_name, spec in aggregations.items():
-            if not isinstance(spec, tuple) or len(spec) != 2:
-                raise TypeError(
-                    "agg() expects specs like "
-                    "output_name=('count'|'sum'|'mean'|'min'|'max'|'median'|"
-                    "'std'|'var'|'first'|'last'|'n_unique', column)."
-                )
-            op, col_spec = spec
-            if not isinstance(op, str):
-                raise TypeError("Aggregation operator must be a string.")
-            if isinstance(col_spec, str):
-                in_col = col_spec
-            elif isinstance(col_spec, Expr):
-                referenced = col_spec.referenced_columns()
-                if len(referenced) != 1:
-                    raise TypeError(
-                        "Aggregation column must reference exactly one column."
-                    )
-                in_col = next(iter(referenced))
-            else:
-                raise TypeError(
-                    "Aggregation column must be a column name or Expr "
-                    "referencing one column."
-                )
-            agg_specs[out_name] = (op, in_col)
-
-        use_streaming = _resolve_engine_streaming(
-            streaming=streaming, default=self._df._engine_streaming_default
-        )
-        grouped_data, schema_descriptors = self._df._engine.execute_groupby_agg(
-            self._df._rust_plan,
-            self._df._root_data,
-            self._keys,
-            agg_specs,
-            maintain_order=self._maintain_order,
-            drop_nulls=self._drop_nulls,
-            as_python_lists=True,
-            streaming=use_streaming,
-        )
-        derived_fields = self._df._field_types_from_descriptors(schema_descriptors)
-        derived_schema_type = make_derived_schema_type(
-            self._df._current_schema_type, derived_fields
-        )
-        rust_plan = self._df._engine.make_plan(field_types_for_rust(derived_fields))
-        return self._df._from_plan(
-            root_data=grouped_data,
-            root_schema_type=derived_schema_type,
-            current_schema_type=derived_schema_type,
-            rust_plan=rust_plan,
-            engine=self._df._engine,
-        )
-
-    def sum(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
-        if not columns:
-            raise ValueError("sum() requires at least one column name.")
-        return self.agg(
-            streaming=streaming, **{f"{c}_sum": ("sum", c) for c in columns}
-        )
-
-    def mean(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
-        if not columns:
-            raise ValueError("mean() requires at least one column name.")
-        return self.agg(
-            streaming=streaming, **{f"{c}_mean": ("mean", c) for c in columns}
-        )
-
-    def min(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
-        if not columns:
-            raise ValueError("min() requires at least one column name.")
-        return self.agg(
-            streaming=streaming, **{f"{c}_min": ("min", c) for c in columns}
-        )
-
-    def max(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
-        if not columns:
-            raise ValueError("max() requires at least one column name.")
-        return self.agg(
-            streaming=streaming, **{f"{c}_max": ("max", c) for c in columns}
-        )
-
-    def count(self, *columns: str, streaming: bool | None = None) -> DataFrame[Any]:
-        if not columns:
-            raise ValueError("count() requires at least one column name.")
-        return self.agg(
-            streaming=streaming, **{f"{c}_count": ("count", c) for c in columns}
-        )
-
-    def len(self, *, streaming: bool | None = None) -> DataFrame[Any]:
-        """Per-group row count (includes null rows) via a synthetic constant column."""
-        tmp = "__pydantable_group_len__"
-        df2 = self._df.with_columns(**{tmp: 1})
-        out = df2.group_by(*self._keys).agg(streaming=streaming, len=("sum", tmp))
-        return out.drop(tmp, strict=False)
-
-
-class DynamicGroupedDataFrame:
-    """Time buckets from :meth:`DataFrame.group_by_dynamic`; then :meth:`agg`."""
-
-    def __init__(
-        self,
-        df: DataFrame[Any],
-        *,
-        index_column: str,
-        every: str,
-        period: str | None,
-        by: Sequence[str],
-    ):
-        self._df = df
-        self._index = index_column
-        self._every = every
-        self._period = period or every
-        self._by = list(by)
-
-    def __repr__(self) -> str:
-        inner = "\n".join(f"  {line}" for line in repr(self._df).split("\n"))
-        return (
-            f"DynamicGroupedDataFrame(index={self._index!r}, "
-            f"every={self._every!r}, period={self._period!r}, by={self._by!r})\n"
-            f"{inner}"
-        )
-
-    def _repr_html_(self) -> str:
-        inner = self._df._repr_html_()
-        hdr = (
-            f"DynamicGroupedDataFrame index={html.escape(repr(self._index))} "
-            f"every={html.escape(repr(self._every))} "
-            f"period={html.escape(repr(self._period))} by={html.escape(repr(self._by))}"
-        )
-        return (
-            '<div class="pydantable-render pydantable-render--context" '
-            'style="margin:0 0 1rem 0;">'
-            '<p style="margin:0 0 10px 0;padding:8px 12px;border-radius:8px;'
-            "font:600 11px ui-sans-serif,system-ui,sans-serif;line-height:1.45;"
-            "color:#334155;background:#ecfdf5;border:1px solid #a7f3d0;"
-            'word-break:break-word;">'
-            f"<b>{hdr}</b></p>{inner}</div>"
-        )
-
-    def agg(
-        self,
-        *,
-        streaming: bool | None = None,
-        **aggregations: tuple[str, str],
-    ) -> DataFrame[Any]:
-        """Same as :meth:`GroupedDataFrame.agg`; column specs are strings only."""
-        agg_specs: dict[str, tuple[str, str]] = {}
-        for out_name, spec in aggregations.items():
-            if not isinstance(spec, tuple) or len(spec) != 2:
-                raise TypeError(
-                    "agg() expects specs like output_name=('count'|'sum'|'mean'|"
-                    "'min'|'max', column)."
-                )
-            op, in_col = spec
-            if not isinstance(op, str) or not isinstance(in_col, str):
-                raise TypeError("agg() op and column must be strings.")
-            agg_specs[out_name] = (op, in_col)
-
-        use_streaming = _resolve_engine_streaming(
-            streaming=streaming, default=self._df._engine_streaming_default
-        )
-        out_data, schema_descriptors = self._df._engine.execute_groupby_dynamic_agg(
-            self._df._rust_plan,
-            self._df._root_data,
-            self._index,
-            self._every,
-            self._period,
-            self._by if self._by else None,
-            agg_specs,
-            as_python_lists=True,
-            streaming=use_streaming,
-        )
-        derived_fields = self._df._field_types_from_descriptors(schema_descriptors)
-        derived_schema_type = make_derived_schema_type(
-            self._df._current_schema_type, derived_fields
-        )
-        rust_plan = self._df._engine.make_plan(field_types_for_rust(derived_fields))
-        return self._df._from_plan(
-            root_data=out_data,
-            root_schema_type=derived_schema_type,
-            current_schema_type=derived_schema_type,
-            rust_plan=rust_plan,
-            engine=self._df._engine,
-        )

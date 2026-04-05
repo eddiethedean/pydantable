@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pydantable import DataFrame, DataFrameModel
-from pydantable.dataframe._impl import _REPR_HTML_MAX_COLS, _REPR_MAX_COLUMNS
+from pydantable.dataframe._repr_display import _REPR_HTML_MAX_COLS, _REPR_MAX_COLUMNS
 from pydantable.schema import Schema
 from pydantic import BaseModel, create_model
 

@@ -76,6 +76,16 @@ Implement **`ExecutionEngine`** from **`pydantable_protocol`** (also re-exported
 - **Protocols:** `PlanExecutor`, `SinkWriter`, and **`ExecutionEngine`** in **`pydantable_protocol`** (thin re-export in `python/pydantable/engine/protocols.py`). **`EngineCapabilities`** includes **`backend`** and optional-feature flags.
 - **ADR:** See {doc}`ADR-engines` for design notes and Track B (portable IR).
 
+### Engine injection (dependency inversion)
+
+Prefer **explicit** engines over relying on the process-wide default when you need predictable tests or multiple backends:
+
+- **Per frame:** pass **`engine=your_engine`** to **`DataFrame[Schema](..., engine=...)`** (and **`DataFrameModel`** / **`SqlDataFrameModel`** where supported). This is the clearest contract for libraries and unit tests.
+- **Process default:** **`get_default_engine()`** / **`set_default_engine(...)`** in **`pydantable.engine`** (used when **`engine=`** is omitted). Use **`set_default_engine(None)`** in test teardown to restore lazy construction of the native engine.
+- **Future option:** a **`contextvars`-scoped override** could be added without removing the global API; it is not implemented today—if you need thread-local engines, pass **`engine=`** per frame or open a design discussion.
+
+For third-party **`ExecutionEngine`** packages, see {doc}`CUSTOM_ENGINE_PACKAGE`.
+
 (docs-sphinx-build)=
 
 ## Documentation builds (Sphinx)

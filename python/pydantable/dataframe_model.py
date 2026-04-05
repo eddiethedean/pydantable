@@ -473,6 +473,54 @@ class DataFrameModel(Generic[RowT]):
         return cast("Self", obj)
 
     @classmethod
+    def _dfm_lazy_read_sync(cls, method: str, *args: Any, **kwargs: Any) -> Self:
+        """Delegate ``DataFrame[Schema].read_*`` / similar lazy constructors."""
+        cls._dfm_require_subclass_with_schema()
+        dataframe_cls = cast("Any", cls._dataframe_cls)
+        inner = getattr(dataframe_cls[cls._SchemaModel], method)(*args, **kwargs)
+        return cls._wrap_inner_df(inner)
+
+    @classmethod
+    def _dfm_aread_lazy_scan(
+        cls,
+        io_coroutine_name: str,
+        method_label: str,
+        path: str | Any,
+        *,
+        columns: list[str] | None = None,
+        executor: Executor | None = None,
+        engine_streaming: bool | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+        **scan_kwargs: Any,
+    ) -> AwaitableDataFrameModel[RowT]:
+        """Shared async lazy scan: ``aread_*`` then ``_from_scan_root``."""
+        cls._dfm_require_subclass_with_schema()
+        from . import io as _io
+
+        aread = getattr(_io, io_coroutine_name)
+
+        async def _load() -> Self:
+            root = await aread(path, columns=columns, executor=executor, **scan_kwargs)
+            dataframe_cls = cast("Any", cls._dataframe_cls)
+            inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
+                root,
+                engine_streaming=engine_streaming,
+                trusted_mode=trusted_mode,
+                fill_missing_optional=fill_missing_optional,
+                ignore_errors=ignore_errors,
+                on_validation_errors=on_validation_errors,
+            )
+            return cls._wrap_inner_df(inner)
+
+        return AwaitableDataFrameModel(
+            _load,
+            repr_label=_short_repr_label(f"{cls.__name__}.{method_label}({path!r})"),
+        )
+
+    @classmethod
     def read_parquet(
         cls,
         path: str | Any,
@@ -486,9 +534,8 @@ class DataFrameModel(Generic[RowT]):
         **scan_kwargs: Any,
     ) -> Self:
         """Lazy Parquet read (local path). See :func:`pydantable.io.read_parquet`."""
-        cls._dfm_require_subclass_with_schema()
-        dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel].read_parquet(
+        return cls._dfm_lazy_read_sync(
+            "read_parquet",
             path,
             columns=columns,
             engine_streaming=engine_streaming,
@@ -498,7 +545,6 @@ class DataFrameModel(Generic[RowT]):
             on_validation_errors=on_validation_errors,
             **scan_kwargs,
         )
-        return cls._wrap_inner_df(inner)
 
     @classmethod
     def iter_parquet(
@@ -543,9 +589,8 @@ class DataFrameModel(Generic[RowT]):
 
         See :func:`pydantable.io.read_parquet_url`.
         """
-        cls._dfm_require_subclass_with_schema()
-        dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel].read_parquet_url(
+        return cls._dfm_lazy_read_sync(
+            "read_parquet_url",
             url,
             experimental=experimental,
             columns=columns,
@@ -556,7 +601,6 @@ class DataFrameModel(Generic[RowT]):
             on_validation_errors=on_validation_errors,
             **kwargs,
         )
-        return cls._wrap_inner_df(inner)
 
     @classmethod
     def read_ipc(
@@ -572,9 +616,8 @@ class DataFrameModel(Generic[RowT]):
         **scan_kwargs: Any,
     ) -> Self:
         """Lazy Arrow IPC file read (local path)."""
-        cls._dfm_require_subclass_with_schema()
-        dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel].read_ipc(
+        return cls._dfm_lazy_read_sync(
+            "read_ipc",
             path,
             columns=columns,
             engine_streaming=engine_streaming,
@@ -584,7 +627,6 @@ class DataFrameModel(Generic[RowT]):
             on_validation_errors=on_validation_errors,
             **scan_kwargs,
         )
-        return cls._wrap_inner_df(inner)
 
     @classmethod
     def iter_ipc(
@@ -625,9 +667,8 @@ class DataFrameModel(Generic[RowT]):
         **scan_kwargs: Any,
     ) -> Self:
         """Lazy CSV read (local path)."""
-        cls._dfm_require_subclass_with_schema()
-        dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel].read_csv(
+        return cls._dfm_lazy_read_sync(
+            "read_csv",
             path,
             columns=columns,
             engine_streaming=engine_streaming,
@@ -637,7 +678,6 @@ class DataFrameModel(Generic[RowT]):
             on_validation_errors=on_validation_errors,
             **scan_kwargs,
         )
-        return cls._wrap_inner_df(inner)
 
     @classmethod
     def iter_csv(
@@ -678,9 +718,8 @@ class DataFrameModel(Generic[RowT]):
         **scan_kwargs: Any,
     ) -> Self:
         """Lazy NDJSON read (local path)."""
-        cls._dfm_require_subclass_with_schema()
-        dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel].read_ndjson(
+        return cls._dfm_lazy_read_sync(
+            "read_ndjson",
             path,
             columns=columns,
             engine_streaming=engine_streaming,
@@ -690,7 +729,6 @@ class DataFrameModel(Generic[RowT]):
             on_validation_errors=on_validation_errors,
             **scan_kwargs,
         )
-        return cls._wrap_inner_df(inner)
 
     @classmethod
     def iter_ndjson(
@@ -731,9 +769,8 @@ class DataFrameModel(Generic[RowT]):
         **scan_kwargs: Any,
     ) -> Self:
         """Lazy JSON Lines read (local path); same as :meth:`read_ndjson`."""
-        cls._dfm_require_subclass_with_schema()
-        dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel].read_json(
+        return cls._dfm_lazy_read_sync(
+            "read_json",
             path,
             columns=columns,
             engine_streaming=engine_streaming,
@@ -743,7 +780,6 @@ class DataFrameModel(Generic[RowT]):
             on_validation_errors=on_validation_errors,
             **scan_kwargs,
         )
-        return cls._wrap_inner_df(inner)
 
     @classmethod
     def export_parquet(
@@ -1306,25 +1342,18 @@ class DataFrameModel(Generic[RowT]):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> AwaitableDataFrameModel[RowT]:
-        cls._dfm_require_subclass_with_schema()
-        from .io import aread_parquet as _aread
-
-        async def _load() -> Self:
-            root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
-            dataframe_cls = cast("Any", cls._dataframe_cls)
-            inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
-                root,
-                engine_streaming=engine_streaming,
-                trusted_mode=trusted_mode,
-                fill_missing_optional=fill_missing_optional,
-                ignore_errors=ignore_errors,
-                on_validation_errors=on_validation_errors,
-            )
-            return cls._wrap_inner_df(inner)
-
-        return AwaitableDataFrameModel(
-            _load,
-            repr_label=_short_repr_label(f"{cls.__name__}.aread_parquet({path!r})"),
+        return cls._dfm_aread_lazy_scan(
+            "aread_parquet",
+            "aread_parquet",
+            path,
+            columns=columns,
+            executor=executor,
+            engine_streaming=engine_streaming,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
 
     @classmethod
@@ -1341,25 +1370,18 @@ class DataFrameModel(Generic[RowT]):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> AwaitableDataFrameModel[RowT]:
-        cls._dfm_require_subclass_with_schema()
-        from .io import aread_ipc as _aread
-
-        async def _load() -> Self:
-            root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
-            dataframe_cls = cast("Any", cls._dataframe_cls)
-            inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
-                root,
-                engine_streaming=engine_streaming,
-                trusted_mode=trusted_mode,
-                fill_missing_optional=fill_missing_optional,
-                ignore_errors=ignore_errors,
-                on_validation_errors=on_validation_errors,
-            )
-            return cls._wrap_inner_df(inner)
-
-        return AwaitableDataFrameModel(
-            _load,
-            repr_label=_short_repr_label(f"{cls.__name__}.aread_ipc({path!r})"),
+        return cls._dfm_aread_lazy_scan(
+            "aread_ipc",
+            "aread_ipc",
+            path,
+            columns=columns,
+            executor=executor,
+            engine_streaming=engine_streaming,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
 
     @classmethod
@@ -1376,25 +1398,18 @@ class DataFrameModel(Generic[RowT]):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> AwaitableDataFrameModel[RowT]:
-        cls._dfm_require_subclass_with_schema()
-        from .io import aread_csv as _aread
-
-        async def _load() -> Self:
-            root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
-            dataframe_cls = cast("Any", cls._dataframe_cls)
-            inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
-                root,
-                engine_streaming=engine_streaming,
-                trusted_mode=trusted_mode,
-                fill_missing_optional=fill_missing_optional,
-                ignore_errors=ignore_errors,
-                on_validation_errors=on_validation_errors,
-            )
-            return cls._wrap_inner_df(inner)
-
-        return AwaitableDataFrameModel(
-            _load,
-            repr_label=_short_repr_label(f"{cls.__name__}.aread_csv({path!r})"),
+        return cls._dfm_aread_lazy_scan(
+            "aread_csv",
+            "aread_csv",
+            path,
+            columns=columns,
+            executor=executor,
+            engine_streaming=engine_streaming,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
 
     @classmethod
@@ -1411,25 +1426,18 @@ class DataFrameModel(Generic[RowT]):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> AwaitableDataFrameModel[RowT]:
-        cls._dfm_require_subclass_with_schema()
-        from .io import aread_ndjson as _aread
-
-        async def _load() -> Self:
-            root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
-            dataframe_cls = cast("Any", cls._dataframe_cls)
-            inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
-                root,
-                engine_streaming=engine_streaming,
-                trusted_mode=trusted_mode,
-                fill_missing_optional=fill_missing_optional,
-                ignore_errors=ignore_errors,
-                on_validation_errors=on_validation_errors,
-            )
-            return cls._wrap_inner_df(inner)
-
-        return AwaitableDataFrameModel(
-            _load,
-            repr_label=_short_repr_label(f"{cls.__name__}.aread_ndjson({path!r})"),
+        return cls._dfm_aread_lazy_scan(
+            "aread_ndjson",
+            "aread_ndjson",
+            path,
+            columns=columns,
+            executor=executor,
+            engine_streaming=engine_streaming,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
 
     @classmethod
@@ -1446,25 +1454,18 @@ class DataFrameModel(Generic[RowT]):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> AwaitableDataFrameModel[RowT]:
-        cls._dfm_require_subclass_with_schema()
-        from .io import aread_json as _aread
-
-        async def _load() -> Self:
-            root = await _aread(path, columns=columns, executor=executor, **scan_kwargs)
-            dataframe_cls = cast("Any", cls._dataframe_cls)
-            inner = dataframe_cls[cls._SchemaModel]._from_scan_root(
-                root,
-                engine_streaming=engine_streaming,
-                trusted_mode=trusted_mode,
-                fill_missing_optional=fill_missing_optional,
-                ignore_errors=ignore_errors,
-                on_validation_errors=on_validation_errors,
-            )
-            return cls._wrap_inner_df(inner)
-
-        return AwaitableDataFrameModel(
-            _load,
-            repr_label=_short_repr_label(f"{cls.__name__}.aread_json({path!r})"),
+        return cls._dfm_aread_lazy_scan(
+            "aread_json",
+            "aread_json",
+            path,
+            columns=columns,
+            executor=executor,
+            engine_streaming=engine_streaming,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
 
     def write_parquet(
