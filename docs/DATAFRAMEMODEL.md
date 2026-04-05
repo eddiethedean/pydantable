@@ -364,10 +364,10 @@ def pipeline(df: Before) -> After:
     return df.with_columns(age2=df.age * 2).select("id", "age2")
 ```
 
-### Static typing: mypy vs pyright/Pylance
+### Static typing: mypy vs everyone else (Pyright, Pylance, Astral `ty`, …)
 
-- **mypy**: transform chains are typed automatically (schema-evolving return typing).
-- **pyright/Pylance**: use `as_model(...)` (or its safer variants) to state the intended after-model explicitly:
+- **mypy** (with `pydantable.mypy_plugin`): transform chains can be typed automatically (schema-evolving return typing).
+- **Pyright / Pylance / Astral `ty`** (and any checker **without** the plugin): use `as_model(...)` (or its safer variants) to state the intended after-model explicitly. **`ty` does not load mypy plugins**, so it follows this second path.
 
 ```python
 def pipeline(df: Before) -> After:
@@ -414,7 +414,7 @@ The plugin refines schema-evolving return types for common transforms when argum
   - Anything where column names are computed dynamically (variables, comprehensions, f-strings, unpacking).
   - `pivot(...)` (output columns depend on data values).
 
-When inference can’t be made safely, mypy will fall back to the original model type. For pyright/Pylance, prefer explicit `.as_model(After)` / `.assert_model(After)`.
+When inference can’t be made safely, mypy will fall back to the original model type. For Pyright, Pylance, **`ty`**, and other non-plugin checkers, prefer explicit `.as_model(After)` / `.assert_model(After)`.
 
 ## Collision handling (replacement semantics)
 

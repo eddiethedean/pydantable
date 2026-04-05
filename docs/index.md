@@ -13,8 +13,8 @@ This **documentation site** is the detailed manual. The repository **README** on
 - **Data workflows**: start with {doc}`DATAFRAMEMODEL`, then {doc}`IO_DECISION_TREE` and {doc}`IO_OVERVIEW`. Optional pandas-like names: {doc}`PANDAS_UI`.
 - **Library/interop**: start with {doc}`INTERFACE_CONTRACT` and {doc}`VERSIONING`, then {doc}`PLAN_AND_PLUGINS`.
 - **Third-party execution backends**: {doc}`CUSTOM_ENGINE_PACKAGE` (ship your own `ExecutionEngine` package with `pydantable-protocol`). Optional Moltres SQL engine: {doc}`MOLTRES_SQL` (**`SqlDataFrame`** / **`SqlDataFrameModel`**, **`pydantable[moltres]`**).
-- `DataFrameModel` transform chains can return typed after-schema models directly (no `to_dict()` materialization step). For pyright/Pylance, use `as_model(...)` (see {doc}`DATAFRAMEMODEL`).
-- Typing guide: {doc}`TYPING` (mypy plugin vs pyright/Pylance, inferred vs explicit patterns).
+- `DataFrameModel` transform chains can return typed after-schema models directly (no `to_dict()` materialization step). **mypy** with the plugin infers many chains; **Pyright**, **Pylance**, and **Astral `ty`** use shipped stubs — call `as_model(...)` (see {doc}`DATAFRAMEMODEL`).
+- Typing guide: {doc}`TYPING` (mypy plugin vs stub-based checkers, including **`ty`**).
 
 If you’re not sure where something is documented, use {doc}`DOCS_MAP`.
 

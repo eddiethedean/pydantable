@@ -1,9 +1,15 @@
 # Typing overview
 
-PydanTable targets two complementary typing experiences:
+PydanTable supports **two end-user strategies** for `DataFrameModel` static typing, plus a **third checker** used to validate the library itself:
 
-- **mypy**: a plugin infers schema-evolving return types for many `DataFrameModel` transform chains.
-- **pyright/Pylance**: uses shipped stubs; for schema evolution, you opt into explicit `as_model(...)`/`try_as_model(...)`/`assert_model(...)`.
+| Strategy | Checkers | Schema-evolving chains |
+|----------|----------|------------------------|
+| **Inferred chains** | **mypy** with `pydantable.mypy_plugin` | Return types refine from literals / conservative plugin rules. |
+| **Explicit after-model** | **Pyright**, **Pylance**, **Astral `ty`**, and any checker **without** the plugin | Shipped `.pyi` stubs; after a transform, use `as_model(...)` / `try_as_model(...)` / `assert_model(...)`. |
+
+**Astral `ty`** does not load mypy plugins. For application code type-checked with `ty`, treat it like **Pyright/Pylance**: use the explicit after-model pattern, not plugin inference.
+
+The **pydantable** repo runs **`ty check`** on first-party trees in CI (`make check-python`). That validates annotations and APIs; it is **not** a substitute for running mypy with the plugin in your project if you rely on inferred chains.
 
 This page consolidates the typing story and links to the relevant contracts.
 
@@ -59,11 +65,13 @@ async def handle(m: SupportsLazyAsyncMaterialize[Any]) -> Any:
     return await m.acollect()
 ```
 
-At **runtime**, `SupportsLazyAsyncMaterialize` is `@runtime_checkable`, so `isinstance(x, SupportsLazyAsyncMaterialize)` succeeds when `x` has a callable **`acollect`** (duck typing). That check does **not** validate coroutine return types or argument kinds; use mypy/pyright for that.
+At **runtime**, `SupportsLazyAsyncMaterialize` is `@runtime_checkable`, so `isinstance(x, SupportsLazyAsyncMaterialize)` succeeds when `x` has a callable **`acollect`** (duck typing). That check does **not** validate coroutine return types or argument kinds; use mypy, Pyright, or `ty` for that.
 
-**Static checkers:** Stubs may not list every lazy **`aread_*`** classmethod on each `DataFrameModel` subclass. If mypy/pyright complains on **`MyModel.aread_parquet(...)`**, assign via **`typing.cast(SupportsLazyAsyncMaterialize[Any], MyModel.aread_parquet(...))`**, bind **`_aread = MyModel.aread_parquet  # type: ignore[attr-defined]`**, or enable the pydantable **mypy plugin** where applicable.
+**Static checkers:** Stubs may not list every lazy **`aread_*`** classmethod on each `DataFrameModel` subclass. If **mypy** (no plugin), **Pyright/Pylance**, or **`ty`** complains on **`MyModel.aread_parquet(...)`**, assign via **`typing.cast(SupportsLazyAsyncMaterialize[Any], MyModel.aread_parquet(...))`**, bind **`_aread = MyModel.aread_parquet  # type: ignore[attr-defined]`**, or enable the pydantable **mypy plugin** (mypy only) where applicable.
 
-## pyright/Pylance workflow (explicit after-model)
+## Pyright, Pylance, and Astral `ty` (explicit after-model)
+
+**Pyright**, **Pylance**, and **Astral `ty`** cannot apply the mypy plugin, so they follow the same stub-based pattern: chained transforms are loosely typed until you assert an after-model. The examples below say “Pyright”; use the identical **`as_model` / `try_as_model` / `assert_model`** workflow with **`ty check`** on your project.
 
 Pyright cannot express dependent “schema evolution” from transform chains, so the ergonomic pattern is:
 
@@ -89,6 +97,8 @@ Safer variants:
 - `assert_model(After)` raises with a richer schema diff (missing/extra/type mismatches).
 
 ## mypy workflow (plugin-based inference)
+
+If you use **Astral `ty`** or **Pyright** on your project instead of mypy, use the **explicit after-model** section above — the plugin applies **only** to mypy.
 
 ### Enabling the plugin
 
@@ -128,7 +138,7 @@ matches transform outputs by **field name** and **static field type** from the c
 body (`Literal[...]`, `ipaddress` classes, `WKB`, and plain or `Annotated` strings show
 up in mypy’s analysis like `int` / `str`).
 
-Pyright users keep the same workflow as other scalars: chained methods are typed as
+Users without the mypy plugin (Pyright, Pylance, **`ty`**, and so on) keep the same workflow as other scalars: chained methods are typed as
 `DataFrameModel[Any]` in stubs, so use **`as_model(After)`** / **`try_as_model`** /
 **`assert_model`** when you need an explicit **`After`** type after `select` /
 `with_columns` / `rename`.
@@ -154,9 +164,9 @@ PydanTable ships `py.typed` and `.pyi` stubs for the public surface. In the repo
 
 | Tool | Role |
 |------|------|
-| **Astral `ty`** | Primary checker for `python/pydantable`, `pydantable-protocol`, and `pydantable-native` (see `[tool.ty]` in `pyproject.toml`). Used in `make check-python` / CI. |
-| **mypy** + `pydantable.mypy_plugin` | Schema-evolving `DataFrameModel` chains; run via `tests/test_mypy_*.py` or `mypy` with the repo config. `tests.*` is ignored by mypy by design. |
-| **Pyright** | Narrow config (`pyrightconfig.json`) targets typing **contract** tests under `tests/` plus `typings/`. Optional `pyrightconfig-strict.json` type-checks the full `python/pydantable` tree for maintainers (`make pyright-check-strict`); expect noise and optional deps. |
+| **Astral `ty`** | Primary checker for `python/pydantable`, `pydantable-protocol`, and `pydantable-native` (see `[tool.ty]` in `pyproject.toml`). Used in `make check-python` / CI. **No mypy plugins** — for `DataFrameModel`, it matches the **stub + `as_model`** story (same as Pyright), not plugin inference. |
+| **mypy** + `pydantable.mypy_plugin` | Optional schema-evolving `DataFrameModel` chains for **mypy** users; run via `tests/test_mypy_*.py` or `mypy` with the repo config. `tests.*` is ignored by mypy by design. |
+| **Pyright** | Narrow config (`pyrightconfig.json`) targets typing **contract** tests under `tests/` plus `typings/`. Same explicit-`as_model` contract as **`ty`** for app code. Optional `pyrightconfig-strict.json` type-checks the full `python/pydantable` tree for maintainers (`make pyright-check-strict`); expect noise and optional deps. |
 
 ### Public vs internal API (pragmatic `Any`)
 

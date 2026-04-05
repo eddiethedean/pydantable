@@ -199,7 +199,8 @@ explicit_package_bases = true
 # mypy's cross-ref fixup when analyzing transitive imports.
 namespace_packages = true
 # Mypy plugin enables automatic schema-evolving return typing for DataFrameModel
-# transform chains. Pyright/Pylance relies on the shipped stubs + `as_model(...)`.
+# transform chains. Pyright/Pylance and Astral ``ty`` rely on shipped stubs +
+# ``as_model(...)`` (``ty`` does not load mypy plugins).
 plugins = ["python/pydantable/mypy_plugin.py"]
 
 # Tests use parametrized UI bases and column attrs that are Expr at runtime but
