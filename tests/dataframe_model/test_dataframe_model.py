@@ -1027,6 +1027,25 @@ def test_p6_dataframe_model_rolling_and_dynamic() -> None:
     assert "v_count" in grouped.collect(as_lists=True)
 
 
+@pytest.mark.asyncio
+async def test_aread_chain_group_by_dynamic_agg(tmp_path) -> None:
+    class TSDyn(DataFrameModel):
+        id: int
+        ts: int
+        v: int | None
+
+    path = tmp_path / "dyn_ts.pq"
+    export_parquet(
+        path,
+        {"id": [1, 1], "ts": [0, 3600], "v": [10, 20]},
+    )
+    adf = TSDyn.aread_parquet(path, trusted_mode="shape_only")
+    dyn = adf.group_by_dynamic("ts", every="1h", by=["id"])
+    mdf = await dyn.agg(v_sum=("sum", "v"))
+    out = await mdf.acollect(as_lists=True)
+    assert "v_sum" in out
+
+
 def test_dataframe_model_accepts_polars_dataframe_trusted_shape_only() -> None:
     pl = pytest.importorskip("polars")
     pdf = pl.DataFrame({"id": [1, 2], "age": [20, None]})

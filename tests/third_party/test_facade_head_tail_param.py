@@ -98,3 +98,20 @@ def test_pandas_facade_rename_missing_column_errors_raise() -> None:
     df = DataFrame[_TwoCol]({"a": [1], "b": [2]})
     with pytest.raises(KeyError, match="not found"):
         df.rename(columns={"missing": "x"}, errors="raise")
+
+
+def test_pandas_facade_reset_index_inplace_not_supported() -> None:
+    pytest.importorskip("pandas")
+    from pydantable.pandas import DataFrame
+
+    df = DataFrame[_P]({"a": [10, 20]})
+    with pytest.raises(NotImplementedError, match="inplace"):
+        df.reset_index(inplace=True)  # type: ignore[call-arg]
+
+
+def test_pyspark_facade_with_column_renamed_expr() -> None:
+    df = _SparkMini({"a": [1, 2]})
+    from pydantable.pyspark.sql import functions as F
+
+    doubled = df.withColumn("b", F.col("a", dtype=int) * 2)
+    assert doubled.collect(as_lists=True)["b"] == [2, 4]

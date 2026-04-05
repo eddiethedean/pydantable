@@ -207,6 +207,16 @@ def test_expr_len_and_is_in_alias() -> None:
     assert out["ok"] == [True]
 
 
+class _OptStr(Schema):
+    s: str | None
+
+
+def test_expr_len_on_optional_str_column() -> None:
+    df = DataFrame[_OptStr]({"s": ["hi", None]})
+    out = df.with_columns(n=df.s.len()).collect(as_lists=True)
+    assert out["n"][0] == 2
+
+
 def test_expr_len_rejects_non_string_column() -> None:
     df = DataFrame[N]({"a": [1], "s": ["x"]})
     with pytest.raises(TypeError, match="len"):

@@ -57,14 +57,14 @@ Prefer **`importorskip`** for optional third-party modules that may be absent in
 
 ## Coverage (CI)
 
-On **Ubuntu** with **Python 3.11** only, CI runs pytest with coverage and a minimum line gate (**`--cov-fail-under=82`**; see `.github/workflows/_shared-ci.yml`). To reproduce locally:
+On **Ubuntu** with **Python 3.11** only, CI runs pytest with coverage and a minimum line gate (**`--cov-fail-under=83`**; see `.github/workflows/_shared-ci.yml`). To reproduce locally:
 
 ```bash
 pytest -q -n auto \
   --cov=pydantable \
   --cov-report=term-missing:skip-covered \
   --cov-report=xml \
-  --cov-fail-under=82
+  --cov-fail-under=83
 ```
 
 `Makefile` target **`make test-cov`** runs the same arguments (see `Makefile`).

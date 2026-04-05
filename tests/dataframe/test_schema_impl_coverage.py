@@ -42,6 +42,10 @@ def test_supported_optional_literal() -> None:
     assert is_supported_scalar_column_annotation(Literal["a", "b"] | None)
 
 
+def test_supported_literal_bool_only() -> None:
+    assert is_supported_scalar_column_annotation(Literal[True, False])
+
+
 def test_enum_non_null_scalar() -> None:
     assert _is_supported_non_null_scalar_type(_Color)
 
