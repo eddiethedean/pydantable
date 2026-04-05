@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 import pydantable.rust_engine as rust_engine
+import pytest
 
 
 @pytest.fixture

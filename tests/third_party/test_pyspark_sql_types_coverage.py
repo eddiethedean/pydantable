@@ -7,8 +7,6 @@ import uuid
 from decimal import Decimal
 
 import pytest
-from pydantic import BaseModel
-
 from pydantable.pyspark.sql.types import (
     ArrayType,
     BooleanType,
@@ -20,6 +18,7 @@ from pydantable.pyspark.sql.types import (
     StructType,
     annotation_to_data_type,
 )
+from pydantic import BaseModel
 
 
 class _E(enum.Enum):

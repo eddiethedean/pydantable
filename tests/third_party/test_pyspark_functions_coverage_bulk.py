@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 
 import pytest
 from pydantable.pyspark import DataFrame
@@ -112,7 +112,7 @@ def test_functions_greatest_int_columns_and_coalesce_validation() -> None:
 
 
 def test_functions_explode_rejects_select_style() -> None:
-    with pytest.raises(TypeError, match="DataFrame.explode"):
+    with pytest.raises(TypeError, match=r"DataFrame\.explode"):
         F.explode(F.col("s", dtype=str))
 
 

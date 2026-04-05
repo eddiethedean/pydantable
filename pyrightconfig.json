@@ -1,5 +1,5 @@
 {
-  "include": ["tests/test_pyright_dataframe_model_return_types.py"],
+  "include": ["tests/typing/test_pyright_dataframe_model_return_types.py"],
   "extraPaths": ["python"],
   "stubPath": "typings",
   "venvPath": ".",

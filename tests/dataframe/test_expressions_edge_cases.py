@@ -160,13 +160,10 @@ def test_map_has_any_key_requires_at_least_one_key() -> None:
 
 def test_contains_any_and_all_scalar_wraps_single_value() -> None:
     df = DataFrame[_Tags]({"tags": [["a", "b"], ["c"]]})
-    out = (
-        df.with_columns(
-            any_a=df.tags.contains_any("a"),
-            all_ab=df.tags.contains_all(("a", "b")),
-        )
-        .collect(as_lists=True)
-    )
+    out = df.with_columns(
+        any_a=df.tags.contains_any("a"),
+        all_ab=df.tags.contains_all(("a", "b")),
+    ).collect(as_lists=True)
     assert out["any_a"] == [True, False]
     assert out["all_ab"] == [True, False]
 

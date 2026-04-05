@@ -77,7 +77,6 @@ if TYPE_CHECKING:
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
 
-
 class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
     """Strongly typed lazy table: schema at construction, transforms, then ``collect``.
 
@@ -3667,5 +3666,3 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             rust_plan=out_plan,
             engine=base._engine,
         )
-
-

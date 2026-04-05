@@ -5,8 +5,6 @@ from __future__ import annotations
 import datetime
 from typing import Literal, Union
 
-import pytest
-
 from pydantable.dataframe import _describe_dtype as dd
 
 

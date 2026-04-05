@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import TypeAdapter, ValidationError
-
 from pydantable.types import WKB
+from pydantic import TypeAdapter, ValidationError
 
 
 def test_wkb_identity_and_coercion() -> None:
