@@ -42,7 +42,10 @@ def _dtype_repr(annotation: Any) -> str:
     if isinstance(annotation, type):
         if annotation is _NoneType:
             return "None"
-        return getattr(annotation, "__qualname__", annotation.__name__)
+        # Py 3.9–3.10: ``list[int]`` is both ``isinstance(..., type)`` and a
+        # ``types.GenericAlias``; it must use get_origin/get_args below, not ``__qualname__``.
+        if get_origin(annotation) is None and not get_args(annotation):
+            return getattr(annotation, "__qualname__", annotation.__name__)
 
     args = get_args(annotation)
     origin = get_origin(annotation)
