@@ -6,11 +6,16 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [1.15.2] — 2026-04-05
 
+### Fixed
+
+- **`_dtype_repr`:** On Python 3.9-3.10, builtin generics such as ``list[int]`` were shown as ``list`` because they are ``isinstance(..., type)``; resolve via ``get_origin`` / ``get_args`` like 3.11+.
+- **Tooling:** ``pyrightconfig.json`` ``include`` path points at ``tests/typing/test_pyright_dataframe_model_return_types.py`` (Pyright contract check).
+
 ### Changed
 
 - **Docs:** Typing guide (`ty` vs mypy/Pyright, `Any` policy), troubleshooting (`engine="auto"` Rust fallback, async cancellation), I/O overview callouts, FASTAPI/DATAFRAMEMODEL non-deprecated SQL examples; DEVELOPER Rust `unwrap` note.
 - **Typing:** Astral `ty` rules (`invalid-return-type`, `unsupported-operator` at error); grouped-frame protocol; SQL `afetch_sqlmodel` / `aiter_sqlmodel` `Sequence` signatures; optional `pyrightconfig-strict.json`.
-- **Tests:** Scan-column engine-error regex regression tests; remove flaky wall-clock skip stub in async materialization tests.
+- **Tests:** Scan-column engine-error regex regression tests; remove flaky wall-clock skip stub in async materialization tests; extra coverage for ``_describe_dtype``, grouped agg, selectors, PySpark shims, and ``rust_engine`` delegation; Ruff-formatted typing stubs.
 
 ### Version bump
 
