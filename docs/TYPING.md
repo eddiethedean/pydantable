@@ -199,7 +199,7 @@ PydanTable ships `py.typed` and `.pyi` stubs for the public surface. In the repo
 
 ### Phased strictness (`ty`)
 
-`[tool.ty.rules]` in `pyproject.toml` enables some rule families gradually (for example `unknown-argument` and `invalid-argument-type` are enforced where clean). When tightening a rule, fix callsites or add a **narrow** suppression with a short comment; prefer fixing types over broad `[tool.ty.analysis]` overrides.
+`[tool.ty.rules]` in `pyproject.toml` enables some rule families gradually. Currently enforced at **error** (where clean): **`unknown-argument`**, **`invalid-argument-type`**, **`invalid-return-type`**, **`unsupported-operator`**. Others (for example **`not-iterable`**) stay **ignore** until Astral `ty` handles async generators and `async for` over imported helpers without false positives. When tightening a rule, fix callsites or add a **narrow** suppression with a short comment; prefer fixing types over broad `[tool.ty.analysis]` overrides.
 
 Hotspots for future annotation work (rough counts in `python/pydantable/**/*.py`, subject to churn): `Any` appears most often in `dataframe/_impl.py`, `dataframe_model.py`, `pandas.py`, `rust_engine.py`, and `io/__init__.py`; `# type: ignore` is concentrated in `io/extras.py`, `pandas.py`, and `schema/_impl.py`; `cast(` is common in `pyspark/dataframe.py` and `dataframe_model.py`.
 

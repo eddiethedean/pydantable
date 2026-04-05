@@ -143,9 +143,9 @@ isinstance-against-typed-dict = "ignore"
 not-iterable = "ignore"
 invalid-context-manager = "ignore"
 invalid-argument-type = "error"
-invalid-return-type = "ignore"
+invalid-return-type = "error"
 unknown-argument = "error"
-unsupported-operator = "ignore"
+unsupported-operator = "error"
 
 [tool.ty.src]
 include = [

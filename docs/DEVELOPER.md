@@ -154,6 +154,8 @@ Current contract direction:
 - **Rust — `plan/executor.rs`:** `PhysicalPlanExecutor` dispatches full-plan `execute_plan`. With `polars_engine`, inherent methods on `PolarsExecutor` (`join`, `groupby_agg`, `concat`, `melt`, `pivot`, `explode`, `unnest`, `groupby_dynamic_agg`) forward to `execute_polars::*` so call sites depend on the executor type rather than raw free functions.
 - **Python — `dataframe/` and `schema/`:** Public API stays `pydantable.dataframe` and `pydantable.schema`; implementations live in `_impl.py` inside each package for a single-responsibility split without changing imports.
 
+**`unwrap()` / `expect()` in non-test Rust:** Prefer `?` and structured errors in new code. A scan of `pydantable-core/src` excluding test-only modules shows production uses are minimal (e.g. `plan/execute_polars/literal_agg.rs` uses `expect` only after an explicit non-empty guard). CI runs **`cargo clippy`** with **`-D warnings`** on `pydantable-core`.
+
 ### Extension checklist (new surface area)
 
 When adding a feature, touch the minimal set in order:

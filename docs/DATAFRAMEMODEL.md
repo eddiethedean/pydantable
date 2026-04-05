@@ -577,7 +577,7 @@ For how these APIs fit the **four** terminal materialization modes (blocking, as
 When you need row-wise output (e.g. for response serialization), the DataFrameModel
 produces:
 
-- `df.collect()` -> `Any` (shape depends on flags like `as_lists` / `as_numpy` / `as_polars`)
+- `df.collect()` -> `Any` (shape depends on flags like `as_lists` / `as_numpy`; prefer **`to_polars()`** / **`ato_polars()`** instead of deprecated **`as_polars=`** on **`collect`** / **`acollect`** — see {doc}`VERSIONING`)
 - `df.rows()` -> `list[RowModel]` (typed materialization API; validated against the current schema)
 - `df.to_dict()` -> columnar `dict[str, list]` (use for column-shaped API responses)
 - `df.to_dicts(**model_dump_kwargs)` -> list of dicts (JSON-friendly), derived from row models via Pydantic `model_dump`

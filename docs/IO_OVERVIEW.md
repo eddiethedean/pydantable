@@ -42,6 +42,10 @@ See {doc}`DATAFRAMEMODEL` for the detailed ingest contract.
 Some eager **Rust** I/O paths (especially **`export_*`** / column-dict writes) require the optional **`polars`** Python package at runtime. If you force `engine="rust"` without that extra installed, you may get an `ImportError`. Using `engine="auto"` will fall back where a pure-Python / PyArrow path exists.
 ```
 
+```{important}
+**`engine="auto"` (default):** implementations **try the Rust fast path first** for formats that support it (local file, right shape of arguments). If the Rust reader **raises**, pydantable **catches the failure** and continues with **PyArrow** or **stdlib** parsing where a fallback exists. You get working data, but you **do not** get an error that says “Rust failed.” To **surface** Rust-only failures (debugging or strict native-only pipelines), set **`engine="rust"`** (or **`PYDANTABLE_IO_ENGINE=rust`**) so the exception propagates. See also {doc}`IO_DECISION_TREE` (**Engine selection**).
+```
+
 | Function | Rust path (typical) | PyArrow / fallback |
 |----------|---------------------|------------------------|
 | **`materialize_parquet`** | Local file path, **`columns is None`** | **`columns`** set, or **`bytes`** / **`BinaryIO`** source, or `auto` fallback |

@@ -25,7 +25,8 @@ def _extract_missing_scan_column_from_engine_error(msg: str) -> str | None:
     if not s:
         return None
     patterns = (
-        # Current/legacy Rust error string used in tests/docs.
+        # Current/legacy Rust error string (pydantable-native tests); keep in sync
+        # with tests/test_scan_column_error_parsing.py.
         r'not found: "([^"]+)" not found',
         # Common Polars Python error variants.
         r"ColumnNotFoundError: '([^']+)'",

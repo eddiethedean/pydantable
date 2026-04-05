@@ -53,9 +53,16 @@ Row order is **not** a stable API guarantee for many operations.
 
 ## Async: why doesn’t cancellation stop execution?
 
-Async APIs (`acollect`, `ato_dict`, …) run blocking native work in a worker thread. Cancelling the awaiting task does **not** cancel in-flight Rust/Polars execution.
+Async APIs (`acollect`, `ato_dict`, …) run blocking native work in a worker thread (or a native async path when available). Cancelling the awaiting task does **not** cancel in-flight Rust/Polars execution—the background work can still run to completion.
 
-If you need strict cancellation semantics, design your service route around timeouts and request limits rather than expecting the engine call to stop mid-flight.
+If you need strict cancellation semantics, design your service route around **timeouts** and **request limits** (reverse proxies, worker kill policies) rather than expecting the engine call to stop mid-flight. For **FastAPI** patterns that combine async materialization with **`BackgroundTasks`**, see {doc}`/cookbook/fastapi_background_tasks` and {doc}`EXECUTION`.
+
+## I/O: why didn’t I get a Rust error under `engine="auto"`?
+
+For **`materialize_*`** (and the **`PYDANTABLE_IO_ENGINE`** default **`auto`**), pydantable **prefers Rust** when the path applies, but on **failure** it may **fall back** to PyArrow or stdlib without re-raising the Rust error. That keeps pipelines resilient but can hide native-only failures during development.
+
+- To **force** the Rust path and see exceptions: **`engine="rust"`** or **`PYDANTABLE_IO_ENGINE=rust`** (when the format supports it).
+- Details: {doc}`IO_OVERVIEW` (Engine matrix), {doc}`IO_DECISION_TREE` (Engine selection).
 
 ## Performance: why is `to_arrow()` / `to_polars()` slower than expected?
 
