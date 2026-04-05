@@ -2415,6 +2415,11 @@ class DataFrameModel(Generic[RowT]):
         force_parallel: bool | None = None,
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
+        """Join on key column(s); forwards to :meth:`DataFrame.join`.
+
+        ``allow_parallel`` and ``force_parallel`` are not supported by the native
+        engine and raise :exc:`NotImplementedError` when set (non-``None``).
+        """
         if not isinstance(other, DataFrameModel):
             raise TypeError("join(other=...) expects another DataFrameModel instance.")
         return self._from_dataframe(

@@ -33,6 +33,8 @@ def materialize_rows(m: DataFrameModelWithRow[RowT]) -> list[RowT]:
 
 The core **`DataFrame`** type also implements a compatible **`acollect`**; static typing treats the protocol as structural, so anything with a matching **`acollect`** is a candidate.
 
+**Deprecation (2.0):** avoid **`acollect(..., as_polars=...)`** and **`collect(..., as_polars=...)`**; they emit **`DeprecationWarning`** and will be removed in pydantable 2.0. Prefer **`ato_polars()`** / **`to_polars()`**, or columnar **`to_dict()`** / **`collect(as_lists=True)`**. See {doc}`VERSIONING` (planned removals).
+
 **Example — shared async materialization**
 
 ```python

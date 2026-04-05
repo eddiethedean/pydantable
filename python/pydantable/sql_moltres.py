@@ -105,12 +105,14 @@ class SqlDataFrame(DataFrame):
             engine=engine,
         )
         root = SqlRootData(table=table, name=name)
-        fts = schema_field_types(cls._schema_type)
+        schema_type = cls._schema_type
+        assert schema_type is not None
+        fts = schema_field_types(schema_type)
         plan = resolved.make_plan(field_types_for_rust(fts))
         return cls._from_plan(
             root_data=root,
-            root_schema_type=cls._schema_type,
-            current_schema_type=cls._schema_type,
+            root_schema_type=schema_type,
+            current_schema_type=schema_type,
             rust_plan=plan,
             engine=resolved,
         )

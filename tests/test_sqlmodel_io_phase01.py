@@ -264,6 +264,42 @@ async def test_aiter_sqlmodel_sqlite(tmp_path: Path) -> None:
     assert flat == list(range(1, 51))
 
 
+@pytest.mark.asyncio
+async def test_aiter_sqlmodel_early_break(tmp_path: Path) -> None:
+    """Consumer may stop mid-stream; producer must not deadlock the event loop."""
+    eng = _engine_with_rows(tmp_path)
+    got: list[int] = []
+    async for b in aiter_sqlmodel(_TRow, eng, order_by=[_TRow.n], batch_size=5):
+        got.extend(b["n"])
+        break
+    assert got == [1, 2, 3, 4, 5]
+
+
+@pytest.mark.asyncio
+async def test_aiter_sqlmodel_thread_pool_executor(tmp_path: Path) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    eng = _engine_with_rows(tmp_path)
+    batches: list[dict] = []
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        async for b in aiter_sqlmodel(
+            _TRow, eng, order_by=[_TRow.n], batch_size=10, executor=ex
+        ):
+            batches.append(b)
+    flat = [x for batch in batches for x in batch["n"]]
+    assert flat == list(range(1, 51))
+
+
+@pytest.mark.asyncio
+async def test_aiter_sqlmodel_small_batches(tmp_path: Path) -> None:
+    """Tight batch_size exercises queue backpressure with maxsize=2."""
+    eng = _engine_with_rows(tmp_path)
+    flat: list[int] = []
+    async for b in aiter_sqlmodel(_TRow, eng, order_by=[_TRow.n], batch_size=1):
+        flat.extend(b["n"])
+    assert flat == list(range(1, 51))
+
+
 def test_require_sqlmodel_import_error_message(monkeypatch: pytest.MonkeyPatch) -> None:
     import builtins
 

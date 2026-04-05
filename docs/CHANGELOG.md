@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.15.1] — 2026-04-04
+
+### Fixed
+
+- **Typing:** `sql_moltres` and `DataFrameModel` stubs aligned so mypy/pyright contract tests pass; `pyrightconfig.json` sets `extraPaths` for snippet imports.
+
+### Changed
+
+- **Rust:** Set-ops column assembly returns `PyRuntimeError` instead of panicking on unexpected internal map keys (`exceptAll` / `intersectAll` materialization).
+- **Docs:** `DataFrame.join` / `DataFrameModel.join` document that `allow_parallel` / `force_parallel` are not implemented; TYPING notes `as_polars` on `collect` / `acollect` deprecation for 2.0.
+- **Version bump:** Align **pydantable**, **pydantable-protocol**, **pydantable-native**, **pydantable-core**, and published **`__version__`** values to **1.15.1**.
+
+### Tests
+
+- **`aiter_sqlmodel`:** early break, `ThreadPoolExecutor`, and `batch_size=1` coverage.
+
 ## [1.15.0] — 2026-04-03
 
 ### Added

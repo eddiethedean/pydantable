@@ -157,13 +157,25 @@ fn multiset_emit<'py>(
         for _ in 0..n {
             for (c, cell) in cols.iter().zip(row.iter()) {
                 let py_val = cell.as_ref().map_or(py.None(), |x| literal_to_py(py, x));
-                out_cols.get_mut(c).unwrap().push(py_val);
+                out_cols
+                    .get_mut(c)
+                    .ok_or_else(|| {
+                        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                            "internal: missing output column {c:?} in set op {op}"
+                        ))
+                    })?
+                    .push(py_val);
             }
         }
     }
 
     for c in cols {
-        out.set_item(c, out_cols.remove(c).unwrap())?;
+        let vec = out_cols.remove(c).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "internal: missing column {c:?} when finalizing set op {op}"
+            ))
+        })?;
+        out.set_item(c, vec)?;
     }
     Ok(out)
 }

@@ -3,7 +3,7 @@
 **Strongly-typed DataFrame layer for FastAPI and Pydantic services**, with a Rust-powered execution core (Polars-backed inside the native extension).
 
 ```{note}
-This **documentation site** is the detailed manual. The repository **README** on your Git host is the short entrypoint; both should stay aligned for install commands and version. **Current release:** **1.15.0** (see {doc}`CHANGELOG`) — stable **1.x** API under the policy in {doc}`VERSIONING`. Roadmap history and the completed **v1.0.0** gate checklist live in {doc}`ROADMAP`. SQLModel-first SQL I/O phases and milestones: {doc}`SQLMODEL_SQL_ROADMAP`.
+This **documentation site** is the detailed manual. The repository **README** on your Git host is the short entrypoint; both should stay aligned for install commands and version. **Current release:** **1.15.1** (see {doc}`CHANGELOG`) — stable **1.x** API under the policy in {doc}`VERSIONING`. Roadmap history and the completed **v1.0.0** gate checklist live in {doc}`ROADMAP`. SQLModel-first SQL I/O phases and milestones: {doc}`SQLMODEL_SQL_ROADMAP`.
 ```
  
 

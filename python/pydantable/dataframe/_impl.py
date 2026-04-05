@@ -2932,7 +2932,12 @@ class DataFrame(Generic[SchemaT]):
         force_parallel: bool | None = None,
         streaming: bool | None = None,
     ) -> DataFrame[Any]:
-        """Join two frames on key column(s); ``how`` is e.g. ``inner``, ``left``."""
+        """Join two frames on key column(s); ``how`` is e.g. ``inner``, ``left``.
+
+        ``allow_parallel`` and ``force_parallel`` match Polars' keyword names but are
+        not implemented in the native engine: passing either raises
+        :exc:`NotImplementedError` (see the parity scorecard in the docs).
+        """
         if not isinstance(other, DataFrame):
             raise TypeError("join(other=...) expects another DataFrame.")
         if coalesce is not None and not isinstance(coalesce, bool):

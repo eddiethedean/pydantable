@@ -44,10 +44,15 @@ class DataFrameModelAsyncIO(Generic[RowT]):
 class DataFrameModel(Generic[RowT]):
     _df: Any
     RowModel: type[RowT]
+    _SchemaModel: type[BaseModel]
     Async: DataFrameModelAsyncIO[RowT]
 
     @classmethod
     def _from_dataframe(cls, df: Any) -> Self: ...
+    @classmethod
+    def _dfm_require_subclass_with_schema(cls) -> None: ...
+    @classmethod
+    def _wrap_inner_df(cls, inner: Any) -> Self: ...
     def __init__(
         self,
         data: Any,
@@ -57,6 +62,7 @@ class DataFrameModel(Generic[RowT]):
         ignore_errors: bool = False,
         on_validation_errors: Any | None = None,
         validation_profile: str | None = None,
+        engine: Any | None = None,
         # Phase 4 strictness defaults are configured via validation profiles and/or
         # `__pydantable__` model policy; no direct kwargs (yet).
     ) -> None: ...
