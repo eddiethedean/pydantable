@@ -1172,16 +1172,12 @@ async def test_concurrent_native_async_execute_plan_overlaps() -> None:
     assert c1 == {"x": [1]} and c2 == {"x": [2]}
 
 
-@pytest.mark.asyncio
-async def test_concurrent_native_async_execute_plan_wall_clock_overlap() -> None:
-    """Deprecated: timing-based overlap tests are intentionally removed."""
-    pytest.skip("Removed: wall-clock overlap assertions are too flaky on CI.")
-
-
 #
-# NOTE: the original wall-clock overlap assertions were removed because they are
-# sensitive to OS scheduling jitter (especially on macOS runners) and cause
-# release-blocking flakes unrelated to correctness.
+# NOTE: wall-clock overlap tests for concurrent native async_execute_plan were removed
+# because they are sensitive to OS scheduling jitter (especially on macOS runners) and
+# cause release-blocking flakes unrelated to correctness. See
+# ``test_concurrent_native_async_execute_plan_overlaps`` above for gather-based coverage
+# without timing assertions.
 
 
 @pytest.mark.asyncio
