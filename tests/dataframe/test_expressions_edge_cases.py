@@ -156,3 +156,23 @@ def test_map_has_any_key_requires_at_least_one_key() -> None:
     df = DataFrame[_MapCol]({"meta": [{"k": 1}]})
     with pytest.raises(TypeError, match="at least one key"):
         df.meta.map_has_any_key([])
+
+
+def test_matches_rejects_empty_pattern() -> None:
+    df = DataFrame[N]({"a": [1], "s": ["x"]})
+    with pytest.raises(TypeError, match="non-empty string"):
+        df.s.matches("")
+
+
+def test_contains_all_with_multiple_literals_ands() -> None:
+    df = DataFrame[_Tags]({"tags": [["a", "b", "c"]]})
+    out = df.with_columns(
+        ok=df.tags.contains_all(["a", "b"]),
+    ).collect(as_lists=True)
+    assert out["ok"] == [True]
+
+
+def test_str_contains_pat_empty_pattern_regex_raises() -> None:
+    df = DataFrame[N]({"a": [1], "s": ["hi"]})
+    with pytest.raises(ValueError, match="empty"):
+        df.s.str_contains_pat("", literal=False)

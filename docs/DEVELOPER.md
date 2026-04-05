@@ -282,7 +282,7 @@ Parallel (uses `pytest-xdist` from the `dev` extra):
 .venv/bin/python -m pytest -q -n auto
 ```
 
-**CI** (`.github/workflows/_shared-ci.yml` **python-tests**): every matrix leg runs **`pytest -q -n auto`** (Linux, Windows, macOS). **Ubuntu + Python 3.11** additionally runs **`--cov=pydantable --cov-report=xml --cov-report=term-missing:skip-covered --cov-fail-under=81`** and uploads **`coverage.xml`** as a workflow artifact (**`coverage-xml-py311-ubuntu`**).
+**CI** (`.github/workflows/_shared-ci.yml` **python-tests**): every matrix leg runs **`pytest -q -n auto`** (Linux, Windows, macOS). **Ubuntu + Python 3.11** additionally runs **`--cov=pydantable --cov-report=xml --cov-report=term-missing:skip-covered --cov-fail-under=82`** and uploads **`coverage.xml`** as a workflow artifact (**`coverage-xml-py311-ubuntu`**).
 
 **Hypothesis** property tests live in `tests/test_hypothesis_properties.py` (installed via **`[dev]`** / CI pip list). They run under the same `pytest` command; examples use bounded `max_examples` for CI speed.
 

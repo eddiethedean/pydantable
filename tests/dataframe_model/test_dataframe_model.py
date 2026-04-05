@@ -285,6 +285,41 @@ def test_awaitable_dataframe_model_default_repr_without_label() -> None:
     assert "pending lazy DataFrameModel" in repr(plain)
 
 
+@pytest.mark.asyncio
+async def test_then_nested_awaitable_chain(tmp_path) -> None:
+    path = tmp_path / "nest_then.pq"
+    export_parquet(path, {"id": [7], "age": [8]})
+    adf = UserDF.aread_parquet(path, trusted_mode="shape_only")
+    out = adf.then(lambda _df: UserDF.aread_parquet(path, trusted_mode="shape_only"))
+    rows = await out.acollect()
+    assert [r.id for r in rows] == [7]
+
+
+@pytest.mark.asyncio
+async def test_awaitable_group_by_agg_max(tmp_path) -> None:
+    path = tmp_path / "gb_agg.pq"
+    export_parquet(path, {"id": [1, 1], "age": [10, 30]})
+    adf = UserDF.aread_parquet(path, trusted_mode="shape_only")
+    g = adf.group_by("id")
+    mdf = await g.agg(m=("max", "age"))
+    rows = await mdf.acollect()
+    assert [r.m for r in rows] == [30]
+
+
+@pytest.mark.asyncio
+async def test_awaitable_join_with_other_awaitable(tmp_path) -> None:
+    p1 = tmp_path / "j1.pq"
+    p2 = tmp_path / "j2.pq"
+    export_parquet(p1, {"id": [1], "age": [10]})
+    export_parquet(p2, {"id": [1], "age": [20]})
+    left = UserDF.aread_parquet(p1, trusted_mode="shape_only")
+    right = UserDF.aread_parquet(p2, trusted_mode="shape_only")
+    joined = left.join(right, on="id", suffix="_r")
+    rows = await joined.acollect()
+    assert len(rows) == 1
+    assert rows[0].id == 1
+
+
 def test_dataframe_model_constructor_from_io_materialize_ndjson(tmp_path) -> None:
     path = tmp_path / "m.ndjson"
     export_ndjson(path, {"id": [3], "age": [None]})

@@ -405,7 +405,7 @@ jobs:
         run: |
           COV_ARGS=""
           if [ "$MATRIX_OS" = "ubuntu-latest" ] && [ "$PYVER" = "3.11" ]; then
-            COV_ARGS="--cov=pydantable --cov-report=xml --cov-report=term-missing:skip-covered --cov-fail-under=81"
+            COV_ARGS="--cov=pydantable --cov-report=xml --cov-report=term-missing:skip-covered --cov-fail-under=82"
           fi
           $PY -m pytest -q -n auto $COV_ARGS
 

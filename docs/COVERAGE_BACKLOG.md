@@ -4,23 +4,28 @@ This document snapshots **statement-line gaps** by area and complements [Testing
 
 ## Baseline (full suite, `--cov-fail-under=0`)
 
-Last regeneration (full `pytest` with branch coverage): **~82%** on the `TOTAL` line in the terminal report (combined statement/branch-style percentage; exact value drifts). CI **`--cov-fail-under`** is **81** (see `Makefile` / `_shared-ci.yml`). Regenerate:
+Last regeneration (full `pytest` with branch coverage): **~82%** on the `TOTAL` line in the terminal report (combined statement/branch-style percentage; exact value drifts). CI **`--cov-fail-under`** is **82** (see `Makefile` / `_shared-ci.yml`). Regenerate:
 
 ```bash
 .venv/bin/python -m pytest -q -n auto --cov=pydantable --cov-report=term-missing:skip-covered --cov-fail-under=0
 ```
 
-### Top files by missed statements (typical run)
+### Top files by missed statements (refresh from latest `term-missing`)
 
-Rough ordering by **Miss** column in `term-missing` (largest gaps first):
+Rough ordering by **Miss** column (largest gaps first; numbers drift each run):
 
 | Rank | Module | Miss (stmts) | Notes |
 |------|--------|----------------|------|
-| 1 | `pandas.py` | ~346 | Façade; extend `tests/third_party/` |
-| 2 | `dataframe/_impl.py` | ~220 | Core engine paths + errors |
-| 3 | `schema/_impl.py` | ~166 | Unions / narrowing edge cases |
-| 4 | `pyspark/dataframe.py` | ~140 | Parity smoke tests |
-| 5 | `io/extras.py` | ~139 | Optional SDKs + mocks |
+| 1 | `pandas.py` | ~300–350 | Façade; extend `tests/third_party/` |
+| 2 | `dataframe/_impl.py` | ~210–230 | Core engine paths + errors |
+| 3 | `schema/_impl.py` | ~150–170 | Unions / narrowing edge cases |
+| 4 | `pyspark/dataframe.py` | ~130–150 | Parity smoke tests |
+| 5 | `io/__init__.py` | ~75–90 | Materialize/export branches |
+| 6 | `io/extras.py` | ~40–55 | Optional SDKs + mocks (improved) |
+| 7 | `dataframe_model.py` | ~120–135 | I/O and async helpers |
+| 8 | `awaitable_dataframe_model.py` | ~70–80 | Async chains / group_by / join |
+| 9 | `pyspark/sql/functions.py` | ~65–75 | Representative calls only |
+| 10 | `expressions.py` | ~40–50 | Public `Expr` surfaces |
 
 ## Per-package focus (highest missing lines first)
 

@@ -25,6 +25,21 @@ from pydantable.io.extras import (
 )
 
 
+def test_iter_excel_openpyxl_import_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fake_import(name: str, *a: object, **kw: object):
+        if name == "openpyxl":
+            raise ImportError("no openpyxl")
+        return real_import(name, *a, **kw)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    with pytest.raises(ImportError, match="iter_excel requires openpyxl"):
+        next(iter_excel(Path("nope.xlsx"), experimental=True))
+
+
 def test_read_excel_openpyxl_import_error(monkeypatch: pytest.MonkeyPatch) -> None:
     import builtins
 

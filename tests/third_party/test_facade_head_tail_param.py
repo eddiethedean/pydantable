@@ -31,3 +31,18 @@ def test_pandas_facade_head_tail_roundtrip() -> None:
 def test_pyspark_facade_head_tail_roundtrip() -> None:
     df = _SparkMini({"a": [1, 2, 3, 4, 5]})
     _assert_head_tail(df)
+
+
+def test_pandas_facade_sort_values_desc() -> None:
+    pytest.importorskip("pandas")
+    from pydantable.pandas import DataFrame
+
+    df = DataFrame[_P]({"a": [3, 1, 2]})
+    out = df.sort_values("a", ascending=False).collect(as_lists=True)
+    assert out["a"] == [3, 2, 1]
+
+
+def test_pyspark_facade_sort_asc() -> None:
+    df = _SparkMini({"a": [3, 1, 2]})
+    out = df.sort("a").collect(as_lists=True)
+    assert out["a"] == [1, 2, 3]

@@ -85,7 +85,7 @@ test-fast:
 # Match CI coverage gate (Ubuntu + Python 3.11 only in Actions).
 test-cov:
 	$(PYTHON) -m pytest -q -n auto \
-		--cov=pydantable --cov-report=xml --cov-report=term-missing:skip-covered --cov-fail-under=81
+		--cov=pydantable --cov-report=xml --cov-report=term-missing:skip-covered --cov-fail-under=82
 
 # Requires ``coverage.xml`` from ``make test-cov`` and ``pip install -e ".[dev]"`` (diff-cover).
 DIFF_COVER ?= $(dir $(PYTHON))diff-cover

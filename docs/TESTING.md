@@ -57,21 +57,21 @@ Prefer **`importorskip`** for optional third-party modules that may be absent in
 
 ## Coverage (CI)
 
-On **Ubuntu** with **Python 3.11** only, CI runs pytest with coverage and a minimum line gate (**`--cov-fail-under=81`**; see `.github/workflows/_shared-ci.yml`). To reproduce locally:
+On **Ubuntu** with **Python 3.11** only, CI runs pytest with coverage and a minimum line gate (**`--cov-fail-under=82`**; see `.github/workflows/_shared-ci.yml`). To reproduce locally:
 
 ```bash
 pytest -q -n auto \
   --cov=pydantable \
   --cov-report=term-missing:skip-covered \
   --cov-report=xml \
-  --cov-fail-under=81
+  --cov-fail-under=82
 ```
 
 `Makefile` target **`make test-cov`** runs the same arguments (see `Makefile`).
 
 **Gap tracking:** Per-area backlog and how to regenerate the baseline report are in {doc}`COVERAGE_BACKLOG`.
 
-**PRs (optional):** After `coverage.xml` exists (from `test-cov` or CI artifacts), run **`make diff-cover`** to compare **changed lines** on the current branch against **`origin/main`** (`diff-cover` is in **`[dev]`**). The Makefile uses **`--fail-under=85`** on touched lines; increase that over time as overall coverage improves (see `COVERAGE_BACKLOG.md`).
+**PRs (recommended for large changes):** After `coverage.xml` exists (from `test-cov` or CI artifacts), run **`make diff-cover`** to compare **changed lines** on the current branch against **`origin/main`** (`diff-cover` is in **`[dev]`**). The Makefile uses **`--fail-under=85`** on touched lines; increase that over time as overall coverage improves (see `COVERAGE_BACKLOG.md`).
 
 ## Timeouts
 
