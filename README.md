@@ -94,6 +94,8 @@ Transforms cheat sheet (**`with_columns_as`**, **`join_as`** with **`schema=`** 
 
 Use a virtual environment at **`.venv`** in the repo root (the `Makefile` defaults to `.venv/bin/python`). Full contributor setup, Maturin/Rust builds, and release notes: [DEVELOPER](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html).
 
+Before **`pip install -e .`** on a checkout (when **`pydantable-native`** matching your **`pyproject.toml`** pin is not on PyPI yet), install **protocol** then build native: **`pip install -e ./pydantable-protocol`**, then **`make native-develop`**, then **`pip install -e ".[dev,docs]"`** (see DEVELOPER).
+
 ```bash
 make check-full      # ruff, ty, pyright, typing snippet tests, Sphinx, Rust
 ```

@@ -17,8 +17,12 @@
 - In a repo checkout:
 
 ```bash
-maturin develop --manifest-path pydantable-core/Cargo.toml
+# from repo root (installs protocol if needed, then builds native):
+make native-develop
+.venv/bin/python -m pip install -e .
 ```
+
+Or from **`pydantable-native/`**: **`.venv/bin/python -m maturin develop --release`** (manifest path is set in **`pydantable-native/pyproject.toml`**; run **`pip install -e ../pydantable-protocol`** first if **`pydantable-protocol==2.x`** is not on PyPI yet).
 
 - Or install a published wheel:
 

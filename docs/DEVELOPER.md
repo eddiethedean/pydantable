@@ -15,17 +15,17 @@ From repo root:
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip setuptools wheel
-# Editable protocol (same repo; satisfies the ``pydantable-protocol`` pin for local work):
+# Order matters before pydantable 2.x is on PyPI: protocol + native first, then the main package.
 .venv/bin/python -m pip install -e ./pydantable-protocol
-# Editable install + test/lint/docs extras (matches CI-ish dev env):
+make native-develop
 .venv/bin/python -m pip install -e ".[dev,docs]"
-# Build the extension (required for lazy I/O tests and accurate doc version):
-(cd pydantable-native && maturin develop --manifest-path ../pydantable-core/Cargo.toml)
 ```
 
-Minimal alternative (narrower deps): **`pip install maturin pytest pytest-asyncio ruff`** then **`pip install -e .`** — you still need **`maturin develop`** from `pydantable-native` (or to install a published `pydantable-native` wheel) for native execution.
+**`make native-develop`** runs **`pip install -e ./pydantable-protocol`** (if needed) and **`maturin develop --release`** from **`pydantable-native`**, using **`[tool.maturin] manifest-path = "../pydantable-core/Cargo.toml"`** in **`pydantable-native/pyproject.toml`**. Do **not** install **`pydantable`** itself before the native wheel exists, or **`pip`** will try to download **`pydantable-native==2.0.0`** from PyPI and fail on unreleased pins.
 
-**`make check-full`** (from repo root) runs Ruff on the whole tree, Astral **`ty`** on the three first-party trees (see **`[tool.ty]`** in **`pyproject.toml`**), a minimal **`ty`** venv (no NumPy/PyArrow), Pyright, typing-artifact checks, Sphinx, and Rust **`cargo fmt` / clippy / test**. **`make rust-test`** prepends **`python/`**, **`pydantable-protocol/python`**, and **`pydantable-native/python`** to **`PYTHONPATH`** (then the venv’s **`site-packages`**) so PyO3 tests resolve **`pydantable`**, **`pydantable_protocol`**, and **`polars`** consistently without relying on editable installs alone. **`make native-develop`** runs **`pip install -e ./pydantable-protocol`** before **`maturin develop`**.
+Minimal alternative (narrower deps): **`pip install maturin pytest pytest-asyncio ruff`**, then **protocol → `make native-develop` → `pip install -e .`**.
+
+**`make check-full`** (from repo root) runs Ruff on the whole tree, Astral **`ty`** on the three first-party trees (see **`[tool.ty]`** in **`pyproject.toml`**), a minimal **`ty`** venv (no NumPy/PyArrow), Pyright, typing-artifact checks, Sphinx, and Rust **`cargo fmt` / clippy / test**. **`make rust-test`** prepends **`python/`**, **`pydantable-protocol/python`**, and **`pydantable-native/python`** to **`PYTHONPATH`** (then the venv’s **`site-packages`**) so PyO3 tests resolve **`pydantable`**, **`pydantable_protocol`**, and **`polars`** consistently without relying on editable installs alone.
 
 For **which checker runs where**, **`ty`** vs **mypy** vs **Pyright**, phased strictness, and public-vs-internal **`Any`**, see {doc}`TYPING` (contributor section).
 
@@ -372,7 +372,7 @@ Optional Python **`polars`** for local `to_polars()` / benchmark comparisons: `p
 Editable installs often compile the native extension in **debug** mode. That is fine for development but **not** comparable to production performance. Before running any benchmark that exercises the extension, build the optimized library:
 
 ```bash
-(cd pydantable-native && .venv/bin/python -m maturin develop --release --manifest-path ../pydantable-core/Cargo.toml)
+make native-develop
 ```
 
 Then run the benchmark scripts (after `pip install -e ".[benchmark]"` for Polars/pandas).
@@ -399,7 +399,7 @@ Install the optional benchmark extra (pulls in Polars for the comparison side):
 
 ```bash
 .venv/bin/python -m pip install -e ".[benchmark]"
-(cd pydantable-native && .venv/bin/python -m maturin develop --release --manifest-path ../pydantable-core/Cargo.toml)
+make native-develop
 .venv/bin/python benchmarks/pydantable_vs_polars.py
 ```
 
@@ -413,7 +413,7 @@ Uses the same optional `benchmark` extra (installs pandas alongside Polars):
 
 ```bash
 .venv/bin/python -m pip install -e ".[benchmark]"
-(cd pydantable-native && .venv/bin/python -m maturin develop --release --manifest-path ../pydantable-core/Cargo.toml)
+make native-develop
 .venv/bin/python benchmarks/pydantable_vs_pandas.py
 ```
 
