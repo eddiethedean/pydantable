@@ -29,6 +29,8 @@ Minimal alternative (narrower deps): **`pip install maturin pytest pytest-asynci
 
 For **which checker runs where**, **`ty`** vs **mypy** vs **Pyright**, phased strictness, and public-vs-internal **`Any`**, see {doc}`TYPING` (contributor section).
 
+**VS Code / Cursor snippets:** optional transform patterns live at **`.vscode/pydantable-transforms.code-snippets`** (prefixes like `pt-join-dfm`). Copy into an application repo if useful; they are documented in {doc}`TRANSFORMS_QUICK_REF`.
+
 Activate when working interactively:
 
 ```bash

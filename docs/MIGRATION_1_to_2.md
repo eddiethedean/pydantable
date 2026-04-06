@@ -123,7 +123,8 @@ class After(Schema):
     id: int
     # ... plus the rest of the post-join schema ...
 
-out = left.join_as(After, right, on=[left.col.id])
+out = left.join_as(schema=After, other=right, on=[left.col.id])
+# Positional is still valid for DataFrame: join_as(After, right, on=[left.col.id])
 ```
 
 ### `group_by(...).agg(...)`

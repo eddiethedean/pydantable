@@ -130,6 +130,9 @@ In strict 2.0, schema evolution is always explicit: use the `*_as` APIs so the o
 schema is statically declared and runtime-validated. **`AfterModel`** can **subclass**
 the input model when the result adds columns (or overrides types/defaults) so you do not
 re-list every inherited field; see {doc}`DATAFRAMEMODEL` **Subclassing (merged schema)**.
+For **`join_as`**, prefer keyword arguments and the **`schema=`** / **`after_model=`**
+aliases so `DataFrame` vs `DataFrameModel` call shapes do not get crossed; see
+{doc}`TRANSFORMS_QUICK_REF`.
 
 ### Column types (Literal, IP, WKB, `Annotated[str, ...]`)
 

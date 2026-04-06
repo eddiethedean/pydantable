@@ -26,6 +26,7 @@ If you’re not sure where something is documented, use {doc}`DOCS_MAP`.
 
 QUICKSTART
 TYPING
+TRANSFORMS_QUICK_REF
 DATAFRAMEMODEL
 SUPPORTED_TYPES
 CUSTOM_DTYPES

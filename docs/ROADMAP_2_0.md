@@ -43,7 +43,7 @@ runtime by comparing the engine’s derived schema to the provided `AfterSchema`
   - `DataFrame.with_columns_as(AfterSchema, ...)`
   - `DataFrame.drop_as(AfterSchema, ...)`
   - `DataFrame.rename_as(AfterSchema, mapping)`
-  - `DataFrame.join_as(AfterSchema, other, on=[...]/left_on/right_on=[...])`
+  - `DataFrame.join_as(AfterSchema, other, on=[...]/left_on/right_on=[...])` — prefer keywords: `after_schema_type=` / `schema=` and `other=`
   - `DataFrame.group_by_agg_as(AfterSchema, keys=[...], **aggs)`
 
 `DataFrameModel` mirrors these constraints:
@@ -52,7 +52,7 @@ runtime by comparing the engine’s derived schema to the provided `AfterSchema`
 - `DataFrameModel.with_columns_as(AfterModel, ...)`
 - `DataFrameModel.drop_as(AfterModel, ...)`
 - `DataFrameModel.rename_as(AfterModel, ...)`
-- `DataFrameModel.join_as(AfterModel, other, ...)`
+- `DataFrameModel.join_as(other, AfterModel, ...)` — prefer keywords: `other=` / `model=` / `after_model=`
 - `DataFrameModel.group_by_agg_as(AfterModel, keys=[...], ...)`
 
 ## Migration guide (1.x → 2.0 patterns)
@@ -139,8 +139,11 @@ class After(DataFrameModel):
     id: int
     # ... joined columns ...
 
-out = left.join_as(After.schema_model(), right, on=[left.col.id])
+# DataFrameModel: right-hand frame first if positionals; prefer keywords.
+out = left.join_as(other=right, model=After, on=[left.col.id])
 ```
+
+If your inputs are **`DataFrame[Schema]`** (not `DataFrameModel`), use **`DataFrame.join_as`**: `left.join_as(schema=After, other=right, on=[left.col.id])` (see {doc}`TRANSFORMS_QUICK_REF`).
 
 ### Group-by + aggregate
 

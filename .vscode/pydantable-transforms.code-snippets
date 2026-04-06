@@ -1,0 +1,51 @@
+{
+  "pydantable join_as (DataFrameModel)": {
+    "scope": "python",
+    "prefix": "pt-join-dfm",
+    "body": [
+      "${1:left}.join_as(other=${2:right}, model=${3:AfterModel}, on=[${4:$1}.col.${5:id}], how=\"${6:inner}\")"
+    ],
+    "description": "DataFrameModel.join_as with keywords (model=/after_model=)"
+  },
+  "pydantable join_as (DataFrame)": {
+    "scope": "python",
+    "prefix": "pt-join-df",
+    "body": [
+      "${1:left}.join_as(schema=${2:AfterSchema}, other=${3:right}, on=[${4:$1}.col.${5:id}], how=\"${6:inner}\")"
+    ],
+    "description": "DataFrame.join_as with keywords (schema=/after_schema_type=)"
+  },
+  "pydantable with_columns_as": {
+    "scope": "python",
+    "prefix": "pt-with-columns",
+    "body": [
+      "${1:df}.with_columns_as(${2:AfterModel}, ${3:new_col}=${4:$1}.col.${5:base} * ${6:2})"
+    ],
+    "description": "with_columns_as(AfterModel, **exprs)"
+  },
+  "pydantable select_as": {
+    "scope": "python",
+    "prefix": "pt-select",
+    "body": [
+      "${1:df}.select_as(${2:AfterModel}, ${3:$1}.col.${4:a}, ${5:$1}.col.${6:b})"
+    ],
+    "description": "select_as(AfterModel, *columns)"
+  },
+  "pydantable group_by_agg_as": {
+    "scope": "python",
+    "prefix": "pt-groupby-agg",
+    "body": [
+      "${1:df}.group_by_agg_as(${2:AfterModel}, keys=[${3:$1}.col.${4:g}], ${5:total}=(\"sum\", ${6:$1}.col.${7:v}))"
+    ],
+    "description": "group_by_agg_as(AfterModel, keys=..., **aggs)"
+  },
+  "pydantable DataFrameModel subclass (delta fields)": {
+    "scope": "python",
+    "prefix": "pt-subclass-dfm",
+    "body": [
+      "class ${1:WithNew}(${2:BaseModel}):",
+      "    ${3:new_field}: ${4:int}"
+    ],
+    "description": "Subclass DataFrameModel with only new fields"
+  }
+}

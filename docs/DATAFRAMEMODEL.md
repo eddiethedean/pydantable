@@ -53,6 +53,8 @@ class OrderWithCountry(Orders):
 
 When the target schema is **not** an extension of the input (for example you **drop** or **rename** columns in ways that are not overrides of the same names), define a separate sibling model or a dedicated `*_as` target as usual.
 
+**Also read:** {doc}`TRANSFORMS_QUICK_REF` (**`join_as`** keyword style and organizing models in larger codebases).
+
 ### Customizing the generated RowModel (Pydantic hooks)
 
 `DataFrameModel` generates Pydantic model types for row validation and materialization.
@@ -417,7 +419,11 @@ places where you should be explicit about the intended output model:
 - **General transforms**: `as_model(...)` / `try_as_model(...)` / `assert_model(...)`
 - **Grouped aggregation**: `group_by_agg_as(AfterModel, keys=[...], ...)`
 - **Reshape**: `melt_as(AfterModel, ...)`, `pivot_as(AfterModel, ...)`, `explode_as(AfterModel, ...)`, `unnest_as(AfterModel, ...)`
-- **Join**: `join_as(other, AfterModel, ...)`
+- **Join**: `join_as(...)` with explicit output schema / model — prefer **keywords** (`other=`, `after_schema_type=` or `schema=` on `DataFrame`; `model=` or `after_model=` on `DataFrameModel`) so argument order never swaps across the two types. See {doc}`TRANSFORMS_QUICK_REF`.
+
+```{note}
+Positional **`join_as`** uses **`(after_schema_type, other)`** on **`DataFrame`** and **`(other, model)`** on **`DataFrameModel`**. Keyword calls avoid that footgun.
+```
 
 Example (service-friendly shape):
 

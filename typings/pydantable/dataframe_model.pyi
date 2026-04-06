@@ -1014,9 +1014,10 @@ class DataFrameModel(Generic[RowT]):
     ) -> Never: ...
     def join_as(
         self,
-        other: DataFrameModel[Any],
-        model: type[AfterModelT],
+        other: DataFrameModel[Any] | None = None,
+        model: type[AfterModelT] | None = None,
         *,
+        after_model: type[AfterModelT] | None = None,
         on: Sequence[Any] | None = None,
         left_on: Sequence[Any] | None = None,
         right_on: Sequence[Any] | None = None,

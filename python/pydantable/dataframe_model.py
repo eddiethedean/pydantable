@@ -2201,9 +2201,10 @@ class DataFrameModel(Generic[RowT]):
 
     def join_as(
         self,
-        other: DataFrameModel[Any],
-        model: type[AfterModelT],
+        other: DataFrameModel[Any] | None = None,
+        model: type[AfterModelT] | None = None,
         *,
+        after_model: type[AfterModelT] | None = None,
         on: Sequence[Any] | None = None,
         left_on: Sequence[Any] | None = None,
         right_on: Sequence[Any] | None = None,
@@ -2217,13 +2218,32 @@ class DataFrameModel(Generic[RowT]):
         force_parallel: bool | None = None,
         streaming: bool | None = None,
     ) -> AfterModelT:
+        """Join with an explicit output model. Prefer ``other=`` and ``model=`` (or
+        ``after_model=`` as an alias) as keywords so order matches the keyword
+        story for :meth:`pydantable.dataframe.DataFrame.join_as`.
+        """
+        if model is not None and after_model is not None and model is not after_model:
+            raise TypeError(
+                "join_as(): model and after_model= disagree; pass only one."
+            )
+        out_model = model if model is not None else after_model
+        if other is None:
+            raise TypeError(
+                "join_as() requires other=... or the right-hand frame as the "
+                "first positional argument."
+            )
+        if out_model is None:
+            raise TypeError(
+                "join_as() requires model=... or after_model=..., or the output "
+                "DataFrameModel subclass as the second positional argument."
+            )
         if not isinstance(other, DataFrameModel):
             raise TypeError(
                 "join_as(other=...) expects another DataFrameModel instance."
             )
         return self._from_dataframe(
             self._df.join_as(
-                model.schema_model(),
+                out_model.schema_model(),
                 other._df,
                 on=on,  # runtime validates ColumnRef
                 left_on=left_on,
@@ -2238,7 +2258,7 @@ class DataFrameModel(Generic[RowT]):
                 force_parallel=force_parallel,
                 streaming=streaming,
             )
-        ).as_model(model)
+        ).as_model(out_model)
 
     def melt_as(
         self,
@@ -2340,7 +2360,8 @@ class DataFrameModel(Generic[RowT]):
     ) -> Never:
         raise TypeError(
             "join_as_model(...) is removed in pydantable 2.0 strict mode. "
-            "Use join_as(AfterModel, ...)."
+            "Use join_as(other=..., model=..., on=[left.col.key], ...) "
+            "(or after_model= as an alias for model)."
         )
 
     def join_try_as_model(

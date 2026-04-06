@@ -2149,7 +2149,9 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         """
         raise TypeError(
             "join() is removed in pydantable 2.0 strict mode. "
-            "Use join_as(AfterSchema, other, on=[df.col.key], ...) so the output "
+            "Use join_as(after_schema_type=AfterSchema, other=other, "
+            "on=[df.col.key], ...) "
+            "(or ``schema=`` as an alias for ``after_schema_type``) so the output "
             "schema is explicit and ColumnRef-based."
         )
         if not isinstance(other, DataFrame):
@@ -2419,9 +2421,10 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
     def join_as(
         self,
-        after_schema_type: type[AfterSchemaT],
-        other: DataFrame[Any],
+        after_schema_type: type[AfterSchemaT] | None = None,
+        other: DataFrame[Any] | None = None,
         *,
+        schema: type[AfterSchemaT] | None = None,
         on: Sequence[ColumnRef] | None = None,
         left_on: Sequence[ColumnRef] | None = None,
         right_on: Sequence[ColumnRef] | None = None,
@@ -2435,6 +2438,33 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         force_parallel: bool | None = None,
         streaming: bool | None = None,
     ) -> DataFrame[AfterSchemaT]:
+        """Join with an explicit output schema. Prefer keyword arguments to avoid
+        mixing argument order with :meth:`DataFrameModel.join_as`.
+
+        Pass the output schema as the first positional, as ``after_schema_type=``,
+        or as ``schema=`` (alias). Do not pass ``after_schema_type`` and ``schema``
+        with two different types.
+        """
+        if (
+            after_schema_type is not None
+            and schema is not None
+            and after_schema_type is not schema
+        ):
+            raise TypeError(
+                "join_as(): after_schema_type and schema= disagree; pass only one."
+            )
+        out_schema = after_schema_type if after_schema_type is not None else schema
+        if out_schema is None:
+            raise TypeError(
+                "join_as() requires an output schema type "
+                "(positional, after_schema_type=..., or schema=...)."
+            )
+        if other is None:
+            raise TypeError(
+                "join_as() requires other=... or the right-hand DataFrame "
+                "as the second positional argument."
+            )
+        after_schema_type = out_schema
         if not isinstance(after_schema_type, type) or not issubclass(
             after_schema_type, BaseModel
         ):
