@@ -6,7 +6,7 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/pydantable)](https://pypi.org/project/pydantable/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Strictly-typed DataFrames for Python, powered by Rust** — define a schema (Pydantic), and get an API that **cannot** “accidentally” change schemas at runtime.
+**Strictly-typed DataFrames for Python, powered by Rust** — familiar dataframe workflows from Python, with optional file/SQL I/O, FastAPI helpers, and Pydantic when you want validated rows.
 
 **Current release: 2.0.0** — highlights in the [changelog](https://pydantable.readthedocs.io/en/latest/CHANGELOG.html).
 
