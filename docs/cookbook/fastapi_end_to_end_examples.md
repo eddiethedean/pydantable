@@ -32,10 +32,7 @@ class UserDimDF(DataFrameModel):
     country: str
 
 
-class OrderUserDF(DataFrameModel):
-    order_id: int
-    user_id: int
-    amount: float | None
+class OrderUserDF(OrderLineDF):
     country: str | None
 
 
@@ -66,7 +63,7 @@ app.include_router(router)
 def sales_by_country(body: SalesByCountryBody):
     orders = OrderLineDF(body.orders)
     users = UserDimDF(body.users)
-    joined = orders.join_as(OrderUserDF, users, on=[orders.col.user_id], how="left")
+    joined = orders.join_as(users, OrderUserDF, on=[orders.col.user_id], how="left")
     filled = joined.fill_null(0.0, subset=["amount"])
     rolled = filled.group_by_agg_as(
         CountryRevenueDF,
@@ -166,10 +163,7 @@ class LineItemDF(DataFrameModel):
     unit_price: float
 
 
-class LineItemWithTotalDF(DataFrameModel):
-    sku: str
-    qty: int
-    unit_price: float
+class LineItemWithTotalDF(LineItemDF):
     line_total: float
 
 

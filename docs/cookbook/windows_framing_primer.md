@@ -25,10 +25,11 @@ class Row(DataFrameModel):
 
 df = Row({"group": ["a", "a", "b"], "v": [2, 1, 5]})
 w = Window.partitionBy("group").orderBy("v")
-class WithRank(DataFrameModel):
-    group: str
-    v: int
+
+
+class WithRank(Row):
     rn: int | None
+
 
 out = df.with_columns_as(WithRank, rn=row_number().over(w)).to_dict()
 assert "rn" in out

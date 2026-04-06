@@ -30,6 +30,7 @@ Forbidden:
 Required:
 - Schema-changing operations must have an explicit, statically-declared output schema.
 - Column identity must be represented by typed column tokens (e.g. ``ColumnRef``), not strings.
+- With **`DataFrameModel`**, the output type may be a **subclass** of the input model when the new schema **extends** the old one (merged field annotations along the MRO). You still pass that subclass to **`*_as(AfterModel, ...)`** so the evolution stays explicit to type checkers and at runtime.
 
 Example (explicit output schema + typed column tokens):
 

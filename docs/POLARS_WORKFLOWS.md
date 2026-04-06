@@ -43,6 +43,8 @@ Output:
 {'country': ['CA', 'US'], 'total': [20.0, 50.0], 'n_orders': [1, 2]}
 ```
 
+For **`DataFrameModel`** and explicit output schemas, prefer **`join_as(other, AfterModel, ...)`** and define **`AfterModel`** as a **subclass** of the left frame’s model when the join only **adds** columns from the right (for example `class OrderUser(Orders): country: str | None`). See {doc}`DATAFRAMEMODEL` **Subclassing (merged schema)** and the {doc}`/cookbook/transforms_join_groupby` recipe.
+
 ## 2) Reshape long-to-wide
 
 ```python

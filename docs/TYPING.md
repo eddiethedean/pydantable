@@ -15,7 +15,7 @@ This page consolidates the typing story and links to the relevant contracts.
 
 ## The typing contract (nominal model, derived row type, structural helpers)
 
-- **Nominal table type**: users name subclasses of `DataFrameModel` (for example `class Users(DataFrameModel): ...`).
+- **Nominal table type**: users name subclasses of `DataFrameModel` (for example `class Users(DataFrameModel): ...`). Evolved schemas can **subclass** a base model to inherit its columns and only declare deltas.
 - **Row type is derived**: each `DataFrameModel` subclass generates a per-row Pydantic model exposed as `Users.RowModel`.
 - **Generics are for relationships / helpers**: for cross-model helpers, prefer structural typing rather than pretending `DataFrameModel[Row]` “is” a particular subclass.
 
@@ -87,9 +87,7 @@ class After(DataFrameModel):
     age2: int
 
 def pipeline(df: Before) -> After:
-    class AfterFull(DataFrameModel):
-        id: int
-        age: int
+    class AfterFull(Before):
         age2: int
 
     out_full = df.with_columns_as(AfterFull, age2=df.col.age * 2)
@@ -129,7 +127,9 @@ def grouped(df: Events) -> ByGroup:
 ### Deterministic schema evolution (`*_as`)
 
 In strict 2.0, schema evolution is always explicit: use the `*_as` APIs so the output
-schema is statically declared and runtime-validated.
+schema is statically declared and runtime-validated. **`AfterModel`** can **subclass**
+the input model when the result adds columns (or overrides types/defaults) so you do not
+re-list every inherited field; see {doc}`DATAFRAMEMODEL` **Subclassing (merged schema)**.
 
 ### Column types (Literal, IP, WKB, `Annotated[str, ...]`)
 

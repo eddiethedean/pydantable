@@ -8,8 +8,6 @@ The goal is to keep the query-building/typing story (`select`, `with_columns`,
 `filter`) while making DataFrames feel native in typical Pydantic/FastAPI
 workflows.
 
-For pandas-style method names (**`assign`**, **`merge`**, **`duplicated`**, **`get_dummies`**, …) import **`DataFrameModel`** from **`pydantable.pandas`**; execution remains the same Rust core ({doc}`PANDAS_UI`).
-
 ## Terms
 
 - **Row model**: A normal Pydantic `BaseModel` describing a single row (e.g. `UserRow`).
@@ -31,6 +29,29 @@ class UserDF(DataFrameModel):
 ```
 
 Defining the class does not print anything; it registers `UserDF.RowModel` and the schema model used by the internal `DataFrame`.
+
+### Subclassing (merged schema)
+
+Subclasses **inherit** column fields from bases along the MRO (like dataclasses or Pydantic models):
+
+- **Annotations** from all bases are merged. Declare only **new or changed** fields in the subclass—for example, after a join, add just the nullable column coming from the right table.
+- **Defaults** apply in MRO order; the subclass can **override** a default or the declared type for the same field name.
+- **Multiple inheritance** is supported: mixin bases contribute columns in deterministic MRO order.
+
+Pair this with **`*_as(ChildModel, ...)`**: `ChildModel` can **subclass** the model you started from when the result is “same columns plus additions”, so you do not repeat every inherited field. Static checkers and runtime schema validation both see the **full** column set on `ChildModel`.
+
+```python
+class Orders(DataFrameModel):
+    order_id: int
+    user_id: int
+    amount: float | None
+
+
+class OrderWithCountry(Orders):
+    country: str | None
+```
+
+When the target schema is **not** an extension of the input (for example you **drop** or **rename** columns in ways that are not overrides of the same names), define a separate sibling model or a dedicated `*_as` target as usual.
 
 ### Customizing the generated RowModel (Pydantic hooks)
 
@@ -361,9 +382,7 @@ class After(DataFrameModel):
     age2: int
 
 def pipeline(df: Before) -> After:
-    class AfterFull(DataFrameModel):
-        id: int
-        age: int
+    class AfterFull(Before):
         age2: int
 
     out_full = df.with_columns_as(AfterFull, age2=df.col.age * 2)
@@ -376,9 +395,7 @@ In strict 2.0, schema evolution is explicit for all checkers: use `*_as(AfterMod
 
 ```python
 def pipeline(df: Before) -> After:
-    class AfterFull(DataFrameModel):
-        id: int
-        age: int
+    class AfterFull(Before):
         age2: int
 
     out_full = df.with_columns_as(AfterFull, age2=df.col.age * 2)
@@ -400,7 +417,7 @@ places where you should be explicit about the intended output model:
 - **General transforms**: `as_model(...)` / `try_as_model(...)` / `assert_model(...)`
 - **Grouped aggregation**: `group_by_agg_as(AfterModel, keys=[...], ...)`
 - **Reshape**: `melt_as(AfterModel, ...)`, `pivot_as(AfterModel, ...)`, `explode_as(AfterModel, ...)`, `unnest_as(AfterModel, ...)`
-- **Join**: `join_as(AfterModel, other, ...)`
+- **Join**: `join_as(other, AfterModel, ...)`
 
 Example (service-friendly shape):
 
