@@ -53,6 +53,63 @@ class _OptionalFieldWithStringDefaultDF(DataFrameModel):
     note: str | None = "n/a"
 
 
+class _BaseWithDefaultsDF(DataFrameModel):
+    id: int
+    country: str = "US"
+
+
+class _ChildInheritsDefaultsDF(_BaseWithDefaultsDF):
+    age: int | None
+
+
+class _BaseOverrideTypeDF(DataFrameModel):
+    id: int
+    age: int
+
+
+class _ChildOverridesTypeDF(_BaseOverrideTypeDF):
+    age: int | None
+
+
+class _ChildOverridesDefaultDF(_BaseWithDefaultsDF):
+    country: str = "CA"
+
+
+class _MixinTenantDF(DataFrameModel):
+    tenant: str = "t1"
+
+
+class _MixinAuditDF(DataFrameModel):
+    # required field with default
+    created_by: str = "system"
+
+
+class _DeepBaseDF(DataFrameModel):
+    id: int
+    # optional with default
+    note: str | None = "n/a"
+
+
+class _DeepMidDF(_DeepBaseDF):
+    # override default value on inherited optional
+    note: str | None = "mid"
+
+
+class _DeepLeafDF(_DeepMidDF):
+    # add a new field, keep inherited defaults
+    age: int | None
+
+
+class _MultiBaseLeafDF(_MixinTenantDF, _MixinAuditDF, _DeepBaseDF):
+    # multiple bases: defaults + required-with-defaults should all apply
+    age: int
+
+
+class _OverrideRequiredToOptionalDF(_BaseWithDefaultsDF):
+    # `country` is required-but-defaulted on base; leaf makes it optional w/ new default
+    country: str | None = None
+
+
 def test_dataframe_model_column_input_happy_path():
     df = UserDF({"id": [1, 2], "age": [20, None]})
     assert df.schema_fields() == {"id": int, "age": int | None}
@@ -129,6 +186,67 @@ def test_dataframe_model_non_none_default_applies_when_fill_false_rows() -> None
 def test_dataframe_model_non_none_default_applies_when_fill_false_columnar() -> None:
     df = _OptionalFieldWithStringDefaultDF({"id": [1]}, fill_missing_optional=False)
     assert df.collect(as_lists=True) == {"id": [1], "note": ["n/a"]}
+
+
+def test_dataframe_model_inherited_defaults_apply_when_missing() -> None:
+    df = _ChildInheritsDefaultsDF({"id": [1], "age": [10]})
+    assert df.collect(as_lists=True) == {"id": [1], "country": ["US"], "age": [10]}
+
+
+def test_dataframe_model_subclass_default_overrides_base_default() -> None:
+    df = _ChildOverridesDefaultDF({"id": [1]})
+    assert df.collect(as_lists=True) == {"id": [1], "country": ["CA"]}
+
+
+def test_dataframe_model_subclass_type_override_wins_in_schema() -> None:
+    df = _ChildOverridesTypeDF({"id": [1], "age": [None]})
+    assert df.schema_fields() == {"id": int, "age": int | None}
+    assert df.collect(as_lists=True) == {"id": [1], "age": [None]}
+
+
+def test_dataframe_model_inherited_required_default_applies_rows() -> None:
+    df = _BaseWithDefaultsDF([{"id": 1}])
+    assert df.collect(as_lists=True) == {"id": [1], "country": ["US"]}
+
+
+def test_dataframe_model_required_default_applies_columnar_fill_false() -> None:
+    # `country` is required but has a default; it should be filled regardless of
+    # `fill_missing_optional` setting.
+    df = _BaseWithDefaultsDF({"id": [1]}, fill_missing_optional=False)
+    assert df.collect(as_lists=True) == {"id": [1], "country": ["US"]}
+
+
+def test_dataframe_model_deep_inheritance_defaults_apply_and_override() -> None:
+    # Leaf should inherit base fields, and defaults should follow subclass override.
+    df = _DeepLeafDF({"id": [1], "age": [10]})
+    assert df.collect(as_lists=True) == {"id": [1], "note": ["mid"], "age": [10]}
+
+
+def test_dataframe_model_multibase_mixins_defaults_apply_columnar() -> None:
+    df = _MultiBaseLeafDF({"id": [1], "age": [3]})
+    assert df.collect(as_lists=True) == {
+        "tenant": ["t1"],
+        "created_by": ["system"],
+        "id": [1],
+        "note": ["n/a"],
+        "age": [3],
+    }
+
+
+def test_dataframe_model_multibase_mixins_defaults_apply_rows() -> None:
+    df = _MultiBaseLeafDF([{"id": 1, "age": 3}])
+    assert df.collect(as_lists=True) == {
+        "tenant": ["t1"],
+        "created_by": ["system"],
+        "id": [1],
+        "note": ["n/a"],
+        "age": [3],
+    }
+
+
+def test_dataframe_model_override_required_default_to_optional_with_default() -> None:
+    df = _OverrideRequiredToOptionalDF({"id": [1]})
+    assert df.collect(as_lists=True) == {"id": [1], "country": [None]}
 
 
 def test_dataframe_model_rejects_str_as_row_sequence() -> None:

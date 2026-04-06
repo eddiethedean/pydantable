@@ -46,9 +46,7 @@ class User(DataFrameModel):
 
 df = User({"id": [1, 2], "age": [20, None]})
 
-class WithAge2(DataFrameModel):
-    id: int
-    age: int | None
+class WithAge2(User):
     age2: int | None
 
 class Result(DataFrameModel):

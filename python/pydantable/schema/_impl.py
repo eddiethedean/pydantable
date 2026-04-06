@@ -977,17 +977,19 @@ def validate_columns_strict(
     lengths = set()
     missing_optional_cols: list[str] = []
     missing_optional_with_defaults: dict[str, Any] = {}
+    missing_required_with_defaults: dict[str, Any] = {}
     missing_required: list[str] = []
     for name, annotation in field_types.items():
         if name not in data:
             _inner, nullable = _annotation_nullable_inner(annotation)
+            fi = field_infos.get(name)
+            if fi is not None:
+                default = getattr(fi, "default", PydanticUndefined)
+                if default is not PydanticUndefined:
+                    missing_required_with_defaults[name] = default
+                    continue
             if nullable:
                 missing_optional_cols.append(name)
-                fi = field_infos.get(name)
-                if fi is not None:
-                    default = getattr(fi, "default", PydanticUndefined)
-                    if default is not PydanticUndefined:
-                        missing_optional_with_defaults[name] = default
                 continue
             missing_required.append(name)
             continue
@@ -1014,6 +1016,12 @@ def validate_columns_strict(
             f"All columns must have the same length; got {sorted(lengths)}"
         )
 
+    n_rows = next(iter(lengths), 0)
+
+    if missing_required_with_defaults:
+        for name, default in missing_required_with_defaults.items():
+            normalized[name] = [default] * n_rows
+
     if missing_optional_cols:
         if not fill_missing_optional:
             missing_without_default = sorted(
@@ -1028,12 +1036,9 @@ def validate_columns_strict(
                     "Missing optional columns (configured as error): "
                     f"{missing_without_default}"
                 )
-        n_rows = next(iter(lengths), 0)
         for name in missing_optional_cols:
             fill_value = missing_optional_with_defaults.get(name)
             normalized[name] = [fill_value] * n_rows
-    else:
-        n_rows = next(iter(lengths), 0)
 
     if mode == "off" and ignore_errors:
         from pydantable.policies import resolve_column_strictness

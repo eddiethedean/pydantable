@@ -54,9 +54,7 @@ class User(DataFrameModel):
 df = User({"id": [1, 2], "age": [20, None]})
 
 
-class UserWithAge2(DataFrameModel):
-    id: int
-    age: int | None
+class UserWithAge2(User):
     age2: int | None
 
 
@@ -81,9 +79,7 @@ class UserReadme(DataFrameModel):
 df = UserReadme({"id": [1, 2], "age": [20, 30]})
 
 
-class UserReadmeWithAge2(DataFrameModel):
-    id: int
-    age: int
+class UserReadmeWithAge2(UserReadme):
     age2: int
 
 
@@ -118,9 +114,7 @@ assert df_rm.to_dict() == {"age": [20, 30], "id": [1, 2]}
 df_c = DFUser({"id": [1, 2], "age": [20, 40]})
 
 
-class DFUserWithAge2(DataFrameModel):
-    id: int
-    age: int
+class DFUserWithAge2(DFUser):
     age2: int
 
 
@@ -157,10 +151,7 @@ orders = Orders(
 users = Users({"user_id": [10, 20], "country": ["US", "CA"]})
 
 
-class OrderUser(DataFrameModel):
-    order_id: int
-    user_id: int
-    amount: float | None
+class OrderUser(Orders):
     country: str | None
 
 
@@ -236,9 +227,7 @@ RM = UserFastApi.row_model()
 df = UserFastApi([RM(id=1, age=20), RM(id=2, age=None)])
 
 
-class UserFastApiWithAge2(DataFrameModel):
-    id: int
-    age: int | None
+class UserFastApiWithAge2(UserFastApi):
     age2: int | None
 
 
@@ -306,12 +295,8 @@ class CountryRevenueRowDF(DataFrameModel):
 joined2 = orders.join_as(users, OrderUser2, on=[orders.col.user_id], how="left")
 
 
-class OrderUser2Filled(DataFrameModel):
-    order_id: int
-    user_id: int
-    amount: float | None
+class OrderUser2Filled(OrderUser2):
     amount_filled: float | None
-    country: str | None
 
 
 filled2 = joined2.with_columns_as(
@@ -341,10 +326,7 @@ df = LineItemDF(
 )
 
 
-class LineItemWithTotalDF(DataFrameModel):
-    sku: str
-    qty: int
-    unit_price: float
+class LineItemWithTotalDF(LineItemDF):
     line_total: float
 
 

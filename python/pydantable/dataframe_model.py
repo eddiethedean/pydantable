@@ -276,7 +276,15 @@ class DataFrameModel(Generic[RowT]):
         eval_ns = dict(vars(typing))
         eval_ns.update(globalns)
 
-        raw_annotations = dict(getattr(cls, "__dict__", {}).get("__annotations__", {}))
+        # Allow schema evolution via class inheritance:
+        # `class WithX(Base): x: ...` reuses base columns without re-declaring them.
+        raw_annotations: dict[str, Any] = {}
+        for base in reversed(cls.__mro__):
+            if base in (object, DataFrameModel):
+                continue
+            base_ann = getattr(base, "__dict__", {}).get("__annotations__", {})
+            if isinstance(base_ann, dict):
+                raw_annotations.update(base_ann)
         annotations: dict[str, Any] = {}
         for field_name, field_type in raw_annotations.items():
             if isinstance(field_type, str):
@@ -291,11 +299,16 @@ class DataFrameModel(Generic[RowT]):
 
         validate_dataframe_model_field_annotations(cls.__name__, annotations)
 
+        # Inherit field defaults from base classes, with subclass overrides winning.
+        # Only capture explicit class attributes (not properties/descriptors).
         field_defaults: dict[str, Any] = {}
-        class_dict = getattr(cls, "__dict__", {})
-        for field_name in annotations:
-            if field_name in class_dict:
-                field_defaults[field_name] = class_dict[field_name]
+        for base in reversed(cls.__mro__):
+            if base in (object, DataFrameModel):
+                continue
+            base_dict = getattr(base, "__dict__", {})
+            for field_name in annotations:
+                if field_name in base_dict:
+                    field_defaults[field_name] = base_dict[field_name]
 
         field_defs_fill = _field_defs_from_annotations(
             annotations, fill_missing_optional=True, field_defaults=field_defaults
@@ -309,6 +322,7 @@ class DataFrameModel(Generic[RowT]):
             annotations, fill_missing_optional=False, field_defaults=field_defaults
         )
 
+        class_dict = getattr(cls, "__dict__", {})
         row_base: type[BaseModel] = Schema
         nested_row = class_dict.get("Row")
         explicit_row_base = class_dict.get("__row_base__")

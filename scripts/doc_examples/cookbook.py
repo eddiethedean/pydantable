@@ -50,10 +50,7 @@ def run_transforms_join_groupby() -> None:
         user_id: int
         country: str
 
-    class OrderUser(DataFrameModel):
-        order_id: int
-        user_id: int
-        amount: float | None
+    class OrderUser(Orders):
         country: str | None
 
     class CountryAgg(DataFrameModel):
@@ -87,9 +84,7 @@ def run_windows_framing_primer() -> None:
     df = Row({"group": ["a", "a", "b"], "v": [2, 1, 5]})
     w = Window.partitionBy("group").orderBy("v")
 
-    class WithRank(DataFrameModel):
-        group: str
-        v: int
+    class WithRank(Row):
         rn: int | None
 
     out = df.with_columns_as(WithRank, rn=row_number().over(w)).to_dict()
