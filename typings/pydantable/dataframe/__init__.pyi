@@ -4,8 +4,8 @@ from pydantable.dataframe._impl import (
     DataFrame,
     DynamicGroupedDataFrame,
     ExecutionHandle,
-    GroupedDataFrame,
 )
+from pydantable.dataframe.grouped import GroupedDataFrame
 from pydantable.dataframe.plan_steps import FilterStep, SelectStep, WithColumnsStep
 
 __all__ = [

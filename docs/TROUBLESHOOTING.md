@@ -81,12 +81,12 @@ Use {doc}`IO_DECISION_TREE` to pick the right entrypoint.
 
 ## Typing: why doesn’t my editor infer the after-schema type?
 
-Some type checkers cannot automatically infer schema-evolving return types from transformation chains. That includes **Pyright**, **Pylance**, and **Astral `ty`**, and any setup **without** the pydantable **mypy** plugin ( **`ty` does not load mypy plugins** ).
+Schema-evolving return types are explicit in strict 2.0: use `*_as(AfterModel/AfterSchema, ...)` so the output schema is declared and validated.
 
 - For Pyright, Pylance, **`ty`**, and similar, use `DataFrameModel.as_model(AfterModel)` to state the after-model explicitly.
 - If you prefer not to raise on mismatch, use `try_as_model(AfterModel) -> AfterModel | None`.
 - If you want a richer mismatch explanation, use `assert_model(AfterModel)` (raises with a schema diff).
-- For **mypy** with `pydantable.mypy_plugin`, transform chains can often be typed automatically; see {doc}`TYPING`.
+- For typing details and examples, see {doc}`TYPING`.
 
 ## FastAPI: `MissingRustExtensionError` on import
 

@@ -1,15 +1,15 @@
 # Typing overview
 
-PydanTable supports **two end-user strategies** for `DataFrameModel` static typing, plus a **third checker** used to validate the library itself:
+PydanTable supports **one end-user strategy** for `DataFrameModel` static typing, plus a **checker** used to validate the library itself:
 
 | Strategy | Checkers | Schema-evolving chains |
 |----------|----------|------------------------|
-| **Inferred chains** | **mypy** with `pydantable.mypy_plugin` | Return types refine from literals / conservative plugin rules. |
-| **Explicit after-model** | **Pyright**, **Pylance**, **Astral `ty`**, and any checker **without** the plugin | Shipped `.pyi` stubs; after a transform, use `as_model(...)` / `try_as_model(...)` / `assert_model(...)`. |
+| **Explicit after-model** | **Pyright**, **Pylance**, **Astral `ty`**, **mypy**, and any checker | Shipped `.pyi` stubs; schema-evolving transforms require `*_as(AfterModel, ...)` so the output schema is explicit. |
 
-**Astral `ty`** does not load mypy plugins. For application code type-checked with `ty`, treat it like **Pyright/Pylance**: use the explicit after-model pattern, not plugin inference.
+For application code type-checked with **Astral `ty`**, follow the same explicit pattern as
+Pyright/Pylance: use `*_as(AfterModel, ...)` for schema evolution.
 
-The **pydantable** repo runs **`ty check`** on first-party trees in CI (`make check-python`). That validates annotations and APIs; it is **not** a substitute for running mypy with the plugin in your project if you rely on inferred chains.
+The **pydantable** repo runs **`ty check`** on first-party trees in CI (`make check-python`). That validates annotations and APIs.
 
 This page consolidates the typing story and links to the relevant contracts.
 
@@ -67,11 +67,11 @@ async def handle(m: SupportsLazyAsyncMaterialize[Any]) -> Any:
 
 At **runtime**, `SupportsLazyAsyncMaterialize` is `@runtime_checkable`, so `isinstance(x, SupportsLazyAsyncMaterialize)` succeeds when `x` has a callable **`acollect`** (duck typing). That check does **not** validate coroutine return types or argument kinds; use mypy, Pyright, or `ty` for that.
 
-**Static checkers:** Stubs may not list every lazy **`aread_*`** classmethod on each `DataFrameModel` subclass. If **mypy** (no plugin), **Pyright/Pylance**, or **`ty`** complains on **`MyModel.aread_parquet(...)`**, assign via **`typing.cast(SupportsLazyAsyncMaterialize[Any], MyModel.aread_parquet(...))`**, bind **`_aread = MyModel.aread_parquet  # type: ignore[attr-defined]`**, or enable the pydantable **mypy plugin** (mypy only) where applicable.
+**Static checkers:** Stubs may not list every lazy **`aread_*`** classmethod on each `DataFrameModel` subclass. If **mypy**, **Pyright/Pylance**, or **`ty`** complains on **`MyModel.aread_parquet(...)`**, assign via **`typing.cast(SupportsLazyAsyncMaterialize[Any], MyModel.aread_parquet(...))`** or bind **`_aread = MyModel.aread_parquet  # type: ignore[attr-defined]`**.
 
 ## Strict 2.0 typing (explicit output model)
 
-**Pyright**, **Pylance**, and **Astral `ty`** cannot apply the mypy plugin, so they follow the same stub-based pattern: chained transforms are loosely typed until you assert an after-model. The examples below say “Pyright”; use the identical **`as_model` / `try_as_model` / `assert_model`** workflow with **`ty check`** on your project.
+**Pyright**, **Pylance**, and **Astral `ty`** follow the same stub-based pattern. In strict 2.0, schema-changing transforms require `*_as(AfterModel, ...)`, and schema-preserving transforms keep the same model type.
 
 In strict 2.0 mode, schema-changing transforms **require an explicit output model** (and enforce it at runtime).
 
@@ -137,51 +137,10 @@ def rolling(df: Events) -> WithRolling:
     )
 ```
 
-### Typed escape hatches for schema-changing transforms (Pyright / `ty`)
+### Deterministic schema evolution (`*_as`)
 
-For other deterministic schema-changing transforms, use the dedicated helpers:
-
-- `melt_as_model(...)` / `melt_try_as_model(...)` / `melt_assert_model(...)`
-- `unpivot_as_model(...)` / `unpivot_try_as_model(...)` / `unpivot_assert_model(...)`
-- `join_as_model(...)` / `join_try_as_model(...)` / `join_assert_model(...)`
-
-## mypy workflow (plugin-based inference)
-
-If you use **Astral `ty`** or **Pyright** on your project instead of mypy, use the **explicit after-model** section above — the plugin applies **only** to mypy.
-
-### Enabling the plugin
-
-Add the plugin to your mypy config:
-
-```toml
-[tool.mypy]
-plugins = ["pydantable.mypy_plugin"]
-```
-
-### What the plugin can infer
-
-Inference is intentionally conservative: it refines return types when arguments are **literal enough**.
-
-- **Schema-evolving transforms** (strict 2.0: explicit output schema required):
-  - `with_columns_as(AfterModel, ...)`
-  - `select_as(AfterModel, ...)`
-  - `drop_as(AfterModel, ...)`
-  - `rename_as(AfterModel, ...)`
-  - `join_as(AfterModel, ...)`
-  - `group_by_agg_as(AfterModel, ...)`
-  - `melt_as(AfterModel, ...)`
-  - `pivot_as(AfterModel, ...)` (requires `pivot_values=[...]` in strict mode)
-  - `explode_as(AfterModel, ...)`
-  - `unnest_as(AfterModel, ...)`
-
-- **Schema-preserving transforms** (kept as the same model type):
-  - `fill_null`, `drop_nulls`, `sort`, `unique`, `distinct`, `clip`, `drop_duplicate_groups`
-
-- **Not inferred / intentionally skipped**:
-  - any call sites using removed legacy APIs (`select`, `with_columns`, `rename`, `drop`, `melt`, `pivot`, etc.)
-  - runtime-dependent schemas (e.g. pivots without explicit `pivot_values`)
-
-When the plugin can’t infer safely, it falls back to the original model type.
+In strict 2.0, schema evolution is always explicit: use the `*_as` APIs so the output
+schema is statically declared and runtime-validated.
 
 ### 1.2.0 column types (Literal, IP, WKB, `Annotated[str, ...]`)
 
@@ -190,7 +149,7 @@ matches transform outputs by **field name** and **static field type** from the c
 body (`Literal[...]`, `ipaddress` classes, `WKB`, and plain or `Annotated` strings show
 up in mypy’s analysis like `int` / `str`).
 
-Users without the mypy plugin (Pyright, Pylance, **`ty`**, and so on) keep the same workflow as other scalars: chained methods are typed as
+Users on stub-based checkers keep the same workflow as other scalars: chained methods are typed as
 `DataFrameModel[Any]` in stubs, so use **`as_model(After)`** / **`try_as_model`** /
 **`assert_model`** when you need an explicit **`After`** type after `select` /
 `with_columns` / `rename`.
@@ -199,7 +158,6 @@ Contract coverage lives in:
 
 - `tests/test_extended_scalar_dtypes_v12.py` (runtime + schema helpers)
 - `tests/test_typing_engine_parity.py` (Rust plan descriptors vs runtime `schema_fields`)
-- `tests/test_mypy_dataframe_model_return_types.py` (`test_mypy_accepts_literal_ip_wkb_...`)
 - `tests/test_pyright_dataframe_model_return_types.py` (`test_pyright_accepts_literal_ip_wkb_...`)
 
 ## Stubs and drift prevention
@@ -216,8 +174,8 @@ PydanTable ships `py.typed` and `.pyi` stubs for the public surface. In the repo
 
 | Tool | Role |
 |------|------|
-| **Astral `ty`** | Primary checker for `python/pydantable`, `pydantable-protocol`, and `pydantable-native` (see `[tool.ty]` in `pyproject.toml`). Used in `make check-python` / CI. **No mypy plugins** — for `DataFrameModel`, it matches the **stub + `as_model`** story (same as Pyright), not plugin inference. |
-| **mypy** + `pydantable.mypy_plugin` | Optional schema-evolving `DataFrameModel` chains for **mypy** users; run via `tests/test_mypy_*.py` or `mypy` with the repo config. `tests.*` is ignored by mypy by design. |
+| **Astral `ty`** | Primary checker for `python/pydantable`, `pydantable-protocol`, and `pydantable-native` (see `[tool.ty]` in `pyproject.toml`). Used in `make check-python` / CI. |
+| **mypy** | Optional checker for contributors. The strict 2.0 API does not require a mypy plugin; schema evolution is explicit via `*_as(AfterModel, ...)`. |
 | **Pyright** | Narrow config (`pyrightconfig.json`) targets typing **contract** tests under `tests/` plus `typings/`. Same explicit-`as_model` contract as **`ty`** for app code. Optional `pyrightconfig-strict.json` type-checks the full `python/pydantable` tree for maintainers (`make pyright-check-strict`); expect noise and optional deps. |
 
 ### Public vs internal API (pragmatic `Any`)
@@ -243,7 +201,6 @@ PydanTable ships `py.typed` and `.pyi` stubs for the public surface. In the repo
 | **Optional / heavy deps** | `io/extras.py`, SQL, Kafka, cloud clients | Third-party libraries may be absent or thinly stubbed; signatures stay permissive at boundaries. |
 | **Dynamic adapters** | `pandas.py`, `pyspark/*`, plugin surfaces | APIs mimic other ecosystems; parameters are intentionally wide. |
 | **Schema / Pydantic internals** | `schema/_impl.py`, `dataframe_model.py` | `TypeAdapter`, `create_model`, and validation hooks use dynamic types from Pydantic. |
-| **Mypy plugin** | `mypy_plugin.py` | Operates on mypy’s internal IR (`Any` is required by the plugin API). |
 | **Public “column dict”** | `dict[str, list[Any]]` for materialized columns | Column element types vary by dtype; a precise `Union` would be enormous and still incomplete. Prefer documenting invariants in `SUPPORTED_TYPES.md`. |
 | **Explicit escape hatch** | Rare | Only with a **short comment** at the definition site: why a `Protocol` or `TypeVar` is not yet possible (e.g. circular import, pending refactor). |
 

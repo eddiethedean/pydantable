@@ -85,7 +85,7 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 
 **Static typing**
 
-- **mypy:** schema-evolving return types for many chains via the bundled [mypy plugin](https://github.com/eddiethedean/pydantable/blob/main/python/pydantable/mypy_plugin.py) (`plugins` in `pyproject.toml`).
+- **mypy:** supported via shipped stubs; strict 2.0 schema evolution is explicit via `*_as(AfterModel/AfterSchema, ...)`.
 - **Pyright / Pylance:** use committed stubs under `typings/`; for explicit targets, `as_model(...)` / `try_as_model(...)` / `assert_model(...)` and typed escape hatches like `agg_as_model(...)` / `rolling_agg_as_model(...)`. See [TYPING](https://pydantable.readthedocs.io/en/latest/TYPING.html).
 
 **Rich column types** (`Literal`, `ipaddress`, `WKB`, `Annotated`, …) are covered in [SUPPORTED_TYPES](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html).

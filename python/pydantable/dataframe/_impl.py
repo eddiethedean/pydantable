@@ -36,7 +36,6 @@ from typing import (
 )
 
 from pydantic import BaseModel
-from typing_extensions import Never
 
 from pydantable.display import get_repr_html_limits
 from pydantable.engine import get_default_engine
@@ -69,7 +68,7 @@ from ._materialize_scan_fallback import (
 from ._repr_display import _REPR_MAX_COLUMNS, _dataframe_to_html_fragment
 from ._scan import _is_scan_file_root
 from ._streaming import _resolve_engine_streaming
-from .grouped import DynamicGroupedDataFrame, GroupedDataFrame, _DataFrameForGroupBy
+from .grouped import DynamicGroupedDataFrame, _DataFrameForGroupBy
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Sequence
@@ -1282,12 +1281,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
                 f"{op_name}(AfterSchema, ...) schema mismatch vs AfterSchema: {details}"
             )
 
-    def with_columns(self, *exprs: Any, **new_columns: Expr | Any) -> Never:
-        raise TypeError(
-            "with_columns() is removed in pydantable 2.0 strict mode. "
-            "Use with_columns_as(AfterSchema, ...) so the output schema is explicit."
-        )
-
     def with_columns_as(
         self,
         after_schema_type: type[AfterSchemaT],
@@ -1336,41 +1329,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
                 rust_plan=rust_plan,
                 engine=self._engine,
             ),
-        )
-
-    def with_columns_cast(
-        self, selector: Selector, dtype: Any, *, strict: bool = True
-    ) -> DataFrame[Any]:
-        raise TypeError(
-            "with_columns_cast(...) is removed in pydantable 2.0 strict mode. "
-            "Use with_columns_as(AfterSchema, ...) with explicit cast expressions so "
-            "the output schema is explicit."
-        )
-
-    def with_columns_fill_null(
-        self,
-        selector: Selector,
-        *,
-        value: Any = None,
-        strategy: str | None = None,
-        strict: bool = True,
-    ) -> DataFrame[Any]:
-        raise TypeError(
-            "with_columns_fill_null(...) is removed in pydantable 2.0 strict mode. "
-            "Use fill_null(...) with an explicit subset list (schema-preserving), or "
-            "use with_columns_as(AfterSchema, ...) to make schema evolution explicit."
-        )
-
-    def select_schema(self, selector: Selector) -> Never:
-        raise TypeError(
-            "select_schema(...) is removed in pydantable 2.0 strict mode "
-            "(dynamic column sets are forbidden)."
-        )
-
-    def select(self, *args: Any, **kwargs: Any) -> Never:
-        raise TypeError(
-            "select() is removed in pydantable 2.0 strict mode. "
-            "Use select_as(AfterSchema, ...) so the output schema is explicit."
         )
 
     def select_as(
@@ -1458,48 +1416,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
                 engine=self._engine,
             ),
         )
-
-    def select_all(self) -> Never:
-        raise TypeError("select_all() is removed in pydantable 2.0 strict mode.")
-
-    def select_prefix(self, prefix: str) -> Never:
-        raise TypeError(
-            "select_prefix(...) is removed in pydantable 2.0 strict mode "
-            "(dynamic column sets are forbidden)."
-        )
-
-    def select_suffix(self, suffix: str) -> Never:
-        raise TypeError(
-            "select_suffix(...) is removed in pydantable 2.0 strict mode "
-            "(dynamic column sets are forbidden)."
-        )
-
-    def _resolve_column_names_or_selector(
-        self, item: str | Selector, *, arg_name: str
-    ) -> list[str]:
-        raise TypeError(
-            "Dynamic name/Selector resolution is removed in pydantable 2.0 strict mode."
-        )
-
-    def reorder_columns(self, order: Sequence[str | Selector]) -> Never:
-        raise TypeError(
-            "reorder_columns(...) is removed in pydantable 2.0 strict mode."
-        )
-
-    def select_first(self, *cols_or_selectors: str | Selector) -> Never:
-        raise TypeError("select_first(...) is removed in pydantable 2.0 strict mode.")
-
-    def select_last(self, *cols_or_selectors: str | Selector) -> Never:
-        raise TypeError("select_last(...) is removed in pydantable 2.0 strict mode.")
-
-    def move(
-        self,
-        cols_or_selector: str | Selector,
-        *,
-        before: str | None = None,
-        after: str | None = None,
-    ) -> Never:
-        raise TypeError("move(...) is removed in pydantable 2.0 strict mode.")
 
     def filter(self, condition: Expr) -> DataFrame[SchemaT]:
         """Keep rows where the boolean ``condition`` is true."""
@@ -1593,17 +1509,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             ),
         )
 
-    def duplicated(
-        self,
-        subset: Sequence[str] | None = None,
-        *,
-        keep: str | bool = "first",
-    ) -> Never:
-        raise TypeError(
-            "duplicated(...) is removed in pydantable 2.0 strict mode "
-            "(schema-evolving helpers must use explicit `*_as` APIs)."
-        )
-
     def drop_duplicate_groups(
         self,
         subset: Sequence[str] | None = None,
@@ -1635,12 +1540,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         keep: str = "first",
     ) -> DataFrame[SchemaT]:
         return self.unique(subset=subset, keep=keep)
-
-    def drop(self, *args: Any, **kwargs: Any) -> Never:
-        raise TypeError(
-            "drop() is removed in pydantable 2.0 strict mode. "
-            "Use drop_as(AfterSchema, ...) so the output schema is explicit."
-        )
 
     def drop_as(
         self,
@@ -1676,12 +1575,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
                 rust_plan=rust_plan,
                 engine=self._engine,
             ),
-        )
-
-    def rename(self, *args: Any, **kwargs: Any) -> Never:
-        raise TypeError(
-            "rename() is removed in pydantable 2.0 strict mode. "
-            "Use rename_as(AfterSchema, ...) with ColumnRef keys."
         )
 
     def rename_as(
@@ -1728,93 +1621,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
                 rust_plan=rust_plan,
                 engine=self._engine,
             ),
-        )
-
-    def rename_with_selector(
-        self,
-        selector: Selector,
-        fn: Callable[[str], str],
-        *,
-        strict: bool = True,
-    ) -> Never:
-        raise TypeError(
-            "rename_with_selector(...) is removed in pydantable 2.0 strict mode "
-            "(dynamic schema changes and Python callables are forbidden). "
-            "Use rename_as(AfterSchema, ...) with explicit ColumnRef mappings."
-        )
-
-    def rename_prefix(
-        self,
-        prefix: str,
-        *,
-        selector: Selector | None = None,
-        strict: bool = True,
-    ) -> Never:
-        raise TypeError(
-            "rename_prefix(...) is removed in pydantable 2.0 strict mode. "
-            "Use rename_as(AfterSchema, ...) with explicit mappings."
-        )
-
-    def rename_suffix(
-        self,
-        suffix: str,
-        *,
-        selector: Selector | None = None,
-        strict: bool = True,
-    ) -> Never:
-        raise TypeError(
-            "rename_suffix(...) is removed in pydantable 2.0 strict mode. "
-            "Use rename_as(AfterSchema, ...) with explicit mappings."
-        )
-
-    def rename_replace(
-        self,
-        old: str,
-        new: str,
-        *,
-        selector: Selector | None = None,
-        strict: bool = True,
-        literal: bool = True,
-    ) -> Never:
-        raise TypeError(
-            "rename_replace(...) is removed in pydantable 2.0 strict mode. "
-            "Use rename_as(AfterSchema, ...) with explicit mappings."
-        )
-
-    def rename_upper(
-        self, selector: Selector | None = None, *, strict: bool = True
-    ) -> Never:
-        raise TypeError(
-            "rename_upper(...) is removed in pydantable 2.0 strict mode. "
-            "Use rename_as(AfterSchema, ...) with explicit mappings."
-        )
-
-    def rename_lower(
-        self, selector: Selector | None = None, *, strict: bool = True
-    ) -> Never:
-        raise TypeError(
-            "rename_lower(...) is removed in pydantable 2.0 strict mode. "
-            "Use rename_as(AfterSchema, ...) with explicit mappings."
-        )
-
-    def rename_title(
-        self, selector: Selector | None = None, *, strict: bool = True
-    ) -> Never:
-        raise TypeError(
-            "rename_title(...) is removed in pydantable 2.0 strict mode. "
-            "Use rename_as(AfterSchema, ...) with explicit mappings."
-        )
-
-    def rename_strip(
-        self,
-        selector: Selector | None = None,
-        *,
-        chars: str | None = None,
-        strict: bool = True,
-    ) -> Never:
-        raise TypeError(
-            "rename_strip(...) is removed in pydantable 2.0 strict mode. "
-            "Use rename_as(AfterSchema, ...) with explicit mappings."
         )
 
     def slice(self, offset: int, length: int) -> DataFrame[SchemaT]:
@@ -2033,20 +1839,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             ),
         )
 
-    def melt(
-        self,
-        *,
-        id_vars: str | Sequence[str] | Selector | None = None,
-        value_vars: str | Sequence[str] | Selector | None = None,
-        variable_name: str = "variable",
-        value_name: str = "value",
-        streaming: bool | None = None,
-    ) -> Never:
-        raise TypeError(
-            "melt()/unpivot()/pivot_*() are removed in pydantable 2.0 strict mode "
-            "(reshape output schemas depend on runtime values)."
-        )
-
     def _colref_names(self, cols: Sequence[ColumnRef], *, arg_name: str) -> list[str]:
         out: list[str] = []
         for c in cols:
@@ -2115,20 +1907,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             ),
         )
 
-    def unpivot(
-        self,
-        *,
-        index: str | Sequence[str] | Selector | None = None,
-        on: str | Sequence[str] | Selector | None = None,
-        variable_name: str = "variable",
-        value_name: str = "value",
-        streaming: bool | None = None,
-    ) -> DataFrame[Any]:
-        raise TypeError(
-            "unpivot() is removed in pydantable 2.0 strict mode "
-            "(reshape output schemas depend on runtime values)."
-        )
-
     # 2.0 strict mode: use melt_as(...) and pivot_as(...) only.
 
     def top_k(
@@ -2163,20 +1941,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             nulls_last=None if nulls_last is None else [bool(nulls_last)] * len(keys),
             maintain_order=True,
         ).limit(n)
-
-    def pivot(
-        self,
-        *,
-        index: str | Sequence[str] | Selector,
-        columns: str | Selector | ColumnRef,
-        values: str | Sequence[str] | Selector,
-        aggregate_function: str = "first",
-        pivot_values: Sequence[Any] | None = None,
-        sort_columns: bool = False,
-        separator: str = "_",
-        streaming: bool | None = None,
-    ) -> DataFrame[Any]:
-        raise TypeError("pivot() is removed in pydantable 2.0 strict mode.")
 
     def pivot_as(
         self,
@@ -2247,19 +2011,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             ),
         )
 
-    def explode(
-        self,
-        columns: str | Sequence[str] | Selector,
-        *,
-        outer: bool = False,
-        streaming: bool | None = None,
-    ) -> DataFrame[Any]:
-        raise TypeError(
-            "explode() is removed in pydantable 2.0 strict mode. "
-            "Use an explicit-schema explode_as(AfterSchema, cols=[...]) API "
-            "(not yet implemented)."
-        )
-
     def explode_as(
         self,
         after_schema_type: type[AfterSchemaT],
@@ -2300,15 +2051,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
                 engine=self._engine,
             ),
         )
-
-    def explode_outer(
-        self,
-        columns: str | Sequence[str] | Selector,
-        *,
-        streaming: bool | None = None,
-    ) -> DataFrame[Any]:
-        """Explode lists; Spark-ish *outer* null/empty handling (see docs)."""
-        return self.explode(columns, outer=True, streaming=streaming)
 
     def posexplode(
         self,
@@ -2363,15 +2105,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         """``posexplode(..., outer=True)`` alias."""
         return self.posexplode(
             column, pos=pos, value=value, outer=True, streaming=streaming
-        )
-
-    def unnest(
-        self, columns: str | Sequence[str] | Selector, *, streaming: bool | None = None
-    ) -> DataFrame[Any]:
-        raise TypeError(
-            "unnest() is removed in pydantable 2.0 strict mode. "
-            "Use an explicit-schema unnest_as(AfterSchema, cols=[...]) API "
-            "(not yet implemented)."
         )
 
     def unnest_as(
@@ -2706,12 +2439,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             engine=self._engine,
         )
 
-    def join(self, *args: Any, **kwargs: Any) -> DataFrame[Any]:
-        raise TypeError(
-            "join() is removed in pydantable 2.0 strict mode. "
-            "Use join_as(AfterSchema, other, ...) with ColumnRef keys."
-        )
-
     def join_as(
         self,
         after_schema_type: type[AfterSchemaT],
@@ -2813,128 +2540,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
                 rust_plan=rust_plan,
                 engine=self._engine,
             ),
-        )
-
-    def join_as_schema(
-        self,
-        other: DataFrame[Any],
-        schema: type[AfterSchemaT],
-        *,
-        on: str | Sequence[str] | Selector | None = None,
-        left_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
-        right_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
-        how: str = "inner",
-        suffix: str = "_right",
-        coalesce: bool | None = None,
-        validate: str | None = None,
-        join_nulls: bool | None = None,
-        maintain_order: bool | str | None = None,
-        allow_parallel: bool | None = None,
-        force_parallel: bool | None = None,
-        streaming: bool | None = None,
-        validate_schema: bool = True,
-    ) -> DataFrame[AfterSchemaT]:
-        raise TypeError(
-            "join_as_schema(...) is removed in pydantable 2.0 strict mode. "
-            "Use join_as(AfterSchema, ...) with ColumnRef keys."
-        )
-
-    def join_try_as_schema(
-        self,
-        other: DataFrame[Any],
-        schema: type[AfterSchemaT],
-        *,
-        on: str | Sequence[str] | Selector | None = None,
-        left_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
-        right_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
-        how: str = "inner",
-        suffix: str = "_right",
-        coalesce: bool | None = None,
-        validate: str | None = None,
-        join_nulls: bool | None = None,
-        maintain_order: bool | str | None = None,
-        allow_parallel: bool | None = None,
-        force_parallel: bool | None = None,
-        streaming: bool | None = None,
-        validate_schema: bool = True,
-    ) -> DataFrame[AfterSchemaT] | None:
-        raise TypeError(
-            "join_try_as_schema(...) is removed in pydantable 2.0 strict mode. "
-            "Use join_as(AfterSchema, ...) and handle errors explicitly."
-        )
-
-    def join_assert_schema(
-        self,
-        other: DataFrame[Any],
-        schema: type[AfterSchemaT],
-        *,
-        on: str | Sequence[str] | Selector | None = None,
-        left_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
-        right_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
-        how: str = "inner",
-        suffix: str = "_right",
-        coalesce: bool | None = None,
-        validate: str | None = None,
-        join_nulls: bool | None = None,
-        maintain_order: bool | str | None = None,
-        allow_parallel: bool | None = None,
-        force_parallel: bool | None = None,
-        streaming: bool | None = None,
-        validate_schema: bool = True,
-    ) -> DataFrame[AfterSchemaT]:
-        raise TypeError(
-            "join_assert_schema(...) is removed in pydantable 2.0 strict mode. "
-            "Use join_as(AfterSchema, ...) which validates schema eagerly."
-        )
-
-    def join_as_model(
-        self,
-        other: DataFrame[Any],
-        schema: type[AfterSchemaT],
-        *,
-        validate_schema: bool = True,
-        **kwargs: Any,
-    ) -> DataFrame[AfterSchemaT]:
-        raise TypeError(
-            "join_as_model(...) is removed in pydantable 2.0 strict mode. "
-            "Use join_as(AfterSchema, ...) on DataFrame, or join_as(AfterModel, ...) "
-            "on DataFrameModel."
-        )
-
-    def join_try_as_model(
-        self,
-        other: DataFrame[Any],
-        schema: type[AfterSchemaT],
-        *,
-        validate_schema: bool = True,
-        **kwargs: Any,
-    ) -> DataFrame[AfterSchemaT] | None:
-        raise TypeError(
-            "join_try_as_model(...) is removed in pydantable 2.0 strict mode."
-        )
-
-    def join_assert_model(
-        self,
-        other: DataFrame[Any],
-        schema: type[AfterSchemaT],
-        *,
-        validate_schema: bool = True,
-        **kwargs: Any,
-    ) -> DataFrame[AfterSchemaT]:
-        raise TypeError(
-            "join_assert_model(...) is removed in pydantable 2.0 strict mode."
-        )
-
-    def group_by(
-        self,
-        *keys: str | ColumnRef,
-        maintain_order: bool = False,
-        drop_nulls: bool = True,
-    ) -> GroupedDataFrame:
-        raise TypeError(
-            "group_by() is removed in pydantable 2.0 strict mode. "
-            "Use group_by_agg_as(AfterSchema, keys=[...], ...) with explicit output "
-            "schema."
         )
 
     def group_by_agg_as(

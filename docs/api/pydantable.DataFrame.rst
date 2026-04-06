@@ -40,11 +40,8 @@
       ~DataFrame.drop_as
       ~DataFrame.drop_duplicate_groups
       ~DataFrame.drop_nulls
-      ~DataFrame.duplicated
       ~DataFrame.explain
-      ~DataFrame.explode
       ~DataFrame.explode_as
-      ~DataFrame.explode_outer
       ~DataFrame.fill_null
       ~DataFrame.filter
       ~DataFrame.first
@@ -59,22 +56,12 @@
       ~DataFrame.iter_json_lines
       ~DataFrame.iter_ndjson
       ~DataFrame.iter_parquet
-      ~DataFrame.join
       ~DataFrame.join_as
-      ~DataFrame.join_as_model
-      ~DataFrame.join_as_schema
-      ~DataFrame.join_assert_model
-      ~DataFrame.join_assert_schema
-      ~DataFrame.join_try_as_model
-      ~DataFrame.join_try_as_schema
       ~DataFrame.last
       ~DataFrame.limit
-      ~DataFrame.melt
       ~DataFrame.melt_as
-      ~DataFrame.move
       ~DataFrame.null_count
       ~DataFrame.pipe
-      ~DataFrame.pivot
       ~DataFrame.pivot_as
       ~DataFrame.posexplode
       ~DataFrame.posexplode_outer
@@ -84,17 +71,7 @@
       ~DataFrame.read_ndjson
       ~DataFrame.read_parquet
       ~DataFrame.read_parquet_url
-      ~DataFrame.rename
       ~DataFrame.rename_as
-      ~DataFrame.rename_lower
-      ~DataFrame.rename_prefix
-      ~DataFrame.rename_replace
-      ~DataFrame.rename_strip
-      ~DataFrame.rename_suffix
-      ~DataFrame.rename_title
-      ~DataFrame.rename_upper
-      ~DataFrame.rename_with_selector
-      ~DataFrame.reorder_columns
       ~DataFrame.rolling_agg
       ~DataFrame.rolling_agg_as_model
       ~DataFrame.rolling_agg_as_schema
@@ -104,14 +81,7 @@
       ~DataFrame.rolling_agg_try_as_schema
       ~DataFrame.sample
       ~DataFrame.schema_fields
-      ~DataFrame.select
-      ~DataFrame.select_all
       ~DataFrame.select_as
-      ~DataFrame.select_first
-      ~DataFrame.select_last
-      ~DataFrame.select_prefix
-      ~DataFrame.select_schema
-      ~DataFrame.select_suffix
       ~DataFrame.shift
       ~DataFrame.slice
       ~DataFrame.sort
@@ -125,14 +95,10 @@
       ~DataFrame.try_as_model
       ~DataFrame.try_as_schema
       ~DataFrame.unique
-      ~DataFrame.unnest
       ~DataFrame.unnest_as
-      ~DataFrame.unpivot
       ~DataFrame.value_counts
       ~DataFrame.with_columns
       ~DataFrame.with_columns_as
-      ~DataFrame.with_columns_cast
-      ~DataFrame.with_columns_fill_null
       ~DataFrame.with_row_count
       ~DataFrame.write_csv
       ~DataFrame.write_ipc

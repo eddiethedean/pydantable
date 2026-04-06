@@ -25,7 +25,7 @@ python3 -m venv .venv
 
 Minimal alternative (narrower deps): **`pip install maturin pytest pytest-asyncio ruff`** then **`pip install -e .`** — you still need **`maturin develop`** from `pydantable-native` (or to install a published `pydantable-native` wheel) for native execution.
 
-**`make check-full`** (from repo root) runs Ruff on the whole tree, Astral **`ty`** on the three first-party trees (see **`[tool.ty]`** in **`pyproject.toml`**), a minimal **`ty`** venv (no NumPy/PyArrow), Pyright, typing-artifact checks, Sphinx, and Rust **`cargo fmt` / clippy / test**. **`make rust-test`** prepends **`python/`**, **`pydantable-protocol/python`**, and **`pydantable-native/python`** to **`PYTHONPATH`** (then the venv’s **`site-packages`**) so PyO3 tests resolve **`pydantable`**, **`pydantable_protocol`**, and **`polars`** consistently without relying on editable installs alone. **`make native-develop`** runs **`pip install -e ./pydantable-protocol`** before **`maturin develop`**. **`mypy`** remains in **`[dev]`** for the optional schema-evolving plugin and **`tests/test_mypy_*.py`** subprocess checks.
+**`make check-full`** (from repo root) runs Ruff on the whole tree, Astral **`ty`** on the three first-party trees (see **`[tool.ty]`** in **`pyproject.toml`**), a minimal **`ty`** venv (no NumPy/PyArrow), Pyright, typing-artifact checks, Sphinx, and Rust **`cargo fmt` / clippy / test**. **`make rust-test`** prepends **`python/`**, **`pydantable-protocol/python`**, and **`pydantable-native/python`** to **`PYTHONPATH`** (then the venv’s **`site-packages`**) so PyO3 tests resolve **`pydantable`**, **`pydantable_protocol`**, and **`polars`** consistently without relying on editable installs alone. **`make native-develop`** runs **`pip install -e ./pydantable-protocol`** before **`maturin develop`**.
 
 For **which checker runs where**, **`ty`** vs **mypy** vs **Pyright**, phased strictness, and public-vs-internal **`Any`**, see {doc}`TYPING` (contributor section).
 
@@ -324,7 +324,6 @@ make check-typing
 
 Typing contract tests live in:
 
-- `tests/test_mypy_*typing*_contracts.py`
 - `tests/test_pyright_*typing*_contracts.py`
 
 When you add or change typing surface area:

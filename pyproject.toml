@@ -105,10 +105,7 @@ include-package-data = true
 [tool.setuptools.packages.find]
 where = ["python"]
 
-# Astral ``ty`` — primary static type checker in ``make check-full`` / CI (fast; no mypy plugins).
-# Optional-import stubs and UI shims match the pragmatism of the historical mypy + Pyright split:
-# Pyright still type-checks the typing contract tests; mypy remains available for the plugin
-# (``tests/test_mypy_*.py``) and ``[tool.mypy]`` config.
+# Astral ``ty`` — primary static type checker in ``make check-full`` / CI.
 [tool.ty.environment]
 python-version = "3.10"
 root = ["python", "pydantable-protocol/python", "pydantable-native/python"]
@@ -156,7 +153,6 @@ include = [
     "pydantable-native/python/pydantable_native/**",
 ]
 exclude = [
-    "python/pydantable/mypy_plugin.py",
     "python/pydantable/pyspark/**",
     "python/pydantable/pandas.py",
     "python/pydantable/pandas.pyi",
@@ -194,140 +190,8 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 "tests/conftest.py" = ["TC003"]
 "tests/io/test_docs_example_scripts.py" = ["TC003"]
 "tests/io/test_scan_column_error_parsing.py" = ["E501"]
-"tests/typing/test_mypy_dataframe_model_return_types.py" = ["TC003"]
-"tests/typing/test_mypy_typing_contracts.py" = ["TC003"]
 "tests/typing/test_pyright_dataframe_model_return_types.py" = ["TC003"]
 "tests/typing/test_pyright_typing_contracts.py" = ["TC003"]
-
-[tool.mypy]
-python_version = "3.10"
-mypy_path = ["python", "pydantable-protocol/python"]
-explicit_package_bases = true
-# OpenTelemetry (and similar PEP 420 namespace packages) can otherwise trigger
-# ``AssertionError: Cannot find component 'trace' for 'opentelemetry.trace'`` in
-# mypy's cross-ref fixup when analyzing transitive imports.
-namespace_packages = true
-# Mypy plugin enables automatic schema-evolving return typing for DataFrameModel
-# transform chains. Pyright/Pylance and Astral ``ty`` rely on shipped stubs +
-# ``as_model(...)`` (``ty`` does not load mypy plugins).
-plugins = ["python/pydantable/mypy_plugin.py"]
-
-# Tests use parametrized UI bases and column attrs that are Expr at runtime but
-# look like optional scalars to static analysis; typecheck the package only.
-[[tool.mypy.overrides]]
-module = "tests.*"
-ignore_errors = true
-
-# Optional runtime deps: CI python-lint job does not install them; imports are guarded.
-[[tool.mypy.overrides]]
-module = "pyarrow"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "polars"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "pandas"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "dataframe_api_compat"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "dataframe_api_compat.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "sqlalchemy"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "sqlalchemy.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "sqlmodel"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "sqlmodel.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "openpyxl"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "fsspec"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "kafka"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "google.cloud.bigquery"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "snowflake.connector"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "snowflake"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "rapcsv"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "rapfiles"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "rapsqlite"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "pyarrow.dataset"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "pyarrow.orc"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "google.cloud"
-ignore_missing_imports = true
-
-# Optional runtime deps: installed only with `[fastapi]` / `[dev]`.
-[[tool.mypy.overrides]]
-module = "fastapi"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "fastapi.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "starlette"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "starlette.*"
-ignore_missing_imports = true
-
-# Optional: ``pydantable[moltres]`` / ``moltres-core``.
-[[tool.mypy.overrides]]
-module = "moltres_core"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "moltres_core.*"
-ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 pythonpath = ["python", "pydantable-protocol/python"]
@@ -351,8 +215,7 @@ markers = [
 [tool.coverage.run]
 branch = true
 source = ["python/pydantable"]
-# Loaded by mypy only; pytest never exercises it meaningfully but it dominates stmt count.
-omit = ["**/mypy_plugin.py"]
+omit = []
 
 [tool.coverage.report]
 exclude_lines = [

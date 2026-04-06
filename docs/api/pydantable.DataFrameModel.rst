@@ -48,14 +48,10 @@
       ~DataFrameModel.concat
       ~DataFrameModel.describe
       ~DataFrameModel.distinct
-      ~DataFrameModel.drop
       ~DataFrameModel.drop_as
       ~DataFrameModel.drop_nulls
       ~DataFrameModel.explain
-      ~DataFrameModel.explode
-      ~DataFrameModel.explode_all
       ~DataFrameModel.explode_as
-      ~DataFrameModel.explode_outer
       ~DataFrameModel.export_csv
       ~DataFrameModel.export_ipc
       ~DataFrameModel.export_json
@@ -64,7 +60,6 @@
       ~DataFrameModel.fetch_sqlmodel
       ~DataFrameModel.fill_null
       ~DataFrameModel.filter
-      ~DataFrameModel.group_by
       ~DataFrameModel.group_by_agg_as
       ~DataFrameModel.group_by_dynamic
       ~DataFrameModel.head
@@ -74,21 +69,13 @@
       ~DataFrameModel.iter_ndjson
       ~DataFrameModel.iter_parquet
       ~DataFrameModel.iter_sqlmodel
-      ~DataFrameModel.join
       ~DataFrameModel.join_as
       ~DataFrameModel.join_as_model
       ~DataFrameModel.join_assert_model
       ~DataFrameModel.join_try_as_model
-      ~DataFrameModel.melt
       ~DataFrameModel.melt_as
-      ~DataFrameModel.melt_as_model
-      ~DataFrameModel.melt_assert_model
-      ~DataFrameModel.melt_try_as_model
       ~DataFrameModel.pipe
-      ~DataFrameModel.pivot
       ~DataFrameModel.pivot_as
-      ~DataFrameModel.pivot_longer
-      ~DataFrameModel.pivot_wider
       ~DataFrameModel.posexplode
       ~DataFrameModel.posexplode_outer
       ~DataFrameModel.pydantable_policy
@@ -99,12 +86,7 @@
       ~DataFrameModel.read_parquet
       ~DataFrameModel.read_parquet_url
       ~DataFrameModel.read_parquet_url_ctx
-      ~DataFrameModel.rename
       ~DataFrameModel.rename_as
-      ~DataFrameModel.rename_lower
-      ~DataFrameModel.rename_strip
-      ~DataFrameModel.rename_title
-      ~DataFrameModel.rename_upper
       ~DataFrameModel.rolling_agg
       ~DataFrameModel.rolling_agg_as_model
       ~DataFrameModel.rolling_agg_assert_model
@@ -115,9 +97,7 @@
       ~DataFrameModel.schema_fields
       ~DataFrameModel.schema_json_schema
       ~DataFrameModel.schema_model
-      ~DataFrameModel.select
       ~DataFrameModel.select_as
-      ~DataFrameModel.select_schema
       ~DataFrameModel.slice
       ~DataFrameModel.sort
       ~DataFrameModel.stream
@@ -129,18 +109,9 @@
       ~DataFrameModel.to_polars
       ~DataFrameModel.try_as_model
       ~DataFrameModel.unique
-      ~DataFrameModel.unnest
-      ~DataFrameModel.unnest_all
       ~DataFrameModel.unnest_as
-      ~DataFrameModel.unpivot
-      ~DataFrameModel.unpivot_as_model
-      ~DataFrameModel.unpivot_assert_model
-      ~DataFrameModel.unpivot_try_as_model
       ~DataFrameModel.value_counts
-      ~DataFrameModel.with_columns
       ~DataFrameModel.with_columns_as
-      ~DataFrameModel.with_columns_cast
-      ~DataFrameModel.with_columns_fill_null
       ~DataFrameModel.with_row_count
       ~DataFrameModel.write_csv
       ~DataFrameModel.write_csv_batches

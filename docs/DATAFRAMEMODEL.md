@@ -361,18 +361,28 @@ class After(DataFrameModel):
     age2: int
 
 def pipeline(df: Before) -> After:
-    return df.with_columns(age2=df.age * 2).select("id", "age2")
+    class AfterFull(DataFrameModel):
+        id: int
+        age: int
+        age2: int
+
+    out_full = df.with_columns_as(AfterFull, age2=df.col.age * 2)
+    return out_full.drop_as(After, out_full.col.age)
 ```
 
 ### Static typing: mypy vs everyone else (Pyright, Pylance, Astral `ty`, …)
 
-- **mypy** (with `pydantable.mypy_plugin`): transform chains can be typed automatically (schema-evolving return typing).
-- **Pyright / Pylance / Astral `ty`** (and any checker **without** the plugin): use `as_model(...)` (or its safer variants) to state the intended after-model explicitly. **`ty` does not load mypy plugins**, so it follows this second path.
+In strict 2.0, schema evolution is explicit for all checkers: use `*_as(AfterModel, ...)`.
 
 ```python
 def pipeline(df: Before) -> After:
-    out = df.with_columns(age2=df.age * 2).select("id", "age2")
-    return out.as_model(After)
+    class AfterFull(DataFrameModel):
+        id: int
+        age: int
+        age2: int
+
+    out_full = df.with_columns_as(AfterFull, age2=df.col.age * 2)
+    return out_full.drop_as(After, out_full.col.age)
 ```
 
 For schema assertions with better ergonomics:
@@ -382,16 +392,15 @@ For schema assertions with better ergonomics:
 
 `as_model(..., validate_schema=False)` is a performance-oriented escape hatch. Prefer leaving validation on unless you have a strong guarantee that the upstream pipeline already enforces schema correctness (e.g. pinned transform chain + contract tests).
 
-#### Pyright/ty golden path (explicit after-model + typed escape hatches)
+#### Golden path (explicit after-model)
 
 For **Pyright**, **Pylance**, and **Astral `ty`**, treat “schema-changing” operations as
 places where you should be explicit about the intended output model:
 
 - **General transforms**: `as_model(...)` / `try_as_model(...)` / `assert_model(...)`
-- **Grouped aggregation**: `group_by(...).agg_as_model(...)` (or `agg_try_as_model` / `agg_assert_model`)
-- **Rolling aggregation**: `rolling_agg_as_model(...)` (or `rolling_agg_try_as_model` / `rolling_agg_assert_model`)
-- **Reshape**: `melt_as_model(...)`, `unpivot_as_model(...)`
-- **Join**: `join_as_model(...)`
+- **Grouped aggregation**: `group_by_agg_as(AfterModel, keys=[...], ...)`
+- **Reshape**: `melt_as(AfterModel, ...)`, `pivot_as(AfterModel, ...)`, `explode_as(AfterModel, ...)`, `unnest_as(AfterModel, ...)`
+- **Join**: `join_as(AfterModel, other, ...)`
 
 Example (service-friendly shape):
 
@@ -412,44 +421,10 @@ class ByGroup(DataFrameModel):
 
 def grouped(df: Events) -> ByGroup:
     # Schema-changing: provide the intended after-model explicitly.
-    return df.group_by("g").agg_as_model(ByGroup, total=("sum", "v"))
+    return df.group_by_agg_as(ByGroup, keys=[df.col.g], total=("sum", df.col.v))
 ```
 
-See {doc}`TYPING` for the full typing story (mypy plugin vs explicit after-model).
-
-#### Enabling the mypy plugin
-
-If you use **mypy**, enable the plugin in your mypy config:
-
-```toml
-[tool.mypy]
-plugins = ["pydantable.mypy_plugin"]
-```
-
-In this repo we run mypy with `mypy_path = "python"` and load the plugin by file path; in normal installed usage, the module form above is preferred.
-
-#### What mypy can infer today (and when it won’t)
-
-The plugin refines schema-evolving return types for common transforms when arguments are **literal enough**.
-
-- **Refined (schema-evolving)**:
-  - `select("a", "b", ...)` (literal column names)
-  - `drop("a", ...)` (literal column names)
-  - `rename({"old": "new", ...})` (dict literal)
-  - `join(other, on="k" | on=["k1", ...], suffix="_right")` (literal `on`/`suffix`)
-  - `group_by(...).agg(out=("op","col"), ...)` (named tuple-literals; a few ops map to `int`/`float`)
-  - `melt(id_vars=[...], variable_name="...", value_name="...")` (literal `id_vars` and names)
-  - `unpivot(index=[...], variable_name="...", value_name="...")` (literal `index` and names)
-  - `rolling_agg(..., op="...", out_name="...")` (literal `op`/`out_name`)
-
-- **Schema-preserving (kept as the same model)**:
-  - `fill_null(...)`, `drop_nulls(...)`, `explode(...)`, `unnest(...)`
-
-- **Not inferred / intentionally conservative**:
-  - Anything where column names are computed dynamically (variables, comprehensions, f-strings, unpacking).
-  - `pivot(...)` (output columns depend on data values).
-
-When inference can’t be made safely, mypy will fall back to the original model type. For Pyright, Pylance, **`ty`**, and other non-plugin checkers, prefer explicit `.as_model(After)` / `.assert_model(After)`.
+See {doc}`TYPING` for the typing story.
 
 ## Collision handling (replacement semantics)
 

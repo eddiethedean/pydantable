@@ -1,6 +1,6 @@
 # Coverage backlog (`python/pydantable`)
 
-This document snapshots **statement-line gaps** by area and complements [Testing](TESTING.md). **`mypy_plugin.py`** is omitted from measurement ([`pyproject.toml`](../pyproject.toml) `[tool.coverage.run] omit`).
+This document snapshots **statement-line gaps** by area and complements [Testing](TESTING.md).
 
 ## Baseline (full suite, `--cov-fail-under=0`)
 

@@ -70,8 +70,6 @@ check-typing:
 	$(PYTHON) scripts/generate_typing_artifacts.py --check
 	$(TY) check
 	$(PYTHON) -m pytest -q \
-		tests/typing/test_mypy_dataframe_model_return_types.py \
-		tests/typing/test_mypy_typing_contracts.py \
 		tests/typing/test_pyright_dataframe_return_types.py \
 		tests/typing/test_pyright_dataframe_model_return_types.py \
 		tests/typing/test_pyright_typing_contracts.py \
