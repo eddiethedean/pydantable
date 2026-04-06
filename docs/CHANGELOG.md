@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.16.0] — 2026-04-06
+
+### Added
+
+- **Typing (DataFrame[Schema]):** `as_schema` / `try_as_schema` / `assert_schema` with `as_model` / `try_as_model` / `assert_model` aliases.
+- **Typing escape hatches (DataFrame[Schema]):** `*_as_schema` (and `*_as_model` aliases) for `join`, `melt`, `unpivot`, and `rolling_agg`.
+- **Typing contract tests:** new Pyright + Astral `ty` snippet tests for the generic `DataFrame` API.
+- **Docs:** `DataFrameModel` “Pyright/ty golden path” section documenting the explicit `*_as_model` helpers.
+
+### Version bump
+
+- Align **pydantable**, **pydantable-protocol**, **pydantable-native**, **pydantable-core**, and published **`__version__`** values to **1.16.0**.
+
 ## [1.15.2] — 2026-04-05
 
 ### Fixed
