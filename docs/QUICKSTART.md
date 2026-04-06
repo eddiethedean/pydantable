@@ -49,7 +49,7 @@ print(df.describe())
 ## 4. Filter and materialize
 
 ```python
-filtered = df.filter(df.score > 8.0)
+filtered = df.filter(df.col.score > 8.0)
 rows = filtered.collect()  # list[Pydantic row models]
 cols = filtered.to_dict()  # dict[str, list]
 ```
@@ -59,7 +59,6 @@ Use `to_polars()` / `to_arrow()` when the optional extras are installed ({doc}`E
 ## Where to read next
 
 - {doc}`DATAFRAMEMODEL` — `DataFrameModel`, validation, transforms
-- {doc}`PANDAS_UI` — optional **`pydantable.pandas`** import (`assign`, `merge`, cleaning helpers)
 - {doc}`EXECUTION` — materialization cost, async, display limits
 - {doc}`INTERFACE_CONTRACT` — semantics (joins, nulls, `shape` vs executed rows)
 - {doc}`IO_DECISION_TREE` — pick lazy vs eager I/O; prefer **`DataFrameModel`** / **`DataFrame[Schema]`** classmethods over raw **`pydantable.io`**

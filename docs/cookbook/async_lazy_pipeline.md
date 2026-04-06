@@ -16,9 +16,9 @@ class UserDF(DataFrameModel):
 
 
 async def load_rows(path: str):
-    return await UserDF.Async.read_parquet(path, trusted_mode="shape_only").select(
-        "id", "age"
-    ).collect()
+    adf = await UserDF.Async.read_parquet(path, trusted_mode="shape_only")
+    df = adf.select_as(UserDF, adf.col.id, adf.col.age)
+    return await df.acollect()
 
 
 async def load_columnar(path: str):

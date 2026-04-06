@@ -67,7 +67,7 @@ register_exception_handlers(app)
 def ingest_users_batch(
     df: Annotated[User, Depends(columnar_dependency(User, trusted_mode="strict"))],
 ) -> dict[str, list]:
-    # e.g. df.select(...).filter(...) then return await … in an async route
+    # e.g. df.select_as(...).filter(...) then return await … in an async route
     return df.to_dict()
 ```
 

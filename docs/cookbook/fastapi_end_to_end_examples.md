@@ -32,6 +32,19 @@ class UserDimDF(DataFrameModel):
     country: str
 
 
+class OrderUserDF(DataFrameModel):
+    order_id: int
+    user_id: int
+    amount: float | None
+    country: str | None
+
+
+class CountryRevenueDF(DataFrameModel):
+    country: str | None
+    total: float | None
+    n_orders: int
+
+
 class SalesByCountryBody(BaseModel):
     """Two datasets in one JSON payload (common for bulk ingest APIs)."""
 
@@ -53,13 +66,14 @@ app.include_router(router)
 def sales_by_country(body: SalesByCountryBody):
     orders = OrderLineDF(body.orders)
     users = UserDimDF(body.users)
-    rolled = (
-        orders.join(users, on="user_id", how="left")
-        .fill_null(0.0, subset=["amount"])
-        .group_by("country")
-        .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
-        .sort("country")
-    )
+    joined = orders.join_as(OrderUserDF, users, on=[orders.col.user_id], how="left")
+    filled = joined.fill_null(0.0, subset=["amount"])
+    rolled = filled.group_by_agg_as(
+        CountryRevenueDF,
+        keys=[filled.col.country],
+        total=("sum", filled.col.amount),
+        n_orders=("count", filled.col.order_id),
+    ).sort("country")
     return rolled.collect()
 ```
 
@@ -123,7 +137,7 @@ def adults(
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
 ):
     df = UserDF(rows)
-    ranked = df.filter(df.age >= min_age).sort("age", descending=True).head(limit)
+    ranked = df.filter(df.col.age >= min_age).sort("age", descending=True).head(limit)
     return ranked.collect()
 ```
 
@@ -152,6 +166,19 @@ class LineItemDF(DataFrameModel):
     unit_price: float
 
 
+class LineItemWithTotalDF(DataFrameModel):
+    sku: str
+    qty: int
+    unit_price: float
+    line_total: float
+
+
+class LineTotalDF(DataFrameModel):
+    sku: str
+    qty: int
+    line_total: float
+
+
 class LineTotalRow(BaseModel):
     sku: str
     qty: int
@@ -168,11 +195,11 @@ def top_lines(
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
 ):
     df = LineItemDF(rows)
-    df2 = df.with_columns(line_total=df.qty * df.unit_price)
-    df3 = df2.filter(df2.line_total >= min_line_total).sort(
+    df2 = df.with_columns_as(LineItemWithTotalDF, line_total=df.col.qty * df.col.unit_price)
+    df3 = df2.filter(df2.col.line_total >= min_line_total).sort(
         "line_total", descending=True
     )
-    out = df3.head(limit).select("sku", "qty", "line_total")
+    out = df3.head(limit).select_as(LineTotalDF, df3.col.sku, df3.col.qty, df3.col.line_total)
     return out.collect()
 ```
 

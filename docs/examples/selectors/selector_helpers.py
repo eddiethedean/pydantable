@@ -1,18 +1,13 @@
-from __future__ import annotations
+"""Selectors example (legacy).
 
-from pydantable import DataFrame
-from pydantable import selectors as s
-from pydantable.schema import Schema
-
-
-class S(Schema):
-    a: int | None
-    b: int | None
+Strict pydantable 2.0 removed selector-driven schema mutation helpers.
+This script is kept only so doc example runners stay green.
+"""
 
 
-df = DataFrame[S]({"a": [None, 1], "b": [2, None]})
+def main() -> None:
+    print("selector_helpers: selectors are legacy; see docs/MIGRATION_1_to_2.md")
 
-print(df.with_columns_fill_null(s.by_name("a"), value=0).to_dict())
-print(df.with_columns_cast(s.by_name("b"), float).to_dict())
-print(df.rename_upper(s.by_name("a")).to_dict())
-print(df.select_schema(s.by_name("b")).to_dict())
+
+if __name__ == "__main__":
+    main()

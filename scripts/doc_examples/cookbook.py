@@ -50,6 +50,17 @@ def run_transforms_join_groupby() -> None:
         user_id: int
         country: str
 
+    class OrderUser(DataFrameModel):
+        order_id: int
+        user_id: int
+        amount: float | None
+        country: str | None
+
+    class CountryAgg(DataFrameModel):
+        country: str | None
+        total: float | None
+        n_orders: int
+
     orders = Orders(
         {
             "order_id": [1, 2, 3],
@@ -58,12 +69,13 @@ def run_transforms_join_groupby() -> None:
         }
     )
     users = Users({"user_id": [10, 20], "country": ["US", "CA"]})
-    out = (
-        orders.join(users, on="user_id", how="left")
-        .group_by("country")
-        .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
-        .to_dict()
-    )
+    joined = orders.join_as(users, OrderUser, on=[orders.col.user_id], how="left")
+    out = joined.group_by_agg_as(
+        CountryAgg,
+        keys=[joined.col.country],
+        total=("sum", joined.col.amount),
+        n_orders=("count", joined.col.order_id),
+    ).to_dict()
     assert set(out.keys()) == {"country", "total", "n_orders"}
 
 
@@ -74,5 +86,11 @@ def run_windows_framing_primer() -> None:
 
     df = Row({"group": ["a", "a", "b"], "v": [2, 1, 5]})
     w = Window.partitionBy("group").orderBy("v")
-    out = df.with_columns(rn=row_number().over(w)).to_dict()
+
+    class WithRank(DataFrameModel):
+        group: str
+        v: int
+        rn: int | None
+
+    out = df.with_columns_as(WithRank, rn=row_number().over(w)).to_dict()
     assert "rn" in out

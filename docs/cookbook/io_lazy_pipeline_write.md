@@ -15,7 +15,7 @@ class User(DataFrameModel):
 
 
 df = User.read_parquet("users.parquet")
-out = df.filter(df.age.is_not_null()).select("id", "age")
+out = df.filter(df.col.age.is_not_null()).select_as(User, df.col.id, df.col.age)
 out.write_parquet("users_filtered.parquet")
 ```
 

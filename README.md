@@ -10,11 +10,11 @@
 
 **Current release: 1.16.0** — highlights in the [changelog](https://pydantable.readthedocs.io/en/latest/CHANGELOG.html).
 
-## Why PydanTable
+## Why PydanTable (strict 2.0)
 
-- **One schema, many surfaces:** define columns with Pydantic models; use `DataFrameModel` (SQLModel-style) or `DataFrame[YourSchema]`.
-- **Typed expressions:** `Expr` and transform chains are validated and lowered in Rust; many errors fail fast at build/plan time.
-- **Familiar operations:** `select`, `filter`, `join`, `group_by`, windows, melt/pivot, and pandas-flavored helpers where they help.
+- **One schema, one contract:** define columns with Pydantic models; use `DataFrameModel` (table class) or `DataFrame[YourSchema]` (generic).
+- **Typed column identity:** use `df.col.<field>` / `ColumnRef` (no string-based schema evolution).
+- **Explicit schema evolution:** schema-changing transforms require `*_as(AfterModel/AfterSchema, ...)` and are validated at runtime.
 - **Flexible materialization:** row models via `collect()` / `rows()`, columnar `dict[str, list]`, or Polars/PyArrow with the right extras.
 - **I/O:** lazy `read_*` / `aread_*`, streaming writes, NDJSON/JSON Lines, Parquet, CSV, IPC, HTTP, SQL (SQLModel-first `fetch_sqlmodel` / `write_sqlmodel`, explicit string SQL `fetch_sql_raw` / `write_sql_raw`, or deprecated unprefixed names) — [I/O overview](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html), [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html), [SQLModel roadmap](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html), and [decision tree](https://pydantable.readthedocs.io/en/latest/IO_DECISION_TREE.html).
 - **JSON & struct columns:** struct expressions, JSON encode/decode helpers, unnest/nested models — [IO_JSON](https://pydantable.readthedocs.io/en/latest/IO_JSON.html), [SELECTORS](https://pydantable.readthedocs.io/en/latest/SELECTORS.html).
@@ -34,8 +34,6 @@ pip install "pydantable[polars]"   # to_polars
 pip install "pydantable[arrow]"    # to_arrow / Arrow constructors
 pip install "pydantable[io]"       # full file I/O convenience (arrow + polars)
 pip install "pydantable[sql]"      # SQLModel + SQLAlchemy: fetch_sqlmodel, write_sqlmodel, *_raw, …
-#
-# 2.0 strict mode: pandas/pyspark facades removed.
 pip install "pydantable[fastapi]"  # FastAPI integration (pydantable.fastapi)
 pip install "pydantable[moltres]"   # SqlDataFrame / SqlDataFrameModel (sqlalchemy engine)
 ```
@@ -80,13 +78,13 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 | `DataFrameModel` | Table class with annotated columns (`class Orders(DataFrameModel): ...`). |
 | `DataFrame[Schema]` | Generic API over your own Pydantic `BaseModel`. |
 | `SqlDataFrame` / `SqlDataFrameModel` | Same shapes with **`pydantable[moltres]`** — Moltres compiles plans to SQL so transforms can stay **in the database** (`sql_config=` / `moltres_engine=`); prefer when you are not round-tripping full tables through Python (e.g. write back to the same DB). |
-| `Expr` | Typed expressions in `with_columns`, `filter`, etc. |
+| `Expr` | Typed expressions in transforms (for example `filter`, `with_columns_as`). |
 | **Errors** | Ingest issues such as column length mismatch raise `ColumnLengthMismatchError` (`ValueError` subclass) from `pydantable.errors` — map to HTTP **400** in FastAPI via `register_exception_handlers`. |
 
 **Static typing**
 
-- **mypy:** supported via shipped stubs; strict 2.0 schema evolution is explicit via `*_as(AfterModel/AfterSchema, ...)`.
-- **Pyright / Pylance:** use committed stubs under `typings/`; for explicit targets, `as_model(...)` / `try_as_model(...)` / `assert_model(...)` and typed escape hatches like `agg_as_model(...)` / `rolling_agg_as_model(...)`. See [TYPING](https://pydantable.readthedocs.io/en/latest/TYPING.html).
+- **All checkers:** strict 2.0 typing is stub-based and explicit—schema-changing transforms require `*_as(AfterModel/AfterSchema, ...)`.
+- See [TYPING](https://pydantable.readthedocs.io/en/latest/TYPING.html).
 
 **Rich column types** (`Literal`, `ipaddress`, `WKB`, `Annotated`, …) are covered in [SUPPORTED_TYPES](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html).
 
@@ -117,7 +115,6 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 | Typing (mypy vs Pyright) | [TYPING](https://pydantable.readthedocs.io/en/latest/TYPING.html) |
 | I/O overview | [IO_OVERVIEW](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html) |
 | SQL (SQLModel, raw string SQL) | [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html) · [SQLMODEL_SQL_ROADMAP](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html) |
-| Pandas-like API | [PANDAS_UI](https://pydantable.readthedocs.io/en/latest/PANDAS_UI.html) |
 | FastAPI path | [GOLDEN_PATH_FASTAPI](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html) → [FASTAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) → [FASTAPI_ENHANCEMENTS](https://pydantable.readthedocs.io/en/latest/FASTAPI_ENHANCEMENTS.html) |
 | Service ergonomics (OpenAPI, aliases, redaction) | [SERVICE_ERGONOMICS](https://pydantable.readthedocs.io/en/latest/SERVICE_ERGONOMICS.html) |
 | Custom dtypes | [CUSTOM_DTYPES](https://pydantable.readthedocs.io/en/latest/CUSTOM_DTYPES.html) |

@@ -76,7 +76,8 @@ async def upsert_users(
 ):
     """Accept validated rows, project columns, materialize off the event loop."""
     df = UserDF(rows)
-    return await df.select("id", "age").acollect(executor=executor)
+    projected = df.select_as(UserDF, df.col.id, df.col.age)
+    return await projected.acollect(executor=executor)
 
 
 @api.get("/users/stream")

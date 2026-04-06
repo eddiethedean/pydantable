@@ -101,11 +101,10 @@ Safer variants:
 - `try_as_model(After)` returns `After | None` on mismatch (no exception).
 - `assert_model(After)` raises with a richer schema diff (missing/extra/type mismatches).
 
-### Typed escape hatches for aggregations (Pyright / `ty`)
+### Aggregations (explicit output model)
 
-Some operations are inherently **schema-changing** (for example grouped aggregations and
-rolling aggregations). For Pyright/`ty` users, prefer the explicit `*_as_model` helpers
-so the return type is your declared after-model.
+Aggregations are inherently **schema-changing**. In strict 2.0, use the explicit `*_as`
+APIs so the output schema is declared and runtime-validated.
 
 ```python
 from pydantable import DataFrameModel
@@ -124,17 +123,7 @@ class WithRolling(DataFrameModel):
     roll: int
 
 def grouped(df: Events) -> ByGroup:
-    return df.group_by("g").agg_as_model(ByGroup, total=("sum", "v"))
-
-def rolling(df: Events) -> WithRolling:
-    return df.rolling_agg_as_model(
-        WithRolling,
-        on="ts",
-        column="v",
-        window_size=3,
-        op="sum",
-        out_name="roll",
-    )
+    return df.group_by_agg_as(ByGroup, keys=[df.col.g], total=("sum", df.col.v))
 ```
 
 ### Deterministic schema evolution (`*_as`)
@@ -142,17 +131,10 @@ def rolling(df: Events) -> WithRolling:
 In strict 2.0, schema evolution is always explicit: use the `*_as` APIs so the output
 schema is statically declared and runtime-validated.
 
-### 1.2.0 column types (Literal, IP, WKB, `Annotated[str, ...]`)
+### Column types (Literal, IP, WKB, `Annotated[str, ...]`)
 
-These scalars are ordinary fields on your `DataFrameModel` subclass: the plugin still
-matches transform outputs by **field name** and **static field type** from the class
-body (`Literal[...]`, `ipaddress` classes, `WKB`, and plain or `Annotated` strings show
-up in mypy’s analysis like `int` / `str`).
-
-Users on stub-based checkers keep the same workflow as other scalars: chained methods are typed as
-`DataFrameModel[Any]` in stubs, so use **`as_model(After)`** / **`try_as_model`** /
-**`assert_model`** when you need an explicit **`After`** type after `select` /
-`with_columns` / `rename`.
+These scalars are ordinary fields on your `DataFrameModel` subclass. In strict 2.0,
+schema evolution is explicit via `*_as(AfterModel, ...)` and validated at runtime.
 
 Contract coverage lives in:
 

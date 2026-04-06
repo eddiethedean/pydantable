@@ -17,7 +17,7 @@ class User(DataFrameModel):
 url = "https://example.com/users.parquet"
 
 with User.read_parquet_url_ctx(url) as df:
-    out = df.filter(df.age.is_not_null()).select("id", "age")
+    out = df.filter(df.col.age.is_not_null()).select_as(User, df.col.id, df.col.age)
     # Materialize inside the context
     _ = out.to_dict()
 ```

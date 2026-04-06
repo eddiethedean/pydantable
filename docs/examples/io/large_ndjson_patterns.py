@@ -34,7 +34,7 @@ def main() -> None:
 
         # Lazy: transforms stay on Polars LazyFrame until collect.
         df = LogLine.read_ndjson(str(path))
-        errs = df.filter(df.level == "error")
+        errs = df.filter(df.col.level == "error")
         rows = errs.collect()
         assert len(rows) == 1
         assert rows[0].msg == "bad"

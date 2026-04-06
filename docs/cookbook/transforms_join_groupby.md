@@ -18,6 +18,18 @@ class Users(DataFrameModel):
     user_id: int
     country: str
 
+class OrderUser(DataFrameModel):
+    order_id: int
+    user_id: int
+    amount: float | None
+    country: str | None
+
+
+class CountryAgg(DataFrameModel):
+    country: str | None
+    total: float | None
+    n_orders: int
+
 
 orders = Orders(
     {
@@ -28,12 +40,14 @@ orders = Orders(
 )
 users = Users({"user_id": [10, 20], "country": ["US", "CA"]})
 
-out = (
-    orders.join(users, on="user_id", how="left")
-    .group_by("country")
-    .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
-    .to_dict()
+joined = orders.join_as(OrderUser, users, on=[orders.col.user_id], how="left")
+agg = joined.group_by_agg_as(
+    CountryAgg,
+    keys=[joined.col.country],
+    total=("sum", joined.col.amount),
+    n_orders=("count", joined.col.order_id),
 )
+out = agg.to_dict()
 assert set(out.keys()) == {"country", "total", "n_orders"}
 ```
 

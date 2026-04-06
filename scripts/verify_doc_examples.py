@@ -25,9 +25,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from pydantable import DataFrameModel
-from pydantable.pandas import DataFrameModel as PandasDataFrameModel
-from pydantable.pyspark import DataFrameModel as PySparkDataFrameModel
-from pydantable.pyspark.sql import functions as F
+from pydantable.expressions import Literal, coalesce
 from pydantic import BaseModel
 
 from scripts.doc_examples.cookbook import (
@@ -54,9 +52,22 @@ class User(DataFrameModel):
 
 
 df = User({"id": [1, 2], "age": [20, None]})
-df2 = df.with_columns(age2=df.age * 2)
-df3 = df2.select("id", "age2")
-df4 = df3.filter(df3.age2 > 10)
+
+
+class UserWithAge2(DataFrameModel):
+    id: int
+    age: int | None
+    age2: int | None
+
+
+class UserOut(DataFrameModel):
+    id: int
+    age2: int | None
+
+
+df2 = df.with_columns_as(UserWithAge2, age2=df.col.age * 2)
+df3 = df2.select_as(UserOut, df2.col.id, df2.col.age2)
+df4 = df3.filter(df3.col.age2 > 10)
 assert df4.to_dict() == {"id": [1], "age2": [40]}
 
 # Same pattern as docs index / README quick start
@@ -68,9 +79,22 @@ class UserReadme(DataFrameModel):
 
 
 df = UserReadme({"id": [1, 2], "age": [20, 30]})
-df2 = df.with_columns(age2=df.age * 2)
-df3 = df2.select("id", "age2")
-df4 = df3.filter(df3.age2 > 40)
+
+
+class UserReadmeWithAge2(DataFrameModel):
+    id: int
+    age: int
+    age2: int
+
+
+class UserReadmeOut(DataFrameModel):
+    id: int
+    age2: int
+
+
+df2 = df.with_columns_as(UserReadmeWithAge2, age2=df.col.age * 2)
+df3 = df2.select_as(UserReadmeOut, df2.col.id, df2.col.age2)
+df4 = df3.filter(df3.col.age2 > 40)
 assert df4.to_dict() == {"id": [2], "age2": [60]}
 
 # docs/DATAFRAMEMODEL.md
@@ -92,42 +116,22 @@ df_rm = DFUser([_RM(id=1, age=20), _RM(id=2, age=30)])
 assert df_rm.to_dict() == {"age": [20, 30], "id": [1, 2]}
 
 df_c = DFUser({"id": [1, 2], "age": [20, 40]})
-df_c2 = df_c.with_columns(age2=df_c.age * 2)
+
+
+class DFUserWithAge2(DataFrameModel):
+    id: int
+    age: int
+    age2: int
+
+
+df_c2 = df_c.with_columns_as(DFUserWithAge2, age2=df_c.col.age * 2)
 assert df_c2.to_dict() == {"id": [1, 2], "age": [20, 40], "age2": [40, 80]}
 
 df_q = DFUser({"id": [1, 2, 3], "age": [10, 50, 60]})
-df_q2 = df_q.with_columns(age2=df_q.age * 2)
-df_q3 = df_q2.select("id", "age2")
-df_q4 = df_q3.filter(df_q3.age2 > 40)
-assert df_q4.to_dict() == {"id": [2, 3], "age2": [100, 120]}
-
-# docs/PANDAS_UI
-
-
-class Sales(PandasDataFrameModel):
-    region: str
-    amount: int
-
-
-df = Sales({"region": ["US", "EU"], "amount": [10, 20]})
-df2 = df.assign(doubled=df.amount * 2)
-assert df2.to_dict() == {
-    "doubled": [20, 40],
-    "region": ["US", "EU"],
-    "amount": [10, 20],
-}
-
-# docs/PYSPARK_UI
-
-
-class UserSparkUi(PySparkDataFrameModel):
-    id: int
-    name: str
-
-
-df = UserSparkUi({"id": [1], "name": ["Ada"]})
-out = df.withColumn("greeting", F.concat(F.col("name", dtype=str), F.lit("!")))
-assert out.to_dict() == {"id": [1], "name": ["Ada"], "greeting": ["Ada!"]}
+df_q2 = df_q.with_columns_as(DFUserWithAge2, age2=df_q.col.age * 2)
+df_q3 = df_q2.select_as(DFUserWithAge2, df_q2.col.id, df_q2.col.age, df_q2.col.age2)
+df_q4 = df_q3.filter(df_q3.col.age2 > 40)
+assert df_q4.to_dict() == {"id": [2, 3], "age": [50, 60], "age2": [100, 120]}
 
 # docs/POLARS_WORKFLOWS
 
@@ -151,12 +155,28 @@ orders = Orders(
     }
 )
 users = Users({"user_id": [10, 20], "country": ["US", "CA"]})
-out = (
-    orders.join(users, on="user_id", how="left")
-    .group_by("country")
-    .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
-    .to_dict()
-)
+
+
+class OrderUser(DataFrameModel):
+    order_id: int
+    user_id: int
+    amount: float | None
+    country: str | None
+
+
+class CountryAgg(DataFrameModel):
+    country: str | None
+    total: float | None
+    n_orders: int
+
+
+joined = orders.join_as(users, OrderUser, on=[orders.col.user_id], how="left")
+out = joined.group_by_agg_as(
+    CountryAgg,
+    keys=[joined.col.country],
+    total=("sum", joined.col.amount),
+    n_orders=("count", joined.col.order_id),
+).to_dict()
 assert _sort_rows_by_country(out) == {
     "country": ["CA", "US"],
     "total": [20.0, 50.0],
@@ -177,8 +197,21 @@ df = Metrics(
         "value": [10, 20, None, 40],
     }
 )
-wide = df.pivot(
-    index="id", columns="metric", values="value", aggregate_function="first"
+
+
+class Wide(DataFrameModel):
+    id: int
+    A_first: int | None
+    B_first: int | None
+
+
+wide = df.pivot_as(
+    Wide,
+    index=[df.col.id],
+    columns=df.col.metric,
+    values=[df.col.value],
+    aggregate_function="first",
+    pivot_values=["A", "B"],
 )
 assert wide.to_dict() == {
     "id": [1, 2],
@@ -187,89 +220,9 @@ assert wide.to_dict() == {
 }
 
 
-class TS(DataFrameModel):
-    id: int
-    ts: int
-    v: int | None
-
-
-df = TS({"id": [1, 1, 1], "ts": [0, 3600, 7200], "v": [10, None, 30]})
-rolled = df.rolling_agg(
-    on="ts",
-    column="v",
-    window_size="2h",
-    op="sum",
-    out_name="v_roll",
-    by=["id"],
-)
-assert rolled.to_dict() == {
-    "v": [10, None, 30],
-    "id": [1, 1, 1],
-    "v_roll": [10, 10, 40],
-    "ts": [0, 3600, 7200],
-}
-dynamic = df.group_by_dynamic("ts", every="1h", by=["id"]).agg(
-    v_sum=("sum", "v"),
-    v_count=("count", "v"),
-)
-assert dynamic.to_dict() == {
-    "ts": [0, 3600, 7200],
-    "id": [1, 1, 1],
-    "v_sum": [10, None, 30],
-    "v_count": [1, 0, 1],
-}
-
-# docs/PYSPARK_INTERFACE
-
-
-class OrdersPySpark(PySparkDataFrameModel):
-    order_id: int
-    user_id: int
-    amount: float | None
-
-
-class UsersPySpark(PySparkDataFrameModel):
-    user_id: int
-    country: str
-
-
-orders = OrdersPySpark(
-    {
-        "order_id": [1, 2, 3],
-        "user_id": [10, 10, 20],
-        "amount": [50.0, None, 20.0],
-    }
-)
-users = UsersPySpark({"user_id": [10, 20], "country": ["US", "CA"]})
-result = (
-    orders.join(users, on="user_id", how="left")
-    .fill_null(0, subset=["amount"])
-    .group_by("country")
-    .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
-    .to_dict()
-)
-assert _sort_rows_by_country(result) == {
-    "country": ["CA", "US"],
-    "total": [20.0, 50.0],
-    "n_orders": [1, 2],
-}
-
-
-class UserPySparkSelect(PySparkDataFrameModel):
-    id: int
-    name: str
-    age: int | None
-
-
-df = UserPySparkSelect({"id": [1], "name": ["a"], "age": [10]})
-step = df.withColumn("age2", df.age * 2)
-out = (
-    step.withColumnRenamed("name", "name_new")
-    .select_typed("id", "name_new", age_x4=step.age2 * 2)
-    .rename({"id": "uid", "name_new": "uname", "age_x4": "uage_x4"})
-    .collect()
-)
-assert [r.model_dump() for r in out] == [{"uage_x4": 40, "uid": 1, "uname": "a"}]
+#
+# NOTE: strict 2.0 removed `rolling_agg`, `group_by_dynamic`, and the `pyspark` facade.
+#
 
 # docs/FASTAPI (transformation logic only)
 
@@ -281,7 +234,21 @@ class UserFastApi(DataFrameModel):
 
 RM = UserFastApi.row_model()
 df = UserFastApi([RM(id=1, age=20), RM(id=2, age=None)])
-df2 = df.with_columns(age2=df.age + 1).select("id", "age2")
+
+
+class UserFastApiWithAge2(DataFrameModel):
+    id: int
+    age: int | None
+    age2: int | None
+
+
+class UserFastApiOut(DataFrameModel):
+    id: int
+    age2: int | None
+
+
+df2_full = df.with_columns_as(UserFastApiWithAge2, age2=df.col.age + 1)
+df2 = df2_full.select_as(UserFastApiOut, df2_full.col.id, df2_full.col.age2)
 assert [m.model_dump() for m in df2.collect()] == [
     {"id": 1, "age2": 21},
     {"id": 2, "age2": None},
@@ -295,7 +262,7 @@ df = UserFastApi(
         RM(id=4, age=30),
     ]
 )
-ranked = df.filter(df.age >= 18).sort("age", descending=True).head(2)
+ranked = df.filter(df.col.age >= 18).sort("age", descending=True).head(2)
 assert [m.model_dump() for m in ranked.collect()] == [
     {"id": 4, "age": 30},
     {"id": 1, "age": 22},
@@ -321,13 +288,41 @@ orders = OrderLineDF(
     }
 )
 users = UserDimDF({"user_id": [10, 20], "country": ["US", "CA"]})
-rolled = (
-    orders.join(users, on="user_id", how="left")
-    .fill_null(0.0, subset=["amount"])
-    .group_by("country")
-    .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
-    .sort("country")
+
+
+class OrderUser2(DataFrameModel):
+    order_id: int
+    user_id: int
+    amount: float | None
+    country: str | None
+
+
+class CountryRevenueRowDF(DataFrameModel):
+    country: str | None
+    total: float | None
+    n_orders: int
+
+
+joined2 = orders.join_as(users, OrderUser2, on=[orders.col.user_id], how="left")
+
+
+class OrderUser2Filled(DataFrameModel):
+    order_id: int
+    user_id: int
+    amount: float | None
+    amount_filled: float | None
+    country: str | None
+
+
+filled2 = joined2.with_columns_as(
+    OrderUser2Filled, amount_filled=coalesce(joined2.col.amount, Literal(value=0.0))
 )
+rolled = filled2.group_by_agg_as(
+    CountryRevenueRowDF,
+    keys=[filled2.col.country],
+    total=("sum", filled2.col.amount_filled),
+    n_orders=("count", filled2.col.order_id),
+).sort("country")
 assert [m.model_dump() for m in rolled.collect()] == [
     {"country": "CA", "n_orders": 1, "total": 20.0},
     {"country": "US", "n_orders": 2, "total": 50.0},
@@ -344,12 +339,27 @@ LM = LineItemDF.row_model()
 df = LineItemDF(
     [LM(sku="A", qty=2, unit_price=10.0), LM(sku="B", qty=1, unit_price=5.0)]
 )
-df2 = df.with_columns(line_total=df.qty * df.unit_price)
+
+
+class LineItemWithTotalDF(DataFrameModel):
+    sku: str
+    qty: int
+    unit_price: float
+    line_total: float
+
+
+class LineTotalDF(DataFrameModel):
+    sku: str
+    qty: int
+    line_total: float
+
+
+df2 = df.with_columns_as(LineItemWithTotalDF, line_total=df.col.qty * df.col.unit_price)
 df3 = (
-    df2.filter(df2.line_total >= 10.0)
+    df2.filter(df2.col.line_total >= 10.0)
     .sort("line_total", descending=True)
     .head(1)
-    .select("sku", "qty", "line_total")
+    .select_as(LineTotalDF, df2.col.sku, df2.col.qty, df2.col.line_total)
 )
 assert [m.model_dump() for m in df3.collect()] == [
     {"sku": "A", "qty": 2, "line_total": 20.0},

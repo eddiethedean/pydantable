@@ -42,7 +42,7 @@ def main() -> None:
 
         df = OrderLine.read_parquet(str(parquet_path))
         # Multi-unit lines only (same idea as HAVING quantity > 1 in SQL)
-        multi = df.filter(df.quantity > 1)
+        multi = df.filter(df.col.quantity > 1)
         rows = multi.collect()
         assert [r.line_id for r in rows] == [102, 103]
         assert [r.quantity for r in rows] == [4, 2]

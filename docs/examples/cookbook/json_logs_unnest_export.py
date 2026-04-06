@@ -29,6 +29,12 @@ class LogLine(DataFrameModel):
     meta: Meta
 
 
+class FlatLogLine(DataFrameModel):
+    event: str
+    meta_region: str
+    meta_code: int
+
+
 def main() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / "events.ndjson"
@@ -39,13 +45,13 @@ def main() -> None:
         )
 
         df = LogLine.read_ndjson(str(src))
-        us_only = df.filter(df.meta.struct_field("region") == "us")
-        flat = us_only.unnest("meta")
+        us_only = df.filter(df.col.meta.struct_field("region") == "us")
+        flat = us_only.unnest_as(FlatLogLine, columns=[us_only.col.meta])
         out_path = Path(tmp) / "flat.ndjson"
         flat.write_ndjson(str(out_path))
 
         text = out_path.read_text(encoding="utf-8")
-        assert "us" in text and ("meta_region" in text or "region" in text)
+        assert "us" in text and "meta_region" in text
 
     print("json_logs_unnest_export: ok")
 
