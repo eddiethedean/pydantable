@@ -6,20 +6,17 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/pydantable)](https://pypi.org/project/pydantable/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Strongly typed DataFrames for Python, powered by Rust** — Pydantic schemas, Polars-backed execution in the native extension, and an API built for services (including optional FastAPI integration).
+**Strictly-typed DataFrames for Python, powered by Rust** — define a schema once (Pydantic), and get an API that **cannot** “accidentally” change schemas at runtime.
 
 **Current release: 2.0.0** — highlights in the [changelog](https://pydantable.readthedocs.io/en/latest/CHANGELOG.html).
 
-## Why PydanTable (strict 2.0)
+## Core contract
 
-- **One schema, one contract:** define columns with Pydantic models; use `DataFrameModel` (table class) or `DataFrame[YourSchema]` (generic).
-- **Typed column identity:** use `df.col.<field>` / `ColumnRef` (no string-based schema evolution).
-- **Explicit schema evolution:** schema-changing transforms require `*_as(AfterModel/AfterSchema, ...)` and are validated at runtime.
-- **Flexible materialization:** row models via `collect()` / `rows()`, columnar `dict[str, list]`, or Polars/PyArrow with the right extras.
-- **I/O:** lazy `read_*` / `aread_*`, streaming writes, NDJSON/JSON Lines, Parquet, CSV, IPC, HTTP, SQL (SQLModel-first `fetch_sqlmodel` / `write_sqlmodel`, explicit string SQL `fetch_sql_raw` / `write_sql_raw`, or deprecated unprefixed names) — [I/O overview](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html), [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html), [SQLModel roadmap](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html), and [decision tree](https://pydantable.readthedocs.io/en/latest/IO_DECISION_TREE.html).
-- **JSON & struct columns:** struct expressions, JSON encode/decode helpers, unnest/nested models — [IO_JSON](https://pydantable.readthedocs.io/en/latest/IO_JSON.html), [SELECTORS](https://pydantable.readthedocs.io/en/latest/SELECTORS.html).
-- **FastAPI (optional):** shared executor lifespan, NDJSON streaming from `astream()`, OpenAPI-friendly columnar bodies, `register_exception_handlers` (**503** / **400** / **422**). Start with the [golden path](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html) and [FastAPI guide](https://pydantable.readthedocs.io/en/latest/FASTAPI.html).
-- **Moltres SQL engine (optional):** install **`pydantable[moltres]`** for **`SqlDataFrame`** / **`SqlDataFrameModel`** backed by [moltres-core](https://pypi.org/project/moltres-core/)’s **`MoltresPydantableEngine`** ([`pydantable-protocol`](https://pypi.org/project/pydantable-protocol/) `ExecutionEngine`). The goal is to **keep transforms on the SQL side** (plans compiled to SQL) instead of loading whole tables into Python—especially when you **write results back to the same database**. Guide: [MOLTRES_SQL](https://pydantable.readthedocs.io/en/latest/MOLTRES_SQL.html); protocol authors: [Custom engine packages](https://pydantable.readthedocs.io/en/latest/CUSTOM_ENGINE_PACKAGE.html).
+- **Column identity is typed**: use `df.col.<field>` / `ColumnRef` (no stringly-typed schema evolution).
+- **Schema evolution is explicit**: schema-changing transforms require `*_as(AfterSchema/AfterModel, ...)` and are runtime-validated.
+
+The contract is defined by the strict typed dataframe spec:
+[typed_dataframe_spec](https://pydantable.readthedocs.io/en/latest/typed_dataframe_spec.html).
 
 ## Install
 
@@ -48,85 +45,50 @@ class User(DataFrameModel):
     age: int | None
 
 df = User({"id": [1, 2], "age": [20, None]})
-class UserWithAge2(DataFrameModel):
+
+class WithAge2(DataFrameModel):
     id: int
     age: int | None
     age2: int | None
 
-class UserResult(DataFrameModel):
+class Result(DataFrameModel):
     id: int
     age2: int | None
 
-df2 = df.with_columns_as(UserWithAge2, age2=df.col.age * 2)
-result = df2.filter(df2.col.age > 10).drop_as(UserResult, df2.col.age)
+df2 = df.with_columns_as(WithAge2, age2=df.col.age * 2)
+out = df2.filter(df2.col.age > 10).drop_as(Result, df2.col.age)
 
-print(result.to_dict())
-print([r.model_dump() for r in result.collect()])
+print(out.to_dict())
+print([r.model_dump() for r in out.collect()])
 ```
 
-Output (exact values depend on filtering; this matches `scripts/verify_doc_examples.py`):
+Output:
 
 ```text
 {'id': [1], 'age2': [40]}
 [{'id': 1, 'age2': 40}]
 ```
 
-## Core concepts
+## Core concepts (one screen)
 
 | Piece | Role |
 | ----- | ---- |
 | `DataFrameModel` | Table class with annotated columns (`class Orders(DataFrameModel): ...`). |
 | `DataFrame[Schema]` | Generic API over your own Pydantic `BaseModel`. |
-| `SqlDataFrame` / `SqlDataFrameModel` | Same shapes with **`pydantable[moltres]`** — Moltres compiles plans to SQL so transforms can stay **in the database** (`sql_config=` / `moltres_engine=`); prefer when you are not round-tripping full tables through Python (e.g. write back to the same DB). |
-| `Expr` | Typed expressions in transforms (for example `filter`, `with_columns_as`). |
-| **Errors** | Ingest issues such as column length mismatch raise `ColumnLengthMismatchError` (`ValueError` subclass) from `pydantable.errors` — map to HTTP **400** in FastAPI via `register_exception_handlers`. |
+| `Expr` / `ColumnRef` | Expressions and typed column tokens used in transforms. |
+| `collect()` / `to_dict()` | Materialize as row models or `dict[str, list]` (and Polars/Arrow with extras). |
 
-**Static typing**
+## I/O, SQL, and engines
 
-- **All checkers:** strict 2.0 typing is stub-based and explicit—schema-changing transforms require `*_as(AfterModel/AfterSchema, ...)`.
-- See [TYPING](https://pydantable.readthedocs.io/en/latest/TYPING.html).
-
-**Rich column types** (`Literal`, `ipaddress`, `WKB`, `Annotated`, …) are covered in [SUPPORTED_TYPES](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html).
-
-**Materialization:** `collect()` / `rows()` → row models; `to_dict()` → `dict[str, list]`; `to_polars()` / `to_arrow()` with matching extras.
-
-## I/O at a glance
-
-- **`DataFrameModel` / `DataFrame[Schema]`:** lazy `read_*` / `aread_*`, `export_*`, `write_*`, and SQLModel helpers (`fetch_sqlmodel`, `write_sqlmodel`, …). For eager column loads, import **`materialize_*`**, **`fetch_sqlmodel`**, **`iter_sqlmodel`**, … from **`pydantable`** (same entrypoints as the internal `pydantable.io` package) and pass `dict[str, list]` into constructors.
-- **SQL details:** [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html) (recommended APIs, `*_raw`, deprecations) and [SQLMODEL_SQL_ROADMAP](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html) (phased migration).
-- Large files & NDJSON patterns: [IO_JSON](https://pydantable.readthedocs.io/en/latest/IO_JSON.html), [IO_NDJSON](https://pydantable.readthedocs.io/en/latest/IO_NDJSON.html), [EXECUTION](https://pydantable.readthedocs.io/en/latest/EXECUTION.html).
-
-## Validation controls
-
-- Strict by default on constructors.
-- Optional ingest controls: `trusted_mode`, `ignore_errors`, `on_validation_errors`.
-- Missing optional fields: `fill_missing_optional` (default `True`).
-- Validation presets: `validation_profile=...` (or `__pydantable__ = {"validation_profile": "..."}`).
-- Per-column and nested strictness: {doc}`STRICTNESS` (field policies + profile defaults).
+- **I/O overview**: <https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html>
+- **SQL** (`*_sqlmodel`, `*_raw`): <https://pydantable.readthedocs.io/en/latest/IO_SQL.html>
+- **SQLModel roadmap**: <https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html>
+- **Custom engines** (`ExecutionEngine`): <https://pydantable.readthedocs.io/en/latest/CUSTOM_ENGINE_PACKAGE.html>
+- **Moltres SQL engine (optional)**: <https://pydantable.readthedocs.io/en/latest/MOLTRES_SQL.html>
 
 ## Documentation
 
-| Topic | Link |
-| ----- | ---- |
-| Docs home | [pydantable.readthedocs.io](https://pydantable.readthedocs.io/en/latest/) |
-| Map of all pages | [DOCS_MAP](https://pydantable.readthedocs.io/en/latest/DOCS_MAP.html) |
-| Quickstart | [QUICKSTART](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html) |
-| `DataFrameModel` | [DATAFRAMEMODEL](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) |
-| Typing (mypy vs Pyright) | [TYPING](https://pydantable.readthedocs.io/en/latest/TYPING.html) |
-| I/O overview | [IO_OVERVIEW](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html) |
-| SQL (SQLModel, raw string SQL) | [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html) · [SQLMODEL_SQL_ROADMAP](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html) |
-| FastAPI path | [GOLDEN_PATH_FASTAPI](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html) → [FASTAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) → [FASTAPI_ENHANCEMENTS](https://pydantable.readthedocs.io/en/latest/FASTAPI_ENHANCEMENTS.html) |
-| Service ergonomics (OpenAPI, aliases, redaction) | [SERVICE_ERGONOMICS](https://pydantable.readthedocs.io/en/latest/SERVICE_ERGONOMICS.html) |
-| Custom dtypes | [CUSTOM_DTYPES](https://pydantable.readthedocs.io/en/latest/CUSTOM_DTYPES.html) |
-| Strictness | [STRICTNESS](https://pydantable.readthedocs.io/en/latest/STRICTNESS.html) |
-| Cookbooks | [Cookbook index](https://pydantable.readthedocs.io/en/latest/cookbook/index.html) (FastAPI, lazy pipelines, JSON logs, …) |
-| Example multi-router app | `docs/examples/fastapi/service_layout/` in this repo |
-| Test helpers | `pydantable.testing.fastapi` — see [FASTAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) |
-| Execution & async | [EXECUTION](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) · [MATERIALIZATION](https://pydantable.readthedocs.io/en/latest/MATERIALIZATION.html) |
-| Behavioral contract | [INTERFACE_CONTRACT](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) |
-| Troubleshooting | [TROUBLESHOOTING](https://pydantable.readthedocs.io/en/latest/TROUBLESHOOTING.html) |
-| Versioning | [VERSIONING](https://pydantable.readthedocs.io/en/latest/VERSIONING.html) |
-| Changelog | [CHANGELOG](https://pydantable.readthedocs.io/en/latest/CHANGELOG.html) |
+Start here: <https://pydantable.readthedocs.io/en/latest/>
 
 ## Development
 
