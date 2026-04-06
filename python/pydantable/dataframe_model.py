@@ -2257,6 +2257,60 @@ class DataFrameModel(Generic[RowT]):
             )
         )
 
+    def melt_as_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        id_vars: str | Sequence[str] | Any | None = None,
+        value_vars: str | Sequence[str] | Any | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+        streaming: bool | None = None,
+    ) -> AfterModelT:
+        return self.melt(
+            id_vars=id_vars,
+            value_vars=value_vars,
+            variable_name=variable_name,
+            value_name=value_name,
+            streaming=streaming,
+        ).as_model(model)
+
+    def melt_try_as_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        id_vars: str | Sequence[str] | Any | None = None,
+        value_vars: str | Sequence[str] | Any | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+        streaming: bool | None = None,
+    ) -> AfterModelT | None:
+        return self.melt(
+            id_vars=id_vars,
+            value_vars=value_vars,
+            variable_name=variable_name,
+            value_name=value_name,
+            streaming=streaming,
+        ).try_as_model(model)
+
+    def melt_assert_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        id_vars: str | Sequence[str] | Any | None = None,
+        value_vars: str | Sequence[str] | Any | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+        streaming: bool | None = None,
+    ) -> AfterModelT:
+        return self.melt(
+            id_vars=id_vars,
+            value_vars=value_vars,
+            variable_name=variable_name,
+            value_name=value_name,
+            streaming=streaming,
+        ).assert_model(model)
+
     def unpivot(
         self,
         *,
@@ -2275,6 +2329,60 @@ class DataFrameModel(Generic[RowT]):
                 streaming=streaming,
             )
         )
+
+    def unpivot_as_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        index: str | Sequence[str] | Any | None = None,
+        on: str | Sequence[str] | Any | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+        streaming: bool | None = None,
+    ) -> AfterModelT:
+        return self.unpivot(
+            index=index,
+            on=on,
+            variable_name=variable_name,
+            value_name=value_name,
+            streaming=streaming,
+        ).as_model(model)
+
+    def unpivot_try_as_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        index: str | Sequence[str] | Any | None = None,
+        on: str | Sequence[str] | Any | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+        streaming: bool | None = None,
+    ) -> AfterModelT | None:
+        return self.unpivot(
+            index=index,
+            on=on,
+            variable_name=variable_name,
+            value_name=value_name,
+            streaming=streaming,
+        ).try_as_model(model)
+
+    def unpivot_assert_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        index: str | Sequence[str] | Any | None = None,
+        on: str | Sequence[str] | Any | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+        streaming: bool | None = None,
+    ) -> AfterModelT:
+        return self.unpivot(
+            index=index,
+            on=on,
+            variable_name=variable_name,
+            value_name=value_name,
+            streaming=streaming,
+        ).assert_model(model)
 
     def pivot_longer(
         self,
@@ -2438,6 +2546,108 @@ class DataFrameModel(Generic[RowT]):
                 streaming=streaming,
             )
         )
+
+    def join_as_model(
+        self,
+        other: DataFrameModel[Any],
+        model: type[AfterModelT],
+        *,
+        on: str | Sequence[str] | Any | None = None,
+        left_on: Any = None,
+        right_on: Any = None,
+        how: str = "inner",
+        suffix: str = "_right",
+        coalesce: bool | None = None,
+        validate: str | None = None,
+        join_nulls: bool | None = None,
+        maintain_order: bool | str | None = None,
+        allow_parallel: bool | None = None,
+        force_parallel: bool | None = None,
+        streaming: bool | None = None,
+    ) -> AfterModelT:
+        return self.join(
+            other,
+            on=on,
+            left_on=left_on,
+            right_on=right_on,
+            how=how,
+            suffix=suffix,
+            coalesce=coalesce,
+            validate=validate,
+            join_nulls=join_nulls,
+            maintain_order=maintain_order,
+            allow_parallel=allow_parallel,
+            force_parallel=force_parallel,
+            streaming=streaming,
+        ).as_model(model)
+
+    def join_try_as_model(
+        self,
+        other: DataFrameModel[Any],
+        model: type[AfterModelT],
+        *,
+        on: str | Sequence[str] | Any | None = None,
+        left_on: Any = None,
+        right_on: Any = None,
+        how: str = "inner",
+        suffix: str = "_right",
+        coalesce: bool | None = None,
+        validate: str | None = None,
+        join_nulls: bool | None = None,
+        maintain_order: bool | str | None = None,
+        allow_parallel: bool | None = None,
+        force_parallel: bool | None = None,
+        streaming: bool | None = None,
+    ) -> AfterModelT | None:
+        return self.join(
+            other,
+            on=on,
+            left_on=left_on,
+            right_on=right_on,
+            how=how,
+            suffix=suffix,
+            coalesce=coalesce,
+            validate=validate,
+            join_nulls=join_nulls,
+            maintain_order=maintain_order,
+            allow_parallel=allow_parallel,
+            force_parallel=force_parallel,
+            streaming=streaming,
+        ).try_as_model(model)
+
+    def join_assert_model(
+        self,
+        other: DataFrameModel[Any],
+        model: type[AfterModelT],
+        *,
+        on: str | Sequence[str] | Any | None = None,
+        left_on: Any = None,
+        right_on: Any = None,
+        how: str = "inner",
+        suffix: str = "_right",
+        coalesce: bool | None = None,
+        validate: str | None = None,
+        join_nulls: bool | None = None,
+        maintain_order: bool | str | None = None,
+        allow_parallel: bool | None = None,
+        force_parallel: bool | None = None,
+        streaming: bool | None = None,
+    ) -> AfterModelT:
+        return self.join(
+            other,
+            on=on,
+            left_on=left_on,
+            right_on=right_on,
+            how=how,
+            suffix=suffix,
+            coalesce=coalesce,
+            validate=validate,
+            join_nulls=join_nulls,
+            maintain_order=maintain_order,
+            allow_parallel=allow_parallel,
+            force_parallel=force_parallel,
+            streaming=streaming,
+        ).assert_model(model)
 
     def group_by(self: ModelSelf, *keys: Any) -> GroupedDataFrameModel[ModelSelf]:
         return GroupedDataFrameModel(self._df.group_by(*keys), self.__class__)

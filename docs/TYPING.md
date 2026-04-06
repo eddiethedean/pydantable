@@ -132,6 +132,14 @@ def rolling(df: Events) -> WithRolling:
     )
 ```
 
+### Typed escape hatches for schema-changing transforms (Pyright / `ty`)
+
+For other deterministic schema-changing transforms, use the dedicated helpers:
+
+- `melt_as_model(...)` / `melt_try_as_model(...)` / `melt_assert_model(...)`
+- `unpivot_as_model(...)` / `unpivot_try_as_model(...)` / `unpivot_assert_model(...)`
+- `join_as_model(...)` / `join_try_as_model(...)` / `join_assert_model(...)`
+
 ## mypy workflow (plugin-based inference)
 
 If you use **Astral `ty`** or **Pyright** on your project instead of mypy, use the **explicit after-model** section above — the plugin applies **only** to mypy.

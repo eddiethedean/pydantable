@@ -72,7 +72,13 @@
       ~DataFrameModel.iter_parquet
       ~DataFrameModel.iter_sqlmodel
       ~DataFrameModel.join
+      ~DataFrameModel.join_as_model
+      ~DataFrameModel.join_assert_model
+      ~DataFrameModel.join_try_as_model
       ~DataFrameModel.melt
+      ~DataFrameModel.melt_as_model
+      ~DataFrameModel.melt_assert_model
+      ~DataFrameModel.melt_try_as_model
       ~DataFrameModel.pipe
       ~DataFrameModel.pivot
       ~DataFrameModel.pivot_longer
@@ -118,6 +124,9 @@
       ~DataFrameModel.unnest
       ~DataFrameModel.unnest_all
       ~DataFrameModel.unpivot
+      ~DataFrameModel.unpivot_as_model
+      ~DataFrameModel.unpivot_assert_model
+      ~DataFrameModel.unpivot_try_as_model
       ~DataFrameModel.value_counts
       ~DataFrameModel.with_columns
       ~DataFrameModel.with_columns_cast

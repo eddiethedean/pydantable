@@ -250,6 +250,50 @@ def test_mypy_accepts_schema_preserving_chain_methods(tmp_path: Path) -> None:
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
+def test_mypy_accepts_melt_unpivot_join_as_model_helpers(tmp_path: Path) -> None:
+    pytest.importorskip("mypy")
+    code = """
+    from pydantable import DataFrameModel
+
+    class Before(DataFrameModel):
+        id: int
+        x: int
+        y: int
+
+    class AfterMelt(DataFrameModel):
+        id: int
+        variable: str
+        value: int
+
+    class AfterUnpivot(DataFrameModel):
+        id: int
+        variable: str
+        value: int
+
+    class Right(DataFrameModel):
+        id: int
+        z: int
+
+    class AfterJoin(DataFrameModel):
+        id: int
+        x: int
+        y: int
+        z: int
+
+    def melt_ok(df: Before) -> AfterMelt:
+        return df.melt_as_model(AfterMelt, id_vars=["id"], value_vars=["x", "y"])
+
+    def unpivot_ok(df: Before) -> AfterUnpivot:
+        return df.unpivot_as_model(AfterUnpivot, index=["id"], on=["x", "y"])
+
+    def join_ok(left: Before, right: Right) -> AfterJoin:
+        return left.join_as_model(right, AfterJoin, on="id")
+    """
+    proc = _run_mypy_snippet(tmp_path, code)
+    _mypy_output_or_skip_on_crash(proc)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
 def test_mypy_with_columns_infers_literal_and_arithmetic_types(tmp_path: Path) -> None:
     pytest.importorskip("mypy")
     code = """
