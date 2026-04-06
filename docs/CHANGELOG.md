@@ -6,11 +6,22 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [2.0.0] — 2026-04-06
 
+### Added
+
+- **`join_as` ergonomics:** keyword aliases **`schema=`** / **`after_schema_type=`** on **`DataFrame.join_as`** and **`after_model=`** / **`model=`** on **`DataFrameModel.join_as`**; docs and examples steer users to **`other=`** + schema keywords to avoid mixing up positional order across the two types.
+- **Docs:** **`TRANSFORMS_QUICK_REF`** (compact `*_as` map), VS Code snippets **`.vscode/pydantable-transforms.code-snippets`**, **`DataFrameModel`** subclassing guidance for incremental schemas, and cookbook/README/typing cross-links.
+- **Tests:** runtime coverage for `join_as` alias resolution and conflicting kwargs.
+
 ### Changed (breaking)
 
 - **Strict typed dataframe spec compliance:** schema-changing operations require explicit `*_as(AfterSchema/AfterModel, ...)` output schemas and typed column tokens (`df.col.<field>` / `ColumnRef`).
 - **Removed:** pandas facade and selector-driven schema mutation surface.
 - **Deprecated:** `pydantable.pyspark` remains importable but is deprecated/non-strict pending 2.1 alignment.
+
+### Changed (deprecations)
+
+- **`collect` / `acollect` `as_polars=`:** deprecation warnings and {doc}`VERSIONING` now target removal in **`v2.1.0`** (parameter remains in **2.0.0**).
+- **Legacy string-SQL I/O aliases** (`fetch_sql`, `write_sql`, …): remain deprecated; removal is **not** tied to the **2.0.0** tag (see {doc}`VERSIONING` and {doc}`SQLMODEL_SQL_ROADMAP`).
 
 ### Version bump
 

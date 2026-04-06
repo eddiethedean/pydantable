@@ -2888,7 +2888,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         """
         if as_polars is not None:
             warnings.warn(
-                "as_polars is deprecated and will be removed in pydantable 2.0.0; "
+                "as_polars is deprecated and will be removed in pydantable 2.1.0; "
                 "use to_polars() for a Polars DataFrame, or collect(as_lists=True) "
                 "/ to_dict() for columnar dicts.",
                 DeprecationWarning,
@@ -3327,7 +3327,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         """
         if as_polars is not None:
             warnings.warn(
-                "as_polars is deprecated and will be removed in pydantable 2.0.0; "
+                "as_polars is deprecated and will be removed in pydantable 2.1.0; "
                 "use to_polars() for a Polars DataFrame, or collect(as_lists=True) "
                 "/ to_dict() for columnar dicts.",
                 DeprecationWarning,

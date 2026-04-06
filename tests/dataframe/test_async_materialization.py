@@ -339,7 +339,7 @@ async def test_acollect_deprecated_as_polars_branch() -> None:
         pl_out = await df.acollect(as_polars=True)
         dict_out = await df.acollect(as_polars=False)
     assert any("as_polars is deprecated" in str(x.message) for x in w)
-    assert any("2.0.0" in str(x.message) for x in w)
+    assert any("2.1.0" in str(x.message) for x in w)
     assert isinstance(pl_out, pl.DataFrame)
     assert pl_out.to_dict(as_series=False) == {"x": [7]}
     assert dict_out == {"x": [7]}
