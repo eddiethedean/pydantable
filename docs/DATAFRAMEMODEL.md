@@ -382,6 +382,41 @@ For schema assertions with better ergonomics:
 
 `as_model(..., validate_schema=False)` is a performance-oriented escape hatch. Prefer leaving validation on unless you have a strong guarantee that the upstream pipeline already enforces schema correctness (e.g. pinned transform chain + contract tests).
 
+#### Pyright/ty golden path (explicit after-model + typed escape hatches)
+
+For **Pyright**, **Pylance**, and **Astral `ty`**, treat “schema-changing” operations as
+places where you should be explicit about the intended output model:
+
+- **General transforms**: `as_model(...)` / `try_as_model(...)` / `assert_model(...)`
+- **Grouped aggregation**: `group_by(...).agg_as_model(...)` (or `agg_try_as_model` / `agg_assert_model`)
+- **Rolling aggregation**: `rolling_agg_as_model(...)` (or `rolling_agg_try_as_model` / `rolling_agg_assert_model`)
+- **Reshape**: `melt_as_model(...)`, `unpivot_as_model(...)`
+- **Join**: `join_as_model(...)`
+
+Example (service-friendly shape):
+
+```python
+from pydantable import DataFrameModel
+
+
+class Events(DataFrameModel):
+    id: int
+    g: int
+    v: int
+
+
+class ByGroup(DataFrameModel):
+    g: int
+    total: int
+
+
+def grouped(df: Events) -> ByGroup:
+    # Schema-changing: provide the intended after-model explicitly.
+    return df.group_by("g").agg_as_model(ByGroup, total=("sum", "v"))
+```
+
+See {doc}`TYPING` for the full typing story (mypy plugin vs explicit after-model).
+
 #### Enabling the mypy plugin
 
 If you use **mypy**, enable the plugin in your mypy config:

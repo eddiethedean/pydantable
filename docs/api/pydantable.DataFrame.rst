@@ -21,6 +21,10 @@
       ~DataFrame.aread_ndjson
       ~DataFrame.aread_parquet
       ~DataFrame.aread_parquet_url
+      ~DataFrame.as_model
+      ~DataFrame.as_schema
+      ~DataFrame.assert_model
+      ~DataFrame.assert_schema
       ~DataFrame.astream
       ~DataFrame.ato_arrow
       ~DataFrame.ato_dict
@@ -55,9 +59,21 @@
       ~DataFrame.iter_ndjson
       ~DataFrame.iter_parquet
       ~DataFrame.join
+      ~DataFrame.join_as_model
+      ~DataFrame.join_as_schema
+      ~DataFrame.join_assert_model
+      ~DataFrame.join_assert_schema
+      ~DataFrame.join_try_as_model
+      ~DataFrame.join_try_as_schema
       ~DataFrame.last
       ~DataFrame.limit
       ~DataFrame.melt
+      ~DataFrame.melt_as_model
+      ~DataFrame.melt_as_schema
+      ~DataFrame.melt_assert_model
+      ~DataFrame.melt_assert_schema
+      ~DataFrame.melt_try_as_model
+      ~DataFrame.melt_try_as_schema
       ~DataFrame.move
       ~DataFrame.null_count
       ~DataFrame.pipe
@@ -83,6 +99,12 @@
       ~DataFrame.rename_with_selector
       ~DataFrame.reorder_columns
       ~DataFrame.rolling_agg
+      ~DataFrame.rolling_agg_as_model
+      ~DataFrame.rolling_agg_as_schema
+      ~DataFrame.rolling_agg_assert_model
+      ~DataFrame.rolling_agg_assert_schema
+      ~DataFrame.rolling_agg_try_as_model
+      ~DataFrame.rolling_agg_try_as_schema
       ~DataFrame.sample
       ~DataFrame.schema_fields
       ~DataFrame.select
@@ -102,10 +124,18 @@
       ~DataFrame.to_dict
       ~DataFrame.to_polars
       ~DataFrame.top_k
+      ~DataFrame.try_as_model
+      ~DataFrame.try_as_schema
       ~DataFrame.unique
       ~DataFrame.unnest
       ~DataFrame.unnest_all
       ~DataFrame.unpivot
+      ~DataFrame.unpivot_as_model
+      ~DataFrame.unpivot_as_schema
+      ~DataFrame.unpivot_assert_model
+      ~DataFrame.unpivot_assert_schema
+      ~DataFrame.unpivot_try_as_model
+      ~DataFrame.unpivot_try_as_schema
       ~DataFrame.value_counts
       ~DataFrame.with_columns
       ~DataFrame.with_columns_cast

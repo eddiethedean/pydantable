@@ -75,6 +75,7 @@ if TYPE_CHECKING:
 
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
+AfterSchemaT = TypeVar("AfterSchemaT", bound=BaseModel)
 
 
 class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
@@ -783,6 +784,121 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
     def schema_fields(self) -> dict[str, Any]:
         return dict(self._current_field_types)
+
+    @staticmethod
+    def _expected_schema_fields(schema: type[BaseModel]) -> dict[str, Any]:
+        # Prefer the direct Pydantic model_fields mapping to avoid evaluating
+        # inherited annotations via typing.get_type_hints at runtime.
+        return {
+            name: field.annotation
+            for name, field in schema.model_fields.items()
+            if not name.startswith("_")
+        }
+
+    def as_schema(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT]:
+        if not isinstance(schema, type) or not issubclass(schema, BaseModel):
+            raise TypeError("as_schema(schema=...) expects a Pydantic BaseModel type.")
+        if validate_schema:
+            expected = self._expected_schema_fields(schema)
+            actual = self.schema_fields()
+            if set(expected) != set(actual) or any(
+                expected[k] != actual[k] for k in expected if k in actual
+            ):
+                raise TypeError(
+                    "as_schema(schema mismatch): expected "
+                    f"{sorted(expected)} got {sorted(actual)}"
+                )
+        # Avoid `DataFrame[schema]` here: some type checkers treat `[...]` as a
+        # type expression and reject runtime variables.
+        df_cls = DataFrame.__class_getitem__(schema)
+        return cast(
+            "DataFrame[AfterSchemaT]",
+            df_cls._from_plan(
+                root_data=self._root_data,
+                root_schema_type=self._root_schema_type,
+                current_schema_type=schema,
+                rust_plan=self._rust_plan,
+                engine=self._engine,
+            ),
+        )
+
+    def try_as_schema(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT] | None:
+        if not isinstance(schema, type) or not issubclass(schema, BaseModel):
+            raise TypeError(
+                "try_as_schema(schema=...) expects a Pydantic BaseModel type."
+            )
+        if not validate_schema:
+            return self.as_schema(schema, validate_schema=False)
+        expected = self._expected_schema_fields(schema)
+        actual = self.schema_fields()
+        if set(expected) != set(actual) or any(
+            expected[k] != actual[k] for k in expected if k in actual
+        ):
+            return None
+        return self.as_schema(schema, validate_schema=False)
+
+    def assert_schema(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT]:
+        if not isinstance(schema, type) or not issubclass(schema, BaseModel):
+            raise TypeError(
+                "assert_schema(schema=...) expects a Pydantic BaseModel type."
+            )
+        if not validate_schema:
+            return self.as_schema(schema, validate_schema=False)
+        expected = self._expected_schema_fields(schema)
+        actual = self.schema_fields()
+        if set(expected) != set(actual) or any(
+            expected[k] != actual[k] for k in expected if k in actual
+        ):
+            missing = sorted(set(expected) - set(actual))
+            extra = sorted(set(actual) - set(expected))
+            mismatched = sorted(
+                k for k in set(expected) & set(actual) if expected[k] != actual[k]
+            )
+            raise TypeError(
+                "assert_schema(schema mismatch): "
+                f"missing={missing} extra={extra} mismatched={mismatched}"
+            )
+        return self.as_schema(schema, validate_schema=False)
+
+    # Aliases for parity with DataFrameModel's after-model helpers.
+    def as_model(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT]:
+        return self.as_schema(schema, validate_schema=validate_schema)
+
+    def try_as_model(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT] | None:
+        return self.try_as_schema(schema, validate_schema=validate_schema)
+
+    def assert_model(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT]:
+        return self.assert_schema(schema, validate_schema=validate_schema)
 
     @property
     def columns(self) -> list[str]:
@@ -2112,6 +2228,83 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             engine=self._engine,
         )
 
+    def melt_as_schema(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        id_vars: str | Sequence[str] | Selector | None = None,
+        value_vars: str | Sequence[str] | Selector | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+        streaming: bool | None = None,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT]:
+        return self.melt(
+            id_vars=id_vars,
+            value_vars=value_vars,
+            variable_name=variable_name,
+            value_name=value_name,
+            streaming=streaming,
+        ).as_schema(schema, validate_schema=validate_schema)
+
+    def melt_try_as_schema(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        id_vars: str | Sequence[str] | Selector | None = None,
+        value_vars: str | Sequence[str] | Selector | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+        streaming: bool | None = None,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT] | None:
+        return self.melt(
+            id_vars=id_vars,
+            value_vars=value_vars,
+            variable_name=variable_name,
+            value_name=value_name,
+            streaming=streaming,
+        ).try_as_schema(schema, validate_schema=validate_schema)
+
+    def melt_assert_schema(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        id_vars: str | Sequence[str] | Selector | None = None,
+        value_vars: str | Sequence[str] | Selector | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+        streaming: bool | None = None,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT]:
+        return self.melt(
+            id_vars=id_vars,
+            value_vars=value_vars,
+            variable_name=variable_name,
+            value_name=value_name,
+            streaming=streaming,
+        ).assert_schema(schema, validate_schema=validate_schema)
+
+    # Aliases for parity with DataFrameModel's after-model helpers.
+    def melt_as_model(
+        self, schema: type[AfterSchemaT], *, validate_schema: bool = True, **kwargs: Any
+    ) -> DataFrame[AfterSchemaT]:
+        return self.melt_as_schema(schema, validate_schema=validate_schema, **kwargs)
+
+    def melt_try_as_model(
+        self, schema: type[AfterSchemaT], *, validate_schema: bool = True, **kwargs: Any
+    ) -> DataFrame[AfterSchemaT] | None:
+        return self.melt_try_as_schema(
+            schema, validate_schema=validate_schema, **kwargs
+        )
+
+    def melt_assert_model(
+        self, schema: type[AfterSchemaT], *, validate_schema: bool = True, **kwargs: Any
+    ) -> DataFrame[AfterSchemaT]:
+        return self.melt_assert_schema(
+            schema, validate_schema=validate_schema, **kwargs
+        )
+
     def unpivot(
         self,
         *,
@@ -2127,6 +2320,82 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             variable_name=variable_name,
             value_name=value_name,
             streaming=streaming,
+        )
+
+    def unpivot_as_schema(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        index: str | Sequence[str] | Selector | None = None,
+        on: str | Sequence[str] | Selector | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+        streaming: bool | None = None,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT]:
+        return self.unpivot(
+            index=index,
+            on=on,
+            variable_name=variable_name,
+            value_name=value_name,
+            streaming=streaming,
+        ).as_schema(schema, validate_schema=validate_schema)
+
+    def unpivot_try_as_schema(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        index: str | Sequence[str] | Selector | None = None,
+        on: str | Sequence[str] | Selector | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+        streaming: bool | None = None,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT] | None:
+        return self.unpivot(
+            index=index,
+            on=on,
+            variable_name=variable_name,
+            value_name=value_name,
+            streaming=streaming,
+        ).try_as_schema(schema, validate_schema=validate_schema)
+
+    def unpivot_assert_schema(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        index: str | Sequence[str] | Selector | None = None,
+        on: str | Sequence[str] | Selector | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+        streaming: bool | None = None,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT]:
+        return self.unpivot(
+            index=index,
+            on=on,
+            variable_name=variable_name,
+            value_name=value_name,
+            streaming=streaming,
+        ).assert_schema(schema, validate_schema=validate_schema)
+
+    def unpivot_as_model(
+        self, schema: type[AfterSchemaT], *, validate_schema: bool = True, **kwargs: Any
+    ) -> DataFrame[AfterSchemaT]:
+        return self.unpivot_as_schema(schema, validate_schema=validate_schema, **kwargs)
+
+    def unpivot_try_as_model(
+        self, schema: type[AfterSchemaT], *, validate_schema: bool = True, **kwargs: Any
+    ) -> DataFrame[AfterSchemaT] | None:
+        return self.unpivot_try_as_schema(
+            schema, validate_schema=validate_schema, **kwargs
+        )
+
+    def unpivot_assert_model(
+        self, schema: type[AfterSchemaT], *, validate_schema: bool = True, **kwargs: Any
+    ) -> DataFrame[AfterSchemaT]:
+        return self.unpivot_assert_schema(
+            schema, validate_schema=validate_schema, **kwargs
         )
 
     def pivot_longer(
@@ -2752,6 +3021,147 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             engine=self._engine,
         )
 
+    def join_as_schema(
+        self,
+        other: DataFrame[Any],
+        schema: type[AfterSchemaT],
+        *,
+        on: str | Sequence[str] | Selector | None = None,
+        left_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
+        right_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
+        how: str = "inner",
+        suffix: str = "_right",
+        coalesce: bool | None = None,
+        validate: str | None = None,
+        join_nulls: bool | None = None,
+        maintain_order: bool | str | None = None,
+        allow_parallel: bool | None = None,
+        force_parallel: bool | None = None,
+        streaming: bool | None = None,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT]:
+        return self.join(
+            other,
+            on=on,
+            left_on=left_on,
+            right_on=right_on,
+            how=how,
+            suffix=suffix,
+            coalesce=coalesce,
+            validate=validate,
+            join_nulls=join_nulls,
+            maintain_order=maintain_order,
+            allow_parallel=allow_parallel,
+            force_parallel=force_parallel,
+            streaming=streaming,
+        ).as_schema(schema, validate_schema=validate_schema)
+
+    def join_try_as_schema(
+        self,
+        other: DataFrame[Any],
+        schema: type[AfterSchemaT],
+        *,
+        on: str | Sequence[str] | Selector | None = None,
+        left_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
+        right_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
+        how: str = "inner",
+        suffix: str = "_right",
+        coalesce: bool | None = None,
+        validate: str | None = None,
+        join_nulls: bool | None = None,
+        maintain_order: bool | str | None = None,
+        allow_parallel: bool | None = None,
+        force_parallel: bool | None = None,
+        streaming: bool | None = None,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT] | None:
+        return self.join(
+            other,
+            on=on,
+            left_on=left_on,
+            right_on=right_on,
+            how=how,
+            suffix=suffix,
+            coalesce=coalesce,
+            validate=validate,
+            join_nulls=join_nulls,
+            maintain_order=maintain_order,
+            allow_parallel=allow_parallel,
+            force_parallel=force_parallel,
+            streaming=streaming,
+        ).try_as_schema(schema, validate_schema=validate_schema)
+
+    def join_assert_schema(
+        self,
+        other: DataFrame[Any],
+        schema: type[AfterSchemaT],
+        *,
+        on: str | Sequence[str] | Selector | None = None,
+        left_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
+        right_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
+        how: str = "inner",
+        suffix: str = "_right",
+        coalesce: bool | None = None,
+        validate: str | None = None,
+        join_nulls: bool | None = None,
+        maintain_order: bool | str | None = None,
+        allow_parallel: bool | None = None,
+        force_parallel: bool | None = None,
+        streaming: bool | None = None,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT]:
+        return self.join(
+            other,
+            on=on,
+            left_on=left_on,
+            right_on=right_on,
+            how=how,
+            suffix=suffix,
+            coalesce=coalesce,
+            validate=validate,
+            join_nulls=join_nulls,
+            maintain_order=maintain_order,
+            allow_parallel=allow_parallel,
+            force_parallel=force_parallel,
+            streaming=streaming,
+        ).assert_schema(schema, validate_schema=validate_schema)
+
+    def join_as_model(
+        self,
+        other: DataFrame[Any],
+        schema: type[AfterSchemaT],
+        *,
+        validate_schema: bool = True,
+        **kwargs: Any,
+    ) -> DataFrame[AfterSchemaT]:
+        return self.join_as_schema(
+            other, schema, validate_schema=validate_schema, **kwargs
+        )
+
+    def join_try_as_model(
+        self,
+        other: DataFrame[Any],
+        schema: type[AfterSchemaT],
+        *,
+        validate_schema: bool = True,
+        **kwargs: Any,
+    ) -> DataFrame[AfterSchemaT] | None:
+        return self.join_try_as_schema(
+            other, schema, validate_schema=validate_schema, **kwargs
+        )
+
+    def join_assert_model(
+        self,
+        other: DataFrame[Any],
+        schema: type[AfterSchemaT],
+        *,
+        validate_schema: bool = True,
+        **kwargs: Any,
+    ) -> DataFrame[AfterSchemaT]:
+        return self.join_assert_schema(
+            other, schema, validate_schema=validate_schema, **kwargs
+        )
+
     def group_by(
         self,
         *keys: str | ColumnRef,
@@ -2896,6 +3306,108 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             current_schema_type=derived_schema_type,
             rust_plan=rust_plan,
             engine=self._engine,
+        )
+
+    def rolling_agg_as_schema(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None = None,
+        min_periods: int = 1,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT]:
+        return self.rolling_agg(
+            on=on,
+            column=column,
+            window_size=window_size,
+            op=op,
+            out_name=out_name,
+            by=by,
+            min_periods=min_periods,
+        ).as_schema(schema, validate_schema=validate_schema)
+
+    def rolling_agg_try_as_schema(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None = None,
+        min_periods: int = 1,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT] | None:
+        return self.rolling_agg(
+            on=on,
+            column=column,
+            window_size=window_size,
+            op=op,
+            out_name=out_name,
+            by=by,
+            min_periods=min_periods,
+        ).try_as_schema(schema, validate_schema=validate_schema)
+
+    def rolling_agg_assert_schema(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None = None,
+        min_periods: int = 1,
+        validate_schema: bool = True,
+    ) -> DataFrame[AfterSchemaT]:
+        return self.rolling_agg(
+            on=on,
+            column=column,
+            window_size=window_size,
+            op=op,
+            out_name=out_name,
+            by=by,
+            min_periods=min_periods,
+        ).assert_schema(schema, validate_schema=validate_schema)
+
+    def rolling_agg_as_model(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        validate_schema: bool = True,
+        **kwargs: Any,
+    ) -> DataFrame[AfterSchemaT]:
+        return self.rolling_agg_as_schema(
+            schema, validate_schema=validate_schema, **kwargs
+        )
+
+    def rolling_agg_try_as_model(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        validate_schema: bool = True,
+        **kwargs: Any,
+    ) -> DataFrame[AfterSchemaT] | None:
+        return self.rolling_agg_try_as_schema(
+            schema, validate_schema=validate_schema, **kwargs
+        )
+
+    def rolling_agg_assert_model(
+        self,
+        schema: type[AfterSchemaT],
+        *,
+        validate_schema: bool = True,
+        **kwargs: Any,
+    ) -> DataFrame[AfterSchemaT]:
+        return self.rolling_agg_assert_schema(
+            schema, validate_schema=validate_schema, **kwargs
         )
 
     def group_by_dynamic(
