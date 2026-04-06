@@ -203,5 +203,5 @@ These are removed because they violate the spec:
 - **Milestone C**: remove/replace remaining dynamic features (selectors, rolling,
   reshape, facades) ☐
 - **Milestone D**: docs + typing contracts + CI stabilization ☐
-- **2.0.0-beta** then **2.0.0** ☐
+- **2.0.0-b** (first beta on PyPI) ✅ then stable **2.0.0** ☐
 

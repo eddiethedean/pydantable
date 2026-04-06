@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pydantable"
-version = "2.0.0"
+version = "2.0.0-b"
 description = "Strongly-typed DataFrames for Python, powered by Rust."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -19,8 +19,8 @@ classifiers = [
 ]
 dependencies = [
     "pydantic>=2.0,<3",
-    "pydantable-protocol==2.0.0",
-    "pydantable-native==2.0.0",
+    "pydantable-protocol==2.0.0-b",
+    "pydantable-native==2.0.0-b",
     "typing-extensions>=4.7",
 ]
 

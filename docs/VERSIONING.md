@@ -1,6 +1,6 @@
 # Versioning and stability
 
-PydanTable follows **semantic versioning**. The **current stable train is 2.x** (as of **v2.0.0**). **Behavioral** guarantees for transforms, nulls, joins, windows, materialization, and interchange live in {doc}`INTERFACE_CONTRACT`—treat that document as the semantics source of truth.
+PydanTable follows **semantic versioning**. **2.0** is in **beta** as **2.0.0-b**; stable **2.0.0** will follow the same API. **Behavioral** guarantees for transforms, nulls, joins, windows, materialization, and interchange live in {doc}`INTERFACE_CONTRACT`—treat that document as the semantics source of truth.
 
 ## Source of truth
 
@@ -10,7 +10,7 @@ PydanTable follows **semantic versioning**. The **current stable train is 2.x** 
 
 ## Python package and Rust extension
 
-`pydantable.__version__`, **`pydantable_protocol.__version__`**, and `pydantable_native._core.rust_version()` are kept equal to **`pyproject.toml`** / **`pydantable-protocol/pyproject.toml`** / **`pydantable-core/Cargo.toml`** on every release (see **`tests/dataframe/test_version_alignment.py`**). The **pydantable** package is pure Python plus documented re-exports; engine protocols ship in **`pydantable-protocol`** (no dependencies); the native extension ships in the **`pydantable-native`** distribution, which pins **`pydantable-protocol`** but does **not** depend on **`pydantable`**.
+`pydantable.__version__`, **`pydantable_protocol.__version__`**, and `pydantable_native._core.rust_version()` are kept equal to **`pyproject.toml`** / **`pydantable-protocol/pyproject.toml`** / **`pydantable-core/Cargo.toml`** on every release (see **`tests/dataframe/test_version_alignment.py`**). Published wheels may show the PEP 440 canonical label **`2.0.0b0`**; that is the same release as source **`2.0.0-b`**, and **`pip install pydantable==2.0.0-b`** still matches. The **pydantable** package is pure Python plus documented re-exports; engine protocols ship in **`pydantable-protocol`** (no dependencies); the native extension ships in the **`pydantable-native`** distribution, which pins **`pydantable-protocol`** but does **not** depend on **`pydantable`**.
 
 ## 2.x policy (effective `v2.0.0+`)
 
@@ -54,7 +54,7 @@ Required for incompatible changes, including:
 
 ## Upcoming removals
 
-The following APIs remain **available in 2.0.0** but are **deprecated**; migrate before the stated target.
+The following APIs remain **available in 2.0.0-b** (and are expected to remain for **2.0.0** stable) but are **deprecated**; migrate before the stated target.
 
 - **`as_polars=`** on **`DataFrame.collect`**, **`DataFrame.acollect`**, and **`DataFrameModel`** collection shims — use **`to_polars()`** / **`ato_polars()`** (and **`collect(as_lists=True)`** / **`to_dict()`** for columnar dicts). **Target removal: `v2.1.0`** (see warnings and {doc}`TYPING`).
 

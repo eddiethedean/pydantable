@@ -8,7 +8,7 @@
 
 **Strictly-typed DataFrames for Python, powered by Rust** — familiar dataframe workflows from Python, with optional file/SQL I/O, FastAPI helpers, and Pydantic when you want validated rows.
 
-**Current release: 2.0.0** — highlights in the [changelog](https://pydantable.readthedocs.io/en/latest/CHANGELOG.html).
+**Current pre-release: 2.0.0-b** (beta toward **2.0.0**) — highlights in the [changelog](https://pydantable.readthedocs.io/en/latest/CHANGELOG.html). Install with **`pip install --pre pydantable`** (or a pinned **`==2.0.0-b`**) so pre-releases resolve.
 
 ## Core contract
 

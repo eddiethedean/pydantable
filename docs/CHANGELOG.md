@@ -4,7 +4,9 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
-## [2.0.0] — 2026-04-06
+## [2.0.0-b] — 2026-04-06
+
+Pre-release: first **beta** toward stable **2.0.0** (same strict 2.x API and pins across **`pydantable`**, **`pydantable-protocol`**, **`pydantable-native`**, **`pydantable-core`**). Install from PyPI with **`pip install --pre pydantable`** or **`pip install pydantable==2.0.0-b`**.
 
 ### Added
 
@@ -20,12 +22,16 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Changed (deprecations)
 
-- **`collect` / `acollect` `as_polars=`:** deprecation warnings and {doc}`VERSIONING` now target removal in **`v2.1.0`** (parameter remains in **2.0.0**).
-- **Legacy string-SQL I/O aliases** (`fetch_sql`, `write_sql`, …): remain deprecated; removal is **not** tied to the **2.0.0** tag (see {doc}`VERSIONING` and {doc}`SQLMODEL_SQL_ROADMAP`).
+- **`collect` / `acollect` `as_polars=`:** deprecation warnings and {doc}`VERSIONING` now target removal in **`v2.1.0`** (parameter remains through **2.0.0** stable).
+- **Legacy string-SQL I/O aliases** (`fetch_sql`, `write_sql`, …): remain deprecated; removal is **not** tied to the **2.0.0** stable tag (see {doc}`VERSIONING` and {doc}`SQLMODEL_SQL_ROADMAP`).
 
 ### Version bump
 
-- Align **pydantable**, **pydantable-protocol**, **pydantable-native**, **pydantable-core**, and published **`__version__`** values to **2.0.0**.
+- Align **pydantable**, **pydantable-protocol**, **pydantable-native**, **pydantable-core**, and published **`__version__`** values to **2.0.0-b**.
+
+## [2.0.0] — (planned stable)
+
+GA release with the same API as **`2.0.0-b`**; version numbers move to **`2.0.0`** on all artifacts when published.
 
 ## [1.16.0] — 2026-04-06
 
