@@ -4,13 +4,13 @@ build-backend = "maturin"
 
 [project]
 name = "pydantable-native"
-version = "1.15.2"
+version = "1.16.0"
 description = "Native execution engine for pydantable (Rust + Polars)."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = [
-  "pydantable-protocol==1.15.2",
+  "pydantable-protocol==1.16.0",
 ]
 
 [tool.maturin]
