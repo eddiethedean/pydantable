@@ -165,7 +165,7 @@ jobs:
             x: int
 
           df = DataFrame[Row]({"x": [1, 2, 3]})
-          out = df.select("x").to_dict()
+          out = df.select_as(Row, df.col.x).to_dict()
           assert out == {"x": [1, 2, 3]}
           print("OK")
           PY

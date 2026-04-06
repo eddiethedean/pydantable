@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-04-06
+
+### Changed (breaking)
+
+- **Strict typed dataframe spec compliance:** schema-changing operations require explicit `*_as(AfterSchema/AfterModel, ...)` output schemas and typed column tokens (`df.col.<field>` / `ColumnRef`).
+- **Removed:** pandas facade and selector-driven schema mutation surface.
+- **Deprecated:** `pydantable.pyspark` remains importable but is deprecated/non-strict pending 2.1 alignment.
+
+### Version bump
+
+- Align **pydantable**, **pydantable-protocol**, **pydantable-native**, **pydantable-core**, and published **`__version__`** values to **2.0.0**.
+
 ## [1.16.0] — 2026-04-06
 
 ### Added
@@ -162,7 +174,7 @@ All notable changes to this project are documented here. The format is inspired 
 - **FastAPI:** columnar **map** / nested field notes with links to {doc}`SUPPORTED_TYPES` and {doc}`IO_JSON`.
 - **Roadmap:** Phase A + B + C JSON/struct work summarized in this **1.10.0** section and {doc}`ROADMAP` (**Shipped in 1.10.0**); **`str_json_decode`** / error semantics in {doc}`SUPPORTED_TYPES` and {doc}`INTERFACE_CONTRACT`; {doc}`IO_JSON` cross-link.
 - **Phase D (I/O):** {doc}`IO_JSON` — **`read_json`** vs **`read_ndjson`** vs **`materialize_json`**, large-file / **`streaming`** patterns, NDJSON **`scan_kwargs`** presets; example **`docs/examples/io/large_ndjson_patterns.py`**; cross-links from {doc}`DATA_IO_SOURCES`, {doc}`EXECUTION`, {doc}`IO_NDJSON`.
-- **Phase E (UX) & 1.10.0 JSON/struct summary:** {doc}`SELECTORS` — **`s.structs()`**, **`unnest`**, **`struct_field`** pipeline; cookbook {doc}`/cookbook/json_logs_unnest_export` (NDJSON → unnest → **`export_json`**); {doc}`DOCS_MAP` link. **Release narrative:** JSON ↔ schema matrix and I/O tests; struct expressions (**`struct_json_encode`**, path/rename/with-fields); **`str_json_decode`**; Phase D large-file NDJSON docs; Phase E selectors + cookbook + this page.
+- **Phase E (UX) & 1.10.0 JSON/struct summary:** cookbook {doc}`/cookbook/json_logs_unnest_export` (NDJSON → unnest → **`export_json`**); {doc}`DOCS_MAP` link. **Release narrative:** JSON ↔ schema matrix and I/O tests; struct expressions (**`struct_json_encode`**, path/rename/with-fields); **`str_json_decode`**; Phase D large-file NDJSON docs; Phase E cookbook + this page.
 
 ### Changed
 
@@ -186,7 +198,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Added
 
-- **Selectors:** selector-driven column and rename helpers (see `pydantable.selectors` and {doc}`/SELECTORS`).
+- **Selectors (legacy):** selector-driven column and rename helpers (removed in strict 2.0; see {doc}`MIGRATION_1_to_2`).
 - **Core DataFrame ergonomics:** `row_count`, `clip`, and `drop_nulls` arguments and convenience behavior aligned with the 1.8 parity push (see {doc}`/POLARS_PARITY_1_8` and {doc}`/PARITY_SCORECARD`).
 - **Joins:** additional join argument parity including `join_nulls` and `maintain_order` (typed contract preserved; see {doc}`/INTERFACE_CONTRACT`).
 - **Reshape:** `pivot_longer` / `pivot_wider` and related reshape ergonomics (see {doc}`/POLARS_WORKFLOWS` and {doc}`/INTERFACE_CONTRACT` reshape notes).

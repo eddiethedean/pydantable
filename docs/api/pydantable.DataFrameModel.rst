@@ -37,7 +37,6 @@
       ~DataFrameModel.ato_dict
       ~DataFrameModel.ato_dicts
       ~DataFrameModel.ato_polars
-      ~DataFrameModel.awrite_sql
       ~DataFrameModel.awrite_sqlmodel
       ~DataFrameModel.awrite_sqlmodel_data
       ~DataFrameModel.clip
@@ -61,7 +60,6 @@
       ~DataFrameModel.fill_null
       ~DataFrameModel.filter
       ~DataFrameModel.group_by_agg_as
-      ~DataFrameModel.group_by_dynamic
       ~DataFrameModel.head
       ~DataFrameModel.info
       ~DataFrameModel.iter_csv
@@ -87,10 +85,6 @@
       ~DataFrameModel.read_parquet_url
       ~DataFrameModel.read_parquet_url_ctx
       ~DataFrameModel.rename_as
-      ~DataFrameModel.rolling_agg
-      ~DataFrameModel.rolling_agg_as_model
-      ~DataFrameModel.rolling_agg_assert_model
-      ~DataFrameModel.rolling_agg_try_as_model
       ~DataFrameModel.row_json_schema
       ~DataFrameModel.row_model
       ~DataFrameModel.rows
@@ -121,7 +115,6 @@
       ~DataFrameModel.write_ndjson_batches
       ~DataFrameModel.write_parquet
       ~DataFrameModel.write_parquet_batches
-      ~DataFrameModel.write_sql
       ~DataFrameModel.write_sqlmodel
       ~DataFrameModel.write_sqlmodel_data
    

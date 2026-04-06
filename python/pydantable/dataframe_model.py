@@ -207,9 +207,6 @@ class _AsyncIOMethods(Generic[RowT]):
     def read_parquet_url_ctx(self, *args: Any, **kwargs: Any) -> Any:
         return self._cls.aread_parquet_url_ctx(*args, **kwargs)
 
-    def write_sql(self, *args: Any, **kwargs: Any) -> Any:
-        return self._cls.awrite_sql(*args, **kwargs)
-
     def write_sqlmodel(self, *args: Any, **kwargs: Any) -> Any:
         return self._cls.awrite_sqlmodel_data(*args, **kwargs)
 
@@ -243,10 +240,11 @@ class DataFrameModel(Generic[RowT]):
     (same as ``aread_parquet``) and unprefixed terminals on
     :class:`~pydantable.awaitable_dataframe_model.AwaitableDataFrameModel` (e.g.
     ``await …collect()``). Eager file/SQL column loads belong in
-    :mod:`pydantable.io` (``materialize_*``, ``fetch_sql``, ``fetch_sqlmodel``) — pass
+    :mod:`pydantable.io` (``materialize_*``, ``fetch_sql_raw``, ``fetch_sqlmodel``)
+    — pass
     the resulting ``dict[str, list]`` to the constructor if you need an in-memory
     table first.
-    **``export_*``** / **``aexport_*``**, **``write_sql``** / **``awrite_sql``**,
+    **``export_*``** / **``aexport_*``**,
     **``write_sqlmodel_data``** / **``awrite_sqlmodel_data``**, **instance**
     **``write_sqlmodel``** / **``awrite_sqlmodel``**,
     **``read_parquet_url_ctx``** / **``aread_parquet_url_ctx``** delegate to
@@ -925,46 +923,6 @@ class DataFrameModel(Generic[RowT]):
         from .io import aexport_json as _aej
 
         await _aej(path, data, indent=indent, executor=executor)
-
-    @classmethod
-    def write_sql(
-        cls,
-        data: dict[str, list[Any]],
-        table_name: str,
-        bind: str | Engine | Connection,
-        *,
-        schema: str | None = None,
-        if_exists: str = "append",
-    ) -> None:
-        """Append/replace rows via :func:`pydantable.io.write_sql` (``[sql]`` extra)."""
-        cls._dfm_require_subclass_with_schema()
-        from .io import write_sql as _ws
-
-        _ws(data, table_name, bind, schema=schema, if_exists=if_exists)
-
-    @classmethod
-    async def awrite_sql(
-        cls,
-        data: dict[str, list[Any]],
-        table_name: str,
-        bind: str | Engine | Connection,
-        *,
-        schema: str | None = None,
-        if_exists: str = "append",
-        executor: Executor | None = None,
-    ) -> None:
-        """Async :func:`pydantable.io.awrite_sql`."""
-        cls._dfm_require_subclass_with_schema()
-        from .io import awrite_sql as _aws
-
-        await _aws(
-            data,
-            table_name,
-            bind,
-            schema=schema,
-            if_exists=if_exists,
-            executor=executor,
-        )
 
     @classmethod
     def write_sqlmodel_data(
@@ -2436,109 +2394,6 @@ class DataFrameModel(Generic[RowT]):
             )
         ).as_model(model)
 
-    def rolling_agg(
-        self,
-        *,
-        on: str,
-        column: str,
-        window_size: int | str,
-        op: str,
-        out_name: str,
-        by: Sequence[str] | None = None,
-        min_periods: int = 1,
-    ) -> DataFrameModel[Any]:
-        return self._from_dataframe(
-            self._df.rolling_agg(
-                on=on,
-                column=column,
-                window_size=window_size,
-                op=op,
-                out_name=out_name,
-                by=by,
-                min_periods=min_periods,
-            )
-        )
-
-    def rolling_agg_as_model(
-        self,
-        model: type[AfterModelT],
-        *,
-        on: str,
-        column: str,
-        window_size: int | str,
-        op: str,
-        out_name: str,
-        by: Sequence[str] | None = None,
-        min_periods: int = 1,
-    ) -> AfterModelT:
-        return self.rolling_agg(
-            on=on,
-            column=column,
-            window_size=window_size,
-            op=op,
-            out_name=out_name,
-            by=by,
-            min_periods=min_periods,
-        ).as_model(model)
-
-    def rolling_agg_try_as_model(
-        self,
-        model: type[AfterModelT],
-        *,
-        on: str,
-        column: str,
-        window_size: int | str,
-        op: str,
-        out_name: str,
-        by: Sequence[str] | None = None,
-        min_periods: int = 1,
-    ) -> AfterModelT | None:
-        return self.rolling_agg(
-            on=on,
-            column=column,
-            window_size=window_size,
-            op=op,
-            out_name=out_name,
-            by=by,
-            min_periods=min_periods,
-        ).try_as_model(model)
-
-    def rolling_agg_assert_model(
-        self,
-        model: type[AfterModelT],
-        *,
-        on: str,
-        column: str,
-        window_size: int | str,
-        op: str,
-        out_name: str,
-        by: Sequence[str] | None = None,
-        min_periods: int = 1,
-    ) -> AfterModelT:
-        return self.rolling_agg(
-            on=on,
-            column=column,
-            window_size=window_size,
-            op=op,
-            out_name=out_name,
-            by=by,
-            min_periods=min_periods,
-        ).assert_model(model)
-
-    def group_by_dynamic(
-        self,
-        index_column: str,
-        *,
-        every: str,
-        period: str | None = None,
-        by: Sequence[str] | None = None,
-    ) -> DynamicGroupedDataFrameModel[ModelSelf]:
-        model_type = cast("type[ModelSelf]", self.__class__)
-        return DynamicGroupedDataFrameModel(
-            self._df.group_by_dynamic(index_column, every=every, period=period, by=by),
-            model_type,
-        )
-
     def __getattr__(self, item: str) -> Any:
         # Strict 2.0 typing contract: no `df.<field>` column access.
         if item in self.schema_fields():
@@ -2641,56 +2496,6 @@ class GroupedDataFrameModel(Generic[GroupedModelT]):
 
     def agg(self, **aggregations: Any) -> DataFrameModel[Any]:
         """Same kwargs as :meth:`pydantable.dataframe.GroupedDataFrame.agg`."""
-        return self._model_type._from_dataframe(self._grouped_df.agg(**aggregations))
-
-    def agg_as_model(
-        self,
-        model: type[AfterModelT],
-        **aggregations: Any,
-    ) -> AfterModelT:
-        return self.agg(**aggregations).as_model(model)
-
-    def agg_try_as_model(
-        self,
-        model: type[AfterModelT],
-        **aggregations: Any,
-    ) -> AfterModelT | None:
-        return self.agg(**aggregations).try_as_model(model)
-
-    def agg_assert_model(
-        self,
-        model: type[AfterModelT],
-        **aggregations: Any,
-    ) -> AfterModelT:
-        return self.agg(**aggregations).assert_model(model)
-
-
-class DynamicGroupedDataFrameModel(Generic[GroupedModelT]):
-    """Time-based ``group_by_dynamic`` grouping; call :meth:`agg` to finalize."""
-
-    def __init__(self, grouped_df: Any, model_type: type[GroupedModelT]) -> None:
-        self._grouped_df = grouped_df
-        self._model_type = model_type
-
-    def __repr__(self) -> str:
-        inner = "\n".join(f"  {line}" for line in repr(self._grouped_df).split("\n"))
-        return f"DynamicGroupedDataFrameModel({self._model_type.__name__})\n{inner}"
-
-    def _repr_html_(self) -> str:
-        inner = self._grouped_df._repr_html_()
-        title = html.escape(self._model_type.__name__)
-        return (
-            '<div class="pydantable-render pydantable-render--context" '
-            'style="margin:0 0 1rem 0;">'
-            '<p style="margin:0 0 10px 0;padding:8px 12px;border-radius:8px;'
-            "font:600 12px ui-sans-serif,system-ui,sans-serif;"
-            "color:#334155;background:#ecfdf5;border:1px solid #a7f3d0;"
-            'letter-spacing:0.02em;">'
-            f"<b>DynamicGroupedDataFrameModel({title})</b></p>{inner}</div>"
-        )
-
-    def agg(self, **aggregations: Any) -> DataFrameModel[Any]:
-        """Same rules as :meth:`pydantable.dataframe.DynamicGroupedDataFrame.agg`."""
         return self._model_type._from_dataframe(self._grouped_df.agg(**aggregations))
 
     def agg_as_model(

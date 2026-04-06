@@ -50,7 +50,6 @@ from pydantable.schema import (
     schema_from_descriptors,
     validate_columns_strict,
 )
-from pydantable.selectors import Selector
 
 from ._column_rows import _coerce_enum_columns, _rows_from_column_dict
 from ._describe_dtype import (
@@ -1682,10 +1681,9 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         *,
         lower: Any | None = None,
         upper: Any | None = None,
-        subset: str | Sequence[str] | Selector | None = None,
+        subset: str | Sequence[str] | None = None,
     ) -> DataFrame[SchemaT]:
         """Clamp numeric columns to the given bounds (schema-first)."""
-        from pydantable import selectors as _selectors
         from pydantable.expressions import Literal, when
 
         if lower is None and upper is None:
@@ -1693,20 +1691,14 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
         if isinstance(subset, str):
             subset = [subset]
-        if isinstance(subset, Selector):
-            cols = subset.resolve(self._current_field_types)
-            if not cols:
-                available = ", ".join(repr(c) for c in self._current_field_types)
-                raise ValueError(
-                    f"clip(subset={subset!r}) matched no columns. "
-                    f"Available columns: [{available}]"
-                )
-            subset = cols
-
         targets = (
             list(subset)
             if subset is not None
-            else _selectors.numeric().resolve(self._current_field_types)
+            else [
+                c
+                for c, dt in self._current_field_types.items()
+                if _is_describe_numeric(dt)
+            ]
         )
         if not targets:
             available = ", ".join(repr(c) for c in self._current_field_types)
@@ -1768,19 +1760,10 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         value: Any = None,
         *,
         strategy: str | None = None,
-        subset: str | Sequence[str] | Selector | None = None,
+        subset: str | Sequence[str] | None = None,
     ) -> DataFrame[SchemaT]:
         if isinstance(subset, str):
             subset = [subset]
-        if isinstance(subset, Selector):
-            subset_cols = subset.resolve(self._current_field_types)
-            if not subset_cols:
-                available = ", ".join(repr(c) for c in self._current_field_types)
-                raise ValueError(
-                    f"fill_null(subset={subset!r}) matched no columns. "
-                    f"Available columns: [{available}]"
-                )
-            subset = subset_cols
         if value is None and strategy is None:
             raise ValueError("fill_null() requires either value or strategy.")
         if value is not None and strategy is not None:
@@ -1811,15 +1794,11 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
     def drop_nulls(
         self,
-        subset: str | Sequence[str] | Selector | None = None,
+        subset: str | Sequence[str] | None = None,
         *,
         how: str = "any",
         threshold: int | None = None,
     ) -> DataFrame[SchemaT]:
-        if isinstance(subset, Selector):
-            raise TypeError(
-                "drop_nulls(subset=Selector) is removed in pydantable 2.0 strict mode."
-            )
         if isinstance(subset, str):
             subset = [subset]
         rust_plan = self._engine.plan_drop_nulls(
@@ -2149,9 +2128,9 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         self,
         other: DataFrame[Any],
         *,
-        on: str | Sequence[str] | Selector | None = None,
-        left_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
-        right_on: str | Expr | Sequence[str | Expr] | Selector | None = None,
+        on: Any | None = None,
+        left_on: Any | None = None,
+        right_on: Any | None = None,
         how: str = "inner",
         suffix: str = "_right",
         coalesce: bool | None = None,
@@ -2168,6 +2147,11 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         not implemented in the native engine: passing either raises
         :exc:`NotImplementedError` (see the parity scorecard in the docs).
         """
+        raise TypeError(
+            "join() is removed in pydantable 2.0 strict mode. "
+            "Use join_as(AfterSchema, other, on=[df.col.key], ...) so the output "
+            "schema is explicit and ColumnRef-based."
+        )
         if not isinstance(other, DataFrame):
             raise TypeError("join(other=...) expects another DataFrame.")
         if coalesce is not None and not isinstance(coalesce, bool):
@@ -2181,7 +2165,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             return ", ".join(repr(c) for c in field_types)
 
         def _resolve_selector(
-            *, sel: Selector, field_types: Mapping[str, Any], arg_name: str
+            *, sel: Any, field_types: Mapping[str, Any], arg_name: str
         ) -> list[str]:
             matched = sel.resolve(field_types)
             if not matched:
@@ -2228,7 +2212,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             return tp
 
         if on is not None:
-            if isinstance(on, Selector):
+            if False:  # pragma: no cover
                 left_keys = _resolve_selector(
                     sel=on, field_types=self._current_field_types, arg_name="on"
                 )
@@ -2250,7 +2234,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             used_non_columnref_expr_keys = False
         else:
             used_non_columnref_expr_keys = False
-            if isinstance(left_on, Selector):
+            if False:  # pragma: no cover
                 left_keys = _resolve_selector(
                     sel=left_on,
                     field_types=self._current_field_types,
@@ -2259,7 +2243,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             else:
                 left_keys = _resolve_keys(left_on)
 
-            if isinstance(right_on, Selector):
+            if False:  # pragma: no cover
                 right_keys = _resolve_selector(
                     sel=right_on,
                     field_types=other._current_field_types,
@@ -2270,19 +2254,13 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             raw_left = (
                 []
                 if left_on is None
-                else (
-                    [left_on]
-                    if isinstance(left_on, (str, Expr, Selector))
-                    else list(left_on)
-                )
+                else ([left_on] if isinstance(left_on, (str, Expr)) else list(left_on))
             )
             raw_right = (
                 []
                 if right_on is None
                 else (
-                    [right_on]
-                    if isinstance(right_on, (str, Expr, Selector))
-                    else list(right_on)
+                    [right_on] if isinstance(right_on, (str, Expr)) else list(right_on)
                 )
             )
             used_non_columnref_expr_keys = any(

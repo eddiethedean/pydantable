@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pydantable"
-version = "1.16.0"
+version = "2.0.0"
 description = "Strongly-typed DataFrames for Python, powered by Rust."
 readme = "README.md"
 license = { text = "MIT" }
@@ -19,8 +19,8 @@ classifiers = [
 ]
 dependencies = [
     "pydantic>=2.0,<3",
-    "pydantable-protocol==1.16.0",
-    "pydantable-native==1.16.0",
+    "pydantable-protocol==2.0.0",
+    "pydantable-native==2.0.0",
     "typing-extensions>=4.7",
 ]
 
@@ -154,8 +154,6 @@ include = [
 ]
 exclude = [
     "python/pydantable/pyspark/**",
-    "python/pydantable/pandas.py",
-    "python/pydantable/pandas.pyi",
     "notebooks/**",
     ".venv-mypy-min/**",
     ".venv-ty-min/**",

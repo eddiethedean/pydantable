@@ -344,7 +344,7 @@ Practical inputs that feed that phase:
 - [x] **Struct expressions (Polars):** **`Expr.struct_json_encode`**, **`struct_json_path_match`**, **`struct_rename_fields`**, **`struct_with_fields`**; PySpark **`struct_json_encode`** / **`struct_json_path_match`**. See {doc}`CHANGELOG` **1.10.0**.
 - [x] **JSON decode:** **`Expr.str_json_decode`** (string → struct or homogeneous map).
 - [x] **I/O & tests:** nested **`materialize_json`**, **`export_json`** round-trip; **`tests/test_json_io_phase_a.py`** and related coverage.
-- [x] **Docs:** {doc}`IO_JSON`, {doc}`SUPPORTED_TYPES`, {doc}`SELECTORS`, NDJSON cookbook; Phase D/E narrative in {doc}`CHANGELOG` **1.10.0**.
+- [x] **Docs:** {doc}`IO_JSON`, {doc}`SUPPORTED_TYPES`, NDJSON cookbook; Phase D/E narrative in {doc}`CHANGELOG` **1.10.0**.
 
 ---
 

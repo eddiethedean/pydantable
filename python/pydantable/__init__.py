@@ -4,7 +4,7 @@
 :class:`DataFrameModel`. Build ``DataFrame[YourSchema](data)`` where ``YourSchema``
 subclasses :class:`Schema`.
 
-**Facades:** removed in strict 2.0 mode.
+**Facades:** the pandas UI is removed in strict 2.0; the PySpark UI is deprecated.
 
 **I/O:** eager loaders, iterators, and SQL helpers are imported from this package
 (``from pydantable import fetch_sqlmodel, materialize_parquet, materialize_json,
@@ -24,7 +24,6 @@ from .display import get_repr_html_limits, reset_display_options, set_display_op
 from .errors import ColumnLengthMismatchError, PydantableUserError
 from .expressions import Expr
 from .io import (
-    afetch_sql,
     afetch_sql_raw,
     afetch_sqlmodel,
     aiter_csv,
@@ -33,7 +32,6 @@ from .io import (
     aiter_json_lines,
     aiter_ndjson,
     aiter_parquet,
-    aiter_sql,
     aiter_sql_raw,
     aiter_sqlmodel,
     amaterialize_json,
@@ -44,7 +42,6 @@ from .io import (
     awrite_sqlmodel,
     awrite_sqlmodel_batches,
     export_parquet,
-    fetch_sql,
     fetch_sql_raw,
     fetch_sqlmodel,
     iter_avro,
@@ -112,7 +109,6 @@ __all__ = [
     "Schema",
     "SqlDataFrame",
     "SqlDataFrameModel",
-    "afetch_sql",
     "afetch_sql_raw",
     "afetch_sqlmodel",
     "aiter_csv",
@@ -121,7 +117,6 @@ __all__ = [
     "aiter_json_lines",
     "aiter_ndjson",
     "aiter_parquet",
-    "aiter_sql",
     "aiter_sql_raw",
     "aiter_sqlmodel",
     "amaterialize_json",
@@ -132,7 +127,6 @@ __all__ = [
     "awrite_sqlmodel",
     "awrite_sqlmodel_batches",
     "export_parquet",
-    "fetch_sql",
     "fetch_sql_raw",
     "fetch_sqlmodel",
     "get_observer",
@@ -172,4 +166,4 @@ __all__ = [
     "write_sqlmodel",
     "write_sqlmodel_batches",
 ]
-__version__ = "1.16.0"
+__version__ = "2.0.0"

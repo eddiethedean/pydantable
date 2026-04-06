@@ -54,7 +54,7 @@ Expand Selector DSL to cover the *most-used* selector patterns from Polars docs 
 - **API coverage**: selectors in more places where Polars users expect them:\n  - `rename` mapping helpers (e.g. rename all columns matching a selector)\n  - `with_columns` conveniences (selector-driven passthrough is likely a non-goal; consider selector-driven `cast`/`fill_null` patterns only if they stay typed)\n- **Better diagnostics**: error messages that include the available schema columns and/or the selector expression summary.
 
 ### Deliverables
-- Extend `pydantable.selectors` surface with new selectors and tests.\n- Update {doc}`SELECTORS` with the expanded catalog.\n+
+- (Legacy) selectors surface was removed in strict 2.0.\n+
 ## Phase 4 — Long-tail popular DataFrame methods (schema-first shortlist)
 
 ### Goal

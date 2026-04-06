@@ -382,25 +382,7 @@ def main(argv: list[str] | None = None) -> int:
         include_all_public_defs=True,
         include_private_defs=True,
     )
-    pandas_stub = _render_module_stub(pkg / "pandas.py", include_all_public_defs=True)
-    # ``pandas.py`` lazy-exports SQL facades via ``__getattr__`` (no TYPE_CHECKING
-    # import: circular with ``pandas_moltres``). Stub needs explicit symbols for
-    # ``__all__`` / Ruff F822.
-    _pandas_src = (pkg / "pandas.py").read_text(encoding="utf-8")
-    _pandas_all = _parse_all_names(ast.parse(_pandas_src))
-    if (
-        _pandas_all
-        and "SqlDataFrame" in _pandas_all
-        and "from .pandas_moltres import SqlDataFrame" not in pandas_stub
-    ):
-        _marker = "def wide_to_long("
-        _pos = pandas_stub.find(_marker)
-        if _pos != -1:
-            pandas_stub = (
-                pandas_stub[:_pos]
-                + "from .pandas_moltres import SqlDataFrame, SqlDataFrameModel\n\n"
-                + pandas_stub[_pos:]
-            )
+    # 2.0 strict mode: pandas facade removed (no stubs generated).
     pyspark_sql_functions_stub = _render_module_stub(
         pkg / "pyspark" / "sql" / "functions.py"
     )
@@ -444,7 +426,7 @@ def main(argv: list[str] | None = None) -> int:
         _Target(pkg / "display.pyi", display_stub, False),
         _Target(pkg / "observe.pyi", observe_stub, False),
         _Target(pkg / "window_spec.pyi", window_spec_stub, False),
-        _Target(pkg / "pandas.pyi", pandas_stub, False),
+        # 2.0 strict mode: pandas facade removed.
         _Target(
             pkg / "pyspark" / "sql" / "functions.pyi", pyspark_sql_functions_stub, False
         ),
@@ -468,7 +450,7 @@ def main(argv: list[str] | None = None) -> int:
         _Target(stub_pkg / "display.pyi", display_stub, True),
         _Target(stub_pkg / "observe.pyi", observe_stub, True),
         _Target(stub_pkg / "window_spec.pyi", window_spec_stub, True),
-        _Target(stub_pkg / "pandas.pyi", pandas_stub, True),
+        # 2.0 strict mode: pandas facade removed.
         _Target(
             stub_pkg / "pyspark" / "sql" / "functions.pyi",
             pyspark_sql_functions_stub,
