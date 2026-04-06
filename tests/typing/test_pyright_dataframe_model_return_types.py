@@ -217,6 +217,9 @@ def test_pyright_keeps_concrete_model_type_through_schema_preserving_chains(
             .with_columns_fill_null("v", value=0)
             .explode("id")
             .unnest("id")
+            .with_row_count()
+            .explode_all()
+            .unnest_all()
             .head(2)
         )
     """

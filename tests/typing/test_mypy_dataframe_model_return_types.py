@@ -239,6 +239,9 @@ def test_mypy_accepts_schema_preserving_chain_methods(tmp_path: Path) -> None:
             .with_columns_fill_null("v", value=0)
             .explode("id")
             .unnest("id")
+            .with_row_count()
+            .explode_all()
+            .unnest_all()
             .head(2)
         )
     """

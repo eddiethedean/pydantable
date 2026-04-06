@@ -96,6 +96,42 @@ Safer variants:
 - `try_as_model(After)` returns `After | None` on mismatch (no exception).
 - `assert_model(After)` raises with a richer schema diff (missing/extra/type mismatches).
 
+### Typed escape hatches for aggregations (Pyright / `ty`)
+
+Some operations are inherently **schema-changing** (for example grouped aggregations and
+rolling aggregations). For Pyright/`ty` users, prefer the explicit `*_as_model` helpers
+so the return type is your declared after-model.
+
+```python
+from pydantable import DataFrameModel
+
+class Events(DataFrameModel):
+    g: int
+    v: int
+    ts: str
+
+class ByGroup(DataFrameModel):
+    g: int
+    total: int
+
+class WithRolling(DataFrameModel):
+    ts: str
+    roll: int
+
+def grouped(df: Events) -> ByGroup:
+    return df.group_by("g").agg_as_model(ByGroup, total=("sum", "v"))
+
+def rolling(df: Events) -> WithRolling:
+    return df.rolling_agg_as_model(
+        WithRolling,
+        on="ts",
+        column="v",
+        window_size=3,
+        op="sum",
+        out_name="roll",
+    )
+```
+
 ## mypy workflow (plugin-based inference)
 
 If you use **Astral `ty`** or **Pyright** on your project instead of mypy, use the **explicit after-model** section above — the plugin applies **only** to mypy.

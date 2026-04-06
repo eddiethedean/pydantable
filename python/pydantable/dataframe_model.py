@@ -2193,9 +2193,7 @@ class DataFrameModel(Generic[RowT]):
     def slice(self, offset: int, length: int) -> Self:
         return self._from_dataframe(self._df.slice(offset, length))
 
-    def with_row_count(
-        self, name: str = "row_nr", *, offset: int = 0
-    ) -> DataFrameModel[Any]:
+    def with_row_count(self, name: str = "row_nr", *, offset: int = 0) -> Self:
         return self._from_dataframe(self._df.with_row_count(name=name, offset=offset))
 
     def head(self, n: int = 5) -> Self:
@@ -2393,10 +2391,10 @@ class DataFrameModel(Generic[RowT]):
     ) -> Self:
         return self._from_dataframe(self._df.unnest(columns, streaming=streaming))
 
-    def explode_all(self, *, streaming: bool | None = None) -> DataFrameModel[Any]:
+    def explode_all(self, *, streaming: bool | None = None) -> Self:
         return self._from_dataframe(self._df.explode_all(streaming=streaming))
 
-    def unnest_all(self, *, streaming: bool | None = None) -> DataFrameModel[Any]:
+    def unnest_all(self, *, streaming: bool | None = None) -> Self:
         return self._from_dataframe(self._df.unnest_all(streaming=streaming))
 
     def join(

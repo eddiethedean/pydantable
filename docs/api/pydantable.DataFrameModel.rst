@@ -93,6 +93,9 @@
       ~DataFrameModel.rename_title
       ~DataFrameModel.rename_upper
       ~DataFrameModel.rolling_agg
+      ~DataFrameModel.rolling_agg_as_model
+      ~DataFrameModel.rolling_agg_assert_model
+      ~DataFrameModel.rolling_agg_try_as_model
       ~DataFrameModel.row_json_schema
       ~DataFrameModel.row_model
       ~DataFrameModel.rows
