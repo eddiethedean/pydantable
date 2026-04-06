@@ -63,7 +63,12 @@ app.include_router(router)
 def sales_by_country(body: SalesByCountryBody):
     orders = OrderLineDF(body.orders)
     users = UserDimDF(body.users)
-    joined = orders.join_as(users, OrderUserDF, on=[orders.col.user_id], how="left")
+    joined = orders.join_as(
+        other=users,
+        model=OrderUserDF,
+        on=[orders.col.user_id],
+        how="left",
+    )
     filled = joined.fill_null(0.0, subset=["amount"])
     rolled = filled.group_by_agg_as(
         CountryRevenueDF,

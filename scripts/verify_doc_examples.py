@@ -161,7 +161,12 @@ class CountryAgg(DataFrameModel):
     n_orders: int
 
 
-joined = orders.join_as(users, OrderUser, on=[orders.col.user_id], how="left")
+joined = orders.join_as(
+    other=users,
+    model=OrderUser,
+    on=[orders.col.user_id],
+    how="left",
+)
 out = joined.group_by_agg_as(
     CountryAgg,
     keys=[joined.col.country],
@@ -292,7 +297,12 @@ class CountryRevenueRowDF(DataFrameModel):
     n_orders: int
 
 
-joined2 = orders.join_as(users, OrderUser2, on=[orders.col.user_id], how="left")
+joined2 = orders.join_as(
+    other=users,
+    model=OrderUser2,
+    on=[orders.col.user_id],
+    how="left",
+)
 
 
 class OrderUser2Filled(OrderUser2):

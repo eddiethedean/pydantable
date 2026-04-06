@@ -48,7 +48,7 @@ def test_pyright_dataframe_as_schema_and_escape_hatches(tmp_path) -> None:
     def join_ok(
         left: DataFrame[Before], right: DataFrame[Right]
     ) -> DataFrame[AfterJoin]:
-        return left.join_as(AfterJoin, right, on=[left.col.id])
+        return left.join_as(schema=AfterJoin, other=right, on=[left.col.id])
     """
     proc = _run_pyright_snippet(tmp_path, code)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)

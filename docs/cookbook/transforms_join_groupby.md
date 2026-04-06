@@ -37,7 +37,12 @@ orders = Orders(
 )
 users = Users({"user_id": [10, 20], "country": ["US", "CA"]})
 
-joined = orders.join_as(users, OrderUser, on=[orders.col.user_id], how="left")
+joined = orders.join_as(
+    other=users,
+    model=OrderUser,
+    on=[orders.col.user_id],
+    how="left",
+)
 agg = joined.group_by_agg_as(
     CountryAgg,
     keys=[joined.col.country],

@@ -88,6 +88,8 @@ Output:
 
 Start here: <https://pydantable.readthedocs.io/en/latest/>
 
+Transforms cheat sheet (**`with_columns_as`**, **`join_as`** with **`schema=`** / **`model=`** keywords, etc.): <https://pydantable.readthedocs.io/en/latest/TRANSFORMS_QUICK_REF.html>
+
 ## Development
 
 Use a virtual environment at **`.venv`** in the repo root (the `Makefile` defaults to `.venv/bin/python`). Full contributor setup, Maturin/Rust builds, and release notes: [DEVELOPER](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html).

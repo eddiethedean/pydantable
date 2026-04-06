@@ -6,6 +6,8 @@ Opinionated, end-to-end recipes built for production usage. Every recipe aims to
 - explicit about **validation** and **materialization** costs
 - clear about **pitfalls** (ordering, null semantics, async cancellation)
 
+For **`*_as`** transforms and recommended **`join_as`** keyword style (**`model=`** / **`schema=`**), see {doc}`/TRANSFORMS_QUICK_REF`.
+
 ```{toctree}
 :titlesonly:
 :maxdepth: 2

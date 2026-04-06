@@ -131,6 +131,8 @@ All must return a new TypedDataFrame with a new schema.
 - Must be deterministic
 - Must produce a new schema every time
 
+For **`join_as`**, prefer **keyword arguments** for the output schema and the right-hand frame (**`schema=`** / **`after_schema_type=`** and **`other=`** on **`DataFrame`**; **`model=`** / **`after_model=`** and **`other=`** on **`DataFrameModel`**) so positional order cannot be mixed up across the two surfaces (see the manual: [TRANSFORMS_QUICK_REF](https://pydantable.readthedocs.io/en/latest/TRANSFORMS_QUICK_REF.html)).
+
 Recommended:
 - Code generation for schemas
 

@@ -59,6 +59,7 @@ Use `to_polars()` / `to_arrow()` when the optional extras are installed ({doc}`E
 ## Where to read next
 
 - {doc}`DATAFRAMEMODEL` — `DataFrameModel`, validation, transforms
+- {doc}`TRANSFORMS_QUICK_REF` — **`join_as`** keywords (**`schema=`** / **`model=`**) and common **`*_as`** patterns
 - {doc}`EXECUTION` — materialization cost, async, display limits
 - {doc}`INTERFACE_CONTRACT` — semantics (joins, nulls, `shape` vs executed rows)
 - {doc}`IO_DECISION_TREE` — pick lazy vs eager I/O; prefer **`DataFrameModel`** / **`DataFrame[Schema]`** classmethods over raw **`pydantable.io`**
