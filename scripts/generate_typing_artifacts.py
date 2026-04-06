@@ -4,6 +4,7 @@ import argparse
 import ast
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -68,6 +69,13 @@ def _normalize_stub_content(repo_root: Path, path: Path, content: str) -> str:
         return fmt_proc.stdout if fmt_proc.returncode == 0 else checked
     except OSError:
         return content
+
+
+@dataclass(frozen=True)
+class _Target:
+    path: Path
+    content: str
+    write_in_check_mode: bool
 
 
 def _render_init_stub(init_py: Path) -> str:
@@ -340,6 +348,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Fail if generated artifacts would change (do not write).",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print every generated target path.",
+    )
     args = parser.parse_args(argv)
 
     repo = Path(__file__).resolve().parents[1]
@@ -407,52 +420,88 @@ def main(argv: list[str] | None = None) -> int:
         pkg / "awaitable_dataframe_model.pyi"
     ).read_text(encoding="utf-8")
 
-    targets: list[tuple[Path, str]] = [
-        (pkg / "__init__.pyi", init_stub),
-        (pkg / "dataframe_model.pyi", committed_dataframe_model),
-        (
+    targets: list[_Target] = [
+        _Target(pkg / "__init__.pyi", init_stub, write_in_check_mode=False),
+        # These two are committed sources-of-truth: generator ensures they are mirrored
+        # into the external `typings/` package, but does not rewrite the in-package
+        # copies (they are maintained manually).
+        _Target(
+            pkg / "dataframe_model.pyi",
+            committed_dataframe_model,
+            write_in_check_mode=False,
+        ),
+        _Target(
             pkg / "awaitable_dataframe_model.pyi",
             committed_awaitable_dataframe_model,
+            write_in_check_mode=False,
         ),
-        (pkg / "dataframe" / "__init__.pyi", dataframe_init_stub),
-        (pkg / "schema" / "__init__.pyi", schema_init_stub),
-        (pkg / "io" / "__init__.pyi", io_init_stub),
-        (pkg / "pyspark" / "__init__.pyi", pyspark_init_stub),
-        (pkg / "pyspark" / "sql" / "__init__.pyi", pyspark_sql_init_stub),
-        (pkg / "expressions.pyi", expressions_stub),
-        (pkg / "display.pyi", display_stub),
-        (pkg / "observe.pyi", observe_stub),
-        (pkg / "window_spec.pyi", window_spec_stub),
-        (pkg / "pandas.pyi", pandas_stub),
-        (pkg / "pyspark" / "sql" / "functions.pyi", pyspark_sql_functions_stub),
-        (pkg / "pyspark" / "sql" / "window.pyi", pyspark_sql_window_stub),
-        (pkg / "pyspark" / "sql" / "column.pyi", pyspark_sql_column_stub),
-        (stub_pkg / "__init__.pyi", init_stub),
-        (stub_pkg / "dataframe_model.pyi", committed_dataframe_model),
-        (
+        _Target(pkg / "dataframe" / "__init__.pyi", dataframe_init_stub, False),
+        _Target(pkg / "schema" / "__init__.pyi", schema_init_stub, False),
+        _Target(pkg / "io" / "__init__.pyi", io_init_stub, False),
+        _Target(pkg / "pyspark" / "__init__.pyi", pyspark_init_stub, False),
+        _Target(pkg / "pyspark" / "sql" / "__init__.pyi", pyspark_sql_init_stub, False),
+        _Target(pkg / "expressions.pyi", expressions_stub, False),
+        _Target(pkg / "display.pyi", display_stub, False),
+        _Target(pkg / "observe.pyi", observe_stub, False),
+        _Target(pkg / "window_spec.pyi", window_spec_stub, False),
+        _Target(pkg / "pandas.pyi", pandas_stub, False),
+        _Target(
+            pkg / "pyspark" / "sql" / "functions.pyi", pyspark_sql_functions_stub, False
+        ),
+        _Target(pkg / "pyspark" / "sql" / "window.pyi", pyspark_sql_window_stub, False),
+        _Target(pkg / "pyspark" / "sql" / "column.pyi", pyspark_sql_column_stub, False),
+        _Target(stub_pkg / "__init__.pyi", init_stub, False),
+        _Target(stub_pkg / "dataframe_model.pyi", committed_dataframe_model, True),
+        _Target(
             stub_pkg / "awaitable_dataframe_model.pyi",
             committed_awaitable_dataframe_model,
+            True,
         ),
-        (stub_pkg / "dataframe" / "__init__.pyi", dataframe_init_stub),
-        (stub_pkg / "schema" / "__init__.pyi", schema_init_stub),
-        (stub_pkg / "io" / "__init__.pyi", io_init_stub),
-        (stub_pkg / "pyspark" / "__init__.pyi", pyspark_init_stub),
-        (stub_pkg / "pyspark" / "sql" / "__init__.pyi", pyspark_sql_init_stub),
-        (stub_pkg / "expressions.pyi", expressions_stub),
-        (stub_pkg / "display.pyi", display_stub),
-        (stub_pkg / "observe.pyi", observe_stub),
-        (stub_pkg / "window_spec.pyi", window_spec_stub),
-        (stub_pkg / "pandas.pyi", pandas_stub),
-        (stub_pkg / "pyspark" / "sql" / "functions.pyi", pyspark_sql_functions_stub),
-        (stub_pkg / "pyspark" / "sql" / "window.pyi", pyspark_sql_window_stub),
-        (stub_pkg / "pyspark" / "sql" / "column.pyi", pyspark_sql_column_stub),
+        _Target(stub_pkg / "dataframe" / "__init__.pyi", dataframe_init_stub, True),
+        _Target(stub_pkg / "schema" / "__init__.pyi", schema_init_stub, True),
+        _Target(stub_pkg / "io" / "__init__.pyi", io_init_stub, True),
+        _Target(stub_pkg / "pyspark" / "__init__.pyi", pyspark_init_stub, True),
+        _Target(
+            stub_pkg / "pyspark" / "sql" / "__init__.pyi", pyspark_sql_init_stub, True
+        ),
+        _Target(stub_pkg / "expressions.pyi", expressions_stub, True),
+        _Target(stub_pkg / "display.pyi", display_stub, True),
+        _Target(stub_pkg / "observe.pyi", observe_stub, True),
+        _Target(stub_pkg / "window_spec.pyi", window_spec_stub, True),
+        _Target(stub_pkg / "pandas.pyi", pandas_stub, True),
+        _Target(
+            stub_pkg / "pyspark" / "sql" / "functions.pyi",
+            pyspark_sql_functions_stub,
+            True,
+        ),
+        _Target(
+            stub_pkg / "pyspark" / "sql" / "window.pyi", pyspark_sql_window_stub, True
+        ),
+        _Target(
+            stub_pkg / "pyspark" / "sql" / "column.pyi", pyspark_sql_column_stub, True
+        ),
     ]
 
-    formatted_targets = [(p, _normalize_stub_content(repo, p, c)) for (p, c) in targets]
+    # Normalize content deterministically (Ruff fix-only + format) using committed
+    # relative paths so config applies consistently.
+    formatted_targets = [
+        _Target(
+            t.path,
+            _normalize_stub_content(repo, t.path, t.content),
+            t.write_in_check_mode,
+        )
+        for t in targets
+    ]
+
+    if args.verbose:
+        for t in formatted_targets:
+            print(str(t.path.relative_to(repo)))
 
     if args.check:
         changed = [
-            str(p.relative_to(repo)) for (p, c) in formatted_targets if _differs(p, c)
+            str(t.path.relative_to(repo))
+            for t in formatted_targets
+            if _differs(t.path, t.content)
         ]
         if changed:
             print("Typing artifacts are out of date. Re-run:")
@@ -462,16 +511,17 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  - {p}")
             return 1
     else:
-        for p, c in formatted_targets:
-            if str(p).startswith(str(pkg)):
-                _write_if_changed(p, c)
+        for t in formatted_targets:
+            if str(t.path).startswith(str(pkg)):
+                _write_if_changed(t.path, t.content)
     (pkg / "py.typed").parent.mkdir(parents=True, exist_ok=True)
     (pkg / "py.typed").touch(exist_ok=True)
 
-    if not args.check:
-        for p, c in formatted_targets:
-            if str(p).startswith(str(stub_pkg)):
-                _write_if_changed(p, c)
+    for t in formatted_targets:
+        if str(t.path).startswith(str(stub_pkg)) and (
+            not args.check or t.write_in_check_mode
+        ):
+            _write_if_changed(t.path, t.content)
     return 0
 
 
