@@ -2144,9 +2144,11 @@ class DataFrameModel(Generic[RowT]):
 
     def with_columns_cast(
         self, selector: Any, dtype: Any, *, strict: bool = True
-    ) -> DataFrameModel[Any]:
-        return self._from_dataframe(
-            self._df.with_columns_cast(selector, dtype, strict=strict)
+    ) -> Never:
+        raise TypeError(
+            "DataFrameModel.with_columns_cast(...) is removed in pydantable 2.0 strict "
+            "mode. Use with_columns_as(AfterModel, ...) with explicit cast "
+            "expressions."
         )
 
     def with_columns_fill_null(
@@ -2156,11 +2158,10 @@ class DataFrameModel(Generic[RowT]):
         value: Any = None,
         strategy: str | None = None,
         strict: bool = True,
-    ) -> Self:
-        return self._from_dataframe(
-            self._df.with_columns_fill_null(
-                selector, value=value, strategy=strategy, strict=strict
-            )
+    ) -> Never:
+        raise TypeError(
+            "DataFrameModel.with_columns_fill_null(...) is removed in pydantable 2.0 "
+            "strict mode. Use fill_null(...) or with_columns_as(AfterModel, ...)."
         )
 
     def filter(self, condition: Any) -> Self:
@@ -2203,19 +2204,13 @@ class DataFrameModel(Generic[RowT]):
             self._df.rename_as(model.schema_model(), columns)
         ).as_model(model)
 
-    def rename_upper(
-        self, selector: Any = None, *, strict: bool = True
-    ) -> DataFrameModel[Any]:
+    def rename_upper(self, selector: Any = None, *, strict: bool = True) -> Never:
         raise TypeError("rename_upper() is removed in pydantable 2.0 strict mode.")
 
-    def rename_lower(
-        self, selector: Any = None, *, strict: bool = True
-    ) -> DataFrameModel[Any]:
+    def rename_lower(self, selector: Any = None, *, strict: bool = True) -> Never:
         raise TypeError("rename_lower() is removed in pydantable 2.0 strict mode.")
 
-    def rename_title(
-        self, selector: Any = None, *, strict: bool = True
-    ) -> DataFrameModel[Any]:
+    def rename_title(self, selector: Any = None, *, strict: bool = True) -> Never:
         raise TypeError("rename_title() is removed in pydantable 2.0 strict mode.")
 
     def rename_strip(
@@ -2224,7 +2219,7 @@ class DataFrameModel(Generic[RowT]):
         *,
         chars: str | None = None,
         strict: bool = True,
-    ) -> DataFrameModel[Any]:
+    ) -> Never:
         raise TypeError("rename_strip() is removed in pydantable 2.0 strict mode.")
 
     def slice(self, offset: int, length: int) -> Self:
@@ -2283,15 +2278,10 @@ class DataFrameModel(Generic[RowT]):
         variable_name: str = "variable",
         value_name: str = "value",
         streaming: bool | None = None,
-    ) -> DataFrameModel[Any]:
-        return self._from_dataframe(
-            self._df.melt(
-                id_vars=id_vars,
-                value_vars=value_vars,
-                variable_name=variable_name,
-                value_name=value_name,
-                streaming=streaming,
-            )
+    ) -> Never:
+        raise TypeError(
+            "DataFrameModel.melt()/unpivot()/pivot_*() are removed in pydantable 2.0 "
+            "strict mode. Use melt_as(AfterModel, ...) / pivot_as(AfterModel, ...)."
         )
 
     def melt_as_model(

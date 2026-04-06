@@ -36,6 +36,7 @@ from typing import (
 )
 
 from pydantic import BaseModel
+from typing_extensions import Never
 
 from pydantable.display import get_repr_html_limits
 from pydantable.engine import get_default_engine
@@ -1281,7 +1282,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
                 f"{op_name}(AfterSchema, ...) schema mismatch vs AfterSchema: {details}"
             )
 
-    def with_columns(self, *exprs: Any, **new_columns: Expr | Any) -> DataFrame[Any]:
+    def with_columns(self, *exprs: Any, **new_columns: Expr | Any) -> Never:
         raise TypeError(
             "with_columns() is removed in pydantable 2.0 strict mode. "
             "Use with_columns_as(AfterSchema, ...) so the output schema is explicit."
@@ -1340,22 +1341,11 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
     def with_columns_cast(
         self, selector: Selector, dtype: Any, *, strict: bool = True
     ) -> DataFrame[Any]:
-        """Cast columns selected by a schema-driven Selector."""
-        if not isinstance(selector, Selector):
-            raise TypeError("with_columns_cast(selector=...) expects a Selector.")
-        selected = selector.resolve(self._current_field_types)
-        if not selected:
-            if strict:
-                available = ", ".join(repr(c) for c in self._current_field_types)
-                raise ValueError(
-                    f"with_columns_cast({selector!r}) matched no columns. "
-                    f"Available columns: [{available}]"
-                )
-            return self
-        updates: dict[str, Expr] = {
-            c: self._col_by_name(c).cast(dtype) for c in selected
-        }
-        return self.with_columns(**updates)
+        raise TypeError(
+            "with_columns_cast(...) is removed in pydantable 2.0 strict mode. "
+            "Use with_columns_as(AfterSchema, ...) with explicit cast expressions so "
+            "the output schema is explicit."
+        )
 
     def with_columns_fill_null(
         self,
@@ -1365,27 +1355,19 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         strategy: str | None = None,
         strict: bool = True,
     ) -> DataFrame[Any]:
-        """Fill nulls for columns selected by a schema-driven Selector."""
-        if not isinstance(selector, Selector):
-            raise TypeError("with_columns_fill_null(selector=...) expects a Selector.")
-        selected = selector.resolve(self._current_field_types)
-        if not selected:
-            if strict:
-                available = ", ".join(repr(c) for c in self._current_field_types)
-                raise ValueError(
-                    f"with_columns_fill_null({selector!r}) matched no columns. "
-                    f"Available columns: [{available}]"
-                )
-            return self
-        return self.fill_null(value, strategy=strategy, subset=selected)
+        raise TypeError(
+            "with_columns_fill_null(...) is removed in pydantable 2.0 strict mode. "
+            "Use fill_null(...) with an explicit subset list (schema-preserving), or "
+            "use with_columns_as(AfterSchema, ...) to make schema evolution explicit."
+        )
 
-    def select_schema(self, selector: Selector) -> DataFrame[Any]:
+    def select_schema(self, selector: Selector) -> Never:
         raise TypeError(
             "select_schema(...) is removed in pydantable 2.0 strict mode "
             "(dynamic column sets are forbidden)."
         )
 
-    def select(self, *args: Any, **kwargs: Any) -> DataFrame[Any]:
+    def select(self, *args: Any, **kwargs: Any) -> Never:
         raise TypeError(
             "select() is removed in pydantable 2.0 strict mode. "
             "Use select_as(AfterSchema, ...) so the output schema is explicit."
@@ -1477,16 +1459,16 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             ),
         )
 
-    def select_all(self) -> DataFrame[Any]:
+    def select_all(self) -> Never:
         raise TypeError("select_all() is removed in pydantable 2.0 strict mode.")
 
-    def select_prefix(self, prefix: str) -> DataFrame[Any]:
+    def select_prefix(self, prefix: str) -> Never:
         raise TypeError(
             "select_prefix(...) is removed in pydantable 2.0 strict mode "
             "(dynamic column sets are forbidden)."
         )
 
-    def select_suffix(self, suffix: str) -> DataFrame[Any]:
+    def select_suffix(self, suffix: str) -> Never:
         raise TypeError(
             "select_suffix(...) is removed in pydantable 2.0 strict mode "
             "(dynamic column sets are forbidden)."
@@ -1499,15 +1481,15 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             "Dynamic name/Selector resolution is removed in pydantable 2.0 strict mode."
         )
 
-    def reorder_columns(self, order: Sequence[str | Selector]) -> DataFrame[Any]:
+    def reorder_columns(self, order: Sequence[str | Selector]) -> Never:
         raise TypeError(
             "reorder_columns(...) is removed in pydantable 2.0 strict mode."
         )
 
-    def select_first(self, *cols_or_selectors: str | Selector) -> DataFrame[Any]:
+    def select_first(self, *cols_or_selectors: str | Selector) -> Never:
         raise TypeError("select_first(...) is removed in pydantable 2.0 strict mode.")
 
-    def select_last(self, *cols_or_selectors: str | Selector) -> DataFrame[Any]:
+    def select_last(self, *cols_or_selectors: str | Selector) -> Never:
         raise TypeError("select_last(...) is removed in pydantable 2.0 strict mode.")
 
     def move(
@@ -1516,21 +1498,24 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         *,
         before: str | None = None,
         after: str | None = None,
-    ) -> DataFrame[Any]:
+    ) -> Never:
         raise TypeError("move(...) is removed in pydantable 2.0 strict mode.")
 
-    def filter(self, condition: Expr) -> DataFrame[Any]:
+    def filter(self, condition: Expr) -> DataFrame[SchemaT]:
         """Keep rows where the boolean ``condition`` is true."""
         if not isinstance(condition, Expr):
             raise TypeError("filter(condition) expects an Expr.")
 
         rust_plan = self._engine.plan_filter(self._rust_plan, condition._rust_expr)
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=self._current_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
+        return cast(
+            "DataFrame[SchemaT]",
+            self._from_plan(
+                root_data=self._root_data,
+                root_schema_type=self._root_schema_type,
+                current_schema_type=self._current_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
     def sort(
@@ -1539,7 +1524,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         descending: bool | Sequence[bool] = False,
         nulls_last: bool | Sequence[bool] | None = None,
         maintain_order: bool = False,
-    ) -> DataFrame[Any]:
+    ) -> DataFrame[SchemaT]:
         """Sort by one or more columns (names or single-column expressions)."""
         keys: list[str] = []
         for key in by:
@@ -1573,12 +1558,15 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         rust_plan = self._engine.plan_sort(
             self._rust_plan, keys, desc, nl, bool(maintain_order)
         )
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=self._current_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
+        return cast(
+            "DataFrame[SchemaT]",
+            self._from_plan(
+                root_data=self._root_data,
+                root_schema_type=self._root_schema_type,
+                current_schema_type=self._current_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
     def unique(
@@ -1587,19 +1575,22 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         *,
         keep: str = "first",
         maintain_order: bool = False,
-    ) -> DataFrame[Any]:
+    ) -> DataFrame[SchemaT]:
         rust_plan = self._engine.plan_unique(
             self._rust_plan,
             None if subset is None else list(subset),
             keep,
             bool(maintain_order),
         )
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=self._current_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
+        return cast(
+            "DataFrame[SchemaT]",
+            self._from_plan(
+                root_data=self._root_data,
+                root_schema_type=self._root_schema_type,
+                current_schema_type=self._current_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
     def duplicated(
@@ -1607,38 +1598,16 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         subset: Sequence[str] | None = None,
         *,
         keep: str | bool = "first",
-    ) -> DataFrame[Any]:
-        """Single-column boolean frame ``duplicated`` (row-wise duplicate mask)."""
-        if keep is True:
-            raise ValueError("duplicated(keep=True) is invalid; use 'first' or 'last'.")
-        keep_s = "none" if keep is False else str(keep)
-        if keep_s not in ("first", "last", "none"):
-            raise ValueError(
-                "duplicated(keep=...) must be 'first', 'last', or False "
-                "(pandas parity)."
-            )
-        rust_plan = self._engine.plan_duplicate_mask(
-            self._rust_plan,
-            None if subset is None else list(subset),
-            keep_s,
-        )
-        desc = rust_plan.schema_descriptors()
-        derived_fields = self._field_types_from_descriptors(desc)
-        derived_schema_type = make_derived_schema_type(
-            self._current_schema_type, derived_fields
-        )
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=derived_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
+    ) -> Never:
+        raise TypeError(
+            "duplicated(...) is removed in pydantable 2.0 strict mode "
+            "(schema-evolving helpers must use explicit `*_as` APIs)."
         )
 
     def drop_duplicate_groups(
         self,
         subset: Sequence[str] | None = None,
-    ) -> DataFrame[Any]:
+    ) -> DataFrame[SchemaT]:
         """Drop rows whose key appears in a duplicate group.
 
         ``subset`` selects key columns; if omitted, all columns participate.
@@ -1648,12 +1617,15 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             self._rust_plan,
             None if subset is None else list(subset),
         )
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=self._current_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
+        return cast(
+            "DataFrame[SchemaT]",
+            self._from_plan(
+                root_data=self._root_data,
+                root_schema_type=self._root_schema_type,
+                current_schema_type=self._current_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
     def distinct(
@@ -1661,10 +1633,10 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         subset: Sequence[str] | None = None,
         *,
         keep: str = "first",
-    ) -> DataFrame[Any]:
+    ) -> DataFrame[SchemaT]:
         return self.unique(subset=subset, keep=keep)
 
-    def drop(self, *args: Any, **kwargs: Any) -> DataFrame[Any]:
+    def drop(self, *args: Any, **kwargs: Any) -> Never:
         raise TypeError(
             "drop() is removed in pydantable 2.0 strict mode. "
             "Use drop_as(AfterSchema, ...) so the output schema is explicit."
@@ -1706,7 +1678,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             ),
         )
 
-    def rename(self, *args: Any, **kwargs: Any) -> DataFrame[Any]:
+    def rename(self, *args: Any, **kwargs: Any) -> Never:
         raise TypeError(
             "rename() is removed in pydantable 2.0 strict mode. "
             "Use rename_as(AfterSchema, ...) with ColumnRef keys."
@@ -1764,7 +1736,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         fn: Callable[[str], str],
         *,
         strict: bool = True,
-    ) -> DataFrame[Any]:
+    ) -> Never:
         raise TypeError(
             "rename_with_selector(...) is removed in pydantable 2.0 strict mode "
             "(dynamic schema changes and Python callables are forbidden). "
@@ -1777,7 +1749,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         *,
         selector: Selector | None = None,
         strict: bool = True,
-    ) -> DataFrame[Any]:
+    ) -> Never:
         raise TypeError(
             "rename_prefix(...) is removed in pydantable 2.0 strict mode. "
             "Use rename_as(AfterSchema, ...) with explicit mappings."
@@ -1789,7 +1761,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         *,
         selector: Selector | None = None,
         strict: bool = True,
-    ) -> DataFrame[Any]:
+    ) -> Never:
         raise TypeError(
             "rename_suffix(...) is removed in pydantable 2.0 strict mode. "
             "Use rename_as(AfterSchema, ...) with explicit mappings."
@@ -1803,97 +1775,35 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         selector: Selector | None = None,
         strict: bool = True,
         literal: bool = True,
-    ) -> DataFrame[Any]:
-        if not isinstance(old, str) or not isinstance(new, str):
-            raise TypeError("rename_replace(old, new) expects strings.")
-        if literal is not True:
-            raise NotImplementedError(
-                "rename_replace(literal=False) is not supported "
-                "(schema-first rename only)."
-            )
-        target = (
-            list(self._current_field_types.keys())
-            if selector is None
-            else selector.resolve(self._current_field_types)
+    ) -> Never:
+        raise TypeError(
+            "rename_replace(...) is removed in pydantable 2.0 strict mode. "
+            "Use rename_as(AfterSchema, ...) with explicit mappings."
         )
-        if selector is not None and not target:
-            available = ", ".join(repr(c) for c in self._current_field_types)
-            raise ValueError(
-                f"rename_replace(selector={selector!r}) matched no columns. "
-                f"Available columns: [{available}]"
-            )
-        rename_map = {c: c.replace(old, new) for c in target}
-        if len(set(rename_map.values())) != len(rename_map):
-            raise ValueError(
-                "rename_replace(...) produced duplicate output column names."
-            )
-        return self.rename(rename_map, strict=strict)
 
     def rename_upper(
         self, selector: Selector | None = None, *, strict: bool = True
-    ) -> DataFrame[Any]:
-        """Uppercase column names for a subset selected by a schema-driven Selector."""
-        target = (
-            list(self._current_field_types.keys())
-            if selector is None
-            else selector.resolve(self._current_field_types)
+    ) -> Never:
+        raise TypeError(
+            "rename_upper(...) is removed in pydantable 2.0 strict mode. "
+            "Use rename_as(AfterSchema, ...) with explicit mappings."
         )
-        if selector is not None and not target:
-            available = ", ".join(repr(c) for c in self._current_field_types)
-            raise ValueError(
-                f"rename_upper(selector={selector!r}) matched no columns. "
-                f"Available columns: [{available}]"
-            )
-        rename_map = {c: c.upper() for c in target}
-        if len(set(rename_map.values())) != len(rename_map):
-            raise ValueError(
-                "rename_upper(...) produced duplicate output column names."
-            )
-        return self.rename(rename_map, strict=strict)
 
     def rename_lower(
         self, selector: Selector | None = None, *, strict: bool = True
-    ) -> DataFrame[Any]:
-        """Lowercase column names for a subset selected by a schema-driven Selector."""
-        target = (
-            list(self._current_field_types.keys())
-            if selector is None
-            else selector.resolve(self._current_field_types)
+    ) -> Never:
+        raise TypeError(
+            "rename_lower(...) is removed in pydantable 2.0 strict mode. "
+            "Use rename_as(AfterSchema, ...) with explicit mappings."
         )
-        if selector is not None and not target:
-            available = ", ".join(repr(c) for c in self._current_field_types)
-            raise ValueError(
-                f"rename_lower(selector={selector!r}) matched no columns. "
-                f"Available columns: [{available}]"
-            )
-        rename_map = {c: c.lower() for c in target}
-        if len(set(rename_map.values())) != len(rename_map):
-            raise ValueError(
-                "rename_lower(...) produced duplicate output column names."
-            )
-        return self.rename(rename_map, strict=strict)
 
     def rename_title(
         self, selector: Selector | None = None, *, strict: bool = True
-    ) -> DataFrame[Any]:
-        """Title-case column names for a subset selected by a schema-driven Selector."""
-        target = (
-            list(self._current_field_types.keys())
-            if selector is None
-            else selector.resolve(self._current_field_types)
+    ) -> Never:
+        raise TypeError(
+            "rename_title(...) is removed in pydantable 2.0 strict mode. "
+            "Use rename_as(AfterSchema, ...) with explicit mappings."
         )
-        if selector is not None and not target:
-            available = ", ".join(repr(c) for c in self._current_field_types)
-            raise ValueError(
-                f"rename_title(selector={selector!r}) matched no columns. "
-                f"Available columns: [{available}]"
-            )
-        rename_map = {c: c.title() for c in target}
-        if len(set(rename_map.values())) != len(rename_map):
-            raise ValueError(
-                "rename_title(...) produced duplicate output column names."
-            )
-        return self.rename(rename_map, strict=strict)
 
     def rename_strip(
         self,
@@ -1901,36 +1811,23 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         *,
         chars: str | None = None,
         strict: bool = True,
-    ) -> DataFrame[Any]:
-        """Strip leading/trailing characters from column names (schema-first)."""
-        if chars is not None and not isinstance(chars, str):
-            raise TypeError("rename_strip(chars=...) expects a string or None.")
-        target = (
-            list(self._current_field_types.keys())
-            if selector is None
-            else selector.resolve(self._current_field_types)
+    ) -> Never:
+        raise TypeError(
+            "rename_strip(...) is removed in pydantable 2.0 strict mode. "
+            "Use rename_as(AfterSchema, ...) with explicit mappings."
         )
-        if selector is not None and not target:
-            available = ", ".join(repr(c) for c in self._current_field_types)
-            raise ValueError(
-                f"rename_strip(selector={selector!r}) matched no columns. "
-                f"Available columns: [{available}]"
-            )
-        rename_map = {c: c.strip(chars) for c in target}
-        if len(set(rename_map.values())) != len(rename_map):
-            raise ValueError(
-                "rename_strip(...) produced duplicate output column names."
-            )
-        return self.rename(rename_map, strict=strict)
 
-    def slice(self, offset: int, length: int) -> DataFrame[Any]:
+    def slice(self, offset: int, length: int) -> DataFrame[SchemaT]:
         rust_plan = self._engine.plan_slice(self._rust_plan, int(offset), int(length))
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=self._current_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
+        return cast(
+            "DataFrame[SchemaT]",
+            self._from_plan(
+                root_data=self._root_data,
+                root_schema_type=self._root_schema_type,
+                current_schema_type=self._current_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
     def with_row_count(
@@ -1955,7 +1852,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             engine=self._engine,
         )
 
-    def head(self, n: int = 5) -> DataFrame[Any]:
+    def head(self, n: int = 5) -> DataFrame[SchemaT]:
         """First ``n`` rows (lazy slice).
 
         Materialize the result with :meth:`to_dict` or :meth:`collect`.
@@ -1964,7 +1861,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         """
         return self.slice(0, n)
 
-    def limit(self, n: int = 5) -> DataFrame[Any]:
+    def limit(self, n: int = 5) -> DataFrame[SchemaT]:
         """First ``n`` rows (Polars-style alias of :meth:`head`)."""
         return self.head(n)
 
@@ -1980,7 +1877,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         lower: Any | None = None,
         upper: Any | None = None,
         subset: str | Sequence[str] | Selector | None = None,
-    ) -> DataFrame[Any]:
+    ) -> DataFrame[SchemaT]:
         """Clamp numeric columns to the given bounds (schema-first)."""
         from pydantable import selectors as _selectors
         from pydantable.expressions import Literal, when
@@ -2011,7 +1908,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
                 f"clip() matched no numeric columns. Available columns: [{available}]"
             )
 
-        updates: dict[str, Expr] = {}
+        updates: dict[str, Any] = {}
         for c in targets:
             dt = self._current_field_types.get(c)
             if dt is None:
@@ -2028,18 +1925,35 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
                 hi = Literal(value=upper).cast(expr.dtype)
                 expr = when(expr > hi, hi).otherwise(expr)
             updates[c] = expr
+        rust_columns = {name: e._rust_expr for name, e in updates.items()}
+        rust_plan = self._engine.plan_with_columns(self._rust_plan, rust_columns)
+        desc = rust_plan.schema_descriptors()
+        derived_fields = self._field_types_from_descriptors(desc)
+        self._assert_after_schema(
+            self._current_schema_type,
+            derived_fields=derived_fields,
+            op_name="clip",
+        )
+        return cast(
+            "DataFrame[SchemaT]",
+            self._from_plan(
+                root_data=self._root_data,
+                root_schema_type=self._root_schema_type,
+                current_schema_type=self._current_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
+        )
 
-        return self.with_columns(**updates)
-
-    def first(self) -> DataFrame[Any]:
+    def first(self) -> DataFrame[SchemaT]:
         """First row as a single-row DataFrame (lazy slice)."""
         return self.head(1)
 
-    def tail(self, n: int = 5) -> DataFrame[Any]:
+    def tail(self, n: int = 5) -> DataFrame[SchemaT]:
         """Last ``n`` rows (lazy slice). **Cost:** same idea as :meth:`head`."""
         return self.slice(-n, n)
 
-    def last(self) -> DataFrame[Any]:
+    def last(self) -> DataFrame[SchemaT]:
         """Last row as a single-row DataFrame (lazy slice)."""
         return self.tail(1)
 
@@ -2049,7 +1963,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         *,
         strategy: str | None = None,
         subset: str | Sequence[str] | Selector | None = None,
-    ) -> DataFrame[Any]:
+    ) -> DataFrame[SchemaT]:
         if isinstance(subset, str):
             subset = [subset]
         if isinstance(subset, Selector):
@@ -2073,15 +1987,20 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         )
         desc = rust_plan.schema_descriptors()
         derived_fields = self._field_types_from_descriptors(desc)
-        derived_schema_type = make_derived_schema_type(
-            self._current_schema_type, derived_fields
+        self._assert_after_schema(
+            self._current_schema_type,
+            derived_fields=derived_fields,
+            op_name="fill_null",
         )
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=derived_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
+        return cast(
+            "DataFrame[SchemaT]",
+            self._from_plan(
+                root_data=self._root_data,
+                root_schema_type=self._root_schema_type,
+                current_schema_type=self._current_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
     def drop_nulls(
@@ -2090,7 +2009,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         *,
         how: str = "any",
         threshold: int | None = None,
-    ) -> DataFrame[Any]:
+    ) -> DataFrame[SchemaT]:
         if isinstance(subset, Selector):
             raise TypeError(
                 "drop_nulls(subset=Selector) is removed in pydantable 2.0 strict mode."
@@ -2103,12 +2022,15 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             str(how),
             threshold,
         )
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=self._current_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
+        return cast(
+            "DataFrame[SchemaT]",
+            self._from_plan(
+                root_data=self._root_data,
+                root_schema_type=self._root_schema_type,
+                current_schema_type=self._current_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
     def melt(
@@ -2119,7 +2041,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         variable_name: str = "variable",
         value_name: str = "value",
         streaming: bool | None = None,
-    ) -> DataFrame[Any]:
+    ) -> Never:
         raise TypeError(
             "melt()/unpivot()/pivot_*() are removed in pydantable 2.0 strict mode "
             "(reshape output schemas depend on runtime values)."

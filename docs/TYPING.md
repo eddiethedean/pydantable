@@ -162,23 +162,26 @@ plugins = ["pydantable.mypy_plugin"]
 
 Inference is intentionally conservative: it refines return types when arguments are **literal enough**.
 
-- **Schema-evolving transforms** (when literal column names / literal config are provided):
-  - `with_columns(...)` (best-effort type inference from mypy’s expression types + literals)
-  - `select(...)`, `drop(...)` (string/list/tuple literals)
-  - `rename({...})` (dict literal)
-  - `join(..., on=..., suffix=...)`
-  - `group_by(...).agg(out=("op","col"), ...)` (tuple literals; some ops map to `int`/`float`)
-  - `melt(...)`, `unpivot(...)` (literal `id_vars`/`index`, plus literal `variable_name`/`value_name`)
-  - `rolling_agg(..., op=..., out_name=...)`
+- **Schema-evolving transforms** (strict 2.0: explicit output schema required):
+  - `with_columns_as(AfterModel, ...)`
+  - `select_as(AfterModel, ...)`
+  - `drop_as(AfterModel, ...)`
+  - `rename_as(AfterModel, ...)`
+  - `join_as(AfterModel, ...)`
+  - `group_by_agg_as(AfterModel, ...)`
+  - `melt_as(AfterModel, ...)`
+  - `pivot_as(AfterModel, ...)` (requires `pivot_values=[...]` in strict mode)
+  - `explode_as(AfterModel, ...)`
+  - `unnest_as(AfterModel, ...)`
 
 - **Schema-preserving transforms** (kept as the same model type):
-  - `fill_null`, `drop_nulls`, `explode`, `unnest`
+  - `fill_null`, `drop_nulls`, `sort`, `unique`, `distinct`, `clip`, `drop_duplicate_groups`
 
 - **Not inferred / intentionally skipped**:
-  - dynamic/computed column name lists (variables, comprehensions, f-strings, unpacking)
-  - `pivot(...)` (output columns depend on data values)
+  - any call sites using removed legacy APIs (`select`, `with_columns`, `rename`, `drop`, `melt`, `pivot`, etc.)
+  - runtime-dependent schemas (e.g. pivots without explicit `pivot_values`)
 
-When the plugin can’t infer safely, it falls back to the original model type (and you can still use `as_model(...)`).
+When the plugin can’t infer safely, it falls back to the original model type.
 
 ### 1.2.0 column types (Literal, IP, WKB, `Annotated[str, ...]`)
 

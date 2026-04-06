@@ -28,7 +28,26 @@ Forbidden:
 - df.rename({some_variable: "new_name"})
 
 Required:
-- df.select("id", "name")  # Literal-only
+- Schema-changing operations must have an explicit, statically-declared output schema.
+- Column identity must be represented by typed column tokens (e.g. ``ColumnRef``), not strings.
+
+Example (explicit output schema + typed column tokens):
+
+```python
+from pydantable import DataFrame, Schema
+
+class Before(Schema):
+    id: int
+    name: str
+    age: int
+
+class After(Schema):
+    id: int
+    name: str
+
+df = DataFrame[Before]({"id": [1], "name": ["a"], "age": [10]})
+out = df.select_as(After, df.col.id, df.col.name)
+```
 
 ### 2.2 No Stringly-Typed Column Access
 Forbidden:
@@ -36,7 +55,11 @@ Forbidden:
 
 Required:
 - df.col.id
-- col("id")  # Literal
+
+Notes:
+- ``ColumnRef`` values must always be bound to a schema (e.g. via ``df.col.<field>``).
+- Avoid helper APIs like ``col(\"id\")`` in strict mode; they invite stringly access and
+  weaken schema coupling.
 
 ### 2.3 No In-Place Mutation
 Forbidden:
@@ -114,10 +137,10 @@ Recommended:
 
 ## 7. Static Typing Requirements
 
-- Use Literal types for column names
-- Avoid raw str usage
+- Prefer typed column tokens over raw strings for column identity
+- Avoid raw ``str`` usage for schema-changing operations
 - Preserve generics
-- No Any leakage
+- Minimize ``Any`` leakage (allowed at I/O and engine boundaries)
 
 ---
 
@@ -125,7 +148,8 @@ Recommended:
 
 - Small, strict API
 - No hidden schema mutations
-- Provide explicit escape hatch (untyped mode)
+- No untyped escape hatch mode in strict 2.0: all transformations must remain typed and
+  schema-evolving operations must be explicit (``*_as`` APIs).
 
 ---
 

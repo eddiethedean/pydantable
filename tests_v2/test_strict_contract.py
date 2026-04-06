@@ -39,6 +39,12 @@ def test_legacy_schema_changing_apis_removed() -> None:
         df.drop("age")
     with pytest.raises(TypeError):
         df.rename({"age": "age2"})
+    with pytest.raises(TypeError):
+        df.duplicated()
+    with pytest.raises(TypeError):
+        df.rename_upper()
+    with pytest.raises(TypeError):
+        df.with_columns_cast(None, int)
 
 
 def test_select_as_enforces_schema() -> None:
