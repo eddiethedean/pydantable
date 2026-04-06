@@ -60,6 +60,7 @@
       ~PlanMaterialization.format
       ~PlanMaterialization.format_map
       ~PlanMaterialization.maketrans
+      ~PlanMaterialization.__init__
    
    
 

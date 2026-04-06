@@ -51,6 +51,7 @@ _HOOK_NAMES = {
     "join",
     "agg",
     # Schema-preserving transforms that currently return `DataFrameModel` at runtime.
+    "clip",
     "fill_null",
     "drop_nulls",
     "explode",
@@ -423,6 +424,7 @@ def _hook(ctx: MethodContext, method: str) -> Type:
         fields = {**grouped_fields, **agg_outputs}
 
     elif method in {
+        "clip",
         "fill_null",
         "drop_nulls",
         "explode",

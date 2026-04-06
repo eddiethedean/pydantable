@@ -19,6 +19,7 @@ from pydantable.dataframe import ExecutionHandle
 from pydantable.schema import Schema
 
 RowT = TypeVar("RowT", bound=BaseModel)
+ModelSelf = TypeVar("ModelSelf", bound="DataFrameModel[Any]")
 AfterModelT = TypeVar("AfterModelT", bound="DataFrameModel[Any]")
 GroupedModelT = TypeVar("GroupedModelT", bound="DataFrameModel[Any]")
 
@@ -737,7 +738,7 @@ class DataFrameModel(Generic[RowT]):
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         executor: Executor | None = None,
-    ) -> Any: ...
+    ) -> AsyncIterator[dict[str, list[Any]]]: ...
     async def arows(
         self,
         *,
@@ -767,7 +768,7 @@ class DataFrameModel(Generic[RowT]):
         value: Any = None,
         strategy: str | None = None,
         strict: bool = True,
-    ) -> DataFrameModel[Any]: ...
+    ) -> Self: ...
     def filter(self, condition: Any) -> Self: ...
     def sort(self, *by: Any, descending: bool | Sequence[bool] = False) -> Self: ...
     def unique(
@@ -809,17 +810,15 @@ class DataFrameModel(Generic[RowT]):
         lower: Any | None = None,
         upper: Any | None = None,
         subset: str | Sequence[str] | Any | None = None,
-    ) -> DataFrameModel[Any]: ...
+    ) -> Self: ...
     def fill_null(
         self,
         value: Any = None,
         *,
         strategy: str | None = None,
         subset: Sequence[str] | None = None,
-    ) -> DataFrameModel[Any]: ...
-    def drop_nulls(
-        self, subset: Sequence[str] | None = None
-    ) -> DataFrameModel[Any]: ...
+    ) -> Self: ...
+    def drop_nulls(self, subset: Sequence[str] | None = None) -> Self: ...
     def melt(
         self,
         *,
@@ -873,10 +872,10 @@ class DataFrameModel(Generic[RowT]):
         *,
         outer: bool = False,
         streaming: bool | None = None,
-    ) -> DataFrameModel[Any]: ...
+    ) -> Self: ...
     def explode_outer(
         self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None
-    ) -> DataFrameModel[Any]: ...
+    ) -> Self: ...
     def posexplode(
         self,
         column: str,
@@ -896,7 +895,7 @@ class DataFrameModel(Generic[RowT]):
     ) -> DataFrameModel[Any]: ...
     def unnest(
         self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None
-    ) -> DataFrameModel[Any]: ...
+    ) -> Self: ...
     def explode_all(self, *, streaming: bool | None = None) -> DataFrameModel[Any]: ...
     def unnest_all(self, *, streaming: bool | None = None) -> DataFrameModel[Any]: ...
     def join(
@@ -928,6 +927,42 @@ class DataFrameModel(Generic[RowT]):
         by: Sequence[str] | None = None,
         min_periods: int = 1,
     ) -> DataFrameModel[Any]: ...
+    def rolling_agg_as_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None = None,
+        min_periods: int = 1,
+    ) -> AfterModelT: ...
+    def rolling_agg_try_as_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None = None,
+        min_periods: int = 1,
+    ) -> AfterModelT | None: ...
+    def rolling_agg_assert_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None = None,
+        min_periods: int = 1,
+    ) -> AfterModelT: ...
     def group_by_dynamic(
         self,
         index_column: str,
@@ -953,11 +988,11 @@ class DataFrameModel(Generic[RowT]):
     def column_policy(cls, name: str) -> dict[str, Any]: ...
     @classmethod
     def concat(
-        cls,
-        dfs: Sequence[DataFrameModel[Any]],
+        cls: type[ModelSelf],
+        dfs: Sequence[ModelSelf],
         *,
         how: str = "vertical",
-    ) -> DataFrameModel[Any]: ...
+    ) -> ModelSelf: ...
 
 class GroupedDataFrameModel(Generic[GroupedModelT]):
     _grouped_df: Any
@@ -965,6 +1000,21 @@ class GroupedDataFrameModel(Generic[GroupedModelT]):
 
     def __init__(self, grouped_df: Any, model_type: type[GroupedModelT]) -> None: ...
     def agg(self, **aggregations: Any) -> DataFrameModel[Any]: ...
+    def agg_as_model(
+        self,
+        model: type[AfterModelT],
+        **aggregations: Any,
+    ) -> AfterModelT: ...
+    def agg_try_as_model(
+        self,
+        model: type[AfterModelT],
+        **aggregations: Any,
+    ) -> AfterModelT | None: ...
+    def agg_assert_model(
+        self,
+        model: type[AfterModelT],
+        **aggregations: Any,
+    ) -> AfterModelT: ...
 
 class DynamicGroupedDataFrameModel(Generic[GroupedModelT]):
     _grouped_df: Any
@@ -972,3 +1022,18 @@ class DynamicGroupedDataFrameModel(Generic[GroupedModelT]):
 
     def __init__(self, grouped_df: Any, model_type: type[GroupedModelT]) -> None: ...
     def agg(self, **aggregations: Any) -> DataFrameModel[Any]: ...
+    def agg_as_model(
+        self,
+        model: type[AfterModelT],
+        **aggregations: Any,
+    ) -> AfterModelT: ...
+    def agg_try_as_model(
+        self,
+        model: type[AfterModelT],
+        **aggregations: Any,
+    ) -> AfterModelT | None: ...
+    def agg_assert_model(
+        self,
+        model: type[AfterModelT],
+        **aggregations: Any,
+    ) -> AfterModelT: ...

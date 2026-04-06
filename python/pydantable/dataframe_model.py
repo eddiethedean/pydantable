@@ -2133,7 +2133,7 @@ class DataFrameModel(Generic[RowT]):
         value: Any = None,
         strategy: str | None = None,
         strict: bool = True,
-    ) -> DataFrameModel[Any]:
+    ) -> Self:
         return self._from_dataframe(
             self._df.with_columns_fill_null(
                 selector, value=value, strategy=strategy, strict=strict
@@ -2213,7 +2213,7 @@ class DataFrameModel(Generic[RowT]):
         lower: Any | None = None,
         upper: Any | None = None,
         subset: str | Sequence[str] | Any | None = None,
-    ) -> DataFrameModel[Any]:
+    ) -> Self:
         return self._from_dataframe(
             self._df.clip(lower=lower, upper=upper, subset=subset)
         )
@@ -2224,7 +2224,7 @@ class DataFrameModel(Generic[RowT]):
         *,
         strategy: str | None = None,
         subset: str | Sequence[str] | Any | None = None,
-    ) -> DataFrameModel[Any]:
+    ) -> Self:
         return self._from_dataframe(
             self._df.fill_null(value, strategy=strategy, subset=subset)
         )
@@ -2235,7 +2235,7 @@ class DataFrameModel(Generic[RowT]):
         *,
         how: str = "any",
         threshold: int | None = None,
-    ) -> DataFrameModel[Any]:
+    ) -> Self:
         return self._from_dataframe(
             self._df.drop_nulls(subset=subset, how=how, threshold=threshold)
         )
@@ -2349,14 +2349,14 @@ class DataFrameModel(Generic[RowT]):
         *,
         outer: bool = False,
         streaming: bool | None = None,
-    ) -> DataFrameModel[Any]:
+    ) -> Self:
         return self._from_dataframe(
             self._df.explode(columns, outer=outer, streaming=streaming)
         )
 
     def explode_outer(
         self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None
-    ) -> DataFrameModel[Any]:
+    ) -> Self:
         return self._from_dataframe(
             self._df.explode_outer(columns, streaming=streaming)
         )
@@ -2390,7 +2390,7 @@ class DataFrameModel(Generic[RowT]):
 
     def unnest(
         self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None
-    ) -> DataFrameModel[Any]:
+    ) -> Self:
         return self._from_dataframe(self._df.unnest(columns, streaming=streaming))
 
     def explode_all(self, *, streaming: bool | None = None) -> DataFrameModel[Any]:
@@ -2467,6 +2467,72 @@ class DataFrameModel(Generic[RowT]):
             )
         )
 
+    def rolling_agg_as_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None = None,
+        min_periods: int = 1,
+    ) -> AfterModelT:
+        return self.rolling_agg(
+            on=on,
+            column=column,
+            window_size=window_size,
+            op=op,
+            out_name=out_name,
+            by=by,
+            min_periods=min_periods,
+        ).as_model(model)
+
+    def rolling_agg_try_as_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None = None,
+        min_periods: int = 1,
+    ) -> AfterModelT | None:
+        return self.rolling_agg(
+            on=on,
+            column=column,
+            window_size=window_size,
+            op=op,
+            out_name=out_name,
+            by=by,
+            min_periods=min_periods,
+        ).try_as_model(model)
+
+    def rolling_agg_assert_model(
+        self,
+        model: type[AfterModelT],
+        *,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: Sequence[str] | None = None,
+        min_periods: int = 1,
+    ) -> AfterModelT:
+        return self.rolling_agg(
+            on=on,
+            column=column,
+            window_size=window_size,
+            op=op,
+            out_name=out_name,
+            by=by,
+            min_periods=min_periods,
+        ).assert_model(model)
+
     def group_by_dynamic(
         self,
         index_column: str,
@@ -2535,11 +2601,11 @@ class DataFrameModel(Generic[RowT]):
 
     @classmethod
     def concat(
-        cls,
-        dfs: Sequence[DataFrameModel[Any]],
+        cls: type[ModelSelf],
+        dfs: Sequence[ModelSelf],
         *,
         how: str = "vertical",
-    ) -> DataFrameModel[Any]:
+    ) -> ModelSelf:
         if len(dfs) < 2:
             raise ValueError("concat() requires at least two DataFrameModel inputs.")
         if not all(isinstance(df, DataFrameModel) for df in dfs):
@@ -2575,6 +2641,27 @@ class GroupedDataFrameModel(Generic[GroupedModelT]):
         """Same kwargs as :meth:`pydantable.dataframe.GroupedDataFrame.agg`."""
         return self._model_type._from_dataframe(self._grouped_df.agg(**aggregations))
 
+    def agg_as_model(
+        self,
+        model: type[AfterModelT],
+        **aggregations: Any,
+    ) -> AfterModelT:
+        return self.agg(**aggregations).as_model(model)
+
+    def agg_try_as_model(
+        self,
+        model: type[AfterModelT],
+        **aggregations: Any,
+    ) -> AfterModelT | None:
+        return self.agg(**aggregations).try_as_model(model)
+
+    def agg_assert_model(
+        self,
+        model: type[AfterModelT],
+        **aggregations: Any,
+    ) -> AfterModelT:
+        return self.agg(**aggregations).assert_model(model)
+
 
 class DynamicGroupedDataFrameModel(Generic[GroupedModelT]):
     """Time-based ``group_by_dynamic`` grouping; call :meth:`agg` to finalize."""
@@ -2603,3 +2690,24 @@ class DynamicGroupedDataFrameModel(Generic[GroupedModelT]):
     def agg(self, **aggregations: Any) -> DataFrameModel[Any]:
         """Same rules as :meth:`pydantable.dataframe.DynamicGroupedDataFrame.agg`."""
         return self._model_type._from_dataframe(self._grouped_df.agg(**aggregations))
+
+    def agg_as_model(
+        self,
+        model: type[AfterModelT],
+        **aggregations: Any,
+    ) -> AfterModelT:
+        return self.agg(**aggregations).as_model(model)
+
+    def agg_try_as_model(
+        self,
+        model: type[AfterModelT],
+        **aggregations: Any,
+    ) -> AfterModelT | None:
+        return self.agg(**aggregations).try_as_model(model)
+
+    def agg_assert_model(
+        self,
+        model: type[AfterModelT],
+        **aggregations: Any,
+    ) -> AfterModelT:
+        return self.agg(**aggregations).assert_model(model)

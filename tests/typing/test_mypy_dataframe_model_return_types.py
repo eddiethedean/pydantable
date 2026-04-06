@@ -219,6 +219,34 @@ def test_mypy_accepts_select_drop_with_list_literals(tmp_path: Path) -> None:
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
+def test_mypy_accepts_schema_preserving_chain_methods(tmp_path: Path) -> None:
+    pytest.importorskip("mypy")
+    code = """
+    from pydantable import DataFrameModel
+
+    class U(DataFrameModel):
+        id: int
+        v: int | None
+
+    def f(df: U) -> U:
+        return (
+            df.filter(df.id > 0)
+            .sort("id")
+            .distinct()
+            .clip(lower=0, upper=10, subset="id")
+            .fill_null(0)
+            .drop_nulls(subset="id")
+            .with_columns_fill_null("v", value=0)
+            .explode("id")
+            .unnest("id")
+            .head(2)
+        )
+    """
+    proc = _run_mypy_snippet(tmp_path, code)
+    _mypy_output_or_skip_on_crash(proc)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
 def test_mypy_with_columns_infers_literal_and_arithmetic_types(tmp_path: Path) -> None:
     pytest.importorskip("mypy")
     code = """

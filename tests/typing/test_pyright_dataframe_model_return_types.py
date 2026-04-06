@@ -192,3 +192,89 @@ def test_pyright_sees_dataframe_model_io_and_model_helpers(tmp_path: Path) -> No
     """
     proc = _run_pyright_snippet(tmp_path, code)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
+def test_pyright_keeps_concrete_model_type_through_schema_preserving_chains(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("pyright")
+    code = """
+    from pydantable import DataFrameModel
+
+    class U(DataFrameModel):
+        id: int
+        v: int | None
+
+    def f(df: U) -> U:
+        # These should preserve the model type (no schema changes).
+        return (
+            df.filter(df.id > 0)
+            .sort("id")
+            .distinct()
+            .clip(lower=0, upper=10, subset="id")
+            .fill_null(0)
+            .drop_nulls(subset="id")
+            .with_columns_fill_null("v", value=0)
+            .explode("id")
+            .unnest("id")
+            .head(2)
+        )
+    """
+    proc = _run_pyright_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
+def test_pyright_groupby_agg_as_model_helpers_return_target_type(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("pyright")
+    code = """
+    from pydantable import DataFrameModel
+
+    class Before(DataFrameModel):
+        g: int
+        v: int
+
+    class After(DataFrameModel):
+        g: int
+        total: int
+
+    def f(df: Before) -> After:
+        grouped = df.group_by("g")
+        out = grouped.agg(total=("sum", "v"))
+        # `agg(...)` itself is schema-changing; these helpers are the typed escape
+        # hatch.
+        return grouped.agg_as_model(After, total=("sum", "v"))
+    """
+    proc = _run_pyright_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
+def test_pyright_rolling_agg_as_model_helpers_return_target_type(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("pyright")
+    code = """
+    from pydantable import DataFrameModel
+
+    class Before(DataFrameModel):
+        ts: str
+        v: int
+
+    class After(DataFrameModel):
+        ts: str
+        roll: int
+
+    def f(df: Before) -> After:
+        # rolling_agg is schema-changing; these helpers provide the typed escape hatch.
+        return df.rolling_agg_as_model(
+            After,
+            on="ts",
+            column="v",
+            window_size=3,
+            op="sum",
+            out_name="roll",
+        )
+    """
+    proc = _run_pyright_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
