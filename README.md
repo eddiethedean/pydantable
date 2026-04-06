@@ -34,7 +34,8 @@ pip install "pydantable[polars]"   # to_polars
 pip install "pydantable[arrow]"    # to_arrow / Arrow constructors
 pip install "pydantable[io]"       # full file I/O convenience (arrow + polars)
 pip install "pydantable[sql]"      # SQLModel + SQLAlchemy: fetch_sqlmodel, write_sqlmodel, *_raw, …
-pip install "pydantable[pandas]"   # pandas-flavored façade (pandas UI doc)
+#
+# 2.0 strict mode: pandas/pyspark facades removed.
 pip install "pydantable[fastapi]"  # FastAPI integration (pydantable.fastapi)
 pip install "pydantable[moltres]"   # SqlDataFrame / SqlDataFrameModel (sqlalchemy engine)
 ```
@@ -49,11 +50,17 @@ class User(DataFrameModel):
     age: int | None
 
 df = User({"id": [1, 2], "age": [20, None]})
-result = (
-    df.with_columns(age2=df.age * 2)
-    .filter(df.age > 10)
-    .select("id", "age2")
-)
+class UserWithAge2(DataFrameModel):
+    id: int
+    age: int | None
+    age2: int | None
+
+class UserResult(DataFrameModel):
+    id: int
+    age2: int | None
+
+df2 = df.with_columns_as(UserWithAge2, age2=df.col.age * 2)
+result = df2.filter(df2.col.age > 10).drop_as(UserResult, df2.col.age)
 
 print(result.to_dict())
 print([r.model_dump() for r in result.collect()])

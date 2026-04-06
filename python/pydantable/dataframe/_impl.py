@@ -22,6 +22,7 @@ import random
 import statistics
 import threading
 import warnings
+from collections.abc import Mapping
 from datetime import date, datetime, timedelta
 from typing import (
     TYPE_CHECKING,
@@ -70,12 +71,27 @@ from ._streaming import _resolve_engine_streaming
 from .grouped import DynamicGroupedDataFrame, GroupedDataFrame, _DataFrameForGroupBy
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator, Mapping, Sequence
+    from collections.abc import Callable, Iterator, Sequence
     from concurrent.futures import Executor
 
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 AfterSchemaT = TypeVar("AfterSchemaT", bound=BaseModel)
+
+
+class _ColumnNamespace(Generic[SchemaT]):
+    __slots__ = ("_df",)
+
+    def __init__(self, df: DataFrame[SchemaT]) -> None:
+        self._df = df
+
+    def __getattr__(self, name: str) -> ColumnRef:
+        if name in self._df._current_field_types:
+            return self._df._col_by_name(name)
+        raise AttributeError(name)
+
+    def __dir__(self) -> list[str]:  # pragma: no cover
+        return sorted(set(super().__dir__()) | set(self._df._current_field_types))
 
 
 class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
@@ -1110,16 +1126,15 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         prev = self._current_field_types if previous is None else previous
         return merge_field_types_preserving_identity(prev, descriptors, derived)
 
-    def col(self, name: str) -> ColumnRef:
+    def _col_by_name(self, name: str) -> ColumnRef:
         if name not in self._current_field_types:
             raise KeyError(f"Unknown column {name!r} for current schema.")
         return ColumnRef(name=name, dtype=self._current_field_types[name])
 
-    def __getattr__(self, item: str) -> Any:
-        # Called only when attribute resolution fails; treat schema fields as columns.
-        if item in self._current_field_types:
-            return self.col(item)
-        raise AttributeError(item)
+    @property
+    def col(self) -> _ColumnNamespace[SchemaT]:
+        """Typed column namespace: use ``df.col.some_field`` (no ``df.some_field``)."""
+        return _ColumnNamespace(self)
 
     def __repr__(self) -> str:
         fields = self._current_field_types
@@ -1235,22 +1250,66 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             max_cell_len=lim.max_cell_len,
         )
 
-    def with_columns(self, *exprs: Any, **new_columns: Expr | Any) -> DataFrame[Any]:
-        """Add or replace columns.
+    @staticmethod
+    def _schema_field_types(schema_type: type[BaseModel]) -> dict[str, Any]:
+        return schema_field_types(schema_type)
 
-        Values are :class:`~pydantable.expressions.Expr` or plain literals.
-        """
+    def _assert_after_schema(
+        self,
+        after_schema_type: type[BaseModel],
+        *,
+        derived_fields: Mapping[str, Any],
+        op_name: str,
+    ) -> None:
+        expected = self._schema_field_types(after_schema_type)
+        got = dict(derived_fields)
+        if set(expected) != set(got) or any(expected[k] != got[k] for k in expected):
+            missing = sorted(set(expected) - set(got))
+            extra = sorted(set(got) - set(expected))
+            mismatched = sorted(
+                k for k in set(expected) & set(got) if expected[k] != got[k]
+            )
+            parts: list[str] = []
+            if missing:
+                parts.append(f"missing={missing}")
+            if extra:
+                parts.append(f"extra={extra}")
+            if mismatched:
+                parts.append(f"mismatched_types={mismatched}")
+            details = "; ".join(parts) if parts else "schema mismatch"
+            raise TypeError(
+                f"{op_name}(AfterSchema, ...) schema mismatch vs AfterSchema: {details}"
+            )
+
+    def with_columns(self, *exprs: Any, **new_columns: Expr | Any) -> DataFrame[Any]:
+        raise TypeError(
+            "with_columns() is removed in pydantable 2.0 strict mode. "
+            "Use with_columns_as(AfterSchema, ...) so the output schema is explicit."
+        )
+
+    def with_columns_as(
+        self,
+        after_schema_type: type[AfterSchemaT],
+        *exprs: Any,
+        **new_columns: Expr | Any,
+    ) -> DataFrame[AfterSchemaT]:
+        """Add or replace columns with an explicit output schema."""
+        if not isinstance(after_schema_type, type) or not issubclass(
+            after_schema_type, BaseModel
+        ):
+            raise TypeError("with_columns_as(after_schema_type, ...) expects a schema.")
+
         rust_columns: dict[str, Any] = {}
 
         for item in exprs:
             if not isinstance(item, AliasedExpr):
                 raise TypeError(
-                    "with_columns() positional args must be Expr.alias('name') "
+                    "with_columns_as() positional args must be Expr.alias('name') "
                     "(AliasedExpr)."
                 )
             if item.name in rust_columns or item.name in new_columns:
                 raise ValueError(
-                    f"with_columns() duplicate output column {item.name!r}."
+                    f"with_columns_as() duplicate output column {item.name!r}."
                 )
             rust_columns[item.name] = item.expr._rust_expr
 
@@ -1263,16 +1322,19 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         rust_plan = self._engine.plan_with_columns(self._rust_plan, rust_columns)
         desc = rust_plan.schema_descriptors()
         derived_fields = self._field_types_from_descriptors(desc)
-        derived_schema_type = make_derived_schema_type(
-            self._current_schema_type, derived_fields
+        self._assert_after_schema(
+            after_schema_type, derived_fields=derived_fields, op_name="with_columns_as"
         )
 
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=derived_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
+        return cast(
+            "DataFrame[AfterSchemaT]",
+            self._from_plan(
+                root_data=self._root_data,
+                root_schema_type=self._root_schema_type,
+                current_schema_type=after_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
     def with_columns_cast(
@@ -1290,7 +1352,9 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
                     f"Available columns: [{available}]"
                 )
             return self
-        updates: dict[str, Expr] = {c: self.col(c).cast(dtype) for c in selected}
+        updates: dict[str, Expr] = {
+            c: self._col_by_name(c).cast(dtype) for c in selected
+        }
         return self.with_columns(**updates)
 
     def with_columns_fill_null(
@@ -1316,204 +1380,135 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         return self.fill_null(value, strategy=strategy, subset=selected)
 
     def select_schema(self, selector: Selector) -> DataFrame[Any]:
-        """Project columns using a schema-first Selector (explicit helper)."""
-        if not isinstance(selector, Selector):
-            raise TypeError("select_schema(selector) expects a Selector.")
-        return self.select(selector)
+        raise TypeError(
+            "select_schema(...) is removed in pydantable 2.0 strict mode "
+            "(dynamic column sets are forbidden)."
+        )
 
-    def select(
+    def select(self, *args: Any, **kwargs: Any) -> DataFrame[Any]:
+        raise TypeError(
+            "select() is removed in pydantable 2.0 strict mode. "
+            "Use select_as(AfterSchema, ...) so the output schema is explicit."
+        )
+
+    def select_as(
         self,
-        *cols: str | ColumnRef | Expr | AliasedExpr | Selector,
-        exclude: Selector | Sequence[str] | None = None,
+        after_schema_type: type[AfterSchemaT],
+        *cols: ColumnRef | Expr | AliasedExpr,
         **named: Any,
-    ) -> DataFrame[Any]:
-        """Project columns and/or compute a **single-row** frame of global aggregates.
+    ) -> DataFrame[AfterSchemaT]:
+        """Project columns / compute globals with an explicit output schema."""
+        if not isinstance(after_schema_type, type) or not issubclass(
+            after_schema_type, BaseModel
+        ):
+            raise TypeError("select_as(after_schema_type, ...) expects a schema.")
 
-        Positional arguments: base column names, single-column refs, or globals such
-        as :func:`~pydantable.expressions.global_sum`. Keyword arguments are only for
-        named global aggregates. Plain projections and globals cannot be mixed.
-        """
         named_items: list[tuple[str, Any]] = []
         for name, e in named.items():
             if not isinstance(e, Expr):
                 raise TypeError(
-                    "select() keyword arguments must be Expr instances "
+                    "select_as() keyword arguments must be Expr instances "
                     "(global aggregates)."
                 )
             named_items.append((name, e._rust_expr))
-
-        exclude_set: set[str] = set()
-        if exclude is not None:
-            if isinstance(exclude, Selector):
-                exclude_set = set(exclude.resolve(self._current_field_types))
-            else:
-                exclude_set = {str(c) for c in exclude}
 
         aggs: list[tuple[str, Any]] = []
         projects: list[str] = []
         computed: dict[str, Any] = {}
         for col in cols:
-            if isinstance(col, str):
-                projects.append(col)
-            elif isinstance(col, Selector):
-                resolved = col.resolve(self._current_field_types)
-                if not resolved:
-                    available = ", ".join(repr(c) for c in self._current_field_types)
-                    raise ValueError(
-                        f"select({col!r}) matched no columns. "
-                        f"Available columns: [{available}]"
-                    )
-                projects.extend(resolved)
-            elif isinstance(col, AliasedExpr):
-                if not isinstance(col.expr, Expr):
-                    raise TypeError("select(AliasedExpr) expects an Expr.")
+            if isinstance(col, AliasedExpr):
                 computed[col.name] = col.expr._rust_expr
                 projects.append(col.name)
-            elif isinstance(col, Expr):
-                if self._engine.expr_is_global_agg(col._rust_expr):
-                    alias = self._engine.expr_global_default_alias(col._rust_expr)
-                    if alias is None:
-                        raise TypeError(
-                            "global aggregate in select() is missing a default "
-                            "output name."
-                        )
-                    aggs.append((alias, col._rust_expr))
-                else:
-                    if isinstance(col, ColumnRef):
-                        projects.append(col._column_name)  # type: ignore[attr-defined]
-                    else:
-                        raise TypeError(
-                            "select() accepts column names, ColumnRef expressions, "
-                            "global aggregates, or Expr.alias('name') for computed "
-                            "expressions."
-                        )
-            else:
-                raise TypeError(
-                    "select() accepts column names, Selector objects, "
-                    "ColumnRef expressions, global aggregates, or "
-                    "Expr.alias('name') (AliasedExpr)."
-                )
+                continue
+            if isinstance(col, ColumnRef):
+                projects.append(col._column_name)  # type: ignore[attr-defined]
+                continue
+            if isinstance(col, Expr) and self._engine.expr_is_global_agg(
+                col._rust_expr
+            ):
+                alias = self._engine.expr_global_default_alias(col._rust_expr)
+                if alias is None:
+                    raise TypeError(
+                        "global aggregate in select_as() is missing a default "
+                        "output name."
+                    )
+                aggs.append((alias, col._rust_expr))
+                continue
+            raise TypeError(
+                "select_as() accepts ColumnRef, Expr.alias('name') (AliasedExpr), "
+                "or global aggregate Expr values."
+            )
 
         if named_items and (projects or aggs):
             raise TypeError(
-                "select() cannot mix keyword aggregates with positional column "
-                "names or aggregates."
+                "select_as() cannot mix keyword aggregates with positional projections."
             )
         if aggs and projects:
             raise TypeError(
-                "select() cannot mix global aggregates with plain column projections."
+                "select_as() cannot mix global aggregates with plain projections."
             )
-        if exclude_set and (named_items or aggs):
-            raise TypeError(
-                "select(exclude=...) cannot be used with global aggregates."
-            )
+
         if named_items:
             rust_plan = self._engine.plan_global_select(self._rust_plan, named_items)
         elif aggs:
             rust_plan = self._engine.plan_global_select(self._rust_plan, aggs)
         else:
             if not projects:
-                if not exclude_set:
-                    raise ValueError("select() requires at least one column.")
-                projects = [
-                    c for c in self._current_field_types if c not in exclude_set
-                ]
-            else:
-                projects = [c for c in projects if c not in exclude_set]
-            if not projects:
-                raise ValueError("select(...) produced an empty projection.")
+                raise ValueError("select_as() requires at least one column.")
             rust_plan = self._rust_plan
             if computed:
                 rust_plan = self._engine.plan_with_columns(rust_plan, computed)
             rust_plan = self._engine.plan_select(rust_plan, projects)
+
         desc = rust_plan.schema_descriptors()
         derived_fields = self._field_types_from_descriptors(desc)
-        # Preserve order: for plain projections, match call order.
-        if projects and not aggs and not named_items:
-            desired_order = [c for c in projects if c in derived_fields]
-            ordered: dict[str, Any] = {k: derived_fields[k] for k in desired_order}
-            for k, v in derived_fields.items():
-                if k not in ordered:
-                    ordered[k] = v
-            derived_fields = ordered
-        derived_schema_type = make_derived_schema_type(
-            self._current_schema_type, derived_fields
+        self._assert_after_schema(
+            after_schema_type, derived_fields=derived_fields, op_name="select_as"
         )
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=derived_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
+
+        return cast(
+            "DataFrame[AfterSchemaT]",
+            self._from_plan(
+                root_data=self._root_data,
+                root_schema_type=self._root_schema_type,
+                current_schema_type=after_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
     def select_all(self) -> DataFrame[Any]:
-        """Select all columns in schema order (schema-driven helper)."""
-        return self.select(*list(self._current_field_types.keys()))
+        raise TypeError("select_all() is removed in pydantable 2.0 strict mode.")
 
     def select_prefix(self, prefix: str) -> DataFrame[Any]:
-        """Select columns whose names start with `prefix` (schema-driven helper)."""
-        if not isinstance(prefix, str):
-            raise TypeError("select_prefix(prefix) expects a string.")
-        cols = [c for c in self._current_field_types if c.startswith(prefix)]
-        if not cols:
-            raise ValueError(f"select_prefix({prefix!r}) matched no columns.")
-        return self.select(*cols)
+        raise TypeError(
+            "select_prefix(...) is removed in pydantable 2.0 strict mode "
+            "(dynamic column sets are forbidden)."
+        )
 
     def select_suffix(self, suffix: str) -> DataFrame[Any]:
-        """Select columns whose names end with `suffix` (schema-driven helper)."""
-        if not isinstance(suffix, str):
-            raise TypeError("select_suffix(suffix) expects a string.")
-        cols = [c for c in self._current_field_types if c.endswith(suffix)]
-        if not cols:
-            raise ValueError(f"select_suffix({suffix!r}) matched no columns.")
-        return self.select(*cols)
+        raise TypeError(
+            "select_suffix(...) is removed in pydantable 2.0 strict mode "
+            "(dynamic column sets are forbidden)."
+        )
 
     def _resolve_column_names_or_selector(
         self, item: str | Selector, *, arg_name: str
     ) -> list[str]:
-        if isinstance(item, str):
-            return [item]
-        if isinstance(item, Selector):
-            resolved = item.resolve(self._current_field_types)
-            if not resolved:
-                available = ", ".join(repr(c) for c in self._current_field_types)
-                raise ValueError(
-                    f"{arg_name}={item!r} matched no columns. "
-                    f"Available columns: [{available}]"
-                )
-            return resolved
-        raise TypeError(f"{arg_name} expects a column name or Selector.")
+        raise TypeError(
+            "Dynamic name/Selector resolution is removed in pydantable 2.0 strict mode."
+        )
 
     def reorder_columns(self, order: Sequence[str | Selector]) -> DataFrame[Any]:
-        """Reorder columns by explicit names/selectors; append remaining columns."""
-        wanted: list[str] = []
-        for it in order:
-            wanted.extend(self._resolve_column_names_or_selector(it, arg_name="order"))
-        if len(set(wanted)) != len(wanted):
-            raise ValueError("reorder_columns(order=...) contains duplicate columns.")
-        remainder = [c for c in self._current_field_types if c not in wanted]
-        return self.select(*wanted, *remainder)
+        raise TypeError(
+            "reorder_columns(...) is removed in pydantable 2.0 strict mode."
+        )
 
     def select_first(self, *cols_or_selectors: str | Selector) -> DataFrame[Any]:
-        """Move selected columns to the front; keep remaining order."""
-        wanted: list[str] = []
-        for it in cols_or_selectors:
-            wanted.extend(self._resolve_column_names_or_selector(it, arg_name="cols"))
-        if len(set(wanted)) != len(wanted):
-            raise ValueError("select_first(...) contains duplicate columns.")
-        remainder = [c for c in self._current_field_types if c not in wanted]
-        return self.select(*wanted, *remainder)
+        raise TypeError("select_first(...) is removed in pydantable 2.0 strict mode.")
 
     def select_last(self, *cols_or_selectors: str | Selector) -> DataFrame[Any]:
-        """Move selected columns to the end; keep remaining order."""
-        wanted: list[str] = []
-        for it in cols_or_selectors:
-            wanted.extend(self._resolve_column_names_or_selector(it, arg_name="cols"))
-        if len(set(wanted)) != len(wanted):
-            raise ValueError("select_last(...) contains duplicate columns.")
-        remainder = [c for c in self._current_field_types if c not in wanted]
-        return self.select(*remainder, *wanted)
+        raise TypeError("select_last(...) is removed in pydantable 2.0 strict mode.")
 
     def move(
         self,
@@ -1522,27 +1517,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         before: str | None = None,
         after: str | None = None,
     ) -> DataFrame[Any]:
-        """Move column(s) before/after an anchor column (schema-first helper)."""
-        if (before is None) == (after is None):
-            raise TypeError(
-                "move(..., before=...) or move(..., after=...) is required."
-            )
-        moving = self._resolve_column_names_or_selector(
-            cols_or_selector, arg_name="cols"
-        )
-        anchor = before if before is not None else after
-        if not isinstance(anchor, str):
-            raise TypeError("move(..., before/after=...) expects a column name.")
-        if anchor not in self._current_field_types:
-            raise KeyError(f"move() unknown anchor column {anchor!r}.")
-        if anchor in moving:
-            raise ValueError("move() cannot move a column relative to itself.")
-        # Remove moving cols, then re-insert as a block.
-        base = [c for c in self._current_field_types if c not in moving]
-        idx = base.index(anchor)
-        insert_at = idx if before is not None else idx + 1
-        new_order = [*base[:insert_at], *moving, *base[insert_at:]]
-        return self.select(*new_order)
+        raise TypeError("move(...) is removed in pydantable 2.0 strict mode.")
 
     def filter(self, condition: Expr) -> DataFrame[Any]:
         """Keep rows where the boolean ``condition`` is true."""
@@ -1689,57 +1664,79 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
     ) -> DataFrame[Any]:
         return self.unique(subset=subset, keep=keep)
 
-    def drop(
-        self, *columns: str | ColumnRef | Selector, strict: bool = True
-    ) -> DataFrame[Any]:
+    def drop(self, *args: Any, **kwargs: Any) -> DataFrame[Any]:
+        raise TypeError(
+            "drop() is removed in pydantable 2.0 strict mode. "
+            "Use drop_as(AfterSchema, ...) so the output schema is explicit."
+        )
+
+    def drop_as(
+        self,
+        after_schema_type: type[AfterSchemaT],
+        *columns: ColumnRef,
+    ) -> DataFrame[AfterSchemaT]:
+        if not isinstance(after_schema_type, type) or not issubclass(
+            after_schema_type, BaseModel
+        ):
+            raise TypeError("drop_as(after_schema_type, ...) expects a schema.")
         selected: list[str] = []
         for col in columns:
-            if isinstance(col, str):
-                selected.append(col)
-            elif isinstance(col, Selector):
-                selected.extend(col.resolve(self._current_field_types))
-            elif isinstance(col, Expr):
-                referenced = col.referenced_columns()
-                if len(referenced) != 1:
-                    raise TypeError(
-                        "drop() accepts column names or a ColumnRef expression."
-                    )
-                selected.append(next(iter(referenced)))
-            else:
-                raise TypeError("drop() accepts column names or ColumnRef objects.")
-        if not strict:
-            selected = [c for c in selected if c in self._current_field_types]
+            if not isinstance(col, ColumnRef):
+                raise TypeError("drop_as(..., *columns) expects ColumnRef values.")
+            referenced = col.referenced_columns()
+            if len(referenced) != 1:
+                raise TypeError("drop_as() expects single-column references.")
+            selected.append(next(iter(referenced)))
         if not selected:
-            return self
+            raise ValueError("drop_as() requires at least one column.")
         rust_plan = self._engine.plan_drop(self._rust_plan, selected)
         desc = rust_plan.schema_descriptors()
         derived_fields = self._field_types_from_descriptors(desc)
-        # Preserve order: keep existing column order minus dropped columns.
-        desired_order = [k for k in self._current_field_types if k in derived_fields]
-        ordered: dict[str, Any] = {k: derived_fields[k] for k in desired_order}
-        for k, v in derived_fields.items():
-            if k not in ordered:
-                ordered[k] = v
-        derived_fields = ordered
-        derived_schema_type = make_derived_schema_type(
-            self._current_schema_type, derived_fields
+        self._assert_after_schema(
+            after_schema_type, derived_fields=derived_fields, op_name="drop_as"
         )
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=derived_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
+        return cast(
+            "DataFrame[AfterSchemaT]",
+            self._from_plan(
+                root_data=self._root_data,
+                root_schema_type=self._root_schema_type,
+                current_schema_type=after_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
-    def rename(
-        self, columns: Mapping[str, str], *, strict: bool = True
-    ) -> DataFrame[Any]:
-        rename_map = dict(columns)
-        if not strict:
-            rename_map = {
-                k: v for k, v in rename_map.items() if k in self._current_field_types
-            }
+    def rename(self, *args: Any, **kwargs: Any) -> DataFrame[Any]:
+        raise TypeError(
+            "rename() is removed in pydantable 2.0 strict mode. "
+            "Use rename_as(AfterSchema, ...) with ColumnRef keys."
+        )
+
+    def rename_as(
+        self,
+        after_schema_type: type[AfterSchemaT],
+        columns: Mapping[ColumnRef, str],
+    ) -> DataFrame[AfterSchemaT]:
+        if not isinstance(after_schema_type, type) or not issubclass(
+            after_schema_type, BaseModel
+        ):
+            raise TypeError("rename_as(after_schema_type, ...) expects a schema.")
+        if not isinstance(columns, Mapping):
+            raise TypeError("rename_as(..., columns=...) expects a mapping.")
+        rename_map: dict[str, str] = {}
+        for old_ref, new_name in columns.items():
+            if not isinstance(old_ref, ColumnRef):
+                raise TypeError("rename_as mapping keys must be ColumnRef values.")
+            referenced = old_ref.referenced_columns()
+            if len(referenced) != 1:
+                raise TypeError("rename_as mapping keys must be single-column refs.")
+            old_name = next(iter(referenced))
+            if not isinstance(new_name, str) or not new_name:
+                raise TypeError("rename_as mapping values must be non-empty strings.")
+            rename_map[old_name] = new_name
+        if len(set(rename_map.values())) != len(rename_map):
+            raise ValueError("rename_as(...) produced duplicate output column names.")
+
         rust_plan = self._engine.plan_rename(self._rust_plan, rename_map)
         desc = rust_plan.schema_descriptors()
         rename_prev: dict[str, Any] = dict(self._current_field_types)
@@ -1747,26 +1744,18 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             if old_name in self._current_field_types:
                 rename_prev[new_name] = self._current_field_types[old_name]
         derived_fields = self._field_types_from_descriptors(desc, previous=rename_prev)
-        # Preserve column order: renamed columns stay in the original position.
-        desired_order: list[str] = []
-        for name in self._current_field_types:
-            desired_order.append(rename_map.get(name, name))
-        ordered: dict[str, Any] = {
-            k: derived_fields[k] for k in desired_order if k in derived_fields
-        }
-        for k, v in derived_fields.items():
-            if k not in ordered:
-                ordered[k] = v
-        derived_fields = ordered
-        derived_schema_type = make_derived_schema_type(
-            self._current_schema_type, derived_fields
+        self._assert_after_schema(
+            after_schema_type, derived_fields=derived_fields, op_name="rename_as"
         )
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=derived_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
+        return cast(
+            "DataFrame[AfterSchemaT]",
+            self._from_plan(
+                root_data=self._root_data,
+                root_schema_type=self._root_schema_type,
+                current_schema_type=after_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
     def rename_with_selector(
@@ -1776,25 +1765,11 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         *,
         strict: bool = True,
     ) -> DataFrame[Any]:
-        """Rename columns selected by a schema-driven Selector."""
-        if not isinstance(selector, Selector):
-            raise TypeError("rename_with_selector(selector, ...) expects a Selector.")
-        if not callable(fn):
-            raise TypeError("rename_with_selector(..., fn=...) expects a callable.")
-        selected = selector.resolve(self._current_field_types)
-        if not selected:
-            available = ", ".join(repr(c) for c in self._current_field_types)
-            raise ValueError(
-                f"rename_with_selector({selector!r}) matched no columns. "
-                f"Available columns: [{available}]"
-            )
-        rename_map: dict[str, str] = {old: str(fn(old)) for old in selected}
-        new_names = list(rename_map.values())
-        if len(set(new_names)) != len(new_names):
-            raise ValueError(
-                "rename_with_selector(...) produced duplicate output column names."
-            )
-        return self.rename(rename_map, strict=strict)
+        raise TypeError(
+            "rename_with_selector(...) is removed in pydantable 2.0 strict mode "
+            "(dynamic schema changes and Python callables are forbidden). "
+            "Use rename_as(AfterSchema, ...) with explicit ColumnRef mappings."
+        )
 
     def rename_prefix(
         self,
@@ -1803,25 +1778,10 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         selector: Selector | None = None,
         strict: bool = True,
     ) -> DataFrame[Any]:
-        if not isinstance(prefix, str):
-            raise TypeError("rename_prefix(prefix) expects a string.")
-        target = (
-            list(self._current_field_types.keys())
-            if selector is None
-            else selector.resolve(self._current_field_types)
+        raise TypeError(
+            "rename_prefix(...) is removed in pydantable 2.0 strict mode. "
+            "Use rename_as(AfterSchema, ...) with explicit mappings."
         )
-        if selector is not None and not target:
-            available = ", ".join(repr(c) for c in self._current_field_types)
-            raise ValueError(
-                f"rename_prefix(selector={selector!r}) matched no columns. "
-                f"Available columns: [{available}]"
-            )
-        rename_map = {c: f"{prefix}{c}" for c in target}
-        if len(set(rename_map.values())) != len(rename_map):
-            raise ValueError(
-                "rename_prefix(...) produced duplicate output column names."
-            )
-        return self.rename(rename_map, strict=strict)
 
     def rename_suffix(
         self,
@@ -1830,25 +1790,10 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         selector: Selector | None = None,
         strict: bool = True,
     ) -> DataFrame[Any]:
-        if not isinstance(suffix, str):
-            raise TypeError("rename_suffix(suffix) expects a string.")
-        target = (
-            list(self._current_field_types.keys())
-            if selector is None
-            else selector.resolve(self._current_field_types)
+        raise TypeError(
+            "rename_suffix(...) is removed in pydantable 2.0 strict mode. "
+            "Use rename_as(AfterSchema, ...) with explicit mappings."
         )
-        if selector is not None and not target:
-            available = ", ".join(repr(c) for c in self._current_field_types)
-            raise ValueError(
-                f"rename_suffix(selector={selector!r}) matched no columns. "
-                f"Available columns: [{available}]"
-            )
-        rename_map = {c: f"{c}{suffix}" for c in target}
-        if len(set(rename_map.values())) != len(rename_map):
-            raise ValueError(
-                "rename_suffix(...) produced duplicate output column names."
-            )
-        return self.rename(rename_map, strict=strict)
 
     def rename_replace(
         self,
@@ -2075,7 +2020,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
                 raise TypeError(
                     f"clip(subset=...) expects numeric columns, got {c!r} dtype={dt!r}."
                 )
-            expr: Expr = self.col(c)
+            expr: Expr = self._col_by_name(c)
             if lower is not None:
                 lo = Literal(value=lower).cast(expr.dtype)
                 expr = when(expr < lo, lo).otherwise(expr)
@@ -2146,17 +2091,12 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         how: str = "any",
         threshold: int | None = None,
     ) -> DataFrame[Any]:
+        if isinstance(subset, Selector):
+            raise TypeError(
+                "drop_nulls(subset=Selector) is removed in pydantable 2.0 strict mode."
+            )
         if isinstance(subset, str):
             subset = [subset]
-        if isinstance(subset, Selector):
-            subset_cols = subset.resolve(self._current_field_types)
-            if not subset_cols:
-                available = ", ".join(repr(c) for c in self._current_field_types)
-                raise ValueError(
-                    f"drop_nulls(subset={subset!r}) matched no columns. "
-                    f"Available columns: [{available}]"
-                )
-            subset = subset_cols
         rust_plan = self._engine.plan_drop_nulls(
             self._rust_plan,
             None if subset is None else list(subset),
@@ -2180,129 +2120,77 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         value_name: str = "value",
         streaming: bool | None = None,
     ) -> DataFrame[Any]:
+        raise TypeError(
+            "melt()/unpivot()/pivot_*() are removed in pydantable 2.0 strict mode "
+            "(reshape output schemas depend on runtime values)."
+        )
+
+    def _colref_names(self, cols: Sequence[ColumnRef], *, arg_name: str) -> list[str]:
+        out: list[str] = []
+        for c in cols:
+            if not isinstance(c, ColumnRef):
+                raise TypeError(f"{arg_name} expects ColumnRef values.")
+            referenced = c.referenced_columns()
+            if len(referenced) != 1:
+                raise TypeError(f"{arg_name} expects single-column ColumnRef values.")
+            out.append(next(iter(referenced)))
+        return out
+
+    def melt_as(
+        self,
+        after_schema_type: type[AfterSchemaT],
+        *,
+        id_vars: Sequence[ColumnRef],
+        value_vars: Sequence[ColumnRef] | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+        streaming: bool | None = None,
+    ) -> DataFrame[AfterSchemaT]:
+        """Strict melt with explicit schema and ColumnRef inputs."""
+        if not isinstance(after_schema_type, type) or not issubclass(
+            after_schema_type, BaseModel
+        ):
+            raise TypeError("melt_as(after_schema_type, ...) expects a schema.")
+        if not id_vars:
+            raise ValueError("melt_as(id_vars=...) requires at least one id column.")
+        if not isinstance(variable_name, str) or not variable_name:
+            raise TypeError("melt_as(variable_name=...) expects a non-empty string.")
+        if not isinstance(value_name, str) or not value_name:
+            raise TypeError("melt_as(value_name=...) expects a non-empty string.")
+
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
         )
-        if isinstance(id_vars, str):
-            id_vars = [id_vars]
-        if isinstance(value_vars, str):
-            value_vars = [value_vars]
-        if isinstance(id_vars, Selector):
-            resolved = id_vars.resolve(self._current_field_types)
-            if not resolved:
-                available = ", ".join(repr(c) for c in self._current_field_types)
-                raise ValueError(
-                    f"melt(id_vars={id_vars!r}) matched no columns. "
-                    f"Available columns: [{available}]"
-                )
-            id_vars = resolved
-        if isinstance(value_vars, Selector):
-            resolved = value_vars.resolve(self._current_field_types)
-            if not resolved:
-                available = ", ".join(repr(c) for c in self._current_field_types)
-                raise ValueError(
-                    f"melt(value_vars={value_vars!r}) matched no columns. "
-                    f"Available columns: [{available}]"
-                )
-            value_vars = resolved
+        id_names = self._colref_names(id_vars, arg_name="melt_as(id_vars=...)")
+        value_names = (
+            None
+            if value_vars is None
+            else self._colref_names(value_vars, arg_name="melt_as(value_vars=...)")
+        )
         out_data, schema_descriptors = self._engine.execute_melt(
             self._rust_plan,
             self._root_data,
-            [] if id_vars is None else list(id_vars),
-            None if value_vars is None else list(value_vars),
+            id_names,
+            value_names,
             variable_name,
             value_name,
             as_python_lists=True,
             streaming=use_streaming,
         )
         derived_fields = self._field_types_from_descriptors(schema_descriptors)
-        derived_schema_type = make_derived_schema_type(
-            self._current_schema_type, derived_fields
+        self._assert_after_schema(
+            after_schema_type, derived_fields=derived_fields, op_name="melt_as"
         )
         rust_plan = self._engine.make_plan(field_types_for_rust(derived_fields))
-        return self._from_plan(
-            root_data=out_data,
-            root_schema_type=derived_schema_type,
-            current_schema_type=derived_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
-        )
-
-    def melt_as_schema(
-        self,
-        schema: type[AfterSchemaT],
-        *,
-        id_vars: str | Sequence[str] | Selector | None = None,
-        value_vars: str | Sequence[str] | Selector | None = None,
-        variable_name: str = "variable",
-        value_name: str = "value",
-        streaming: bool | None = None,
-        validate_schema: bool = True,
-    ) -> DataFrame[AfterSchemaT]:
-        return self.melt(
-            id_vars=id_vars,
-            value_vars=value_vars,
-            variable_name=variable_name,
-            value_name=value_name,
-            streaming=streaming,
-        ).as_schema(schema, validate_schema=validate_schema)
-
-    def melt_try_as_schema(
-        self,
-        schema: type[AfterSchemaT],
-        *,
-        id_vars: str | Sequence[str] | Selector | None = None,
-        value_vars: str | Sequence[str] | Selector | None = None,
-        variable_name: str = "variable",
-        value_name: str = "value",
-        streaming: bool | None = None,
-        validate_schema: bool = True,
-    ) -> DataFrame[AfterSchemaT] | None:
-        return self.melt(
-            id_vars=id_vars,
-            value_vars=value_vars,
-            variable_name=variable_name,
-            value_name=value_name,
-            streaming=streaming,
-        ).try_as_schema(schema, validate_schema=validate_schema)
-
-    def melt_assert_schema(
-        self,
-        schema: type[AfterSchemaT],
-        *,
-        id_vars: str | Sequence[str] | Selector | None = None,
-        value_vars: str | Sequence[str] | Selector | None = None,
-        variable_name: str = "variable",
-        value_name: str = "value",
-        streaming: bool | None = None,
-        validate_schema: bool = True,
-    ) -> DataFrame[AfterSchemaT]:
-        return self.melt(
-            id_vars=id_vars,
-            value_vars=value_vars,
-            variable_name=variable_name,
-            value_name=value_name,
-            streaming=streaming,
-        ).assert_schema(schema, validate_schema=validate_schema)
-
-    # Aliases for parity with DataFrameModel's after-model helpers.
-    def melt_as_model(
-        self, schema: type[AfterSchemaT], *, validate_schema: bool = True, **kwargs: Any
-    ) -> DataFrame[AfterSchemaT]:
-        return self.melt_as_schema(schema, validate_schema=validate_schema, **kwargs)
-
-    def melt_try_as_model(
-        self, schema: type[AfterSchemaT], *, validate_schema: bool = True, **kwargs: Any
-    ) -> DataFrame[AfterSchemaT] | None:
-        return self.melt_try_as_schema(
-            schema, validate_schema=validate_schema, **kwargs
-        )
-
-    def melt_assert_model(
-        self, schema: type[AfterSchemaT], *, validate_schema: bool = True, **kwargs: Any
-    ) -> DataFrame[AfterSchemaT]:
-        return self.melt_assert_schema(
-            schema, validate_schema=validate_schema, **kwargs
+        return cast(
+            "DataFrame[AfterSchemaT]",
+            self._from_plan(
+                root_data=out_data,
+                root_schema_type=after_schema_type,
+                current_schema_type=after_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
     def unpivot(
@@ -2314,129 +2202,12 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         value_name: str = "value",
         streaming: bool | None = None,
     ) -> DataFrame[Any]:
-        return self.melt(
-            id_vars=index,
-            value_vars=on,
-            variable_name=variable_name,
-            value_name=value_name,
-            streaming=streaming,
+        raise TypeError(
+            "unpivot() is removed in pydantable 2.0 strict mode "
+            "(reshape output schemas depend on runtime values)."
         )
 
-    def unpivot_as_schema(
-        self,
-        schema: type[AfterSchemaT],
-        *,
-        index: str | Sequence[str] | Selector | None = None,
-        on: str | Sequence[str] | Selector | None = None,
-        variable_name: str = "variable",
-        value_name: str = "value",
-        streaming: bool | None = None,
-        validate_schema: bool = True,
-    ) -> DataFrame[AfterSchemaT]:
-        return self.unpivot(
-            index=index,
-            on=on,
-            variable_name=variable_name,
-            value_name=value_name,
-            streaming=streaming,
-        ).as_schema(schema, validate_schema=validate_schema)
-
-    def unpivot_try_as_schema(
-        self,
-        schema: type[AfterSchemaT],
-        *,
-        index: str | Sequence[str] | Selector | None = None,
-        on: str | Sequence[str] | Selector | None = None,
-        variable_name: str = "variable",
-        value_name: str = "value",
-        streaming: bool | None = None,
-        validate_schema: bool = True,
-    ) -> DataFrame[AfterSchemaT] | None:
-        return self.unpivot(
-            index=index,
-            on=on,
-            variable_name=variable_name,
-            value_name=value_name,
-            streaming=streaming,
-        ).try_as_schema(schema, validate_schema=validate_schema)
-
-    def unpivot_assert_schema(
-        self,
-        schema: type[AfterSchemaT],
-        *,
-        index: str | Sequence[str] | Selector | None = None,
-        on: str | Sequence[str] | Selector | None = None,
-        variable_name: str = "variable",
-        value_name: str = "value",
-        streaming: bool | None = None,
-        validate_schema: bool = True,
-    ) -> DataFrame[AfterSchemaT]:
-        return self.unpivot(
-            index=index,
-            on=on,
-            variable_name=variable_name,
-            value_name=value_name,
-            streaming=streaming,
-        ).assert_schema(schema, validate_schema=validate_schema)
-
-    def unpivot_as_model(
-        self, schema: type[AfterSchemaT], *, validate_schema: bool = True, **kwargs: Any
-    ) -> DataFrame[AfterSchemaT]:
-        return self.unpivot_as_schema(schema, validate_schema=validate_schema, **kwargs)
-
-    def unpivot_try_as_model(
-        self, schema: type[AfterSchemaT], *, validate_schema: bool = True, **kwargs: Any
-    ) -> DataFrame[AfterSchemaT] | None:
-        return self.unpivot_try_as_schema(
-            schema, validate_schema=validate_schema, **kwargs
-        )
-
-    def unpivot_assert_model(
-        self, schema: type[AfterSchemaT], *, validate_schema: bool = True, **kwargs: Any
-    ) -> DataFrame[AfterSchemaT]:
-        return self.unpivot_assert_schema(
-            schema, validate_schema=validate_schema, **kwargs
-        )
-
-    def pivot_longer(
-        self,
-        *,
-        id_vars: str | Sequence[str] | Selector | None = None,
-        value_vars: str | Sequence[str] | Selector | None = None,
-        names_to: str = "variable",
-        values_to: str = "value",
-        streaming: bool | None = None,
-    ) -> DataFrame[Any]:
-        """Polars-friendly alias of :meth:`melt` (aka pivot_longer)."""
-        return self.melt(
-            id_vars=id_vars,
-            value_vars=value_vars,
-            variable_name=names_to,
-            value_name=values_to,
-            streaming=streaming,
-        )
-
-    def pivot_wider(
-        self,
-        *,
-        index: str | Sequence[str] | Selector,
-        names_from: str | Selector | ColumnRef,
-        values_from: str | Sequence[str] | Selector,
-        aggregate_function: str = "first",
-        sort_columns: bool = False,
-        separator: str = "_",
-        streaming: bool | None = None,
-    ) -> DataFrame[Any]:
-        """Polars-friendly alias of :meth:`pivot` (aka pivot_wider)."""
-        return self.pivot(
-            index=index,
-            columns=names_from,
-            values=values_from,
-            aggregate_function=aggregate_function,
-            sort_columns=sort_columns,
-            separator=separator,
-            streaming=streaming,
-        )
+    # 2.0 strict mode: use melt_as(...) and pivot_as(...) only.
 
     def top_k(
         self,
@@ -2483,57 +2254,45 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         separator: str = "_",
         streaming: bool | None = None,
     ) -> DataFrame[Any]:
-        if isinstance(index, Selector):
-            resolved = index.resolve(self._current_field_types)
-            if not resolved:
-                available = ", ".join(repr(c) for c in self._current_field_types)
-                raise ValueError(
-                    f"pivot(index={index!r}) matched no columns. "
-                    f"Available columns: [{available}]"
-                )
-            index_cols = resolved
-        else:
-            index_cols = [index] if isinstance(index, str) else list(index)
+        raise TypeError("pivot() is removed in pydantable 2.0 strict mode.")
 
-        if isinstance(values, Selector):
-            resolved = values.resolve(self._current_field_types)
-            if not resolved:
-                available = ", ".join(repr(c) for c in self._current_field_types)
-                raise ValueError(
-                    f"pivot(values={values!r}) matched no columns. "
-                    f"Available columns: [{available}]"
-                )
-            value_cols = resolved
-        else:
-            value_cols = [values] if isinstance(values, str) else list(values)
-
-        if isinstance(columns, Selector):
-            resolved = columns.resolve(self._current_field_types)
-            if len(resolved) != 1:
-                available = ", ".join(repr(c) for c in self._current_field_types)
-                raise ValueError(
-                    "pivot(columns=...) selector must match exactly one column; "
-                    f"matched={resolved}. Available columns: [{available}]"
-                )
-            columns_col = resolved[0]
-        elif isinstance(columns, str):
-            columns_col = columns
-        elif isinstance(columns, Expr):
-            referenced = columns.referenced_columns()
-            if len(referenced) != 1:
-                raise TypeError(
-                    "pivot(columns=...) expects a column name or "
-                    "single-column ColumnRef; "
-                    f"referenced_columns={sorted(referenced)!r}"
-                )
-            columns_col = next(iter(referenced))
-        else:
+    def pivot_as(
+        self,
+        after_schema_type: type[AfterSchemaT],
+        *,
+        index: Sequence[ColumnRef],
+        columns: ColumnRef,
+        values: Sequence[ColumnRef],
+        aggregate_function: str = "first",
+        pivot_values: Sequence[Any],
+        sort_columns: bool = False,
+        separator: str = "_",
+        streaming: bool | None = None,
+    ) -> DataFrame[AfterSchemaT]:
+        """Strict pivot with explicit schema and explicit pivot_values."""
+        if not isinstance(after_schema_type, type) or not issubclass(
+            after_schema_type, BaseModel
+        ):
+            raise TypeError("pivot_as(after_schema_type, ...) expects a schema.")
+        if not index:
+            raise ValueError("pivot_as(index=...) requires at least one index column.")
+        if not values:
+            raise ValueError("pivot_as(values=...) requires at least one value column.")
+        if not pivot_values:
             raise TypeError(
-                "pivot(columns=...) expects a column name, Selector, or "
-                "single-column ColumnRef."
+                "pivot_as(pivot_values=...) is required in strict mode so the output "
+                "columns are statically enumerable."
             )
         if not isinstance(separator, str) or not separator:
-            raise TypeError("pivot(separator=...) expects a non-empty string.")
+            raise TypeError("pivot_as(separator=...) expects a non-empty string.")
+
+        index_cols = self._colref_names(index, arg_name="pivot_as(index=...)")
+        referenced = columns.referenced_columns()
+        if len(referenced) != 1:
+            raise TypeError("pivot_as(columns=...) expects a single-column ColumnRef.")
+        columns_col = next(iter(referenced))
+        value_cols = self._colref_names(values, arg_name="pivot_as(values=...)")
+
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
         )
@@ -2551,16 +2310,19 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             streaming=use_streaming,
         )
         derived_fields = self._field_types_from_descriptors(schema_descriptors)
-        derived_schema_type = make_derived_schema_type(
-            self._current_schema_type, derived_fields
+        self._assert_after_schema(
+            after_schema_type, derived_fields=derived_fields, op_name="pivot_as"
         )
         rust_plan = self._engine.make_plan(field_types_for_rust(derived_fields))
-        return self._from_plan(
-            root_data=out_data,
-            root_schema_type=derived_schema_type,
-            current_schema_type=derived_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
+        return cast(
+            "DataFrame[AfterSchemaT]",
+            self._from_plan(
+                root_data=out_data,
+                root_schema_type=after_schema_type,
+                current_schema_type=after_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
     def explode(
@@ -2570,16 +2332,27 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         outer: bool = False,
         streaming: bool | None = None,
     ) -> DataFrame[Any]:
-        if isinstance(columns, Selector):
-            cols = columns.resolve(self._current_field_types)
-            if not cols:
-                available = ", ".join(repr(c) for c in self._current_field_types)
-                raise ValueError(
-                    f"explode(columns={columns!r}) matched no columns. "
-                    f"Available columns: [{available}]"
-                )
-        else:
-            cols = [columns] if isinstance(columns, str) else list(columns)
+        raise TypeError(
+            "explode() is removed in pydantable 2.0 strict mode. "
+            "Use an explicit-schema explode_as(AfterSchema, cols=[...]) API "
+            "(not yet implemented)."
+        )
+
+    def explode_as(
+        self,
+        after_schema_type: type[AfterSchemaT],
+        *,
+        columns: Sequence[ColumnRef],
+        outer: bool = False,
+        streaming: bool | None = None,
+    ) -> DataFrame[AfterSchemaT]:
+        if not isinstance(after_schema_type, type) or not issubclass(
+            after_schema_type, BaseModel
+        ):
+            raise TypeError("explode_as(after_schema_type, ...) expects a schema.")
+        if not columns:
+            raise ValueError("explode_as(columns=...) requires at least one column.")
+        cols = self._colref_names(columns, arg_name="explode_as(columns=...)")
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
         )
@@ -2588,19 +2361,22 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             self._root_data,
             cols,
             streaming=use_streaming,
-            outer=outer,
+            outer=bool(outer),
         )
         derived_fields = self._field_types_from_descriptors(schema_descriptors)
-        derived_schema_type = make_derived_schema_type(
-            self._current_schema_type, derived_fields
+        self._assert_after_schema(
+            after_schema_type, derived_fields=derived_fields, op_name="explode_as"
         )
         rust_plan = self._engine.make_plan(field_types_for_rust(derived_fields))
-        return self._from_plan(
-            root_data=out_data,
-            root_schema_type=derived_schema_type,
-            current_schema_type=derived_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
+        return cast(
+            "DataFrame[AfterSchemaT]",
+            self._from_plan(
+                root_data=out_data,
+                root_schema_type=after_schema_type,
+                current_schema_type=after_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
     def explode_outer(
@@ -2670,16 +2446,26 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
     def unnest(
         self, columns: str | Sequence[str] | Selector, *, streaming: bool | None = None
     ) -> DataFrame[Any]:
-        if isinstance(columns, Selector):
-            cols = columns.resolve(self._current_field_types)
-            if not cols:
-                available = ", ".join(repr(c) for c in self._current_field_types)
-                raise ValueError(
-                    f"unnest(columns={columns!r}) matched no columns. "
-                    f"Available columns: [{available}]"
-                )
-        else:
-            cols = [columns] if isinstance(columns, str) else list(columns)
+        raise TypeError(
+            "unnest() is removed in pydantable 2.0 strict mode. "
+            "Use an explicit-schema unnest_as(AfterSchema, cols=[...]) API "
+            "(not yet implemented)."
+        )
+
+    def unnest_as(
+        self,
+        after_schema_type: type[AfterSchemaT],
+        *,
+        columns: Sequence[ColumnRef],
+        streaming: bool | None = None,
+    ) -> DataFrame[AfterSchemaT]:
+        if not isinstance(after_schema_type, type) or not issubclass(
+            after_schema_type, BaseModel
+        ):
+            raise TypeError("unnest_as(after_schema_type, ...) expects a schema.")
+        if not columns:
+            raise ValueError("unnest_as(columns=...) requires at least one column.")
+        cols = self._colref_names(columns, arg_name="unnest_as(columns=...)")
         use_streaming = _resolve_engine_streaming(
             streaming=streaming, default=self._engine_streaming_default
         )
@@ -2687,47 +2473,24 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             self._rust_plan, self._root_data, cols, streaming=use_streaming
         )
         derived_fields = self._field_types_from_descriptors(schema_descriptors)
-        derived_schema_type = make_derived_schema_type(
-            self._current_schema_type, derived_fields
+        self._assert_after_schema(
+            after_schema_type, derived_fields=derived_fields, op_name="unnest_as"
         )
         rust_plan = self._engine.make_plan(field_types_for_rust(derived_fields))
-        return self._from_plan(
-            root_data=out_data,
-            root_schema_type=derived_schema_type,
-            current_schema_type=derived_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
+        return cast(
+            "DataFrame[AfterSchemaT]",
+            self._from_plan(
+                root_data=out_data,
+                root_schema_type=after_schema_type,
+                current_schema_type=after_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
-    def explode_all(self, *, streaming: bool | None = None) -> DataFrame[Any]:
-        """Explode all list-typed columns (schema-driven)."""
-        from pydantable import selectors as _selectors
+    # 2.0 strict mode: no explode_all / unnest_all (dynamic column sets forbidden).
 
-        sel = _selectors.by_dtype(_selectors.LIST)
-        matched = sel.resolve(self._current_field_types)
-        if not matched:
-            available = ", ".join(repr(c) for c in self._current_field_types)
-            raise ValueError(
-                "explode_all() matched no list-typed columns. "
-                f"Available columns: [{available}]"
-            )
-        return self.explode(sel, streaming=streaming)
-
-    def unnest_all(self, *, streaming: bool | None = None) -> DataFrame[Any]:
-        """Unnest all struct-typed columns (schema-driven)."""
-        from pydantable import selectors as _selectors
-
-        sel = _selectors.by_dtype(_selectors.STRUCT)
-        matched = sel.resolve(self._current_field_types)
-        if not matched:
-            available = ", ".join(repr(c) for c in self._current_field_types)
-            raise ValueError(
-                "unnest_all() matched no struct-typed columns. "
-                f"Available columns: [{available}]"
-            )
-        return self.unnest(sel, streaming=streaming)
-
-    def join(
+    def _join_impl_legacy(
         self,
         other: DataFrame[Any],
         *,
@@ -3021,6 +2784,115 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             engine=self._engine,
         )
 
+    def join(self, *args: Any, **kwargs: Any) -> DataFrame[Any]:
+        raise TypeError(
+            "join() is removed in pydantable 2.0 strict mode. "
+            "Use join_as(AfterSchema, other, ...) with ColumnRef keys."
+        )
+
+    def join_as(
+        self,
+        after_schema_type: type[AfterSchemaT],
+        other: DataFrame[Any],
+        *,
+        on: Sequence[ColumnRef] | None = None,
+        left_on: Sequence[ColumnRef] | None = None,
+        right_on: Sequence[ColumnRef] | None = None,
+        how: str = "inner",
+        suffix: str = "_right",
+        coalesce: bool | None = None,
+        validate: str | None = None,
+        join_nulls: bool | None = None,
+        maintain_order: bool | str | None = None,
+        allow_parallel: bool | None = None,
+        force_parallel: bool | None = None,
+        streaming: bool | None = None,
+    ) -> DataFrame[AfterSchemaT]:
+        if not isinstance(after_schema_type, type) or not issubclass(
+            after_schema_type, BaseModel
+        ):
+            raise TypeError("join_as(after_schema_type, ...) expects a schema.")
+        if not isinstance(other, DataFrame):
+            raise TypeError("join_as(other=...) expects another DataFrame.")
+        if on is not None and (left_on is not None or right_on is not None):
+            raise ValueError(
+                "join_as() use either on=... or left_on=/right_on=..., not both."
+            )
+
+        def _names(cols: Sequence[ColumnRef] | None) -> list[str]:
+            if cols is None:
+                return []
+            out: list[str] = []
+            for c in cols:
+                if not isinstance(c, ColumnRef):
+                    raise TypeError("join_as() keys must be ColumnRef values.")
+                referenced = c.referenced_columns()
+                if len(referenced) != 1:
+                    raise TypeError("join_as() keys must reference exactly one column.")
+                out.append(next(iter(referenced)))
+            return out
+
+        if on is not None:
+            left_keys = _names(on)
+            right_keys = list(left_keys)
+        else:
+            left_keys = _names(left_on)
+            right_keys = _names(right_on)
+
+        if how != "cross":
+            if not left_keys or not right_keys:
+                raise ValueError(
+                    "join_as() requires join keys for non-cross joins "
+                    "(use on=... or left_on/right_on)."
+                )
+            if len(left_keys) != len(right_keys):
+                raise ValueError("join_as() left_on and right_on lengths must match.")
+
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming, default=self._engine_streaming_default
+        )
+        joined_data, schema_descriptors = self._engine.execute_join(
+            self._rust_plan,
+            self._root_data,
+            other._rust_plan,
+            other._root_data,
+            left_keys,
+            right_keys,
+            how,
+            suffix,
+            validate=validate,
+            coalesce=coalesce,
+            join_nulls=join_nulls,
+            maintain_order=maintain_order,
+            allow_parallel=allow_parallel,
+            force_parallel=force_parallel,
+            as_python_lists=True,
+            streaming=use_streaming,
+        )
+        join_prev = previous_field_types_for_join(
+            self._current_field_types,
+            other._current_field_types,
+            suffix=suffix,
+            output_columns=list(schema_descriptors.keys()),
+        )
+        derived_fields = self._field_types_from_descriptors(
+            schema_descriptors, previous=join_prev
+        )
+        self._assert_after_schema(
+            after_schema_type, derived_fields=derived_fields, op_name="join_as"
+        )
+        rust_plan = self._engine.make_plan(field_types_for_rust(derived_fields))
+        return cast(
+            "DataFrame[AfterSchemaT]",
+            self._from_plan(
+                root_data=joined_data,
+                root_schema_type=after_schema_type,
+                current_schema_type=after_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
+        )
+
     def join_as_schema(
         self,
         other: DataFrame[Any],
@@ -3040,21 +2912,10 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         streaming: bool | None = None,
         validate_schema: bool = True,
     ) -> DataFrame[AfterSchemaT]:
-        return self.join(
-            other,
-            on=on,
-            left_on=left_on,
-            right_on=right_on,
-            how=how,
-            suffix=suffix,
-            coalesce=coalesce,
-            validate=validate,
-            join_nulls=join_nulls,
-            maintain_order=maintain_order,
-            allow_parallel=allow_parallel,
-            force_parallel=force_parallel,
-            streaming=streaming,
-        ).as_schema(schema, validate_schema=validate_schema)
+        raise TypeError(
+            "join_as_schema(...) is removed in pydantable 2.0 strict mode. "
+            "Use join_as(AfterSchema, ...) with ColumnRef keys."
+        )
 
     def join_try_as_schema(
         self,
@@ -3075,21 +2936,10 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         streaming: bool | None = None,
         validate_schema: bool = True,
     ) -> DataFrame[AfterSchemaT] | None:
-        return self.join(
-            other,
-            on=on,
-            left_on=left_on,
-            right_on=right_on,
-            how=how,
-            suffix=suffix,
-            coalesce=coalesce,
-            validate=validate,
-            join_nulls=join_nulls,
-            maintain_order=maintain_order,
-            allow_parallel=allow_parallel,
-            force_parallel=force_parallel,
-            streaming=streaming,
-        ).try_as_schema(schema, validate_schema=validate_schema)
+        raise TypeError(
+            "join_try_as_schema(...) is removed in pydantable 2.0 strict mode. "
+            "Use join_as(AfterSchema, ...) and handle errors explicitly."
+        )
 
     def join_assert_schema(
         self,
@@ -3110,21 +2960,10 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         streaming: bool | None = None,
         validate_schema: bool = True,
     ) -> DataFrame[AfterSchemaT]:
-        return self.join(
-            other,
-            on=on,
-            left_on=left_on,
-            right_on=right_on,
-            how=how,
-            suffix=suffix,
-            coalesce=coalesce,
-            validate=validate,
-            join_nulls=join_nulls,
-            maintain_order=maintain_order,
-            allow_parallel=allow_parallel,
-            force_parallel=force_parallel,
-            streaming=streaming,
-        ).assert_schema(schema, validate_schema=validate_schema)
+        raise TypeError(
+            "join_assert_schema(...) is removed in pydantable 2.0 strict mode. "
+            "Use join_as(AfterSchema, ...) which validates schema eagerly."
+        )
 
     def join_as_model(
         self,
@@ -3134,8 +2973,10 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         validate_schema: bool = True,
         **kwargs: Any,
     ) -> DataFrame[AfterSchemaT]:
-        return self.join_as_schema(
-            other, schema, validate_schema=validate_schema, **kwargs
+        raise TypeError(
+            "join_as_model(...) is removed in pydantable 2.0 strict mode. "
+            "Use join_as(AfterSchema, ...) on DataFrame, or join_as(AfterModel, ...) "
+            "on DataFrameModel."
         )
 
     def join_try_as_model(
@@ -3146,8 +2987,8 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         validate_schema: bool = True,
         **kwargs: Any,
     ) -> DataFrame[AfterSchemaT] | None:
-        return self.join_try_as_schema(
-            other, schema, validate_schema=validate_schema, **kwargs
+        raise TypeError(
+            "join_try_as_model(...) is removed in pydantable 2.0 strict mode."
         )
 
     def join_assert_model(
@@ -3158,8 +2999,8 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         validate_schema: bool = True,
         **kwargs: Any,
     ) -> DataFrame[AfterSchemaT]:
-        return self.join_assert_schema(
-            other, schema, validate_schema=validate_schema, **kwargs
+        raise TypeError(
+            "join_assert_model(...) is removed in pydantable 2.0 strict mode."
         )
 
     def group_by(
@@ -3168,31 +3009,81 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         maintain_order: bool = False,
         drop_nulls: bool = True,
     ) -> GroupedDataFrame:
-        """Group by key column(s); finish with :meth:`GroupedDataFrame.agg`.
+        raise TypeError(
+            "group_by() is removed in pydantable 2.0 strict mode. "
+            "Use group_by_agg_as(AfterSchema, keys=[...], ...) with explicit output "
+            "schema."
+        )
 
-        `maintain_order` / `drop_nulls` are accepted for Polars parity, but only the
-        default behavior is implemented today.
-        """
-        selected: list[str] = []
-        for key in keys:
-            if isinstance(key, str):
-                selected.append(key)
-            elif isinstance(key, Expr):
-                referenced = key.referenced_columns()
+    def group_by_agg_as(
+        self,
+        after_schema_type: type[AfterSchemaT],
+        *,
+        keys: Sequence[ColumnRef],
+        maintain_order: bool = False,
+        drop_nulls: bool = True,
+        streaming: bool | None = None,
+        **aggregations: tuple[str, ColumnRef | Expr],
+    ) -> DataFrame[AfterSchemaT]:
+        if not isinstance(after_schema_type, type) or not issubclass(
+            after_schema_type, BaseModel
+        ):
+            raise TypeError("group_by_agg_as(after_schema_type, ...) expects a schema.")
+        if not keys:
+            raise ValueError("group_by_agg_as(keys=...) requires at least one key.")
+
+        key_names: list[str] = []
+        for k in keys:
+            if not isinstance(k, ColumnRef):
+                raise TypeError("group_by_agg_as(keys=...) expects ColumnRef values.")
+            referenced = k.referenced_columns()
+            if len(referenced) != 1:
+                raise TypeError("group_by_agg_as() keys must reference one column.")
+            key_names.append(next(iter(referenced)))
+
+        agg_specs: dict[str, tuple[str, str]] = {}
+        for out_name, spec in aggregations.items():
+            if not isinstance(spec, tuple) or len(spec) != 2:
+                raise TypeError("Aggregations must be out_name=(op, column_ref).")
+            op, col_spec = spec
+            if not isinstance(op, str):
+                raise TypeError("Aggregation operator must be a string.")
+            if isinstance(col_spec, Expr):
+                referenced = col_spec.referenced_columns()
                 if len(referenced) != 1:
-                    raise TypeError(
-                        "group_by() accepts column names or ColumnRef expressions."
-                    )
-                selected.append(next(iter(referenced)))
+                    raise TypeError("Aggregation Expr must reference one column.")
+                in_col = next(iter(referenced))
             else:
-                raise TypeError(
-                    "group_by() accepts column names or ColumnRef expressions."
-                )
-        return GroupedDataFrame(
-            self,
-            selected,
+                raise TypeError("Aggregation column must be an Expr / ColumnRef.")
+            agg_specs[out_name] = (op, in_col)
+
+        use_streaming = _resolve_engine_streaming(
+            streaming=streaming, default=self._engine_streaming_default
+        )
+        grouped_data, schema_descriptors = self._engine.execute_groupby_agg(
+            self._rust_plan,
+            self._root_data,
+            key_names,
+            agg_specs,
             maintain_order=bool(maintain_order),
             drop_nulls=bool(drop_nulls),
+            as_python_lists=True,
+            streaming=use_streaming,
+        )
+        derived_fields = self._field_types_from_descriptors(schema_descriptors)
+        self._assert_after_schema(
+            after_schema_type, derived_fields=derived_fields, op_name="group_by_agg_as"
+        )
+        rust_plan = self._engine.make_plan(field_types_for_rust(derived_fields))
+        return cast(
+            "DataFrame[AfterSchemaT]",
+            self._from_plan(
+                root_data=grouped_data,
+                root_schema_type=after_schema_type,
+                current_schema_type=after_schema_type,
+                rust_plan=rust_plan,
+                engine=self._engine,
+            ),
         )
 
     def rolling_agg(
@@ -3206,6 +3097,10 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         by: Sequence[str] | None = None,
         min_periods: int = 1,
     ) -> DataFrame[Any]:
+        raise TypeError(
+            "rolling_agg() is removed in pydantable 2.0 strict mode "
+            "(schema-changing and stringly-typed parameters)."
+        )
         data = self.collect(as_lists=True)
         if on not in data or column not in data:
             raise KeyError("rolling_agg() requires existing on/column names.")
@@ -3418,12 +3313,10 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         period: str | None = None,
         by: Sequence[str] | None = None,
     ) -> DynamicGroupedDataFrame:
-        return DynamicGroupedDataFrame(
-            self,
-            index_column=index_column,
-            every=every,
-            period=period,
-            by=[] if by is None else list(by),
+        raise TypeError(
+            "group_by_dynamic() is removed in pydantable 2.0 strict mode "
+            "(time bucket outputs are schema-changing and frequently "
+            "runtime-dependent)."
         )
 
     def collect(

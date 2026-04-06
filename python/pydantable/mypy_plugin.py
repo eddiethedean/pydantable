@@ -49,6 +49,8 @@ _HOOK_NAMES = {
     "drop",
     "rename",
     "join",
+    "group_by",
+    "group_by_dynamic",
     "agg",
     # Schema-preserving transforms that currently return `DataFrameModel` at runtime.
     "clip",
@@ -250,6 +252,14 @@ def _hook(ctx: MethodContext, method: str) -> Type:
         fields = dict(_model_fields(model_arg.type))
         fallback = model_arg
         grouped_keys = None
+    if method in {"group_by", "group_by_dynamic"}:
+        cast("Any", ctx.api).fail(
+            f"{method}() is removed in pydantable 2.0 strict mode; "
+            "use group_by_agg_as(AfterModel, keys=[...], ...) instead.",
+            ctx.context,
+        )
+        return ctx.default_return_type
+
     if method == "with_columns":
         # Best-effort: use mypy's inferred type for the kwarg expression when available.
         # Fallback to literal type for simple constants; otherwise Any.
@@ -364,6 +374,11 @@ def _hook(ctx: MethodContext, method: str) -> Type:
             group_member.name if isinstance(group_member, MemberExpr) else None
         )
         if group_method in {"group_by", "group_by_dynamic"}:
+            cast("Any", ctx.api).fail(
+                f"{group_method}().agg(...) is removed in pydantable 2.0 strict mode; "
+                "use group_by_agg_as(AfterModel, keys=[...], ...) instead.",
+                ctx.context,
+            )
             grouped_keys = set()
             group_args = cast("list[Expression]", getattr(group_call, "args", []))
             group_kinds = cast("list[Any]", getattr(group_call, "arg_kinds", []))

@@ -372,10 +372,12 @@ def test_mypy_accepts_join_and_groupby_agg_return_model_without_materialize(
         age_mean: float
 
     def join_transform(users: Users, cities: Cities) -> Joined:
-        return users.join(cities, on="id")
+        return users.join_as(cities, Joined, on=[users.col.id])
 
     def agg_transform(users: Users) -> AggOut:
-        return users.group_by("id").agg(age_mean=("mean", "age"))
+        return users.group_by_agg_as(
+            AggOut, keys=[users.col.id], age_mean=("mean", users.col.age)
+        )
     """
     proc = _run_mypy_snippet(tmp_path, code)
     _mypy_output_or_skip_on_crash(proc)
@@ -689,8 +691,16 @@ def test_mypy_rejects_wrong_after_model_for_groupby_agg(tmp_path: Path) -> None:
         id: int
         age_max: int
 
+    class AggOut(DataFrameModel):
+        id: int
+        age_mean: float
+
     def bad(users: Users) -> WrongAggOut:
-        return users.group_by("id").agg(age_mean=("mean", "age"))
+        return users.group_by_agg_as(
+            AggOut,
+            keys=[users.col.id],
+            age_mean=("mean", users.col.age),
+        )
     """
     proc = _run_mypy_snippet(tmp_path, code)
     out = _mypy_output_or_skip_on_crash(proc)

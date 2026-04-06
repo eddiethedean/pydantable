@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import enum
 import ipaddress
-import re
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -184,39 +183,19 @@ def by_name(*names: str) -> Selector:
 
 
 def starts_with(prefix: str) -> Selector:
-    """Select columns whose names start with ``prefix``."""
-    p = str(prefix)
-    return Selector(
-        lambda schema: {n for n in schema if n.startswith(p)},
-        f"starts_with({p!r})",
-    )
+    raise TypeError("starts_with(...) is removed in pydantable 2.0 strict mode.")
 
 
 def ends_with(suffix: str) -> Selector:
-    """Select columns whose names end with ``suffix``."""
-    s = str(suffix)
-    return Selector(
-        lambda schema: {n for n in schema if n.endswith(s)},
-        f"ends_with({s!r})",
-    )
+    raise TypeError("ends_with(...) is removed in pydantable 2.0 strict mode.")
 
 
 def contains(substr: str) -> Selector:
-    """Select columns whose names contain the substring ``substr``."""
-    sub = str(substr)
-    return Selector(
-        lambda schema: {n for n in schema if sub in n},
-        f"contains({sub!r})",
-    )
+    raise TypeError("contains(...) is removed in pydantable 2.0 strict mode.")
 
 
-def matches(pattern: str | re.Pattern[str]) -> Selector:
-    """Select columns whose names match the regex ``pattern`` (``search`` semantics)."""
-    rx = re.compile(pattern) if isinstance(pattern, str) else pattern
-    return Selector(
-        lambda schema: {n for n in schema if rx.search(n) is not None},
-        f"matches({rx.pattern!r})",
-    )
+def matches(pattern: Any) -> Selector:
+    raise TypeError("matches(...) is removed in pydantable 2.0 strict mode.")
 
 
 class _DTypeGroup:
@@ -389,23 +368,7 @@ def wkbs() -> Selector:
 def rename_map(
     selector: Selector, fn: Callable[[str], str]
 ) -> Callable[[Mapping[str, Any]], dict[str, str]]:
-    """Build a rename mapping from a selector and renaming function (schema-driven)."""
-    if not isinstance(selector, Selector):
-        raise TypeError("rename_map(selector, fn) expects a Selector.")
-    if not callable(fn):
-        raise TypeError("rename_map(selector, fn) expects a callable.")
-
-    def _mk(schema_field_types: Mapping[str, Any]) -> dict[str, str]:
-        cols = selector.resolve(schema_field_types)
-        if not cols:
-            available = ", ".join(repr(c) for c in schema_field_types)
-            raise ValueError(
-                f"rename_map({selector!r}) matched no columns. "
-                f"Available columns: [{available}]"
-            )
-        mapping = {c: str(fn(c)) for c in cols}
-        if len(set(mapping.values())) != len(mapping):
-            raise ValueError("rename_map(...) produced duplicate output column names.")
-        return mapping
-
-    return _mk
+    raise TypeError(
+        "rename_map(selector, fn) is removed in pydantable 2.0 strict mode "
+        "(callable-driven schema changes are forbidden)."
+    )

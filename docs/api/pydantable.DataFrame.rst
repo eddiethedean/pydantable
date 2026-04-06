@@ -31,24 +31,25 @@
       ~DataFrame.ato_polars
       ~DataFrame.bottom_k
       ~DataFrame.clip
-      ~DataFrame.col
       ~DataFrame.collect
       ~DataFrame.collect_batches
       ~DataFrame.concat
       ~DataFrame.describe
       ~DataFrame.distinct
       ~DataFrame.drop
+      ~DataFrame.drop_as
       ~DataFrame.drop_duplicate_groups
       ~DataFrame.drop_nulls
       ~DataFrame.duplicated
       ~DataFrame.explain
       ~DataFrame.explode
-      ~DataFrame.explode_all
+      ~DataFrame.explode_as
       ~DataFrame.explode_outer
       ~DataFrame.fill_null
       ~DataFrame.filter
       ~DataFrame.first
       ~DataFrame.group_by
+      ~DataFrame.group_by_agg_as
       ~DataFrame.group_by_dynamic
       ~DataFrame.head
       ~DataFrame.info
@@ -59,6 +60,7 @@
       ~DataFrame.iter_ndjson
       ~DataFrame.iter_parquet
       ~DataFrame.join
+      ~DataFrame.join_as
       ~DataFrame.join_as_model
       ~DataFrame.join_as_schema
       ~DataFrame.join_assert_model
@@ -68,18 +70,12 @@
       ~DataFrame.last
       ~DataFrame.limit
       ~DataFrame.melt
-      ~DataFrame.melt_as_model
-      ~DataFrame.melt_as_schema
-      ~DataFrame.melt_assert_model
-      ~DataFrame.melt_assert_schema
-      ~DataFrame.melt_try_as_model
-      ~DataFrame.melt_try_as_schema
+      ~DataFrame.melt_as
       ~DataFrame.move
       ~DataFrame.null_count
       ~DataFrame.pipe
       ~DataFrame.pivot
-      ~DataFrame.pivot_longer
-      ~DataFrame.pivot_wider
+      ~DataFrame.pivot_as
       ~DataFrame.posexplode
       ~DataFrame.posexplode_outer
       ~DataFrame.read_csv
@@ -89,6 +85,7 @@
       ~DataFrame.read_parquet
       ~DataFrame.read_parquet_url
       ~DataFrame.rename
+      ~DataFrame.rename_as
       ~DataFrame.rename_lower
       ~DataFrame.rename_prefix
       ~DataFrame.rename_replace
@@ -109,6 +106,7 @@
       ~DataFrame.schema_fields
       ~DataFrame.select
       ~DataFrame.select_all
+      ~DataFrame.select_as
       ~DataFrame.select_first
       ~DataFrame.select_last
       ~DataFrame.select_prefix
@@ -128,16 +126,11 @@
       ~DataFrame.try_as_schema
       ~DataFrame.unique
       ~DataFrame.unnest
-      ~DataFrame.unnest_all
+      ~DataFrame.unnest_as
       ~DataFrame.unpivot
-      ~DataFrame.unpivot_as_model
-      ~DataFrame.unpivot_as_schema
-      ~DataFrame.unpivot_assert_model
-      ~DataFrame.unpivot_assert_schema
-      ~DataFrame.unpivot_try_as_model
-      ~DataFrame.unpivot_try_as_schema
       ~DataFrame.value_counts
       ~DataFrame.with_columns
+      ~DataFrame.with_columns_as
       ~DataFrame.with_columns_cast
       ~DataFrame.with_columns_fill_null
       ~DataFrame.with_row_count
@@ -154,6 +147,7 @@
 
    .. autosummary::
    
+      ~DataFrame.col
       ~DataFrame.columns
       ~DataFrame.dtypes
       ~DataFrame.empty

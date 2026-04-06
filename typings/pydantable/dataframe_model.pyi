@@ -15,7 +15,7 @@ from pydantable.awaitable_dataframe_model import AwaitableDataFrameModel
 from pydantable.dataframe import ExecutionHandle
 from pydantable.schema import Schema
 from pydantic import BaseModel
-from typing_extensions import Self
+from typing_extensions import Never, Self
 
 RowT = TypeVar("RowT", bound=BaseModel)
 ModelSelf = TypeVar("ModelSelf", bound="DataFrameModel[Any]")
@@ -754,9 +754,15 @@ class DataFrameModel(Generic[RowT]):
         redact: bool | None = None,
         **model_dump_kwargs: Any,
     ) -> list[dict[str, Any]]: ...
-    def select(self, *cols: Any) -> DataFrameModel[Any]: ...
-    def select_schema(self, selector: Any) -> DataFrameModel[Any]: ...
-    def with_columns(self, **new_columns: Any) -> DataFrameModel[Any]: ...
+    def select(self, *cols: Any) -> Never: ...
+    def select_schema(self, selector: Any) -> Never: ...
+    def select_as(
+        self, model: type[AfterModelT], *cols: Any, **named: Any
+    ) -> AfterModelT: ...
+    def with_columns(self, **new_columns: Any) -> Never: ...
+    def with_columns_as(
+        self, model: type[AfterModelT], *exprs: Any, **new_columns: Any
+    ) -> AfterModelT: ...
     def with_columns_cast(
         self, selector: Any, dtype: Any, *, strict: bool = True
     ) -> DataFrameModel[Any]: ...
@@ -776,26 +782,22 @@ class DataFrameModel(Generic[RowT]):
     def distinct(
         self, subset: Sequence[str] | None = None, *, keep: str = "first"
     ) -> Self: ...
-    def drop(self, *columns: Any, strict: bool = True) -> DataFrameModel[Any]: ...
-    def rename(
-        self, columns: Mapping[str, str], *, strict: bool = True
-    ) -> DataFrameModel[Any]: ...
-    def rename_upper(
-        self, selector: Any = None, *, strict: bool = True
-    ) -> DataFrameModel[Any]: ...
-    def rename_lower(
-        self, selector: Any = None, *, strict: bool = True
-    ) -> DataFrameModel[Any]: ...
-    def rename_title(
-        self, selector: Any = None, *, strict: bool = True
-    ) -> DataFrameModel[Any]: ...
+    def drop(self, *columns: Any, strict: bool = True) -> Never: ...
+    def drop_as(self, model: type[AfterModelT], *columns: Any) -> AfterModelT: ...
+    def rename(self, columns: Mapping[str, str], *, strict: bool = True) -> Never: ...
+    def rename_as(
+        self, model: type[AfterModelT], columns: Mapping[Any, str]
+    ) -> AfterModelT: ...
+    def rename_upper(self, selector: Any = None, *, strict: bool = True) -> Never: ...
+    def rename_lower(self, selector: Any = None, *, strict: bool = True) -> Never: ...
+    def rename_title(self, selector: Any = None, *, strict: bool = True) -> Never: ...
     def rename_strip(
         self,
         selector: Any = None,
         *,
         chars: str | None = None,
         strict: bool = True,
-    ) -> DataFrameModel[Any]: ...
+    ) -> Never: ...
     def slice(self, offset: int, length: int) -> Self: ...
     def with_row_count(self, name: str = "row_nr", *, offset: int = 0) -> Self: ...
     def head(self, n: int = 5) -> Self: ...
@@ -892,6 +894,44 @@ class DataFrameModel(Generic[RowT]):
         value_name: str = "value",
         streaming: bool | None = None,
     ) -> AfterModelT: ...
+    def melt_as(
+        self,
+        model: type[AfterModelT],
+        *,
+        id_vars: Sequence[Any],
+        value_vars: Sequence[Any] | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+        streaming: bool | None = None,
+    ) -> AfterModelT: ...
+    def pivot_as(
+        self,
+        model: type[AfterModelT],
+        *,
+        index: Sequence[Any],
+        columns: Any,
+        values: Sequence[Any],
+        aggregate_function: str = "first",
+        pivot_values: Sequence[Any] = ...,
+        sort_columns: bool = False,
+        separator: str = "_",
+        streaming: bool | None = None,
+    ) -> AfterModelT: ...
+    def explode_as(
+        self,
+        model: type[AfterModelT],
+        *,
+        columns: Sequence[Any],
+        outer: bool = False,
+        streaming: bool | None = None,
+    ) -> AfterModelT: ...
+    def unnest_as(
+        self,
+        model: type[AfterModelT],
+        *,
+        columns: Sequence[Any],
+        streaming: bool | None = None,
+    ) -> AfterModelT: ...
     def pivot_longer(
         self,
         *,
@@ -953,8 +993,8 @@ class DataFrameModel(Generic[RowT]):
     def unnest(
         self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None
     ) -> Self: ...
-    def explode_all(self, *, streaming: bool | None = None) -> Self: ...
-    def unnest_all(self, *, streaming: bool | None = None) -> Self: ...
+    def explode_all(self, *, streaming: bool | None = None) -> Never: ...
+    def unnest_all(self, *, streaming: bool | None = None) -> Never: ...
     def join(
         self,
         other: DataFrameModel[Any],
@@ -971,15 +1011,15 @@ class DataFrameModel(Generic[RowT]):
         allow_parallel: bool | None = None,
         force_parallel: bool | None = None,
         streaming: bool | None = None,
-    ) -> DataFrameModel[Any]: ...
-    def join_as_model(
+    ) -> Never: ...
+    def join_as(
         self,
         other: DataFrameModel[Any],
         model: type[AfterModelT],
         *,
-        on: str | Sequence[str] | Any | None = None,
-        left_on: Any = None,
-        right_on: Any = None,
+        on: Sequence[Any] | None = None,
+        left_on: Sequence[Any] | None = None,
+        right_on: Sequence[Any] | None = None,
         how: str = "inner",
         suffix: str = "_right",
         coalesce: bool | None = None,
@@ -990,43 +1030,20 @@ class DataFrameModel(Generic[RowT]):
         force_parallel: bool | None = None,
         streaming: bool | None = None,
     ) -> AfterModelT: ...
-    def join_try_as_model(
+    def join_as_model(self, *args: Any, **kwargs: Any) -> Never: ...
+    def join_try_as_model(self, *args: Any, **kwargs: Any) -> Never: ...
+    def join_assert_model(self, *args: Any, **kwargs: Any) -> Never: ...
+    def group_by(self, *keys: Any) -> Never: ...
+    def group_by_agg_as(
         self,
-        other: DataFrameModel[Any],
         model: type[AfterModelT],
         *,
-        on: str | Sequence[str] | Any | None = None,
-        left_on: Any = None,
-        right_on: Any = None,
-        how: str = "inner",
-        suffix: str = "_right",
-        coalesce: bool | None = None,
-        validate: str | None = None,
-        join_nulls: bool | None = None,
-        maintain_order: bool | str | None = None,
-        allow_parallel: bool | None = None,
-        force_parallel: bool | None = None,
+        keys: Sequence[Any],
+        maintain_order: bool = False,
+        drop_nulls: bool = True,
         streaming: bool | None = None,
-    ) -> AfterModelT | None: ...
-    def join_assert_model(
-        self,
-        other: DataFrameModel[Any],
-        model: type[AfterModelT],
-        *,
-        on: str | Sequence[str] | Any | None = None,
-        left_on: Any = None,
-        right_on: Any = None,
-        how: str = "inner",
-        suffix: str = "_right",
-        coalesce: bool | None = None,
-        validate: str | None = None,
-        join_nulls: bool | None = None,
-        maintain_order: bool | str | None = None,
-        allow_parallel: bool | None = None,
-        force_parallel: bool | None = None,
-        streaming: bool | None = None,
+        **aggregations: tuple[str, Any],
     ) -> AfterModelT: ...
-    def group_by(self, *keys: Any) -> GroupedDataFrameModel[Self]: ...
     def rolling_agg(
         self,
         *,

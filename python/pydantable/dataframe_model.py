@@ -13,7 +13,7 @@ import typing
 from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast
 
-from typing_extensions import Self
+from typing_extensions import Never, Self
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
@@ -2110,14 +2110,37 @@ class DataFrameModel(Generic[RowT]):
             out = apply_redaction_to_row_dicts(self._SchemaModel, out)
         return out
 
-    def select(self, *cols: Any) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.select(*cols))
+    def select(self, *cols: Any) -> Never:
+        raise TypeError(
+            "DataFrameModel.select() is removed in pydantable 2.0 strict mode. "
+            "Use select_as(AfterModel, ...) so the output schema is explicit."
+        )
+
+    def select_as(
+        self, model: type[AfterModelT], *cols: Any, **named: Any
+    ) -> AfterModelT:
+        return self._from_dataframe(
+            self._df.select_as(model.schema_model(), *cols, **named)
+        ).as_model(model)
 
     def select_schema(self, selector: Any) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.select_schema(selector))
+        raise TypeError(
+            "DataFrameModel.select_schema(...) is removed in pydantable 2.0 strict "
+            "mode."
+        )
 
-    def with_columns(self, **new_columns: Any) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.with_columns(**new_columns))
+    def with_columns(self, **new_columns: Any) -> Never:
+        raise TypeError(
+            "DataFrameModel.with_columns() is removed in pydantable 2.0 strict mode. "
+            "Use with_columns_as(AfterModel, ...)."
+        )
+
+    def with_columns_as(
+        self, model: type[AfterModelT], *exprs: Any, **new_columns: Any
+    ) -> AfterModelT:
+        return self._from_dataframe(
+            self._df.with_columns_as(model.schema_model(), *exprs, **new_columns)
+        ).as_model(model)
 
     def with_columns_cast(
         self, selector: Any, dtype: Any, *, strict: bool = True
@@ -2156,28 +2179,44 @@ class DataFrameModel(Generic[RowT]):
     ) -> Self:
         return self._from_dataframe(self._df.distinct(subset=subset, keep=keep))
 
-    def drop(self, *columns: Any, strict: bool = True) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.drop(*columns, strict=strict))
+    def drop(self, *columns: Any, strict: bool = True) -> Never:
+        raise TypeError(
+            "DataFrameModel.drop() is removed in pydantable 2.0 strict mode. "
+            "Use drop_as(AfterModel, ...)."
+        )
 
-    def rename(
-        self, columns: Mapping[str, str], *, strict: bool = True
-    ) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.rename(columns, strict=strict))
+    def drop_as(self, model: type[AfterModelT], *columns: Any) -> AfterModelT:
+        return self._from_dataframe(
+            self._df.drop_as(model.schema_model(), *columns)
+        ).as_model(model)
+
+    def rename(self, columns: Mapping[str, str], *, strict: bool = True) -> Never:
+        raise TypeError(
+            "DataFrameModel.rename() is removed in pydantable 2.0 strict mode. "
+            "Use rename_as(AfterModel, ...) with ColumnRef keys."
+        )
+
+    def rename_as(
+        self, model: type[AfterModelT], columns: Mapping[Any, str]
+    ) -> AfterModelT:
+        return self._from_dataframe(
+            self._df.rename_as(model.schema_model(), columns)
+        ).as_model(model)
 
     def rename_upper(
         self, selector: Any = None, *, strict: bool = True
     ) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.rename_upper(selector, strict=strict))
+        raise TypeError("rename_upper() is removed in pydantable 2.0 strict mode.")
 
     def rename_lower(
         self, selector: Any = None, *, strict: bool = True
     ) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.rename_lower(selector, strict=strict))
+        raise TypeError("rename_lower() is removed in pydantable 2.0 strict mode.")
 
     def rename_title(
         self, selector: Any = None, *, strict: bool = True
     ) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.rename_title(selector, strict=strict))
+        raise TypeError("rename_title() is removed in pydantable 2.0 strict mode.")
 
     def rename_strip(
         self,
@@ -2186,9 +2225,7 @@ class DataFrameModel(Generic[RowT]):
         chars: str | None = None,
         strict: bool = True,
     ) -> DataFrameModel[Any]:
-        return self._from_dataframe(
-            self._df.rename_strip(selector, chars=chars, strict=strict)
-        )
+        raise TypeError("rename_strip() is removed in pydantable 2.0 strict mode.")
 
     def slice(self, offset: int, length: int) -> Self:
         return self._from_dataframe(self._df.slice(offset, length))
@@ -2393,14 +2430,9 @@ class DataFrameModel(Generic[RowT]):
         values_to: str = "value",
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
-        return self._from_dataframe(
-            self._df.pivot_longer(
-                id_vars=id_vars,
-                value_vars=value_vars,
-                names_to=names_to,
-                values_to=values_to,
-                streaming=streaming,
-            )
+        raise TypeError(
+            "DataFrameModel.pivot_longer() is removed in pydantable 2.0 strict mode. "
+            "Use melt_as(AfterModel, id_vars=[...], value_vars=[...])."
         )
 
     def pivot_wider(
@@ -2414,16 +2446,10 @@ class DataFrameModel(Generic[RowT]):
         separator: str = "_",
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
-        return self._from_dataframe(
-            self._df.pivot_wider(
-                index=index,
-                names_from=names_from,
-                values_from=values_from,
-                aggregate_function=aggregate_function,
-                sort_columns=sort_columns,
-                separator=separator,
-                streaming=streaming,
-            )
+        raise TypeError(
+            "DataFrameModel.pivot_wider() is removed in pydantable 2.0 strict mode. "
+            "Use pivot_as(AfterModel, index=[...], columns=..., values=[...], "
+            "pivot_values=[...])."
         )
 
     def pivot(
@@ -2437,16 +2463,10 @@ class DataFrameModel(Generic[RowT]):
         separator: str = "_",
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
-        return self._from_dataframe(
-            self._df.pivot(
-                index=index,
-                columns=columns,
-                values=values,
-                aggregate_function=aggregate_function,
-                sort_columns=sort_columns,
-                separator=separator,
-                streaming=streaming,
-            )
+        raise TypeError(
+            "DataFrameModel.pivot() is removed in pydantable 2.0 strict mode. "
+            "Use pivot_as(AfterModel, ..., pivot_values=[...]) so the output schema "
+            "is explicit."
         )
 
     def explode(
@@ -2456,15 +2476,17 @@ class DataFrameModel(Generic[RowT]):
         outer: bool = False,
         streaming: bool | None = None,
     ) -> Self:
-        return self._from_dataframe(
-            self._df.explode(columns, outer=outer, streaming=streaming)
+        raise TypeError(
+            "DataFrameModel.explode() is removed in pydantable 2.0 strict mode. "
+            "Use explode_as(AfterModel, columns=[...])."
         )
 
     def explode_outer(
         self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None
     ) -> Self:
-        return self._from_dataframe(
-            self._df.explode_outer(columns, streaming=streaming)
+        raise TypeError(
+            "DataFrameModel.explode_outer() is removed in pydantable 2.0 strict mode. "
+            "Use explode_as(AfterModel, columns=[...], outer=True)."
         )
 
     def posexplode(
@@ -2497,13 +2519,22 @@ class DataFrameModel(Generic[RowT]):
     def unnest(
         self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None
     ) -> Self:
-        return self._from_dataframe(self._df.unnest(columns, streaming=streaming))
+        raise TypeError(
+            "DataFrameModel.unnest() is removed in pydantable 2.0 strict mode. "
+            "Use unnest_as(AfterModel, columns=[...])."
+        )
 
     def explode_all(self, *, streaming: bool | None = None) -> Self:
-        return self._from_dataframe(self._df.explode_all(streaming=streaming))
+        raise TypeError(
+            "DataFrameModel.explode_all() is removed in pydantable 2.0 strict mode "
+            "(dynamic column sets are forbidden)."
+        )
 
     def unnest_all(self, *, streaming: bool | None = None) -> Self:
-        return self._from_dataframe(self._df.unnest_all(streaming=streaming))
+        raise TypeError(
+            "DataFrameModel.unnest_all() is removed in pydantable 2.0 strict mode "
+            "(dynamic column sets are forbidden)."
+        )
 
     def join(
         self,
@@ -2522,17 +2553,38 @@ class DataFrameModel(Generic[RowT]):
         force_parallel: bool | None = None,
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
-        """Join on key column(s); forwards to :meth:`DataFrame.join`.
+        raise TypeError(
+            "DataFrameModel.join() is removed in pydantable 2.0 strict mode. "
+            "Use join_as(AfterModel, other, ...) with ColumnRef keys."
+        )
 
-        ``allow_parallel`` and ``force_parallel`` are not supported by the native
-        engine and raise :exc:`NotImplementedError` when set (non-``None``).
-        """
+    def join_as(
+        self,
+        other: DataFrameModel[Any],
+        model: type[AfterModelT],
+        *,
+        on: Sequence[Any] | None = None,
+        left_on: Sequence[Any] | None = None,
+        right_on: Sequence[Any] | None = None,
+        how: str = "inner",
+        suffix: str = "_right",
+        coalesce: bool | None = None,
+        validate: str | None = None,
+        join_nulls: bool | None = None,
+        maintain_order: bool | str | None = None,
+        allow_parallel: bool | None = None,
+        force_parallel: bool | None = None,
+        streaming: bool | None = None,
+    ) -> AfterModelT:
         if not isinstance(other, DataFrameModel):
-            raise TypeError("join(other=...) expects another DataFrameModel instance.")
+            raise TypeError(
+                "join_as(other=...) expects another DataFrameModel instance."
+            )
         return self._from_dataframe(
-            self._df.join(
+            self._df.join_as(
+                model.schema_model(),
                 other._df,
-                on=on,
+                on=on,  # runtime validates ColumnRef
                 left_on=left_on,
                 right_on=right_on,
                 how=how,
@@ -2545,7 +2597,87 @@ class DataFrameModel(Generic[RowT]):
                 force_parallel=force_parallel,
                 streaming=streaming,
             )
-        )
+        ).as_model(model)
+
+    def melt_as(
+        self,
+        model: type[AfterModelT],
+        *,
+        id_vars: Sequence[Any],
+        value_vars: Sequence[Any] | None = None,
+        variable_name: str = "variable",
+        value_name: str = "value",
+        streaming: bool | None = None,
+    ) -> AfterModelT:
+        return self._from_dataframe(
+            self._df.melt_as(
+                model.schema_model(),
+                id_vars=id_vars,
+                value_vars=value_vars,
+                variable_name=variable_name,
+                value_name=value_name,
+                streaming=streaming,
+            )
+        ).as_model(model)
+
+    def pivot_as(
+        self,
+        model: type[AfterModelT],
+        *,
+        index: Sequence[Any],
+        columns: Any,
+        values: Sequence[Any],
+        aggregate_function: str = "first",
+        pivot_values: Sequence[Any] = (),
+        sort_columns: bool = False,
+        separator: str = "_",
+        streaming: bool | None = None,
+    ) -> AfterModelT:
+        return self._from_dataframe(
+            self._df.pivot_as(
+                model.schema_model(),
+                index=index,
+                columns=columns,
+                values=values,
+                aggregate_function=aggregate_function,
+                pivot_values=pivot_values,
+                sort_columns=sort_columns,
+                separator=separator,
+                streaming=streaming,
+            )
+        ).as_model(model)
+
+    def explode_as(
+        self,
+        model: type[AfterModelT],
+        *,
+        columns: Sequence[Any],
+        outer: bool = False,
+        streaming: bool | None = None,
+    ) -> AfterModelT:
+        return self._from_dataframe(
+            self._df.explode_as(
+                model.schema_model(),
+                columns=columns,
+                outer=outer,
+                streaming=streaming,
+            )
+        ).as_model(model)
+
+    def unnest_as(
+        self,
+        model: type[AfterModelT],
+        *,
+        columns: Sequence[Any],
+        streaming: bool | None = None,
+    ) -> AfterModelT:
+        return self._from_dataframe(
+            self._df.unnest_as(
+                model.schema_model(),
+                columns=columns,
+                streaming=streaming,
+            )
+        ).as_model(model)
 
     def join_as_model(
         self,
@@ -2564,22 +2696,11 @@ class DataFrameModel(Generic[RowT]):
         allow_parallel: bool | None = None,
         force_parallel: bool | None = None,
         streaming: bool | None = None,
-    ) -> AfterModelT:
-        return self.join(
-            other,
-            on=on,
-            left_on=left_on,
-            right_on=right_on,
-            how=how,
-            suffix=suffix,
-            coalesce=coalesce,
-            validate=validate,
-            join_nulls=join_nulls,
-            maintain_order=maintain_order,
-            allow_parallel=allow_parallel,
-            force_parallel=force_parallel,
-            streaming=streaming,
-        ).as_model(model)
+    ) -> Never:
+        raise TypeError(
+            "join_as_model(...) is removed in pydantable 2.0 strict mode. "
+            "Use join_as(AfterModel, ...)."
+        )
 
     def join_try_as_model(
         self,
@@ -2598,22 +2719,10 @@ class DataFrameModel(Generic[RowT]):
         allow_parallel: bool | None = None,
         force_parallel: bool | None = None,
         streaming: bool | None = None,
-    ) -> AfterModelT | None:
-        return self.join(
-            other,
-            on=on,
-            left_on=left_on,
-            right_on=right_on,
-            how=how,
-            suffix=suffix,
-            coalesce=coalesce,
-            validate=validate,
-            join_nulls=join_nulls,
-            maintain_order=maintain_order,
-            allow_parallel=allow_parallel,
-            force_parallel=force_parallel,
-            streaming=streaming,
-        ).try_as_model(model)
+    ) -> Never:
+        raise TypeError(
+            "join_try_as_model(...) is removed in pydantable 2.0 strict mode."
+        )
 
     def join_assert_model(
         self,
@@ -2632,25 +2741,37 @@ class DataFrameModel(Generic[RowT]):
         allow_parallel: bool | None = None,
         force_parallel: bool | None = None,
         streaming: bool | None = None,
-    ) -> AfterModelT:
-        return self.join(
-            other,
-            on=on,
-            left_on=left_on,
-            right_on=right_on,
-            how=how,
-            suffix=suffix,
-            coalesce=coalesce,
-            validate=validate,
-            join_nulls=join_nulls,
-            maintain_order=maintain_order,
-            allow_parallel=allow_parallel,
-            force_parallel=force_parallel,
-            streaming=streaming,
-        ).assert_model(model)
+    ) -> Never:
+        raise TypeError(
+            "join_assert_model(...) is removed in pydantable 2.0 strict mode."
+        )
 
-    def group_by(self: ModelSelf, *keys: Any) -> GroupedDataFrameModel[ModelSelf]:
-        return GroupedDataFrameModel(self._df.group_by(*keys), self.__class__)
+    def group_by(self: ModelSelf, *keys: Any) -> Never:
+        raise TypeError(
+            "DataFrameModel.group_by() is removed in pydantable 2.0 strict mode. "
+            "Use group_by_agg_as(AfterModel, keys=[...], ...)."
+        )
+
+    def group_by_agg_as(
+        self: ModelSelf,
+        model: type[AfterModelT],
+        *,
+        keys: Sequence[Any],
+        maintain_order: bool = False,
+        drop_nulls: bool = True,
+        streaming: bool | None = None,
+        **aggregations: tuple[str, Any],
+    ) -> AfterModelT:
+        return self._from_dataframe(
+            self._df.group_by_agg_as(
+                model.schema_model(),
+                keys=keys,  # runtime will validate ColumnRef
+                maintain_order=maintain_order,
+                drop_nulls=drop_nulls,
+                streaming=streaming,
+                **aggregations,
+            )
+        ).as_model(model)
 
     def rolling_agg(
         self,
@@ -2756,8 +2877,18 @@ class DataFrameModel(Generic[RowT]):
         )
 
     def __getattr__(self, item: str) -> Any:
-        # Delegate column refs + API methods to wrapped DataFrame.
+        # Strict 2.0 typing contract: no `df.<field>` column access.
+        if item in self.schema_fields():
+            raise AttributeError(
+                f"{type(self).__name__!r} has no attribute {item!r}; "
+                "use `df.col.<field>` for typed column access."
+            )
         return getattr(self._df, item)
+
+    @property
+    def col(self) -> Any:
+        """Typed column namespace: use ``df.col.some_field``."""
+        return self._df.col
 
     @classmethod
     def row_model(cls) -> type[RowT]:

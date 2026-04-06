@@ -4,8 +4,7 @@
 :class:`DataFrameModel`. Build ``DataFrame[YourSchema](data)`` where ``YourSchema``
 subclasses :class:`Schema`.
 
-**Facades:** :mod:`pydantable.pandas` (pandas-like names) and
-:mod:`pydantable.pyspark` (PySpark-like names) wrap the same engine.
+**Facades:** removed in strict 2.0 mode.
 
 **I/O:** eager loaders, iterators, and SQL helpers are imported from this package
 (``from pydantable import fetch_sqlmodel, materialize_parquet, materialize_json,
@@ -16,10 +15,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from . import pandas as pandas
 from . import plugins as plugins
-from . import pyspark as pyspark
-from . import selectors as selectors
 from ._extension import MissingRustExtensionError
 from .awaitable_dataframe_model import AwaitableDataFrameModel
 from .dataframe import DataFrame
@@ -160,14 +156,11 @@ __all__ = [
     "materialize_json",
     "materialize_ndjson",
     "materialize_parquet",
-    "pandas",
     "plan_materialization_summary",
     "plugins",
-    "pyspark",
     "read_parquet",
     "read_parquet_url",
     "reset_display_options",
-    "selectors",
     "set_display_options",
     "set_observer",
     "sqlmodel_columns",

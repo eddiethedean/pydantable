@@ -738,8 +738,10 @@ class DataFrame(CoreDataFrame):
         return self._as_pyspark_df(super().explode_outer(column, streaming=streaming))
 
     def explode_all(self, *, streaming: bool | None = None) -> DataFrame:
-        """Explode every list-typed column (schema-driven; not a Spark name)."""
-        return self._as_pyspark_df(super().explode_all(streaming=streaming))
+        raise TypeError(
+            "pydantable.pyspark.DataFrame.explode_all() is removed in pydantable 2.0 "
+            "strict mode (dynamic column sets are forbidden)."
+        )
 
     def posexplode(
         self,
@@ -775,8 +777,10 @@ class DataFrame(CoreDataFrame):
         return self._as_pyspark_df(super().unnest(column, streaming=streaming))
 
     def unnest_all(self, *, streaming: bool | None = None) -> DataFrame:
-        """Unnest every struct-typed column in the schema."""
-        return self._as_pyspark_df(super().unnest_all(streaming=streaming))
+        raise TypeError(
+            "pydantable.pyspark.DataFrame.unnest_all() is removed in pydantable 2.0 "
+            "strict mode (dynamic column sets are forbidden)."
+        )
 
     def drop(self, *columns: Any, strict: bool = True) -> DataFrame:
         """Drop columns by name (Spark ``drop``)."""
@@ -1530,10 +1534,9 @@ class DataFrameModel(CoreDataFrameModel):
         )
 
     def explode_all(self, *, streaming: bool | None = None) -> DataFrameModel:
-        """Explode every list-typed column in the schema (schema-driven convenience)."""
-        return cast(
-            "DataFrameModel",
-            self._from_dataframe(self._df.explode_all(streaming=streaming)),
+        raise TypeError(
+            "pydantable.pyspark.DataFrameModel.explode_all() is removed in "
+            "pydantable 2.0 strict mode (dynamic column sets are forbidden)."
         )
 
     def posexplode(
@@ -1581,10 +1584,9 @@ class DataFrameModel(CoreDataFrameModel):
         )
 
     def unnest_all(self, *, streaming: bool | None = None) -> DataFrameModel:
-        """Unnest every struct-typed column in the schema."""
-        return cast(
-            "DataFrameModel",
-            self._from_dataframe(self._df.unnest_all(streaming=streaming)),
+        raise TypeError(
+            "pydantable.pyspark.DataFrameModel.unnest_all() is removed in "
+            "pydantable 2.0 strict mode (dynamic column sets are forbidden)."
         )
 
     def drop(self, *cols: str | ColumnRef) -> DataFrameModel:

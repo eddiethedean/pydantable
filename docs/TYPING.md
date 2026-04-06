@@ -69,11 +69,11 @@ At **runtime**, `SupportsLazyAsyncMaterialize` is `@runtime_checkable`, so `isin
 
 **Static checkers:** Stubs may not list every lazy **`aread_*`** classmethod on each `DataFrameModel` subclass. If **mypy** (no plugin), **Pyright/Pylance**, or **`ty`** complains on **`MyModel.aread_parquet(...)`**, assign via **`typing.cast(SupportsLazyAsyncMaterialize[Any], MyModel.aread_parquet(...))`**, bind **`_aread = MyModel.aread_parquet  # type: ignore[attr-defined]`**, or enable the pydantable **mypy plugin** (mypy only) where applicable.
 
-## Pyright, Pylance, and Astral `ty` (explicit after-model)
+## Strict 2.0 typing (explicit output model)
 
 **Pyright**, **Pylance**, and **Astral `ty`** cannot apply the mypy plugin, so they follow the same stub-based pattern: chained transforms are loosely typed until you assert an after-model. The examples below say “Pyright”; use the identical **`as_model` / `try_as_model` / `assert_model`** workflow with **`ty check`** on your project.
 
-Pyright cannot express dependent “schema evolution” from transform chains, so the ergonomic pattern is:
+In strict 2.0 mode, schema-changing transforms **require an explicit output model** (and enforce it at runtime).
 
 ```python
 from pydantable import DataFrameModel
@@ -87,8 +87,13 @@ class After(DataFrameModel):
     age2: int
 
 def pipeline(df: Before) -> After:
-    out = df.with_columns(age2=df.age * 2).select("id", "age2")
-    return out.as_model(After)
+    class AfterFull(DataFrameModel):
+        id: int
+        age: int
+        age2: int
+
+    out_full = df.with_columns_as(AfterFull, age2=df.col.age * 2)
+    return out_full.drop_as(After, out_full.col.age)
 ```
 
 Safer variants:
