@@ -16,13 +16,16 @@ def _run_pyright_snippet(tmp_path: Path, code: str) -> subprocess.CompletedProce
     snippet = tmp_path / "snippet.py"
     snippet.write_text(textwrap.dedent(code), encoding="utf-8")
     cfg = tmp_path / "pyrightconfig.json"
-    # Point pyright at the active repo venv so third-party imports (e.g. pydantic)
-    # resolve reliably in CI and local dev.
+    # Point pyright at the repo venv so third-party imports (e.g. pydantic)
+    # resolve reliably in CI and local dev. Prefer `.venv310` for local dev,
+    # fall back to CI's `.venv` (see workflow).
+    root = repo_root()
+    venv = ".venv310" if (root / ".venv310").is_dir() else ".venv"
     cfg.write_text(
         json.dumps(
             {
-                "venvPath": str(repo_root()),
-                "venv": ".venv310",
+                "venvPath": str(root),
+                "venv": venv,
                 "pythonVersion": "3.10",
             }
         ),
