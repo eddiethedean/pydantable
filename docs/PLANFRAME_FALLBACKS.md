@@ -46,6 +46,7 @@ Wiring more of these through PlanFrame plan nodes (and tightening types) is incr
 | **`planframe_adapter/expr.py`** | Lower remaining `planframe.expr.api` nodes (`StrLower`, `DtYear`, `Over`, …) so PlanFrame-native expr trees execute without `NotImplementedError`. |
 | **Public escape hatch** | Documented way to get a `DataFrame` from a `DataFrameModel` for APIs we intentionally do not wrap (until PlanFrame catches up). |
 | **Tests / typing artifacts** | Regenerate stubs and add tests when new PlanFrame-backed methods ship. |
+| **`execute_frame` duplication** | When [planframe#19](https://github.com/eddiethedean/planframe/issues/19) lands, delegate to PlanFrame’s public executor instead of maintaining a parallel switch in `planframe_adapter/execute.py`. |
 
 ## Upstream PlanFrame — tracker
 
@@ -65,6 +66,13 @@ Wiring more of these through PlanFrame plan nodes (and tightening types) is incr
 | [16](https://github.com/eddiethedean/planframe/issues/16) | `DropNulls`: `how=all`, `threshold` |
 | [17](https://github.com/eddiethedean/planframe/issues/17) | `FillNull`: strategies / expr fill |
 | [18](https://github.com/eddiethedean/planframe/issues/18) | Join typing for many key columns (no `Any` cast) |
+| [19](https://github.com/eddiethedean/planframe/issues/19) | **Enhancement:** public `execute_plan` API (share `Frame._eval`) |
+| [20](https://github.com/eddiethedean/planframe/issues/20) | **Enhancement:** expand `__all__` / package exports |
+| [21](https://github.com/eddiethedean/planframe/issues/21) | **Enhancement:** plan tree introspection (iterator / visitor) |
+| [22](https://github.com/eddiethedean/planframe/issues/22) | **Enhancement:** optional IR version on `Source` |
+| [23](https://github.com/eddiethedean/planframe/issues/23) | **Enhancement:** optional plan optimization (fuse `Select`, …) |
+| [24](https://github.com/eddiethedean/planframe/issues/24) | **Enhancement:** cache `Schema.field_map` hot path |
+| [25](https://github.com/eddiethedean/planframe/issues/25) | **Enhancement:** `Frame.__repr__` / debug summary |
 
 **Str-only column lists in PlanFrame IR** (`Explode` / `Unnest` / subsets, etc.) — same theme as rich `select` ([planframe#8](https://github.com/eddiethedean/planframe/issues/8)).
 
