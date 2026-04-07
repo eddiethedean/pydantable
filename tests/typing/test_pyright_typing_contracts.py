@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import textwrap
@@ -13,8 +14,28 @@ from tests._support.paths import repo_root
 def _run_pyright_snippet(tmp_path: Path, code: str) -> subprocess.CompletedProcess[str]:
     snippet = tmp_path / "snippet.py"
     snippet.write_text(textwrap.dedent(code), encoding="utf-8")
+    cfg = tmp_path / "pyrightconfig.json"
+    # Point pyright at the active repo venv so third-party imports (e.g. pydantic)
+    # resolve reliably in CI and local dev.
+    cfg.write_text(
+        json.dumps(
+            {
+                "venvPath": str(repo_root()),
+                "venv": ".venv310",
+                "pythonVersion": "3.10",
+            }
+        ),
+        encoding="utf-8",
+    )
     return subprocess.run(
-        [sys.executable, "-m", "pyright", str(snippet)],
+        [
+            sys.executable,
+            "-m",
+            "pyright",
+            "--project",
+            str(cfg),
+            str(snippet),
+        ],
         cwd=repo_root(),
         capture_output=True,
         text=True,

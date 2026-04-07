@@ -168,7 +168,7 @@ exclude = [
 [tool.ruff]
 target-version = "py310"
 line-length = 88
-exclude = ["notebooks", ".venv-mypy-min", ".venv-ty-min"]
+exclude = ["notebooks", ".venv", ".venv310", ".venv-mypy-min", ".venv-ty-min"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]

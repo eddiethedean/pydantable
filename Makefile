@@ -113,8 +113,8 @@ rust-check-no-default-features:
 # PyO3's embedded interpreter does not always load site-packages; prepend repo source
 # trees plus venv site-packages so ``polars``, ``pydantable``, and ``pydantable_protocol`` resolve.
 rust-test:
-	PYO3_PYTHON=$(CURDIR)/.venv/bin/python \
-	PYTHONPATH=$(RUST_PYTHONPATH):$$($(CURDIR)/.venv/bin/python -c "import site; print(site.getsitepackages()[0])") \
+	PYO3_PYTHON=$(CURDIR)/$(PYTHON) \
+	PYTHONPATH=$(RUST_PYTHONPATH):$$($(CURDIR)/$(PYTHON) -c "import site; print(site.getsitepackages()[0])") \
 	cargo test --manifest-path $(CARGO_MANIFEST) --all-features
 
 # --- Editable installs & native extension (maturin) ---

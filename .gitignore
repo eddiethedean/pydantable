@@ -8,6 +8,7 @@ __pycache__/
 .Python
 venv/
 .venv/
+.venv310/
 .venv-mypy/
 .venv-mypy-min/
 .venv-ty-min/
