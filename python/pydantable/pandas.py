@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 import random
 import re
+import warnings
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -27,6 +28,13 @@ from .schema import Schema
 from .schema._impl import make_derived_schema_type, schema_field_types
 from .selectors import Selector
 from .window_spec import WindowSpec
+
+warnings.warn(
+    "`pydantable.pandas` is deprecated and will be removed in pydantable 2.0. "
+    "Use the DataFrameModel-first API instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 def _is_pandas_series(value: object) -> bool:

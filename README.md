@@ -34,7 +34,7 @@ pip install "pydantable[polars]"   # to_polars
 pip install "pydantable[arrow]"    # to_arrow / Arrow constructors
 pip install "pydantable[io]"       # full file I/O convenience (arrow + polars)
 pip install "pydantable[sql]"      # SQLModel + SQLAlchemy: fetch_sqlmodel, write_sqlmodel, *_raw, …
-pip install "pydantable[pandas]"   # pandas-flavored façade (pandas UI doc)
+pip install "pydantable[pandas]"   # DEPRECATED: pandas-flavored façade (removed in 2.0)
 pip install "pydantable[fastapi]"  # FastAPI integration (pydantable.fastapi)
 pip install "pydantable[moltres]"   # SqlDataFrame / SqlDataFrameModel (sqlalchemy engine)
 ```

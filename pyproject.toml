@@ -18,6 +18,8 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
+    # PlanFrame is the core plan layer for the DataFrameModel-first interface.
+    "planframe>=0.2.0,<0.3",
     "pydantic>=2.0,<3",
     "pydantable-protocol==1.16.0",
     "pydantable-native==1.16.0",

@@ -7,6 +7,7 @@ and :class:`~pydantable.window_spec.Window`.
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Any
 
 from pydantable.expressions import Expr
@@ -14,6 +15,13 @@ from pydantable.schema import Schema
 
 from . import sql
 from .dataframe import DataFrame, DataFrameModel
+
+warnings.warn(
+    "`pydantable.pyspark` is deprecated and will be removed in pydantable 2.0. "
+    "Use the DataFrameModel-first API instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 if TYPE_CHECKING:
     from pydantable.pyspark.sql_moltres import SqlDataFrame, SqlDataFrameModel

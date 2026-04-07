@@ -14,11 +14,11 @@ iter_sql_raw, write_sql_raw, …``); :mod:`pydantable.io` is the implementation 
 
 from __future__ import annotations
 
+import importlib
+import warnings
 from typing import TYPE_CHECKING, Any
 
-from . import pandas as pandas
 from . import plugins as plugins
-from . import pyspark as pyspark
 from . import selectors as selectors
 from ._extension import MissingRustExtensionError
 from .awaitable_dataframe_model import AwaitableDataFrameModel
@@ -87,10 +87,23 @@ from .schema import DtypeDriftWarning, Schema
 from .types import WKB
 
 if TYPE_CHECKING:
+    # Statically expose deprecated UI modules for type checkers without importing
+    # them at runtime (they emit DeprecationWarning on import).
     from pydantable.sql_moltres import SqlDataFrame, SqlDataFrameModel
+
+    from . import pandas as pandas
+    from . import pyspark as pyspark
 
 
 def __getattr__(name: str) -> Any:
+    if name in {"pandas", "pyspark"}:
+        warnings.warn(
+            f"`pydantable.{name}` is deprecated and will be removed in pydantable 2.0. "
+            "Use the DataFrameModel-first API instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return importlib.import_module(f"{__name__}.{name}")
     if name == "SqlDataFrame":
         from pydantable.sql_moltres import SqlDataFrame
 

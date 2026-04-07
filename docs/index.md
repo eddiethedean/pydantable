@@ -85,6 +85,7 @@ typed_dataframe_spec
 :caption: Introspection and extensions
 
 PLAN_AND_PLUGINS
+PLANFRAME_FALLBACKS
 ```
 
 ```{toctree}

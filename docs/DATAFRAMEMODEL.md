@@ -8,6 +8,8 @@ The goal is to keep the query-building/typing story (`select`, `with_columns`,
 `filter`) while making DataFrames feel native in typical Pydantic/FastAPI
 workflows.
 
+`DataFrameModel` keeps a typed [PlanFrame](https://pypi.org/project/planframe/) `Frame` for **core** transforms (strict column names, PlanFrame-expressible joins, etc.); other methods delegate to the wrapped `DataFrame` and re-bind PlanFrame to a fresh `Source` for the result. See {doc}`PLANFRAME_FALLBACKS` for the split and upstream gaps.
+
 For pandas-style method names (**`assign`**, **`merge`**, **`duplicated`**, **`get_dummies`**, …) import **`DataFrameModel`** from **`pydantable.pandas`**; execution remains the same Rust core ({doc}`PANDAS_UI`).
 
 ## Terms

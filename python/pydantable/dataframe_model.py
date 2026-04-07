@@ -13,23 +13,27 @@ import typing
 from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast
 
-from typing_extensions import Self
+from typing_extensions import LiteralString, Self
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
 
+    from planframe.frame import Frame as PlanFrameFrame
     from sqlalchemy.engine import Connection, Engine
 
 from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
 from .awaitable_dataframe_model import AwaitableDataFrameModel
 from .dataframe import DataFrame, ExecutionHandle
+from .planframe_adapter.adapter import PydantableAdapter
+from .planframe_adapter.execute import execute_frame
 from .repr_label import short_repr_label as _short_repr_label
 from .schema import (
     Schema,
     _is_polars_dataframe,
     validate_dataframe_model_field_annotations,
 )
+from .selectors import Selector
 
 
 def _annotation_is_classvar(annotation: Any) -> bool:
@@ -60,6 +64,55 @@ def _field_defs_from_annotations(
 # ``str``, ``bytes``, ``memoryview``, etc. are ``Sequence`` but must not be treated
 # as a list of row dicts (classic foot-gun).
 _ROW_SEQUENCE_EXCLUDES: tuple[type[Any], ...] = (str, bytes, bytearray, memoryview)
+
+
+def _dfm_plain_str_join_keys(value: Any) -> tuple[str, ...] | None:
+    """Join keys for PlanFrame when ``value`` is only ``str`` / ``Sequence[str]``."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, Selector):
+        return None
+    if isinstance(value, Sequence) and not isinstance(
+        value, (str, bytes, bytearray, memoryview)
+    ):
+        out: list[str] = []
+        for x in value:
+            if not isinstance(x, str):
+                return None
+            out.append(x)
+        return tuple(out)
+    return None
+
+
+def _planframe_col_name(name: str) -> LiteralString:
+    """Widen runtime ``str`` to PlanFrame stub ``LiteralString`` (ty-checker)."""
+
+    return cast("LiteralString", name)
+
+
+def _dfm_columns_as_tuple(
+    columns: str | Sequence[str] | None,
+) -> tuple[str, ...]:
+    """Normalize str / Sequence[str] to a tuple of names (PlanFrame-only API)."""
+    if isinstance(columns, str):
+        return (columns,)
+    if isinstance(columns, Sequence) and not isinstance(
+        columns, (str, bytes, bytearray, memoryview)
+    ):
+        out: list[str] = []
+        for x in columns:
+            if not isinstance(x, str):
+                raise TypeError(
+                    "Expected column names as str or Sequence[str]; "
+                    f"got non-str entry {x!r}."
+                )
+            out.append(x)
+        return tuple(out)
+    raise TypeError(
+        f"Expected str or Sequence[str] column names, got {type(columns).__name__}."
+    )
 
 
 def _normalize_input(
@@ -258,6 +311,7 @@ class DataFrameModel(Generic[RowT]):
     _RowModel_require_optional: type[BaseModel]
     _SchemaModel: type[Schema]
     _df: DataFrame[Any]
+    _pf: PlanFrameFrame[type[BaseModel], DataFrame[Any], Any]
     _dataframe_cls: type[DataFrame[Any]] = DataFrame
 
     Async = _AsyncIODescriptor()
@@ -449,6 +503,13 @@ class DataFrameModel(Generic[RowT]):
             nested_strictness_default=nested_sd,
             engine=engine,
         )
+        from planframe.frame import Frame as _PFFrame
+
+        self._pf = _PFFrame.source(
+            self._df,
+            adapter=PydantableAdapter(engine=self._df._engine),
+            schema=self._SchemaModel,
+        )
 
     @classmethod
     def _dfm_require_subclass_with_schema(cls) -> None:
@@ -470,6 +531,13 @@ class DataFrameModel(Generic[RowT]):
     def _wrap_inner_df(cls, inner: DataFrame[Any]) -> Self:
         obj = cls.__new__(cls)
         obj._df = inner
+        from planframe.frame import Frame as _PFFrame
+
+        obj._pf = _PFFrame.source(
+            inner,
+            adapter=PydantableAdapter(engine=inner._engine),
+            schema=cls._SchemaModel,
+        )
         return cast("Self", obj)
 
     @classmethod
@@ -1726,10 +1794,24 @@ class DataFrameModel(Generic[RowT]):
         derived_type = cls._derived_model_type(df.schema_fields())
         obj = derived_type.__new__(derived_type)
         obj._df = df
+        from planframe.frame import Frame as _PFFrame
+
+        obj._pf = _PFFrame.source(
+            df,
+            adapter=PydantableAdapter(engine=df._engine),
+            schema=derived_type._SchemaModel,
+        )
         return cast("ModelSelf", obj)
 
     def schema_fields(self) -> dict[str, Any]:
         return self._df.schema_fields()
+
+    def _dfm_sync_pf(self, pf2: Any) -> Self:
+        """Execute a PlanFrame frame and return a model whose ``_pf`` is *pf2*."""
+        compiled = execute_frame(pf2)
+        out = self._from_dataframe(compiled)
+        out._pf = pf2
+        return out
 
     @staticmethod
     def _expected_schema_fields(model: type[DataFrameModel[Any]]) -> dict[str, Any]:
@@ -1773,6 +1855,13 @@ class DataFrameModel(Generic[RowT]):
                 )
         obj = model.__new__(model)
         obj._df = self._df
+        from planframe.frame import Frame as _PFFrame
+
+        obj._pf = _PFFrame.source(
+            self._df,
+            adapter=PydantableAdapter(engine=self._df._engine),
+            schema=model._SchemaModel,
+        )
         return cast("AfterModelT", obj)
 
     @staticmethod
@@ -2110,14 +2199,25 @@ class DataFrameModel(Generic[RowT]):
             out = apply_redaction_to_row_dicts(self._SchemaModel, out)
         return out
 
-    def select(self, *cols: Any) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.select(*cols))
+    def select(self, *cols: str) -> DataFrameModel[Any]:
+        if not cols:
+            raise ValueError("select() requires at least one column name.")
+        ls = tuple(_planframe_col_name(c) for c in cols)
+        return self._dfm_sync_pf(self._pf.select(*ls))
 
     def select_schema(self, selector: Any) -> DataFrameModel[Any]:
         return self._from_dataframe(self._df.select_schema(selector))
 
     def with_columns(self, **new_columns: Any) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.with_columns(**new_columns))
+        from planframe.expr.api import lit as _pflit
+
+        from pydantable.expressions import Expr as PydExpr
+
+        pf2 = self._pf
+        for name, value in new_columns.items():
+            expr = value if isinstance(value, PydExpr) else _pflit(value)
+            pf2 = pf2.with_column(_planframe_col_name(name), expr)
+        return self._dfm_sync_pf(pf2)
 
     def with_columns_cast(
         self, selector: Any, dtype: Any, *, strict: bool = True
@@ -2141,28 +2241,68 @@ class DataFrameModel(Generic[RowT]):
         )
 
     def filter(self, condition: Any) -> Self:
-        return self._from_dataframe(self._df.filter(condition))
+        return self._dfm_sync_pf(self._pf.filter(condition))
 
-    def sort(self, *by: Any, descending: bool | Sequence[bool] = False) -> Self:
-        return self._from_dataframe(self._df.sort(*by, descending=descending))
+    def sort(
+        self,
+        *by: str,
+        descending: bool | Sequence[bool] = False,
+        nulls_last: bool | Sequence[bool] = False,
+    ) -> Self:
+        if not by:
+            raise ValueError("sort() requires at least one column name.")
+        keys = tuple(_planframe_col_name(b) for b in by)
+        return self._dfm_sync_pf(
+            self._pf.sort(*keys, descending=descending, nulls_last=nulls_last)
+        )
 
     def unique(
-        self, subset: Sequence[str] | None = None, *, keep: str = "first"
+        self,
+        subset: Sequence[str] | None = None,
+        *,
+        keep: Literal["first", "last"] = "first",
+        maintain_order: bool = False,
     ) -> Self:
-        return self._from_dataframe(self._df.unique(subset=subset, keep=keep))
+        if subset is None:
+            pf2 = self._pf.unique(keep=keep, maintain_order=maintain_order)
+        else:
+            if not all(isinstance(x, str) for x in subset):
+                raise TypeError(
+                    "unique(subset=...) expects a sequence of str column names."
+                )
+            sub_ls = tuple(_planframe_col_name(x) for x in subset)
+            pf2 = self._pf.unique(
+                *sub_ls, keep=keep, maintain_order=maintain_order
+            )
+        return self._dfm_sync_pf(pf2)
 
     def distinct(
-        self, subset: Sequence[str] | None = None, *, keep: str = "first"
+        self,
+        subset: Sequence[str] | None = None,
+        *,
+        keep: Literal["first", "last"] = "first",
     ) -> Self:
-        return self._from_dataframe(self._df.distinct(subset=subset, keep=keep))
+        return self.unique(subset=subset, keep=keep, maintain_order=False)
 
-    def drop(self, *columns: Any, strict: bool = True) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.drop(*columns, strict=strict))
+    def drop(self, *columns: str, strict: bool = True) -> Self:
+        if not columns:
+            return self
+        cols = tuple(_planframe_col_name(c) for c in columns)
+        return self._dfm_sync_pf(self._pf.drop(*cols, strict=strict))
 
     def rename(
         self, columns: Mapping[str, str], *, strict: bool = True
     ) -> DataFrameModel[Any]:
-        return self._from_dataframe(self._df.rename(columns, strict=strict))
+        if strict is not True:
+            raise TypeError(
+                "DataFrameModel.rename only supports strict=True until PlanFrame "
+                "models rename(strict=False); see planframe issue #7."
+            )
+        mapping = {
+            _planframe_col_name(k): _planframe_col_name(v)
+            for k, v in columns.items()
+        }
+        return self._dfm_sync_pf(self._pf.rename(**mapping))
 
     def rename_upper(
         self, selector: Any = None, *, strict: bool = True
@@ -2191,16 +2331,18 @@ class DataFrameModel(Generic[RowT]):
         )
 
     def slice(self, offset: int, length: int) -> Self:
-        return self._from_dataframe(self._df.slice(offset, length))
+        return self._dfm_sync_pf(self._pf.slice(offset, length))
 
     def with_row_count(self, name: str = "row_nr", *, offset: int = 0) -> Self:
-        return self._from_dataframe(self._df.with_row_count(name=name, offset=offset))
+        return self._from_dataframe(
+            self._df.with_row_count(name=name, offset=offset)
+        )
 
     def head(self, n: int = 5) -> Self:
-        return self._from_dataframe(self._df.head(n))
+        return self._dfm_sync_pf(self._pf.head(n))
 
     def tail(self, n: int = 5) -> Self:
-        return self._from_dataframe(self._df.tail(n))
+        return self._dfm_sync_pf(self._pf.tail(n))
 
     def pipe(self, fn: Any, *args: Any, **kwargs: Any) -> Any:
         return self._df.pipe(fn, *args, **kwargs)
@@ -2221,22 +2363,35 @@ class DataFrameModel(Generic[RowT]):
         value: Any = None,
         *,
         strategy: str | None = None,
-        subset: str | Sequence[str] | Any | None = None,
+        subset: str | Sequence[str] | None = None,
     ) -> Self:
-        return self._from_dataframe(
-            self._df.fill_null(value, strategy=strategy, subset=subset)
-        )
+        if strategy is not None:
+            raise TypeError(
+                "DataFrameModel.fill_null only supports value=... "
+                "(strategy= is not supported)."
+            )
+        if value is None:
+            raise ValueError("fill_null() requires value= when strategy is omitted.")
+        if subset is None:
+            return self._dfm_sync_pf(self._pf.fill_null(value))
+        sub_ls = tuple(_planframe_col_name(c) for c in _dfm_columns_as_tuple(subset))
+        return self._dfm_sync_pf(self._pf.fill_null(value, *sub_ls))
 
     def drop_nulls(
         self,
-        subset: str | Sequence[str] | Any | None = None,
+        subset: str | Sequence[str] | None = None,
         *,
         how: str = "any",
         threshold: int | None = None,
     ) -> Self:
-        return self._from_dataframe(
-            self._df.drop_nulls(subset=subset, how=how, threshold=threshold)
-        )
+        if how != "any" or threshold is not None:
+            raise TypeError(
+                "DataFrameModel.drop_nulls only supports how='any' and threshold=None."
+            )
+        if subset is None:
+            return self._dfm_sync_pf(self._pf.drop_nulls())
+        sub_ls = tuple(_planframe_col_name(c) for c in _dfm_columns_as_tuple(subset))
+        return self._dfm_sync_pf(self._pf.drop_nulls(*sub_ls))
 
     def melt(
         self,
@@ -2522,29 +2677,94 @@ class DataFrameModel(Generic[RowT]):
         force_parallel: bool | None = None,
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
-        """Join on key column(s); forwards to :meth:`DataFrame.join`.
+        """Join on key column(s) via PlanFrame (string keys only).
 
-        ``allow_parallel`` and ``force_parallel`` are not supported by the native
-        engine and raise :exc:`NotImplementedError` when set (non-``None``).
+        Expression/selector join keys and parallel join flags are not supported on
+        :class:`DataFrameModel`; use the inner :class:`~pydantable.dataframe.DataFrame`
+        if you need them.
         """
         if not isinstance(other, DataFrameModel):
             raise TypeError("join(other=...) expects another DataFrameModel instance.")
-        return self._from_dataframe(
-            self._df.join(
-                other._df,
-                on=on,
-                left_on=left_on,
-                right_on=right_on,
-                how=how,
-                suffix=suffix,
+        if allow_parallel is not None or force_parallel is not None:
+            raise NotImplementedError(
+                "DataFrameModel.join does not support allow_parallel= or "
+                "force_parallel=."
+            )
+
+        from planframe.plan.join_options import JoinOptions
+
+        join_opts: JoinOptions | None = None
+        if any(
+            x is not None
+            for x in (
+                coalesce,
+                validate,
+                join_nulls,
+                maintain_order,
+                streaming,
+            )
+        ):
+            join_opts = JoinOptions(
                 coalesce=coalesce,
                 validate=validate,
                 join_nulls=join_nulls,
                 maintain_order=maintain_order,
-                allow_parallel=allow_parallel,
-                force_parallel=force_parallel,
                 streaming=streaming,
             )
+
+        how_any = cast("Any", how)
+        # PlanFrame stubs use fixed-arity join overloads; widen for runtime join keys.
+        _pf_a = cast("Any", self._pf)
+        _opf_a = cast("Any", other._pf)
+        if how_any == "cross":
+            if on is not None or left_on is not None or right_on is not None:
+                raise TypeError(
+                    "cross join must not set on=, left_on=, or right_on= "
+                    "on DataFrameModel."
+                )
+            return self._dfm_sync_pf(
+                _pf_a.join(_opf_a, how="cross", suffix=suffix, options=join_opts)
+            )
+
+        on_keys = _dfm_plain_str_join_keys(on)
+        if on_keys and left_on is None and right_on is None:
+            on_ls = tuple(_planframe_col_name(k) for k in on_keys)
+            return self._dfm_sync_pf(
+                _pf_a.join(
+                    _opf_a,
+                    on=on_ls,
+                    how=how_any,
+                    suffix=suffix,
+                    options=join_opts,
+                )
+            )
+
+        lk = _dfm_plain_str_join_keys(left_on)
+        rk = _dfm_plain_str_join_keys(right_on)
+        if (
+            on is None
+            and lk is not None
+            and rk is not None
+            and len(lk) == len(rk)
+            and lk
+        ):
+            lk_ls = tuple(_planframe_col_name(k) for k in lk)
+            rk_ls = tuple(_planframe_col_name(k) for k in rk)
+            return self._dfm_sync_pf(
+                _pf_a.join(
+                    _opf_a,
+                    left_on=lk_ls,
+                    right_on=rk_ls,
+                    how=how_any,
+                    suffix=suffix,
+                    options=join_opts,
+                )
+            )
+
+        raise TypeError(
+            "DataFrameModel.join requires string keys: use on= as str or "
+            "Sequence[str], or left_on= and right_on= with the same length "
+            "(Expr/Selector keys are not supported)."
         )
 
     def join_as_model(

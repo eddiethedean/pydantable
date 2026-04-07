@@ -1,5 +1,10 @@
 # Pandas UI (`pydantable.pandas`)
 
+```{warning}
+`pydantable.pandas` is **deprecated** and will be **removed in pydantable 2.0**.
+Prefer the primary `DataFrameModel` interface from `pydantable`.
+```
+
 The **pandas UI** is an optional import surface that layers **pandas-like method and property names** on top of pydantable’s typed logical DataFrame. It does **not** wrap a `pandas.DataFrame` for the schema-driven `DataFrame` / `DataFrameModel` types; execution uses the same **Rust engine** as the default export (see [Execution](EXECUTION.md)).
 
 ## Index-light model and lazy vs eager
