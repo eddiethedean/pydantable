@@ -48,7 +48,7 @@ ty-check-minimal:
 		if [ -x .venv/bin/python ]; then .venv/bin/python -m venv .venv-ty-min; else python3 -m venv .venv-ty-min; fi; \
 	fi
 	@.venv-ty-min/bin/python -m pip -q install -U pip >/dev/null
-	@.venv-ty-min/bin/python -m pip -q install "ty>=0.0.28" "pydantic>=2.0,<3" "typing-extensions>=4.7" "planframe>=0.3.0,<0.4" >/dev/null
+	@.venv-ty-min/bin/python -m pip -q install "ty>=0.0.28" "pydantic>=2.0,<3" "typing-extensions>=4.7" "planframe>=0.5.0,<0.6" >/dev/null
 	@.venv-ty-min/bin/python -m ty check --python .venv-ty-min/bin/python
 
 pyright-check:

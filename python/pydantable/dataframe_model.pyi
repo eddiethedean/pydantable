@@ -858,8 +858,8 @@ class DataFrameModel(Generic[RowT]):
     def unpivot(
         self,
         *,
-        index: Sequence[str] | None = None,
-        on: Sequence[str] | None = None,
+        index: str | Sequence[str] | None = None,
+        on: str | Sequence[str] | None = None,
         variable_name: str = "variable",
         value_name: str = "value",
     ) -> DataFrameModel[Any]: ...
@@ -918,7 +918,7 @@ class DataFrameModel(Generic[RowT]):
         *,
         index: str | Sequence[str],
         columns: str,
-        values: str,
+        values: str | Sequence[str],
         aggregate_function: str = "first",
         sort_columns: bool = False,
         separator: str = "_",
@@ -926,13 +926,16 @@ class DataFrameModel(Generic[RowT]):
     ) -> DataFrameModel[Any]: ...
     def explode(
         self,
-        columns: str,
+        columns: str | Sequence[str],
         *,
         outer: bool = False,
         streaming: bool | None = None,
     ) -> Self: ...
     def explode_outer(
-        self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None
+        self,
+        columns: str | Sequence[str] | None = None,
+        *,
+        streaming: bool | None = None,
     ) -> Self: ...
     def posexplode(
         self,
@@ -953,9 +956,7 @@ class DataFrameModel(Generic[RowT]):
     ) -> DataFrameModel[Any]: ...
     def unnest(
         self,
-        column: str,
-        *,
-        fields: Sequence[str],
+        columns: str | Sequence[str],
         streaming: bool | None = None,
     ) -> Self: ...
     def explode_all(self, *, streaming: bool | None = None) -> Self: ...

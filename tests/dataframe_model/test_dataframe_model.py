@@ -732,8 +732,9 @@ def test_dataframe_model_pipe_and_clip() -> None:
         y: float
 
     df = S({"x": [1, 5], "y": [1.5, -2.0]})
-    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
-        df.clip(lower=0, upper=3).to_dict()
+    out = df.clip(lower=0, upper=3).to_dict()
+    # PlanFrame's clip(subset=None) clips all numeric columns in schema.
+    assert out == {"x": [1, 3], "y": [1.5, 0.0]}
 
     # pipe() delegates to the underlying DataFrame, so operations inside the pipe
     # run on DataFrame (not DataFrameModel) and are allowed.
@@ -746,8 +747,9 @@ def test_dataframe_model_with_row_count() -> None:
         x: int
 
     df = S({"x": [10, 20, 30]})
-    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
-        df.with_row_count().to_dict()
+    out = df.with_row_count().to_dict()
+    assert out["x"] == [10, 20, 30]
+    assert out["row_nr"] == [0, 1, 2]
 
 
 def test_dataframe_model_selector_helpers() -> None:
@@ -758,17 +760,18 @@ def test_dataframe_model_selector_helpers() -> None:
         b: int | None
 
     df = S({"a": [None, 1], "b": [2, None]})
-    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
-        df.with_columns_fill_null(s.by_name("a"), value=0).to_dict()
+    out1 = df.with_columns_fill_null(s.by_name("a"), value=0).to_dict()
+    assert out1["a"] == [0, 1]
 
-    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
-        df.with_columns_cast(s.by_name("b"), float).to_dict()
+    out2 = df.with_columns_cast(s.by_name("b"), float).to_dict()
+    assert out2["b"] == [2.0, None]
 
-    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
-        df.rename_upper(s.by_name("a")).to_dict()
+    out3 = df.rename_upper(s.by_name("a")).to_dict()
+    assert "A" in out3
+    assert "a" not in out3
 
-    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
-        df.select_schema(s.by_name("b")).to_dict()
+    out4 = df.select_schema(s.by_name("b")).to_dict()
+    assert out4 == {"b": [2, None]}
 
 
 def test_dataframe_model_row_input_rejects_bad_item_type():
@@ -1015,18 +1018,18 @@ def test_p6_dataframe_model_rolling_and_dynamic() -> None:
             "v": [10, None, 30],
         }
     )
-    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
-        df.rolling_agg(
-            on="ts",
-            column="v",
-            window_size="2h",
-            op="sum",
-            out_name="v_roll_sum",
-            by=["id"],
-        )
+    out = df.rolling_agg(
+        on="ts",
+        column="v",
+        window_size="2h",
+        op="sum",
+        out_name="v_roll_sum",
+        by=["id"],
+    ).to_dict()
+    assert "v_roll_sum" in out
 
-    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
-        df.group_by_dynamic("ts", every="1h", by=["id"]).agg(v_count=("count", "v"))
+    out2 = df.group_by_dynamic("ts", every="1h", by=["id"]).agg(v_count=("count", "v"))
+    assert "v_count" in out2.schema_fields()
 
 
 @pytest.mark.asyncio
@@ -1042,9 +1045,9 @@ async def test_aread_chain_group_by_dynamic_agg(tmp_path) -> None:
         {"id": [1, 1], "ts": [0, 3600], "v": [10, 20]},
     )
     adf = TSDyn.aread_parquet(path, trusted_mode="shape_only")
-    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
-        dyn = adf.group_by_dynamic("ts", every="1h", by=["id"])
-        await dyn.agg(v_sum=("sum", "v"))
+    dyn = adf.group_by_dynamic("ts", every="1h", by=["id"])
+    out = await dyn.agg(v_sum=("sum", "v"))
+    assert "v_sum" in out.schema_fields()
 
 
 def test_dataframe_model_accepts_polars_dataframe_trusted_shape_only() -> None:

@@ -141,6 +141,14 @@ def _to_pyd_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:
         )
 
     if isinstance(expr, pf.Clip):
+        # pydantable's `case_when` requires else dtype == then dtype.
+        # Coerce literal bounds to the column dtype when possible.
+        clip_dtype = None
+        if isinstance(expr.value, pf.Col):
+            field = schema_fields.get(expr.value.name)
+            if field is not None:
+                clip_dtype = field
+
         lower = (
             None
             if expr.lower is None
@@ -151,6 +159,11 @@ def _to_pyd_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:
             if expr.upper is None
             else _to_pyd_expr(expr.upper, schema_fields=schema_fields)
         )
+        if clip_dtype is not None:
+            if lower is not None:
+                lower = lower.cast(clip_dtype)
+            if upper is not None:
+                upper = upper.cast(clip_dtype)
         return _to_pyd_expr(expr.value, schema_fields=schema_fields).clip(
             lower=lower, upper=upper
         )

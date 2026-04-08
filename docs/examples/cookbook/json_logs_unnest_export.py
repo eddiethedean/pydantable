@@ -40,8 +40,8 @@ def main() -> None:
 
         df = LogLine.read_ndjson(str(src))
         us_only = df.filter(df.meta.struct_field("region") == "us")
-        # PlanFrame-first API: unnest requires explicit field list.
-        flat = us_only.unnest("meta", fields=["region", "code"])
+        # PlanFrame-first API: unnest expands struct fields from schema.
+        flat = us_only.unnest("meta")
         out_path = Path(tmp) / "flat.ndjson"
         flat.write_ndjson(str(out_path))
 

@@ -65,6 +65,9 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
         # Prefer a cast expression; keep narrow to avoid selector re-implementation.
         return df.with_columns(**{name: df.col(name).cast(dtype)})
 
+    def with_row_count(self, df: Any, *, name: str = "row_nr", offset: int = 0) -> Any:
+        return df.with_row_count(name=name, offset=offset)
+
     def filter(self, df: Any, predicate: Any) -> Any:
         return df.filter(predicate)
 
@@ -152,6 +155,41 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
             else:
                 out_aggs[out_name] = spec
         return grouped.agg(**out_aggs)
+
+    def group_by_dynamic_agg(
+        self,
+        df: Any,
+        *,
+        index_column: str,
+        every: str,
+        period: str | None = None,
+        by: tuple[str, ...] | None = None,
+        named_aggs: dict[str, Any],
+    ) -> Any:
+        grouped = df.group_by_dynamic(index_column, every=every, period=period, by=by)
+        return grouped.agg(**named_aggs)
+
+    def rolling_agg(
+        self,
+        df: Any,
+        *,
+        on: str,
+        column: str,
+        window_size: int | str,
+        op: str,
+        out_name: str,
+        by: tuple[str, ...] | None = None,
+        min_periods: int = 1,
+    ) -> Any:
+        return df.rolling_agg(
+            on=on,
+            column=column,
+            window_size=window_size,
+            op=op,
+            out_name=out_name,
+            by=None if by is None else list(by),
+            min_periods=min_periods,
+        )
 
     def drop_nulls(
         self,
@@ -287,20 +325,40 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
         *,
         index: tuple[str, ...],
         on: str,
-        values: str,
+        values: tuple[str, ...],
         agg: str = "first",
         on_columns: tuple[str, ...] | None = None,
         separator: str = "_",
+        sort_columns: bool = False,
     ) -> Any:
+        vals: Any = list(values) if len(values) != 1 else values[0]
         return df.pivot(
             index=list(index),
             columns=on,
-            values=values,
+            values=vals,
             aggregate_function=agg,
             pivot_values=None if on_columns is None else list(on_columns),
-            sort_columns=False,
+            sort_columns=sort_columns,
             separator=separator,
         )
+
+    def explode(self, df: Any, columns: tuple[str, ...], *, outer: bool = False) -> Any:
+        return df.explode(list(columns), outer=outer)
+
+    def unnest(self, df: Any, items: tuple[Any, ...]) -> Any:
+        cols = [i.column for i in items]
+        return df.unnest(cols)
+
+    def posexplode(
+        self,
+        df: Any,
+        *,
+        column: str,
+        pos: str = "pos",
+        value: str | None = None,
+        outer: bool = False,
+    ) -> Any:
+        return df.posexplode(column, pos=pos, value=value, outer=outer)
 
     # ---- writes (delegate where supported; otherwise explicit error) ----
 
@@ -391,15 +449,8 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
             "write_avro is not implemented in pydantable adapter yet."
         )
 
-    def explode(self, df: Any, column: str) -> Any:
-        return df.explode(column)
-
-    def unnest(self, df: Any, column: str, *, fields: tuple[str, ...]) -> Any:
-        # pydantable unnest accepts str | Sequence[str] | Selector
-        # For a single struct column, we can pass the column name; field selection
-        # is not yet exposed.
-        _ = fields
-        return df.unnest(column)
+    # (legacy explode/unnest adapter hooks removed; PlanFrame 0.4 uses
+    # explode(columns=..., outer=...) and unnest(items=...) instead)
 
     def drop_nulls_all(self, df: Any, subset: tuple[str, ...] | None) -> Any:
         # pydantable has drop_nulls_all helper

@@ -2,7 +2,7 @@
 
 `DataFrameModel` keeps a typed [PlanFrame](https://pypi.org/project/planframe/) `Frame` as `_pf` and executes it through `pydantable.planframe_adapter.PydantableAdapter` (Rust/native `DataFrame` backend).
 
-**Requirement:** pydantable **1.16.x** depends on **PlanFrame ≥ 0.3.0**.
+**Requirement:** pydantable **1.16.x** depends on **PlanFrame ≥ 0.5.0**.
 
 ## PlanFrame–first core API
 
@@ -17,13 +17,20 @@ For the methods below, **there is no silent legacy path**: the operation is expr
 | `rename(..., strict=…)` | PlanFrame `Rename` supports `strict=True/False`. |
 | `join` | PlanFrame `Join` supports string and expression keys; `how="cross"` with no keys; `JoinOptions` supported. `allow_parallel` / `force_parallel` remain pydantable-native concerns. |
 | `group_by(...).agg(...)` | PlanFrame `GroupBy` + `Agg` (narrowed: key columns are `str` only). |
+| `group_by_dynamic(...).agg(...)` | PlanFrame `DynamicGroupByAgg` via adapter; returns a dynamic grouped object whose `agg(...)` is PlanFrame-backed. |
+| `rolling_agg(...)` | PlanFrame `RollingAgg` via adapter. |
 | `unique`, `distinct`, `head`, `tail`, `slice` | PlanFrame nodes + `execute_frame`. |
+| `with_row_count(name="row_nr", offset=0)` | PlanFrame `WithRowCount`. |
 | `fill_null` | PlanFrame `FillNull` supports `value=` literals or expressions and `strategy=`. |
 | `drop_nulls` | PlanFrame `DropNulls` supports `how="any"/"all"` and `threshold`. |
+| `clip(lower=..., upper=..., subset=...)` | PlanFrame `clip` (note: `subset=None` clips **all numeric** columns). |
 | `melt` | PlanFrame `Melt` (narrowed: `value_vars=` required; string names only; no `streaming=`). |
-| `pivot` | PlanFrame `Pivot` (narrowed: `index/columns/values` are strings; no `sort_columns=` or `streaming=`). |
-| `explode` | PlanFrame `Explode` (narrowed: single column name only; no `outer=` or `streaming=`). |
-| `unnest` | PlanFrame `Unnest` (narrowed: `unnest(column, fields=[...])`; no `streaming=`). |
+| `unpivot` | PlanFrame `unpivot` (lowered to `melt`). |
+| `pivot` | PlanFrame `Pivot` (narrowed: string column names only; no `streaming=`). |
+| `explode` | PlanFrame `Explode` (narrowed: string column names only; no `streaming=`). Supports `outer=`. |
+| `explode_all` | PlanFrame-backed: expands to `explode(*schema_fields)`. |
+| `unnest` | PlanFrame `Unnest` (narrowed: string column names only; expands struct fields from schema; no `streaming=`). |
+| `unnest_all` | PlanFrame-backed: expands to `unnest(*schema_fields)`. |
 | `concat` | PlanFrame `ConcatVertical` / `ConcatHorizontal` (narrowed: identical schemas for vertical; no overlaps for horizontal). |
 
 Unsupported use cases (e.g. `select` with expressions, `join` on `Expr` keys) currently require the core **`DataFrame`**. There is **no stable public accessor** on `DataFrameModel` today—**backlog:** add something like `to_dataframe()` / `inner_frame()` if we want a supported escape hatch (see below).
@@ -36,7 +43,7 @@ Every instance from `_from_dataframe` or `as_model` gets `_pf = Frame.source(inn
 
 These either have no PlanFrame node yet, or require selector-driven behavior that `DataFrameModel` is avoiding in the PlanFrame-first surface. They raise `NotImplementedError` (with the old backend implementation kept in place after the `raise` for future work).
 
-`select_schema`, `with_columns_cast`, `with_columns_fill_null`, `with_row_count`, `rename_upper` / `rename_lower` / `rename_title` / `rename_strip`, `clip`, `unpivot`, `pivot_longer`, `pivot_wider`, `explode_outer`, `posexplode*`, `explode_all`, `unnest_all`, window/rolling helpers (`rolling_agg`, `group_by_dynamic`), and similar.
+`select_schema`, `with_columns_cast`, `with_columns_fill_null`, `rename_upper` / `rename_lower` / `rename_title` / `rename_strip`, `pivot_longer`, `pivot_wider`, and similar selector-driven helpers.
 
 Wiring more of these through PlanFrame plan nodes (and tightening types) is incremental work.
 
@@ -55,7 +62,7 @@ Wiring more of these through PlanFrame plan nodes (and tightening types) is incr
 
 ## Upstream PlanFrame
 
-PlanFrame **0.3.0** includes the previously reported gaps (mixed projection, expr keys for sort/join/group, rename strictness, `Unnest.fields`, schema-aware `compile_expr`, async APIs, plan execution helpers, repr/optimize/IR metadata).
+PlanFrame **0.5.0** adds several schema-driven conveniences (selectors, multi-cast/fill, rename case helpers, pivot_longer/pivot_wider) that allow pydantable to remove more `NotImplementedError` gaps in the PlanFrame-first `DataFrameModel` surface.
 
 ### PlanFrame `Expr` lowering in the pydantable adapter
 
