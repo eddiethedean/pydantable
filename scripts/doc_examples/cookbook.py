@@ -61,7 +61,10 @@ def run_transforms_join_groupby() -> None:
     out = (
         orders.join(users, on="user_id", how="left")
         .group_by("country")
-        .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
+        .agg(
+            total=("sum", "amount"),
+            n_orders=("count", "order_id"),
+        )
         .to_dict()
     )
     assert set(out.keys()) == {"country", "total", "n_orders"}

@@ -154,7 +154,10 @@ users = Users({"user_id": [10, 20], "country": ["US", "CA"]})
 out = (
     orders.join(users, on="user_id", how="left")
     .group_by("country")
-    .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
+    .agg(
+        total=("sum", "amount"),
+        n_orders=("count", "order_id"),
+    )
     .to_dict()
 )
 assert _sort_rows_by_country(out) == {
@@ -177,7 +180,7 @@ df = Metrics(
         "value": [10, 20, None, 40],
     }
 )
-wide = df.pivot(
+wide = df._df.pivot(
     index="id", columns="metric", values="value", aggregate_function="first"
 )
 assert wide.to_dict() == {
@@ -194,7 +197,7 @@ class TS(DataFrameModel):
 
 
 df = TS({"id": [1, 1, 1], "ts": [0, 3600, 7200], "v": [10, None, 30]})
-rolled = df.rolling_agg(
+rolled = df._df.rolling_agg(
     on="ts",
     column="v",
     window_size="2h",
@@ -208,7 +211,7 @@ assert rolled.to_dict() == {
     "v_roll": [10, 10, 40],
     "ts": [0, 3600, 7200],
 }
-dynamic = df.group_by_dynamic("ts", every="1h", by=["id"]).agg(
+dynamic = df._df.group_by_dynamic("ts", every="1h", by=["id"]).agg(
     v_sum=("sum", "v"),
     v_count=("count", "v"),
 )
@@ -241,11 +244,14 @@ orders = OrdersPySpark(
     }
 )
 users = UsersPySpark({"user_id": [10, 20], "country": ["US", "CA"]})
+joined = orders.join(users, on="user_id", how="left")._df
 result = (
-    orders.join(users, on="user_id", how="left")
-    .fill_null(0, subset=["amount"])
+    joined.fill_null(0, subset=["amount"])
     .group_by("country")
-    .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
+    .agg(
+        total=("sum", "amount"),
+        n_orders=("count", "order_id"),
+    )
     .to_dict()
 )
 assert _sort_rows_by_country(result) == {
@@ -328,10 +334,11 @@ rolled = (
     .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
     .sort("country")
 )
-assert [m.model_dump() for m in rolled.collect()] == [
-    {"country": "CA", "n_orders": 1, "total": 20.0},
-    {"country": "US", "n_orders": 2, "total": 50.0},
-]
+assert rolled.collect(as_lists=True) == {
+    "country": ["CA", "US"],
+    "n_orders": [1, 2],
+    "total": [20.0, 50.0],
+}
 
 
 class LineItemDF(DataFrameModel):

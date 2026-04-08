@@ -29,41 +29,69 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
     def select(self, df: Any, columns: tuple[str, ...]) -> Any:
         return df.select(*columns)
 
+    def project(self, df: Any, items: tuple[Any, ...]) -> Any:
+        # CompiledProjectItem(name=..., from_column=... | expr=...)
+        # → select + with_columns
+        computed: dict[str, Any] = {}
+        order: list[str] = []
+        for it in items:
+            name = getattr(it, "name", None)
+            from_col = getattr(it, "from_column", None)
+            expr = getattr(it, "expr", None)
+            if not isinstance(name, str):
+                raise TypeError("Invalid project item: missing name.")
+            if from_col is not None:
+                order.append(str(from_col))
+                continue
+            if expr is None:
+                raise TypeError("Invalid project item: needs from_column or expr.")
+            computed[name] = expr
+            order.append(name)
+        out = df
+        if computed:
+            out = out.with_columns(**computed)
+        return out.select(*order)
+
     def drop(self, df: Any, columns: tuple[str, ...], *, strict: bool = True) -> Any:
         return df.drop(*columns, strict=strict)
 
-    def rename(self, df: Any, mapping: dict[str, str]) -> Any:
-        return df.rename(mapping)
+    def rename(self, df: Any, mapping: dict[str, str], *, strict: bool = True) -> Any:
+        return df.rename(mapping, strict=strict)
 
     def with_column(self, df: Any, name: str, expr: Any) -> Any:
-        from pydantable.planframe_adapter.expr import compiled_to_pydantable_expr
-
-        pexpr = compiled_to_pydantable_expr(expr, df=df)
-        return df.with_columns(**{name: pexpr})
+        return df.with_columns(**{name: expr})
 
     def cast(self, df: Any, name: str, dtype: Any) -> Any:
         # Prefer a cast expression; keep narrow to avoid selector re-implementation.
         return df.with_columns(**{name: df.col(name).cast(dtype)})
 
     def filter(self, df: Any, predicate: Any) -> Any:
-        from pydantable.planframe_adapter.expr import compiled_to_pydantable_expr
-
-        pexpr = compiled_to_pydantable_expr(predicate, df=df)
-        return df.filter(pexpr)
+        return df.filter(predicate)
 
     def sort(
         self,
         df: Any,
-        columns: tuple[str, ...],
+        keys: tuple[Any, ...],
         *,
         descending: tuple[bool, ...],
         nulls_last: tuple[bool, ...],
     ) -> Any:
-        return df.sort(
-            *columns,
-            descending=list(descending),
-            nulls_last=list(nulls_last),
-        )
+        cols: list[str] = []
+        for k in keys:
+            col = getattr(k, "column", None)
+            expr = getattr(k, "expr", None)
+            if col is not None:
+                cols.append(str(col))
+            elif expr is not None:
+                # pydantable engine sort supports column names or ColumnRef only.
+                # For now, require PlanFrame expr sort keys to compile to ColumnRef.
+                referenced = expr.referenced_columns()
+                if len(referenced) != 1:
+                    raise TypeError("sort expr keys must reference exactly one column.")
+                cols.append(next(iter(referenced)))
+            else:
+                raise TypeError("Invalid sort key: expected column or expr.")
+        return df.sort(*cols, descending=list(descending), nulls_last=list(nulls_last))
 
     def unique(
         self,
@@ -97,18 +125,61 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
         self,
         df: Any,
         *,
-        keys: tuple[str, ...],
-        named_aggs: dict[str, tuple[str, str]],
+        keys: tuple[Any, ...],
+        named_aggs: dict[str, Any],
     ) -> Any:
-        grouped = df.group_by(*keys)
-        # PlanFrame `Agg.named_aggs` is `{out_name: (op, input_column_name)}`.
-        return grouped.agg(**{out: (op, col) for out, (op, col) in named_aggs.items()})
+        group_cols: list[str] = []
+        for k in keys:
+            col = getattr(k, "column", None)
+            expr = getattr(k, "expr", None)
+            if col is not None:
+                group_cols.append(str(col))
+            elif expr is not None:
+                referenced = expr.referenced_columns()
+                if len(referenced) != 1:
+                    raise TypeError(
+                        "group_by expr keys must reference exactly one column."
+                    )
+                group_cols.append(next(iter(referenced)))
+            else:
+                raise TypeError("Invalid group_by key: expected column or expr.")
+        grouped = df.group_by(*group_cols)
+        out_aggs: dict[str, Any] = {}
+        for out_name, spec in named_aggs.items():
+            if isinstance(spec, tuple) and len(spec) == 2:
+                op, col = spec
+                out_aggs[out_name] = (op, col)
+            else:
+                out_aggs[out_name] = spec
+        return grouped.agg(**out_aggs)
 
-    def drop_nulls(self, df: Any, subset: tuple[str, ...] | None) -> Any:
-        return df.drop_nulls(subset=None if subset is None else list(subset))
+    def drop_nulls(
+        self,
+        df: Any,
+        subset: tuple[str, ...] | None,
+        *,
+        how: str = "any",
+        threshold: int | None = None,
+    ) -> Any:
+        return df.drop_nulls(
+            subset=None if subset is None else list(subset),
+            how=how,
+            threshold=threshold,
+        )
 
-    def fill_null(self, df: Any, value: Any, subset: tuple[str, ...] | None) -> Any:
-        return df.fill_null(value, subset=None if subset is None else list(subset))
+    def fill_null(
+        self,
+        df: Any,
+        value: Any,
+        subset: tuple[str, ...] | None,
+        *,
+        strategy: str | None = None,
+    ) -> Any:
+        return df.fill_null(
+            value,
+            strategy=strategy,
+            subset=None if subset is None else list(subset),
+        )
 
     def melt(
         self,
@@ -131,8 +202,8 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
         left: Any,
         right: Any,
         *,
-        left_on: tuple[str, ...],
-        right_on: tuple[str, ...],
+        left_on: tuple[Any, ...],
+        right_on: tuple[Any, ...],
         how: str = "inner",
         suffix: str = "_right",
         options: Any | None = None,
@@ -151,10 +222,37 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
                 kw["streaming"] = options.streaming
         if how == "cross":
             return left.join(right, **kw)
+        # pydantable join expects string columns; PlanFrame may provide expr keys.
+        lk: list[str] = []
+        rk: list[str] = []
+        for k in left_on:
+            col = getattr(k, "column", None)
+            expr = getattr(k, "expr", None)
+            if col is not None:
+                lk.append(str(col))
+            elif expr is not None:
+                referenced = expr.referenced_columns()
+                if len(referenced) != 1:
+                    raise TypeError("join expr keys must reference exactly one column.")
+                lk.append(next(iter(referenced)))
+            else:
+                raise TypeError("Invalid join key.")
+        for k in right_on:
+            col = getattr(k, "column", None)
+            expr = getattr(k, "expr", None)
+            if col is not None:
+                rk.append(str(col))
+            elif expr is not None:
+                referenced = expr.referenced_columns()
+                if len(referenced) != 1:
+                    raise TypeError("join expr keys must reference exactly one column.")
+                rk.append(next(iter(referenced)))
+            else:
+                raise TypeError("Invalid join key.")
         return left.join(
             right,
-            left_on=list(left_on),
-            right_on=list(right_on),
+            left_on=lk,
+            right_on=rk,
             **kw,
         )
 
@@ -174,10 +272,14 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
         return df.tail(n)
 
     def concat_vertical(self, left: Any, right: Any) -> Any:
-        return left.concat_vertical(right)
+        from pydantable.dataframe import DataFrame
+
+        return DataFrame.concat([left, right], how="vertical")
 
     def concat_horizontal(self, left: Any, right: Any) -> Any:
-        return left.concat_horizontal(right)
+        from pydantable.dataframe import DataFrame
+
+        return DataFrame.concat([left, right], how="horizontal")
 
     def pivot(
         self,
@@ -192,12 +294,12 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
     ) -> Any:
         return df.pivot(
             index=list(index),
-            on=on,
+            columns=on,
             values=values,
-            aggregate_fn=agg,
+            aggregate_function=agg,
+            pivot_values=None if on_columns is None else list(on_columns),
             sort_columns=False,
             separator=separator,
-            # pydantable pivot doesn't expose on_columns as of 1.16.0
         )
 
     # ---- writes (delegate where supported; otherwise explicit error) ----
@@ -292,7 +394,11 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
     def explode(self, df: Any, column: str) -> Any:
         return df.explode(column)
 
-    def unnest(self, df: Any, column: str) -> Any:
+    def unnest(self, df: Any, column: str, *, fields: tuple[str, ...]) -> Any:
+        # pydantable unnest accepts str | Sequence[str] | Selector
+        # For a single struct column, we can pass the column name; field selection
+        # is not yet exposed.
+        _ = fields
         return df.unnest(column)
 
     def drop_nulls_all(self, df: Any, subset: tuple[str, ...] | None) -> Any:
@@ -319,10 +425,11 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
 
     # ---- expression compilation + materialization ----
 
-    def compile_expr(self, expr: Any) -> Any:
+    def compile_expr(self, expr: Any, *, schema: Any) -> Any:
         from pydantable.planframe_adapter.expr import compile_expr
 
-        return compile_expr(expr)
+        schema_fields = {f.name: f.dtype for f in schema.fields}
+        return compile_expr(expr, schema_fields=schema_fields)
 
     def collect(self, df: Any) -> Any:
         # PlanFrame expects `.collect` to return a backend frame; for pydantable the

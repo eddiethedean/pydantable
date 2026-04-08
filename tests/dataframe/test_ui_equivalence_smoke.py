@@ -88,12 +88,12 @@ def test_ui_equivalence_join_and_groupby_all_null_semantics(
     assert_table_eq_sorted(default_join_out, ui_join_out, keys=["id"])
 
     # all-null group semantics: sum/mean -> None, count -> 0
-    default_grouped = default_joined.group_by("id").agg(
+    default_grouped = default_joined._df.group_by("id").agg(
         age_sum=("sum", "age"),
         age_mean=("mean", "age"),
         age_count=("count", "age"),
     )
-    ui_grouped = ui_joined.group_by("id").agg(
+    ui_grouped = ui_joined._df.group_by("id").agg(
         age_sum=("sum", "age"),
         age_mean=("mean", "age"),
         age_count=("count", "age"),
@@ -138,10 +138,12 @@ def test_ui_equivalence_p1_unary_and_concat(ui_mod: str) -> None:
     assert_table_eq_sorted(default_out, ui_out, keys=["id"])
 
     default_cat = PolarsDataFrameModel.concat(
-        [default_df.select("id"), default_df.select("id")], how="vertical"
+        [default_df.select("id"), default_df.select("id")],
+        how="vertical",
     ).collect(as_lists=True)
     ui_cat = UiDataFrameModel.concat(
-        [ui_df.select("id"), ui_df.select("id")], how="vertical"
+        [ui_df.select("id"), ui_df.select("id")],
+        how="vertical",
     ).collect(as_lists=True)
     assert_table_eq_sorted(default_cat, ui_cat, keys=["id"])
 
@@ -233,11 +235,12 @@ def test_ui_equivalence_p3_join_variants_and_expr_keys(ui_mod: str) -> None:
             d_out, b_out, keys=["id"] if "id" in d_out else list(d_out.keys())[:1]
         )
 
-    d_expr = d_left.join(
-        d_right, left_on=d_left.id, right_on=d_right.id, how="inner"
+    # Expr-key joins are supported on DataFrame (not on DataFrameModel).
+    d_expr = d_left._df.join(
+        d_right._df, left_on=d_left._df.id, right_on=d_right._df.id, how="inner"
     ).collect(as_lists=True)
-    b_expr = b_left.join(
-        b_right, left_on=b_left.id, right_on=b_right.id, how="inner"
+    b_expr = b_left._df.join(
+        b_right._df, left_on=b_left._df.id, right_on=b_right._df.id, how="inner"
     ).collect(as_lists=True)
     assert_table_eq_sorted(d_expr, b_expr, keys=["id"])
 
@@ -260,7 +263,7 @@ def test_ui_equivalence_p4_groupby_aggregations(ui_mod: str) -> None:
     b_df = UserUi(payload)
 
     d_out = (
-        d_df.group_by("id")
+        d_df._df.group_by("id")
         .agg(
             age_min=("min", "age"),
             age_max=("max", "age"),
@@ -274,7 +277,7 @@ def test_ui_equivalence_p4_groupby_aggregations(ui_mod: str) -> None:
         .collect(as_lists=True)
     )
     b_out = (
-        b_df.group_by("id")
+        b_df._df.group_by("id")
         .agg(
             age_min=("min", "age"),
             age_max=("max", "age"),
@@ -313,14 +316,14 @@ def test_ui_equivalence_p5_reshape_ops(ui_mod: str) -> None:
     d_df = UserDefault(payload)
     b_df = UserUi(payload)
 
-    d_melt = d_df.melt(id_vars=["id"], value_vars=["age"]).collect(as_lists=True)
-    b_melt = b_df.melt(id_vars=["id"], value_vars=["age"]).collect(as_lists=True)
+    d_melt = d_df._df.melt(id_vars=["id"], value_vars=["age"]).collect(as_lists=True)
+    b_melt = b_df._df.melt(id_vars=["id"], value_vars=["age"]).collect(as_lists=True)
     assert_table_eq_sorted(d_melt, b_melt, keys=["id", "variable"])
 
-    d_pivot = d_df.pivot(
+    d_pivot = d_df._df.pivot(
         index="id", columns="key", values="age", aggregate_function="sum"
     ).collect(as_lists=True)
-    b_pivot = b_df.pivot(
+    b_pivot = b_df._df.pivot(
         index="id", columns="key", values="age", aggregate_function="sum"
     ).collect(as_lists=True)
     assert_table_eq_sorted(d_pivot, b_pivot, keys=["id"])
@@ -349,21 +352,21 @@ def test_ui_equivalence_p6_rolling_and_dynamic(ui_mod: str) -> None:
     d_df = TSDefault(payload)
     b_df = TSUi(payload)
 
-    d_roll = d_df.rolling_agg(
+    d_roll = d_df._df.rolling_agg(
         on="ts", column="v", window_size="2h", op="sum", out_name="v_roll", by=["id"]
     ).collect(as_lists=True)
-    b_roll = b_df.rolling_agg(
+    b_roll = b_df._df.rolling_agg(
         on="ts", column="v", window_size="2h", op="sum", out_name="v_roll", by=["id"]
     ).collect(as_lists=True)
     assert_table_eq_sorted(d_roll, b_roll, keys=["id", "ts"])
 
     d_dyn = (
-        d_df.group_by_dynamic("ts", every="1h", by=["id"])
+        d_df._df.group_by_dynamic("ts", every="1h", by=["id"])
         .agg(v_sum=("sum", "v"))
         .collect(as_lists=True)
     )
     b_dyn = (
-        b_df.group_by_dynamic("ts", every="1h", by=["id"])
+        b_df._df.group_by_dynamic("ts", every="1h", by=["id"])
         .agg(v_sum=("sum", "v"))
         .collect(as_lists=True)
     )

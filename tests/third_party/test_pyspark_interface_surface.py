@@ -60,14 +60,17 @@ def test_pyspark_interface_consolidated_pipeline() -> None:
         amount_sum=("sum", "amount"),
         id_count=("count", "id"),
     )
-    melted = grouped.melt(id_vars=["bucket"], value_vars=["amount_sum", "id_count"])
+
+    # DataFrameModel is PlanFrame-first; use the underlying DataFrame for
+    # backend-only reshape + time-series ops.
+    melted = grouped._df.melt(id_vars=["bucket"], value_vars=["amount_sum", "id_count"])
     pivoted = melted.pivot(
         index="bucket",
         columns="variable",
         values="value",
         aggregate_function="first",
     )
-    rolled = base.rolling_agg(
+    rolled = base._df.rolling_agg(
         on="ts",
         column="amount",
         window_size="2h",
@@ -75,7 +78,7 @@ def test_pyspark_interface_consolidated_pipeline() -> None:
         out_name="amount_roll",
         by=["bucket"],
     )
-    dynamic = base.group_by_dynamic("ts", every="1h", by=["bucket"]).agg(
+    dynamic = base._df.group_by_dynamic("ts", every="1h", by=["bucket"]).agg(
         amount_sum=("sum", "amount"),
         amount_count=("count", "amount"),
     )

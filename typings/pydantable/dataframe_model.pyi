@@ -915,9 +915,9 @@ class DataFrameModel(Generic[RowT]):
     def pivot(
         self,
         *,
-        index: str | Sequence[str] | Any,
-        columns: Any,
-        values: str | Sequence[str] | Any,
+        index: str | Sequence[str],
+        columns: str,
+        values: str,
         aggregate_function: str = "first",
         sort_columns: bool = False,
         separator: str = "_",
@@ -925,7 +925,7 @@ class DataFrameModel(Generic[RowT]):
     ) -> DataFrameModel[Any]: ...
     def explode(
         self,
-        columns: str | Sequence[str] | Any,
+        columns: str,
         *,
         outer: bool = False,
         streaming: bool | None = None,
@@ -951,7 +951,11 @@ class DataFrameModel(Generic[RowT]):
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]: ...
     def unnest(
-        self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None
+        self,
+        column: str,
+        *,
+        fields: Sequence[str],
+        streaming: bool | None = None,
     ) -> Self: ...
     def explode_all(self, *, streaming: bool | None = None) -> Self: ...
     def unnest_all(self, *, streaming: bool | None = None) -> Self: ...
@@ -1026,7 +1030,7 @@ class DataFrameModel(Generic[RowT]):
         force_parallel: bool | None = None,
         streaming: bool | None = None,
     ) -> AfterModelT: ...
-    def group_by(self, *keys: Any) -> GroupedDataFrameModel[Self]: ...
+    def group_by(self, *keys: str) -> GroupedDataFrameModel[Self]: ...
     def rolling_agg(
         self,
         *,
@@ -1108,6 +1112,8 @@ class DataFrameModel(Generic[RowT]):
 class GroupedDataFrameModel(Generic[GroupedModelT]):
     _grouped_df: Any
     _model_type: type[GroupedModelT]
+    _parent: GroupedModelT | None
+    _grouped_pf: Any
 
     def __init__(self, grouped_df: Any, model_type: type[GroupedModelT]) -> None: ...
     def agg(self, **aggregations: Any) -> DataFrameModel[Any]: ...

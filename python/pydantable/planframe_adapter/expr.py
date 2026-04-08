@@ -1,46 +1,20 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 from pydantable.planframe_adapter.errors import require_planframe
 
 
-@dataclass(frozen=True, slots=True)
-class CompiledExpr:
+def compile_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:
     """
-    Backend expression placeholder.
+    Lower a PlanFrame Expr to a pydantable Expr using known column dtypes.
 
-    PlanFrame calls `adapter.compile_expr(expr)` without passing a schema context.
-    pydantable needs column dtypes for `ColumnRef` nodes, so we keep the PlanFrame
-    Expr around and lower it to pydantable Expr inside adapter methods that have
-    access to the current `DataFrame`.
-    """
-
-    expr: Any
-
-
-def compile_expr(expr: Any) -> Any:
-    """
-    PlanFrame hook: return a backend expression object.
+    PlanFrame 0.3+ passes a Schema into `BaseAdapter.compile_expr(...)` so adapters can
+    lower dtype-aware column references without requiring a concrete backend frame.
     """
 
     require_planframe()
-    return CompiledExpr(expr=expr)
-
-
-def compiled_to_pydantable_expr(compiled: Any, *, df: Any) -> Any:
-    from pydantable.expressions import Expr as PydExpr
-
-    if isinstance(compiled, PydExpr):
-        return compiled
-    if isinstance(compiled, CompiledExpr):
-        inner = compiled.expr
-        if isinstance(inner, PydExpr):
-            return inner
-        schema_fields = cast("dict[str, Any]", df.schema_fields())
-        return _to_pyd_expr(inner, schema_fields=schema_fields)
-    raise TypeError("Expected a compiled PlanFrame expression.")
+    return _to_pyd_expr(expr, schema_fields=schema_fields)
 
 
 def _to_pyd_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:

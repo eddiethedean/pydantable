@@ -59,7 +59,7 @@ def test_performance_guardrails_major_transforms() -> None:
 
     t2 = perf_counter()
     _ = (
-        left.melt(id_vars=["id"], value_vars=["v"])
+        left._df.melt(id_vars=["id"], value_vars=["v"])
         .pivot(
             index="id", columns="variable", values="value", aggregate_function="first"
         )
@@ -68,7 +68,7 @@ def test_performance_guardrails_major_transforms() -> None:
     reshape_s = perf_counter() - t2
 
     t3 = perf_counter()
-    _ = left.rolling_agg(
+    _ = left._df.rolling_agg(
         on="ts", column="v", window_size="10m", op="sum", out_name="v_roll", by=["key"]
     ).collect(as_lists=True)
     window_s = perf_counter() - t3

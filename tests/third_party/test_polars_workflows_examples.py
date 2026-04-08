@@ -38,7 +38,10 @@ def test_workflow_join_groupby() -> None:
     out = (
         orders.join(users, on="user_id", how="left")
         .group_by("country")
-        .agg(total=("sum", "amount"), n_orders=("count", "order_id"))
+        .agg(
+            total=("sum", "amount"),
+            n_orders=("count", "order_id"),
+        )
         .collect(as_lists=True)
     )
     assert set(out["country"]) == {"US", "CA"}
@@ -53,7 +56,7 @@ def test_workflow_reshape() -> None:
             "value": [10, 20, None, 40],
         }
     )
-    out = df.pivot(
+    out = df._df.pivot(
         index="id",
         columns="metric",
         values="value",
@@ -65,12 +68,12 @@ def test_workflow_reshape() -> None:
 
 def test_workflow_time_series() -> None:
     df = TS({"id": [1, 1, 1], "ts": [0, 3600, 7200], "v": [10, None, 30]})
-    rolled = df.rolling_agg(
+    rolled = df._df.rolling_agg(
         on="ts", column="v", window_size="2h", op="sum", out_name="v_roll", by=["id"]
     ).collect(as_lists=True)
     assert "v_roll" in rolled
 
-    dynamic = df.group_by_dynamic("ts", every="1h", by=["id"]).agg(
+    dynamic = df._df.group_by_dynamic("ts", every="1h", by=["id"]).agg(
         v_sum=("sum", "v"),
         v_count=("count", "v"),
     )

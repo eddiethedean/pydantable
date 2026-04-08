@@ -13,7 +13,7 @@ import typing
 from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast
 
-from typing_extensions import LiteralString, Self
+from typing_extensions import Self
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
@@ -84,12 +84,6 @@ def _dfm_plain_str_join_keys(value: Any) -> tuple[str, ...] | None:
             out.append(x)
         return tuple(out)
     return None
-
-
-def _planframe_col_name(name: str) -> LiteralString:
-    """Widen runtime ``str`` to PlanFrame stub ``LiteralString`` (ty-checker)."""
-
-    return cast("LiteralString", name)
 
 
 def _dfm_columns_as_tuple(
@@ -2202,10 +2196,13 @@ class DataFrameModel(Generic[RowT]):
     def select(self, *cols: str) -> DataFrameModel[Any]:
         if not cols:
             raise ValueError("select() requires at least one column name.")
-        ls = tuple(_planframe_col_name(c) for c in cols)
-        return self._dfm_sync_pf(self._pf.select(*ls))
+        return self._dfm_sync_pf(self._pf.select(*cols))
 
     def select_schema(self, selector: Any) -> DataFrameModel[Any]:
+        raise NotImplementedError(
+            "DataFrameModel.select_schema is not supported in the PlanFrame-first API "
+            "yet."
+        )
         return self._from_dataframe(self._df.select_schema(selector))
 
     def with_columns(self, **new_columns: Any) -> DataFrameModel[Any]:
@@ -2216,12 +2213,17 @@ class DataFrameModel(Generic[RowT]):
         pf2 = self._pf
         for name, value in new_columns.items():
             expr = value if isinstance(value, PydExpr) else _pflit(value)
-            pf2 = pf2.with_column(_planframe_col_name(name), expr)
+            # PlanFrame stubs encourage literal column names; this is a dynamic name.
+            pf2 = cast("Any", pf2).with_column(name, expr)
         return self._dfm_sync_pf(pf2)
 
     def with_columns_cast(
         self, selector: Any, dtype: Any, *, strict: bool = True
     ) -> DataFrameModel[Any]:
+        raise NotImplementedError(
+            "DataFrameModel.with_columns_cast is not supported in the PlanFrame-first "
+            "API yet."
+        )
         return self._from_dataframe(
             self._df.with_columns_cast(selector, dtype, strict=strict)
         )
@@ -2234,6 +2236,10 @@ class DataFrameModel(Generic[RowT]):
         strategy: str | None = None,
         strict: bool = True,
     ) -> Self:
+        raise NotImplementedError(
+            "DataFrameModel.with_columns_fill_null is not supported in the "
+            "PlanFrame-first API yet."
+        )
         return self._from_dataframe(
             self._df.with_columns_fill_null(
                 selector, value=value, strategy=strategy, strict=strict
@@ -2251,9 +2257,8 @@ class DataFrameModel(Generic[RowT]):
     ) -> Self:
         if not by:
             raise ValueError("sort() requires at least one column name.")
-        keys = tuple(_planframe_col_name(b) for b in by)
         return self._dfm_sync_pf(
-            self._pf.sort(*keys, descending=descending, nulls_last=nulls_last)
+            self._pf.sort(*by, descending=descending, nulls_last=nulls_last)
         )
 
     def unique(
@@ -2270,9 +2275,8 @@ class DataFrameModel(Generic[RowT]):
                 raise TypeError(
                     "unique(subset=...) expects a sequence of str column names."
                 )
-            sub_ls = tuple(_planframe_col_name(x) for x in subset)
             pf2 = self._pf.unique(
-                *sub_ls, keep=keep, maintain_order=maintain_order
+                *tuple(subset), keep=keep, maintain_order=maintain_order
             )
         return self._dfm_sync_pf(pf2)
 
@@ -2287,36 +2291,38 @@ class DataFrameModel(Generic[RowT]):
     def drop(self, *columns: str, strict: bool = True) -> Self:
         if not columns:
             return self
-        cols = tuple(_planframe_col_name(c) for c in columns)
-        return self._dfm_sync_pf(self._pf.drop(*cols, strict=strict))
+        return self._dfm_sync_pf(self._pf.drop(*columns, strict=strict))
 
     def rename(
         self, columns: Mapping[str, str], *, strict: bool = True
     ) -> DataFrameModel[Any]:
-        if strict is not True:
-            raise TypeError(
-                "DataFrameModel.rename only supports strict=True until PlanFrame "
-                "models rename(strict=False); see planframe issue #7."
-            )
-        mapping = {
-            _planframe_col_name(k): _planframe_col_name(v)
-            for k, v in columns.items()
-        }
-        return self._dfm_sync_pf(self._pf.rename(**mapping))
+        return self._dfm_sync_pf(self._pf.rename(**dict(columns), strict=strict))
 
     def rename_upper(
         self, selector: Any = None, *, strict: bool = True
     ) -> DataFrameModel[Any]:
+        raise NotImplementedError(
+            "DataFrameModel.rename_upper is not supported in the PlanFrame-first API "
+            "yet."
+        )
         return self._from_dataframe(self._df.rename_upper(selector, strict=strict))
 
     def rename_lower(
         self, selector: Any = None, *, strict: bool = True
     ) -> DataFrameModel[Any]:
+        raise NotImplementedError(
+            "DataFrameModel.rename_lower is not supported in the PlanFrame-first API "
+            "yet."
+        )
         return self._from_dataframe(self._df.rename_lower(selector, strict=strict))
 
     def rename_title(
         self, selector: Any = None, *, strict: bool = True
     ) -> DataFrameModel[Any]:
+        raise NotImplementedError(
+            "DataFrameModel.rename_title is not supported in the PlanFrame-first API "
+            "yet."
+        )
         return self._from_dataframe(self._df.rename_title(selector, strict=strict))
 
     def rename_strip(
@@ -2326,6 +2332,10 @@ class DataFrameModel(Generic[RowT]):
         chars: str | None = None,
         strict: bool = True,
     ) -> DataFrameModel[Any]:
+        raise NotImplementedError(
+            "DataFrameModel.rename_strip is not supported in the PlanFrame-first API "
+            "yet."
+        )
         return self._from_dataframe(
             self._df.rename_strip(selector, chars=chars, strict=strict)
         )
@@ -2334,9 +2344,11 @@ class DataFrameModel(Generic[RowT]):
         return self._dfm_sync_pf(self._pf.slice(offset, length))
 
     def with_row_count(self, name: str = "row_nr", *, offset: int = 0) -> Self:
-        return self._from_dataframe(
-            self._df.with_row_count(name=name, offset=offset)
+        raise NotImplementedError(
+            "DataFrameModel.with_row_count is not supported in the PlanFrame-first "
+            "API yet."
         )
+        return self._from_dataframe(self._df.with_row_count(name=name, offset=offset))
 
     def head(self, n: int = 5) -> Self:
         return self._dfm_sync_pf(self._pf.head(n))
@@ -2354,6 +2366,9 @@ class DataFrameModel(Generic[RowT]):
         upper: Any | None = None,
         subset: str | Sequence[str] | Any | None = None,
     ) -> Self:
+        raise NotImplementedError(
+            "DataFrameModel.clip is not supported in the PlanFrame-first API yet."
+        )
         return self._from_dataframe(
             self._df.clip(lower=lower, upper=upper, subset=subset)
         )
@@ -2365,17 +2380,17 @@ class DataFrameModel(Generic[RowT]):
         strategy: str | None = None,
         subset: str | Sequence[str] | None = None,
     ) -> Self:
-        if strategy is not None:
-            raise TypeError(
-                "DataFrameModel.fill_null only supports value=... "
-                "(strategy= is not supported)."
-            )
-        if value is None:
-            raise ValueError("fill_null() requires value= when strategy is omitted.")
+        if value is None and strategy is None:
+            raise ValueError("fill_null() requires value= or strategy=.")
         if subset is None:
-            return self._dfm_sync_pf(self._pf.fill_null(value))
-        sub_ls = tuple(_planframe_col_name(c) for c in _dfm_columns_as_tuple(subset))
-        return self._dfm_sync_pf(self._pf.fill_null(value, *sub_ls))
+            return self._dfm_sync_pf(self._pf.fill_null(value, strategy=strategy))
+        return self._dfm_sync_pf(
+            self._pf.fill_null(
+                value,
+                *_dfm_columns_as_tuple(subset),
+                strategy=strategy,
+            )
+        )
 
     def drop_nulls(
         self,
@@ -2384,24 +2399,49 @@ class DataFrameModel(Generic[RowT]):
         how: str = "any",
         threshold: int | None = None,
     ) -> Self:
-        if how != "any" or threshold is not None:
-            raise TypeError(
-                "DataFrameModel.drop_nulls only supports how='any' and threshold=None."
-            )
         if subset is None:
-            return self._dfm_sync_pf(self._pf.drop_nulls())
-        sub_ls = tuple(_planframe_col_name(c) for c in _dfm_columns_as_tuple(subset))
-        return self._dfm_sync_pf(self._pf.drop_nulls(*sub_ls))
+            return self._dfm_sync_pf(
+                self._pf.drop_nulls(how=cast("Any", how), threshold=threshold)
+            )
+        return self._dfm_sync_pf(
+            self._pf.drop_nulls(
+                *_dfm_columns_as_tuple(subset),
+                how=cast("Any", how),
+                threshold=threshold,
+            )
+        )
 
     def melt(
         self,
         *,
-        id_vars: str | Sequence[str] | Any | None = None,
-        value_vars: str | Sequence[str] | Any | None = None,
+        id_vars: str | Sequence[str] | None = None,
+        value_vars: str | Sequence[str] | None = None,
         variable_name: str = "variable",
         value_name: str = "value",
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
+        # PlanFrame-backed (narrowed): string column names only (no selectors).
+        if streaming is not None:
+            raise NotImplementedError(
+                "DataFrameModel.melt does not support streaming=."
+            )
+        if id_vars is None:
+            id_cols: tuple[str, ...] = tuple()
+        else:
+            id_cols = _dfm_columns_as_tuple(id_vars)
+        if value_vars is None:
+            raise TypeError(
+                "DataFrameModel.melt requires value_vars= in the PlanFrame-first API."
+            )
+        value_cols = _dfm_columns_as_tuple(value_vars)
+        return self._dfm_sync_pf(
+            self._pf.melt(
+                id_vars=id_cols,
+                value_vars=value_cols,
+                variable_name=variable_name,
+                value_name=value_name,
+            )
+        )
         return self._from_dataframe(
             self._df.melt(
                 id_vars=id_vars,
@@ -2475,6 +2515,9 @@ class DataFrameModel(Generic[RowT]):
         value_name: str = "value",
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
+        raise NotImplementedError(
+            "DataFrameModel.unpivot is not supported in the PlanFrame-first API yet."
+        )
         return self._from_dataframe(
             self._df.unpivot(
                 index=index,
@@ -2548,6 +2591,10 @@ class DataFrameModel(Generic[RowT]):
         values_to: str = "value",
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
+        raise NotImplementedError(
+            "DataFrameModel.pivot_longer is not supported in the PlanFrame-first API "
+            "yet."
+        )
         return self._from_dataframe(
             self._df.pivot_longer(
                 id_vars=id_vars,
@@ -2569,6 +2616,10 @@ class DataFrameModel(Generic[RowT]):
         separator: str = "_",
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
+        raise NotImplementedError(
+            "DataFrameModel.pivot_wider is not supported in the PlanFrame-first API "
+            "yet."
+        )
         return self._from_dataframe(
             self._df.pivot_wider(
                 index=index,
@@ -2584,14 +2635,34 @@ class DataFrameModel(Generic[RowT]):
     def pivot(
         self,
         *,
-        index: str | Sequence[str] | Any,
-        columns: Any,
-        values: str | Sequence[str] | Any,
+        index: str | Sequence[str],
+        columns: str,
+        values: str,
         aggregate_function: str = "first",
         sort_columns: bool = False,
         separator: str = "_",
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
+        # PlanFrame-backed (narrowed): index cols tuple + string on/values columns.
+        if streaming is not None:
+            raise NotImplementedError(
+                "DataFrameModel.pivot does not support streaming=."
+            )
+        if sort_columns:
+            raise NotImplementedError(
+                "DataFrameModel.pivot does not support sort_columns= in the "
+                "PlanFrame-first API."
+            )
+        idx = _dfm_columns_as_tuple(index)
+        return self._dfm_sync_pf(
+            self._pf.pivot(
+                index=idx,
+                on=columns,
+                values=values,
+                agg=cast("Any", aggregate_function),
+                separator=separator,
+            )
+        )
         return self._from_dataframe(
             self._df.pivot(
                 index=index,
@@ -2606,11 +2677,19 @@ class DataFrameModel(Generic[RowT]):
 
     def explode(
         self,
-        columns: str | Sequence[str] | Any,
+        columns: str,
         *,
         outer: bool = False,
         streaming: bool | None = None,
     ) -> Self:
+        # PlanFrame-backed (narrowed): single string column only (no selectors).
+        if outer:
+            raise NotImplementedError("DataFrameModel.explode does not support outer=.")
+        if streaming is not None:
+            raise NotImplementedError(
+                "DataFrameModel.explode does not support streaming=."
+            )
+        return self._dfm_sync_pf(self._pf.explode(columns))
         return self._from_dataframe(
             self._df.explode(columns, outer=outer, streaming=streaming)
         )
@@ -2618,6 +2697,10 @@ class DataFrameModel(Generic[RowT]):
     def explode_outer(
         self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None
     ) -> Self:
+        raise NotImplementedError(
+            "DataFrameModel.explode_outer is not supported in the PlanFrame-first API "
+            "yet."
+        )
         return self._from_dataframe(
             self._df.explode_outer(columns, streaming=streaming)
         )
@@ -2631,6 +2714,9 @@ class DataFrameModel(Generic[RowT]):
         outer: bool = False,
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
+        raise NotImplementedError(
+            "DataFrameModel.posexplode is not supported in the PlanFrame-first API yet."
+        )
         return self._from_dataframe(
             self._df.posexplode(
                 column, pos=pos, value=value, outer=outer, streaming=streaming
@@ -2645,19 +2731,45 @@ class DataFrameModel(Generic[RowT]):
         value: str | None = None,
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
+        raise NotImplementedError(
+            "DataFrameModel.posexplode_outer is not supported in the PlanFrame-first "
+            "API yet."
+        )
         return self._from_dataframe(
             self._df.posexplode_outer(column, pos=pos, value=value, streaming=streaming)
         )
 
     def unnest(
-        self, columns: str | Sequence[str] | Any, *, streaming: bool | None = None
+        self,
+        column: str,
+        *,
+        fields: Sequence[str],
+        streaming: bool | None = None,
     ) -> Self:
-        return self._from_dataframe(self._df.unnest(columns, streaming=streaming))
+        # PlanFrame-backed (narrowed): single struct column + explicit field list.
+        if streaming is not None:
+            raise NotImplementedError(
+                "DataFrameModel.unnest does not support streaming=."
+            )
+        if not fields:
+            raise ValueError(
+                "DataFrameModel.unnest requires fields= with at least one field name."
+            )
+        field_names = _dfm_columns_as_tuple(fields)
+        return self._dfm_sync_pf(self._pf.unnest(column, fields=field_names))
+        return self._from_dataframe(self._df.unnest(column, streaming=streaming))
 
     def explode_all(self, *, streaming: bool | None = None) -> Self:
+        raise NotImplementedError(
+            "DataFrameModel.explode_all is not supported in the PlanFrame-first API "
+            "yet."
+        )
         return self._from_dataframe(self._df.explode_all(streaming=streaming))
 
     def unnest_all(self, *, streaming: bool | None = None) -> Self:
+        raise NotImplementedError(
+            "DataFrameModel.unnest_all is not supported in the PlanFrame-first API yet."
+        )
         return self._from_dataframe(self._df.unnest_all(streaming=streaming))
 
     def join(
@@ -2713,9 +2825,6 @@ class DataFrameModel(Generic[RowT]):
             )
 
         how_any = cast("Any", how)
-        # PlanFrame stubs use fixed-arity join overloads; widen for runtime join keys.
-        _pf_a = cast("Any", self._pf)
-        _opf_a = cast("Any", other._pf)
         if how_any == "cross":
             if on is not None or left_on is not None or right_on is not None:
                 raise TypeError(
@@ -2723,16 +2832,15 @@ class DataFrameModel(Generic[RowT]):
                     "on DataFrameModel."
                 )
             return self._dfm_sync_pf(
-                _pf_a.join(_opf_a, how="cross", suffix=suffix, options=join_opts)
+                self._pf.join(other._pf, how="cross", suffix=suffix, options=join_opts)
             )
 
         on_keys = _dfm_plain_str_join_keys(on)
         if on_keys and left_on is None and right_on is None:
-            on_ls = tuple(_planframe_col_name(k) for k in on_keys)
             return self._dfm_sync_pf(
-                _pf_a.join(
-                    _opf_a,
-                    on=on_ls,
+                self._pf.join(
+                    other._pf,
+                    on=on_keys,
                     how=how_any,
                     suffix=suffix,
                     options=join_opts,
@@ -2748,13 +2856,11 @@ class DataFrameModel(Generic[RowT]):
             and len(lk) == len(rk)
             and lk
         ):
-            lk_ls = tuple(_planframe_col_name(k) for k in lk)
-            rk_ls = tuple(_planframe_col_name(k) for k in rk)
             return self._dfm_sync_pf(
-                _pf_a.join(
-                    _opf_a,
-                    left_on=lk_ls,
-                    right_on=rk_ls,
+                self._pf.join(
+                    other._pf,
+                    left_on=lk,
+                    right_on=rk,
                     how=how_any,
                     suffix=suffix,
                     options=join_opts,
@@ -2870,7 +2976,14 @@ class DataFrameModel(Generic[RowT]):
         ).assert_model(model)
 
     def group_by(self: ModelSelf, *keys: Any) -> GroupedDataFrameModel[ModelSelf]:
-        return GroupedDataFrameModel(self._df.group_by(*keys), self.__class__)
+        if not keys:
+            raise ValueError("group_by() requires at least one key column name.")
+        if not all(isinstance(k, str) for k in keys):
+            raise TypeError(
+                "DataFrameModel.group_by expects only str key column names."
+            )
+        grouped_pf = self._pf.group_by(*cast("tuple[str, ...]", keys))
+        return GroupedDataFrameModel(self, grouped_pf)
 
     def rolling_agg(
         self,
@@ -2883,6 +2996,10 @@ class DataFrameModel(Generic[RowT]):
         by: Sequence[str] | None = None,
         min_periods: int = 1,
     ) -> DataFrameModel[Any]:
+        raise NotImplementedError(
+            "DataFrameModel.rolling_agg is not supported in the PlanFrame-first API "
+            "yet."
+        )
         return self._from_dataframe(
             self._df.rolling_agg(
                 on=on,
@@ -2969,6 +3086,10 @@ class DataFrameModel(Generic[RowT]):
         period: str | None = None,
         by: Sequence[str] | None = None,
     ) -> DynamicGroupedDataFrameModel[ModelSelf]:
+        raise NotImplementedError(
+            "DataFrameModel.group_by_dynamic is not supported in the PlanFrame-first "
+            "API yet."
+        )
         model_type = cast("type[ModelSelf]", self.__class__)
         return DynamicGroupedDataFrameModel(
             self._df.group_by_dynamic(index_column, every=every, period=period, by=by),
@@ -3034,26 +3155,64 @@ class DataFrameModel(Generic[RowT]):
         *,
         how: str = "vertical",
     ) -> ModelSelf:
+        # PlanFrame-backed (narrowed): concat via PlanFrame concat_* nodes.
         if len(dfs) < 2:
             raise ValueError("concat() requires at least two DataFrameModel inputs.")
         if not all(isinstance(df, DataFrameModel) for df in dfs):
             raise TypeError("concat() expects a sequence of DataFrameModel objects.")
+        how_any = cast("Any", how)
+        pf_out = dfs[0]._pf
+        if how_any == "vertical":
+            for d in dfs[1:]:
+                pf_out = pf_out.concat_vertical(d._pf)
+        elif how_any == "horizontal":
+            for d in dfs[1:]:
+                pf_out = pf_out.concat_horizontal(d._pf)
+        else:
+            raise ValueError("concat(how=...) must be 'vertical' or 'horizontal'.")
+        return dfs[0]._dfm_sync_pf(pf_out)
         return cls._from_dataframe(DataFrame.concat([df._df for df in dfs], how=how))
 
 
 class GroupedDataFrameModel(Generic[GroupedModelT]):
     """Result of ``DataFrameModel.group_by``; use :meth:`agg` to produce a new model."""
 
-    def __init__(self, grouped_df: Any, model_type: type[GroupedModelT]) -> None:
-        self._grouped_df = grouped_df
-        self._model_type = model_type
+    def __init__(
+        self, grouped_df_or_parent: Any, model_type_or_grouped_pf: Any
+    ) -> None:
+        # Back-compat shape (used by pandas/pyspark facades and old core path):
+        #   GroupedDataFrameModel(
+        #       grouped_df=<native grouped df>, model_type=<DFM subclass>
+        #   )
+        #
+        # PlanFrame-first shape:
+        #   GroupedDataFrameModel(
+        #       parent=<DFM instance>, grouped_pf=<planframe.GroupedFrame>
+        #   )
+        if isinstance(model_type_or_grouped_pf, type):
+            self._grouped_df = grouped_df_or_parent
+            self._model_type = cast("type[GroupedModelT]", model_type_or_grouped_pf)
+            self._parent = None
+            self._grouped_pf = None
+        else:
+            self._parent = cast("GroupedModelT", grouped_df_or_parent)
+            self._grouped_pf = model_type_or_grouped_pf
+            self._grouped_df = None
+            self._model_type = self._parent.__class__
 
     def __repr__(self) -> str:
-        inner = "\n".join(f"  {line}" for line in repr(self._grouped_df).split("\n"))
-        return f"GroupedDataFrameModel({self._model_type.__name__})\n{inner}"
+        inner_obj = (
+            self._grouped_pf if self._grouped_pf is not None else self._grouped_df
+        )
+        model_name = self._model_type.__name__
+        inner = "\n".join(f"  {line}" for line in repr(inner_obj).split("\n"))
+        return f"GroupedDataFrameModel({model_name})\n{inner}"
 
     def _repr_html_(self) -> str:
-        inner = self._grouped_df._repr_html_()
+        inner_obj = (
+            self._grouped_pf if self._grouped_pf is not None else self._grouped_df
+        )
+        inner = html.escape(repr(inner_obj))
         title = html.escape(self._model_type.__name__)
         return (
             '<div class="pydantable-render pydantable-render--context" '
@@ -3062,11 +3221,13 @@ class GroupedDataFrameModel(Generic[GroupedModelT]):
             "font:600 12px ui-sans-serif,system-ui,sans-serif;"
             "color:#334155;background:#eef2ff;border:1px solid #c7d2fe;"
             'letter-spacing:0.02em;">'
-            f"<b>GroupedDataFrameModel({title})</b></p>{inner}</div>"
+            f"<b>GroupedDataFrameModel({title})</b></p><pre>{inner}</pre></div>"
         )
 
     def agg(self, **aggregations: Any) -> DataFrameModel[Any]:
-        """Same kwargs as :meth:`pydantable.dataframe.GroupedDataFrame.agg`."""
+        """PlanFrame-first group-by aggregations (named kwargs)."""
+        if self._grouped_pf is not None and self._parent is not None:
+            return self._parent._dfm_sync_pf(self._grouped_pf.agg(**aggregations))
         return self._model_type._from_dataframe(self._grouped_df.agg(**aggregations))
 
     def agg_as_model(

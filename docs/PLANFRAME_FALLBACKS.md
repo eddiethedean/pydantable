@@ -2,11 +2,11 @@
 
 `DataFrameModel` keeps a typed [PlanFrame](https://pypi.org/project/planframe/) `Frame` as `_pf` and executes it through `pydantable.planframe_adapter.PydantableAdapter` (Rust/native `DataFrame` backend).
 
-**Requirement:** pydantable **1.16.x** depends on **PlanFrame ≥ 0.2.0**.
+**Requirement:** pydantable **1.16.x** depends on **PlanFrame ≥ 0.3.0**.
 
 ## PlanFrame–first core API
 
-For the methods below, **there is no silent legacy path**: only shapes PlanFrame can represent are accepted. Narrow **static types** (`str` column names, `strict=True` rename, etc.) match that contract.
+For the methods below, **there is no silent legacy path**: the operation is expressed in PlanFrame and executed via the adapter.
 
 | Method | Behavior |
 |--------|----------|
@@ -14,11 +14,17 @@ For the methods below, **there is no silent legacy path**: only shapes PlanFrame
 | `with_columns`, `filter` | Always PlanFrame `WithColumn` / `Filter`. |
 | `drop(*columns: str, strict=…)` | PlanFrame `Drop` (no-op if no columns). |
 | `sort(*by: str, …)` | PlanFrame `Sort`; supports `nulls_last` (per-key like PlanFrame). |
-| `rename(..., strict=True)` | PlanFrame `Rename`; `strict=False` raises until [planframe#7](https://github.com/eddiethedean/planframe/issues/7). |
-| `join` | String `on` / `left_on` / `right_on` only; `how="cross"` with no keys; `JoinOptions` supported. Otherwise `TypeError`. `allow_parallel` / `force_parallel` → `NotImplementedError`. Typing uses `cast(Any, _pf)` until [planframe#18](https://github.com/eddiethedean/planframe/issues/18). Expr keys: [planframe#10](https://github.com/eddiethedean/planframe/issues/10). |
+| `rename(..., strict=…)` | PlanFrame `Rename` supports `strict=True/False`. |
+| `join` | PlanFrame `Join` supports string and expression keys; `how="cross"` with no keys; `JoinOptions` supported. `allow_parallel` / `force_parallel` remain pydantable-native concerns. |
+| `group_by(...).agg(...)` | PlanFrame `GroupBy` + `Agg` (narrowed: key columns are `str` only). |
 | `unique`, `distinct`, `head`, `tail`, `slice` | PlanFrame nodes + `execute_frame`. |
-| `fill_null` | `value=` only (no `strategy=`); `subset` as `str` or `Sequence[str]` or `None`. Strategies / expr fill: [planframe#17](https://github.com/eddiethedean/planframe/issues/17). |
-| `drop_nulls` | `how="any"`, `threshold=None` only; `subset` as `str` or `Sequence[str]` or `None`. Wider row-null semantics: [planframe#16](https://github.com/eddiethedean/planframe/issues/16). |
+| `fill_null` | PlanFrame `FillNull` supports `value=` literals or expressions and `strategy=`. |
+| `drop_nulls` | PlanFrame `DropNulls` supports `how="any"/"all"` and `threshold`. |
+| `melt` | PlanFrame `Melt` (narrowed: `value_vars=` required; string names only; no `streaming=`). |
+| `pivot` | PlanFrame `Pivot` (narrowed: `index/columns/values` are strings; no `sort_columns=` or `streaming=`). |
+| `explode` | PlanFrame `Explode` (narrowed: single column name only; no `outer=` or `streaming=`). |
+| `unnest` | PlanFrame `Unnest` (narrowed: `unnest(column, fields=[...])`; no `streaming=`). |
+| `concat` | PlanFrame `ConcatVertical` / `ConcatHorizontal` (narrowed: identical schemas for vertical; no overlaps for horizontal). |
 
 Unsupported use cases (e.g. `select` with expressions, `join` on `Expr` keys) currently require the core **`DataFrame`**. There is **no stable public accessor** on `DataFrameModel` today—**backlog:** add something like `to_dataframe()` / `inner_frame()` if we want a supported escape hatch (see below).
 
@@ -26,11 +32,11 @@ Unsupported use cases (e.g. `select` with expressions, `join` on `Expr` keys) cu
 
 Every instance from `_from_dataframe` or `as_model` gets `_pf = Frame.source(inner_df, …)` so `_pf` is never missing. After each PlanFrame-backed step, `_pf` holds the extended plan; after transforms that still delegate to `_df` only (see below), `_from_dataframe` **resets** `_pf` to a fresh `Source` for the new lazy frame so the plan never points at the wrong data.
 
-## Operations that still use `_df` (PlanFrame plan reset to `Source`)
+## Operations that are intentionally unsupported on `DataFrameModel` for now
 
-These either have no `DataFrameModel` wrapper over PlanFrame yet, or need engine features PlanFrame does not model. They return a new model via `_from_dataframe`, which re-binds `_pf` to `Source` for the result:
+These either have no PlanFrame node yet, or require selector-driven behavior that `DataFrameModel` is avoiding in the PlanFrame-first surface. They raise `NotImplementedError` (with the old backend implementation kept in place after the `raise` for future work).
 
-`select_schema`, `with_columns_cast`, `with_columns_fill_null`, `with_row_count`, `rename_upper` / `rename_lower` / `rename_title` / `rename_strip`, `clip`, `melt` / `unpivot` / `pivot*` (rich kwargs), `explode` / `unnest` (multi-column, streaming, etc.), `group_by`, window/rolling helpers, I/O, `concat`, and similar.
+`select_schema`, `with_columns_cast`, `with_columns_fill_null`, `with_row_count`, `rename_upper` / `rename_lower` / `rename_title` / `rename_strip`, `clip`, `unpivot`, `pivot_longer`, `pivot_wider`, `explode_outer`, `posexplode*`, `explode_all`, `unnest_all`, window/rolling helpers (`rolling_agg`, `group_by_dynamic`), and similar.
 
 Wiring more of these through PlanFrame plan nodes (and tightening types) is incremental work.
 
@@ -38,43 +44,18 @@ Wiring more of these through PlanFrame plan nodes (and tightening types) is incr
 
 | Area | What |
 |------|------|
-| **Wire `_pf` + `execute_frame`** | For ops that already exist in PlanFrame (`Melt`, `Pivot`, `Explode`, `Unnest`, `ConcatVertical` / `ConcatHorizontal`, `Sample`, `DropNullsAll`, `Cast`, …): add `DataFrameModel` methods that build the same plans instead of only `_df`, so history stays on the plan where possible. |
-| **`DataFrameModel.concat`** | Today uses `DataFrame.concat` + `_from_dataframe` (plan resets to `Source`). Could use `Frame.concat_vertical` / `concat_horizontal` between two models’ `_pf` when schemas align. |
-| **`group_by` / `GroupedDataFrameModel`** | Still native grouped `DataFrame` only. Needs `GroupBy` + `Agg` on `_pf` once keys/aggs match PlanFrame ([planframe#11](https://github.com/eddiethedean/planframe/issues/11), [planframe#12](https://github.com/eddiethedean/planframe/issues/12)). |
-| **Parity for `drop_nulls` / `fill_null`** | After [planframe#16](https://github.com/eddiethedean/planframe/issues/16) / [planframe#17](https://github.com/eddiethedean/planframe/issues/17), extend `DataFrameModel` to forward `how` / `threshold` / `strategy`. |
-| **`join` typing** | Remove `cast(Any, _pf)` once [planframe#18](https://github.com/eddiethedean/planframe/issues/18) lands. |
+| **Improve reshape ergonomics** | Support richer `melt` / `pivot` kwargs (selectors, defaults) while keeping the PlanFrame-first typing ethos. |
+| **Widen explode/unnest** | Multi-column explode/unnest, `outer=`, and schema-driven `*_all` variants need additional PlanFrame/pydantable surface design. |
+| **Parity for `drop_nulls` / `fill_null`** | Now available via PlanFrame 0.3; ensure all `DataFrameModel` surface params are forwarded and covered by tests. |
+| **Join + sort + group_by expr keys** | PlanFrame supports expression keys; pydantable adapter currently lowers expr keys only when they reference exactly one column (core engine limitation). Decide whether to extend the engine or constrain the model API. |
 | **`planframe_adapter/expr.py`** | Lower remaining `planframe.expr.api` nodes (`StrLower`, `DtYear`, `Over`, …) so PlanFrame-native expr trees execute without `NotImplementedError`. |
 | **Public escape hatch** | Documented way to get a `DataFrame` from a `DataFrameModel` for APIs we intentionally do not wrap (until PlanFrame catches up). |
 | **Tests / typing artifacts** | Regenerate stubs and add tests when new PlanFrame-backed methods ship. |
-| **`execute_frame` duplication** | When [planframe#19](https://github.com/eddiethedean/planframe/issues/19) lands, delegate to PlanFrame’s public executor instead of maintaining a parallel switch in `planframe_adapter/execute.py`. |
+| **`execute_frame` duplication** | PlanFrame 0.3 ships a public plan interpreter (`planframe.execution.execute_plan`); pydantable delegates to it. |
 
-## Upstream PlanFrame — tracker
+## Upstream PlanFrame
 
-**Shipped in 0.2.0:** asymmetric join keys + `JoinOptions`, per-key `Sort`, `Drop(strict=…)`. Issues [planframe#1](https://github.com/eddiethedean/planframe/issues/1)–[#3](https://github.com/eddiethedean/planframe/issues/3) (closed).
-
-| # | Topic |
-|---|--------|
-| [7](https://github.com/eddiethedean/planframe/issues/7) | `Rename.strict=False` |
-| [8](https://github.com/eddiethedean/planframe/issues/8) | Rich `select` / projection with `Expr` |
-| [9](https://github.com/eddiethedean/planframe/issues/9) | Sort keys as expressions |
-| [10](https://github.com/eddiethedean/planframe/issues/10) | Join keys as expressions |
-| [11](https://github.com/eddiethedean/planframe/issues/11) | Group-by keys as expressions |
-| [12](https://github.com/eddiethedean/planframe/issues/12) | Aggregations beyond `(op, column)` |
-| [13](https://github.com/eddiethedean/planframe/issues/13) | `Unnest` IR must carry `fields` |
-| [14](https://github.com/eddiethedean/planframe/issues/14) | Optional schema context for `compile_expr` |
-| [15](https://github.com/eddiethedean/planframe/issues/15) | Async materialization / adapter hooks |
-| [16](https://github.com/eddiethedean/planframe/issues/16) | `DropNulls`: `how=all`, `threshold` |
-| [17](https://github.com/eddiethedean/planframe/issues/17) | `FillNull`: strategies / expr fill |
-| [18](https://github.com/eddiethedean/planframe/issues/18) | Join typing for many key columns (no `Any` cast) |
-| [19](https://github.com/eddiethedean/planframe/issues/19) | **Enhancement:** public `execute_plan` API (share `Frame._eval`) |
-| [20](https://github.com/eddiethedean/planframe/issues/20) | **Enhancement:** expand `__all__` / package exports |
-| [21](https://github.com/eddiethedean/planframe/issues/21) | **Enhancement:** plan tree introspection (iterator / visitor) |
-| [22](https://github.com/eddiethedean/planframe/issues/22) | **Enhancement:** optional IR version on `Source` |
-| [23](https://github.com/eddiethedean/planframe/issues/23) | **Enhancement:** optional plan optimization (fuse `Select`, …) |
-| [24](https://github.com/eddiethedean/planframe/issues/24) | **Enhancement:** cache `Schema.field_map` hot path |
-| [25](https://github.com/eddiethedean/planframe/issues/25) | **Enhancement:** `Frame.__repr__` / debug summary |
-
-**Str-only column lists in PlanFrame IR** (`Explode` / `Unnest` / subsets, etc.) — same theme as rich `select` ([planframe#8](https://github.com/eddiethedean/planframe/issues/8)).
+PlanFrame **0.3.0** includes the previously reported gaps (mixed projection, expr keys for sort/join/group, rename strictness, `Unnest.fields`, schema-aware `compile_expr`, async APIs, plan execution helpers, repr/optimize/IR metadata).
 
 ### PlanFrame `Expr` lowering in the pydantable adapter
 

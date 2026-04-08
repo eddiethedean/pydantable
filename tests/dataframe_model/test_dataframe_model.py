@@ -259,7 +259,8 @@ async def test_awaitable_concat_vertical(tmp_path) -> None:
     a = UserDF.aread_parquet(p1, trusted_mode="shape_only")
     b = UserDF.aread_parquet(p2, trusted_mode="shape_only")
     merged = await AwaitableDataFrameModel.concat(a, b)
-    assert merged.collect(as_lists=True) == {"id": [1, 3], "age": [2, 4]}
+    out = await merged.acollect(as_lists=True)
+    assert out == {"id": [1, 3], "age": [2, 4]}
 
 
 @pytest.mark.asyncio
@@ -731,9 +732,11 @@ def test_dataframe_model_pipe_and_clip() -> None:
         y: float
 
     df = S({"x": [1, 5], "y": [1.5, -2.0]})
-    out = df.clip(lower=0, upper=3).to_dict()
-    assert out == {"x": [1, 3], "y": [1.5, 0.0]}
+    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
+        df.clip(lower=0, upper=3).to_dict()
 
+    # pipe() delegates to the underlying DataFrame, so operations inside the pipe
+    # run on DataFrame (not DataFrameModel) and are allowed.
     out2 = df.pipe(lambda d: d.clip(upper=0, subset="y")).to_dict()
     assert out2 == {"x": [1, 5], "y": [0.0, -2.0]}
 
@@ -743,8 +746,8 @@ def test_dataframe_model_with_row_count() -> None:
         x: int
 
     df = S({"x": [10, 20, 30]})
-    out = df.with_row_count().to_dict()
-    assert out == {"x": [10, 20, 30], "row_nr": [0, 1, 2]}
+    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
+        df.with_row_count().to_dict()
 
 
 def test_dataframe_model_selector_helpers() -> None:
@@ -755,16 +758,17 @@ def test_dataframe_model_selector_helpers() -> None:
         b: int | None
 
     df = S({"a": [None, 1], "b": [2, None]})
-    out = df.with_columns_fill_null(s.by_name("a"), value=0).to_dict()
-    assert out == {"a": [0, 1], "b": [2, None]}
+    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
+        df.with_columns_fill_null(s.by_name("a"), value=0).to_dict()
 
-    out2 = df.with_columns_cast(s.by_name("b"), float).to_dict()
-    assert out2 == {"a": [None, 1], "b": [2.0, None]}
+    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
+        df.with_columns_cast(s.by_name("b"), float).to_dict()
 
-    out3 = df.rename_upper(s.by_name("a")).to_dict()
-    assert out3 == {"A": [None, 1], "b": [2, None]}
+    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
+        df.rename_upper(s.by_name("a")).to_dict()
 
-    assert df.select_schema(s.by_name("b")).to_dict() == {"b": [2, None]}
+    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
+        df.select_schema(s.by_name("b")).to_dict()
 
 
 def test_dataframe_model_row_input_rejects_bad_item_type():
@@ -1011,20 +1015,18 @@ def test_p6_dataframe_model_rolling_and_dynamic() -> None:
             "v": [10, None, 30],
         }
     )
-    rolled = df.rolling_agg(
-        on="ts",
-        column="v",
-        window_size="2h",
-        op="sum",
-        out_name="v_roll_sum",
-        by=["id"],
-    )
-    assert rolled.collect(as_lists=True)["v_roll_sum"] == [10, 10, 40]
+    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
+        df.rolling_agg(
+            on="ts",
+            column="v",
+            window_size="2h",
+            op="sum",
+            out_name="v_roll_sum",
+            by=["id"],
+        )
 
-    grouped = df.group_by_dynamic("ts", every="1h", by=["id"]).agg(
-        v_count=("count", "v")
-    )
-    assert "v_count" in grouped.collect(as_lists=True)
+    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
+        df.group_by_dynamic("ts", every="1h", by=["id"]).agg(v_count=("count", "v"))
 
 
 @pytest.mark.asyncio
@@ -1040,10 +1042,9 @@ async def test_aread_chain_group_by_dynamic_agg(tmp_path) -> None:
         {"id": [1, 1], "ts": [0, 3600], "v": [10, 20]},
     )
     adf = TSDyn.aread_parquet(path, trusted_mode="shape_only")
-    dyn = adf.group_by_dynamic("ts", every="1h", by=["id"])
-    mdf = await dyn.agg(v_sum=("sum", "v"))
-    out = await mdf.acollect(as_lists=True)
-    assert "v_sum" in out
+    with pytest.raises(NotImplementedError, match="PlanFrame-first API"):
+        dyn = adf.group_by_dynamic("ts", every="1h", by=["id"])
+        await dyn.agg(v_sum=("sum", "v"))
 
 
 def test_dataframe_model_accepts_polars_dataframe_trusted_shape_only() -> None:
