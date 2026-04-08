@@ -178,17 +178,35 @@ def _to_pyd_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:
         return _to_pyd_expr(expr.value, schema_fields=schema_fields).log()
 
     if isinstance(expr, pf.StrContains):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).str_contains(
-            expr.pattern, literal=expr.literal
-        )
+        v = _to_pyd_expr(expr.value, schema_fields=schema_fields)
+        if expr.literal:
+            return v.str_contains(expr.pattern)
+        return v.str_contains_pat(expr.pattern, literal=False)
     if isinstance(expr, pf.StrStartsWith):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).str_starts_with(
+        return _to_pyd_expr(expr.value, schema_fields=schema_fields).starts_with(
             expr.prefix
         )
     if isinstance(expr, pf.StrEndsWith):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).str_ends_with(
+        return _to_pyd_expr(expr.value, schema_fields=schema_fields).ends_with(
             expr.suffix
         )
+
+    if isinstance(expr, pf.StrLower):
+        return _to_pyd_expr(expr.value, schema_fields=schema_fields).lower()
+    if isinstance(expr, pf.StrUpper):
+        return _to_pyd_expr(expr.value, schema_fields=schema_fields).upper()
+    if isinstance(expr, pf.StrLen):
+        return _to_pyd_expr(expr.value, schema_fields=schema_fields).char_length()
+    if isinstance(expr, pf.StrStrip):
+        return _to_pyd_expr(expr.value, schema_fields=schema_fields).strip()
+    if isinstance(expr, pf.StrReplace):
+        return _to_pyd_expr(expr.value, schema_fields=schema_fields).str_replace(
+            expr.pattern,
+            expr.replacement,
+            literal=expr.literal,
+        )
+    if isinstance(expr, pf.StrSplit):
+        return _to_pyd_expr(expr.value, schema_fields=schema_fields).str_split(expr.by)
 
     raise NotImplementedError(
         f"Unsupported PlanFrame expression node: {type(expr).__name__}"
