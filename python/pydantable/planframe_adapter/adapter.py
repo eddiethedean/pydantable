@@ -482,21 +482,45 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
         schema_fields = {f.name: f.dtype for f in schema.fields}
         return compile_expr(expr, schema_fields=schema_fields)
 
-    def collect(self, df: Any) -> Any:
+    def collect(self, df: Any, *, options: Any | None = None) -> Any:
         # PlanFrame expects `.collect` to return a backend frame; for pydantable the
         # "collected frame" is a materialized column dict, which we can wrap back
         # into a DataFrame of the same schema.
-        d = df.to_dict()
+        if options is None:
+            d = df.to_dict()
+        else:
+            d = df.to_dict(
+                streaming=options.streaming,
+                engine_streaming=options.engine_streaming,
+            )
         schema_t = cast("type", df.schema_type)
         return df.__class__[schema_t](d)
 
-    def to_dicts(self, df: Any) -> list[dict[str, object]]:
-        d = df.to_dict()
+    def to_dicts(
+        self, df: Any, *, options: Any | None = None
+    ) -> list[dict[str, object]]:
+        d = (
+            df.to_dict()
+            if options is None
+            else df.to_dict(
+                streaming=options.streaming,
+                engine_streaming=options.engine_streaming,
+            )
+        )
         if not d:
             return []
         keys = list(d.keys())
         n = len(next(iter(d.values())))
         return [dict(zip(keys, (d[k][i] for k in keys), strict=True)) for i in range(n)]
 
-    def to_dict(self, df: Any) -> dict[str, list[object]]:
-        return cast("dict[str, list[object]]", df.to_dict())
+    def to_dict(
+        self, df: Any, *, options: Any | None = None
+    ) -> dict[str, list[object]]:
+        if options is None:
+            out = df.to_dict()
+        else:
+            out = df.to_dict(
+                streaming=options.streaming,
+                engine_streaming=options.engine_streaming,
+            )
+        return cast("dict[str, list[object]]", out)

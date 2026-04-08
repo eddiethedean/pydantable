@@ -2,7 +2,7 @@
 
 `DataFrameModel` keeps a typed [PlanFrame](https://pypi.org/project/planframe/) `Frame` as `_pf` and executes it through `pydantable.planframe_adapter.PydantableAdapter` (Rust/native `DataFrame` backend).
 
-**Requirement:** pydantable **1.16.x** depends on **PlanFrame ≥ 0.5.0**.
+**Requirement:** pydantable **1.16.x** depends on **PlanFrame ≥ 0.6.0**.
 
 ## PlanFrame–first core API
 
@@ -62,7 +62,7 @@ Wiring more of these through PlanFrame plan nodes (and tightening types) is incr
 
 ## Upstream PlanFrame
 
-PlanFrame **0.5.0** adds several schema-driven conveniences (selectors, multi-cast/fill, rename case helpers, pivot_longer/pivot_wider) that allow pydantable to remove more `NotImplementedError` gaps in the PlanFrame-first `DataFrameModel` surface.
+PlanFrame **0.6.0** adds execution-time options (e.g. `ExecutionOptions.streaming` / `engine_streaming`) and join execution hints, allowing pydantable to remove remaining PlanFrame-first surface rejections while keeping schema evolution deterministic.
 
 ### PlanFrame `Expr` lowering in the pydantable adapter
 

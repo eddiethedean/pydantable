@@ -2489,10 +2489,6 @@ class DataFrameModel(Generic[RowT]):
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
         # PlanFrame-backed (narrowed): string column names only (no selectors).
-        if streaming is not None:
-            raise NotImplementedError(
-                "DataFrameModel.melt does not support streaming=."
-            )
         pf_any = cast("Any", self._pf)
         return self._dfm_sync_pf(
             pf_any.melt(
@@ -2577,10 +2573,6 @@ class DataFrameModel(Generic[RowT]):
         value_name: str = "value",
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
-        if streaming is not None:
-            raise NotImplementedError(
-                "DataFrameModel.unpivot does not support streaming=."
-            )
         pf_any = cast("Any", self._pf)
         return self._dfm_sync_pf(
             pf_any.unpivot(
@@ -2654,10 +2646,6 @@ class DataFrameModel(Generic[RowT]):
         values_to: str = "value",
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
-        if streaming is not None:
-            raise NotImplementedError(
-                "DataFrameModel.pivot_longer does not support streaming=."
-            )
         if id_vars is not None and not isinstance(id_vars, (str, Sequence)):
             raise TypeError("pivot_longer id_vars must be str or sequence[str].")
         if value_vars is not None and not isinstance(value_vars, (str, Sequence)):
@@ -2693,10 +2681,6 @@ class DataFrameModel(Generic[RowT]):
         separator: str = "_",
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
-        if streaming is not None:
-            raise NotImplementedError(
-                "DataFrameModel.pivot_wider does not support streaming=."
-            )
         if not isinstance(names_from, str):
             raise TypeError("pivot_wider names_from must be a string column name.")
         idx = _dfm_columns_as_tuple(cast("Any", index))
@@ -2737,10 +2721,6 @@ class DataFrameModel(Generic[RowT]):
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
         # PlanFrame-backed (narrowed): string columns only (no selectors / exprs).
-        if streaming is not None:
-            raise NotImplementedError(
-                "DataFrameModel.pivot does not support streaming=."
-            )
         idx = _dfm_columns_as_tuple(index)
         pf_any = cast("Any", self._pf)
         return self._dfm_sync_pf(
@@ -2772,10 +2752,6 @@ class DataFrameModel(Generic[RowT]):
         outer: bool = False,
         streaming: bool | None = None,
     ) -> Self:
-        if streaming is not None:
-            raise NotImplementedError(
-                "DataFrameModel.explode does not support streaming=."
-            )
         cols = _dfm_columns_as_tuple(columns)
         return self._dfm_sync_pf(self._pf.explode(*cols, outer=outer))
         return self._from_dataframe(
@@ -2801,10 +2777,6 @@ class DataFrameModel(Generic[RowT]):
         outer: bool = False,
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
-        if streaming is not None:
-            raise NotImplementedError(
-                "DataFrameModel.posexplode does not support streaming=."
-            )
         pf_any = cast("Any", self._pf)
         return self._dfm_sync_pf(
             pf_any.posexplode(column, pos=pos, value=value, outer=outer)
@@ -2828,26 +2800,14 @@ class DataFrameModel(Generic[RowT]):
         streaming: bool | None = None,
     ) -> Self:
         # PlanFrame-backed: unnest full structs by schema (no field selection).
-        if streaming is not None:
-            raise NotImplementedError(
-                "DataFrameModel.unnest does not support streaming=."
-            )
         cols = _dfm_columns_as_tuple(columns)
         return self._dfm_sync_pf(self._pf.unnest(*cols))
 
     def explode_all(self, *, streaming: bool | None = None) -> Self:
-        if streaming is not None:
-            raise NotImplementedError(
-                "DataFrameModel.explode_all does not support streaming=."
-            )
         cols = tuple(self.schema_fields().keys())
         return self._dfm_sync_pf(self._pf.explode(*cols))
 
     def unnest_all(self, *, streaming: bool | None = None) -> Self:
-        if streaming is not None:
-            raise NotImplementedError(
-                "DataFrameModel.unnest_all does not support streaming=."
-            )
         cols = tuple(self.schema_fields().keys())
         return self._dfm_sync_pf(self._pf.unnest(*cols))
 
