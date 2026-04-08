@@ -208,6 +208,14 @@ def _to_pyd_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:
     if isinstance(expr, pf.StrSplit):
         return _to_pyd_expr(expr.value, schema_fields=schema_fields).str_split(expr.by)
 
+    # Datetime / date parts
+    if isinstance(expr, pf.DtYear):
+        return _to_pyd_expr(expr.value, schema_fields=schema_fields).dt_year()
+    if isinstance(expr, pf.DtMonth):
+        return _to_pyd_expr(expr.value, schema_fields=schema_fields).dt_month()
+    if isinstance(expr, pf.DtDay):
+        return _to_pyd_expr(expr.value, schema_fields=schema_fields).dt_day()
+
     raise NotImplementedError(
         f"Unsupported PlanFrame expression node: {type(expr).__name__}"
     )
