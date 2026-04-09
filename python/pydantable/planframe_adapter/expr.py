@@ -54,7 +54,12 @@ def compile_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:
     return _to_pyd_expr(expr, schema_fields=schema_fields)
 
 
-def _to_pyd_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:
+def _to_pyd_expr(
+    expr: Any,
+    *,
+    schema_fields: dict[str, Any],
+    allow_unknown_cols: bool = False,
+) -> Any:
     require_planframe()
     from planframe.expr import api as pf
 
@@ -71,109 +76,91 @@ def _to_pyd_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:
 
     if isinstance(expr, pf.Col):
         if expr.name not in schema_fields:
+            if allow_unknown_cols:
+                # Group-by ``AggExpr`` compilation uses the *output* Frame schema, which
+                # omits non-key source columns; aggregation still references them on the
+                # pre-group frame. Use a permissive scalar dtype so :class:`ColumnRef`
+                # can be built; the group-by engine still resolves the column on the
+                # input frame by name.
+                return ColumnRef(name=expr.name, dtype=float)
             raise KeyError(f"Unknown column {expr.name!r} for PlanFrame expression.")
         return ColumnRef(name=expr.name, dtype=schema_fields[expr.name])
     if isinstance(expr, pf.Lit):
         return Literal(value=expr.value)
 
+    def _rec(e: Any) -> Any:
+        return _to_pyd_expr(
+            e, schema_fields=schema_fields, allow_unknown_cols=allow_unknown_cols
+        )
+
     # Binary arithmetic
     if isinstance(expr, pf.Add):
-        return _to_pyd_expr(expr.left, schema_fields=schema_fields) + _to_pyd_expr(
-            expr.right, schema_fields=schema_fields
-        )
+        return _rec(expr.left) + _rec(expr.right)
     if isinstance(expr, pf.Sub):
-        return _to_pyd_expr(expr.left, schema_fields=schema_fields) - _to_pyd_expr(
-            expr.right, schema_fields=schema_fields
-        )
+        return _rec(expr.left) - _rec(expr.right)
     if isinstance(expr, pf.Mul):
-        return _to_pyd_expr(expr.left, schema_fields=schema_fields) * _to_pyd_expr(
-            expr.right, schema_fields=schema_fields
-        )
+        return _rec(expr.left) * _rec(expr.right)
     if isinstance(expr, pf.TrueDiv):
-        return _to_pyd_expr(expr.left, schema_fields=schema_fields) / _to_pyd_expr(
-            expr.right, schema_fields=schema_fields
-        )
+        return _rec(expr.left) / _rec(expr.right)
 
     # Comparisons
     if isinstance(expr, pf.Eq):
-        return _to_pyd_expr(expr.left, schema_fields=schema_fields) == _to_pyd_expr(
-            expr.right, schema_fields=schema_fields
-        )
+        return _rec(expr.left) == _rec(expr.right)
     if isinstance(expr, pf.Ne):
-        return _to_pyd_expr(expr.left, schema_fields=schema_fields) != _to_pyd_expr(
-            expr.right, schema_fields=schema_fields
-        )
+        return _rec(expr.left) != _rec(expr.right)
     if isinstance(expr, pf.Lt):
-        return _to_pyd_expr(expr.left, schema_fields=schema_fields) < _to_pyd_expr(
-            expr.right, schema_fields=schema_fields
-        )
+        return _rec(expr.left) < _rec(expr.right)
     if isinstance(expr, pf.Le):
-        return _to_pyd_expr(expr.left, schema_fields=schema_fields) <= _to_pyd_expr(
-            expr.right, schema_fields=schema_fields
-        )
+        return _rec(expr.left) <= _rec(expr.right)
     if isinstance(expr, pf.Gt):
-        return _to_pyd_expr(expr.left, schema_fields=schema_fields) > _to_pyd_expr(
-            expr.right, schema_fields=schema_fields
-        )
+        return _rec(expr.left) > _rec(expr.right)
     if isinstance(expr, pf.Ge):
-        return _to_pyd_expr(expr.left, schema_fields=schema_fields) >= _to_pyd_expr(
-            expr.right, schema_fields=schema_fields
-        )
+        return _rec(expr.left) >= _rec(expr.right)
 
     # Null + membership
     if isinstance(expr, pf.IsNull):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).is_null()
+        return _rec(expr.value).is_null()
     if isinstance(expr, pf.IsNotNull):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).is_not_null()
+        return _rec(expr.value).is_not_null()
     if isinstance(expr, pf.IsIn):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).is_in(
-            list(expr.options)
-        )
+        return _rec(expr.value).is_in(list(expr.options))
 
     # Boolean ops
     if isinstance(expr, pf.And):
-        return _to_pyd_expr(expr.left, schema_fields=schema_fields) & _to_pyd_expr(
-            expr.right, schema_fields=schema_fields
-        )
+        return _rec(expr.left) & _rec(expr.right)
     if isinstance(expr, pf.Or):
-        return _to_pyd_expr(expr.left, schema_fields=schema_fields) | _to_pyd_expr(
-            expr.right, schema_fields=schema_fields
-        )
+        return _rec(expr.left) | _rec(expr.right)
     if isinstance(expr, pf.Not):
-        return ~_to_pyd_expr(expr.value, schema_fields=schema_fields)
+        return ~_rec(expr.value)
     if isinstance(expr, pf.Xor):
-        return _to_pyd_expr(expr.left, schema_fields=schema_fields) ^ _to_pyd_expr(
-            expr.right, schema_fields=schema_fields
-        )
+        return _rec(expr.left) ^ _rec(expr.right)
 
     # Common scalar functions
     if isinstance(expr, pf.Abs):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).abs()
+        return _rec(expr.value).abs()
     if isinstance(expr, pf.Round):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).round(expr.ndigits)
+        return _rec(expr.value).round(expr.ndigits)
     if isinstance(expr, pf.Floor):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).floor()
+        return _rec(expr.value).floor()
     if isinstance(expr, pf.Ceil):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).ceil()
+        return _rec(expr.value).ceil()
     if isinstance(expr, pf.Coalesce):
         from pydantable.expressions import coalesce
 
-        return coalesce(
-            *[_to_pyd_expr(v, schema_fields=schema_fields) for v in expr.values]
-        )
+        return coalesce(*[_rec(v) for v in expr.values])
 
     if isinstance(expr, pf.IfElse):
         from pydantable.expressions import when
 
         return when(
-            _to_pyd_expr(expr.cond, schema_fields=schema_fields),
-            _to_pyd_expr(expr.then_value, schema_fields=schema_fields),
-        ).otherwise(_to_pyd_expr(expr.else_value, schema_fields=schema_fields))
+            _rec(expr.cond),
+            _rec(expr.then_value),
+        ).otherwise(_rec(expr.else_value))
 
     if isinstance(expr, pf.Between):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).is_between(
-            _to_pyd_expr(expr.low, schema_fields=schema_fields),
-            _to_pyd_expr(expr.high, schema_fields=schema_fields),
+        return _rec(expr.value).is_between(
+            _rec(expr.low),
+            _rec(expr.high),
             closed=expr.closed,
         )
 
@@ -186,77 +173,77 @@ def _to_pyd_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:
             if field is not None:
                 clip_dtype = field
 
-        lower = (
-            None
-            if expr.lower is None
-            else _to_pyd_expr(expr.lower, schema_fields=schema_fields)
-        )
-        upper = (
-            None
-            if expr.upper is None
-            else _to_pyd_expr(expr.upper, schema_fields=schema_fields)
-        )
+        lower = None if expr.lower is None else _rec(expr.lower)
+        upper = None if expr.upper is None else _rec(expr.upper)
         if clip_dtype is not None:
             if lower is not None:
                 lower = lower.cast(clip_dtype)
             if upper is not None:
                 upper = upper.cast(clip_dtype)
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).clip(
-            lower=lower, upper=upper
-        )
+        return _rec(expr.value).clip(lower=lower, upper=upper)
 
     if isinstance(expr, pf.Pow):
-        return _to_pyd_expr(expr.base, schema_fields=schema_fields) ** _to_pyd_expr(
-            expr.exponent, schema_fields=schema_fields
-        )
+        return _rec(expr.base) ** _rec(expr.exponent)
     if isinstance(expr, pf.Exp):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).exp()
+        return _rec(expr.value).exp()
     if isinstance(expr, pf.Log):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).log()
+        return _rec(expr.value).log()
 
     if isinstance(expr, pf.Sqrt):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).sqrt()
+        return _rec(expr.value).sqrt()
     if isinstance(expr, pf.IsFinite):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).is_finite()
+        return _rec(expr.value).is_finite()
+
+    # Group-by: PlanFrame ``AggExpr`` lowers to ``(op, inner_expr)`` for
+    # :meth:`pydantable.dataframe.grouped.GroupedDataFrame.agg`.
+    if isinstance(expr, pf.AggExpr):
+        inner_e = _to_pyd_expr(
+            expr.inner,
+            schema_fields=schema_fields,
+            allow_unknown_cols=True,
+        )
+        op = expr.op
+        if op not in {"count", "sum", "mean", "min", "max", "n_unique"}:
+            raise NotImplementedError(
+                f"Unsupported PlanFrame AggExpr op: {op!r} "
+                "(supported: count, sum, mean, min, max, n_unique)."
+            )
+        return (op, inner_e)
 
     if isinstance(expr, pf.StrContains):
-        v = _to_pyd_expr(expr.value, schema_fields=schema_fields)
+        v = _rec(expr.value)
         if expr.literal:
             return v.str_contains(expr.pattern)
         return v.str_contains_pat(expr.pattern, literal=False)
     if isinstance(expr, pf.StrStartsWith):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).starts_with(
-            expr.prefix
-        )
+        return _rec(expr.value).starts_with(expr.prefix)
     if isinstance(expr, pf.StrEndsWith):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).ends_with(
-            expr.suffix
-        )
+        return _rec(expr.value).ends_with(expr.suffix)
 
     if isinstance(expr, pf.StrLower):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).lower()
+        return _rec(expr.value).lower()
     if isinstance(expr, pf.StrUpper):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).upper()
+        return _rec(expr.value).upper()
     if isinstance(expr, pf.StrLen):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).char_length()
+        return _rec(expr.value).char_length()
     if isinstance(expr, pf.StrStrip):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).strip()
+        return _rec(expr.value).strip()
     if isinstance(expr, pf.StrReplace):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).str_replace(
+        return _rec(expr.value).str_replace(
             expr.pattern,
             expr.replacement,
             literal=expr.literal,
         )
     if isinstance(expr, pf.StrSplit):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).str_split(expr.by)
+        return _rec(expr.value).str_split(expr.by)
 
     # Datetime / date parts
     if isinstance(expr, pf.DtYear):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).dt_year()
+        return _rec(expr.value).dt_year()
     if isinstance(expr, pf.DtMonth):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).dt_month()
+        return _rec(expr.value).dt_month()
     if isinstance(expr, pf.DtDay):
-        return _to_pyd_expr(expr.value, schema_fields=schema_fields).dt_day()
+        return _rec(expr.value).dt_day()
 
     if isinstance(expr, pf.Over):
         _validate_planframe_window_columns(
@@ -272,7 +259,7 @@ def _to_pyd_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:
                 window_sum,
             )
 
-            col_e = _to_pyd_expr(inner_pf.inner, schema_fields=schema_fields)
+            col_e = _rec(inner_pf.inner)
             op = inner_pf.op
             if op == "sum":
                 return window_sum(col_e).over(ws)

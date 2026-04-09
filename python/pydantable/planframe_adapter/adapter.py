@@ -5,6 +5,8 @@ from typing import Any, cast
 
 from planframe.backend.adapter import BaseAdapter
 
+from pydantable.expressions import Expr as PydExpr
+
 from pydantable.planframe_adapter.errors import require_planframe
 
 
@@ -167,7 +169,23 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
         named_aggs: dict[str, Any],
     ) -> Any:
         grouped = df.group_by_dynamic(index_column, every=every, period=period, by=by)
-        return grouped.agg(**named_aggs)
+        normalized: dict[str, Any] = {}
+        for out_name, spec in named_aggs.items():
+            if isinstance(spec, tuple) and len(spec) == 2:
+                op, col = spec
+                if isinstance(col, PydExpr):
+                    refs = col.referenced_columns()
+                    if len(refs) != 1:
+                        raise TypeError(
+                            "dynamic group_by aggregation expression must reference "
+                            "exactly one column."
+                        )
+                    normalized[out_name] = (op, next(iter(refs)))
+                else:
+                    normalized[out_name] = (op, col)
+            else:
+                normalized[out_name] = spec
+        return grouped.agg(**normalized)
 
     def rolling_agg(
         self,
