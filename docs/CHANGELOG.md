@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-04-08
+
+### Version bump
+
+- Align **pydantable**, **pydantable-protocol**, **pydantable-native**, **pydantable-core**, and published **`__version__`** values to **2.0.0**.
+
 ## [1.16.0] — 2026-04-06
 
 ### Added
