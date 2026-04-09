@@ -33,9 +33,7 @@ def _validate_planframe_window_columns(
 ) -> None:
     for name in partition_by:
         if name not in schema_fields:
-            raise KeyError(
-                f"Unknown column {name!r} in PlanFrame Over partition_by."
-            )
+            raise KeyError(f"Unknown column {name!r} in PlanFrame Over partition_by.")
     if order_by is not None:
         for name in order_by:
             if name not in schema_fields:

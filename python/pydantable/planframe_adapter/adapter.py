@@ -6,7 +6,6 @@ from typing import Any, cast
 from planframe.backend.adapter import BaseAdapter
 
 from pydantable.expressions import Expr as PydExpr
-
 from pydantable.planframe_adapter.errors import require_planframe
 
 
