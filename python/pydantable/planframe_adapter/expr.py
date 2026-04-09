@@ -5,6 +5,43 @@ from typing import Any
 from pydantable.planframe_adapter.errors import require_planframe
 
 
+def _planframe_window_spec(
+    partition_by: tuple[str, ...],
+    order_by: tuple[str, ...] | None,
+) -> Any:
+    """Build :class:`~pydantable.window_spec.WindowSpec` from PlanFrame ``Over``."""
+
+    from pydantable.window_spec import Window
+
+    if not partition_by:
+        raise ValueError("PlanFrame Over requires non-empty partition_by.")
+    if order_by is not None and not order_by:
+        raise ValueError(
+            "PlanFrame Over order_by must be non-empty when provided "
+            "(use None for partition-only windows)."
+        )
+    if order_by is None:
+        return Window.partitionBy(*partition_by).spec()
+    return Window.partitionBy(*partition_by).orderBy(*order_by)
+
+
+def _validate_planframe_window_columns(
+    partition_by: tuple[str, ...],
+    order_by: tuple[str, ...] | None,
+    *,
+    schema_fields: dict[str, Any],
+) -> None:
+    for name in partition_by:
+        if name not in schema_fields:
+            raise KeyError(
+                f"Unknown column {name!r} in PlanFrame Over partition_by."
+            )
+    if order_by is not None:
+        for name in order_by:
+            if name not in schema_fields:
+                raise KeyError(f"Unknown column {name!r} in PlanFrame Over order_by.")
+
+
 def compile_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:
     """
     Lower a PlanFrame Expr to a pydantable Expr using known column dtypes.
@@ -220,6 +257,39 @@ def _to_pyd_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:
         return _to_pyd_expr(expr.value, schema_fields=schema_fields).dt_month()
     if isinstance(expr, pf.DtDay):
         return _to_pyd_expr(expr.value, schema_fields=schema_fields).dt_day()
+
+    if isinstance(expr, pf.Over):
+        _validate_planframe_window_columns(
+            expr.partition_by, expr.order_by, schema_fields=schema_fields
+        )
+        ws = _planframe_window_spec(expr.partition_by, expr.order_by)
+        inner_pf = expr.value
+        if isinstance(inner_pf, pf.AggExpr):
+            from pydantable.expressions import (
+                window_max,
+                window_mean,
+                window_min,
+                window_sum,
+            )
+
+            col_e = _to_pyd_expr(inner_pf.inner, schema_fields=schema_fields)
+            op = inner_pf.op
+            if op == "sum":
+                return window_sum(col_e).over(ws)
+            if op == "mean":
+                return window_mean(col_e).over(ws)
+            if op == "min":
+                return window_min(col_e).over(ws)
+            if op == "max":
+                return window_max(col_e).over(ws)
+            raise NotImplementedError(
+                f"Unsupported AggExpr op inside PlanFrame Over: {op!r} "
+                "(supported: sum, mean, min, max)."
+            )
+        raise NotImplementedError(
+            f"Unsupported PlanFrame expression inside Over: {type(inner_pf).__name__} "
+            "(only AggExpr is supported)."
+        )
 
     raise NotImplementedError(
         f"Unsupported PlanFrame expression node: {type(expr).__name__}"
