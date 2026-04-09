@@ -46,6 +46,7 @@ pub enum UnaryNumericOp {
     Round { decimals: u32 },
     Floor,
     Ceil,
+    Sqrt,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -161,6 +162,11 @@ pub enum ExprNode {
         dtype: DTypeDesc,
     },
     IsNotNull {
+        input: Box<ExprNode>,
+        dtype: DTypeDesc,
+    },
+    /// True where numeric cell is finite (not NaN/±inf); null stays null (Polars `is_finite`).
+    IsFinite {
         input: Box<ExprNode>,
         dtype: DTypeDesc,
     },

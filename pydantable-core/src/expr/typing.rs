@@ -220,6 +220,7 @@ impl ExprNode {
             ExprNode::Cast { dtype, .. } => dtype.clone(),
             ExprNode::IsNull { dtype, .. } => dtype.clone(),
             ExprNode::IsNotNull { dtype, .. } => dtype.clone(),
+            ExprNode::IsFinite { dtype, .. } => dtype.clone(),
             ExprNode::Coalesce { dtype, .. }
             | ExprNode::CaseWhen { dtype, .. }
             | ExprNode::InList { dtype, .. }
@@ -288,7 +289,8 @@ impl ExprNode {
             }
             ExprNode::Cast { input, .. }
             | ExprNode::IsNull { input, .. }
-            | ExprNode::IsNotNull { input, .. } => input.referenced_columns(),
+            | ExprNode::IsNotNull { input, .. }
+            | ExprNode::IsFinite { input, .. } => input.referenced_columns(),
             ExprNode::Coalesce { exprs, .. } => {
                 let mut out = HashSet::new();
                 for e in exprs {
@@ -903,6 +905,19 @@ impl ExprNode {
         })
     }
 
+    pub fn make_is_finite(input: ExprNode) -> PyResult<Self> {
+        let _ = Self::numeric_inner_dtype(&input.dtype())?;
+        let nullable = input.dtype().nullable_flag();
+        Ok(ExprNode::IsFinite {
+            input: Box::new(input),
+            dtype: DTypeDesc::Scalar {
+                base: Some(BaseType::Bool),
+                nullable,
+                literals: None,
+            },
+        })
+    }
+
     pub fn make_coalesce(exprs: Vec<ExprNode>) -> PyResult<Self> {
         if exprs.is_empty() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -1477,11 +1492,13 @@ impl ExprNode {
                 nullable,
                 literals: None,
             },
-            UnaryNumericOp::Floor | UnaryNumericOp::Ceil => DTypeDesc::Scalar {
-                base: Some(BaseType::Float),
-                nullable,
-                literals: None,
-            },
+            UnaryNumericOp::Floor | UnaryNumericOp::Ceil | UnaryNumericOp::Sqrt => {
+                DTypeDesc::Scalar {
+                    base: Some(BaseType::Float),
+                    nullable,
+                    literals: None,
+                }
+            }
         };
         Ok(ExprNode::UnaryNumeric {
             op,
@@ -3732,6 +3749,18 @@ impl ExprNode {
                     .map(|v| Some(LiteralValue::Bool(v.is_some())))
                     .collect())
             }
+            ExprNode::IsFinite { input, .. } => {
+                let vals = input.eval(ctx, n)?;
+                Ok(vals
+                    .into_iter()
+                    .map(|v| match v {
+                        None => None,
+                        Some(LiteralValue::Float(f)) => Some(LiteralValue::Bool(f.is_finite())),
+                        Some(LiteralValue::Int(i)) => Some(LiteralValue::Bool(true)),
+                        Some(_) => None,
+                    })
+                    .collect())
+            }
             ExprNode::Coalesce { exprs, .. } => {
                 let mut cols: Vec<Vec<Option<LiteralValue>>> = Vec::new();
                 for e in exprs {
@@ -4025,6 +4054,12 @@ impl ExprNode {
                         }
                         (UnaryNumericOp::Ceil, Some(LiteralValue::Float(f))) => {
                             Some(LiteralValue::Float(f.ceil()))
+                        }
+                        (UnaryNumericOp::Sqrt, Some(LiteralValue::Int(i))) => {
+                            Some(LiteralValue::Float((i as f64).sqrt()))
+                        }
+                        (UnaryNumericOp::Sqrt, Some(LiteralValue::Float(f))) => {
+                            Some(LiteralValue::Float(f.sqrt()))
                         }
                         _ => None,
                     })

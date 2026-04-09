@@ -177,6 +177,11 @@ def _to_pyd_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:
     if isinstance(expr, pf.Log):
         return _to_pyd_expr(expr.value, schema_fields=schema_fields).log()
 
+    if isinstance(expr, pf.Sqrt):
+        return _to_pyd_expr(expr.value, schema_fields=schema_fields).sqrt()
+    if isinstance(expr, pf.IsFinite):
+        return _to_pyd_expr(expr.value, schema_fields=schema_fields).is_finite()
+
     if isinstance(expr, pf.StrContains):
         v = _to_pyd_expr(expr.value, schema_fields=schema_fields)
         if expr.literal:

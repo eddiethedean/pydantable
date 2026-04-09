@@ -48,7 +48,8 @@ impl PolarsPlanRunner {
             }
             ExprNode::Cast { input, .. }
             | ExprNode::IsNull { input, .. }
-            | ExprNode::IsNotNull { input, .. } => Self::expr_has_framed_window(input),
+            | ExprNode::IsNotNull { input, .. }
+            | ExprNode::IsFinite { input, .. } => Self::expr_has_framed_window(input),
             ExprNode::Coalesce { exprs, .. } | ExprNode::StringConcat { parts: exprs, .. } => {
                 exprs.iter().any(Self::expr_has_framed_window)
             }

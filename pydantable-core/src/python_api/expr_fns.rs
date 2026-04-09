@@ -298,6 +298,20 @@ fn expr_ceil(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
 }
 
 #[pyfunction]
+fn expr_sqrt(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_unary_numeric(inner.borrow().node.clone(), UnaryNumericOp::Sqrt)?,
+    })
+}
+
+#[pyfunction]
+fn expr_is_finite(inner: Bound<'_, PyExpr>) -> PyResult<PyExpr> {
+    Ok(PyExpr {
+        node: ExprNode::make_is_finite(inner.borrow().node.clone())?,
+    })
+}
+
+#[pyfunction]
 #[pyo3(signature = (inner, op, arg=None))]
 fn expr_string_unary(
     inner: Bound<'_, PyExpr>,
@@ -1078,6 +1092,8 @@ pub(super) fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr_round, m)?)?;
     m.add_function(wrap_pyfunction!(expr_floor, m)?)?;
     m.add_function(wrap_pyfunction!(expr_ceil, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_sqrt, m)?)?;
+    m.add_function(wrap_pyfunction!(expr_is_finite, m)?)?;
     m.add_function(wrap_pyfunction!(expr_string_unary, m)?)?;
     m.add_function(wrap_pyfunction!(expr_logical_and, m)?)?;
     m.add_function(wrap_pyfunction!(expr_logical_or, m)?)?;

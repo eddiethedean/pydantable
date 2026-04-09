@@ -319,6 +319,14 @@ class Expr:  # type: ignore[override]
         rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_ceil(self._rust_expr))
 
+    def sqrt(self) -> Expr:
+        rust = get_expression_runtime()
+        return Expr(rust_expr=rust.expr_sqrt(self._rust_expr))
+
+    def is_finite(self) -> Expr:
+        rust = get_expression_runtime()
+        return Expr(rust_expr=rust.expr_is_finite(self._rust_expr))
+
     def cumsum(self) -> Expr:
         rust = get_expression_runtime()
         return Expr(rust_expr=rust.expr_row_accum_cum_sum(self._rust_expr))

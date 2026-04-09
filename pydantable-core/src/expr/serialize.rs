@@ -114,6 +114,11 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             dict.set_item("input", exprnode_to_serializable(py, input)?)?;
             dict.set_item("inner", exprnode_to_serializable(py, input)?)?;
         }
+        ExprNode::IsFinite { input, .. } => {
+            dict.set_item("kind", "is_finite")?;
+            dict.set_item("input", exprnode_to_serializable(py, input)?)?;
+            dict.set_item("inner", exprnode_to_serializable(py, input)?)?;
+        }
         ExprNode::Coalesce { exprs, .. } => {
             dict.set_item("kind", "coalesce")?;
             let list = PyList::empty_bound(py);
@@ -266,6 +271,7 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
                 UnaryNumericOp::Round { decimals } => ("round", Some(*decimals)),
                 UnaryNumericOp::Floor => ("floor", None),
                 UnaryNumericOp::Ceil => ("ceil", None),
+                UnaryNumericOp::Sqrt => ("sqrt", None),
             };
             dict.set_item("op", op_s)?;
             if let Some(d) = dec {
