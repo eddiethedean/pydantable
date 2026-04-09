@@ -368,6 +368,7 @@ impl ExprNode {
             }
             ExprNode::IsNull { input, .. } => Ok(input.to_polars_expr()?.is_null()),
             ExprNode::IsNotNull { input, .. } => Ok(input.to_polars_expr()?.is_not_null()),
+            ExprNode::IsFinite { input, .. } => Ok(input.to_polars_expr()?.is_finite()),
             ExprNode::Coalesce { exprs, .. } => {
                 let parts: Vec<PolarsExpr> = exprs
                     .iter()
@@ -491,6 +492,7 @@ impl ExprNode {
                     }
                     UnaryNumericOp::Floor => Ok(e.floor()),
                     UnaryNumericOp::Ceil => Ok(e.ceil()),
+                    UnaryNumericOp::Sqrt => Ok(e.sqrt()),
                 }
             }
             ExprNode::StringUnary { op, inner, .. } => {
