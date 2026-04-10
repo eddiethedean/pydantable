@@ -18,14 +18,14 @@ NATIVE_PYPROJECT ?= pydantable-native/pyproject.toml
 # Source roots on PYTHONPATH for Rust ``cargo test`` (Polars in venv + editable packages).
 RUST_PYTHONPATH ?= $(CURDIR)/python:$(CURDIR)/pydantable-protocol/python:$(CURDIR)/pydantable-native/python
 
-.PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check engine-bypass-check ty-check ty-check-minimal pyright-check pyright-check-strict sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
+.PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check engine-bypass-check planframe-dfm-legacy-check ty-check ty-check-minimal pyright-check pyright-check-strict sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 .PHONY: native-develop native-develop-fast native-wheel install-editable dev-setup install-dev help
 .PHONY: test test-fast test-cov test-moltres diff-cover
 .PHONY: gen-typing check-typing
 
 check-full: check-python check-docs check-rust
 
-check-python: ruff-format-check ruff-check engine-bypass-check ty-check ty-check-minimal pyright-check check-typing
+check-python: ruff-format-check ruff-check engine-bypass-check planframe-dfm-legacy-check ty-check ty-check-minimal pyright-check check-typing
 
 check-docs: sphinx-check
 
@@ -37,6 +37,9 @@ ruff-check:
 
 engine-bypass-check:
 	$(PYTHON) scripts/check_engine_bypass.py
+
+planframe-dfm-legacy-check:
+	$(PYTHON) scripts/check_planframe_dfm_legacy_returns.py
 
 # Uses ``[tool.ty]`` in repo ``pyproject.toml`` (roots + include globs).
 ty-check:

@@ -38,6 +38,9 @@ jobs:
       - name: Engine bypass (no direct _core outside allowlist)
         run: python scripts/check_engine_bypass.py
 
+      - name: PlanFrame DataFrameModel (no legacy self._df return tails)
+        run: python scripts/check_planframe_dfm_legacy_returns.py
+
       - name: ty
         run: python -m ty check
 

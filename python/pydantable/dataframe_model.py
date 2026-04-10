@@ -2322,7 +2322,6 @@ class DataFrameModel(Generic[RowT]):
         raise TypeError(
             "select_schema expects a pydantable Selector or a planframe ColumnSelector."
         )
-        return self._from_dataframe(self._df.select_schema(selector))
 
     def with_columns(self, **new_columns: Any) -> DataFrameModel[Any]:
         from planframe.expr.api import lit as _pflit
@@ -2356,9 +2355,6 @@ class DataFrameModel(Generic[RowT]):
             "with_columns_cast expects a ColumnSelector or a mapping of "
             "{col_name: dtype}."
         )
-        return self._from_dataframe(
-            self._df.with_columns_cast(selector, dtype, strict=strict)
-        )
 
     def with_columns_fill_null(
         self,
@@ -2388,11 +2384,6 @@ class DataFrameModel(Generic[RowT]):
         raise TypeError(
             "with_columns_fill_null expects a ColumnSelector or a mapping of "
             "{col_name: value}."
-        )
-        return self._from_dataframe(
-            self._df.with_columns_fill_null(
-                selector, value=value, strategy=strategy, strict=strict
-            )
         )
 
     def filter(self, condition: Any) -> Self:
@@ -2461,7 +2452,6 @@ class DataFrameModel(Generic[RowT]):
             cols = cast("Any", selector).select(pf_any.schema())
             return self._dfm_sync_pf(pf_any.rename_upper(*cols, strict=strict))
         raise TypeError("rename_upper expects a ColumnSelector or None.")
-        return self._from_dataframe(self._df.rename_upper(selector, strict=strict))
 
     def rename_lower(
         self, selector: Any = None, *, strict: bool = True
@@ -2476,7 +2466,6 @@ class DataFrameModel(Generic[RowT]):
             cols = cast("Any", selector).select(pf_any.schema())
             return self._dfm_sync_pf(pf_any.rename_lower(*cols, strict=strict))
         raise TypeError("rename_lower expects a ColumnSelector or None.")
-        return self._from_dataframe(self._df.rename_lower(selector, strict=strict))
 
     def rename_title(
         self, selector: Any = None, *, strict: bool = True
@@ -2491,7 +2480,6 @@ class DataFrameModel(Generic[RowT]):
             cols = cast("Any", selector).select(pf_any.schema())
             return self._dfm_sync_pf(pf_any.rename_title(*cols, strict=strict))
         raise TypeError("rename_title expects a ColumnSelector or None.")
-        return self._from_dataframe(self._df.rename_title(selector, strict=strict))
 
     def rename_strip(
         self,
@@ -2514,9 +2502,6 @@ class DataFrameModel(Generic[RowT]):
                 pf_any.rename_strip(*cols, chars=chars, strict=strict)
             )
         raise TypeError("rename_strip expects a ColumnSelector or None.")
-        return self._from_dataframe(
-            self._df.rename_strip(selector, chars=chars, strict=strict)
-        )
 
     def slice(self, offset: int, length: int) -> Self:
         return self._dfm_sync_pf(self._pf.slice(offset, length))
@@ -2599,15 +2584,6 @@ class DataFrameModel(Generic[RowT]):
                 on=None if value_vars is None else _dfm_columns_as_tuple(value_vars),
                 variable_name=variable_name,
                 value_name=value_name,
-            )
-        )
-        return self._from_dataframe(
-            self._df.melt(
-                id_vars=id_vars,
-                value_vars=value_vars,
-                variable_name=variable_name,
-                value_name=value_name,
-                streaming=streaming,
             )
         )
 
@@ -2761,15 +2737,6 @@ class DataFrameModel(Generic[RowT]):
                 values_to=values_to,
             )
         )
-        return self._from_dataframe(
-            self._df.pivot_longer(
-                id_vars=id_vars,
-                value_vars=value_vars,
-                names_to=names_to,
-                values_to=values_to,
-                streaming=streaming,
-            )
-        )
 
     def pivot_wider(
         self,
@@ -2798,17 +2765,6 @@ class DataFrameModel(Generic[RowT]):
                 separator=separator,
             )
         )
-        return self._from_dataframe(
-            self._df.pivot_wider(
-                index=index,
-                names_from=names_from,
-                values_from=values_from,
-                aggregate_function=aggregate_function,
-                sort_columns=sort_columns,
-                separator=separator,
-                streaming=streaming,
-            )
-        )
 
     def pivot(
         self,
@@ -2834,17 +2790,6 @@ class DataFrameModel(Generic[RowT]):
                 sort_columns=sort_columns,
             )
         )
-        return self._from_dataframe(
-            self._df.pivot(
-                index=index,
-                columns=columns,
-                values=values,
-                aggregate_function=aggregate_function,
-                sort_columns=sort_columns,
-                separator=separator,
-                streaming=streaming,
-            )
-        )
 
     def explode(
         self,
@@ -2855,9 +2800,6 @@ class DataFrameModel(Generic[RowT]):
     ) -> Self:
         cols = _dfm_columns_as_tuple(columns)
         return self._dfm_sync_pf(self._pf.explode(*cols, outer=outer))
-        return self._from_dataframe(
-            self._df.explode(columns, outer=outer, streaming=streaming)
-        )
 
     def explode_outer(
         self,
@@ -3143,17 +3085,6 @@ class DataFrameModel(Generic[RowT]):
                 op=op,
                 out_name=out_name,
                 by=None if by is None else tuple(by),
-                min_periods=min_periods,
-            )
-        )
-        return self._from_dataframe(
-            self._df.rolling_agg(
-                on=on,
-                column=column,
-                window_size=window_size,
-                op=op,
-                out_name=out_name,
-                by=by,
                 min_periods=min_periods,
             )
         )

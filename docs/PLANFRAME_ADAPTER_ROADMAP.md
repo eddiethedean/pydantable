@@ -46,7 +46,7 @@ DataFrameModel -- collect(rows) / to_polars / to_arrow --> _df
 
 **Remaining / folded into Phase 2**
 
-- Ensure every materialization entry point that accepts streaming-like kwargs either routes through PlanFrame or is explicitly documented as engine-only.
+- **Addressed (docs):** Entry points that accept streaming-like kwargs either use PlanFrame (`to_dict`, `collect(as_lists=True)`) or are documented as engine-only in Phase 2 (`collect` rows, `to_polars`, `to_arrow`, async paths, etc.). No further Phase 0 work unless new materializers are added.
 
 **Acceptance criteria**
 
@@ -118,7 +118,7 @@ Implemented in `planframe_adapter/expr.py` and covered by adapter tests:
 
 - **Done:** `sort(*keys)` / `join(..., on= / left_on= / right_on=)` / `group_by(*keys)` accept **`str`** or **`planframe.expr.api.Expr`**; join key tuples can mix str and Expr; **`group_by(pf.col("x"))`** normalizes to **`group_by("x")`** for **`agg`**. Tests: `tests/dataframe_model/test_dataframe_model_planframe_expr_keys.py`.
 - **Done (reshape):** `pivot_longer` / `pivot_wider` already PlanFrame-backed; regression test added for **`pivot_longer`**.
-- **Next:** composite **group_by** expression keys + **`agg`** end-to-end (adapter/schema); selector-driven args for reshape where still **`NotImplementedError`** on **`DataFrameModel`**; Phase 4 cleanup.
+- **Next:** composite **group_by** expression keys + **`agg`** end-to-end (adapter/schema); richer selector-driven reshape kwargs where PlanFrame typing allows.
 
 **Acceptance criteria**
 
@@ -131,6 +131,12 @@ Implemented in `planframe_adapter/expr.py` and covered by adapter tests:
 - Remove preserved “old backend code after `raise`” once a method has been PlanFrame-backed for at least one release cycle.
 - Delete docs that imply `_df`-only fallback behavior for `DataFrameModel` when it no longer exists.
 - Optional: CI gates for new `_df`-only transforms on `DataFrameModel`.
+
+### Phase 4 status (2026-04-09)
+
+- **Done:** Removed unreachable `return self._from_dataframe(self._df...)` tails after PlanFrame-backed paths in `DataFrameModel` (migration leftovers, not user-visible).
+- **Done:** [PLANFRAME_FALLBACKS](PLANFRAME_FALLBACKS.md) updated so PlanFrame-first methods are not listed as unsupported.
+- **CI:** `make planframe-dfm-legacy-check` runs `scripts/check_planframe_dfm_legacy_returns.py` and fails if that anti-pattern is reintroduced in `dataframe_model.py` (included in `make check-python`).
 
 **Acceptance criteria**
 
@@ -151,7 +157,8 @@ The transition is “done” when:
 |----------|------|
 | P1 | Extend `expr.py` for additional `AggExpr` / `Over` shapes the engine can support. |
 | P2 | Optional: route more materialization shapes through PlanFrame once parity with `DataFrame` is proven. |
-| P3 | Phase 4: audit `NotImplementedError` branches and unreachable post-`raise` code in `DataFrameModel`. |
+| P3 | Composite **group_by** non-trivial expression keys + **agg** end-to-end (adapter / schema / compile). |
+| P4 | Reshape ergonomics: selectors and kwargs aligned with PlanFrame where supported. |
 
 ## See also
 

@@ -11,11 +11,14 @@ For the methods below, **there is no silent legacy path**: the operation is expr
 | Method | Behavior |
 |--------|----------|
 | `select(*cols: str)` | Plain projection only; at least one name. |
+| `select_schema(selector)` | PlanFrame `select_schema` with a pydantable `Selector` (`resolve`) or PlanFrame column selector (`select`). |
 | `with_columns`, `filter` | Always PlanFrame `WithColumn` / `Filter`. |
+| `with_columns_cast`, `with_columns_fill_null` | PlanFrame `cast_subset` / `cast_many`, `fill_null_subset` / `fill_null_many` via selector or mapping. |
 | `drop(*columns: str, strict=…)` | PlanFrame `Drop` (no-op if no columns). |
 | `sort(*by, …)` | PlanFrame `Sort`; each key is `str` or `planframe.expr.api` expression; supports `nulls_last` (per-key like PlanFrame). |
 | `rename(..., strict=…)` | PlanFrame `Rename` supports `strict=True/False`. |
-| `join` | PlanFrame `Join`; `on` / `left_on` / `right_on` are `str`, Expr, or sequences of str/Expr; `how="cross"` with no keys; `JoinOptions` supported. `allow_parallel` / `force_parallel` remain unsupported on `DataFrameModel`. |
+| `rename_upper`, `rename_lower`, `rename_title`, `rename_strip` | PlanFrame rename helpers; optional column subset via pydantable `Selector` or PlanFrame selector. |
+| `join` | PlanFrame `Join`; `on` / `left_on` / `right_on` are `str`, Expr, or sequences of str/Expr; `how="cross"` with no keys; `JoinOptions` supported. `allow_parallel` / `force_parallel` raise `NotImplementedError` on `DataFrameModel` (use `to_dataframe()` if you need them on the core `DataFrame`). |
 | `group_by(...).agg(...)` | PlanFrame `GroupBy` + `Agg`; keys are `str` or `planframe.expr.api` expressions. `planframe.expr.api.Col("x")` normalizes to `"x"` for `agg`. Composite expression keys may still fail at `agg` until a follow-up. |
 | `group_by_dynamic(...).agg(...)` | PlanFrame `DynamicGroupByAgg` via adapter; returns a dynamic grouped object whose `agg(...)` is PlanFrame-backed. |
 | `rolling_agg(...)` | PlanFrame `RollingAgg` via adapter. |
@@ -24,8 +27,9 @@ For the methods below, **there is no silent legacy path**: the operation is expr
 | `fill_null` | PlanFrame `FillNull` supports `value=` literals or expressions and `strategy=`. |
 | `drop_nulls` | PlanFrame `DropNulls` supports `how="any"/"all"` and `threshold`. |
 | `clip(lower=..., upper=..., subset=...)` | PlanFrame `clip` (note: `subset=None` clips **all numeric** columns). |
-| `melt` | User API; PlanFrame `Frame` uses `unpivot` (narrowed: `value_vars=` required; string names only; no `streaming=`). |
+| `melt` | User API; PlanFrame `Frame` uses `unpivot` (narrowed: string column names only). |
 | `unpivot` | PlanFrame `unpivot` (same reshape family as `melt`). |
+| `pivot_longer`, `pivot_wider` | PlanFrame `pivot_longer` / `pivot_wider` (narrowed types; e.g. `pivot_wider` requires string `names_from`). |
 | `pivot` | PlanFrame `Pivot` (narrowed: string column names only; no `streaming=`). |
 | `explode` | PlanFrame `Explode` (narrowed: string column names only; no `streaming=`). Supports `outer=`. |
 | `explode_all` | PlanFrame-backed: expands to `explode(*schema_fields)`. |
@@ -37,15 +41,13 @@ Unsupported use cases (e.g. `select` with expressions only available via **`with
 
 ## `_pf` always defined and consistent
 
-Every instance from `_from_dataframe` or `as_model` gets `_pf = Frame.source(inner_df, …)` so `_pf` is never missing. After each PlanFrame-backed step, `_pf` holds the extended plan; after transforms that still delegate to `_df` only (see below), `_from_dataframe` **resets** `_pf` to a fresh `Source` for the new lazy frame so the plan never points at the wrong data.
+Every instance from `_from_dataframe`, `as_model`, or `concat` gets `_pf = Frame.source(inner_df, …)` (or an extended plan after `_dfm_sync_pf`). After each PlanFrame-backed transform, `_pf` stores the lazy plan and `_df` is kept in sync by executing that plan. Methods that delegate only to the inner `DataFrame` without updating `_pf` (for example `pipe`) do not extend the PlanFrame plan; use `to_dataframe()` when you need arbitrary engine operations, then wrap again if required.
 
-## Operations that are intentionally unsupported on `DataFrameModel` for now
+## Explicit errors and remaining gaps (not silent legacy paths)
 
-These either have no PlanFrame node yet, or require selector-driven behavior that `DataFrameModel` is avoiding in the PlanFrame-first surface. They raise `NotImplementedError` (with the old backend implementation kept in place after the `raise` for future work).
-
-`select_schema`, `with_columns_cast`, `with_columns_fill_null`, `rename_upper` / `rename_lower` / `rename_title` / `rename_strip`, `pivot_longer`, `pivot_wider`, and similar selector-driven helpers.
-
-Wiring more of these through PlanFrame plan nodes (and tightening types) is incremental work.
+- **`join(..., allow_parallel=, force_parallel=)`** — `NotImplementedError` on `DataFrameModel`; use **`DataFrameModel.to_dataframe()`** for parallel join flags on the core **`DataFrame`** if needed.
+- **Composite non-trivial `group_by` expression keys + `agg`** — may fail at execution until adapter/schema support catches up; see `tests/dataframe_model/test_dataframe_model_planframe_expr_keys.py`.
+- **Expression coverage** — any `planframe.expr.api` node not lowered in `planframe_adapter/expr.py` still raises when executed through the adapter (see Phase 1 in {doc}`PLANFRAME_ADAPTER_ROADMAP`).
 
 ## Pydantable backlog (work still to do here)
 
@@ -54,7 +56,7 @@ Wiring more of these through PlanFrame plan nodes (and tightening types) is incr
 | **Improve reshape ergonomics** | Support richer `melt` / `pivot` kwargs (selectors, defaults) while keeping the PlanFrame-first typing ethos. |
 | **Widen explode/unnest** | Multi-column explode/unnest, `outer=`, and schema-driven `*_all` variants need additional PlanFrame/pydantable surface design. |
 | **Parity for `drop_nulls` / `fill_null`** | Ensure all `DataFrameModel` surface params are forwarded and covered by tests. |
-| **Join + sort + group_by expr keys** | PlanFrame supports expression keys; pydantable adapter currently lowers expr keys only when they reference exactly one column (core engine limitation). Decide whether to extend the engine or constrain the model API. |
+| **Composite `group_by` expr keys + `agg`** | Non-trivial expression group keys need end-to-end compile/schema support (beyond normalizing `Col("x")` to `"x"`). |
 | **`planframe_adapter/expr.py`** | Extend lowering for additional `planframe.expr.api` nodes and `AggExpr` / `Over` combinations as they are claimed supported (see {doc}`PLANFRAME_ADAPTER_ROADMAP`). |
 | **Tests / typing artifacts** | Regenerate stubs and add tests when new PlanFrame-backed methods ship. |
 | **`execute_frame`** | pydantable delegates to `planframe.execution.execute_plan`. |
