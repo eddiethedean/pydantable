@@ -86,6 +86,71 @@ def _dfm_plain_str_join_keys(value: Any) -> tuple[str, ...] | None:
     return None
 
 
+def _dfm_validate_str_or_planframe_expr(*items: Any, label: str) -> None:
+    """Allow ``str`` or :mod:`planframe.expr.api` expressions (sort/group keys)."""
+
+    from planframe.expr import api as _pf_expr
+
+    for x in items:
+        if isinstance(x, (str, _pf_expr.Expr)):
+            continue
+        raise TypeError(
+            f"{label} expects str column names or planframe.expr.api.Expr keys; "
+            f"got {type(x).__name__}."
+        )
+
+
+def _dfm_normalize_group_by_keys(*keys: Any) -> tuple[Any, ...]:
+    """Map :class:`planframe.expr.api.Col` keys to ``str`` for grouped ``agg``."""
+
+    from planframe.expr import api as _pf_expr
+
+    out: list[Any] = []
+    for k in keys:
+        if isinstance(k, _pf_expr.Col):
+            out.append(k.name)
+        else:
+            out.append(k)
+    return tuple(out)
+
+
+def _dfm_planframe_join_keys_tuple(
+    value: Any,
+    *,
+    field: str,
+) -> tuple[Any, ...] | None:
+    """Normalize join key args for :class:`planframe.frame.Frame.join`."""
+
+    if value is None:
+        return None
+    from planframe.expr import api as _pf_expr
+
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, _pf_expr.Expr):
+        return (value,)
+    if isinstance(value, Sequence) and not isinstance(
+        value, (str, bytes, bytearray, memoryview)
+    ):
+        out: list[Any] = []
+        for i, x in enumerate(value):
+            if isinstance(x, (str, _pf_expr.Expr)):
+                out.append(x)
+            else:
+                raise TypeError(
+                    f"DataFrameModel.join {field}=... expects str or "
+                    f"planframe.expr.api.Expr entries; got {type(x).__name__} "
+                    f"at index {i}."
+                )
+        if not out:
+            raise TypeError(f"DataFrameModel.join {field}=... must not be empty.")
+        return tuple(out)
+    raise TypeError(
+        f"DataFrameModel.join {field}=... expects str, planframe.expr.api.Expr, "
+        f"or a sequence of those; got {type(value).__name__}."
+    )
+
+
 def _dfm_columns_as_tuple(
     columns: str | Sequence[str] | None,
 ) -> tuple[str, ...]:
@@ -2007,14 +2072,22 @@ class DataFrameModel(Generic[RowT]):
     def to_dict(
         self, *, streaming: bool | None = None, engine_streaming: bool | None = None
     ) -> dict[str, list[Any]]:
+        from planframe.backend.errors import PlanFrameExecutionError
         from planframe.execution import ExecutionOptions
 
-        out = self._pf.to_dict(
-            options=ExecutionOptions(
-                streaming=streaming,
-                engine_streaming=engine_streaming,
+        try:
+            out = self._pf.to_dict(
+                options=ExecutionOptions(
+                    streaming=streaming,
+                    engine_streaming=engine_streaming,
+                )
             )
-        )
+        except PlanFrameExecutionError as e:
+            # Unwrap: PlanFrame wraps failures; callers expect engine ValueError.
+            cause = e.__cause__
+            if isinstance(cause, ValueError):
+                raise cause from None
+            raise
         return cast("dict[str, list[Any]]", out)
 
     def to_dataframe(self) -> DataFrame[Any]:
@@ -2327,12 +2400,13 @@ class DataFrameModel(Generic[RowT]):
 
     def sort(
         self,
-        *by: str,
+        *by: Any,
         descending: bool | Sequence[bool] = False,
         nulls_last: bool | Sequence[bool] = False,
     ) -> Self:
         if not by:
             raise ValueError("sort() requires at least one column name.")
+        _dfm_validate_str_or_planframe_expr(*by, label="DataFrameModel.sort")
         return self._dfm_sync_pf(
             self._pf.sort(*by, descending=descending, nulls_last=nulls_last)
         )
@@ -2855,11 +2929,11 @@ class DataFrameModel(Generic[RowT]):
         force_parallel: bool | None = None,
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
-        """Join on key column(s) via PlanFrame (string keys only).
+        """Join on key column(s) via PlanFrame.
 
-        Expression/selector join keys and parallel join flags are not supported on
-        :class:`DataFrameModel`; use the inner :class:`~pydantable.dataframe.DataFrame`
-        if you need them.
+        Keys may be column names (``str``) or :mod:`planframe.expr.api` expressions
+        (e.g. ``planframe.expr.api.col(\"a\")``). Parallel join flags are not supported;
+        use :meth:`to_dataframe` if you need them on the core :class:`DataFrame`.
         """
         if not isinstance(other, DataFrameModel):
             raise TypeError("join(other=...) expects another DataFrameModel instance.")
@@ -2901,8 +2975,8 @@ class DataFrameModel(Generic[RowT]):
                 self._pf.join(other._pf, how="cross", suffix=suffix, options=join_opts)
             )
 
-        on_keys = _dfm_plain_str_join_keys(on)
-        if on_keys and left_on is None and right_on is None:
+        on_keys = _dfm_planframe_join_keys_tuple(on, field="on")
+        if on_keys is not None and left_on is None and right_on is None:
             return self._dfm_sync_pf(
                 self._pf.join(
                     other._pf,
@@ -2913,8 +2987,8 @@ class DataFrameModel(Generic[RowT]):
                 )
             )
 
-        lk = _dfm_plain_str_join_keys(left_on)
-        rk = _dfm_plain_str_join_keys(right_on)
+        lk = _dfm_planframe_join_keys_tuple(left_on, field="left_on")
+        rk = _dfm_planframe_join_keys_tuple(right_on, field="right_on")
         if (
             on is None
             and lk is not None
@@ -2934,9 +3008,9 @@ class DataFrameModel(Generic[RowT]):
             )
 
         raise TypeError(
-            "DataFrameModel.join requires string keys: use on= as str or "
-            "Sequence[str], or left_on= and right_on= with the same length "
-            "(Expr/Selector keys are not supported)."
+            "DataFrameModel.join requires on= as str, Expr, or sequence of str/Expr, "
+            "or left_on= and right_on= with the same length "
+            "(Selectors are not supported)."
         )
 
     def join_as_model(
@@ -3044,11 +3118,9 @@ class DataFrameModel(Generic[RowT]):
     def group_by(self: ModelSelf, *keys: Any) -> GroupedDataFrameModel[ModelSelf]:
         if not keys:
             raise ValueError("group_by() requires at least one key column name.")
-        if not all(isinstance(k, str) for k in keys):
-            raise TypeError(
-                "DataFrameModel.group_by expects only str key column names."
-            )
-        grouped_pf = self._pf.group_by(*cast("tuple[str, ...]", keys))
+        _dfm_validate_str_or_planframe_expr(*keys, label="DataFrameModel.group_by")
+        normalized = _dfm_normalize_group_by_keys(*keys)
+        grouped_pf = self._pf.group_by(*normalized)
         return GroupedDataFrameModel(self, grouped_pf)
 
     def rolling_agg(

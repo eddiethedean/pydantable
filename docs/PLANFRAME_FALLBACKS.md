@@ -13,10 +13,10 @@ For the methods below, **there is no silent legacy path**: the operation is expr
 | `select(*cols: str)` | Plain projection only; at least one name. |
 | `with_columns`, `filter` | Always PlanFrame `WithColumn` / `Filter`. |
 | `drop(*columns: str, strict=…)` | PlanFrame `Drop` (no-op if no columns). |
-| `sort(*by: str, …)` | PlanFrame `Sort`; supports `nulls_last` (per-key like PlanFrame). |
+| `sort(*by, …)` | PlanFrame `Sort`; each key is `str` or `planframe.expr.api` expression; supports `nulls_last` (per-key like PlanFrame). |
 | `rename(..., strict=…)` | PlanFrame `Rename` supports `strict=True/False`. |
-| `join` | PlanFrame `Join` supports string and expression keys; `how="cross"` with no keys; `JoinOptions` supported. `allow_parallel` / `force_parallel` remain pydantable-native concerns. |
-| `group_by(...).agg(...)` | PlanFrame `GroupBy` + `Agg` (narrowed: key columns are `str` only). |
+| `join` | PlanFrame `Join`; `on` / `left_on` / `right_on` are `str`, Expr, or sequences of str/Expr; `how="cross"` with no keys; `JoinOptions` supported. `allow_parallel` / `force_parallel` remain unsupported on `DataFrameModel`. |
+| `group_by(...).agg(...)` | PlanFrame `GroupBy` + `Agg`; keys are `str` or `planframe.expr.api` expressions. `planframe.expr.api.Col("x")` normalizes to `"x"` for `agg`. Composite expression keys may still fail at `agg` until a follow-up. |
 | `group_by_dynamic(...).agg(...)` | PlanFrame `DynamicGroupByAgg` via adapter; returns a dynamic grouped object whose `agg(...)` is PlanFrame-backed. |
 | `rolling_agg(...)` | PlanFrame `RollingAgg` via adapter. |
 | `unique`, `distinct`, `head`, `tail`, `slice` | PlanFrame nodes + `execute_frame`. |
@@ -33,7 +33,7 @@ For the methods below, **there is no silent legacy path**: the operation is expr
 | `unnest_all` | PlanFrame-backed: expands to `unnest(*schema_fields)`. |
 | `concat` | PlanFrame `concat(how="vertical"|"horizontal")` (narrowed: identical schemas for vertical; no overlaps for horizontal). |
 
-Unsupported use cases (e.g. `select` with expressions, `join` on `Expr` keys) currently require the core **`DataFrame`**. Use **`DataFrameModel.to_dataframe()`** to access the inner lazy `DataFrame` for those APIs. See {doc}`PLANFRAME_ADAPTER_ROADMAP` Phase 2.
+Unsupported use cases (e.g. `select` with expressions only available via **`with_columns`**, parallel join flags, or composite **group_by** expr keys + **`agg`** where compilation fails) may still require the core **`DataFrame`**. Use **`DataFrameModel.to_dataframe()`** for engine-only APIs. See {doc}`PLANFRAME_ADAPTER_ROADMAP` Phase 3.
 
 ## `_pf` always defined and consistent
 

@@ -108,15 +108,21 @@ Implemented in `planframe_adapter/expr.py` and covered by adapter tests:
 
 **Goal**: minimize the need for the escape hatch for common workflows.
 
-### 3.1 Parity areas (evaluate and prioritize)
+### 3.1 Parity areas
 
-- **Projection with expressions**: PlanFrame has `project`; expose or document a typed `DataFrameModel`-level API that stays PlanFrame-first.
-- **Expr keys in sort/join/group_by**: PlanFrame supports them; pydantable adapter supports them where the engine can (see adapter notes on single-column expr keys).
-- **Reshape:** PlanFrame **`Frame`** uses names like **`unpivot`** / **`pivot_*`**; **`DataFrameModel`** keeps user-facing **`melt`** / **`pivot`** and maps to the current PlanFrame nodes.
+- **Computed columns**: use **`with_columns`** with pydantable **`Expr`** (PlanFrame does not expose a separate public **`Frame.project`** in 1.x; the adapter still lowers internal project nodes).
+- **Expr keys in sort/join/group_by**: **`DataFrameModel.sort`**, **`join`**, and **`group_by`** accept column names (`str`) or **`planframe.expr.api`** expressions (e.g. **`planframe.expr.api.col("a")`**). Trivial **`Col(name)`** group keys normalize to **`str`** so grouped **`agg`** compiles; **non-trivial composite expression group keys** may still fail at **`agg`** until compile/schema follow-up (see tests).
+- **Reshape:** PlanFrame **`Frame`** uses **`unpivot`** / **`pivot_longer`** / **`pivot_wider`**; **`DataFrameModel`** exposes **`melt`** / **`unpivot`** / **`pivot`** / **`pivot_longer`** / **`pivot_wider`** and maps to PlanFrame.
+
+### Phase 3 status (2026-04-09)
+
+- **Done:** `sort(*keys)` / `join(..., on= / left_on= / right_on=)` / `group_by(*keys)` accept **`str`** or **`planframe.expr.api.Expr`**; join key tuples can mix str and Expr; **`group_by(pf.col("x"))`** normalizes to **`group_by("x")`** for **`agg`**. Tests: `tests/dataframe_model/test_dataframe_model_planframe_expr_keys.py`.
+- **Done (reshape):** `pivot_longer` / `pivot_wider` already PlanFrame-backed; regression test added for **`pivot_longer`**.
+- **Next:** composite **group_by** expression keys + **`agg`** end-to-end (adapter/schema); selector-driven args for reshape where still **`NotImplementedError`** on **`DataFrameModel`**; Phase 4 cleanup.
 
 **Acceptance criteria**
 
-- The documented PlanFrame-first surface covers the majority of workflows without escape hatches.
+- The documented PlanFrame-first surface covers more workflows without **`to_dataframe()`**; remaining gaps are explicit in this section and in {doc}`PLANFRAME_FALLBACKS`.
 
 ## Phase 4: Deprecation and cleanup of legacy paths
 
