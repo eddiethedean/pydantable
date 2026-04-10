@@ -15,6 +15,18 @@ The **pydantable** repo runs **`ty check`** on first-party trees in CI (`make ch
 
 This page consolidates the typing story and links to the relevant contracts.
 
+## Phase T0 checker matrix (recommended path per checker)
+
+This table records the **expected** and **recommended** typing story per checker, including the planned PlanFrame-first path (Phase T1) and boundary model (Phase T3). Until Phase T1 lands, treat the “Frame exposure” column as a target state.
+
+| Checker | `DataFrameModel` chains only (today) | PlanFrame `Frame` exposure (Phase T1) | `materialize_model` bridge (Phase T3) |
+|---|---|---|---|
+| **mypy + plugin** | **Best** schema-evolving inference when args are literal enough. Fallback: `as_model(...)`. | Prefer PlanFrame chain typing when you need Pyright-like Resolve semantics; plugin remains for `DataFrameModel`-only ergonomics. | Use boundary recipe to get exact output types; still compatible with plugin on the pydantable side. |
+| **mypy (no plugin)** | Treat like Pyright: **explicit** after-model (`as_model` / `assert_model`) for schema changes; chains remain loose. | PlanFrame chain becomes the primary way to get “inferred” schema changes without the plugin (via stubs/Resolve tiers). | Boundary recipe yields exact output model at explicit points (no plugin required). |
+| **Pyright / Pylance** | **Explicit after-model** workflow (`as_model` / `try_as_model` / `assert_model`, plus `*_as_model` helpers). | PlanFrame chain is the intended “fully typed transforms” path (literals + upstream stubs; future: optional plugin). | Use boundary recipe for exact output types where needed; complements PlanFrame chain typing. |
+| **Astral `ty`** | Same as Pyright: **no mypy plugins**; rely on shipped stubs + explicit after-model helpers. | PlanFrame chain should provide the strongest static typing story without relying on mypy internals. | Boundary recipe gives explicit exact output types; keep `DataFrameModel` validation semantics centralized. |
+
+**Common constraint for typed paths:** prefer **literal column names** and avoid dynamic/computed column name lists when you want the checker to follow schema evolution rules (matches PlanFrame’s typing constraints).\n+
 ## The typing contract (nominal model, derived row type, structural helpers)
 
 - **Nominal table type**: users name subclasses of `DataFrameModel` (for example `class Users(DataFrameModel): ...`).

@@ -74,6 +74,44 @@ DataFrameModel ──typing goal──> expose Frame API so checkers use PlanFra
 - A single table in {doc}`TYPING` (or this doc) lists **recommended** typing path per checker.
 - No new public typing promises until Phase T1 API is drafted.
 
+### Inventory (T0): `DataFrameModel` → PlanFrame `Frame`
+
+This table is a **typing-oriented index** of the PlanFrame-first surface. Runtime behavior details and explicit gaps live in {doc}`PLANFRAME_FALLBACKS`.
+
+| `DataFrameModel` API | PlanFrame API / node | Notes (typing constraints / gotchas) |
+|---|---|---|
+| `select(*cols)` | `Frame.select(*cols)` | `DataFrameModel` requires at least one `str`; PlanFrame stubs encourage `Literal` column names. |
+| `select_schema(selector)` | `Frame.select_schema(ColumnSelector)` | Accepts either pydantable `Selector.resolve(...)` or PlanFrame selector (`selector.select(schema)`). |
+| `with_columns(**new_columns)` | `Frame.with_columns(...)` | Runtime supports dynamic output names; PlanFrame typing is strongest when names are literals. |
+| `with_columns_cast(selector, ...)` | `cast_subset` / `cast_many` | Selector is pydantable or PlanFrame; mapping path uses “many” form. |
+| `with_columns_fill_null(selector, ...)` | `fill_null_subset` / `fill_null_many` | Requires `value=` or `strategy=`; selector/mapping mirrors cast. |
+| `filter(condition)` | `Frame.filter(expr)` | Condition may be pydantable `Expr` or PlanFrame expr lowered by the adapter. |
+| `sort(*keys, ...)` | `Frame.sort(...)` | Keys allow `str` or limited PlanFrame expr shapes; see {doc}`PLANFRAME_FALLBACKS`. |
+| `drop(*columns, strict=...)` | `Frame.drop(...)` | `DataFrameModel.drop()` is a no-op if no columns; PlanFrame still typed for literals. |
+| `rename(mapping, strict=...)` | `Frame.rename(mapping=..., strict=...)` | Keyword rename helpers are PlanFrame-backed; mapping keys are `str`. |
+| `rename_upper/lower/title/strip(...)` | PlanFrame rename helpers | Optional selector (pydantable or PlanFrame). |
+| `unique(...)` / `distinct(...)` | `Frame.unique(...)` | `subset=None` vs `subset=[...]` paths; subset must be `Sequence[str]`. |
+| `slice(...)`, `head(...)`, `tail(...)` | `Frame.slice/head/tail` | Schema-preserving. |
+| `with_row_count(name, offset)` | `Frame.with_row_index(...)` | User API name differs; PlanFrame uses `with_row_index`. |
+| `clip(lower, upper, subset=...)` | `Frame.clip(...)` | `subset=None` means “all numeric columns” in PlanFrame semantics. |
+| `fill_null(...)` | `Frame.fill_null(value/strategy)` | `value` may be literal or expression; strategy-based fill supported. |
+| `drop_nulls(...)` | `Frame.drop_nulls(how/threshold/subset)` | Selector support is via PlanFrame/pydantable selector normalization. |
+| `melt(...)` | PlanFrame `unpivot` family | pydantable keeps `melt` name; narrowed to `str` column names. |
+| `unpivot(...)` | `Frame.unpivot(...)` | Same reshape family; narrowed args for PlanFrame typing ethos. |
+| `pivot(...)` | `Frame.pivot(...)` | Narrowed to `str` names; `streaming=` rejected on `DataFrameModel`. |
+| `pivot_longer(...)` / `pivot_wider(...)` | `Frame.pivot_longer` / `pivot_wider` | Narrowed params (e.g. `pivot_wider` requires string `names_from`). |
+| `explode(*cols, outer=...)` / `explode_all(...)` | `Frame.explode(...)` | `explode_all` expands to schema fields; cols are `str` only. |
+| `unnest(*cols)` / `unnest_all(...)` | `Frame.unnest(...)` | `unnest_all` expands to schema fields; cols are `str` only. |
+| `join(...)` | `Frame.join(..., options=JoinOptions)` | Keys can be `str` or limited PlanFrame expr keys; parallel flags are explicit errors. |
+| `group_by(*keys)` | `Frame.group_by(...)` → grouped wrapper | Returns `GroupedDataFrameModel` holding grouped PlanFrame frame; `.agg(...)` executes PlanFrame `Agg`. |
+| `group_by_dynamic(...).agg(...)` | `Frame.group_by_dynamic` → dynamic grouped wrapper | Dynamic grouped object’s `.agg(...)` is PlanFrame-backed. |
+| `rolling_agg(...)` | `Frame.rolling_agg(...)` | PlanFrame-backed node; output name is a string param. |
+| `GroupedDataFrameModel.agg(...)` | `GroupedFrame.agg(...)` | Aggregations accept PlanFrame `AggExpr` shapes; adapter lowers supported ops. |
+| `concat(*dfs, how=...)` | `Frame.concat(how=...)` | Horizontal/vertical constraints apply; see {doc}`PLANFRAME_FALLBACKS`. |
+
+### Upstream tracking (T0): PlanFrame typing artifacts
+
+- **Authoritative upstream check:** PlanFrame’s repo describes and enforces stub regeneration with `scripts/generate_typing_stubs.py --check` (see PlanFrame README).\n- **What to watch when bumping PlanFrame:**\n  - Public `Frame` / `Expr` **generic parameters**, method overloads, and selector/protocol types referenced by adapters.\n  - Any signature changes that alter “Resolve” behavior for Pyright (overload set changes can be typing-breaking without runtime breakage).\n- **pydantable bump checklist (typing):** when changing the PlanFrame pin, skim the upstream stub diff (or changelog notes), then run `make check-typing` and `make sphinx-check` in pydantable.\n+
 ---
 
 ## Phase T1 — First-class PlanFrame-typed surface
