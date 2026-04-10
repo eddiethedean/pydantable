@@ -134,10 +134,21 @@ This table is a **typing-oriented index** of the PlanFrame-first surface. Runtim
 
 3. **Naming** in docs: “**Typing-first path**: `model.planframe.select(...)` …” vs “**Pydantic-first path**: `model.select(...)` …”.
 
+### T1 priorities (derived from T0 inventory)
+
+Start with the “highest leverage” PlanFrame-backed methods—these dominate real-world chains and benefit most from PlanFrame’s Resolve / stub typing:
+
+- **Core chain:** `select`, `select_schema`, `with_columns`, `filter`, `sort`, `drop`, `rename`
+- **Join + grouping:** `join`, `group_by(...).agg(...)`, `group_by_dynamic(...).agg(...)`, `rolling_agg`
+- **Reshape:** `melt`/`unpivot`, `pivot`, `pivot_longer`/`pivot_wider`
+
+Then broaden to the schema-preserving convenience nodes (`head`, `tail`, `slice`, `unique`, `distinct`, `clip`, `fill_null`, `drop_nulls`) and “expand-to-schema-fields” helpers (`explode_all`, `unnest_all`).
+
 **Acceptance criteria**
 
 - Pyright / `ty` tests (or contract tests under `tests/typing/`) that assign the result of `planframe` to a variable annotated with PlanFrame’s public `Frame` type (or a concrete backend frame type if you document that subset).
 - {doc}`DATAFRAMEMODEL` and {doc}`TYPING` updated with the recommended pattern.
+- A small `tests/typing/` contract snippet shows the canonical workflow compiles under **Pyright** and **`ty`**:\n  `df.planframe.select(\"id\").with_column(\"x\", ...)` (literal names) plus a “bridge back” step (T3) using pydantable APIs.
 
 ---
 
@@ -151,6 +162,12 @@ This table is a **typing-oriented index** of the PlanFrame-first surface. Runtim
 - **Join / group / sort** parameters already accepting `planframe.expr.api` shapes: ensure `.pyi` matches **actual** runtime acceptance (see `python/pydantable/dataframe_model.py`).
 - **`scripts/generate_typing_artifacts.py`**: extend templates so regenerated stubs stay aligned with Phase T1 accessors (run `--check` in CI).
 - **Reduce** redundant overloads on `DataFrameModel` that duplicate PlanFrame once T1 is canonical for “full inference”.
+
+### T2 priorities (derived from T0 inventory)
+
+Once `DataFrameModel.planframe` (or `to_planframe()`) exists, ensure stubs align for the inventory’s “PlanFrame-first core API”:\n
+
+- **Keys that accept PlanFrame exprs:** `sort`, `join`, `group_by` (only `str` / `pf.col(\"x\")` today), and grouped `.agg(...)`.\n- **Selector dual-protocol:** `select_schema`, `rename_*`, `with_columns_cast`, `with_columns_fill_null` accept either a pydantable selector (`resolve`) or a PlanFrame selector (`select`).\n- **Reshape narrowings:** `melt`/`unpivot`/`pivot`/`pivot_wider` constraints must match stubs so checkers don’t accept shapes that runtime rejects.\n
 
 **Acceptance criteria**
 
