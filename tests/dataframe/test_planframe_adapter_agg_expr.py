@@ -24,3 +24,14 @@ def test_planframe_group_by_agg_count_agg_expr() -> None:
     out = m.group_by("g").agg(n=pf.agg_count(pf.col("x")))
     d = out.to_dict()
     assert sorted(zip(d["g"], d["n"], strict=True)) == [(1, 3), (2, 1)]
+
+
+def test_planframe_group_by_agg_median_agg_expr() -> None:
+    """``AggExpr(op='median')`` lowers to the same group-by path as tuple agg specs."""
+
+    m = _Grp({"g": [1, 1, 2], "x": [10.0, 30.0, 5.0]})
+    out = m.group_by("g").agg(
+        med=pf.AggExpr(inner=pf.col("x"), op="median"),
+    )
+    d = out.to_dict()
+    assert sorted(zip(d["g"], d["med"], strict=True)) == [(1, 20.0), (2, 5.0)]

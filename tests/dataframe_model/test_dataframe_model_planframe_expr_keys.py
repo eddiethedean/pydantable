@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from planframe.backend.errors import PlanFrameBackendError
 from planframe.expr import api as pf
 from pydantable import DataFrameModel
 
@@ -58,13 +57,13 @@ def test_dataframe_model_group_by_planframe_col_normalizes_to_str() -> None:
     assert sorted(zip(out_col["g"], out_col["s"], strict=True)) == [(1, 30.0), (2, 5.0)]
 
 
-def test_dataframe_model_group_by_non_trivial_expr_agg_not_supported_yet() -> None:
-    """Composite expr group keys may fail at agg until schema/compile follow-up."""
+def test_dataframe_model_group_by_rejects_non_col_expr_keys() -> None:
+    """Reject non-``col()`` expr keys; add a column with ``with_columns`` first."""
 
     m = _GrpDF({"g": [1, 2], "x": [1.0, 1.0]})
     key = pf.Add(pf.col("g"), pf.lit(0))
-    with pytest.raises((PlanFrameBackendError, KeyError)):
-        m.group_by(key).agg(s=pf.agg_sum(pf.col("x"))).to_dict()
+    with pytest.raises(TypeError, match="only supports str column names"):
+        m.group_by(key).agg(s=pf.agg_sum(pf.col("x")))
 
 
 class _PivotDF(DataFrameModel):

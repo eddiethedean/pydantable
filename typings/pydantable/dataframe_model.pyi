@@ -814,9 +814,15 @@ class DataFrameModel(Generic[RowT]):
         value: Any = None,
         *,
         strategy: str | None = None,
-        subset: Sequence[str] | None = None,
+        subset: str | Sequence[str] | Any | None = None,
     ) -> Self: ...
-    def drop_nulls(self, subset: Sequence[str] | None = None) -> Self: ...
+    def drop_nulls(
+        self,
+        subset: str | Sequence[str] | Any | None = None,
+        *,
+        how: str = "any",
+        threshold: int | None = None,
+    ) -> Self: ...
     def melt(
         self,
         *,

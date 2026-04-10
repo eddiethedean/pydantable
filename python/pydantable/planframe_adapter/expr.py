@@ -1,3 +1,24 @@
+"""Lower PlanFrame expression IR to pydantable ``Expr`` objects.
+
+**Supported surface** (keep in sync with adapter tests and
+``docs/PLANFRAME_ADAPTER_ROADMAP.md`` §1.1):
+
+- **Refs / literals:** ``Col``, ``Lit``
+- **Arithmetic / compare / boolean / null / membership:** binary ops, ``IsNull``,
+  ``IsIn``, ``And``, ``Or``, ``Not``, ``Xor``
+- **Scalars:** ``Abs``, ``Round``, ``Floor``, ``Ceil``, ``Coalesce``, ``IfElse``,
+  ``Between``, ``Clip``, ``Pow``, ``Exp``, ``Log``, ``Sqrt``, ``IsFinite``
+- **Strings:** ``StrContains``, ``StrStartsWith``, ``StrEndsWith``, ``StrLower``,
+  ``StrUpper``, ``StrLen``, ``StrStrip``, ``StrReplace``, ``StrSplit``
+- **Datetime parts:** ``DtYear``, ``DtMonth``, ``DtDay``
+- **AggExpr** (ops): ``count``, ``sum``, ``mean``, ``min``, ``max``, ``median``,
+  ``std``, ``var``, ``first``, ``last``, ``n_unique`` (must match
+  :meth:`pydantable.dataframe.grouped.GroupedDataFrame.agg`)
+- **Over:** inner node must be ``AggExpr`` with ops ``sum``, ``mean``, ``min``, ``max``
+
+Any other node raises ``NotImplementedError`` with a stable message.
+"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -201,10 +222,25 @@ def _to_pyd_expr(
             allow_unknown_cols=True,
         )
         op = expr.op
-        if op not in {"count", "sum", "mean", "min", "max", "n_unique"}:
+        _AGG_OPS = frozenset(
+            {
+                "count",
+                "sum",
+                "mean",
+                "min",
+                "max",
+                "median",
+                "std",
+                "var",
+                "first",
+                "last",
+                "n_unique",
+            }
+        )
+        if op not in _AGG_OPS:
             raise NotImplementedError(
                 f"Unsupported PlanFrame AggExpr op: {op!r} "
-                "(supported: count, sum, mean, min, max, n_unique)."
+                f"(supported: {', '.join(sorted(_AGG_OPS))})."
             )
         return (op, inner_e)
 

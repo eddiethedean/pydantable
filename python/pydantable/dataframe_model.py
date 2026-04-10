@@ -101,7 +101,13 @@ def _dfm_validate_str_or_planframe_expr(*items: Any, label: str) -> None:
 
 
 def _dfm_normalize_group_by_keys(*keys: Any) -> tuple[Any, ...]:
-    """Map :class:`planframe.expr.api.Col` keys to ``str`` for grouped ``agg``."""
+    """Map :class:`planframe.expr.api.Col` keys to ``str`` for grouped ``agg``.
+
+    Only ``str`` or :class:`planframe.expr.api.Col` keys are allowed. General
+    PlanFrame expressions (e.g. ``col("a") + 1``) are rejected: the pydantable
+    engine groups by column names; use :meth:`with_columns` to materialize a key
+    column first if you need a computed group key.
+    """
 
     from planframe.expr import api as _pf_expr
 
@@ -109,6 +115,12 @@ def _dfm_normalize_group_by_keys(*keys: Any) -> tuple[Any, ...]:
     for k in keys:
         if isinstance(k, _pf_expr.Col):
             out.append(k.name)
+        elif isinstance(k, _pf_expr.Expr):
+            raise TypeError(
+                "DataFrameModel.group_by only supports str column names or "
+                "planframe.expr.api.col('name'). Arbitrary expressions are not "
+                "supported as group keys; add a column with with_columns(...) first."
+            )
         else:
             out.append(k)
     return tuple(out)
@@ -2534,10 +2546,29 @@ class DataFrameModel(Generic[RowT]):
         value: Any = None,
         *,
         strategy: str | None = None,
-        subset: str | Sequence[str] | None = None,
+        subset: str | Sequence[str] | Any | None = None,
     ) -> Self:
         if value is None and strategy is None:
             raise ValueError("fill_null() requires value= or strategy=.")
+        pf_any = cast("Any", self._pf)
+        if subset is not None and hasattr(subset, "resolve"):
+            cols = tuple(cast("Any", subset).resolve(self.schema_fields()))
+            if not cols:
+                raise ValueError(
+                    f"fill_null(subset={subset!r}) matched no schema columns."
+                )
+            return self._dfm_sync_pf(
+                pf_any.fill_null(value, *cols, strategy=strategy)
+            )
+        if subset is not None and hasattr(subset, "select"):
+            cols = tuple(cast("Any", subset).select(pf_any.schema()))
+            if not cols:
+                raise ValueError(
+                    f"fill_null(subset={subset!r}) matched no schema columns."
+                )
+            return self._dfm_sync_pf(
+                pf_any.fill_null(value, *cols, strategy=strategy)
+            )
         if subset is None:
             return self._dfm_sync_pf(self._pf.fill_null(value, strategy=strategy))
         return self._dfm_sync_pf(
@@ -2550,11 +2581,38 @@ class DataFrameModel(Generic[RowT]):
 
     def drop_nulls(
         self,
-        subset: str | Sequence[str] | None = None,
+        subset: str | Sequence[str] | Any | None = None,
         *,
         how: str = "any",
         threshold: int | None = None,
     ) -> Self:
+        pf_any = cast("Any", self._pf)
+        if subset is not None and hasattr(subset, "resolve"):
+            cols = tuple(cast("Any", subset).resolve(self.schema_fields()))
+            if not cols:
+                raise ValueError(
+                    f"drop_nulls(subset={subset!r}) matched no schema columns."
+                )
+            return self._dfm_sync_pf(
+                pf_any.drop_nulls(
+                    cols,
+                    how=cast("Any", how),
+                    threshold=threshold,
+                )
+            )
+        if subset is not None and hasattr(subset, "select"):
+            cols = tuple(cast("Any", subset).select(pf_any.schema()))
+            if not cols:
+                raise ValueError(
+                    f"drop_nulls(subset={subset!r}) matched no schema columns."
+                )
+            return self._dfm_sync_pf(
+                pf_any.drop_nulls(
+                    cols,
+                    how=cast("Any", how),
+                    threshold=threshold,
+                )
+            )
         if subset is None:
             return self._dfm_sync_pf(
                 self._pf.drop_nulls(how=cast("Any", how), threshold=threshold)
@@ -2576,6 +2634,11 @@ class DataFrameModel(Generic[RowT]):
         value_name: str = "value",
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
+        if streaming is not None:
+            raise ValueError(
+                "DataFrameModel.melt does not support streaming=; "
+                "PlanFrame unpivot has no streaming parameter."
+            )
         # PlanFrame-backed (narrowed): string column names only (no selectors).
         pf_any = cast("Any", self._pf)
         return self._dfm_sync_pf(
@@ -2650,6 +2713,11 @@ class DataFrameModel(Generic[RowT]):
         value_name: str = "value",
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]:
+        if streaming is not None:
+            raise ValueError(
+                "DataFrameModel.unpivot does not support streaming=; "
+                "PlanFrame unpivot has no streaming parameter."
+            )
         pf_any = cast("Any", self._pf)
         return self._dfm_sync_pf(
             pf_any.unpivot(

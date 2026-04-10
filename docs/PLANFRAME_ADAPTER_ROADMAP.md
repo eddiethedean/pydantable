@@ -23,6 +23,16 @@ This document describes the transition for **pydantable** to behave as a “real
 - After each PlanFrame-backed step, `_dfm_sync_pf` runs `execute_frame` so the inner pydantable `DataFrame` (`_df`) matches the compiled plan; `_pf` stores the extended lazy plan.
 - **Expression lowering** lives in `python/pydantable/planframe_adapter/expr.py`. End-to-end coverage for the adapter is in `tests/dataframe/test_planframe_adapter_*.py`.
 
+### `BaseAdapter` contract (PlanFrame 1.x)
+
+`pydantable.planframe_adapter.PydantableAdapter` subclasses [`planframe.backend.adapter.BaseAdapter`](https://github.com/eddiethedean/planframe/blob/main/docs/guides/planframe/creating-an-adapter.md) and **implements every abstract plan-node / IO / materialization method** on that class (select through write hooks, plus `compile_expr`, `collect`, `to_dict`, `to_dicts`). Optional hooks use upstream defaults unless pydantable overrides them:
+
+- **`hint`:** default no-op (identity on the backend frame).
+- **`write_delta` / `write_avro`:** explicit `NotImplementedError` until the engine exposes them.
+- **Async reader/writer surfaces** (`areader` / `awriter`): default wrappers around sync methods on `BaseAdapter`; pydantable does not specialize them.
+
+Regression: `tests/dataframe/test_planframe_adapter_contract.py` asserts abstract methods remain implemented.
+
 ### Materialization path (today)
 
 `collect` / `to_dict` / `to_polars` / `to_arrow` must preserve pydantable’s validation and optional-field semantics on the inner `DataFrame`. Columnar materialization is routed through **`Frame.to_dict(options=ExecutionOptions(...))`** so streaming hints follow PlanFrame’s execution boundary; row-shaped `collect()` (default) and numpy paths still delegate to `DataFrame.collect` on `_df`. See Phase 2.
@@ -33,6 +43,10 @@ DataFrameModel -- _df --> pydantable DataFrame
 _pf -- to_dict(options) --> _df
 DataFrameModel -- collect(rows) / to_polars / to_arrow --> _df
 ```
+
+### Materialization stance (“full adapter” scope)
+
+Being a **full PlanFrame adapter** means transforms and expression compilation go through PlanFrame + `PydantableAdapter`, and **columnar** results use `ExecutionOptions` at the PlanFrame boundary (`to_dict`, `collect(as_lists=True)`). **Row-shaped `collect()` (Pydantic row models), numpy, Polars, Arrow, async terminals, and streaming helpers** stay on the core `DataFrame` so validation and interchange semantics stay in one place until optional rerouting is justified by parity tests. That split is **intentional**, not a missing adapter implementation. Async PlanFrame execution remains upstream ([planframe#15](https://github.com/eddiethedean/planframe/issues/15)).
 
 ## Phase 0: “Adapter correctness” hardening
 
@@ -59,14 +73,14 @@ DataFrameModel -- collect(rows) / to_polars / to_arrow --> _df
 
 ### 1.1 Supported today (non-exhaustive)
 
-Implemented in `planframe_adapter/expr.py` and covered by adapter tests:
+The module docstring of `python/pydantable/planframe_adapter/expr.py` duplicates this matrix for developers. Implemented nodes are covered by adapter tests:
 
 - **Arithmetic / comparisons / boolean / null / membership:** e.g. `Add`, `Eq`, `IsNull`, `IsIn`, …
 - **Scalars:** `Abs`, `Round`, `Floor`, `Ceil`, `Coalesce`, `IfElse`, `Between`, `Clip`, `Pow`, `Exp`, `Log`, …
 - **Strings:** `StrContains`, `StrStartsWith`, `StrEndsWith`, `StrLower`, `StrUpper`, `StrLen`, `StrStrip`, `StrReplace`, `StrSplit`
 - **Datetime parts:** `DtYear`, `DtMonth`, `DtDay`
 - **Math:** `Sqrt`, `IsFinite`
-- **`AggExpr`:** lowered for ops `count`, `sum`, `mean`, `min`, `max`, `n_unique` (other ops still raise `NotImplementedError`).
+- **`AggExpr`:** lowered for ops `count`, `sum`, `mean`, `min`, `max`, `median`, `std`, `var`, `first`, `last`, `n_unique` (other ops still raise `NotImplementedError`).
 - **`Over`:** only when the inner node is `AggExpr` with ops `sum`, `mean`, `min`, `max` (other window shapes raise `NotImplementedError`).
 
 ### 1.2 Still open / next
@@ -95,6 +109,8 @@ Implemented in `planframe_adapter/expr.py` and covered by adapter tests:
 
 - Default **`collect()`** (row models), **`as_numpy=True`**, **`to_polars`**, **`to_arrow`**, **`acollect` / `ato_dict`**, **`collect_batches`**, **`stream`**: remain on the core `DataFrame` so pydantable row validation, numpy, Arrow, Polars, and async semantics stay centralized.
 
+**Optional P2 (materialization through PlanFrame):** No additional shapes are routed through `_pf` beyond columnar **`to_dict`** / **`collect(as_lists=True)`** unless a future change proves parity for row validation and interchange types. Treat rerouting **`to_polars`** / **`to_arrow`** as a dedicated spike with before/after tests.
+
 ### 2.2 Escape hatch: core `DataFrame`
 
 **Implemented:** **`DataFrameModel.to_dataframe()`** returns the inner lazy **`DataFrame`** for APIs that are intentionally not wrapped by the PlanFrame-first surface. See {doc}`PLANFRAME_FALLBACKS`.
@@ -111,14 +127,14 @@ Implemented in `planframe_adapter/expr.py` and covered by adapter tests:
 ### 3.1 Parity areas
 
 - **Computed columns**: use **`with_columns`** with pydantable **`Expr`** (PlanFrame does not expose a separate public **`Frame.project`** in 1.x; the adapter still lowers internal project nodes).
-- **Expr keys in sort/join/group_by**: **`DataFrameModel.sort`**, **`join`**, and **`group_by`** accept column names (`str`) or **`planframe.expr.api`** expressions (e.g. **`planframe.expr.api.col("a")`**). Trivial **`Col(name)`** group keys normalize to **`str`** so grouped **`agg`** compiles; **non-trivial composite expression group keys** may still fail at **`agg`** until compile/schema follow-up (see tests).
+- **Expr keys in sort/join/group_by**: **`sort`** and **`join`** accept column names (`str`) or PlanFrame expressions whose compiled form is supported by the engine (join/sort expr keys must reference **exactly one** column in the adapter today). **`group_by`** accepts **`str`** or **`planframe.expr.api.col("name")` only**; other expressions raise **`TypeError`** (use **`with_columns`** to add a computed key column). See tests in `tests/dataframe_model/test_dataframe_model_planframe_expr_keys.py`.
 - **Reshape:** PlanFrame **`Frame`** uses **`unpivot`** / **`pivot_longer`** / **`pivot_wider`**; **`DataFrameModel`** exposes **`melt`** / **`unpivot`** / **`pivot`** / **`pivot_longer`** / **`pivot_wider`** and maps to PlanFrame.
 
 ### Phase 3 status (2026-04-09)
 
-- **Done:** `sort(*keys)` / `join(..., on= / left_on= / right_on=)` / `group_by(*keys)` accept **`str`** or **`planframe.expr.api.Expr`**; join key tuples can mix str and Expr; **`group_by(pf.col("x"))`** normalizes to **`group_by("x")`** for **`agg`**. Tests: `tests/dataframe_model/test_dataframe_model_planframe_expr_keys.py`.
+- **Done:** `sort(*keys)` / `join(...)` accept **`str`** or expression keys where supported; **`group_by`** accepts **`str`** or **`pf.col("x")`** (normalized to **`str`**). Tests: `tests/dataframe_model/test_dataframe_model_planframe_expr_keys.py`.
 - **Done (reshape):** `pivot_longer` / `pivot_wider` already PlanFrame-backed; regression test added for **`pivot_longer`**.
-- **Next:** composite **group_by** expression keys + **`agg`** end-to-end (adapter/schema); richer selector-driven reshape kwargs where PlanFrame typing allows.
+- **Next:** richer selector-driven reshape kwargs where PlanFrame typing allows; optional future: computed **group_by** keys via PlanFrame `with_columns` lowering without widening **`group_by(*)**` to arbitrary expressions (would duplicate **`with_columns`** semantics).
 
 **Acceptance criteria**
 
@@ -146,9 +162,11 @@ Implemented in `planframe_adapter/expr.py` and covered by adapter tests:
 
 The transition is “done” when:
 
+- **`PydantableAdapter` implements the PlanFrame `BaseAdapter` abstract surface** (see the **BaseAdapter contract** subsection above; smoke-tested in `tests/dataframe/test_planframe_adapter_contract.py`).
 - `DataFrameModel` is a typed PlanFrame façade (composition) over the pydantable engine adapter for **transforms** and for **columnar materialization** via `_pf.to_dict`.
-- Adapter **expr** coverage matches what pydantable documents as supported (`expr.py` + tests).
+- Adapter **expr** coverage matches what pydantable documents as supported (`expr.py` module docstring + §1.1 + tests).
 - Execution-time hints for supported paths use PlanFrame **`ExecutionOptions`** (and **`JoinOptions`** on join) where applicable.
+- **Materialization split** is explicit: PlanFrame boundaries for columnar dict paths; engine-only paths for row models / interchange / async as in **Materialization stance** above.
 - Any remaining engine-only API is accessed through **`to_dataframe()`** or other documented escape hatches.
 
 ## Suggested follow-on work (priority)
@@ -157,8 +175,12 @@ The transition is “done” when:
 |----------|------|
 | P1 | Extend `expr.py` for additional `AggExpr` / `Over` shapes the engine can support. |
 | P2 | Optional: route more materialization shapes through PlanFrame once parity with `DataFrame` is proven. |
-| P3 | Composite **group_by** non-trivial expression keys + **agg** end-to-end (adapter / schema / compile). |
+| P3 | Optional: computed **group_by** keys without `with_columns` (PlanFrame/compiler feature work). |
 | P4 | Reshape ergonomics: selectors and kwargs aligned with PlanFrame where supported. |
+
+### Explode / unnest widening (survey before coding)
+
+Multi-column explode/unnest, additional `outer=` behavior, and richer `*_all` helpers depend on both PlanFrame `Frame` node shapes and the Rust engine. Before expanding `DataFrameModel` APIs, compare PlanFrame’s reshape/explode IR with `pydantable-core` capabilities and add a short design note (inputs/outputs/schema evolution).
 
 ## See also
 

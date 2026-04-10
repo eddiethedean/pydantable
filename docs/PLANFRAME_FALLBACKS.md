@@ -19,7 +19,7 @@ For the methods below, **there is no silent legacy path**: the operation is expr
 | `rename(..., strict=…)` | PlanFrame `Rename` supports `strict=True/False`. |
 | `rename_upper`, `rename_lower`, `rename_title`, `rename_strip` | PlanFrame rename helpers; optional column subset via pydantable `Selector` or PlanFrame selector. |
 | `join` | PlanFrame `Join`; `on` / `left_on` / `right_on` are `str`, Expr, or sequences of str/Expr; `how="cross"` with no keys; `JoinOptions` supported. `allow_parallel` / `force_parallel` raise `NotImplementedError` on `DataFrameModel` (use `to_dataframe()` if you need them on the core `DataFrame`). |
-| `group_by(...).agg(...)` | PlanFrame `GroupBy` + `Agg`; keys are `str` or `planframe.expr.api` expressions. `planframe.expr.api.Col("x")` normalizes to `"x"` for `agg`. Composite expression keys may still fail at `agg` until a follow-up. |
+| `group_by(...).agg(...)` | PlanFrame `GroupBy` + `Agg`; keys must be `str` or `planframe.expr.api.col("name")` (other expressions raise `TypeError`; use `with_columns` to build a key column first). |
 | `group_by_dynamic(...).agg(...)` | PlanFrame `DynamicGroupByAgg` via adapter; returns a dynamic grouped object whose `agg(...)` is PlanFrame-backed. |
 | `rolling_agg(...)` | PlanFrame `RollingAgg` via adapter. |
 | `unique`, `distinct`, `head`, `tail`, `slice` | PlanFrame nodes + `execute_frame`. |
@@ -37,7 +37,7 @@ For the methods below, **there is no silent legacy path**: the operation is expr
 | `unnest_all` | PlanFrame-backed: expands to `unnest(*schema_fields)`. |
 | `concat` | PlanFrame `concat(how="vertical"|"horizontal")` (narrowed: identical schemas for vertical; no overlaps for horizontal). |
 
-Unsupported use cases (e.g. `select` with expressions only available via **`with_columns`**, parallel join flags, or composite **group_by** expr keys + **`agg`** where compilation fails) may still require the core **`DataFrame`**. Use **`DataFrameModel.to_dataframe()`** for engine-only APIs. See {doc}`PLANFRAME_ADAPTER_ROADMAP` Phase 3.
+Unsupported use cases (e.g. `select` with expressions only available via **`with_columns`**, parallel join flags, or **`group_by`** on arbitrary expressions without adding a column first) may still require the core **`DataFrame`**. Use **`DataFrameModel.to_dataframe()`** for engine-only APIs. See {doc}`PLANFRAME_ADAPTER_ROADMAP` Phase 3.
 
 ## `_pf` always defined and consistent
 
@@ -46,7 +46,7 @@ Every instance from `_from_dataframe`, `as_model`, or `concat` gets `_pf = Frame
 ## Explicit errors and remaining gaps (not silent legacy paths)
 
 - **`join(..., allow_parallel=, force_parallel=)`** — `NotImplementedError` on `DataFrameModel`; use **`DataFrameModel.to_dataframe()`** for parallel join flags on the core **`DataFrame`** if needed.
-- **Composite non-trivial `group_by` expression keys + `agg`** — may fail at execution until adapter/schema support catches up; see `tests/dataframe_model/test_dataframe_model_planframe_expr_keys.py`.
+- **`group_by`** — only `str` or `planframe.expr.api.col("x")`; other expression keys raise **`TypeError`** (see {doc}`PLANFRAME_ADAPTER_ROADMAP` Phase 3).
 - **Expression coverage** — any `planframe.expr.api` node not lowered in `planframe_adapter/expr.py` still raises when executed through the adapter (see Phase 1 in {doc}`PLANFRAME_ADAPTER_ROADMAP`).
 
 ## Pydantable backlog (work still to do here)
@@ -56,10 +56,12 @@ Every instance from `_from_dataframe`, `as_model`, or `concat` gets `_pf = Frame
 | **Improve reshape ergonomics** | Support richer `melt` / `pivot` kwargs (selectors, defaults) while keeping the PlanFrame-first typing ethos. |
 | **Widen explode/unnest** | Multi-column explode/unnest, `outer=`, and schema-driven `*_all` variants need additional PlanFrame/pydantable surface design. |
 | **Parity for `drop_nulls` / `fill_null`** | Ensure all `DataFrameModel` surface params are forwarded and covered by tests. |
-| **Composite `group_by` expr keys + `agg`** | Non-trivial expression group keys need end-to-end compile/schema support (beyond normalizing `Col("x")` to `"x"`). |
+| **Optional: computed `group_by` without `with_columns`** | Could be added via PlanFrame/compiler work; today users add a key column explicitly. |
 | **`planframe_adapter/expr.py`** | Extend lowering for additional `planframe.expr.api` nodes and `AggExpr` / `Over` combinations as they are claimed supported (see {doc}`PLANFRAME_ADAPTER_ROADMAP`). |
 | **Tests / typing artifacts** | Regenerate stubs and add tests when new PlanFrame-backed methods ship. |
 | **`execute_frame`** | pydantable delegates to `planframe.execution.execute_plan`. |
+| **`write_delta` / `write_avro` (adapter)** | `NotImplementedError` until the core `DataFrame` exposes matching sinks; `PydantableAdapter` mirrors that. |
+| **`join` parallel flags** | Core `DataFrame.join` does not support `allow_parallel` / `force_parallel` in this build either; use `to_dataframe()` if a future engine adds them. |
 
 ## Upstream PlanFrame
 
@@ -72,6 +74,21 @@ PlanFrame **1.x** provides `ExecutionOptions` (e.g. `streaming` / `engine_stream
 ### Async
 
 PlanFrame is synchronous; pydantable `acollect` / `ato_dict` / … delegate to `DataFrame`. See [planframe#15](https://github.com/eddiethedean/planframe/issues/15).
+
+## Recipe: computed group key without widening `group_by`
+
+`DataFrameModel.group_by` accepts only column names or `planframe.expr.api.col("name")`. To group by a derived value, add a column with `with_columns`, then group on that name (pydantable `Expr` or PlanFrame expr):
+
+```python
+from planframe.expr import api as pf
+from pydantable.expressions import col
+
+out = (
+    df.with_columns(dbl=col("x") * 2)
+    .group_by("dbl")
+    .agg(n=pf.agg_count(pf.col("y")))
+)
+```
 
 ## See also
 

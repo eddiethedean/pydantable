@@ -957,6 +957,24 @@ def test_p2_dataframe_model_fill_and_drop_nulls() -> None:
     assert dropped.collect(as_lists=True) == {"id": [1, 3], "age": [10, 30]}
 
 
+def test_dataframe_model_fill_drop_nulls_selector_subset_matches_dataframe() -> None:
+    from pydantable import selectors as s
+
+    df = UserDF({"id": [1, 2, 3], "age": [10, None, 30]})
+    filled = df.fill_null(0, subset=s.by_name("age"))
+    assert filled.collect(as_lists=True) == {"id": [1, 2, 3], "age": [10, 0, 30]}
+    dropped = df.drop_nulls(subset=s.by_name("age"))
+    assert dropped.collect(as_lists=True) == {"id": [1, 3], "age": [10, 30]}
+
+
+def test_dataframe_model_melt_unpivot_reject_streaming_kw() -> None:
+    df = UserDF({"id": [1], "age": [10]})
+    with pytest.raises(ValueError, match="does not support streaming"):
+        df.melt(id_vars=["id"], value_vars=["age"], streaming=True)
+    with pytest.raises(ValueError, match="does not support streaming"):
+        df.unpivot(index=["id"], on=["age"], streaming=True)
+
+
 def test_p4_dataframe_model_groupby_aggregations_schema() -> None:
     df = UserDF({"id": [1, 1, 2], "age": [10, 20, 30]})
     grouped = df.group_by("id").agg(
