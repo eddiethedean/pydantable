@@ -15,6 +15,16 @@ The **pydantable** repo runs **`ty check`** on first-party trees in CI (`make ch
 
 This page consolidates the typing story and links to the relevant contracts.
 
+## PlanFrame boundary types (what stubs expose)
+
+Even if you don’t use the `df.planframe` typing-first chain directly, some `DataFrameModel` APIs accept **PlanFrame types** at the boundary:
+
+- **Sort/join keys**: `str` or `planframe.expr.api.Expr` (e.g. `pf.col("id")`)
+- **Group keys**: `str` or `planframe.expr.api.Col` (not general expressions; add a key column first)
+- **Selector inputs**: pydantable `Selector` (has `resolve(...)`) or PlanFrame `ColumnSelector` (has `select(schema)`)
+
+These are typed in the shipped stubs so Pyright and Astral `ty` match the runtime contract.
+
 ## Phase T0 checker matrix (recommended path per checker)
 
 This table records the **expected** and **recommended** typing story per checker, including the planned PlanFrame-first path (Phase T1) and boundary model (Phase T3). Until Phase T1 lands, treat the “Frame exposure” column as a target state.

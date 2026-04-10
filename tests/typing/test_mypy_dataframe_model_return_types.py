@@ -223,6 +223,7 @@ def test_mypy_accepts_schema_preserving_chain_methods(tmp_path: Path) -> None:
     pytest.importorskip("mypy")
     code = """
     from pydantable import DataFrameModel
+    from pydantable.selectors import by_name
 
     class U(DataFrameModel):
         id: int
@@ -236,7 +237,7 @@ def test_mypy_accepts_schema_preserving_chain_methods(tmp_path: Path) -> None:
             .clip(lower=0, upper=10, subset="id")
             .fill_null(0)
             .drop_nulls(subset="id")
-            .with_columns_fill_null("v", value=0)
+            .with_columns_fill_null(by_name("v"), value=0)
             .explode("id")
             .with_row_count()
             .explode_all()
@@ -433,16 +434,17 @@ def test_mypy_with_columns_cast_and_fill_null_preserve_model_type(
     pytest.importorskip("mypy")
     code = """
     from pydantable import DataFrameModel
+    from pydantable.selectors import by_name
 
     class U(DataFrameModel):
         id: int
         age: int
 
     def f_cast(df: U) -> U:
-        return df.with_columns_cast("age", int)
+        return df.with_columns_cast(by_name("age"), int)
 
     def f_fill(df: U) -> U:
-        return df.with_columns_fill_null("age", value=0)
+        return df.with_columns_fill_null(by_name("age"), value=0)
     """
     proc = _run_mypy_snippet(tmp_path, code)
     _mypy_output_or_skip_on_crash(proc)

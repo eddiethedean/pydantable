@@ -11,13 +11,16 @@ from collections.abc import (
 from concurrent.futures import Executor
 from typing import Any, Generic, Literal, TypeVar
 
+from planframe.expr import api as pf
 from planframe.frame import Frame as PlanFrameFrame
+from planframe.selector import ColumnSelector
 from pydantic import BaseModel
 from typing_extensions import Self
 
 from pydantable.awaitable_dataframe_model import AwaitableDataFrameModel
 from pydantable.dataframe import DataFrame, ExecutionHandle
 from pydantable.schema import Schema
+from pydantable.selectors import Selector
 
 RowT = TypeVar("RowT", bound=BaseModel)
 ModelSelf = TypeVar("ModelSelf", bound="DataFrameModel[Any]")
@@ -761,21 +764,32 @@ class DataFrameModel(Generic[RowT]):
         **model_dump_kwargs: Any,
     ) -> list[dict[str, Any]]: ...
     def select(self, *cols: Any) -> DataFrameModel[Any]: ...
-    def select_schema(self, selector: Any) -> DataFrameModel[Any]: ...
+    def select_schema(
+        self, selector: Selector | ColumnSelector
+    ) -> DataFrameModel[Any]: ...
     def with_columns(self, **new_columns: Any) -> DataFrameModel[Any]: ...
     def with_columns_cast(
-        self, selector: Any, dtype: Any, *, strict: bool = True
+        self,
+        selector: Selector | ColumnSelector | Mapping[str, Any],
+        dtype: Any,
+        *,
+        strict: bool = True,
     ) -> DataFrameModel[Any]: ...
     def with_columns_fill_null(
         self,
-        selector: Any,
+        selector: Selector | ColumnSelector | Mapping[str, Any],
         *,
         value: Any = None,
         strategy: str | None = None,
         strict: bool = True,
     ) -> Self: ...
     def filter(self, condition: Any) -> Self: ...
-    def sort(self, *by: Any, descending: bool | Sequence[bool] = False) -> Self: ...
+    def sort(
+        self,
+        *by: str | pf.Expr[Any],
+        descending: bool | Sequence[bool] = False,
+        nulls_last: bool | Sequence[bool] = False,
+    ) -> Self: ...
     def unique(
         self, subset: Sequence[str] | None = None, *, keep: str = "first"
     ) -> Self: ...
@@ -787,17 +801,17 @@ class DataFrameModel(Generic[RowT]):
         self, columns: Mapping[str, str], *, strict: bool = True
     ) -> DataFrameModel[Any]: ...
     def rename_upper(
-        self, selector: Any = None, *, strict: bool = True
+        self, selector: Selector | ColumnSelector | None = None, *, strict: bool = True
     ) -> DataFrameModel[Any]: ...
     def rename_lower(
-        self, selector: Any = None, *, strict: bool = True
+        self, selector: Selector | ColumnSelector | None = None, *, strict: bool = True
     ) -> DataFrameModel[Any]: ...
     def rename_title(
-        self, selector: Any = None, *, strict: bool = True
+        self, selector: Selector | ColumnSelector | None = None, *, strict: bool = True
     ) -> DataFrameModel[Any]: ...
     def rename_strip(
         self,
-        selector: Any = None,
+        selector: Selector | ColumnSelector | None = None,
         *,
         chars: str | None = None,
         strict: bool = True,
@@ -976,17 +990,17 @@ class DataFrameModel(Generic[RowT]):
         self,
         other: DataFrameModel[Any],
         *,
-        on: str | Sequence[str] | Any | None = None,
-        left_on: Any = None,
-        right_on: Any = None,
+        on: str | pf.Expr[Any] | Sequence[str | pf.Expr[Any]] | None = None,
+        left_on: str | pf.Expr[Any] | Sequence[str | pf.Expr[Any]] | None = None,
+        right_on: str | pf.Expr[Any] | Sequence[str | pf.Expr[Any]] | None = None,
         how: str = "inner",
         suffix: str = "_right",
         coalesce: bool | None = None,
         validate: str | None = None,
         join_nulls: bool | None = None,
         maintain_order: bool | str | None = None,
-        allow_parallel: bool | None = None,
-        force_parallel: bool | None = None,
+        allow_parallel: Literal[None] = None,
+        force_parallel: Literal[None] = None,
         streaming: bool | None = None,
     ) -> DataFrameModel[Any]: ...
     def join_as_model(
@@ -994,17 +1008,17 @@ class DataFrameModel(Generic[RowT]):
         other: DataFrameModel[Any],
         model: type[AfterModelT],
         *,
-        on: str | Sequence[str] | Any | None = None,
-        left_on: Any = None,
-        right_on: Any = None,
+        on: str | pf.Expr[Any] | Sequence[str | pf.Expr[Any]] | None = None,
+        left_on: str | pf.Expr[Any] | Sequence[str | pf.Expr[Any]] | None = None,
+        right_on: str | pf.Expr[Any] | Sequence[str | pf.Expr[Any]] | None = None,
         how: str = "inner",
         suffix: str = "_right",
         coalesce: bool | None = None,
         validate: str | None = None,
         join_nulls: bool | None = None,
         maintain_order: bool | str | None = None,
-        allow_parallel: bool | None = None,
-        force_parallel: bool | None = None,
+        allow_parallel: Literal[None] = None,
+        force_parallel: Literal[None] = None,
         streaming: bool | None = None,
     ) -> AfterModelT: ...
     def join_try_as_model(
@@ -1012,17 +1026,17 @@ class DataFrameModel(Generic[RowT]):
         other: DataFrameModel[Any],
         model: type[AfterModelT],
         *,
-        on: str | Sequence[str] | Any | None = None,
-        left_on: Any = None,
-        right_on: Any = None,
+        on: str | pf.Expr[Any] | Sequence[str | pf.Expr[Any]] | None = None,
+        left_on: str | pf.Expr[Any] | Sequence[str | pf.Expr[Any]] | None = None,
+        right_on: str | pf.Expr[Any] | Sequence[str | pf.Expr[Any]] | None = None,
         how: str = "inner",
         suffix: str = "_right",
         coalesce: bool | None = None,
         validate: str | None = None,
         join_nulls: bool | None = None,
         maintain_order: bool | str | None = None,
-        allow_parallel: bool | None = None,
-        force_parallel: bool | None = None,
+        allow_parallel: Literal[None] = None,
+        force_parallel: Literal[None] = None,
         streaming: bool | None = None,
     ) -> AfterModelT | None: ...
     def join_assert_model(
@@ -1030,20 +1044,20 @@ class DataFrameModel(Generic[RowT]):
         other: DataFrameModel[Any],
         model: type[AfterModelT],
         *,
-        on: str | Sequence[str] | Any | None = None,
-        left_on: Any = None,
-        right_on: Any = None,
+        on: str | pf.Expr[Any] | Sequence[str | pf.Expr[Any]] | None = None,
+        left_on: str | pf.Expr[Any] | Sequence[str | pf.Expr[Any]] | None = None,
+        right_on: str | pf.Expr[Any] | Sequence[str | pf.Expr[Any]] | None = None,
         how: str = "inner",
         suffix: str = "_right",
         coalesce: bool | None = None,
         validate: str | None = None,
         join_nulls: bool | None = None,
         maintain_order: bool | str | None = None,
-        allow_parallel: bool | None = None,
-        force_parallel: bool | None = None,
+        allow_parallel: Literal[None] = None,
+        force_parallel: Literal[None] = None,
         streaming: bool | None = None,
     ) -> AfterModelT: ...
-    def group_by(self, *keys: Any) -> GroupedDataFrameModel[Self]: ...
+    def group_by(self, *keys: str | pf.Col) -> GroupedDataFrameModel[Self]: ...
     def rolling_agg(
         self,
         *,

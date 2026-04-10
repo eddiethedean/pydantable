@@ -165,6 +165,14 @@ Then broaden to the schema-preserving convenience nodes (`head`, `tail`, `slice`
 - **`scripts/generate_typing_artifacts.py`**: extend templates so regenerated stubs stay aligned with Phase T1 accessors (run `--check` in CI).
 - **Reduce** redundant overloads on `DataFrameModel` that duplicate PlanFrame once T1 is canonical for “full inference”.
 
+**Status (implemented)**
+
+- `python/pydantable/dataframe_model.pyi` now **imports and references** PlanFrame boundary types directly:
+  - `planframe.expr.api` (`Expr` for `sort`/`join`, `Col` for `group_by`)
+  - `planframe.selector.ColumnSelector` (for `select_schema` / selector-accepting helpers)
+  - pydantable `Selector` is typed explicitly as an alternate selector protocol.
+- Join parallel flags remain present but are typed as **`Literal[None]`** in stubs to reflect that runtime raises on non-`None`.
+
 ### T2 priorities (derived from T0 inventory)
 
 Once `DataFrameModel.planframe` (or `to_planframe()`) exists, ensure stubs align for the inventory’s “PlanFrame-first core API”:\n

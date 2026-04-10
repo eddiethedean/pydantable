@@ -32,6 +32,7 @@ def test_ty_keeps_concrete_model_type_through_schema_preserving_chains(
     pytest.importorskip("ty")
     code = """
     from pydantable import DataFrameModel
+    from pydantable.selectors import by_name
 
     class U(DataFrameModel):
         id: int
@@ -45,7 +46,7 @@ def test_ty_keeps_concrete_model_type_through_schema_preserving_chains(
             .clip(lower=0, upper=10, subset="id")
             .fill_null(0)
             .drop_nulls(subset="id")
-            .with_columns_fill_null("v", value=0)
+            .with_columns_fill_null(by_name("v"), value=0)
             .explode("id")
             .with_row_count()
             .explode_all()
@@ -82,6 +83,7 @@ def test_ty_sees_dataframe_model_planframe_property(tmp_path: Path) -> None:
     pytest.importorskip("ty")
     code = """
     from planframe.frame import Frame as PFFrame
+    from planframe.expr import api as pf
 
     from pydantable import DataFrameModel
 
@@ -93,6 +95,11 @@ def test_ty_sees_dataframe_model_planframe_property(tmp_path: Path) -> None:
         pf = df.planframe
         _ = pf.select("id")
         return pf
+
+    def key_exprs(df: U) -> None:
+        _ = df.sort(pf.col("id"))
+        _ = df.join(df, on=pf.col("id"))
+        _ = df.group_by(pf.col("id"))
     """
     proc = _run_ty_snippet(tmp_path, code)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)

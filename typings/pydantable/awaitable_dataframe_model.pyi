@@ -4,6 +4,8 @@ from collections.abc import Callable, Coroutine, Sequence
 from concurrent.futures import Executor
 from typing import Any, Generic, TypeVar
 
+from planframe.expr import api as pf
+
 GroupedT = TypeVar("GroupedT")
 RowT = TypeVar("RowT")
 
@@ -27,13 +29,13 @@ class AwaitableDataFrameModel(Generic[RowT]):
         self,
         other: Any,
         *,
-        on: str | Sequence[str] | None = ...,
+        on: str | pf.Expr[Any] | Sequence[str | pf.Expr[Any]] | None = ...,
         left_on: Any = ...,
         right_on: Any = ...,
         how: str = ...,
         suffix: str = ...,
     ) -> AwaitableDataFrameModel[Any]: ...
-    def group_by(self, *keys: Any) -> AwaitableGroupedDataFrameModel[Any]: ...
+    def group_by(self, *keys: str | pf.Col) -> AwaitableGroupedDataFrameModel[Any]: ...
     def group_by_dynamic(
         self,
         index_column: str,

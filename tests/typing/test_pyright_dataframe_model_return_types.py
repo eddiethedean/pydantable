@@ -194,6 +194,7 @@ def test_pyright_sees_dataframe_model_io_and_model_helpers(tmp_path: Path) -> No
     from typing import Any
 
     from pydantable import DataFrameModel
+    from pydantable.selectors import by_name
 
     class U(DataFrameModel):
         id: int
@@ -212,7 +213,7 @@ def test_pyright_sees_dataframe_model_io_and_model_helpers(tmp_path: Path) -> No
         return df.filter(df.id == 1).distinct()
 
     def typed(df: U) -> DataFrameModel[Any]:
-        return df.with_columns_cast("id", int)
+        return df.with_columns_cast(by_name("id"), int)
     """
     proc = _run_pyright_snippet(tmp_path, code)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
@@ -225,6 +226,7 @@ def test_pyright_sees_dataframe_model_planframe_property(tmp_path: Path) -> None
     from __future__ import annotations
 
     from planframe.frame import Frame as PFFrame
+    from planframe.expr import api as pf
 
     from pydantable import DataFrameModel
 
@@ -237,6 +239,12 @@ def test_pyright_sees_dataframe_model_planframe_property(tmp_path: Path) -> None
         # PlanFrame typing is strongest with literal column names.
         _ = pf.select("id")
         return pf
+
+    def key_exprs(df: U) -> None:
+        # DataFrameModel accepts str and planframe.expr.api.Expr keys at runtime.
+        _ = df.sort(pf.col("id"))
+        _ = df.join(df, on=pf.col("id"))
+        _ = df.group_by(pf.col("id"))
     """
     proc = _run_pyright_snippet(tmp_path, code)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
@@ -248,6 +256,7 @@ def test_pyright_keeps_concrete_model_type_through_schema_preserving_chains(
     pytest.importorskip("pyright")
     code = """
     from pydantable import DataFrameModel
+    from pydantable.selectors import by_name
 
     class U(DataFrameModel):
         id: int
@@ -262,7 +271,7 @@ def test_pyright_keeps_concrete_model_type_through_schema_preserving_chains(
             .clip(lower=0, upper=10, subset="id")
             .fill_null(0)
             .drop_nulls(subset="id")
-            .with_columns_fill_null("v", value=0)
+            .with_columns_fill_null(by_name("v"), value=0)
             .explode("id")
             .with_row_count()
             .explode_all()
