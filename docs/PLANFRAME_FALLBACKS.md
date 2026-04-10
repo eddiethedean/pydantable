@@ -2,7 +2,7 @@
 
 `DataFrameModel` keeps a typed [PlanFrame](https://pypi.org/project/planframe/) `Frame` as `_pf` and executes it through `pydantable.planframe_adapter.PydantableAdapter` (Rust/native `DataFrame` backend).
 
-**Requirement:** current pydantable releases depend on **PlanFrame `>=1.0.0,<2`** (see `pyproject.toml`).
+**Requirement:** current pydantable releases depend on **PlanFrame `>=1.2.0,<2`** (see `pyproject.toml`).
 
 ## PlanFrame–first core API
 
@@ -79,7 +79,7 @@ PlanFrame **1.x** provides `ExecutionOptions` (e.g. `streaming` / `engine_stream
 
 ### Async
 
-PlanFrame is synchronous; pydantable `acollect` / `ato_dict` / … delegate to `DataFrame`. See [planframe#15](https://github.com/eddiethedean/planframe/issues/15).
+PlanFrame **1.2.0+** exposes async execution/materialization on **`Frame`** (e.g. `ato_dict`, `execute_plan_async`, and the `*_async` aliases; see [planframe#105](https://github.com/eddiethedean/planframe/issues/105)). **`DataFrameModel`** async terminals (`acollect`, `ato_dict`, …) still **delegate to the inner `DataFrame`** so row validation and engine semantics stay consistent; use **`df.planframe`** when you want the PlanFrame async path explicitly. Older tracking: [planframe#15](https://github.com/eddiethedean/planframe/issues/15).
 
 ## Recipe: computed group key without widening `group_by`
 

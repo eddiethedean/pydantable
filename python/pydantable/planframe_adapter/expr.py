@@ -21,6 +21,7 @@ Any other node raises ``NotImplementedError`` with a stable message.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from pydantable.planframe_adapter.errors import require_planframe
@@ -62,17 +63,29 @@ def _validate_planframe_window_columns(
 
 
 def compile_expr(
-    expr: Any, *, schema_fields: dict[str, Any], allow_unknown_cols: bool = False
+    expr: Any,
+    *,
+    schema_fields: dict[str, Any],
+    allow_unknown_cols: bool = False,
+    resolve_col: Callable[[str], Any] | None = None,
 ) -> Any:
     """
     Lower a PlanFrame Expr to a pydantable Expr using known column dtypes.
 
     PlanFrame 0.3+ passes a Schema into `BaseAdapter.compile_expr(...)` so adapters can
     lower dtype-aware column references without requiring a concrete backend frame.
+
+    When *resolve_col* is provided (typically wired to ``BaseAdapter.resolve_dtype``),
+    it is used for column names missing from *schema_fields* (e.g. projected schemas).
     """
 
     require_planframe()
-    return _to_pyd_expr(expr, schema_fields=schema_fields, allow_unknown_cols=allow_unknown_cols)
+    return _to_pyd_expr(
+        expr,
+        schema_fields=schema_fields,
+        allow_unknown_cols=allow_unknown_cols,
+        resolve_col=resolve_col,
+    )
 
 
 def _to_pyd_expr(
@@ -80,6 +93,7 @@ def _to_pyd_expr(
     *,
     schema_fields: dict[str, Any],
     allow_unknown_cols: bool = False,
+    resolve_col: Callable[[str], Any] | None = None,
 ) -> Any:
     require_planframe()
     from planframe.expr import api as pf
@@ -97,6 +111,10 @@ def _to_pyd_expr(
 
     if isinstance(expr, pf.Col):
         if expr.name not in schema_fields:
+            if resolve_col is not None:
+                resolved = resolve_col(expr.name)
+                if resolved is not None:
+                    return ColumnRef(name=expr.name, dtype=resolved)
             if allow_unknown_cols:
                 # Group-by ``AggExpr`` compilation uses the *output* Frame schema, which
                 # omits non-key source columns; aggregation still references them on the
@@ -111,7 +129,10 @@ def _to_pyd_expr(
 
     def _rec(e: Any) -> Any:
         return _to_pyd_expr(
-            e, schema_fields=schema_fields, allow_unknown_cols=allow_unknown_cols
+            e,
+            schema_fields=schema_fields,
+            allow_unknown_cols=allow_unknown_cols,
+            resolve_col=resolve_col,
         )
 
     # Binary arithmetic
@@ -222,6 +243,7 @@ def _to_pyd_expr(
             expr.inner,
             schema_fields=schema_fields,
             allow_unknown_cols=True,
+            resolve_col=resolve_col,
         )
         op = expr.op
         _AGG_OPS = frozenset(

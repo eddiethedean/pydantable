@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, cast
 
-from planframe.backend.adapter import BaseAdapter
+from planframe.backend.adapter import BaseAdapter, CompileExprContext
 
 from pydantable.expressions import Expr as PydExpr
 from pydantable.planframe_adapter.errors import require_planframe
@@ -493,15 +493,56 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
 
     # ---- expression compilation + materialization ----
 
-    def compile_expr(self, expr: Any, *, schema: Any) -> Any:
+    def resolve_dtype(self, name: str, *, ctx: CompileExprContext) -> object | None:
+        """Map ``Col(name)`` to a dtype when PlanFrame's step schema is partial.
+
+        PlanFrame 1.2+ routes ``compile_expr`` through :class:`CompileExprContext` and
+        expects adapters to recover dtypes for columns that still exist on the backend
+        frame but are omitted from the projected schema (e.g. ``filter`` then
+        ``select``). When the column is not in ``ctx.schema``, fall back to a
+        permissive scalar dtype; the engine still resolves the column by name.
+        """
+
+        sch = ctx.schema
+        if sch is not None:
+            if hasattr(sch, "field_map"):
+                fm = sch.field_map()
+                if name in fm:
+                    return fm[name].dtype
+            fields = getattr(sch, "fields", None)
+            if fields is not None:
+                for f in fields:
+                    if getattr(f, "name", None) == name:
+                        return getattr(f, "dtype", None)
+        return float
+
+    def compile_expr(
+        self,
+        expr: Any,
+        *,
+        schema: Any | None = None,
+        ctx: CompileExprContext | None = None,
+    ) -> Any:
         from pydantable.planframe_adapter.expr import compile_expr
 
-        schema_fields = {f.name: f.dtype for f in schema.fields}
-        # PlanFrame may compile predicates using a projected/output schema (e.g. when a
-        # downstream `select(...)` drops columns referenced by an upstream `filter(...)`).
-        # In that case the backend frame *still* has the column at the filter node, so
-        # we allow unknown column refs and let the engine resolve them by name.
-        return compile_expr(expr, schema_fields=schema_fields, allow_unknown_cols=True)
+        effective_schema = schema if schema is not None else (
+            ctx.schema if ctx is not None else None
+        )
+        if effective_schema is None:
+            raise TypeError("compile_expr requires schema or ctx.schema")
+        compile_ctx = ctx if ctx is not None else CompileExprContext(
+            schema=effective_schema
+        )
+        schema_fields = {f.name: f.dtype for f in effective_schema.fields}
+
+        def _resolve_col(n: str) -> object | None:
+            return self.resolve_dtype(n, ctx=compile_ctx)
+
+        return compile_expr(
+            expr,
+            schema_fields=schema_fields,
+            resolve_col=_resolve_col,
+        )
 
     def collect(self, df: Any, *, options: Any | None = None) -> Any:
         # PlanFrame expects `.collect` to return a backend frame; for pydantable the

@@ -19,7 +19,7 @@ classifiers = [
 ]
 dependencies = [
     # PlanFrame is the core plan layer for the DataFrameModel-first interface.
-    "planframe>=1.1.0,<2",
+    "planframe>=1.2.0,<2",
     "pydantic>=2.0,<3",
     "pydantable-protocol==2.0.0",
     "pydantable-native==2.0.0",

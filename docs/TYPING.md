@@ -54,6 +54,10 @@ def pipeline(df: Before) -> After:
     return materialize_dataframe_model(pf_out, After, trusted_mode="shape_only")
 ```
 
+Sync helpers delegate to PlanFrame’s `planframe.materialize.materialize_columns` (same `ExecutionOptions` story). In async code, use `amaterialize_dataframe_model`, which follows PlanFrame’s `amaterialize_columns` / `Frame.ato_dict` path (default backend implementation uses a worker thread).
+
+PlanFrame **1.2.0** also fixed **per-step input schema** during `execute_plan` (so `filter(...).select(...)` predicates type-check and execute against the right columns; [planframe#103](https://github.com/eddiethedean/planframe/issues/103)), added **`resolve_dtype`** / **`CompileExprContext`** for adapters ([planframe#104](https://github.com/eddiethedean/planframe/issues/104)), expanded **`Expr`** stub operators for comparisons and booleans ([planframe#106](https://github.com/eddiethedean/planframe/issues/106)), and documented **`planframe.materialize`** ([planframe#107](https://github.com/eddiethedean/planframe/issues/107)). Upstream async aliases (`to_dict_async`, `execute_plan_async`, …) are described in PlanFrame’s adapter docs; pydantable’s async escape hatches for **`DataFrameModel`** remain in {doc}`PLANFRAME_FALLBACKS`.
+
 ## Phase T0 checker matrix (recommended path per checker)
 
 This table records the **expected** and **recommended** typing story per checker, including the planned PlanFrame-first path (Phase T1) and boundary model (Phase T3). Until Phase T1 lands, treat the “Frame exposure” column as a target state.
