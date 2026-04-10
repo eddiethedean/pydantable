@@ -397,7 +397,7 @@ class DataFrameModel(Generic[RowT]):
         `docs/PLANFRAME_TYPING_ROADMAP.md`, Phase T3).
 
         For best static typing in Pyright/`ty`, prefer **literal** column names in
-        PlanFrame chains (matches PlanFrame’s stub design).
+        PlanFrame chains (matches the PlanFrame stub design).
         """
 
         return self._pf
@@ -2572,18 +2572,14 @@ class DataFrameModel(Generic[RowT]):
                 raise ValueError(
                     f"fill_null(subset={subset!r}) matched no schema columns."
                 )
-            return self._dfm_sync_pf(
-                pf_any.fill_null(value, *cols, strategy=strategy)
-            )
+            return self._dfm_sync_pf(pf_any.fill_null(value, *cols, strategy=strategy))
         if subset is not None and hasattr(subset, "select"):
             cols = tuple(cast("Any", subset).select(pf_any.schema()))
             if not cols:
                 raise ValueError(
                     f"fill_null(subset={subset!r}) matched no schema columns."
                 )
-            return self._dfm_sync_pf(
-                pf_any.fill_null(value, *cols, strategy=strategy)
-            )
+            return self._dfm_sync_pf(pf_any.fill_null(value, *cols, strategy=strategy))
         if subset is None:
             return self._dfm_sync_pf(self._pf.fill_null(value, strategy=strategy))
         return self._dfm_sync_pf(

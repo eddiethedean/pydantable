@@ -525,13 +525,13 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
     ) -> Any:
         from pydantable.planframe_adapter.expr import compile_expr
 
-        effective_schema = schema if schema is not None else (
-            ctx.schema if ctx is not None else None
+        effective_schema = (
+            schema if schema is not None else (ctx.schema if ctx is not None else None)
         )
         if effective_schema is None:
             raise TypeError("compile_expr requires schema or ctx.schema")
-        compile_ctx = ctx if ctx is not None else CompileExprContext(
-            schema=effective_schema
+        compile_ctx = (
+            ctx if ctx is not None else CompileExprContext(schema=effective_schema)
         )
         schema_fields = {f.name: f.dtype for f in effective_schema.fields}
 

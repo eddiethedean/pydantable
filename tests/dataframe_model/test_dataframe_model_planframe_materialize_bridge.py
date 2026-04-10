@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from planframe.expr import api as pf
-
 from pydantable import DataFrameModel
 from pydantable.planframe_adapter import (
     amaterialize_dataframe_model,
@@ -32,4 +31,3 @@ async def test_amaterialize_dataframe_model_from_planframe_chain() -> None:
     out = await amaterialize_dataframe_model(pf_out, After)
     assert isinstance(out, After)
     assert out.to_dict() == {"id": [1, 3]}
-

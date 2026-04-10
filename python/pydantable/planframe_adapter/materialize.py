@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 from pydantable.planframe_adapter.errors import require_planframe
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pydantable.dataframe_model import DataFrameModel
 
 AfterModelT = TypeVar("AfterModelT", bound="DataFrameModel[Any]")
@@ -67,7 +68,7 @@ async def amaterialize_dataframe_model(
     ignore_errors: bool = False,
     on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> AfterModelT:
-    """Async columnar materialization via PlanFrame ``amaterialize_columns`` / ``ato_dict``."""
+    """Async columnar export via PlanFrame ``amaterialize_columns`` (``ato_dict``)."""
 
     require_planframe()
     from planframe.execution import ExecutionOptions

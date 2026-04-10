@@ -21,10 +21,12 @@ Any other node raises ``NotImplementedError`` with a stable message.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantable.planframe_adapter.errors import require_planframe
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def _planframe_window_spec(

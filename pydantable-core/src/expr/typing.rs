@@ -3756,7 +3756,7 @@ impl ExprNode {
                     .map(|v| match v {
                         None => None,
                         Some(LiteralValue::Float(f)) => Some(LiteralValue::Bool(f.is_finite())),
-                        Some(LiteralValue::Int(i)) => Some(LiteralValue::Bool(true)),
+                        Some(LiteralValue::Int(_)) => Some(LiteralValue::Bool(true)),
                         Some(_) => None,
                     })
                     .collect())
