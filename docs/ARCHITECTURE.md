@@ -15,6 +15,10 @@ flowchart LR
   materialize --> outputs[Outputs_RowsOrDictOrArrowOrPolars]
 ```
 
+## PlanFrame adapter (`DataFrameModel`)
+
+**`DataFrameModel`** holds a [PlanFrame](https://pypi.org/project/planframe/) **`Frame`** for most typed transforms; the adapter lowers those plans and runs them through **`planframe.execution.execute_plan`** into the same **`ExecutionEngine`** path as the core **`DataFrame`**. **`_df`** is updated to match the executed result where the adapter applies. Explicit escape hatches, async behavior, and remaining gaps: {doc}`PLANFRAME_FALLBACKS`; roadmap: {doc}`PLANFRAME_ADAPTER_ROADMAP`.
+
 ## I/O vocabulary (lazy vs eager)
 
 ```

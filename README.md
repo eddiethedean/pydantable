@@ -15,6 +15,7 @@
 - **One schema, many surfaces:** define columns with Pydantic models; use `DataFrameModel` (SQLModel-style) or `DataFrame[YourSchema]`.
 - **Typed expressions:** `Expr` and transform chains are validated and lowered in Rust; many errors fail fast at build/plan time.
 - **Familiar operations:** `select`, `filter`, `join`, `group_by`, windows, melt/pivot, and pandas-flavored helpers where they help.
+- **`DataFrameModel` + PlanFrame:** typed transforms are PlanFrame-first (adapter + Rust engine); columnar `to_dict()` / `collect(as_lists=True)` can follow that path when enabled—see [PLANFRAME_FALLBACKS](https://pydantable.readthedocs.io/en/latest/PLANFRAME_FALLBACKS.html) and the [adapter roadmap](https://pydantable.readthedocs.io/en/latest/PLANFRAME_ADAPTER_ROADMAP.html).
 - **Flexible materialization:** row models via `collect()` / `rows()`, columnar `dict[str, list]`, or Polars/PyArrow with the right extras.
 - **I/O:** lazy `read_*` / `aread_*`, streaming writes, NDJSON/JSON Lines, Parquet, CSV, IPC, HTTP, SQL (SQLModel-first `fetch_sqlmodel` / `write_sqlmodel`, explicit string SQL `fetch_sql_raw` / `write_sql_raw`, or deprecated unprefixed names) — [I/O overview](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html), [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html), [SQLModel roadmap](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html), and [decision tree](https://pydantable.readthedocs.io/en/latest/IO_DECISION_TREE.html).
 - **JSON & struct columns:** struct expressions, JSON encode/decode helpers, unnest/nested models — [IO_JSON](https://pydantable.readthedocs.io/en/latest/IO_JSON.html), [SELECTORS](https://pydantable.readthedocs.io/en/latest/SELECTORS.html).
@@ -83,7 +84,7 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 
 **Rich column types** (`Literal`, `ipaddress`, `WKB`, `Annotated`, …) are covered in [SUPPORTED_TYPES](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html).
 
-**Materialization:** `collect()` / `rows()` → row models; `to_dict()` → `dict[str, list]`; `to_polars()` / `to_arrow()` with matching extras.
+**Materialization:** `collect()` / `rows()` → row models; `to_dict()` / `collect(as_lists=True)` → columnar `dict[str, list]` (on `DataFrameModel`, optionally via PlanFrame—[PLANFRAME_FALLBACKS](https://pydantable.readthedocs.io/en/latest/PLANFRAME_FALLBACKS.html)); `to_polars()` / `to_arrow()` with matching extras.
 
 ## I/O at a glance
 
@@ -107,6 +108,7 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 | Map of all pages | [DOCS_MAP](https://pydantable.readthedocs.io/en/latest/DOCS_MAP.html) |
 | Quickstart | [QUICKSTART](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html) |
 | `DataFrameModel` | [DATAFRAMEMODEL](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) |
+| PlanFrame (`DataFrameModel`) | [PLANFRAME_FALLBACKS](https://pydantable.readthedocs.io/en/latest/PLANFRAME_FALLBACKS.html) · [PLANFRAME_ADAPTER_ROADMAP](https://pydantable.readthedocs.io/en/latest/PLANFRAME_ADAPTER_ROADMAP.html) |
 | Typing (mypy vs Pyright) | [TYPING](https://pydantable.readthedocs.io/en/latest/TYPING.html) |
 | I/O overview | [IO_OVERVIEW](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html) |
 | SQL (SQLModel, raw string SQL) | [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html) · [SQLMODEL_SQL_ROADMAP](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html) |

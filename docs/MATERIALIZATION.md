@@ -31,5 +31,6 @@ Same logical work as blocking, but invoked with **`await`**. When the wheel expo
 
 ## Related
 
+- **`DataFrameModel` + PlanFrame:** columnar **`to_dict()`** / **`collect(as_lists=True)`** may execute through the PlanFrame plan and adapter when enabled; async terminal APIs may still delegate to the inner **`DataFrame`** per upstream limits ({doc}`PLANFRAME_FALLBACKS`, {doc}`EXECUTION`).
 - **Eager file I/O** on **`DataFrameModel`** (**`materialize_*`**, **`fetch_sql`**, …) is **not** a fifth plan mode: it loads external data into a typed frame (backed by **`dict[str, list]`**), then you run transforms and terminal materialization as usual ({doc}`IO_OVERVIEW`).
 - **Engine streaming** (**`streaming=True`** / **`Engine::Streaming`**) is a **Polars collect** option, orthogonal to the four modes above ({doc}`EXECUTION`).

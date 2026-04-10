@@ -11,6 +11,7 @@ This **documentation site** is the detailed manual. The repository **README** on
 
 - **Services (FastAPI)**: {doc}`GOLDEN_PATH_FASTAPI` (shortest runnable path), then {doc}`FASTAPI` (common patterns), {doc}`FASTAPI_ADVANCED` (less common patterns), {doc}`FASTAPI_ENHANCEMENTS` (roadmap + “when to use what”), {doc}`DATAFRAMEMODEL`, and {doc}`EXECUTION`. Use **`register_exception_handlers`** for HTTP **503** / **400** / **422** (`ColumnLengthMismatchError` → **400**). Cookbooks: {doc}`/cookbook/fastapi_columnar_bodies`, {doc}`/cookbook/fastapi_observability`, {doc}`/cookbook/fastapi_background_tasks`, {doc}`/cookbook/async_lazy_pipeline`. Copy layout from `docs/examples/fastapi/service_layout/`. Tests: **`pydantable.testing.fastapi`**. Troubleshooting: {doc}`TROUBLESHOOTING`.
 - **Data workflows**: start with {doc}`DATAFRAMEMODEL`, then {doc}`IO_DECISION_TREE` and {doc}`IO_OVERVIEW`. Optional pandas-like names: {doc}`PANDAS_UI`.
+- **`DataFrameModel` + PlanFrame**: transforms and columnar materialization are PlanFrame-first where supported; explicit escape hatches and async limits in {doc}`PLANFRAME_FALLBACKS`; adapter coverage and backlog in {doc}`PLANFRAME_ADAPTER_ROADMAP`.
 - **Library/interop**: start with {doc}`INTERFACE_CONTRACT` and {doc}`VERSIONING`, then {doc}`PLAN_AND_PLUGINS`.
 - **Third-party execution backends**: {doc}`CUSTOM_ENGINE_PACKAGE` (ship your own `ExecutionEngine` package with `pydantable-protocol`). Optional Moltres SQL engine: {doc}`MOLTRES_SQL` (**`SqlDataFrame`** / **`SqlDataFrameModel`**, **`pydantable[moltres]`**).
 - `DataFrameModel` transform chains can return typed after-schema models directly (no `to_dict()` materialization step). **mypy** with the plugin infers many chains; **Pyright**, **Pylance**, and **Astral `ty`** use shipped stubs — call `as_model(...)` (see {doc}`DATAFRAMEMODEL`).
@@ -86,6 +87,7 @@ typed_dataframe_spec
 
 PLAN_AND_PLUGINS
 PLANFRAME_FALLBACKS
+PLANFRAME_ADAPTER_ROADMAP
 ```
 
 ```{toctree}

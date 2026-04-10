@@ -7,7 +7,7 @@ How to run the suite, markers, coverage, and CI alignment are documented in [Tes
 | Directory | Focus |
 |-----------|--------|
 | `tests/io/` | Scans, lazy reads, JSON/Parquet/CSV/IPC, HTTP transports, doc example scripts tied to I/O |
-| `tests/dataframe/` | Core `DataFrame` behavior, expressions, materialization, engine contracts, version checks, Hypothesis, phase/feature tests not covered below |
+| `tests/dataframe/` | Core `DataFrame` behavior, expressions, materialization, engine contracts, PlanFrame adapter contract tests (`test_planframe_adapter_*.py`), version checks, Hypothesis, phase/feature tests not covered below |
 | `tests/dataframe_model/` | `DataFrameModel` parity, constructors, variants |
 | `tests/sql/` | SQLModel I/O, string-SQL deprecation, Moltres / `SqlDataFrame` |
 | `tests/fastapi/` | FastAPI integration and columnar helpers |

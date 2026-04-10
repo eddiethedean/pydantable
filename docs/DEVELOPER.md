@@ -75,6 +75,8 @@ Implement **`ExecutionEngine`** from **`pydantable_protocol`** (also re-exported
 
 **Guardrail:** Run **`python scripts/check_engine_bypass.py`** (included in **`make check-python`** as **`engine-bypass-check`**) after changes under **`python/pydantable/`**. It rejects direct native-extension imports and **`get_default_engine().rust_core`** outside the allowlist documented in {doc}`ADR-engines`.
 
+**Guardrail (PlanFrame `DataFrameModel`):** Run **`python scripts/check_planframe_dfm_legacy_returns.py`** ( **`make check-python`** → **`planframe-dfm-legacy-check`**) after edits to **`python/pydantable/dataframe_model.py`**. It fails if legacy **`return self._from_dataframe(self._df...)`** tails reappear—those paths should stay superseded by PlanFrame **`_dfm_sync_pf`** flows; use **`to_dataframe()`** for engine-only work ({doc}`PLANFRAME_FALLBACKS`).
+
 - **Protocols:** `PlanExecutor`, `SinkWriter`, and **`ExecutionEngine`** in **`pydantable_protocol`** (thin re-export in `python/pydantable/engine/protocols.py`). **`EngineCapabilities`** includes **`backend`** and optional-feature flags.
 - **ADR:** See {doc}`ADR-engines` for design notes and Track B (portable IR).
 

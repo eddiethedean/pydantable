@@ -42,3 +42,7 @@ assert set(out.keys()) == {"country", "total", "n_orders"}
 - **Row order is not guaranteed** for many operations; compare using sorted keys (see {doc}`/INTERFACE_CONTRACT`).
 - **All-null groups**: `sum/mean/min/max/...` yield `None`; `count` yields `0` (see {doc}`/INTERFACE_CONTRACT`).
 
+## See also
+
+- **`DataFrameModel` + PlanFrame:** how these transforms run and when escape hatches apply — {doc}`/PLANFRAME_FALLBACKS`; adapter details — {doc}`/PLANFRAME_ADAPTER_ROADMAP`.
+
