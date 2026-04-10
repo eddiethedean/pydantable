@@ -47,6 +47,7 @@
       ~ColumnRef.from_unix_time
       ~ColumnRef.is_blank_str
       ~ColumnRef.is_empty_str
+      ~ColumnRef.is_finite
       ~ColumnRef.is_in
       ~ColumnRef.is_not_null
       ~ColumnRef.is_not_null_and_not_empty_str
@@ -83,6 +84,7 @@
       ~ColumnRef.referenced_columns
       ~ColumnRef.replace
       ~ColumnRef.round
+      ~ColumnRef.sqrt
       ~ColumnRef.starts_with
       ~ColumnRef.str_contains
       ~ColumnRef.str_contains_pat

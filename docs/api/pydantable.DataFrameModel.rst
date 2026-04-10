@@ -116,6 +116,7 @@
       ~DataFrameModel.submit
       ~DataFrameModel.tail
       ~DataFrameModel.to_arrow
+      ~DataFrameModel.to_dataframe
       ~DataFrameModel.to_dict
       ~DataFrameModel.to_dicts
       ~DataFrameModel.to_polars

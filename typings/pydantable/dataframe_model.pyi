@@ -12,7 +12,7 @@ from concurrent.futures import Executor
 from typing import Any, Generic, Literal, TypeVar
 
 from pydantable.awaitable_dataframe_model import AwaitableDataFrameModel
-from pydantable.dataframe import ExecutionHandle
+from pydantable.dataframe import DataFrame, ExecutionHandle
 from pydantable.schema import Schema
 from pydantic import BaseModel
 from typing_extensions import Self
@@ -660,6 +660,7 @@ class DataFrameModel(Generic[RowT]):
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
     ) -> dict[str, list[Any]]: ...
+    def to_dataframe(self) -> DataFrame[Any]: ...
     def to_polars(
         self,
         *,

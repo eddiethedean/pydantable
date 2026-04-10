@@ -2372,7 +2372,7 @@ class DataFrameModel(Generic[RowT]):
     def rename(
         self, columns: Mapping[str, str], *, strict: bool = True
     ) -> DataFrameModel[Any]:
-        return self._dfm_sync_pf(self._pf.rename(**dict(columns), strict=strict))
+        return self._dfm_sync_pf(self._pf.rename(mapping=dict(columns), strict=strict))
 
     def rename_upper(
         self, selector: Any = None, *, strict: bool = True
@@ -2502,7 +2502,7 @@ class DataFrameModel(Generic[RowT]):
             )
         return self._dfm_sync_pf(
             self._pf.drop_nulls(
-                *_dfm_columns_as_tuple(subset),
+                cast("Any", _dfm_columns_as_tuple(subset)),
                 how=cast("Any", how),
                 threshold=threshold,
             )

@@ -47,6 +47,7 @@
       ~Expr.from_unix_time
       ~Expr.is_blank_str
       ~Expr.is_empty_str
+      ~Expr.is_finite
       ~Expr.is_in
       ~Expr.is_not_null
       ~Expr.is_not_null_and_not_empty_str
@@ -83,6 +84,7 @@
       ~Expr.referenced_columns
       ~Expr.replace
       ~Expr.round
+      ~Expr.sqrt
       ~Expr.starts_with
       ~Expr.str_contains
       ~Expr.str_contains_pat

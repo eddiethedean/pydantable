@@ -27,17 +27,11 @@ This document describes the transition for **pydantable** to behave as a “real
 
 `collect` / `to_dict` / `to_polars` / `to_arrow` must preserve pydantable’s validation and optional-field semantics on the inner `DataFrame`. Columnar materialization is routed through **`Frame.to_dict(options=ExecutionOptions(...))`** so streaming hints follow PlanFrame’s execution boundary; row-shaped `collect()` (default) and numpy paths still delegate to `DataFrame.collect` on `_df`. See Phase 2.
 
-```mermaid
-flowchart LR
-  subgraph today [Materialization]
-    DFM[DataFrameModel]
-    PF["_pf Frame"]
-    DF["_df DataFrame"]
-    DFM --> PF
-    DFM --> DF
-    PF -->|"to_dict(options)"| DF
-    DFM -->|"collect rows / to_polars / to_arrow"| DF
-  end
+```text
+DataFrameModel -- _pf --> PlanFrame Frame
+DataFrameModel -- _df --> pydantable DataFrame
+_pf -- to_dict(options) --> _df
+DataFrameModel -- collect(rows) / to_polars / to_arrow --> _df
 ```
 
 ## Phase 0: “Adapter correctness” hardening
