@@ -157,6 +157,7 @@
       ~DataFrameModel.columns
       ~DataFrameModel.dtypes
       ~DataFrameModel.empty
+      ~DataFrameModel.planframe
       ~DataFrameModel.shape
       ~DataFrameModel.RowModel
    

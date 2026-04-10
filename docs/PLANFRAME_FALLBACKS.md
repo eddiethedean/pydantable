@@ -8,6 +8,12 @@
 
 For the methods below, **there is no silent legacy path**: the operation is expressed in PlanFrame and executed via the adapter.
 
+## Typing-first escape hatch: `df.planframe`
+
+`DataFrameModel.planframe` exposes the underlying PlanFrame `Frame` (`_pf`) as a **lazy** object for **typing-first** transform chains. This is distinct from `to_dataframe()`, which exposes the core pydantable `DataFrame` for **engine-only** APIs.
+
+In Phase T1 (`PLANFRAME_TYPING_ROADMAP`), `planframe` is the recommended way for **Pyright** / **`ty`** users to lean on PlanFrame’s Resolve/stub typing for complex schema-evolving chains.
+
 | Method | Behavior |
 |--------|----------|
 | `select(*cols: str)` | Plain projection only; at least one name. |

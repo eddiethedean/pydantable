@@ -150,6 +150,8 @@ Then broaden to the schema-preserving convenience nodes (`head`, `tail`, `slice`
 - {doc}`DATAFRAMEMODEL` and {doc}`TYPING` updated with the recommended pattern.
 - A small `tests/typing/` contract snippet shows the canonical workflow compiles under **Pyright** and **`ty`**:\n  `df.planframe.select(\"id\").with_column(\"x\", ...)` (literal names) plus a “bridge back” step (T3) using pydantable APIs.
 
+**Status:** implemented as `DataFrameModel.planframe` (public, lazy) in pydantable; follow-on work is the T3 “wrap back” bridge.
+
 ---
 
 ## Phase T2 — Stub and annotation alignment

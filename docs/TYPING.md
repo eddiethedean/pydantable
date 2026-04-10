@@ -26,7 +26,8 @@ This table records the **expected** and **recommended** typing story per checker
 | **Pyright / Pylance** | **Explicit after-model** workflow (`as_model` / `try_as_model` / `assert_model`, plus `*_as_model` helpers). | PlanFrame chain is the intended “fully typed transforms” path (literals + upstream stubs; future: optional plugin). | Use boundary recipe for exact output types where needed; complements PlanFrame chain typing. |
 | **Astral `ty`** | Same as Pyright: **no mypy plugins**; rely on shipped stubs + explicit after-model helpers. | PlanFrame chain should provide the strongest static typing story without relying on mypy internals. | Boundary recipe gives explicit exact output types; keep `DataFrameModel` validation semantics centralized. |
 
-**Common constraint for typed paths:** prefer **literal column names** and avoid dynamic/computed column name lists when you want the checker to follow schema evolution rules (matches PlanFrame’s typing constraints).\n+
+**Common constraint for typed paths:** prefer **literal column names** and avoid dynamic/computed column name lists when you want the checker to follow schema evolution rules (matches PlanFrame’s typing constraints).
+
 ## The typing contract (nominal model, derived row type, structural helpers)
 
 - **Nominal table type**: users name subclasses of `DataFrameModel` (for example `class Users(DataFrameModel): ...`).

@@ -387,6 +387,21 @@ class DataFrameModel(Generic[RowT]):
 
     Async = _AsyncIODescriptor()
 
+    @property
+    def planframe(self) -> PlanFrameFrame[type[BaseModel], DataFrame[Any], Any]:
+        """Expose the underlying PlanFrame `Frame` for typing-first chains.
+
+        This is a **lazy** view of the internal plan (`_pf`). It does **not**
+        execute the plan, and transforms on the returned PlanFrame `Frame` do not
+        automatically re-wrap into a `DataFrameModel` (that bridge is tracked in
+        `docs/PLANFRAME_TYPING_ROADMAP.md`, Phase T3).
+
+        For best static typing in Pyright/`ty`, prefer **literal** column names in
+        PlanFrame chains (matches PlanFrame’s stub design).
+        """
+
+        return self._pf
+
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         # Bridge classes in interface modules reuse the name `DataFrameModel` or

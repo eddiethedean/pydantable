@@ -78,6 +78,26 @@ def test_ty_groupby_agg_as_model_helpers_return_target_type(tmp_path: Path) -> N
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
+def test_ty_sees_dataframe_model_planframe_property(tmp_path: Path) -> None:
+    pytest.importorskip("ty")
+    code = """
+    from planframe.frame import Frame as PFFrame
+
+    from pydantable import DataFrameModel
+
+    class U(DataFrameModel):
+        id: int
+        age: int
+
+    def f(df: U) -> PFFrame[object, object, object]:
+        pf = df.planframe
+        _ = pf.select("id")
+        return pf
+    """
+    proc = _run_ty_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
 def test_ty_rolling_agg_as_model_helpers_return_target_type(tmp_path: Path) -> None:
     pytest.importorskip("ty")
     code = """

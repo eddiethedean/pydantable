@@ -218,6 +218,30 @@ def test_pyright_sees_dataframe_model_io_and_model_helpers(tmp_path: Path) -> No
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
+def test_pyright_sees_dataframe_model_planframe_property(tmp_path: Path) -> None:
+    """`DataFrameModel.planframe` exposes a typed PlanFrame Frame."""
+    pytest.importorskip("pyright")
+    code = """
+    from __future__ import annotations
+
+    from planframe.frame import Frame as PFFrame
+
+    from pydantable import DataFrameModel
+
+    class U(DataFrameModel):
+        id: int
+        age: int
+
+    def f(df: U) -> PFFrame[object, object, object]:
+        pf = df.planframe
+        # PlanFrame typing is strongest with literal column names.
+        _ = pf.select("id")
+        return pf
+    """
+    proc = _run_pyright_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
 def test_pyright_keeps_concrete_model_type_through_schema_preserving_chains(
     tmp_path: Path,
 ) -> None:

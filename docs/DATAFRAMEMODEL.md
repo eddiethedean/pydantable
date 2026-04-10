@@ -10,6 +10,30 @@ workflows.
 
 `DataFrameModel` is **PlanFrame-first** for typed transforms: most operations are expressed on a [PlanFrame](https://pypi.org/project/planframe/) `Frame`, lowered through the adapter, and executed on the Rust engine; the wrapped `DataFrame` (`_df`) is kept consistent with the plan result where that applies. **Escape hatches** are explicit—use `to_dataframe()` for arbitrary engine work, `pipe` when you intentionally bypass extending the PlanFrame plan (see {doc}`PLANFRAME_FALLBACKS`), and read {doc}`PLANFRAME_FALLBACKS` / {doc}`PLANFRAME_ADAPTER_ROADMAP` for async delegation limits, remaining gaps, and adapter backlog.
 
+## Typing-first chains: `df.planframe`
+
+If you want to **lean on PlanFrame’s Resolve/stub typing** (especially under **Pyright** / **Pylance** / **Astral `ty`**), use the underlying PlanFrame frame:
+
+```python
+from pydantable import DataFrameModel
+
+
+class Users(DataFrameModel):
+    id: int
+    age: int
+
+
+df = Users({"id": [1], "age": [10]})
+pf = df.planframe
+
+# PlanFrame typing is strongest with literal column names.
+from planframe.expr import api as pf_expr
+
+pf2 = pf.select("id").with_columns(age_plus_one=pf_expr.col("age") + 1)
+```
+
+This is a **lazy** view of the internal plan. Today it is a **typing-first escape hatch**: `pf2` is a PlanFrame `Frame`, not a `DataFrameModel`. The planned “wrap back into a `DataFrameModel`” bridge is tracked in {doc}`PLANFRAME_TYPING_ROADMAP` (Phase T3).
+
 For pandas-style method names (**`assign`**, **`merge`**, **`duplicated`**, **`get_dummies`**, …) import **`DataFrameModel`** from **`pydantable.pandas`**; execution remains the same Rust core ({doc}`PANDAS_UI`).
 
 ## Terms

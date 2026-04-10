@@ -11,6 +11,7 @@ from collections.abc import (
 from concurrent.futures import Executor
 from typing import Any, Generic, Literal, TypeVar
 
+from planframe.frame import Frame as PlanFrameFrame
 from pydantable.awaitable_dataframe_model import AwaitableDataFrameModel
 from pydantable.dataframe import DataFrame, ExecutionHandle
 from pydantable.schema import Schema
@@ -43,6 +44,7 @@ class DataFrameModelAsyncIO(Generic[RowT]):
 
 class DataFrameModel(Generic[RowT]):
     _df: Any
+    _pf: Any
     RowModel: type[RowT]
     _SchemaModel: type[BaseModel]
     Async: DataFrameModelAsyncIO[RowT]
@@ -67,6 +69,8 @@ class DataFrameModel(Generic[RowT]):
         # `__pydantable__` model policy; no direct kwargs (yet).
     ) -> None: ...
     def schema_fields(self) -> dict[str, Any]: ...
+    @property
+    def planframe(self) -> PlanFrameFrame[Any, Any, Any]: ...
 
     # --- I/O classmethods (lazy reads, eager exports) ---
     @classmethod
