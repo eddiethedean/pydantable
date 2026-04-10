@@ -61,7 +61,9 @@ def _validate_planframe_window_columns(
                 raise KeyError(f"Unknown column {name!r} in PlanFrame Over order_by.")
 
 
-def compile_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:
+def compile_expr(
+    expr: Any, *, schema_fields: dict[str, Any], allow_unknown_cols: bool = False
+) -> Any:
     """
     Lower a PlanFrame Expr to a pydantable Expr using known column dtypes.
 
@@ -70,7 +72,7 @@ def compile_expr(expr: Any, *, schema_fields: dict[str, Any]) -> Any:
     """
 
     require_planframe()
-    return _to_pyd_expr(expr, schema_fields=schema_fields)
+    return _to_pyd_expr(expr, schema_fields=schema_fields, allow_unknown_cols=allow_unknown_cols)
 
 
 def _to_pyd_expr(

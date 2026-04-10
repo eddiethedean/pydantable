@@ -152,6 +152,31 @@ def test_pyright_supports_lazy_async_materialize_accepts_model_and_awaitable(
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
 
 
+def test_pyright_planframe_materialize_dataframe_model_bridge(tmp_path: Path) -> None:
+    pytest.importorskip("pyright")
+    code = """
+    from __future__ import annotations
+
+    from planframe.expr import api as pf
+
+    from pydantable import DataFrameModel
+    from pydantable.planframe_adapter import materialize_dataframe_model
+
+    class Before(DataFrameModel):
+        id: int
+        age: int
+
+    class After(DataFrameModel):
+        id: int
+
+    def f(df: Before) -> After:
+        pf_out = df.planframe.filter(pf.col("age") > 0).select("id")
+        return materialize_dataframe_model(pf_out, After)
+    """
+    proc = _run_pyright_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
 def test_pyright_supports_lazy_async_materialize_rejects_without_acollect(
     tmp_path: Path,
 ) -> None:

@@ -175,3 +175,26 @@ def test_ty_melt_unpivot_join_as_model_helpers_return_target_type(
     """
     proc = _run_ty_snippet(tmp_path, code)
     assert proc.returncode == 0, (proc.stdout, proc.stderr)
+
+
+def test_ty_planframe_materialize_dataframe_model_bridge(tmp_path: Path) -> None:
+    pytest.importorskip("ty")
+    code = """
+    from planframe.expr import api as pf
+
+    from pydantable import DataFrameModel
+    from pydantable.planframe_adapter import materialize_dataframe_model
+
+    class Before(DataFrameModel):
+        id: int
+        age: int
+
+    class After(DataFrameModel):
+        id: int
+
+    def f(df: Before) -> After:
+        pf_out = df.planframe.filter(pf.col("age") > 0).select("id")
+        return materialize_dataframe_model(pf_out, After)
+    """
+    proc = _run_ty_snippet(tmp_path, code)
+    assert proc.returncode == 0, (proc.stdout, proc.stderr)

@@ -196,6 +196,12 @@ Once `DataFrameModel.planframe` (or `to_planframe()`) exists, ensure stubs align
 - **Compare** with existing `as_model` / `collect()` typing story; prefer **one** golden path for “exact schema at boundary” in docs.
 - **Decide** whether codegen or runtime-only bridge is in scope (PlanFrame doc: exact types at boundary via materialization + stubs/codegen).
 
+**Status (implemented)**
+
+- Added `pydantable.planframe_adapter.materialize_dataframe_model(frame, AfterModel, ...)` as the **supported** PlanFrame→pydantable boundary.
+- The golden path is **columnar materialization** (`Frame.to_dict(options=ExecutionOptions(...))`) then `AfterModel(cols, trusted_mode=...)`, so validation and optional-field behavior remain centralized in pydantable constructors.
+- Added runtime and typing contract tests for the bridge.
+
 **Acceptance criteria**
 
 - Cookbook or {doc}`TYPING` section: end-to-end example **typed** with Pyright using **PlanFrame chain + pydantable boundary**.

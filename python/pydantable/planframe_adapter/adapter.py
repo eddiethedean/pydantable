@@ -497,7 +497,11 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
         from pydantable.planframe_adapter.expr import compile_expr
 
         schema_fields = {f.name: f.dtype for f in schema.fields}
-        return compile_expr(expr, schema_fields=schema_fields)
+        # PlanFrame may compile predicates using a projected/output schema (e.g. when a
+        # downstream `select(...)` drops columns referenced by an upstream `filter(...)`).
+        # In that case the backend frame *still* has the column at the filter node, so
+        # we allow unknown column refs and let the engine resolve them by name.
+        return compile_expr(expr, schema_fields=schema_fields, allow_unknown_cols=True)
 
     def collect(self, df: Any, *, options: Any | None = None) -> Any:
         # PlanFrame expects `.collect` to return a backend frame; for pydantable the

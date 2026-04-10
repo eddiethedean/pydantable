@@ -25,6 +25,35 @@ Even if you don’t use the `df.planframe` typing-first chain directly, some `Da
 
 These are typed in the shipped stubs so Pyright and Astral `ty` match the runtime contract.
 
+## Phase T3 boundary recipe (PlanFrame chain → exact `DataFrameModel`)
+
+When you build a typing-first chain with PlanFrame (`df.planframe...`), the supported way to get back to an **exact** pydantable model type is to materialize **columnar** data at the PlanFrame boundary and then construct the target `DataFrameModel`.
+
+Use `materialize_dataframe_model`:
+
+```python
+from __future__ import annotations
+
+from planframe.expr import api as pf
+
+from pydantable import DataFrameModel
+from pydantable.planframe_adapter import materialize_dataframe_model
+
+
+class Before(DataFrameModel):
+    id: int
+    age: int
+
+
+class After(DataFrameModel):
+    id: int
+
+
+def pipeline(df: Before) -> After:
+    pf_out = df.planframe.filter(pf.col("age") > 0).select("id")
+    return materialize_dataframe_model(pf_out, After, trusted_mode="shape_only")
+```
+
 ## Phase T0 checker matrix (recommended path per checker)
 
 This table records the **expected** and **recommended** typing story per checker, including the planned PlanFrame-first path (Phase T1) and boundary model (Phase T3). Until Phase T1 lands, treat the “Frame exposure” column as a target state.

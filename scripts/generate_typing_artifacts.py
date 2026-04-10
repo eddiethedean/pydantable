@@ -354,6 +354,9 @@ def main(argv: list[str] | None = None) -> int:
         include_all_public_defs=True,
         include_private_defs=True,
     )
+    planframe_adapter_init_stub = _render_init_stub(
+        pkg / "planframe_adapter" / "__init__.py"
+    )
     pyspark_init_stub = _render_init_stub(pkg / "pyspark" / "__init__.py")
     pyspark_sql_init_stub = _render_init_stub(pkg / "pyspark" / "sql" / "__init__.py")
 
@@ -417,6 +420,7 @@ def main(argv: list[str] | None = None) -> int:
         (pkg / "dataframe" / "__init__.pyi", dataframe_init_stub),
         (pkg / "schema" / "__init__.pyi", schema_init_stub),
         (pkg / "io" / "__init__.pyi", io_init_stub),
+        (pkg / "planframe_adapter" / "__init__.pyi", planframe_adapter_init_stub),
         (pkg / "pyspark" / "__init__.pyi", pyspark_init_stub),
         (pkg / "pyspark" / "sql" / "__init__.pyi", pyspark_sql_init_stub),
         (pkg / "expressions.pyi", expressions_stub),
@@ -436,6 +440,10 @@ def main(argv: list[str] | None = None) -> int:
         (stub_pkg / "dataframe" / "__init__.pyi", dataframe_init_stub),
         (stub_pkg / "schema" / "__init__.pyi", schema_init_stub),
         (stub_pkg / "io" / "__init__.pyi", io_init_stub),
+        (
+            stub_pkg / "planframe_adapter" / "__init__.pyi",
+            planframe_adapter_init_stub,
+        ),
         (stub_pkg / "pyspark" / "__init__.pyi", pyspark_init_stub),
         (stub_pkg / "pyspark" / "sql" / "__init__.pyi", pyspark_sql_init_stub),
         (stub_pkg / "expressions.pyi", expressions_stub),
