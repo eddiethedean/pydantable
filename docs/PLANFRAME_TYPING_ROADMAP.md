@@ -2,6 +2,12 @@
 
 This document is the **typing counterpart** to {doc}`PLANFRAME_ADAPTER_ROADMAP`. Runtime adapter work makes `DataFrameModel` PlanFrame-first for execution; **this roadmap** makes **PlanFrame’s type system** the **primary** way to get precise static types for **lazy transform chains**, instead of duplicating that work in **pydantable’s mypy plugin** and hand-maintained parallel stubs.
 
+## Historical note (posterity)
+
+Pydantable’s **first attempts** at static typing—schema-evolving **`DataFrameModel`**, a [**mypy plugin**](https://github.com/eddiethedean/pydantable/blob/main/python/pydantable/mypy_plugin.py) for chain return types, and **shipped `.pyi` stubs** for checkers that cannot load that plugin—showed both what users wanted (lazy plans with column-level types through transforms) and where Python’s ecosystem **fell short** without a dedicated planning layer and a first-class **Resolve** story.
+
+**PlanFrame was heavily inspired by those pydantable experiments** and was built to supply the **static typing system** that work needed: **`Frame`** / **`Expr[T]`**, **literal** column APIs, **generated stubs**, **`materialize_model`** at boundaries, and the tiered strategy described in PlanFrame’s [typing design](https://planframe.readthedocs.io/en/latest/planframe/design/typing-design/). This roadmap is the **closing of the loop**: pydantable becomes a **PlanFrame adapter** and **leans on** that system instead of **re-implementing** Resolve in the plugin forever.
+
 **PlanFrame’s design** (see [PlanFrame — Resolve typing design for Pyright](https://planframe.readthedocs.io/en/latest/planframe/design/typing-design/) and the [planframe](https://github.com/eddiethedean/planframe) README) already invests in:
 
 - **`Frame[PlanT, BackendT]`** and **`Expr[T]`**
