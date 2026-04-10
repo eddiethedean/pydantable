@@ -18,117 +18,142 @@ This document describes the transition for **pydantable** to behave as a “real
 
 ## Current state (baseline)
 
-- `DataFrameModel` holds a PlanFrame frame (`_pf`) and executes via `pydantable.planframe_adapter.PydantableAdapter`.
-- PlanFrame `ExecutionOptions` is available (PlanFrame ≥ 0.6.0).
-- Most `DataFrameModel` transforms are PlanFrame-backed; remaining gaps are primarily **expression lowering coverage** in `python/pydantable/planframe_adapter/expr.py`.
+- **Dependency:** pydantable pins **PlanFrame `>=1.0.0,<2`** (see `pyproject.toml`). PlanFrame 1.x renamed several **`Frame` methods** compared with older lines (`with_column` → `with_columns`, `concat_vertical` / `concat_horizontal` → `concat(how=…)`, `with_row_count` → `with_row_index`, table reshape `melt` → `unpivot` on `Frame`). **`DataFrameModel` keeps stable user names** (`with_row_count`, `melt`, …) and bridges to the current PlanFrame `Frame` API internally.
+- `DataFrameModel` holds a PlanFrame frame (`_pf`) and executes transforms via `pydantable.planframe_adapter.PydantableAdapter` and `planframe.execution.execute_plan` (`execute_frame` in pydantable).
+- After each PlanFrame-backed step, `_dfm_sync_pf` runs `execute_frame` so the inner pydantable `DataFrame` (`_df`) matches the compiled plan; `_pf` stores the extended lazy plan.
+- **Expression lowering** lives in `python/pydantable/planframe_adapter/expr.py`. End-to-end coverage for the adapter is in `tests/dataframe/test_planframe_adapter_*.py`.
+
+### Materialization path (today)
+
+`collect` / `to_dict` / `to_polars` / `to_arrow` must preserve pydantable’s validation and optional-field semantics on the inner `DataFrame`. Columnar materialization is routed through **`Frame.to_dict(options=ExecutionOptions(...))`** so streaming hints follow PlanFrame’s execution boundary; row-shaped `collect()` (default) and numpy paths still delegate to `DataFrame.collect` on `_df`. See Phase 2.
+
+```mermaid
+flowchart LR
+  subgraph today [Materialization]
+    DFM[DataFrameModel]
+    PF["_pf Frame"]
+    DF["_df DataFrame"]
+    DFM --> PF
+    DFM --> DF
+    PF -->|"to_dict(options)"| DF
+    DFM -->|"collect rows / to_polars / to_arrow"| DF
+  end
+```
 
 ## Phase 0: “Adapter correctness” hardening
 
 **Goal**: make adapter behavior unambiguous, deterministic, and PlanFrame-aligned.
 
-- **Ensure `BaseAdapter` signatures match PlanFrame**
-  - Adapter `collect`/`to_dicts`/`to_dict` accept `options: ExecutionOptions | None`.
-  - Join forwards `JoinOptions` hints where the pydantable engine can honor them.
-- **Execution boundaries are PlanFrame boundaries**
-  - For PlanFrame-backed plans, prefer PlanFrame materializers (`Frame.collect/to_dict/to_dicts`) to route options consistently.
-  - Ensure adapter `collect` does not accidentally force extra computation beyond what the backend needs.
+**Status (partial)**
+
+- **`PydantableAdapter`** implements `collect` / `to_dict` / `to_dicts` with `options: ExecutionOptions | None` and forwards streaming flags to `DataFrame.to_dict` / `to_dicts` (see `python/pydantable/planframe_adapter/adapter.py`).
+- **Join** forwards `JoinOptions` where the pydantable engine and adapter support them.
+- **`DataFrameModel` public materializers:** columnar **`to_dict`** and **`collect(as_lists=True)`** use PlanFrame **`_pf.to_dict(...)`** so execution-time options align with PlanFrame. Other shapes still use `_df` where required (see Phase 2).
+
+**Remaining / folded into Phase 2**
+
+- Ensure every materialization entry point that accepts streaming-like kwargs either routes through PlanFrame or is explicitly documented as engine-only.
 
 **Acceptance criteria**
 
-- `ruff` + `ty-check-minimal` + `pytest -n 10` pass.
+- `ruff` + `ty-check-minimal` + `pytest` pass.
 - No transform in `DataFrameModel` performs backend work while building the plan.
 
-## Phase 1: Complete PlanFrame expression lowering for the pydantable backend
+## Phase 1: PlanFrame expression lowering (`expr.py`)
 
-**Goal**: “If PlanFrame can express it, pydantable can execute it” (within pydantable engine capability).
+**Goal:** support a **documented** subset of `planframe.expr.api` with tests; extend the subset as needed.
 
-### 1.1 Implement missing PlanFrame `expr.api` nodes
+### 1.1 Supported today (non-exhaustive)
 
-As of PlanFrame 0.6.0, the remaining missing nodes in `python/pydantable/planframe_adapter/expr.py` are:
+Implemented in `planframe_adapter/expr.py` and covered by adapter tests:
 
-- **Strings**: `StrLower`, `StrUpper`, `StrLen`, `StrStrip`, `StrReplace`, `StrSplit`
-- **Datetime extraction**: `DtYear`, `DtMonth`, `DtDay`
-- **Numeric/math**: `Sqrt`, `IsFinite`
-- **Windows**: `Over`
-- **Aggregations**: `AggExpr`
+- **Arithmetic / comparisons / boolean / null / membership:** e.g. `Add`, `Eq`, `IsNull`, `IsIn`, …
+- **Scalars:** `Abs`, `Round`, `Floor`, `Ceil`, `Coalesce`, `IfElse`, `Between`, `Clip`, `Pow`, `Exp`, `Log`, …
+- **Strings:** `StrContains`, `StrStartsWith`, `StrEndsWith`, `StrLower`, `StrUpper`, `StrLen`, `StrStrip`, `StrReplace`, `StrSplit`
+- **Datetime parts:** `DtYear`, `DtMonth`, `DtDay`
+- **Math:** `Sqrt`, `IsFinite`
+- **`AggExpr`:** lowered for ops `count`, `sum`, `mean`, `min`, `max`, `n_unique` (other ops still raise `NotImplementedError`).
+- **`Over`:** only when the inner node is `AggExpr` with ops `sum`, `mean`, `min`, `max` (other window shapes raise `NotImplementedError`).
 
-Track this work in pydantable issues:
+### 1.2 Still open / next
 
-- pydantable #2 (strings)
-- pydantable #3 (datetime)
-- pydantable #4 (math)
-- pydantable #5 (windows)
-- pydantable #6 (AggExpr)
-
-### 1.2 Add end-to-end tests for each newly supported node
-
-- Prefer tests that construct a `DataFrameModel`, build a PlanFrame-backed plan using each node, execute it, and assert results.
-- Include “nullability” cases where relevant (e.g. `StrLen` on optional strings, date parts on optional timestamps).
+- Any **`planframe.expr.api` node** not handled above falls through to `NotImplementedError("Unsupported PlanFrame expression node: …")`.
+- **`AggExpr`** ops outside the supported set.
+- **`Over`** with non-`AggExpr` inner expressions.
+- New upstream expr nodes: add lowering + tests when pydantable claims support.
 
 **Acceptance criteria**
 
-- No `NotImplementedError("Unsupported PlanFrame expression node: ...")` for PlanFrame’s published `expr.api` surface we claim to support.
-- Each supported PlanFrame node has a dedicated test (or is covered by an integration test).
+- No `NotImplementedError` for expression nodes that are **listed as supported** in this section (tests must cover them).
+- New nodes require explicit lowering and tests before being advertised.
 
-## Phase 2: Make `DataFrameModel` a thin typed wrapper over PlanFrame materialization
+## Phase 2: `DataFrameModel` and PlanFrame materialization
 
-**Goal**: PlanFrame becomes the authoritative execution surface for the typed API.
+**Goal**: PlanFrame owns execution-boundary semantics for options where possible; engine-only behavior is explicit.
 
-### 2.1 Route materialization through PlanFrame when a PlanFrame plan exists
+### 2.1 Route columnar materialization through PlanFrame
 
-Where appropriate, prefer:
+**Done / current approach**
 
-- `_pf.collect(options=ExecutionOptions(...))`
-- `_pf.to_dict(options=...)`
-- `_pf.to_dicts(options=...)`
+- **`to_dict`** and **`collect(as_lists=True)`** call **`_pf.to_dict(options=ExecutionOptions(streaming=…, engine_streaming=…))`**, which evaluates the plan and invokes `PydantableAdapter.to_dict` on the backend frame (same columnar path as `DataFrame.to_dict`).
 
-…and keep direct `_df` materialization only for APIs explicitly defined as “core engine only”.
+**Still on `_df` (by design until extended)**
 
-### 2.2 Document and stabilize the escape hatch
+- Default **`collect()`** (row models), **`as_numpy=True`**, **`to_polars`**, **`to_arrow`**, **`acollect` / `ato_dict`**, **`collect_batches`**, **`stream`**: remain on the core `DataFrame` so pydantable row validation, numpy, Arrow, Polars, and async semantics stay centralized.
 
-Define and document a single supported escape hatch for users who need engine-only behaviors:
+### 2.2 Escape hatch: core `DataFrame`
 
-- `DataFrameModel.to_dataframe()` or `DataFrameModel.inner_frame()` returning the core pydantable `DataFrame`
-
-This makes “not supported in PlanFrame-first surface” a deliberate, documented choice rather than an accidental fallback.
+**Implemented:** **`DataFrameModel.to_dataframe()`** returns the inner lazy **`DataFrame`** for APIs that are intentionally not wrapped by the PlanFrame-first surface. See {doc}`PLANFRAME_FALLBACKS`.
 
 **Acceptance criteria**
 
-- `DataFrameModel` execution-time options map cleanly to PlanFrame `ExecutionOptions`.
-- The “engine-only” escape hatch is documented and covered by a small test.
+- `DataFrameModel` execution-time streaming options for **`to_dict`** / **`collect(as_lists=True)`** map to PlanFrame `ExecutionOptions`.
+- **`to_dataframe()`** is documented and tested.
 
-## Phase 3: Expand PlanFrame-first surface to match “DataFrameModel expectations”
+## Phase 3: Expand PlanFrame-first surface
 
 **Goal**: minimize the need for the escape hatch for common workflows.
 
 ### 3.1 Parity areas (evaluate and prioritize)
 
-- **Projection with expressions**: PlanFrame already has `project`; expose a typed `DataFrameModel`-level API that stays PlanFrame-first.
-- **Expr keys in sort/join/group_by**: PlanFrame supports them; pydantable adapter should support them to the degree the engine can.
-- **Reshape ergonomics**: richer `melt`/`pivot` options while keeping selector-free, schema-first semantics.
+- **Projection with expressions**: PlanFrame has `project`; expose or document a typed `DataFrameModel`-level API that stays PlanFrame-first.
+- **Expr keys in sort/join/group_by**: PlanFrame supports them; pydantable adapter supports them where the engine can (see adapter notes on single-column expr keys).
+- **Reshape:** PlanFrame **`Frame`** uses names like **`unpivot`** / **`pivot_*`**; **`DataFrameModel`** keeps user-facing **`melt`** / **`pivot`** and maps to the current PlanFrame nodes.
 
 **Acceptance criteria**
 
-- The “PlanFrame-first core API” documented surface covers the majority of workflows without escape hatches.
+- The documented PlanFrame-first surface covers the majority of workflows without escape hatches.
 
 ## Phase 4: Deprecation and cleanup of legacy paths
 
 **Goal**: eliminate dead code and clarify invariants.
 
 - Remove preserved “old backend code after `raise`” once a method has been PlanFrame-backed for at least one release cycle.
-- Delete docs that imply `_df` fallback behavior for `DataFrameModel` when it no longer exists.
-- Add CI gates ensuring no new `_df`-only transforms are introduced into `DataFrameModel`.
+- Delete docs that imply `_df`-only fallback behavior for `DataFrameModel` when it no longer exists.
+- Optional: CI gates for new `_df`-only transforms on `DataFrameModel`.
 
 **Acceptance criteria**
 
-- `DataFrameModel` is PlanFrame-first by construction; any engine-only behavior is explicit and documented.
+- `DataFrameModel` is PlanFrame-first by construction for transforms; engine-only behavior is explicit and documented.
 
 ## Definition of done
 
 The transition is “done” when:
 
-- `DataFrameModel` is effectively a typed PlanFrame façade (composition) over the pydantable engine adapter.
-- Adapter coverage is complete for the PlanFrame surface pydantable claims to support.
-- Execution-time hints are supported via PlanFrame’s options objects (and forwarded in the adapter).
-- Any remaining engine-only API is accessed through a single, documented escape hatch.
+- `DataFrameModel` is a typed PlanFrame façade (composition) over the pydantable engine adapter for **transforms** and for **columnar materialization** via `_pf.to_dict`.
+- Adapter **expr** coverage matches what pydantable documents as supported (`expr.py` + tests).
+- Execution-time hints for supported paths use PlanFrame **`ExecutionOptions`** (and **`JoinOptions`** on join) where applicable.
+- Any remaining engine-only API is accessed through **`to_dataframe()`** or other documented escape hatches.
 
+## Suggested follow-on work (priority)
+
+| Priority | Work |
+|----------|------|
+| P1 | Extend `expr.py` for additional `AggExpr` / `Over` shapes the engine can support. |
+| P2 | Optional: route more materialization shapes through PlanFrame once parity with `DataFrame` is proven. |
+| P3 | Phase 4: audit `NotImplementedError` branches and unreachable post-`raise` code in `DataFrameModel`. |
+
+## See also
+
+- {doc}`PLANFRAME_FALLBACKS` — PlanFrame-first surface vs escape hatch.
+- [PlanFrame: Creating an adapter](https://github.com/eddiethedean/planframe/blob/main/docs/guides/planframe/creating-an-adapter.md) — `BaseAdapter` contract.

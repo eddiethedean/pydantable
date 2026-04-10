@@ -1983,10 +1983,23 @@ class DataFrameModel(Generic[RowT]):
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
     ) -> Any:
+        if as_polars is not None:
+            return self._df.collect(
+                as_lists=as_lists,
+                as_numpy=as_numpy,
+                as_polars=as_polars,
+                streaming=streaming,
+                engine_streaming=engine_streaming,
+            )
+        if as_numpy and as_lists:
+            raise ValueError(
+                "collect() cannot specify both as_numpy=True and as_lists=True."
+            )
+        if as_lists:
+            return self.to_dict(streaming=streaming, engine_streaming=engine_streaming)
         return self._df.collect(
-            as_lists=as_lists,
+            as_lists=False,
             as_numpy=as_numpy,
-            as_polars=as_polars,
             streaming=streaming,
             engine_streaming=engine_streaming,
         )
@@ -1994,7 +2007,23 @@ class DataFrameModel(Generic[RowT]):
     def to_dict(
         self, *, streaming: bool | None = None, engine_streaming: bool | None = None
     ) -> dict[str, list[Any]]:
-        return self._df.to_dict(streaming=streaming, engine_streaming=engine_streaming)
+        from planframe.execution import ExecutionOptions
+
+        out = self._pf.to_dict(
+            options=ExecutionOptions(
+                streaming=streaming,
+                engine_streaming=engine_streaming,
+            )
+        )
+        return cast("dict[str, list[Any]]", out)
+
+    def to_dataframe(self) -> DataFrame[Any]:
+        """Return the inner lazy :class:`DataFrame` for engine-only APIs.
+
+        Use this when you need pydantable features not exposed on
+        :class:`DataFrameModel` (see the "PlanFrame and DataFrameModel" docs).
+        """
+        return self._df
 
     def to_polars(
         self, *, streaming: bool | None = None, engine_streaming: bool | None = None
@@ -2231,7 +2260,7 @@ class DataFrameModel(Generic[RowT]):
         for name, value in new_columns.items():
             expr = value if isinstance(value, PydExpr) else _pflit(value)
             # PlanFrame stubs encourage literal column names; this is a dynamic name.
-            pf2 = cast("Any", pf2).with_column(name, expr)
+            pf2 = cast("Any", pf2).with_columns(**{name: expr})
         return self._dfm_sync_pf(pf2)
 
     def with_columns_cast(
@@ -2419,7 +2448,7 @@ class DataFrameModel(Generic[RowT]):
         return self._dfm_sync_pf(self._pf.slice(offset, length))
 
     def with_row_count(self, name: str = "row_nr", *, offset: int = 0) -> Self:
-        return self._dfm_sync_pf(self._pf.with_row_count(name=name, offset=offset))
+        return self._dfm_sync_pf(self._pf.with_row_index(name=name, offset=offset))
 
     def head(self, n: int = 5) -> Self:
         return self._dfm_sync_pf(self._pf.head(n))
@@ -2491,11 +2520,9 @@ class DataFrameModel(Generic[RowT]):
         # PlanFrame-backed (narrowed): string column names only (no selectors).
         pf_any = cast("Any", self._pf)
         return self._dfm_sync_pf(
-            pf_any.melt(
-                id_vars=None if id_vars is None else _dfm_columns_as_tuple(id_vars),
-                value_vars=None
-                if value_vars is None
-                else _dfm_columns_as_tuple(value_vars),
+            pf_any.unpivot(
+                index=None if id_vars is None else _dfm_columns_as_tuple(id_vars),
+                on=None if value_vars is None else _dfm_columns_as_tuple(value_vars),
                 variable_name=variable_name,
                 value_name=value_name,
             )
@@ -3213,10 +3240,10 @@ class DataFrameModel(Generic[RowT]):
         pf_out = dfs[0]._pf
         if how_any == "vertical":
             for d in dfs[1:]:
-                pf_out = pf_out.concat_vertical(d._pf)
+                pf_out = pf_out.concat(d._pf, how="vertical")
         elif how_any == "horizontal":
             for d in dfs[1:]:
-                pf_out = pf_out.concat_horizontal(d._pf)
+                pf_out = pf_out.concat(d._pf, how="horizontal")
         else:
             raise ValueError("concat(how=...) must be 'vertical' or 'horizontal'.")
         return dfs[0]._dfm_sync_pf(pf_out)

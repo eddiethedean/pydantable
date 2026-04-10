@@ -752,6 +752,25 @@ def test_dataframe_model_with_row_count() -> None:
     assert out["row_nr"] == [0, 1, 2]
 
 
+def test_dataframe_model_to_dataframe_is_inner_engine_frame() -> None:
+    class S(DataFrameModel):
+        x: int
+
+    df = S({"x": [1, 2]})
+    inner = df.to_dataframe()
+    assert inner is df._df
+    assert inner.to_dict() == {"x": [1, 2]}
+
+
+def test_dataframe_model_to_dict_collect_as_lists_use_planframe_path() -> None:
+    class S(DataFrameModel):
+        x: int
+
+    df = S({"x": [1, 2, 3]})
+    assert df.to_dict() == {"x": [1, 2, 3]}
+    assert df.collect(as_lists=True) == {"x": [1, 2, 3]}
+
+
 def test_dataframe_model_selector_helpers() -> None:
     from pydantable import selectors as s
 

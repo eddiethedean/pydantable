@@ -16,7 +16,7 @@ class _StringsOpt(DataFrameModel):
 
 
 def _run_with_column(m: DataFrameModel, pf_expr: object) -> dict[str, list[object]]:
-    out = execute_frame(m._pf.with_column("out", pf_expr))
+    out = execute_frame(m._pf.with_columns(out=pf_expr))
     return out.to_dict()
 
 
@@ -61,7 +61,7 @@ def test_planframe_str_split() -> None:
 
 def test_planframe_str_len_nullable_string() -> None:
     m = _StringsOpt({"s": ["ab", None]})
-    out = execute_frame(m._pf.with_column("n", pf.StrLen(pf.col("s"))))
+    out = execute_frame(m._pf.with_columns(n=pf.StrLen(pf.col("s"))))
     assert out.to_dict()["n"] == [2, None]
 
 

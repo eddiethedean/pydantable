@@ -18,7 +18,7 @@ class _Datetimes(DataFrameModel):
 
 
 def _run_with_column(m: DataFrameModel, pf_expr: object) -> dict[str, list[object]]:
-    out = execute_frame(m._pf.with_column("out", pf_expr))
+    out = execute_frame(m._pf.with_columns(out=pf_expr))
     return out.to_dict()
 
 
