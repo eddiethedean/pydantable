@@ -7,6 +7,7 @@ This document describes the transition for **pydantable** to behave as a “real
 - **PlanFrame is the single planning surface** for the `DataFrameModel`-first API.
 - **pydantable is the backend engine + adapter**: it compiles PlanFrame expression IR into pydantable expressions, lowers PlanFrame plan nodes into pydantable lazy operations, and materializes results only at execution boundaries.
 - **No silent legacy path** inside `DataFrameModel`: if something can’t be expressed/executed via PlanFrame + adapter, it must be an explicit and documented escape hatch (or an explicit error).
+- **Static typing:** PlanFrame’s **Resolve** / stubs / `materialize_model` story should become the **primary** way users get precise checker feedback on lazy chains; see {doc}`PLANFRAME_TYPING_ROADMAP`.
 
 ## Principles and constraints
 
@@ -184,5 +185,6 @@ Multi-column explode/unnest, additional `outer=` behavior, and richer `*_all` he
 
 ## See also
 
+- {doc}`PLANFRAME_TYPING_ROADMAP` — leverage PlanFrame’s typing system; mypy plugin shrink / boundaries.
 - {doc}`PLANFRAME_FALLBACKS` — PlanFrame-first surface vs escape hatch.
 - [PlanFrame: Creating an adapter](https://github.com/eddiethedean/planframe/blob/main/docs/guides/planframe/creating-an-adapter.md) — `BaseAdapter` contract.

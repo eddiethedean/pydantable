@@ -12,7 +12,7 @@ Use this page when you know **what you need to do**, but not **where it is docum
 - **Understand versioning/semver expectations**: {doc}`VERSIONING`.
 - **Learn supported dtypes and edge cases**: {doc}`SUPPORTED_TYPES`.
 - **Debug plans / observe runtime / discover extension points**: {doc}`PLAN_AND_PLUGINS`.
-- **PlanFrame–first `DataFrameModel` API** (and `_df`-only ops): {doc}`PLANFRAME_FALLBACKS`; adapter coverage, backlog, and surveys: {doc}`PLANFRAME_ADAPTER_ROADMAP`.
+- **PlanFrame–first `DataFrameModel` API** (and `_df`-only ops): {doc}`PLANFRAME_FALLBACKS`; adapter coverage, backlog, and surveys: {doc}`PLANFRAME_ADAPTER_ROADMAP`; **static typing / Resolve / mypy plugin strategy**: {doc}`PLANFRAME_TYPING_ROADMAP`.
 
 ## Reference paths (by topic)
 

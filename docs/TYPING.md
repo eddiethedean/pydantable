@@ -11,6 +11,8 @@ PydanTable supports **two end-user strategies** for `DataFrameModel` static typi
 
 The **pydantable** repo runs **`ty check`** on first-party trees in CI (`make check-python`). That validates annotations and APIs; it is **not** a substitute for running mypy with the plugin in your project if you rely on inferred chains.
 
+**PlanFrame-first static typing (roadmap):** being a PlanFrame adapter means leaning on **PlanFrame’s** `Frame` / `Expr` typing, generated stubs, and `materialize_model` boundaries rather than duplicating Resolve logic in the [**mypy plugin**](https://github.com/eddiethedean/pydantable/blob/main/python/pydantable/mypy_plugin.py) forever. Long-term direction, phases, and plugin scope: {doc}`PLANFRAME_TYPING_ROADMAP`.
+
 This page consolidates the typing story and links to the relevant contracts.
 
 ## The typing contract (nominal model, derived row type, structural helpers)

@@ -108,7 +108,7 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 | Map of all pages | [DOCS_MAP](https://pydantable.readthedocs.io/en/latest/DOCS_MAP.html) |
 | Quickstart | [QUICKSTART](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html) |
 | `DataFrameModel` | [DATAFRAMEMODEL](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) |
-| PlanFrame (`DataFrameModel`) | [PLANFRAME_FALLBACKS](https://pydantable.readthedocs.io/en/latest/PLANFRAME_FALLBACKS.html) · [PLANFRAME_ADAPTER_ROADMAP](https://pydantable.readthedocs.io/en/latest/PLANFRAME_ADAPTER_ROADMAP.html) |
+| PlanFrame (`DataFrameModel`) | [PLANFRAME_FALLBACKS](https://pydantable.readthedocs.io/en/latest/PLANFRAME_FALLBACKS.html) · [PLANFRAME_ADAPTER_ROADMAP](https://pydantable.readthedocs.io/en/latest/PLANFRAME_ADAPTER_ROADMAP.html) · [PLANFRAME_TYPING_ROADMAP](https://pydantable.readthedocs.io/en/latest/PLANFRAME_TYPING_ROADMAP.html) |
 | Typing (mypy vs Pyright) | [TYPING](https://pydantable.readthedocs.io/en/latest/TYPING.html) |
 | I/O overview | [IO_OVERVIEW](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html) |
 | SQL (SQLModel, raw string SQL) | [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html) · [SQLMODEL_SQL_ROADMAP](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html) |
