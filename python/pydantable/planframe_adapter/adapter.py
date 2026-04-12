@@ -493,28 +493,19 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
 
     # ---- expression compilation + materialization ----
 
-    def resolve_dtype(self, name: str, *, ctx: CompileExprContext) -> object | None:
-        """Map ``Col(name)`` to a dtype when PlanFrame's step schema is partial.
+    def resolve_backend_dtype_from_frame(self, df: Any, name: str) -> object | None:
+        """Return dtype annotation for *name* from a live pydantable ``DataFrame``.
 
-        PlanFrame 1.2+ routes ``compile_expr`` through :class:`CompileExprContext` and
-        expects adapters to recover dtypes for columns that still exist on the backend
-        frame but are omitted from the projected schema (e.g. ``filter`` then
-        ``select``). When the column is not in ``ctx.schema``, fall back to a
-        permissive scalar dtype; the engine still resolves the column by name.
+        Used when PlanFrame builds ``CompileExprContext.resolve_backend_dtype`` so
+        ``compile_expr`` can resolve columns on the frame missing from the step schema.
         """
 
-        sch = ctx.schema
-        if sch is not None:
-            if hasattr(sch, "field_map"):
-                fm = sch.field_map()
-                if name in fm:
-                    return fm[name].dtype
-            fields = getattr(sch, "fields", None)
-            if fields is not None:
-                for f in fields:
-                    if getattr(f, "name", None) == name:
-                        return getattr(f, "dtype", None)
-        return float
+        schema_fields = getattr(df, "schema_fields", None)
+        if callable(schema_fields):
+            fields = schema_fields()
+            if isinstance(fields, dict):
+                return fields.get(name)
+        return None
 
     def compile_expr(
         self,
@@ -536,7 +527,7 @@ class PydantableAdapter(BaseAdapter[Any, Any]):
         schema_fields = {f.name: f.dtype for f in effective_schema.fields}
 
         def _resolve_col(n: str) -> object | None:
-            return self.resolve_dtype(n, ctx=compile_ctx)
+            return BaseAdapter.resolve_dtype(self, n, ctx=compile_ctx)
 
         return compile_expr(
             expr,

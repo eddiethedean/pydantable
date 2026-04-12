@@ -19,7 +19,7 @@ This document describes the transition for **pydantable** to behave as a “real
 
 ## Current state (baseline)
 
-- **Dependency:** pydantable pins **PlanFrame `>=1.2.0,<2`** (see `pyproject.toml`). PlanFrame 1.x renamed several **`Frame` methods** compared with older lines (`with_column` → `with_columns`, `concat_vertical` / `concat_horizontal` → `concat(how=…)`, `with_row_count` → `with_row_index`, table reshape `melt` → `unpivot` on `Frame`). **`DataFrameModel` keeps stable user names** (`with_row_count`, `melt`, …) and bridges to the current PlanFrame `Frame` API internally.
+- **Dependency:** pydantable pins **PlanFrame `>=1.3.0,<2`** (see `pyproject.toml`). PlanFrame 1.x renamed several **`Frame` methods** compared with older lines (`with_column` → `with_columns`, `concat_vertical` / `concat_horizontal` → `concat(how=…)`, `with_row_count` → `with_row_index`, table reshape `melt` → `unpivot` on `Frame`). **`DataFrameModel` keeps stable user names** (`with_row_count`, `melt`, …) and bridges to the current PlanFrame `Frame` API internally.
 - `DataFrameModel` holds a PlanFrame frame (`_pf`) and executes transforms via `pydantable.planframe_adapter.PydantableAdapter` and `planframe.execution.execute_plan` (`execute_frame` in pydantable).
 - After each PlanFrame-backed step, `_dfm_sync_pf` runs `execute_frame` so the inner pydantable `DataFrame` (`_df`) matches the compiled plan; `_pf` stores the extended lazy plan.
 - **Expression lowering** lives in `python/pydantable/planframe_adapter/expr.py`. End-to-end coverage for the adapter is in `tests/dataframe/test_planframe_adapter_*.py`.
@@ -43,12 +43,25 @@ These upstream changes matter for pydantable as a PlanFrame adapter; see the [pl
 **Added**
 
 - **Async execution surface** ([planframe#105](https://github.com/eddiethedean/planframe/issues/105)): upstream provides `execute_plan_async` (thread-pooled sync plan) and Frame convenience aliases (`collect_async`, `collect_backend_async`, `to_dict_async`, `to_dicts_async`, …) alongside the existing `a*` materializers. pydantable still documents where **`DataFrameModel`** async behavior delegates to the inner **`DataFrame`** vs PlanFrame (`Frame`) in {doc}`PLANFRAME_FALLBACKS`.
-- **`BaseAdapter.resolve_dtype`** with **`CompileExprContext`** ([planframe#104](https://github.com/eddiethedean/planframe/issues/104)): `PydantableAdapter` implements `resolve_dtype` and threads it through `compile_expr` → `planframe_adapter/expr.py` for dtype-aware `Col(...)` lowering.
+- **`BaseAdapter.resolve_dtype`** with **`CompileExprContext`** ([planframe#104](https://github.com/eddiethedean/planframe/issues/104)): pydantable’s `compile_expr` delegates to `BaseAdapter.resolve_dtype` and `expr.py` lowering for dtype-aware `Col(...)`; see PlanFrame **1.3.0** for backend frame dtype recovery.
 - **`planframe.materialize`** ([planframe#107](https://github.com/eddiethedean/planframe/issues/107)): `materialize_dataframe_model` / `amaterialize_dataframe_model` in `pydantable.planframe_adapter` delegate to `materialize_columns` / `amaterialize_columns` so `ExecutionOptions` forwarding matches upstream boundaries.
 
 **Typing**
 
 - **`Expr` operator overloads** ([planframe#106](https://github.com/eddiethedean/planframe/issues/106)): comparisons and boolean ops align with PlanFrame’s IR; pydantable’s shipped stubs continue to reference PlanFrame types at `DataFrameModel` boundaries ({doc}`TYPING`).
+
+### PlanFrame 1.3.0 (upstream alignment)
+
+**Added**
+
+- **`CompileExprContext.resolve_backend_dtype`** and **`BaseAdapter.resolve_backend_dtype_from_frame`**: `execute_plan` can recover dtypes from the live backend frame when the step schema omits a column ([planframe#113](https://github.com/eddiethedean/planframe/issues/113)). **pydantable** implements `resolve_backend_dtype_from_frame` using `DataFrame.schema_fields()`.
+- **`AdapterCapabilities.native_async_materialize`**: advisory flag (default `False`) for thread-pooled vs native async materializers ([planframe#115](https://github.com/eddiethedean/planframe/issues/115)).
+
+**Documentation** (upstream; pydantable benefits from clearer adapter contracts)
+
+- Third-party adapter checklist, unknown-column policy during `compile_expr`, `Frame` materializers ↔ `planframe.materialize` cross-links ([planframe#114](https://github.com/eddiethedean/planframe/issues/114), [planframe#116](https://github.com/eddiethedean/planframe/issues/116), [planframe#119](https://github.com/eddiethedean/planframe/issues/119)).
+- Typing CI / stub parity expectations ([planframe#118](https://github.com/eddiethedean/planframe/issues/118)).
+- Columnar streaming design note (`AdapterColumnarStreamer` protocol; [planframe#117](https://github.com/eddiethedean/planframe/issues/117)).
 
 Regression: `tests/dataframe/test_planframe_adapter_contract.py` asserts abstract methods remain implemented.
 

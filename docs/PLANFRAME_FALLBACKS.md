@@ -2,7 +2,7 @@
 
 `DataFrameModel` keeps a typed [PlanFrame](https://pypi.org/project/planframe/) `Frame` as `_pf` and executes it through `pydantable.planframe_adapter.PydantableAdapter` (Rust/native `DataFrame` backend).
 
-**Requirement:** current pydantable releases depend on **PlanFrame `>=1.2.0,<2`** (see `pyproject.toml`).
+**Requirement:** current pydantable releases depend on **PlanFrame `>=1.3.0,<2`** (see `pyproject.toml`).
 
 ## PlanFrame–first core API
 
