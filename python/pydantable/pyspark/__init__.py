@@ -3,25 +3,20 @@
 This is a **facade** for familiar names (``withColumn``, ``orderBy``, …), not a
 Spark cluster client. See :mod:`pydantable.pyspark.sql` for ``functions``, types,
 and :class:`~pydantable.window_spec.Window`.
+
+PlanFrame's PySpark-shaped lazy API lives under :mod:`pydantable.pyspark.planframe`
+(re-export of :mod:`planframe.spark`).
 """
 
 from __future__ import annotations
 
-import warnings
 from typing import TYPE_CHECKING, Any
 
 from pydantable.expressions import Expr
 from pydantable.schema import Schema
 
-from . import sql
+from . import planframe, sql
 from .dataframe import DataFrame, DataFrameModel
-
-warnings.warn(
-    "`pydantable.pyspark` is deprecated and will be removed in pydantable 2.0. "
-    "Use the DataFrameModel-first API instead.",
-    DeprecationWarning,
-    stacklevel=2,
-)
 
 if TYPE_CHECKING:
     from pydantable.pyspark.sql_moltres import SqlDataFrame, SqlDataFrameModel
@@ -48,5 +43,6 @@ __all__ = [
     "Schema",
     "SqlDataFrame",
     "SqlDataFrameModel",
+    "planframe",
     "sql",
 ]

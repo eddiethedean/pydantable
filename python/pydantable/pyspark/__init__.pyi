@@ -4,7 +4,7 @@ from pydantable.expressions import Expr
 from pydantable.pyspark.sql_moltres import SqlDataFrame, SqlDataFrameModel
 from pydantable.schema import Schema
 
-from . import sql
+from . import planframe, sql
 from .dataframe import DataFrame, DataFrameModel
 
 __all__ = [
@@ -14,5 +14,6 @@ __all__ = [
     "Schema",
     "SqlDataFrame",
     "SqlDataFrameModel",
+    "planframe",
     "sql",
 ]

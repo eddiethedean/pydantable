@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+import planframe.pandas as planframe
 from typing_extensions import Self
 
 from .dataframe import DataFrame as CoreDataFrame
@@ -565,4 +566,5 @@ __all__ = [
     "Schema",
     "SqlDataFrame",
     "SqlDataFrameModel",
+    "planframe",
 ]

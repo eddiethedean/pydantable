@@ -3,6 +3,9 @@
 ``merge``/``assign``/``query`` mirror familiar pandas entry points where supported;
 execution remains the Rust engine. Import ``DataFrame`` from this module for the
 pandas-shaped API.
+
+The :mod:`planframe.pandas` lazy API (``PandasLikeFrame``, ``Series``, …) is exposed
+as module attribute ``planframe`` for PlanFrame-first workflows (see PlanFrame docs).
 """
 
 from __future__ import annotations
@@ -10,10 +13,10 @@ from __future__ import annotations
 import ast
 import random
 import re
-import warnings
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+import planframe.pandas as planframe
 from pydantic import create_model
 from typing_extensions import Self
 
@@ -28,13 +31,6 @@ from .schema import Schema
 from .schema._impl import make_derived_schema_type, schema_field_types
 from .selectors import Selector
 from .window_spec import WindowSpec
-
-warnings.warn(
-    "`pydantable.pandas` is deprecated and will be removed in pydantable 2.0. "
-    "Use the DataFrameModel-first API instead.",
-    DeprecationWarning,
-    stacklevel=2,
-)
 
 
 def _is_pandas_series(value: object) -> bool:
@@ -3175,4 +3171,5 @@ __all__ = [
     "Schema",
     "SqlDataFrame",
     "SqlDataFrameModel",
+    "planframe",
 ]

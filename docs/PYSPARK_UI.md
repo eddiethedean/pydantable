@@ -1,8 +1,9 @@
 # PySpark UI (`pydantable.pyspark`)
 
-```{warning}
-`pydantable.pyspark` is **deprecated** and will be **removed in pydantable 2.0**.
-Prefer the primary `DataFrameModel` interface from `pydantable`.
+```{note}
+**Primary API:** {doc}`DATAFRAMEMODEL` — `DataFrameModel` from `pydantable`.
+
+**PySpark UI:** `pydantable.pyspark` is a **supported** optional façade with Spark-style names and `pydantable.pyspark.sql.functions as F`. **PlanFrame:** `pydantable.pyspark.planframe` re-exports `planframe.spark` (`SparkFrame`, `functions`, …) for lazy PlanFrame plans with an adapter; see {doc}`PLANFRAME_ADAPTER_ROADMAP` (implementation: `python/pydantable/pyspark/planframe.py`).
 ```
 
 The **PySpark UI** is an optional import surface that adds **Apache Spark–style names** (`withColumn`, `where`, `orderBy`, …) and a small **`pyspark.sql`-like** submodule on top of pydantable’s typed logical DataFrame. It is **not** the Apache Spark `DataFrame`; there is no JVM, no `SparkSession`, and no runtime dependency on the `pyspark` package.

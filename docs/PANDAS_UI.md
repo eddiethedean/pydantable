@@ -1,8 +1,9 @@
 # Pandas UI (`pydantable.pandas`)
 
-```{warning}
-`pydantable.pandas` is **deprecated** and will be **removed in pydantable 2.0**.
-Prefer the primary `DataFrameModel` interface from `pydantable`.
+```{note}
+**Primary API:** {doc}`DATAFRAMEMODEL` — `DataFrameModel` from `pydantable`.
+
+**Pandas UI:** `pydantable.pandas` is a **supported** optional façade with pandas-like names on the same Rust core. **PlanFrame:** module attribute `pydantable.pandas.planframe` is `planframe.pandas` (`PandasLikeFrame`, `Series`, …); see {doc}`PLANFRAME_ADAPTER_ROADMAP`.
 ```
 
 The **pandas UI** is an optional import surface that layers **pandas-like method and property names** on top of pydantable’s typed logical DataFrame. It does **not** wrap a `pandas.DataFrame` for the schema-driven `DataFrame` / `DataFrameModel` types; execution uses the same **Rust engine** as the default export (see [Execution](EXECUTION.md)).
