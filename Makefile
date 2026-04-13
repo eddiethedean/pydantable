@@ -105,7 +105,7 @@ rust-fmt-check:
 	cargo fmt --manifest-path $(CARGO_MANIFEST) -- --check
 
 rust-clippy:
-	cargo clippy --manifest-path $(CARGO_MANIFEST) \
+	cargo clippy --manifest-path $(CARGO_MANIFEST) --all-features --tests \
 		-- -D warnings -W clippy::unwrap_used -W clippy::expect_used
 
 rust-check-no-default-features:
