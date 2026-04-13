@@ -30,6 +30,11 @@ chrono = { version = "0.4.41", default-features = false, features = ["std"] }
 tokio = { version = "1", features = ["rt-multi-thread"] }
 pyo3-async-runtimes = { version = "0.24", features = ["tokio-runtime"] }
 
+[lints.clippy]
+# Panicking on unwrap/expect in library code is discouraged; tests allow these lints locally.
+unwrap_used = "warn"
+expect_used = "warn"
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

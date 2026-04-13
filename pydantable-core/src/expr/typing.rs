@@ -2776,8 +2776,11 @@ impl ExprNode {
                 "map_get() requires a map column.",
             ));
         }
-        let DTypeDesc::Map { value, .. } = inner.dtype() else {
-            unreachable!("is_map checked");
+        let dtype_src = inner.dtype();
+        let DTypeDesc::Map { value, .. } = dtype_src else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "internal error: expected map dtype after is_map() check",
+            ));
         };
         let dtype = match value.as_ref().clone() {
             DTypeDesc::Scalar { base, .. } => DTypeDesc::Scalar {
@@ -2849,8 +2852,11 @@ impl ExprNode {
                 "map_values() requires a map column.",
             ));
         }
-        let DTypeDesc::Map { value, .. } = inner.dtype() else {
-            unreachable!("is_map checked");
+        let dtype_src = inner.dtype();
+        let DTypeDesc::Map { value, .. } = dtype_src else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "internal error: expected map dtype after is_map() check",
+            ));
         };
         let nullable = inner.dtype().nullable_flag();
         Ok(ExprNode::MapValues {
@@ -2868,8 +2874,11 @@ impl ExprNode {
                 "map_entries() requires a map column.",
             ));
         }
-        let DTypeDesc::Map { value, .. } = inner.dtype() else {
-            unreachable!("is_map checked");
+        let dtype_src = inner.dtype();
+        let DTypeDesc::Map { value, .. } = dtype_src else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "internal error: expected map dtype after is_map() check",
+            ));
         };
         let nullable = inner.dtype().nullable_flag();
         Ok(ExprNode::MapEntries {
@@ -3098,7 +3107,14 @@ impl ExprNode {
                                     ArithOp::Add => ai + bi,
                                     ArithOp::Sub => ai - bi,
                                     ArithOp::Mul => ai * bi,
-                                    ArithOp::Div => unreachable!(),
+                                    ArithOp::Div => {
+                                        return Err(PyErr::new::<
+                                            pyo3::exceptions::PyTypeError,
+                                            _,
+                                        >(
+                                            "internal error: division in integer arithmetic path.",
+                                        ));
+                                    }
                                 };
                                 out.push(Some(LiteralValue::Int(res_i)));
                             }
@@ -3466,7 +3482,14 @@ impl ExprNode {
                                                 CmpOp::Le => af <= bf,
                                                 CmpOp::Gt => af > bf,
                                                 CmpOp::Ge => af >= bf,
-                                                CmpOp::Eq | CmpOp::Ne => unreachable!(),
+                                                CmpOp::Eq | CmpOp::Ne => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyRuntimeError,
+                                                        _,
+                                                    >(
+                                                        "internal error: unexpected comparison op in numeric ordering path.",
+                                                    ));
+                                                }
                                             }
                                         }
                                         BaseType::Str
@@ -3504,7 +3527,14 @@ impl ExprNode {
                                                 CmpOp::Le => as_ <= bs_,
                                                 CmpOp::Gt => as_ > bs_,
                                                 CmpOp::Ge => as_ >= bs_,
-                                                CmpOp::Eq | CmpOp::Ne => unreachable!(),
+                                                CmpOp::Eq | CmpOp::Ne => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyRuntimeError,
+                                                        _,
+                                                    >(
+                                                        "internal error: unexpected comparison op in string ordering path.",
+                                                    ));
+                                                }
                                             }
                                         }
                                         BaseType::Uuid => {
@@ -3535,7 +3565,14 @@ impl ExprNode {
                                                 CmpOp::Le => as_ <= bs_,
                                                 CmpOp::Gt => as_ > bs_,
                                                 CmpOp::Ge => as_ >= bs_,
-                                                CmpOp::Eq | CmpOp::Ne => unreachable!(),
+                                                CmpOp::Eq | CmpOp::Ne => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyRuntimeError,
+                                                        _,
+                                                    >(
+                                                        "internal error: unexpected comparison op in uuid ordering path.",
+                                                    ));
+                                                }
                                             }
                                         }
                                         BaseType::Decimal => {
@@ -3566,7 +3603,14 @@ impl ExprNode {
                                                 CmpOp::Le => ai <= bi,
                                                 CmpOp::Gt => ai > bi,
                                                 CmpOp::Ge => ai >= bi,
-                                                CmpOp::Eq | CmpOp::Ne => unreachable!(),
+                                                CmpOp::Eq | CmpOp::Ne => {
+                                                    return Err(PyErr::new::<
+                                                        pyo3::exceptions::PyRuntimeError,
+                                                        _,
+                                                    >(
+                                                        "internal error: unexpected comparison op in decimal ordering path.",
+                                                    ));
+                                                }
                                             }
                                         }
                                         BaseType::DateTime => {
@@ -3966,22 +4010,34 @@ impl ExprNode {
                 pattern,
                 ..
             } => {
-                if matches!(kind, StringPredicateKind::Contains { literal: false }) {
-                    return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-                        "Regex str_contains is only supported with the Polars execution engine.",
-                    ));
+                #[derive(Copy, Clone)]
+                enum RowWiseStrPred {
+                    Starts,
+                    Ends,
+                    ContainsLiteral,
                 }
+                let pred = match kind {
+                    StringPredicateKind::StartsWith => RowWiseStrPred::Starts,
+                    StringPredicateKind::EndsWith => RowWiseStrPred::Ends,
+                    StringPredicateKind::Contains { literal: true } => {
+                        RowWiseStrPred::ContainsLiteral
+                    }
+                    StringPredicateKind::Contains { literal: false } => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                            "Regex str_contains is only supported with the Polars execution engine.",
+                        ));
+                    }
+                };
                 let vals = inner.eval(ctx, n)?;
                 let pat = pattern.as_str();
                 Ok(vals
                     .into_iter()
                     .map(|v| {
                         let str_like = |s: &str| {
-                            let b = match kind {
-                                StringPredicateKind::StartsWith => s.starts_with(pat),
-                                StringPredicateKind::EndsWith => s.ends_with(pat),
-                                StringPredicateKind::Contains { literal: true } => s.contains(pat),
-                                StringPredicateKind::Contains { literal: false } => unreachable!(),
+                            let b = match pred {
+                                RowWiseStrPred::Starts => s.starts_with(pat),
+                                RowWiseStrPred::Ends => s.ends_with(pat),
+                                RowWiseStrPred::ContainsLiteral => s.contains(pat),
                             };
                             Some(LiteralValue::Bool(b))
                         };
@@ -4153,34 +4209,30 @@ impl ExprNode {
                             };
                             Some(LiteralValue::Int(i))
                         }
-                        Some(LiteralValue::DateDays(days)) if is_date => match part {
-                            TemporalPart::Hour
-                            | TemporalPart::Minute
-                            | TemporalPart::Second
-                            | TemporalPart::Nanosecond => None,
-                            TemporalPart::Year
-                            | TemporalPart::Month
-                            | TemporalPart::Day
-                            | TemporalPart::Weekday
-                            | TemporalPart::Quarter
-                            | TemporalPart::Week
-                            | TemporalPart::DayOfYear => {
-                                let (y, mo, d) = utc_calendar_from_epoch_days(days);
-                                let i = match part {
-                                    TemporalPart::Year => i64::from(y),
-                                    TemporalPart::Month => i64::from(mo),
-                                    TemporalPart::Day => i64::from(d),
-                                    TemporalPart::Weekday => {
-                                        iso_weekday_monday1(y, mo as i32, d as i32)
-                                    }
-                                    TemporalPart::Quarter => ((i64::from(mo) - 1) / 3) + 1,
-                                    TemporalPart::Week => iso_week_from_ymd(y, mo, d),
-                                    TemporalPart::DayOfYear => ordinal_day_from_ymd(y, mo, d),
-                                    _ => unreachable!(),
-                                };
-                                Some(LiteralValue::Int(i))
+                        Some(LiteralValue::DateDays(days)) if is_date => {
+                            let (y, mo, d) = utc_calendar_from_epoch_days(days);
+                            match part {
+                                TemporalPart::Hour
+                                | TemporalPart::Minute
+                                | TemporalPart::Second
+                                | TemporalPart::Nanosecond => None,
+                                TemporalPart::Year => Some(LiteralValue::Int(i64::from(y))),
+                                TemporalPart::Month => Some(LiteralValue::Int(i64::from(mo))),
+                                TemporalPart::Day => Some(LiteralValue::Int(i64::from(d))),
+                                TemporalPart::Weekday => Some(LiteralValue::Int(
+                                    iso_weekday_monday1(y, mo as i32, d as i32),
+                                )),
+                                TemporalPart::Quarter => Some(LiteralValue::Int(
+                                    ((i64::from(mo) - 1) / 3) + 1,
+                                )),
+                                TemporalPart::Week => {
+                                    Some(LiteralValue::Int(iso_week_from_ymd(y, mo, d)))
+                                }
+                                TemporalPart::DayOfYear => Some(LiteralValue::Int(
+                                    ordinal_day_from_ymd(y, mo, d),
+                                )),
                             }
-                        },
+                        }
                         Some(LiteralValue::TimeNanos(ns)) if is_time => match part {
                             TemporalPart::Year
                             | TemporalPart::Month

@@ -1897,6 +1897,20 @@ def test_pandas_ui_compare_flags_diffs() -> None:
     assert cmp["b_diff"] == [False, False]
 
 
+def test_pandas_ui_compare_float_respects_rtol() -> None:
+    from pydantable.pandas import DataFrame
+
+    class R(Schema):
+        x: float
+
+    a = 1.0
+    b = a + 1e-9
+    x = DataFrame[R]({"x": [a]})
+    y = DataFrame[R]({"x": [b]})
+    assert x.compare(y, rtol=1e-5).collect(as_lists=True)["x_diff"] == [False]
+    assert x.compare(y, rtol=1e-12).collect(as_lists=True)["x_diff"] == [True]
+
+
 def test_pandas_ui_corr_and_cov() -> None:
     np = pytest.importorskip("numpy")
     from pydantable.pandas import DataFrame

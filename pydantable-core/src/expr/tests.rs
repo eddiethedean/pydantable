@@ -1,4 +1,5 @@
 //! Unit tests for expression IR, operator parsing, and typing helpers.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::collections::HashSet;
 

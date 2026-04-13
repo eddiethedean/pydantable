@@ -218,7 +218,9 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Clippy
-        run: cargo clippy --manifest-path pydantable-core/Cargo.toml -- -D warnings
+        run: |
+          cargo clippy --manifest-path pydantable-core/Cargo.toml \
+            -- -D warnings -W clippy::unwrap_used -W clippy::expect_used
 
       - name: Check no-default-features (rowwise skeleton)
         run: cargo check --manifest-path pydantable-core/Cargo.toml --no-default-features

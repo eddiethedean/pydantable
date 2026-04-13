@@ -5,10 +5,15 @@ from __future__ import annotations
 import sys
 
 import pydantable
-import pydantable_native._core as _core  # type: ignore[import-not-found]
 import pydantable_protocol
+import pytest
 
 from tests._support.paths import repo_root
+
+try:
+    import pydantable_native._core as _core  # type: ignore[import-not-found]
+except ImportError:
+    _core = None
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -17,8 +22,18 @@ else:
 
 _REPO_ROOT = repo_root()
 
+_NATIVE_SKIP = pytest.mark.skipif(
+    _core is None,
+    reason=(
+        "pydantable_native._core is not built (run `make native-develop` or "
+        "`maturin develop --manifest-path pydantable-core/Cargo.toml`)."
+    ),
+)
 
+
+@_NATIVE_SKIP
 def test_python_package_version_matches_rust_extension() -> None:
+    assert _core is not None
     assert pydantable.__version__ == _core.rust_version()
 
 

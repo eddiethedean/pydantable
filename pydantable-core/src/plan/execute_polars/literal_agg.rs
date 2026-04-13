@@ -176,12 +176,22 @@ pub(super) fn agg_literal(
                 let as_float = |x: i128| x as f64 / scale;
                 return match op {
                     "sum" => Ok(Some(LiteralValue::Decimal(decs.iter().copied().sum()))),
-                    "min" => Ok(Some(LiteralValue::Decimal(
-                        *decs.iter().min().expect("non-empty decs checked above"),
-                    ))),
-                    "max" => Ok(Some(LiteralValue::Decimal(
-                        *decs.iter().max().expect("non-empty decs checked above"),
-                    ))),
+                    "min" => {
+                        let m = decs.iter().copied().min().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                                "internal error: empty decimal list for min aggregate",
+                            )
+                        })?;
+                        Ok(Some(LiteralValue::Decimal(m)))
+                    }
+                    "max" => {
+                        let m = decs.iter().copied().max().ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                                "internal error: empty decimal list for max aggregate",
+                            )
+                        })?;
+                        Ok(Some(LiteralValue::Decimal(m)))
+                    }
                     "mean" => Ok(Some(LiteralValue::Float(
                         decs.iter().map(|&x| as_float(x)).sum::<f64>() / decs.len() as f64,
                     ))),

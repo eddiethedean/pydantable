@@ -8,6 +8,7 @@ pandas-shaped API.
 from __future__ import annotations
 
 import ast
+import math
 import random
 import re
 from collections.abc import Mapping, Sequence
@@ -43,6 +44,24 @@ def _as_list_str(x: str | list[str] | None, *, name: str) -> list[str] | None:
     if isinstance(x, list) and all(isinstance(v, str) for v in x):
         return list(x)
     raise TypeError(f"{name} must be a str or list[str].")
+
+
+def _compare_cells_differ(
+    va: Any, vb: Any, *, rtol: float, atol: float
+) -> bool:
+    """Return True when ``compare`` should flag a difference for one cell pair."""
+    if va == vb:
+        return False
+    if isinstance(va, bool) or isinstance(vb, bool):
+        return va != vb
+    if isinstance(va, (int, float)) and isinstance(vb, (int, float)):
+        try:
+            return not math.isclose(
+                float(va), float(vb), rel_tol=rtol, abs_tol=atol
+            )
+        except (OverflowError, TypeError, ValueError):
+            return va != vb
+    return va != vb
 
 
 def _keys_have_duplicates(df: CoreDataFrame, keys: list[str]) -> bool:
@@ -2079,7 +2098,7 @@ class PandasDataFrame(CoreDataFrame):
     def compare(
         self, other: CoreDataFrame, *, rtol: float = 1e-5, atol: float = 0.0
     ) -> CoreDataFrame:
-        _ = rtol, atol
+        """Row-wise diff flags; numeric cells use ``math.isclose`` tolerance."""
         if set(self.schema_fields()) != set(other.schema_fields()):
             raise ValueError(
                 "compare() requires both frames to share the same columns."
@@ -2096,7 +2115,9 @@ class PandasDataFrame(CoreDataFrame):
             diff_cols[f"{c}_diff"] = []
             for i in range(n):
                 va, vb = a[c][i], b[c][i]
-                diff_cols[f"{c}_diff"].append(va != vb)
+                diff_cols[f"{c}_diff"].append(
+                    _compare_cells_differ(va, vb, rtol=rtol, atol=atol)
+                )
         dyn = create_model("_CompareOut", **{k: (bool, ...) for k in diff_cols})
         return DataFrame[dyn](diff_cols)
 

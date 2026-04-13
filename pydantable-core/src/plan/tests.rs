@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use std::collections::HashMap;
 
 use pyo3::prelude::*;
@@ -291,8 +293,7 @@ mod polars_engine_tests {
             let keys: Vec<i64> = dict.get_item("k").unwrap().unwrap().extract().unwrap();
             let sums: Vec<Option<i64>> = dict.get_item("s").unwrap().unwrap().extract().unwrap();
 
-            let mut pairs: Vec<(i64, Option<i64>)> =
-                keys.into_iter().zip(sums.into_iter()).collect();
+            let mut pairs: Vec<(i64, Option<i64>)> = keys.into_iter().zip(sums).collect();
             pairs.sort_by_key(|(k, _)| *k);
             assert_eq!(pairs, vec![(1, None), (2, Some(5))]);
         });
@@ -404,10 +405,9 @@ mod polars_engine_tests {
                 .unwrap();
 
             let mut pairs_lists: Vec<(i64, Option<i64>)> =
-                k_lists.into_iter().zip(s_lists.into_iter()).collect();
+                k_lists.into_iter().zip(s_lists).collect();
             pairs_lists.sort_by_key(|(k, _)| *k);
-            let mut pairs_ipc: Vec<(i64, Option<i64>)> =
-                k_ipc.into_iter().zip(s_ipc.into_iter()).collect();
+            let mut pairs_ipc: Vec<(i64, Option<i64>)> = k_ipc.into_iter().zip(s_ipc).collect();
             pairs_ipc.sort_by_key(|(k, _)| *k);
             assert_eq!(
                 pairs_ipc, pairs_lists,
