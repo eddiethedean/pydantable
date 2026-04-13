@@ -6,10 +6,11 @@ pytest.importorskip("pyarrow")
 
 
 def test_interchange_protocol_consumed_by_pandas() -> None:
-    """pandas can import objects implementing `__dataframe__`."""
+    """Round-trip interchange via PyArrow's consumer, then pandas assertions."""
+
+    import pyarrow.interchange as pa_interchange
 
     pd = pytest.importorskip("pandas")
-
     from pydantable import DataFrameModel
 
     class SmallDF(DataFrameModel):
@@ -19,7 +20,7 @@ def test_interchange_protocol_consumed_by_pandas() -> None:
 
     df = SmallDF({"id": [1, 2], "name": ["a", "b"], "age": [10, None]})
 
-    out = pd.api.interchange.from_dataframe(df)
+    out = pa_interchange.from_dataframe(df).to_pandas()
     # Interchange importers are not required to preserve column order.
     assert set(out.columns) == {"id", "name", "age"}
     assert out["id"].tolist() == [1, 2]
@@ -36,6 +37,7 @@ def test_interchange_protocol_nan_as_null_passthrough() -> None:
     pd = pytest.importorskip("pandas")
 
     import pyarrow as pa
+    import pyarrow.interchange as pa_interchange
     from pydantable import DataFrameModel
 
     class Floats(DataFrameModel):
@@ -47,8 +49,8 @@ def test_interchange_protocol_nan_as_null_passthrough() -> None:
     with pytest.raises(RuntimeError, match="nan_as_null=True"):
         _ = df.__dataframe__(nan_as_null=True)
 
-    # Default export should still be consumable.
-    out = pd.api.interchange.from_dataframe(df)
+    # Default export consumable without deprecated ``pandas.api.interchange``.
+    out = pa_interchange.from_dataframe(df).to_pandas()
     got = out["x"].tolist()
     assert got[0] == 1.0
     assert isinstance(got[1], float) and pa.compute.is_nan(pa.scalar(got[1])).as_py()

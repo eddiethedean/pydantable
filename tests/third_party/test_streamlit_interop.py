@@ -5,7 +5,7 @@ import warnings
 import pytest
 
 pytest.importorskip("pyarrow")
-pytest.importorskip("pandas")
+pd = pytest.importorskip("pandas")
 pytest.importorskip("streamlit")
 
 
@@ -45,6 +45,10 @@ def test_streamlit_dataframe_interchange_smoke() -> None:
                 r"defaulting to empty attributes\.$"
             ),
         )
+        # Streamlit may call deprecated ``pd.api.interchange.from_dataframe``; silence
+        # until Streamlit migrates off the interchange protocol.
+        if hasattr(pd.errors, "Pandas4Warning"):
+            warnings.filterwarnings("ignore", category=pd.errors.Pandas4Warning)
         at = AppTest.from_function(app).run()
 
     # If protocol export fails, Streamlit surfaces an exception during app run.
