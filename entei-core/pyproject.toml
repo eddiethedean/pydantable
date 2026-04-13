@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "entei-core"
+version = "1.16.1"
+description = "MongoDB-backed optional execution engine for pydantable (PyMongo)."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "pydantable>=1.16.1,<2",
+    "pymongo>=4.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "entei-core[test]",
+]
+test = [
+    "pytest>=7.0",
+    "mongomock>=4.1",
+]
+
+[tool.setuptools]
+package-dir = { "" = "python" }
+
+[tool.setuptools.packages.find]
+where = ["python"]

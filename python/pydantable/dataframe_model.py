@@ -270,6 +270,7 @@ class DataFrameModel(Generic[RowT]):
             "DataFrameModel",
             "PandasDataFrameModel",
             "SqlDataFrameModel",
+            "EnteiDataFrameModel",
         ):
             return
 

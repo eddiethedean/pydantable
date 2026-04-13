@@ -67,6 +67,7 @@ The crate’s `[features]` block in `pydantable-core/Cargo.toml` gates the Polar
 ## Repository Layout
 
 - `pydantable-protocol/python/pydantable_protocol/`: **`ExecutionEngine`**, shared exceptions (**`MissingRustExtensionError`**, **`UnsupportedEngineOperationError`**), and related types with **no runtime dependencies** (for third-party backends that should not install **`pydantable`**).
+- `entei-core/python/entei_core/`: optional **MongoDB** engine (**`EnteiPydantableEngine`**, **`MongoRoot`**, **`EnteiDataFrame`**) published as **`entei-core`**; install with **`pip install -e ./entei-core`** (or **`pip install "pydantable[entei]"`** when using releases). Run **`make test-entei`** after installing **`entei-core`** editable.
 - `python/pydantable/`: thin Python API layer + Pydantic integration (`dataframe/`, `schema/` packages with `_impl.py` bodies)
 - `python/pydantable/engine/`: execution engine abstraction; the native backend ships in **`pydantable-native`**, which depends **only** on **`pydantable-protocol`** and wraps **`pydantable_native._core`**. **`pydantable`** requires **`pydantable-native`** on PyPI, so **`get_default_engine()`** works after **`pip install pydantable`**. **`rust_engine.py`** remains a thin compatibility shim delegating to the default engine.
 - `pydantable-core/src/`: Rust core (`dtype`, `expr`, `plan`, PyO3 exports)

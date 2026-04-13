@@ -41,6 +41,8 @@ rap = ["rapcsv>=0.2", "rapfiles>=0.1", "rapsqlite>=0.1"]
 fastapi = ["fastapi>=0.100"]
 # Moltres SQL engine (moltres-core) — SqlDataFrame / SqlDataFrameModel; rapsqlite for async SQLAlchemy URLs
 moltres = ["moltres-core>=1.0.0,<2", "rapsqlite>=0.1", "greenlet>=3.0"]
+# MongoDB engine (entei-core) — EnteiDataFrame / EnteiPydantableEngine / MongoRoot
+entei = ["entei-core==1.16.1"]
 dev = [
     "tomli>=1.2.0; python_version < '3.11'",
     "fastapi>=0.100",
@@ -50,6 +52,7 @@ dev = [
     "sqlmodel>=0.0.22,<0.1",
     "python-multipart>=0.0.6",
     "hypothesis>=6.0",
+    "mongomock>=4.1",
     "jinja2>=3.1",
     "numpy>=1.24",
     "pyarrow>=14.0",
@@ -155,6 +158,7 @@ include = [
     "python/pydantable/**",
     "pydantable-protocol/python/pydantable_protocol/**",
     "pydantable-native/python/pydantable_native/**",
+    "entei-core/python/entei_core/**",
 ]
 exclude = [
     "python/pydantable/mypy_plugin.py",
@@ -190,6 +194,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 "python/pydantable/dataframe/grouped.py" = ["TC003"]
 "tests/fastapi/test_pydantable_fastapi_columnar.py" = ["TC003"]
 "tests/sql/test_sql_moltres.py" = ["TC003"]
+"entei-core/**/*.py" = ["TC003"]
 # ``__all__`` lists lazy ``SqlDataFrame`` / ``SqlDataFrameModel`` from ``__getattr__``.
 "python/pydantable/pandas.py" = ["F822"]
 "tests/conftest.py" = ["TC003"]
@@ -331,8 +336,8 @@ module = "moltres_core.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-pythonpath = ["python", "pydantable-protocol/python"]
-testpaths = ["tests"]
+pythonpath = ["python", "pydantable-protocol/python", "entei-core/python"]
+testpaths = ["tests", "entei-core/tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 addopts = "--strict-markers"
