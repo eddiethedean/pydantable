@@ -173,26 +173,17 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
         Column validation is not applied yet.
         """
-        if cls._schema_type is None:
-            raise TypeError(
-                "Use DataFrame[SchemaType].read_* to construct from a lazy file read."
-            )
-        eng = get_default_engine()
-        plan = eng.make_plan(field_types_for_rust(schema_field_types(cls._schema_type)))
-        df = cls._from_plan(
-            root_data=root,
-            root_schema_type=cls._schema_type,
-            current_schema_type=cls._schema_type,
-            rust_plan=plan,
-            engine=eng,
+        from ._impl_lazy_sources import _from_scan_root as _fsr
+
+        return _fsr(
+            cls,
+            root,
+            engine_streaming=engine_streaming,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
         )
-        df._io_validation_enabled = True
-        df._io_validation_trusted_mode = trusted_mode
-        df._io_validation_fill_missing_optional = fill_missing_optional
-        df._io_validation_ignore_errors = bool(ignore_errors)
-        df._io_validation_on_validation_errors = on_validation_errors
-        df._engine_streaming_default = engine_streaming
-        return df
 
     @classmethod
     def read_parquet(
@@ -208,15 +199,18 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         **scan_kwargs: Any,
     ) -> DataFrame[Any]:
         """Lazy Parquet read (local file path)."""
-        from pydantable.io import read_parquet as _read_parquet
+        from ._impl_lazy_sources import read_parquet as _read_parquet
 
-        return cls._from_scan_root(
-            _read_parquet(path, columns=columns, **scan_kwargs),
+        return _read_parquet(
+            cls,
+            path,
+            columns=columns,
             engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
 
     @classmethod
@@ -239,18 +233,19 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         validation options are applied when you materialize (`to_dict()` /
         `collect()` / `to_arrow()` / `to_polars()`), not at scan time.
         """
-        from pydantable.io import aread_parquet as _aread_parquet
+        from ._impl_lazy_sources import aread_parquet as _aread_parquet
 
-        root = await _aread_parquet(
-            path, columns=columns, executor=executor, **scan_kwargs
-        )
-        return cls._from_scan_root(
-            root,
+        return await _aread_parquet(
+            cls,
+            path,
+            columns=columns,
+            executor=executor,
             engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
 
     @classmethod
@@ -271,17 +266,19 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
         See {doc}`DATA_IO_SOURCES`.
         """
-        from pydantable.io import read_parquet_url as _read_parquet_url
+        from ._impl_lazy_sources import read_parquet_url as _read_parquet_url
 
-        return cls._from_scan_root(
-            _read_parquet_url(
-                url, experimental=experimental, columns=columns, **kwargs
-            ),
+        return _read_parquet_url(
+            cls,
+            url,
+            experimental=experimental,
+            columns=columns,
             engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+            **kwargs,
         )
 
     @classmethod
@@ -305,22 +302,20 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         `pydantable.io.aread_parquet_url_ctx` for automatic temp-file cleanup.
         Validation options apply on materialization.
         """
-        from pydantable.io import aread_parquet_url as _aread_parquet_url
+        from ._impl_lazy_sources import aread_parquet_url as _aread_parquet_url
 
-        root = await _aread_parquet_url(
+        return await _aread_parquet_url(
+            cls,
             url,
             experimental=experimental,
             columns=columns,
             executor=executor,
-            **kwargs,
-        )
-        return cls._from_scan_root(
-            root,
             engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+            **kwargs,
         )
 
     @classmethod
@@ -336,15 +331,18 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> DataFrame[Any]:
-        from pydantable.io import read_csv as _read_csv
+        from ._impl_lazy_sources import read_csv as _read_csv
 
-        return cls._from_scan_root(
-            _read_csv(path, columns=columns, **scan_kwargs),
+        return _read_csv(
+            cls,
+            path,
+            columns=columns,
             engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
 
     @classmethod
@@ -365,16 +363,19 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
         Validation options apply on materialization (see `aread_parquet`).
         """
-        from pydantable.io import aread_csv as _aread_csv
+        from ._impl_lazy_sources import aread_csv as _aread_csv
 
-        root = await _aread_csv(path, columns=columns, executor=executor, **scan_kwargs)
-        return cls._from_scan_root(
-            root,
+        return await _aread_csv(
+            cls,
+            path,
+            columns=columns,
+            executor=executor,
             engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
 
     @classmethod
@@ -390,15 +391,18 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> DataFrame[Any]:
-        from pydantable.io import read_ndjson as _read_ndjson
+        from ._impl_lazy_sources import read_ndjson as _read_ndjson
 
-        return cls._from_scan_root(
-            _read_ndjson(path, columns=columns, **scan_kwargs),
+        return _read_ndjson(
+            cls,
+            path,
+            columns=columns,
             engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
 
     @classmethod
@@ -419,18 +423,19 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
         Validation options apply on materialization (see `aread_parquet`).
         """
-        from pydantable.io import aread_ndjson as _aread_ndjson
+        from ._impl_lazy_sources import aread_ndjson as _aread_ndjson
 
-        root = await _aread_ndjson(
-            path, columns=columns, executor=executor, **scan_kwargs
-        )
-        return cls._from_scan_root(
-            root,
+        return await _aread_ndjson(
+            cls,
+            path,
+            columns=columns,
+            executor=executor,
             engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
 
     @classmethod
@@ -447,15 +452,18 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         **scan_kwargs: Any,
     ) -> DataFrame[Any]:
         """Lazy JSON Lines (same as :meth:`read_ndjson`)."""
-        from pydantable.io import read_json as _read_json
+        from ._impl_lazy_sources import read_json as _read_json
 
-        return cls._from_scan_root(
-            _read_json(path, columns=columns, **scan_kwargs),
+        return _read_json(
+            cls,
+            path,
+            columns=columns,
             engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
 
     @classmethod
@@ -476,18 +484,19 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
         Validation options apply on materialization (see `aread_parquet`).
         """
-        from pydantable.io import aread_json as _aread_json
+        from ._impl_lazy_sources import aread_json as _aread_json
 
-        root = await _aread_json(
-            path, columns=columns, executor=executor, **scan_kwargs
-        )
-        return cls._from_scan_root(
-            root,
+        return await _aread_json(
+            cls,
+            path,
+            columns=columns,
+            executor=executor,
             engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
 
     @classmethod
@@ -503,15 +512,18 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         **scan_kwargs: Any,
     ) -> DataFrame[Any]:
-        from pydantable.io import read_ipc as _read_ipc
+        from ._impl_lazy_sources import read_ipc as _read_ipc
 
-        return cls._from_scan_root(
-            _read_ipc(path, columns=columns, **scan_kwargs),
+        return _read_ipc(
+            cls,
+            path,
+            columns=columns,
             engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
 
     @classmethod
@@ -532,16 +544,19 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
         Validation options apply on materialization (see `aread_parquet`).
         """
-        from pydantable.io import aread_ipc as _aread_ipc
+        from ._impl_lazy_sources import aread_ipc as _aread_ipc
 
-        root = await _aread_ipc(path, columns=columns, executor=executor, **scan_kwargs)
-        return cls._from_scan_root(
-            root,
+        return await _aread_ipc(
+            cls,
+            path,
+            columns=columns,
+            executor=executor,
             engine_streaming=engine_streaming,
             trusted_mode=trusted_mode,
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+            **scan_kwargs,
         )
 
     @classmethod
@@ -557,16 +572,18 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ):
         """Stream Parquet as batches of in-memory typed frames (PyArrow-backed)."""
-        from pydantable.io.iter_file import iter_parquet as _iter
+        from ._impl_lazy_sources import iter_parquet as _iter_parquet
 
-        for cols_dict in _iter(path, batch_size=batch_size, columns=columns):
-            yield cls(
-                cols_dict,
-                trusted_mode=trusted_mode,
-                fill_missing_optional=fill_missing_optional,
-                ignore_errors=ignore_errors,
-                on_validation_errors=on_validation_errors,
-            )
+        yield from _iter_parquet(
+            cls,
+            path,
+            batch_size=batch_size,
+            columns=columns,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
 
     @classmethod
     def iter_ipc(
@@ -581,16 +598,18 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ):
         """Stream IPC as batches of in-memory typed frames (PyArrow-backed)."""
-        from pydantable.io.iter_file import iter_ipc as _iter
+        from ._impl_lazy_sources import iter_ipc as _iter_ipc
 
-        for cols_dict in _iter(source, batch_size=batch_size, as_stream=as_stream):
-            yield cls(
-                cols_dict,
-                trusted_mode=trusted_mode,
-                fill_missing_optional=fill_missing_optional,
-                ignore_errors=ignore_errors,
-                on_validation_errors=on_validation_errors,
-            )
+        yield from _iter_ipc(
+            cls,
+            source,
+            batch_size=batch_size,
+            as_stream=as_stream,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
 
     @classmethod
     def iter_csv(
@@ -605,16 +624,18 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ):
         """Stream CSV as batches of in-memory typed frames (stdlib CSV)."""
-        from pydantable.io.iter_file import iter_csv as _iter
+        from ._impl_lazy_sources import iter_csv as _iter_csv
 
-        for cols_dict in _iter(path, batch_size=batch_size, encoding=encoding):
-            yield cls(
-                cols_dict,
-                trusted_mode=trusted_mode,
-                fill_missing_optional=fill_missing_optional,
-                ignore_errors=ignore_errors,
-                on_validation_errors=on_validation_errors,
-            )
+        yield from _iter_csv(
+            cls,
+            path,
+            batch_size=batch_size,
+            encoding=encoding,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
 
     @classmethod
     def iter_ndjson(
@@ -629,16 +650,18 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ):
         """Stream NDJSON/JSONL as batches of in-memory typed frames (stdlib json)."""
-        from pydantable.io.iter_file import iter_ndjson as _iter
+        from ._impl_lazy_sources import iter_ndjson as _iter_ndjson
 
-        for cols_dict in _iter(path, batch_size=batch_size, encoding=encoding):
-            yield cls(
-                cols_dict,
-                trusted_mode=trusted_mode,
-                fill_missing_optional=fill_missing_optional,
-                ignore_errors=ignore_errors,
-                on_validation_errors=on_validation_errors,
-            )
+        yield from _iter_ndjson(
+            cls,
+            path,
+            batch_size=batch_size,
+            encoding=encoding,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
 
     @classmethod
     def iter_json_lines(
@@ -653,16 +676,18 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ):
         """Stream JSON Lines as batches of in-memory typed frames."""
-        from pydantable.io.iter_file import iter_json_lines as _iter
+        from ._impl_lazy_sources import iter_json_lines as _iter_json_lines
 
-        for cols_dict in _iter(path, batch_size=batch_size, encoding=encoding):
-            yield cls(
-                cols_dict,
-                trusted_mode=trusted_mode,
-                fill_missing_optional=fill_missing_optional,
-                ignore_errors=ignore_errors,
-                on_validation_errors=on_validation_errors,
-            )
+        yield from _iter_json_lines(
+            cls,
+            path,
+            batch_size=batch_size,
+            encoding=encoding,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
 
     @classmethod
     def _from_plan(

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Fail if ``pydantable._core`` is reached outside the engine allowlist.
 
+Dependency-inversion gate (see docs/DEVELOPER.md, SOLID): keep native coupling in the
+engine layer so alternate backends can implement the same protocols.
+
 See docs/ADR-engines.md. Allowed locations:
   - ``python/pydantable/engine/`` (entire package)
   - ``python/pydantable/_extension.py``

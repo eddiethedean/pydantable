@@ -29,6 +29,24 @@ Minimal alternative (narrower deps): **`pip install maturin pytest pytest-asynci
 
 For **which checker runs where**, **`ty`** vs **mypy** vs **Pyright**, phased strictness, and public-vs-internal **`Any`**, see {doc}`TYPING` (contributor section).
 
+### Architecture notes (SOLID-oriented)
+
+Contributors should keep boundaries clear so the codebase stays testable and third-party engines remain possible (see {doc}`CUSTOM_ENGINE_PACKAGE` and {doc}`ADR-engines`).
+
+| Principle | In this repo |
+|-----------|----------------|
+| **S** (single responsibility) | Prefer focused modules: plan execution vs expr typing vs I/O. Avoid growing “god” files when a submodule or helper will do. |
+| **O** (open/closed) | Extend via new plan steps, `ExprNode` variants, or `EngineCapabilities` flags rather than editing unrelated code paths. |
+| **L** (Liskov substitution) | Any `ExecutionEngine` implementation (native, stub, SQL/Moltres) must honor the protocol: same error types for unsupported ops, capabilities that match behavior. |
+| **I** (interface segregation) | Depend on the smallest protocol that suffices: `PlanExecutor` for execute-only call sites; full `ExecutionEngine` only when building plans or using sinks. |
+| **D** (dependency inversion) | Application code depends on **`pydantable_protocol`** protocols and `get_default_engine()` / injected `engine=`, not on `pydantable_native` or `pydantable._core` directly. |
+
+**Engine coupling gate:** `make check-python` runs **`scripts/check_engine_bypass.py`**, which fails if `pydantable._core` is imported outside the allowlist (`python/pydantable/engine/`, `rust_engine.py`, `_extension.py`). Do not bypass this without an ADR update.
+
+**Imports:** Prefer `from pydantable.engine import get_default_engine` (and protocols from `pydantable.engine` or `pydantable_protocol`) over `pydantable_native` in non-engine packages.
+
+**Expected native touchpoints (audit):** `pydantable_native` and `pydantable_native.io_core` are allowed where lazy I/O or scan roots must talk to Rust (`python/pydantable/io/`, `python/pydantable/io/http.py`). `pydantable._core` stays behind `scripts/check_engine_bypass.py`. `python/pydantable/plan.py` documents native plan types; `rust_engine.py` and `python/pydantable/engine/` load the extension. Everything else should go through protocols (`ExecutionEngine`, `PlanExecutor`) or documented facades.
+
 Activate when working interactively:
 
 ```bash

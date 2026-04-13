@@ -7,6 +7,7 @@ from pydantable import DataFrameModel
 from pydantable.engine import (
     ExecutionEngine,
     NativePolarsEngine,
+    PlanExecutor,
     get_default_engine,
     set_default_engine,
 )
@@ -28,6 +29,16 @@ def test_stub_engine_capabilities_and_protocol() -> None:
     stub = StubExecutionEngine()
     assert stub.capabilities.backend == "stub"
     assert isinstance(stub, ExecutionEngine)
+    # Structural PlanExecutor (ISP): callers may narrow to execute-only surface.
+    assert isinstance(stub, PlanExecutor)
+
+
+def test_stub_engine_capabilities_flags_are_conservative() -> None:
+    """Liskov: stub must not advertise capabilities it does not implement."""
+    caps = StubExecutionEngine().capabilities
+    assert caps.extension_loaded is False
+    assert caps.has_execute_plan is False
+    assert caps.has_sink_parquet is False
 
 
 def test_set_default_engine_round_trip() -> None:

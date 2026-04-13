@@ -10,6 +10,7 @@ from pydantable.errors import UnsupportedEngineOperationError
 from .protocols import (
     EngineCapabilities,
     ExecutionEngine,
+    PlanExecutor,
     native_engine_capabilities,
     stub_engine_capabilities,
 )
@@ -21,6 +22,7 @@ __all__ = [
     "EngineCapabilities",
     "ExecutionEngine",
     "NativePolarsEngine",
+    "PlanExecutor",
     "get_default_engine",
     "get_expression_runtime",
     "native_engine_capabilities",

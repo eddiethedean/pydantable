@@ -4,19 +4,22 @@ from __future__ import annotations
 
 import functools
 from concurrent.futures import Executor
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel  # noqa: TC002
 from pydantic_core import PydanticUndefined
 
 from pydantable.schema import _annotation_nullable_inner, field_types_for_rust
 
+if TYPE_CHECKING:
+    from pydantable.engine.protocols import ExecutionEngine
+
 from ._execution_handle import _materialize_in_thread
 from ._scan import _extract_missing_scan_column_from_engine_error, _is_scan_file_root
 
 
 def materialize_with_optional_scan_fallback_sync(
-    engine: Any,
+    engine: ExecutionEngine,
     *,
     plan: Any,
     root_data: Any,
@@ -67,7 +70,7 @@ def materialize_with_optional_scan_fallback_sync(
 
 
 async def materialize_with_optional_scan_fallback_async(
-    engine: Any,
+    engine: ExecutionEngine,
     *,
     plan: Any,
     root_data: Any,

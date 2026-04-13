@@ -220,3 +220,17 @@ fn window_range_frame_serializes_with_kind_and_bounds() {
         );
     });
 }
+
+/// Smoke test for non-Polars row-wise [`ExprNode::eval`] (implementation in `eval_rowwise`).
+#[cfg(not(feature = "polars_engine"))]
+#[test]
+fn rowwise_eval_literal_materializes_rows() {
+    let lit = ExprNode::make_literal(
+        Some(LiteralValue::Int(42)),
+        DTypeDesc::non_nullable(BaseType::Int),
+    )
+    .expect("literal");
+    let ctx = std::collections::HashMap::new();
+    let out = lit.eval(&ctx, 3).expect("eval");
+    assert_eq!(out, vec![Some(LiteralValue::Int(42)); 3]);
+}
