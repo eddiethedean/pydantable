@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.16.1] — 2026-04-13
+
+### Changed
+
+- **Python:** Narrow `ImportError` handling for optional dtype registry and native capabilities; debug logging on intentional broad I/O / `Expr` repr fallbacks; optional scan-column recovery iteration bound in `_materialize_scan_fallback`.
+- **Rust:** Split row-wise calendar/string helpers into `expr/rowwise_support.rs`.
+
+### Version bump
+
+- Align **pydantable**, **pydantable-protocol**, **pydantable-native**, **pydantable-core**, and published **`__version__`** values to **1.16.1**.
+
 ## [1.16.0] — 2026-04-06
 
 ### Added

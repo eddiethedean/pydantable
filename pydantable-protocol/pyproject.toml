@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pydantable-protocol"
-version = "1.16.0"
+version = "1.16.1"
 description = "Execution engine protocols for pydantable (zero runtime dependencies)."
 readme = "README.md"
 license = { text = "MIT" }
