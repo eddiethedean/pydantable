@@ -10,6 +10,7 @@ from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 from hypothesis.strategies import composite
 from pydantable import DataFrame, Schema
+from pydantable.expressions import Literal, coalesce, global_mean, global_sum
 from pydantable.schema import (
     DtypeDriftWarning,
     dtype_descriptor_to_annotation,
@@ -43,6 +44,53 @@ class JLeft(Schema):
 class JRight(Schema):
     id: int
     y: int
+
+
+class LineBits(Schema):
+    qty: int
+    unit_price_cents: int
+    discount_bps: int | None
+
+
+def _oracle_discounted_line_total_cents(
+    qty: int,
+    unit_price_cents: int,
+    discount_bps: int | None,
+) -> int:
+    d = 0 if discount_bps is None else int(discount_bps)
+    subtotal = qty * unit_price_cents
+    return (subtotal * (10_000 - d)) // 10_000
+
+
+@composite
+def aligned_qty_unit_discount(draw):
+    n = draw(st.integers(min_value=0, max_value=128))
+    qty = draw(
+        st.lists(
+            st.integers(min_value=0, max_value=50),
+            min_size=n,
+            max_size=n,
+        )
+    )
+    unit_price_cents = draw(
+        st.lists(
+            st.integers(min_value=0, max_value=100_000),
+            min_size=n,
+            max_size=n,
+        )
+    )
+    discount_bps = draw(
+        st.lists(
+            st.one_of(st.none(), st.integers(min_value=0, max_value=9999)),
+            min_size=n,
+            max_size=n,
+        )
+    )
+    return {
+        "qty": qty,
+        "unit_price_cents": unit_price_cents,
+        "discount_bps": discount_bps,
+    }
 
 
 @composite
@@ -346,6 +394,62 @@ def test_inner_join_unique_ids_row_count(data: dict[str, list]) -> None:
         key=lambda t: (t[0], t[1], t[2]),
     )
     assert got == exp
+
+
+@given(data=aligned_qty_unit_discount())
+@settings(max_examples=25, deadline=None)
+def test_with_columns_discounted_line_total_matches_python_oracle(
+    data: dict[str, list],
+) -> None:
+    df = DataFrame[LineBits](data)
+    bps = coalesce(df.discount_bps, Literal(value=0))
+    sub = df.qty * df.unit_price_cents
+    numer = sub * (Literal(value=10000) - bps)
+    line_total = (numer / Literal(value=10000)).floor()
+    out = df.with_columns(line_total_cents=line_total).collect(as_lists=True)
+    n = len(data["qty"])
+    expected = [
+        _oracle_discounted_line_total_cents(
+            int(data["qty"][i]),
+            int(data["unit_price_cents"][i]),
+            data["discount_bps"][i],
+        )
+        for i in range(n)
+    ]
+    assert out["line_total_cents"] == expected
+
+
+@given(data=aligned_qty_unit_discount())
+@settings(max_examples=25, deadline=None)
+def test_global_sum_mean_discounted_line_totals_match_python(
+    data: dict[str, list],
+) -> None:
+    df = DataFrame[LineBits](data)
+    bps = coalesce(df.discount_bps, Literal(value=0))
+    sub = df.qty * df.unit_price_cents
+    numer = sub * (Literal(value=10000) - bps)
+    line_total = (numer / Literal(value=10000)).floor()
+    df2 = df.with_columns(line_total_cents=line_total)
+    out = df2.select(
+        global_sum(df2.line_total_cents),
+        global_mean(df2.line_total_cents),
+    ).collect(as_lists=True)
+    n = len(data["qty"])
+    totals = [
+        _oracle_discounted_line_total_cents(
+            int(data["qty"][i]),
+            int(data["unit_price_cents"][i]),
+            data["discount_bps"][i],
+        )
+        for i in range(n)
+    ]
+    exp_sum = sum(totals)
+    if n == 0:
+        assert out["sum_line_total_cents"] == [0]
+        assert out["mean_line_total_cents"] == [None]
+    else:
+        assert out["sum_line_total_cents"] == [exp_sum]
+        assert out["mean_line_total_cents"][0] == pytest.approx(exp_sum / n)
 
 
 @given(every=st.sampled_from(["0s", "0m", "0h", "0d"]))

@@ -20,6 +20,8 @@ from pydantable.expressions import (
 )
 from pydantable.schema import Schema
 
+from tests._support.scenarios import LineItem, line_items_retail_payload
+
 
 class T(Schema):
     id: int
@@ -38,6 +40,13 @@ def test_select_global_sum_named() -> None:
     df = DataFrame[T]({"id": [1, 2], "v": [5, 15]})
     out = df.select(total=global_sum(df.v)).collect(as_lists=True)
     assert out == {"total": [20]}
+
+
+def test_global_sum_qty_on_retail_line_items_matches_python() -> None:
+    payload = line_items_retail_payload()
+    df = LineItem(payload)
+    out = df.select(global_sum(df.qty)).collect(as_lists=True)
+    assert out["sum_qty"][0] == sum(int(x) for x in payload["qty"])
 
 
 class Nullable(Schema):
