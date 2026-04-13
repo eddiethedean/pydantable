@@ -76,7 +76,6 @@ INTERFACE_CONTRACT
 VERSIONING
 WINDOW_SQL_SEMANTICS
 WHY_NOT_POLARS
-typed_dataframe_spec
 ```
 
 ```{toctree}

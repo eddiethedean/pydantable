@@ -4222,15 +4222,15 @@ impl ExprNode {
                                 TemporalPart::Weekday => Some(LiteralValue::Int(
                                     iso_weekday_monday1(y, mo as i32, d as i32),
                                 )),
-                                TemporalPart::Quarter => Some(LiteralValue::Int(
-                                    ((i64::from(mo) - 1) / 3) + 1,
-                                )),
+                                TemporalPart::Quarter => {
+                                    Some(LiteralValue::Int(((i64::from(mo) - 1) / 3) + 1))
+                                }
                                 TemporalPart::Week => {
                                     Some(LiteralValue::Int(iso_week_from_ymd(y, mo, d)))
                                 }
-                                TemporalPart::DayOfYear => Some(LiteralValue::Int(
-                                    ordinal_day_from_ymd(y, mo, d),
-                                )),
+                                TemporalPart::DayOfYear => {
+                                    Some(LiteralValue::Int(ordinal_day_from_ymd(y, mo, d)))
+                                }
                             }
                         }
                         Some(LiteralValue::TimeNanos(ns)) if is_time => match part {

@@ -46,9 +46,7 @@ def _as_list_str(x: str | list[str] | None, *, name: str) -> list[str] | None:
     raise TypeError(f"{name} must be a str or list[str].")
 
 
-def _compare_cells_differ(
-    va: Any, vb: Any, *, rtol: float, atol: float
-) -> bool:
+def _compare_cells_differ(va: Any, vb: Any, *, rtol: float, atol: float) -> bool:
     """Return True when ``compare`` should flag a difference for one cell pair."""
     if va == vb:
         return False
@@ -56,9 +54,7 @@ def _compare_cells_differ(
         return va != vb
     if isinstance(va, (int, float)) and isinstance(vb, (int, float)):
         try:
-            return not math.isclose(
-                float(va), float(vb), rel_tol=rtol, abs_tol=atol
-            )
+            return not math.isclose(float(va), float(vb), rel_tol=rtol, abs_tol=atol)
         except (OverflowError, TypeError, ValueError):
             return va != vb
     return va != vb
