@@ -11,6 +11,10 @@ All notable changes to this project are documented here. The format is inspired 
 - **Python:** Narrow `ImportError` handling for optional dtype registry and native capabilities; debug logging on intentional broad I/O / `Expr` repr fallbacks; optional scan-column recovery iteration bound in `_materialize_scan_fallback`.
 - **Rust:** Split row-wise calendar/string helpers into `expr/rowwise_support.rs`.
 
+### Tests
+
+- **DataFrame:** Shared retail-style columnar scenarios (`tests/_support/scenarios.py`), multi-step workflow coverage (`tests/dataframe/test_dataframe_realistic_workflows.py`), Hypothesis strategies with Python oracles for discounted line totals and global sum/mean, and a global aggregate check on the scenario payload (`tests/dataframe/test_global_agg.py`).
+
 ### Version bump
 
 - Align **pydantable**, **pydantable-protocol**, **pydantable-native**, **pydantable-core**, and published **`__version__`** values to **1.16.1**.
