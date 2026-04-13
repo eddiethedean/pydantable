@@ -27,7 +27,8 @@ jobs:
           python -m pip install ruff "ty>=0.0.28" pyright
           python -m pip install -e ./pydantable-protocol
           python -m pip install "pydantic>=2.0,<3" "typing-extensions>=4.7" \
-            "sqlalchemy>=2.0,<3" "sqlmodel>=0.0.22,<0.1"
+            "sqlalchemy>=2.0,<3" "sqlmodel>=0.0.22,<0.1" \
+            "jinja2>=3.1"
 
       - name: Ruff format
         run: ruff format --check .
