@@ -115,6 +115,7 @@ def fetch_csv_url(
         try:
             return rust_read_csv_path(str(path))
         except Exception:
+            # Native reader can surface PyO3-wrapped errors; stdlib csv is the fallback.
             import csv
 
             with path.open(newline="", encoding="utf-8") as fh:

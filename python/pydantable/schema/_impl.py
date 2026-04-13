@@ -144,12 +144,12 @@ def _is_supported_non_null_scalar_type(tp: Any) -> bool:
     """True if ``tp`` is one allowed non-null scalar or enum (before ``| None``)."""
     try:
         from pydantable.dtypes import get_registered_scalar_base
-
+    except ImportError:
+        # Optional registry (fail closed below).
+        pass
+    else:
         if isinstance(tp, type) and get_registered_scalar_base(tp) is not None:
             return True
-    except Exception:
-        # Registry is optional; unsupported should fail closed.
-        pass
     if tp in _SUPPORTED_NON_NULL_SCALAR_TYPES:
         return True
     if _is_wkb_type(tp):
@@ -522,13 +522,13 @@ def _trusted_scalar_compatible(annotation: Any, value: Any) -> bool:
         return True
     try:
         from pydantable.dtypes import get_registered_scalar_base
-
+    except ImportError:
+        pass
+    else:
         if isinstance(inner, type):
             base = get_registered_scalar_base(inner)
             if base is not None:
                 inner = base
-    except Exception:
-        pass
     if isinstance(inner, type) and issubclass(inner, BaseModel):
         return isinstance(value, (Mapping, BaseModel))
     if isinstance(inner, type):
@@ -574,13 +574,13 @@ def _polars_float_dtype_classes(pl: Any) -> frozenset[type]:
 def _polars_scalar_dtype_matches(inner: Any, dt: Any, pl: Any) -> bool:
     try:
         from pydantable.dtypes import get_registered_scalar_base
-
+    except ImportError:
+        pass
+    else:
         if isinstance(inner, type):
             base = get_registered_scalar_base(inner)
             if base is not None:
                 inner = base
-    except Exception:
-        pass
     if inner is int:
         return dt.__class__ in _polars_integer_dtype_classes(pl)
     if inner is float:
@@ -740,13 +740,13 @@ def _trusted_pyarrow_strict_scalar(annotation_inner: Any, dt_low: str) -> bool:
 
     try:
         from pydantable.dtypes import get_registered_scalar_base
-
+    except ImportError:
+        pass
+    else:
         if isinstance(annotation_inner, type):
             base = get_registered_scalar_base(annotation_inner)
             if base is not None:
                 annotation_inner = base
-    except Exception:
-        pass
 
     if annotation_inner is int:
         if "decimal" in dt_low:
@@ -814,13 +814,13 @@ def _trusted_column_strict_compatible(annotation: Any, col: Any) -> bool:
     origin = get_origin(inner)
     try:
         from pydantable.dtypes import get_registered_scalar_base
-
+    except ImportError:
+        pass
+    else:
         if origin is None and isinstance(inner, type):
             base = get_registered_scalar_base(inner)
             if base is not None:
                 inner = base
-    except Exception:
-        pass
 
     if isinstance(col, (list, tuple)):
         if origin is list or origin is dict:
@@ -1334,13 +1334,13 @@ def descriptor_matches_column_annotation(
     inner, nullable = _annotation_nullable_inner(annotation)
     try:
         from pydantable.dtypes import get_registered_scalar_base
-
+    except ImportError:
+        pass
+    else:
         if get_origin(inner) is None and isinstance(inner, type):
             base = get_registered_scalar_base(inner)
             if base is not None:
                 inner = base
-    except Exception:
-        pass
     if bool(descriptor.get("nullable", False)) != nullable:
         return False
 

@@ -1265,7 +1265,7 @@ class PandasDataFrame(CoreDataFrame):
         """
         try:
             import pandas as pd  # type: ignore[import-not-found]
-        except Exception as e:  # pragma: no cover
+        except ImportError as e:  # pragma: no cover
             raise ModuleNotFoundError(
                 "to_pandas() requires the optional 'pandas' dependency."
             ) from e

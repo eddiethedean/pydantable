@@ -45,8 +45,9 @@ def test_streamlit_dataframe_interchange_smoke() -> None:
                 r"defaulting to empty attributes\.$"
             ),
         )
-        # Streamlit may call deprecated ``pd.api.interchange.from_dataframe``; silence
-        # until Streamlit migrates off the interchange protocol.
+        # Streamlit may still route some inputs through pandas' interchange importer
+        # (deprecated as of pandas 4 / Pandas4Warning). Remove this filter when
+        # Streamlit uses Arrow-native paths for pydantable inputs (upstream change).
         if hasattr(pd.errors, "Pandas4Warning"):
             warnings.filterwarnings("ignore", category=pd.errors.Pandas4Warning)
         at = AppTest.from_function(app).run()

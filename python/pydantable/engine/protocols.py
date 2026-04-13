@@ -31,7 +31,7 @@ def native_engine_capabilities() -> EngineCapabilities:
         from pydantable_native.capabilities import (  # type: ignore[import-not-found]
             native_engine_capabilities as _native_engine_capabilities,
         )
-    except Exception:
+    except (ImportError, ModuleNotFoundError):
         return EngineCapabilities(
             backend="native",
             extension_loaded=False,

@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import csv
 import json
+import logging
 import os
 import tempfile
 import warnings
@@ -88,6 +89,8 @@ if TYPE_CHECKING:
     from concurrent.futures import Executor
 
 from pydantable.plugins import register_reader, register_writer
+
+_IO_LOG = logging.getLogger(__name__)
 
 _Source = str | Path | BinaryIO | bytes
 
@@ -253,13 +256,14 @@ def read_parquet_url(
     try:
         with os.fdopen(fd, "wb") as f:
             f.write(data)
-    except Exception:
+    except (OSError, MemoryError):
         with suppress(OSError):
             os.unlink(name)
         raise
     try:
         return _scan_file_root(name, "parquet", columns=columns, scan_kwargs=None)
     except Exception:
+        # Scan setup can fail for many reasons; always remove the temp file.
         with suppress(OSError):
             os.unlink(name)
         raise
@@ -357,6 +361,11 @@ def materialize_parquet(
                 try:
                     return rust_read_parquet_path(path)
                 except Exception:
+                    # PyO3/native may wrap diverse failures; fall back to PyArrow when auto.
+                    _IO_LOG.debug(
+                        "rust_read_parquet_path failed; trying PyArrow",
+                        exc_info=True,
+                    )
                     if eng == "rust":
                         raise
         if eng == "rust" and not use_rust:
@@ -392,6 +401,7 @@ def materialize_ipc(
             try:
                 return rust_read_ipc_path(str(source))
             except Exception:
+                _IO_LOG.debug("rust_read_ipc_path failed; trying PyArrow", exc_info=True)
                 if eng == "rust":
                     raise
         if eng == "rust" and (as_stream or not _is_local_path(source)):
@@ -439,6 +449,7 @@ def materialize_csv(
             try:
                 return rust_read_csv_path(str(path))
             except Exception:
+                _IO_LOG.debug("rust_read_csv_path failed; using stdlib csv", exc_info=True)
                 if eng == "rust":
                     raise
         with open(path, newline="", encoding="utf-8") as fh:
@@ -469,6 +480,10 @@ def materialize_ndjson(
             try:
                 return rust_read_ndjson_path(str(path))
             except Exception:
+                _IO_LOG.debug(
+                    "rust_read_ndjson_path failed; using pure Python JSON lines",
+                    exc_info=True,
+                )
                 if eng == "rust":
                     raise
         rows: list[dict[str, Any]] = []

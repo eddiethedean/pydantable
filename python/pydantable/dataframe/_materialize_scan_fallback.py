@@ -18,6 +18,11 @@ from ._execution_handle import _materialize_in_thread
 from ._scan import _extract_missing_scan_column_from_engine_error, _is_scan_file_root
 
 
+def _optional_scan_recovery_limit(initial_field_count: int) -> int:
+    """Upper bound on execute/replan rounds (one optional column dropped per round)."""
+    return max(initial_field_count + 2, 8)
+
+
 def materialize_with_optional_scan_fallback_sync(
     engine: ExecutionEngine,
     *,
@@ -32,7 +37,15 @@ def materialize_with_optional_scan_fallback_sync(
     """Run ``execute_plan``; drop missing optional columns on scan roots when needed."""
     ft = dict(field_types)
     pl = plan
+    limit = _optional_scan_recovery_limit(len(ft))
+    rnd = 0
     while True:
+        rnd += 1
+        if rnd > limit:
+            raise RuntimeError(
+                "Optional scan column recovery exceeded iteration bound "
+                f"({rnd} > {limit}); error_context={error_context!r}"
+            )
         try:
             return engine.execute_plan(
                 pl,
@@ -100,7 +113,15 @@ async def materialize_with_optional_scan_fallback_async(
 
     ft = dict(field_types)
     pl = plan
+    limit = _optional_scan_recovery_limit(len(ft))
+    rnd = 0
     while True:
+        rnd += 1
+        if rnd > limit:
+            raise RuntimeError(
+                "Optional scan column recovery exceeded iteration bound "
+                f"({rnd} > {limit}); error_context={error_context!r}"
+            )
         try:
             return await engine.async_execute_plan(
                 pl,

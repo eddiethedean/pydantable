@@ -182,7 +182,7 @@ def iter_avro(
     try:
         reader = pa.avro.open_file(str(path))  # type: ignore[attr-defined]
     except Exception:
-        # Some builds lack streaming Avro; fall back to eager.
+        # PyArrow Avro API varies by version/build; eager read is the fallback.
         yield read_avro(path, experimental=True)
         return
     with reader:

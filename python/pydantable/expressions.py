@@ -8,6 +8,7 @@ pending objects finished with ``.over(WindowSpec(...))``. Globals such as
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, get_args, get_origin
 
@@ -47,6 +48,7 @@ __all__ = [
 
 # Bound serialized AST size in :meth:`Expr.__repr__` for readable REPL output.
 _MAX_EXPR_REPR_AST = 200
+_LOG = logging.getLogger(__name__)
 
 
 def _rust_expr_ast_snippet(rust_expr: Any) -> str:
@@ -57,6 +59,8 @@ def _rust_expr_ast_snippet(rust_expr: Any) -> str:
             return f"{s[: _MAX_EXPR_REPR_AST - 1]}…"
         return s
     except Exception:
+        # Any failure from Rust bridge or JSON: keep repr cheap for notebooks.
+        _LOG.debug("Expr repr snippet omitted (serialization failed)", exc_info=True)
         return "?"
 
 
