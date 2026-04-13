@@ -6,12 +6,14 @@ chaining and materialization (single-responsibility split).
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from concurrent.futures import Executor
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantable.engine import get_default_engine
 from pydantable.schema import field_types_for_rust, schema_field_types
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from concurrent.futures import Executor
 
 
 def _from_scan_root(
@@ -24,7 +26,10 @@ def _from_scan_root(
     ignore_errors: bool = False,
     on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> Any:
-    """Build a lazy frame from a native ``ScanFileRoot`` (see ``DataFrame._from_scan_root``)."""
+    """Build a lazy frame from a native ``ScanFileRoot``.
+
+    See ``DataFrame._from_scan_root``.
+    """
     if cls._schema_type is None:
         raise TypeError(
             "Use DataFrame[SchemaType].read_* to construct from a lazy file read."
@@ -87,9 +92,7 @@ async def aread_parquet(
 ) -> Any:
     from pydantable.io import aread_parquet as _aread_parquet
 
-    root = await _aread_parquet(
-        path, columns=columns, executor=executor, **scan_kwargs
-    )
+    root = await _aread_parquet(path, columns=columns, executor=executor, **scan_kwargs)
     return _from_scan_root(
         cls,
         root,
@@ -253,9 +256,7 @@ async def aread_ndjson(
 ) -> Any:
     from pydantable.io import aread_ndjson as _aread_ndjson
 
-    root = await _aread_ndjson(
-        path, columns=columns, executor=executor, **scan_kwargs
-    )
+    root = await _aread_ndjson(path, columns=columns, executor=executor, **scan_kwargs)
     return _from_scan_root(
         cls,
         root,
@@ -307,9 +308,7 @@ async def aread_json(
 ) -> Any:
     from pydantable.io import aread_json as _aread_json
 
-    root = await _aread_json(
-        path, columns=columns, executor=executor, **scan_kwargs
-    )
+    root = await _aread_json(path, columns=columns, executor=executor, **scan_kwargs)
     return _from_scan_root(
         cls,
         root,
