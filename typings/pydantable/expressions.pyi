@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -7,6 +8,8 @@ from typing import Any
 from .window_spec import WindowSpec
 
 _MAX_EXPR_REPR_AST = 200
+
+_LOG = logging.getLogger(__name__)
 
 def _rust_expr_ast_snippet(rust_expr: Any) -> str: ...
 

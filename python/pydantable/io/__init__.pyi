@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping, Sequence
 from concurrent.futures import Executor
 from pathlib import Path
@@ -66,6 +67,8 @@ from .write_batches import (
     write_ndjson_batches,
     write_parquet_batches,
 )
+
+_IO_LOG = logging.getLogger(__name__)
 
 _Source = str | Path | BinaryIO | bytes
 

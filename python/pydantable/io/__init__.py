@@ -401,7 +401,9 @@ def materialize_ipc(
             try:
                 return rust_read_ipc_path(str(source))
             except Exception:
-                _IO_LOG.debug("rust_read_ipc_path failed; trying PyArrow", exc_info=True)
+                _IO_LOG.debug(
+                    "rust_read_ipc_path failed; trying PyArrow", exc_info=True
+                )
                 if eng == "rust":
                     raise
         if eng == "rust" and (as_stream or not _is_local_path(source)):
@@ -449,7 +451,9 @@ def materialize_csv(
             try:
                 return rust_read_csv_path(str(path))
             except Exception:
-                _IO_LOG.debug("rust_read_csv_path failed; using stdlib csv", exc_info=True)
+                _IO_LOG.debug(
+                    "rust_read_csv_path failed; using stdlib csv", exc_info=True
+                )
                 if eng == "rust":
                     raise
         with open(path, newline="", encoding="utf-8") as fh:
