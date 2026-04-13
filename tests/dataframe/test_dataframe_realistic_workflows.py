@@ -36,9 +36,13 @@ def test_revenue_by_customer_filter_with_columns_groupby() -> None:
     paid_or_shipped = (df.status == "paid") | (df.status == "shipped")
     filtered = df.filter(paid_or_shipped & df.customer_id.is_not_null())
     enriched = filtered.with_columns(line_total_cents=_line_total_expr(filtered))
-    out = enriched.group_by("customer_id").agg(
-        revenue=("sum", "line_total_cents"),
-    ).collect(as_lists=True)
+    out = (
+        enriched.group_by("customer_id")
+        .agg(
+            revenue=("sum", "line_total_cents"),
+        )
+        .collect(as_lists=True)
+    )
 
     expected = {
         "customer_id": list(gold.keys()),
