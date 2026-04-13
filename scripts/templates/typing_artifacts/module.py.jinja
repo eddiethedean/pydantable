@@ -1,0 +1,11 @@
+from __future__ import annotations
+
+{% if imports_src %}
+{{ imports_src }}
+
+{% endif %}
+{% for block in def_blocks %}
+{{ block }}
+
+{% endfor %}
+{{ all_src }}

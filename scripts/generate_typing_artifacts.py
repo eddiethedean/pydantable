@@ -6,6 +6,23 @@ import subprocess
 import sys
 from pathlib import Path
 
+from jinja2 import Environment, FileSystemLoader
+
+_TEMPLATE_DIR = Path(__file__).resolve().parent / "templates" / "typing_artifacts"
+_typing_env: Environment | None = None
+
+
+def _get_typing_env() -> Environment:
+    global _typing_env
+    if _typing_env is None:
+        _typing_env = Environment(
+            loader=FileSystemLoader(_TEMPLATE_DIR),
+            trim_blocks=True,
+            lstrip_blocks=True,
+            autoescape=False,
+        )
+    return _typing_env
+
 
 def _write_if_changed(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -126,18 +143,18 @@ def _render_init_stub(init_py: Path) -> str:
     imports_src = "\n".join(ast.unparse(n) for n in import_nodes).strip()
     # Emit `__all__` deterministically without relying on synthesized AST locations.
     all_src = f"__all__ = {all_names!r}"
-
-    lines: list[str] = ["from __future__ import annotations", ""]
-    if imports_src:
-        lines.append(imports_src)
-        lines.append("")
-    if version_value is not None:
-        lines.append(f"__version__ = {version_value!r}")
-        lines.append("")
-    # Keep explicit __all__ for editor/typing tooling parity.
-    lines.append(all_src)
-    lines.append("")
-    return "\n".join(lines)
+    version_line = (
+        f"__version__ = {version_value!r}" if version_value is not None else None
+    )
+    return (
+        _get_typing_env()
+        .get_template("init.py.jinja")
+        .render(
+            imports_src=imports_src,
+            version_line=version_line,
+            all_src=all_src,
+        )
+    )
 
 
 def _stubify_function(fn: ast.AST) -> ast.AST:
@@ -303,17 +320,13 @@ def _render_module_stub(
                     ordered.append(name)
 
     imports_src = "\n".join(ast.unparse(n) for n in import_nodes).strip()
-    lines: list[str] = ["from __future__ import annotations", ""]
-    if imports_src:
-        lines.append(imports_src)
-        lines.append("")
+    def_blocks: list[str] = []
     if include_all_public_defs:
         for name in ordered:
             node = defs.get(name)
             if node is None:
                 continue
-            lines.append(ast.unparse(node).rstrip())
-            lines.append("")
+            def_blocks.append(ast.unparse(node).rstrip())
     else:
         # Emit defs in a stable order: exported names in __all__ order.
         for name in all_names:
@@ -321,11 +334,17 @@ def _render_module_stub(
             if node is None:
                 # It's still useful for re-export-only modules to have __all__ entries.
                 continue
-            lines.append(ast.unparse(node).rstrip())
-            lines.append("")
-    lines.append(f"__all__ = {all_names!r}")
-    lines.append("")
-    return "\n".join(lines)
+            def_blocks.append(ast.unparse(node).rstrip())
+    all_src = f"__all__ = {all_names!r}"
+    return (
+        _get_typing_env()
+        .get_template("module.py.jinja")
+        .render(
+            imports_src=imports_src,
+            def_blocks=def_blocks,
+            all_src=all_src,
+        )
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
