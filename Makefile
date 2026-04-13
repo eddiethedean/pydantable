@@ -99,9 +99,9 @@ diff-cover:
 test-moltres:
 	$(PYTHON) -m pytest -q -n auto tests/sql/test_sql_moltres.py
 
-# Optional Mongo engine (``entei-core``); requires ``pip install -e ./entei-core`` or PyPI ``entei-core``.
+# Optional Mongo engine: install sibling ``../entei-core`` editable, or PyPI ``entei-core`` / ``pydantable[mongo]``.
 test-entei:
-	$(PYTHON) -m pytest -q entei-core/tests
+	$(PYTHON) -m pytest -q $(CURDIR)/../entei-core/tests
 
 check-rust: rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 
@@ -136,7 +136,7 @@ help:
 	@echo "  native-wheel       Build a release wheel (does not pip-install)"
 	@echo ""
 	@echo "Checks: check-full, check-python, check-rust, check-docs"
-	@echo "Tests: test, test-fast (-m \"not slow\"), test-cov (CI coverage args), test-moltres (sql/), test-entei (entei-core/)"
+	@echo "Tests: test, test-fast (-m \"not slow\"), test-cov (CI coverage args), test-moltres (sql/), test-entei (../entei-core/tests)"
 	@echo "Coverage: diff-cover (needs test-cov + origin/main)"
 	@echo "  pyright-check-strict  Optional Pyright over python/pydantable (maintainers)"
 

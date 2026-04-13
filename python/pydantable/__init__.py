@@ -14,6 +14,7 @@ iter_sql_raw, write_sql_raw, …``); :mod:`pydantable.io` is the implementation 
 
 from __future__ import annotations
 
+import importlib
 from typing import TYPE_CHECKING, Any
 
 from . import pandas as pandas
@@ -99,6 +100,26 @@ def __getattr__(name: str) -> Any:
         from pydantable.sql_moltres import SqlDataFrameModel
 
         return SqlDataFrameModel
+    if name in (
+        "EnteiDataFrame",
+        "EnteiDataFrameModel",
+        "EnteiPydantableEngine",
+        "MongoRoot",
+    ):
+        try:
+            mod = importlib.import_module("entei_core")
+        except ImportError as e:
+            raise ImportError(
+                f"{name!r} requires the entei-core package. "
+                'Install with: pip install "pydantable[mongo]" '
+                "or pip install entei-core"
+            ) from e
+        return {
+            "EnteiDataFrame": mod.EnteiDataFrame,
+            "EnteiDataFrameModel": mod.EnteiDataFrameModel,
+            "EnteiPydantableEngine": mod.EnteiPydantableEngine,
+            "MongoRoot": mod.MongoRoot,
+        }[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -109,8 +130,12 @@ __all__ = [
     "DataFrame",
     "DataFrameModel",
     "DtypeDriftWarning",
+    "EnteiDataFrame",
+    "EnteiDataFrameModel",
+    "EnteiPydantableEngine",
     "Expr",
     "MissingRustExtensionError",
+    "MongoRoot",
     "PlanMaterialization",
     "PydantableUserError",
     "Schema",

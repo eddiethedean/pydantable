@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+### Changed
+
+- **Optional dependencies:** **`pydantable[mongo]`** now pins **`entei-core`** to **`>=0.1.0,<0.2`** (PyPI package **`entei-core`** is versioned independently of **pydantable** **1.x**).
+
 ## [1.16.1] — 2026-04-13
 
 ### Changed
