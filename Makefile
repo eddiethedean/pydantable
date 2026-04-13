@@ -20,7 +20,7 @@ RUST_PYTHONPATH ?= $(CURDIR)/python:$(CURDIR)/pydantable-protocol/python:$(CURDI
 
 .PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check engine-bypass-check ty-check ty-check-minimal pyright-check pyright-check-strict sphinx-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 .PHONY: native-develop native-develop-fast native-wheel install-editable dev-setup install-dev help
-.PHONY: test test-fast test-cov test-moltres diff-cover
+.PHONY: test test-fast test-cov test-moltres test-mongo diff-cover
 .PHONY: gen-typing check-typing
 
 check-full: check-python check-docs check-rust
@@ -99,9 +99,9 @@ diff-cover:
 test-moltres:
 	$(PYTHON) -m pytest -q -n auto tests/sql/test_sql_moltres.py
 
-# Optional Mongo engine: install sibling ``../entei-core`` editable, or PyPI ``entei-core`` / ``pydantable[mongo]``.
-test-entei:
-	$(PYTHON) -m pytest -q $(CURDIR)/../entei-core/tests
+# Mongo integration (``pydantable.mongo_entei`` + optional PyPI ``entei-core``); install ``entei-core`` / ``pydantable[mongo]``.
+test-mongo:
+	$(PYTHON) -m pytest -q tests/mongo
 
 check-rust: rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 
@@ -136,7 +136,7 @@ help:
 	@echo "  native-wheel       Build a release wheel (does not pip-install)"
 	@echo ""
 	@echo "Checks: check-full, check-python, check-rust, check-docs"
-	@echo "Tests: test, test-fast (-m \"not slow\"), test-cov (CI coverage args), test-moltres (sql/), test-entei (../entei-core/tests)"
+	@echo "Tests: test, test-fast (-m \"not slow\"), test-cov (CI coverage args), test-moltres (sql/), test-mongo (tests/mongo/)"
 	@echo "Coverage: diff-cover (needs test-cov + origin/main)"
 	@echo "  pyright-check-strict  Optional Pyright over python/pydantable (maintainers)"
 

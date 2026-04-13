@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+### Added
+
+- **Mongo (entei-core):** **`pydantable.mongo_entei`** — **`EnteiDataFrame`** / **`EnteiDataFrameModel`** facades (same pattern as **`pydantable.sql_moltres`** + **moltres-core**). **`entei-core`** supplies **`EnteiPydantableEngine`** and **`MongoRoot`** only.
+
 ### Changed
 
 - **Optional dependencies:** **`pydantable[mongo]`** now pins **`entei-core`** to **`>=0.1.0,<0.2`** (PyPI package **`entei-core`** is versioned independently of **pydantable** **1.x**).

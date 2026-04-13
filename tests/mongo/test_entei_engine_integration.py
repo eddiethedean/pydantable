@@ -15,12 +15,8 @@ from typing_extensions import get_protocol_members
 
 pytest.importorskip("entei_core")
 
-from entei_core import (
-    EnteiDataFrame,
-    EnteiDataFrameModel,
-    EnteiPydantableEngine,
-    MongoRoot,
-)
+from entei_core import EnteiPydantableEngine, MongoRoot
+from pydantable.mongo_entei import EnteiDataFrame, EnteiDataFrameModel
 
 
 class Row(Schema):

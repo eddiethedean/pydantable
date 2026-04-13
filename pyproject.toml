@@ -41,7 +41,7 @@ rap = ["rapcsv>=0.2", "rapfiles>=0.1", "rapsqlite>=0.1"]
 fastapi = ["fastapi>=0.100"]
 # Moltres SQL engine (moltres-core) — SqlDataFrame / SqlDataFrameModel; rapsqlite for async SQLAlchemy URLs
 moltres = ["moltres-core>=1.0.0,<2", "rapsqlite>=0.1", "greenlet>=3.0"]
-# MongoDB engine (standalone ``entei-core``) — EnteiDataFrame / EnteiPydantableEngine / MongoRoot
+# MongoDB engine (PyPI ``entei-core``) — EnteiDataFrame / EnteiPydantableEngine / MongoRoot
 mongo = ["entei-core>=0.1.0,<0.2"]
 dev = [
     "tomli>=1.2.0; python_version < '3.11'",
@@ -187,6 +187,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 "tests/dataframe/test_async_materialization.py" = ["TC003"]
 "python/pydantable/testing/**/*.py" = ["TC003"]
 "python/pydantable/sql_moltres.py" = ["TC003"]
+"python/pydantable/mongo_entei.py" = ["TC003", "F822"]
 "python/pydantable/pandas_moltres.py" = ["TC003"]
 "python/pydantable/pyspark/sql_moltres.py" = ["TC003", "TC001"]
 "python/pydantable/dataframe/_execution_handle.py" = ["TC003"]

@@ -398,7 +398,7 @@ jobs:
           $PY -m pip install -e ./pydantable-protocol
           (cd pydantable-native && $PY -m maturin develop --release)
           $PY -m pip install -e .
-          # ``tests/mongo/`` imports ``entei_core`` (standalone package; not in this repo).
+          # ``tests/mongo/`` needs ``entei_core`` from PyPI ``entei-core``.
           $PY -m pip install "entei-core==0.1.0"
         env:
           VIRTUAL_ENV: ${{ github.workspace }}/.venv
@@ -484,6 +484,7 @@ jobs:
           $PY -m pip install -e ./pydantable-protocol
           (cd pydantable-native && $PY -m maturin develop --release)
           $PY -m pip install -e .
+          # ``tests/mongo/`` needs ``entei_core`` from PyPI ``entei-core``.
           $PY -m pip install "entei-core==0.1.0"
         env:
           VIRTUAL_ENV: ${{ github.workspace }}/.venv

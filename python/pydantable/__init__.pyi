@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+from pydantable.mongo_entei import (
+    EnteiDataFrame,
+    EnteiDataFrameModel,
+    EnteiPydantableEngine,
+    MongoRoot,
+)
 from pydantable.sql_moltres import SqlDataFrame, SqlDataFrameModel
 
 from . import pandas as pandas
