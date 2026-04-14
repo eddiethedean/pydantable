@@ -99,14 +99,20 @@ def _projection_model_for_fields(
     document_cls: type[Any], fields: Sequence[str]
 ) -> type[Any]:
     """Build a Pydantic projection model using the Document's field annotations."""
-    from pydantic import BaseModel, ConfigDict, create_model
+    from pydantic import BaseModel, ConfigDict, Field, create_model
 
     doc_fields = getattr(document_cls, "model_fields", {}) or {}
     defs: dict[str, tuple[Any, Any]] = {}
+
     for name in fields:
+        # Beanie exposes `id` for Mongo `_id`. When projecting with Beanie, the
+        # underlying Mongo key is still `_id`, so give `id` an alias.
         field = doc_fields.get(name)
         ann = getattr(field, "annotation", Any) if field is not None else Any
-        defs[name] = (ann, None)
+        if name == "id":
+            defs[name] = (ann, Field(default=None, alias="_id"))
+        else:
+            defs[name] = (ann, None)
 
     cfg = ConfigDict(populate_by_name=True)
     return create_model(  # type: ignore[call-overload]

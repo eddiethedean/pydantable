@@ -13,11 +13,10 @@ class _Doc:
 
     def model_dump(self, by_alias: bool = False):
         # simulate Beanie/Pydantic dump with alias for id
-        if by_alias and "id" in self._data:
-            d = dict(self._data)
+        d = dict(self._data)
+        if by_alias and "id" in d and "_id" not in d:
             d["_id"] = d.pop("id")
-            return d
-        return dict(self._data)
+        return d
 
 
 class _Query:
@@ -36,7 +35,12 @@ class _Query:
             out = []
             for d in self._docs:
                 base = d.model_dump(by_alias=True)
-                out.append(_Doc(**{k: base.get(k) for k in names}))
+                proj = {}
+                for k in names:
+                    fi = self._projection.model_fields[k]
+                    src = getattr(fi, "alias", None) or k
+                    proj[k] = base.get(src)
+                out.append(_Doc(**proj))
             return out
         return list(self._docs)
 
