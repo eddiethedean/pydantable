@@ -31,6 +31,21 @@ from .window_spec import WindowSpec
 
 
 def _is_pandas_series(value: object) -> bool:
+    # Prefer a real isinstance check when pandas is installed. The fallback heuristic
+    # is intentionally cheap for environments without pandas.
+    try:
+        import pandas as pd  # type: ignore[import-not-found]
+    except Exception:
+        pd = None
+    if pd is not None:
+        try:
+            if isinstance(value, pd.Series):  # type: ignore[arg-type]
+                return True
+        except Exception:
+            # If pandas is partially-imported or behaves unexpectedly, fall back.
+            pass
+    # Fallback heuristic also intentionally treats "Series-like" objects (used in
+    # tests) as Series.
     return type(value).__name__ == "Series" and type(value).__module__.startswith(
         "pandas."
     )
