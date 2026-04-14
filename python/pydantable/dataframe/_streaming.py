@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import types
 from typing import Union, get_args, get_origin
 
 _ENGINE_STREAMING_ENV = "PYDANTABLE_ENGINE_STREAMING"
@@ -40,7 +41,7 @@ def _is_bool_or_nullable_bool(dtype: object) -> bool:
     if dtype is bool:
         return True
     origin = get_origin(dtype)
-    if origin is Union:
+    if origin is Union or origin is types.UnionType:
         args = tuple(get_args(dtype))
         if len(args) == 2 and _NoneType in args and bool in args:
             return True

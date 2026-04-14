@@ -67,6 +67,11 @@ class _DocCls:
         _ = (criteria, fetch_links)
         return _Query([_Doc(id=1, x=10), _Doc(id=2, x=20)])
 
+    @classmethod
+    def find_all(cls, fetch_links=False):
+        _ = fetch_links
+        return _Query([_Doc(id=1, x=10), _Doc(id=2, x=20)])
+
 
 @pytest.mark.asyncio
 async def test_afetch_beanie_flattens_and_normalizes_id():
@@ -88,6 +93,38 @@ async def test_afetch_beanie_fields_projection_preserves_order():
 
 
 @pytest.mark.asyncio
+async def test_afetch_beanie_rejects_projection_and_fields_together() -> None:
+    from pydantable.io.beanie import afetch_beanie
+
+    with pytest.raises(TypeError, match="only one of projection_model= or fields="):
+        await afetch_beanie(_DocCls, projection_model=object(), fields=["x"])
+
+
+@pytest.mark.asyncio
+async def test_afetch_beanie_rejects_query_without_project_support() -> None:
+    from pydantable.io.beanie import afetch_beanie
+
+    class NoProjectQuery:
+        async def to_list(self):
+            return []
+
+    with pytest.raises(TypeError, match=r"project"):
+        await afetch_beanie(NoProjectQuery(), projection_model=object())
+
+
+@pytest.mark.asyncio
+async def test_afetch_beanie_empty_result_is_empty_dict() -> None:
+    from pydantable.io.beanie import afetch_beanie
+
+    class EmptyQuery(_Query):
+        async def to_list(self):
+            return []
+
+    cols = await afetch_beanie(EmptyQuery([]))
+    assert cols == {}
+
+
+@pytest.mark.asyncio
 async def test_aiter_beanie_batches():
     from pydantable.io.beanie import aiter_beanie
 
@@ -100,9 +137,73 @@ async def test_aiter_beanie_batches():
 
 
 @pytest.mark.asyncio
+async def test_aiter_beanie_rejects_non_positive_batch_size() -> None:
+    from pydantable.io.beanie import aiter_beanie
+
+    with pytest.raises(ValueError, match="positive"):
+        async for _ in aiter_beanie(_DocCls, batch_size=0):
+            pass
+
+
+@pytest.mark.asyncio
+async def test_aiter_beanie_rejects_projection_and_fields_together() -> None:
+    from pydantable.io.beanie import aiter_beanie
+
+    with pytest.raises(TypeError, match="only one of projection_model= or fields="):
+        async for _ in aiter_beanie(_DocCls, projection_model=object(), fields=["x"]):
+            pass
+
+
+@pytest.mark.asyncio
+async def test_aiter_beanie_rejects_query_criteria_misuse() -> None:
+    from pydantable.io.beanie import aiter_beanie
+
+    q = _DocCls.find({"x": 10})
+    with pytest.raises(TypeError, match=r"criteria="):
+        async for _ in aiter_beanie(q, criteria={"x": 20}):
+            pass
+
+
+@pytest.mark.asyncio
+async def test_aiter_beanie_query_without_project_support_errors() -> None:
+    from pydantable.io.beanie import aiter_beanie
+
+    class NoProjectQuery:
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            raise StopAsyncIteration
+
+    with pytest.raises(TypeError, match=r"project"):
+        async for _ in aiter_beanie(NoProjectQuery(), projection_model=object()):
+            pass
+
+
+@pytest.mark.asyncio
 async def test_afetch_beanie_query_rejects_criteria() -> None:
     from pydantable.io.beanie import afetch_beanie
 
     q = _DocCls.find({"x": 10})
     with pytest.raises(TypeError, match=r"criteria="):
         await afetch_beanie(q, criteria={"x": 20})
+
+
+@pytest.mark.asyncio
+async def test_awrite_beanie_ordered_and_unordered() -> None:
+    from pydantable.io.beanie import awrite_beanie
+
+    class Doc:
+        def __init__(self, **row):
+            self.row = row
+
+        async def insert(self, **kwargs):
+            _ = kwargs
+            if self.row.get("x") == 2:
+                raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        await awrite_beanie(Doc, {"x": [1, 2, 3]}, ordered=True, chunk_size=10)
+
+    n = await awrite_beanie(Doc, {"x": [1, 2, 3]}, ordered=False, chunk_size=10)
+    assert n == 2
