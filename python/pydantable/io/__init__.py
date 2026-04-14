@@ -76,6 +76,7 @@ from .sql import (
 )
 from .sqlmodel_read import fetch_sqlmodel, iter_sqlmodel
 from .sqlmodel_schema import sqlmodel_columns
+from .beanie import BeanieWriteOptions, afetch_beanie, aiter_beanie, awrite_beanie
 from .mongo import fetch_mongo, iter_mongo, write_mongo
 from .sqlmodel_write import write_sqlmodel
 from .write_batches import (
@@ -1566,10 +1567,12 @@ __all__ = [
     "aexport_json",
     "aexport_ndjson",
     "aexport_parquet",
+    "afetch_beanie",
     "afetch_mongo",
     "afetch_sql",
     "afetch_sql_raw",
     "afetch_sqlmodel",
+    "aiter_beanie",
     "aiter_csv",
     "aiter_ipc",
     "aiter_json_array",
@@ -1594,12 +1597,14 @@ __all__ = [
     "aread_parquet_url",
     "aread_parquet_url_ctx",
     "arrow_table_to_column_dict",
+    "awrite_beanie",
     "awrite_mongo",
     "awrite_sql",
     "awrite_sql_batches",
     "awrite_sql_raw",
     "awrite_sqlmodel",
     "awrite_sqlmodel_batches",
+    "BeanieWriteOptions",
     "export_csv",
     "export_ipc",
     "export_json",

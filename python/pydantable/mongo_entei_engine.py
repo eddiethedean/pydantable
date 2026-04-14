@@ -11,6 +11,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from pydantable.engine import NativePolarsEngine, native_engine_capabilities
+from pydantable.errors import UnsupportedEngineOperationError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -20,6 +21,28 @@ def _materialize_root_data(data: Any) -> Any:
     from entei_core import materialize_root_data
 
     return materialize_root_data(data)
+
+
+async def _amaterialize_root_data(data: Any) -> Any:
+    # Async Beanie root support lives in pydantable (no entei-core required).
+    try:
+        from pydantable.mongo_entei import BeanieAsyncRoot
+    except Exception:
+        BeanieAsyncRoot = None  # type: ignore[assignment]
+    if BeanieAsyncRoot is not None and isinstance(data, BeanieAsyncRoot):
+        from pydantable.io.beanie import afetch_beanie
+
+        return await afetch_beanie(
+            data.document_cls,
+            criteria=data.criteria,
+            fields=list(data.fields) if data.fields is not None else None,
+            fetch_links=data.fetch_links,
+            nesting_depth=data.nesting_depth,
+            nesting_depths_per_field=data.nesting_depths_per_field,
+            flatten=data.flatten,
+            id_column=data.id_column,
+        )
+    return _materialize_root_data(data)
 
 
 if NativePolarsEngine is None:
@@ -57,6 +80,17 @@ else:
             streaming: bool = False,
             error_context: str | None = None,
         ) -> Any:
+            # Async Beanie roots are async-only.
+            try:
+                from pydantable.mongo_entei import BeanieAsyncRoot
+            except Exception:
+                BeanieAsyncRoot = None  # type: ignore[assignment]
+            if BeanieAsyncRoot is not None and isinstance(data, BeanieAsyncRoot):
+                raise UnsupportedEngineOperationError(
+                    "Beanie-backed Mongo roots require async materialization. "
+                    "Use `await df.acollect()` / `await df.ato_dict()` (or call "
+                    "EnteiDataFrame.from_beanie(...) with a sync database)."
+                )
             return super().execute_plan(
                 plan,
                 _materialize_root_data(data),
@@ -76,7 +110,7 @@ else:
         ) -> Any:
             return await super().async_execute_plan(
                 plan,
-                _materialize_root_data(data),
+                await _amaterialize_root_data(data),
                 as_python_lists=as_python_lists,
                 streaming=streaming,
                 error_context=error_context,
@@ -92,7 +126,7 @@ else:
         ) -> list[Any]:
             return await super().async_collect_plan_batches(
                 plan,
-                _materialize_root_data(root_data),
+                await _amaterialize_root_data(root_data),
                 batch_size=batch_size,
                 streaming=streaming,
             )
@@ -105,6 +139,15 @@ else:
             batch_size: int = 65_536,
             streaming: bool = False,
         ) -> list[Any]:
+            try:
+                from pydantable.mongo_entei import BeanieAsyncRoot
+            except Exception:
+                BeanieAsyncRoot = None  # type: ignore[assignment]
+            if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
+                raise UnsupportedEngineOperationError(
+                    "Beanie-backed Mongo roots require async materialization. "
+                    "Use `await df.acollect()` / `await df.astream()`."
+                )
             return super().collect_batches(
                 plan,
                 _materialize_root_data(root_data),
@@ -123,6 +166,15 @@ else:
             partition_by: list[str] | tuple[str, ...] | None = None,
             mkdir: bool = True,
         ) -> None:
+            try:
+                from pydantable.mongo_entei import BeanieAsyncRoot
+            except Exception:
+                BeanieAsyncRoot = None  # type: ignore[assignment]
+            if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
+                raise UnsupportedEngineOperationError(
+                    "Beanie-backed Mongo roots require async materialization and do not support "
+                    "sync lazy sinks. Materialize async to a column dict, then export/write."
+                )
             super().write_parquet(
                 plan,
                 _materialize_root_data(root_data),
@@ -143,6 +195,15 @@ else:
             separator: int = ord(","),
             write_kwargs: dict[str, Any] | None = None,
         ) -> None:
+            try:
+                from pydantable.mongo_entei import BeanieAsyncRoot
+            except Exception:
+                BeanieAsyncRoot = None  # type: ignore[assignment]
+            if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
+                raise UnsupportedEngineOperationError(
+                    "Beanie-backed Mongo roots require async materialization and do not support "
+                    "sync lazy sinks. Materialize async to a column dict, then export/write."
+                )
             super().write_csv(
                 plan,
                 _materialize_root_data(root_data),
@@ -162,6 +223,15 @@ else:
             compression: str | None = None,
             write_kwargs: dict[str, Any] | None = None,
         ) -> None:
+            try:
+                from pydantable.mongo_entei import BeanieAsyncRoot
+            except Exception:
+                BeanieAsyncRoot = None  # type: ignore[assignment]
+            if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
+                raise UnsupportedEngineOperationError(
+                    "Beanie-backed Mongo roots require async materialization and do not support "
+                    "sync lazy sinks. Materialize async to a column dict, then export/write."
+                )
             super().write_ipc(
                 plan,
                 _materialize_root_data(root_data),
@@ -180,6 +250,15 @@ else:
             streaming: bool = False,
             write_kwargs: dict[str, Any] | None = None,
         ) -> None:
+            try:
+                from pydantable.mongo_entei import BeanieAsyncRoot
+            except Exception:
+                BeanieAsyncRoot = None  # type: ignore[assignment]
+            if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
+                raise UnsupportedEngineOperationError(
+                    "Beanie-backed Mongo roots require async materialization and do not support "
+                    "sync lazy sinks. Materialize async to a column dict, then export/write."
+                )
             super().write_ndjson(
                 plan,
                 _materialize_root_data(root_data),

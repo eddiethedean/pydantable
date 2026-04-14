@@ -21,11 +21,31 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import Any, Literal, cast
 
 from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
 from .schema import field_types_for_rust, schema_field_types
+
+
+@dataclass(frozen=True, slots=True)
+class BeanieAsyncRoot:
+    """Async Beanie-backed root for async-only materialization.
+
+    Unlike ``entei_core.MongoRoot`` (sync PyMongo), this root is materialized by
+    calling Beanie queries in :class:`~pydantable.mongo_entei_engine.EnteiPydantableEngine`
+    async execution paths.
+    """
+
+    document_cls: type[Any]
+    criteria: Any | None = None
+    fields: tuple[str, ...] | None = None
+    fetch_links: bool = False
+    nesting_depth: int | None = None
+    nesting_depths_per_field: dict[str, int] | None = None
+    flatten: bool = True
+    id_column: Literal["id", "_id"] = "id"
 
 
 def _import_entei_engine_types() -> tuple[Any, Any]:
@@ -103,6 +123,55 @@ class EnteiDataFrame(DataFrame):
         coll = sync_pymongo_collection(document_cls, database)
         return cls.from_collection(coll, fields=fields, engine=engine)
 
+    @classmethod
+    def from_beanie_async(
+        cls,
+        document_cls: type[Any],
+        *,
+        criteria: Any | None = None,
+        fields: Sequence[str] | None = None,
+        fetch_links: bool = False,
+        nesting_depth: int | None = None,
+        nesting_depths_per_field: dict[str, int] | None = None,
+        flatten: bool = True,
+        id_column: Literal["id", "_id"] = "id",
+        engine: Any | None = None,
+    ) -> Any:
+        """Async-first lazy frame for a Beanie ``Document`` collection.
+
+        This path supports **async materialization only** (``acollect`` / ``ato_dict`` /
+        ``astream``). Calling sync terminals (``collect``, ``to_dict``) will raise
+        :class:`~pydantable.errors.UnsupportedEngineOperationError` because Beanie is
+        async-only.
+        """
+        if cls._schema_type is None:
+            raise TypeError(
+                "Use EnteiDataFrame[Schema].from_beanie_async(...) with a schema."
+            )
+        EnteiPydantableEngine, _MongoRoot = _import_entei_engine_types()
+        eng = engine if engine is not None else EnteiPydantableEngine()
+        st = cls._schema_type
+        fts = schema_field_types(st)
+        plan = eng.make_plan(field_types_for_rust(fts))
+        field_keys = tuple(fields) if fields is not None else tuple(fts.keys())
+        root = BeanieAsyncRoot(
+            document_cls=document_cls,
+            criteria=criteria,
+            fields=field_keys,
+            fetch_links=fetch_links,
+            nesting_depth=nesting_depth,
+            nesting_depths_per_field=nesting_depths_per_field,
+            flatten=flatten,
+            id_column=id_column,
+        )
+        return cls._from_plan(
+            root_data=root,
+            root_schema_type=st,
+            current_schema_type=st,
+            rust_plan=plan,
+            engine=eng,
+        )
+
 
 class EnteiDataFrameModel(DataFrameModel):
     """Mongo ``DataFrameModel`` (see :mod:`pydantable.mongo_entei_engine`).
@@ -173,6 +242,35 @@ class EnteiDataFrameModel(DataFrameModel):
         )
         return cls._wrap_inner_df(inner)
 
+    @classmethod
+    def from_beanie_async(
+        cls,
+        document_cls: type[Any],
+        *,
+        criteria: Any | None = None,
+        fields: Sequence[str] | None = None,
+        fetch_links: bool = False,
+        nesting_depth: int | None = None,
+        nesting_depths_per_field: dict[str, int] | None = None,
+        flatten: bool = True,
+        id_column: Literal["id", "_id"] = "id",
+        engine: Any | None = None,
+    ) -> Any:
+        cls._dfm_require_subclass_with_schema()
+        dataframe_cls = cast("Any", cls._dataframe_cls)
+        inner = dataframe_cls[cls._SchemaModel].from_beanie_async(
+            document_cls,
+            criteria=criteria,
+            fields=fields,
+            fetch_links=fetch_links,
+            nesting_depth=nesting_depth,
+            nesting_depths_per_field=nesting_depths_per_field,
+            flatten=flatten,
+            id_column=id_column,
+            engine=engine,
+        )
+        return cls._wrap_inner_df(inner)
+
 
 def __getattr__(name: str) -> Any:
     """Lazy re-exports: engine from pydantable, ``MongoRoot`` from **entei-core**."""
@@ -184,6 +282,7 @@ def __getattr__(name: str) -> Any:
 
 
 __all__ = [
+    "BeanieAsyncRoot",
     "EnteiDataFrame",
     "EnteiDataFrameModel",
     "EnteiPydantableEngine",

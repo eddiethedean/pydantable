@@ -102,6 +102,10 @@ Prefer **`sync_pymongo_collection(DocumentClass, sync_db)`** as the **`collectio
 | **`iter_mongo(sync_pymongo_collection(Doc, db), ...)`** | **`async for batch in aiter_mongo(...)`** |
 | **`write_mongo(sync_pymongo_collection(Doc, db), data, ...)`** | **`await awrite_mongo(...)`** |
 
+```{note}
+**ODM hooks:** ``write_mongo`` / ``awrite_mongo`` are **driver-level** inserts (PyMongo) from a rectangular column dict. They do **not** run Beanie's ``validate_on_save`` or event-based actions. For ODM-aware inserts that execute Beanie hooks, use **`await awrite_beanie(MyDocument, data)`** (see below).
+```
+
 **`fetch_mongo`** materializes the full cursor in memory; for large scans prefer **`iter_mongo`**.
 
 ## Eager column-dict I/O (PyMongo `Collection`)
@@ -117,6 +121,40 @@ If you are **not** using Beanie, pass any **sync** **`Collection`** you already 
 | **`fetch_mongo(collection, match=..., projection=..., sort=..., limit=..., fields=...)`** → **`dict[str, list]`** | **`await afetch_mongo(...)`** |
 | **`iter_mongo(..., batch_size=...)`** → yields rectangular batches | **`async for batch in aiter_mongo(...)`** |
 | **`write_mongo(collection, data, ordered=..., chunk_size=...)`** → inserted row count | **`await awrite_mongo(...)`** |
+
+## Async-first Beanie ODM I/O (no sync Collection required)
+
+When your application is already using Beanie's async ODM, you can stay fully in that world for eager I/O:
+
+- **`await afetch_beanie(MyDocument, ...)`** → **`dict[str, list]`**
+- **`async for batch in aiter_beanie(MyDocument, ...)`** → rectangular batches
+- **`await awrite_beanie(MyDocument, data, ...)`** → inserts via Beanie so **`validate_on_save`** and **event-based actions** can run
+
+These APIs also accept a **Beanie query object** (for example, the result of ``MyDocument.find(...)``) so you can use Beanie's operator DSL, projections, and ``fetch_links`` behavior.
+
+### ODM-aware inserts (`awrite_beanie`)
+
+Beanie supports on-save validation (`Settings.validate_on_save = True`) and event-based actions (``@before_event`` / ``@after_event``). See Beanie docs:
+
+- [On save validation](https://beanie-odm.dev/tutorial/on-save-validation/)
+- [Event-based actions](https://beanie-odm.dev/tutorial/event-based-actions/)
+
+Pydantable's **`awrite_beanie`** inserts rows by constructing Beanie documents and calling ``await doc.insert(...)`` so those behaviors can run.
+
+### Relations / links (`fetch_links=True`)
+
+Beanie can prefetch linked documents with ``fetch_links=True`` (and optional nesting depth controls). See [Relations](https://beanie-odm.dev/tutorial/relations/).
+
+When you call **`afetch_beanie(..., fetch_links=True)`**, nested documents are flattened into **dot-path columns** by default (for example ``door.height``).
+
+## Async-first lazy execution (`EnteiDataFrame.from_beanie_async`)
+
+If you want the **lazy** `EnteiDataFrame` / `EnteiDataFrameModel` API over a Beanie `Document` without wiring a sync PyMongo client, use:
+
+- **`EnteiDataFrame[Row].from_beanie_async(MyDocument, ...)`**
+- **`MyModel.from_beanie_async(MyDocument, ...)`** (where `MyModel` subclasses `EnteiDataFrameModel`)
+
+This root is **async-only**: materialize with **`await acollect()`** / **`await ato_dict()`**. Sync terminals (`collect`, `to_dict`, `write_parquet`, ...) will raise.
 
 ## Alternative: Pydantic `Schema` only (no Beanie)
 

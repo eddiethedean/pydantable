@@ -9,6 +9,7 @@ Use this page when you know **what you need to do**, but not **where it is docum
 - **Understand execution/materialization costs**: {doc}`EXECUTION`; **four plan materialization modes** (blocking / async / deferred / chunked): {doc}`MATERIALIZATION`.
 - **Choose an I/O entrypoint**: {doc}`IO_DECISION_TREE`, then the per-format pages under {doc}`IO_OVERVIEW`.
 - **Optional swap-in engines (keep the `DataFrame` API; different backends)**: {doc}`MOLTRES_SQL` (**`pydantable[moltres]`**, SQL), {doc}`MONGO_ENGINE` (**`pydantable[mongo]`** — **entei-core**, **pymongo**, **Beanie**; prefer [Beanie](https://github.com/BeanieODM/beanie) **`Document`** for lazy **`EnteiDataFrame`** / eager I/O), {doc}`CUSTOM_ENGINE_PACKAGE` (ship your own **`ExecutionEngine`**).
+- **Beanie-specific Mongo patterns** (async ODM I/O, projections, links, hooks): {doc}`BEANIE`.
 - **Know what behavior is guaranteed (joins/nulls/windows/order)**: {doc}`INTERFACE_CONTRACT`.
 - **Understand versioning/semver expectations**: {doc}`VERSIONING`.
 - **Learn supported dtypes and edge cases**: {doc}`SUPPORTED_TYPES`.
