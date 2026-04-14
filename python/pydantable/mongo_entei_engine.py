@@ -1,4 +1,5 @@
-"""Mongo-oriented execution engine: native plans + :class:`entei_core.MongoRoot` materialization.
+"""Mongo-oriented execution engine: native plans + :class:`entei_core.MongoRoot`
+materialization.
 
 The **entei-core** distribution supplies :class:`~entei_core.mongo_root.MongoRoot` and
 columnar scan helpers; this module implements :class:`EnteiPydantableEngine` on the
@@ -7,6 +8,7 @@ pydantable side (same pattern as lazy SQL facades + **moltres-core**).
 
 from __future__ import annotations
 
+import importlib
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
@@ -18,9 +20,8 @@ if TYPE_CHECKING:
 
 
 def _materialize_root_data(data: Any) -> Any:
-    from entei_core import materialize_root_data
-
-    return materialize_root_data(data)
+    entei_core = importlib.import_module("entei_core")
+    return entei_core.materialize_root_data(data)
 
 
 async def _amaterialize_root_data(data: Any) -> Any:
@@ -63,7 +64,10 @@ if NativePolarsEngine is None:
 else:
 
     class EnteiPydantableEngine(NativePolarsEngine):  # type: ignore[misc, no-redef]
-        """Delegate planning/execution to :class:`NativePolarsEngine`; materialize Mongo roots."""
+        """Delegate planning/execution to :class:`NativePolarsEngine`.
+
+        Materializes Mongo roots at execution time.
+        """
 
         __slots__ = ()
 
@@ -172,8 +176,10 @@ else:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
                 raise UnsupportedEngineOperationError(
-                    "Beanie-backed Mongo roots require async materialization and do not support "
-                    "sync lazy sinks. Materialize async to a column dict, then export/write."
+                    "Beanie-backed Mongo roots require async materialization and "
+                    "do not support sync lazy sinks. Materialize async to a "
+                    "column dict, then "
+                    "export/write."
                 )
             super().write_parquet(
                 plan,
@@ -201,8 +207,10 @@ else:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
                 raise UnsupportedEngineOperationError(
-                    "Beanie-backed Mongo roots require async materialization and do not support "
-                    "sync lazy sinks. Materialize async to a column dict, then export/write."
+                    "Beanie-backed Mongo roots require async materialization and "
+                    "do not support sync lazy sinks. Materialize async to a "
+                    "column dict, then "
+                    "export/write."
                 )
             super().write_csv(
                 plan,
@@ -229,8 +237,10 @@ else:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
                 raise UnsupportedEngineOperationError(
-                    "Beanie-backed Mongo roots require async materialization and do not support "
-                    "sync lazy sinks. Materialize async to a column dict, then export/write."
+                    "Beanie-backed Mongo roots require async materialization and "
+                    "do not support sync lazy sinks. Materialize async to a "
+                    "column dict, then "
+                    "export/write."
                 )
             super().write_ipc(
                 plan,
@@ -256,8 +266,10 @@ else:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
                 raise UnsupportedEngineOperationError(
-                    "Beanie-backed Mongo roots require async materialization and do not support "
-                    "sync lazy sinks. Materialize async to a column dict, then export/write."
+                    "Beanie-backed Mongo roots require async materialization and "
+                    "do not support sync lazy sinks. Materialize async to a "
+                    "column dict, then "
+                    "export/write."
                 )
             super().write_ndjson(
                 plan,

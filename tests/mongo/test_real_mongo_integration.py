@@ -5,7 +5,6 @@ import uuid
 
 import pytest
 
-
 pytestmark = pytest.mark.network
 
 
@@ -17,7 +16,9 @@ def _mongo_uri() -> str | None:
 def mongo_uri() -> str:
     uri = _mongo_uri()
     if not uri:
-        pytest.skip("Set MONGO_URI or PYDANTABLE_TEST_MONGO_URI to run real Mongo tests.")
+        pytest.skip(
+            "Set MONGO_URI or PYDANTABLE_TEST_MONGO_URI to run real Mongo tests."
+        )
     return uri
 
 
@@ -37,9 +38,8 @@ def _require_native_engine() -> None:
 
 def test_real_mongo_sync_io_roundtrip(mongo_uri: str, db_name: str) -> None:
     pytest.importorskip("pymongo")
-    from pymongo import MongoClient
-
     from pydantable import fetch_mongo, iter_mongo, write_mongo
+    from pymongo import MongoClient
 
     client = MongoClient(mongo_uri)
     db = client[db_name]
@@ -57,15 +57,15 @@ def test_real_mongo_sync_io_roundtrip(mongo_uri: str, db_name: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_real_mongo_beanie_fetch_links_flattening(mongo_uri: str, db_name: str) -> None:
+async def test_real_mongo_beanie_fetch_links_flattening(
+    mongo_uri: str, db_name: str
+) -> None:
     beanie = pytest.importorskip("beanie")
     _ = beanie
 
-    from pymongo import AsyncMongoClient
-
-    from pydantable import afetch_beanie
-
     from beanie import Document, Link, init_beanie
+    from pydantable import afetch_beanie
+    from pymongo import AsyncMongoClient
 
     class Door(Document):
         height: int
@@ -120,11 +120,9 @@ async def test_real_mongo_entei_from_beanie_async(mongo_uri: str, db_name: str) 
     pytest.importorskip("entei_core")
     pytest.importorskip("beanie")
 
-    from pymongo import AsyncMongoClient
-
-    from pydantable import EnteiDataFrame, Schema
-
     from beanie import Document, init_beanie
+    from pydantable import EnteiDataFrame, Schema
+    from pymongo import AsyncMongoClient
 
     class Item(Document):
         name: str
@@ -148,4 +146,3 @@ async def test_real_mongo_entei_from_beanie_async(mongo_uri: str, db_name: str) 
     assert out == {"name": ["alpha"]}
 
     await aclient.close()
-

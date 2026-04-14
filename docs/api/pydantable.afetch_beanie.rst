@@ -1,5 +1,6 @@
-pydantable.afetch_beanie
-========================
+pydantable.afetch\_beanie
+=========================
 
-.. autofunction:: pydantable.afetch_beanie
+.. currentmodule:: pydantable
 
+.. autofunction:: afetch_beanie

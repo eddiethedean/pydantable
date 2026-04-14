@@ -15,6 +15,7 @@ from .arrow import (
     record_batch_to_column_dict,
 )
 from .batches import iter_chain_batches
+from .beanie import BeanieWriteOptions, afetch_beanie, aiter_beanie, awrite_beanie
 from .extras import (
     iter_avro,
     iter_bigquery,
@@ -49,7 +50,6 @@ from .iter_file import (
     iter_parquet,
 )
 from .mongo import fetch_mongo, iter_mongo, write_mongo
-from .beanie import BeanieWriteOptions, afetch_beanie, aiter_beanie, awrite_beanie
 from .rap_support import aread_csv_rap, rap_csv_available
 from .sql import (
     StreamingColumns,
@@ -382,47 +382,6 @@ async def afetch_mongo(
     fields: Sequence[str] | None = None,
     executor: Executor | None = None,
 ) -> dict[str, list[Any]]: ...
-
-async def afetch_beanie(
-    document_or_query: Any,
-    *,
-    criteria: Any | None = None,
-    projection_model: type[Any] | None = None,
-    fields: Sequence[str] | None = None,
-    fetch_links: bool = False,
-    nesting_depth: int | None = None,
-    nesting_depths_per_field: Mapping[str, int] | None = None,
-    flatten: bool = True,
-    id_column: str = "id",
-) -> dict[str, list[Any]]: ...
-
-async def aiter_beanie(
-    document_or_query: Any,
-    *,
-    criteria: Any | None = None,
-    batch_size: int = 1000,
-    projection_model: type[Any] | None = None,
-    fields: Sequence[str] | None = None,
-    fetch_links: bool = False,
-    nesting_depth: int | None = None,
-    nesting_depths_per_field: Mapping[str, int] | None = None,
-    flatten: bool = True,
-    id_column: str = "id",
-): ...
-
-class BeanieWriteOptions:
-    validate_on_save: bool | None
-    skip_actions: Sequence[Any] | None
-    link_rule: Any | None
-
-async def awrite_beanie(
-    document_cls: type[Any],
-    data: dict[str, list[Any]],
-    *,
-    ordered: bool = True,
-    chunk_size: int | None = None,
-    options: BeanieWriteOptions | None = None,
-) -> int: ...
 async def aiter_mongo(
     collection: Any,
     *,
@@ -518,16 +477,19 @@ async def awrite_sqlmodel_batches(
 ) -> None: ...
 
 __all__ = [
+    "BeanieWriteOptions",
     "MissingRustExtensionError",
     "aexport_csv",
     "aexport_ipc",
     "aexport_json",
     "aexport_ndjson",
     "aexport_parquet",
+    "afetch_beanie",
     "afetch_mongo",
     "afetch_sql",
     "afetch_sql_raw",
     "afetch_sqlmodel",
+    "aiter_beanie",
     "aiter_csv",
     "aiter_ipc",
     "aiter_json_array",
@@ -552,6 +514,7 @@ __all__ = [
     "aread_parquet_url",
     "aread_parquet_url_ctx",
     "arrow_table_to_column_dict",
+    "awrite_beanie",
     "awrite_mongo",
     "awrite_sql",
     "awrite_sql_batches",

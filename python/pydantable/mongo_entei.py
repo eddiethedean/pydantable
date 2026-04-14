@@ -34,8 +34,9 @@ class BeanieAsyncRoot:
     """Async Beanie-backed root for async-only materialization.
 
     Unlike ``entei_core.MongoRoot`` (sync PyMongo), this root is materialized by
-    calling Beanie queries in :class:`~pydantable.mongo_entei_engine.EnteiPydantableEngine`
-    async execution paths.
+    calling Beanie queries in
+    :class:`~pydantable.mongo_entei_engine.EnteiPydantableEngine` async execution
+    paths.
     """
 
     document_cls: type[Any]

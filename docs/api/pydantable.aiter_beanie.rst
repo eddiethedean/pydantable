@@ -1,5 +1,6 @@
-pydantable.aiter_beanie
-=======================
+pydantable.aiter\_beanie
+========================
 
-.. autofunction:: pydantable.aiter_beanie
+.. currentmodule:: pydantable
 
+.. autofunction:: aiter_beanie

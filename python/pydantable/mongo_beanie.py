@@ -23,15 +23,17 @@ At runtime :func:`sync_pymongo_collection` only needs **pymongo** (tests may use
 
 from __future__ import annotations
 
+import importlib
 from typing import Any
 
 
 def _is_sync_database(database: Any) -> bool:
     """True for real PyMongo ``Database`` and for ``mongomock`` test doubles."""
     try:
-        import pymongo.database
-
-        if isinstance(database, pymongo.database.Database):
+        pymongo = importlib.import_module("pymongo")
+        database_mod = getattr(pymongo, "database", None)
+        Database = getattr(database_mod, "Database", None)
+        if Database is not None and isinstance(database, Database):
             return True
     except ImportError:
         pass

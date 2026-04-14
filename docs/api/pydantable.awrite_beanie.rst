@@ -1,5 +1,6 @@
-pydantable.awrite_beanie
-========================
+pydantable.awrite\_beanie
+=========================
 
-.. autofunction:: pydantable.awrite_beanie
+.. currentmodule:: pydantable
 
+.. autofunction:: awrite_beanie

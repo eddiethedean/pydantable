@@ -9,7 +9,7 @@ They return/accept the same column-dict shape as other pydantable eager I/O:
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -52,7 +52,9 @@ def _flatten_dict(
     return out
 
 
-def _normalize_id_keys(row: dict[str, Any], *, id_column: Literal["id", "_id"]) -> dict[str, Any]:
+def _normalize_id_keys(
+    row: dict[str, Any], *, id_column: Literal["id", "_id"]
+) -> dict[str, Any]:
     # Beanie exposes `id` for Mongo `_id`. When dumping `by_alias=True`, `_id` may appear.
     if id_column == "id":
         if "id" in row:
@@ -93,7 +95,9 @@ def _rows_to_column_dict(
     return out
 
 
-def _projection_model_for_fields(document_cls: type[Any], fields: Sequence[str]) -> type[Any]:
+def _projection_model_for_fields(
+    document_cls: type[Any], fields: Sequence[str]
+) -> type[Any]:
     """Build a Pydantic projection model using the Document's field annotations."""
     from pydantic import BaseModel, ConfigDict, create_model
 
@@ -178,7 +182,9 @@ async def afetch_beanie(
     if projection_model is not None and fields is not None:
         raise TypeError("Pass only one of projection_model= or fields=, not both.")
     if fields is not None:
-        projection_model = _projection_model_for_fields(doc_cls or type("Doc", (), {}), fields)
+        projection_model = _projection_model_for_fields(
+            doc_cls or type("Doc", (), {}), fields
+        )
     if projection_model is not None:
         project = getattr(query, "project", None)
         if not callable(project):
@@ -244,7 +250,9 @@ async def aiter_beanie(
     if projection_model is not None and fields is not None:
         raise TypeError("Pass only one of projection_model= or fields=, not both.")
     if fields is not None:
-        projection_model = _projection_model_for_fields(doc_cls or type("Doc", (), {}), fields)
+        projection_model = _projection_model_for_fields(
+            doc_cls or type("Doc", (), {}), fields
+        )
     if projection_model is not None:
         project = getattr(query, "project", None)
         if not callable(project):
@@ -342,4 +350,3 @@ __all__ = [
     "aiter_beanie",
     "awrite_beanie",
 ]
-

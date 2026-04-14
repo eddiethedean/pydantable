@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 
 beanie = pytest.importorskip("beanie")
@@ -30,7 +32,7 @@ class _Query:
     async def to_list(self):
         # naive projection: keep declared fields only
         if self._projection is not None:
-            names = list(getattr(self._projection, "model_fields").keys())
+            names = list(self._projection.model_fields.keys())
             out = []
             for d in self._docs:
                 base = d.model_dump(by_alias=True)
@@ -46,12 +48,15 @@ class _Query:
         try:
             return next(self._it)
         except StopIteration:
-            raise StopAsyncIteration
+            raise StopAsyncIteration from None
 
 
 class _DocCls:
     __name__ = "MyDoc"
-    model_fields = {"id": type("F", (), {"annotation": object})(), "x": type("F", (), {"annotation": int})()}
+    model_fields: ClassVar[dict[str, object]] = {
+        "id": type("F", (), {"annotation": object})(),
+        "x": type("F", (), {"annotation": int})(),
+    }
 
     @classmethod
     def find(cls, criteria=None, fetch_links=False):
@@ -88,4 +93,3 @@ async def test_aiter_beanie_batches():
     assert len(batches) == 2
     assert batches[0]["id"] == [1]
     assert batches[1]["id"] == [2]
-

@@ -31,6 +31,7 @@ from .arrow import (
     record_batch_to_column_dict,
 )
 from .batches import iter_chain_batches
+from .beanie import BeanieWriteOptions, afetch_beanie, aiter_beanie, awrite_beanie
 from .extras import (
     iter_avro,
     iter_bigquery,
@@ -64,6 +65,7 @@ from .iter_file import (
     iter_ndjson,
     iter_parquet,
 )
+from .mongo import fetch_mongo, iter_mongo, write_mongo
 from .rap_support import aread_csv_rap, rap_csv_available
 from .sql import (
     StreamingColumns,
@@ -76,8 +78,6 @@ from .sql import (
 )
 from .sqlmodel_read import fetch_sqlmodel, iter_sqlmodel
 from .sqlmodel_schema import sqlmodel_columns
-from .beanie import BeanieWriteOptions, afetch_beanie, aiter_beanie, awrite_beanie
-from .mongo import fetch_mongo, iter_mongo, write_mongo
 from .sqlmodel_write import write_sqlmodel
 from .write_batches import (
     write_csv_batches,
@@ -1561,6 +1561,7 @@ async def awrite_sqlmodel_batches(
 
 
 __all__ = [
+    "BeanieWriteOptions",
     "MissingRustExtensionError",
     "aexport_csv",
     "aexport_ipc",
@@ -1604,7 +1605,6 @@ __all__ = [
     "awrite_sql_raw",
     "awrite_sqlmodel",
     "awrite_sqlmodel_batches",
-    "BeanieWriteOptions",
     "export_csv",
     "export_ipc",
     "export_json",
@@ -1613,9 +1613,9 @@ __all__ = [
     "extras",
     "fetch_bytes",
     "fetch_csv_url",
+    "fetch_mongo",
     "fetch_ndjson_url",
     "fetch_parquet_url",
-    "fetch_mongo",
     "fetch_sql",
     "fetch_sql_raw",
     "fetch_sqlmodel",
@@ -1665,9 +1665,9 @@ __all__ = [
     "write_csv_batches",
     "write_csv_stdout",
     "write_ipc_batches",
+    "write_mongo",
     "write_ndjson_batches",
     "write_parquet_batches",
-    "write_mongo",
     "write_sql",
     "write_sql_batches",
     "write_sql_raw",

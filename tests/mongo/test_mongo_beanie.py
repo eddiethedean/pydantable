@@ -11,7 +11,10 @@ from pydantable.mongo_beanie import sync_pymongo_collection
 
 
 class _FakeBeanieDocument:
-    """Minimal stand-in for a Beanie :class:`Document` (``get_collection_name`` only)."""
+    """Minimal stand-in for a Beanie :class:`Document`.
+
+    Only provides ``get_collection_name``.
+    """
 
     @classmethod
     def get_collection_name(cls) -> str:

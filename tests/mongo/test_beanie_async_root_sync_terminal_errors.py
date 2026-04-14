@@ -29,4 +29,3 @@ def test_beanie_async_root_rejects_sync_collect() -> None:
     )
     with pytest.raises(UnsupportedEngineOperationError):
         df.collect(as_lists=True)
-
