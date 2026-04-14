@@ -3,7 +3,7 @@
 **Strongly-typed DataFrame layer for FastAPI and Pydantic services**, with a Rust-powered execution core (Polars-backed inside the native extension).
 
 ```{note}
-This **documentation site** is the detailed manual. The repository **README** on your Git host is the short entrypoint; both should stay aligned for install commands and version. **Current release:** **1.16.1** (see {doc}`CHANGELOG`) — stable **1.x** API under the policy in {doc}`VERSIONING`. Roadmap history and the completed **v1.0.0** gate checklist live in {doc}`ROADMAP`. SQLModel-first SQL I/O phases and milestones: {doc}`SQLMODEL_SQL_ROADMAP`.
+This **documentation site** is the detailed manual. The repository **README** on your Git host is the short entrypoint; both should stay aligned for install commands and version. **Current release:** **1.17.0** (see {doc}`CHANGELOG`) — stable **1.x** API under the policy in {doc}`VERSIONING`. Roadmap history and the completed **v1.0.0** gate checklist live in {doc}`ROADMAP`. SQLModel-first SQL I/O phases and milestones: {doc}`SQLMODEL_SQL_ROADMAP`.
 ```
  
 
@@ -12,7 +12,7 @@ This **documentation site** is the detailed manual. The repository **README** on
 - **Services (FastAPI)**: {doc}`GOLDEN_PATH_FASTAPI` (shortest runnable path), then {doc}`FASTAPI` (common patterns), {doc}`FASTAPI_ADVANCED` (less common patterns), {doc}`FASTAPI_ENHANCEMENTS` (roadmap + “when to use what”), {doc}`DATAFRAMEMODEL`, and {doc}`EXECUTION`. Use **`register_exception_handlers`** for HTTP **503** / **400** / **422** (`ColumnLengthMismatchError` → **400**). Cookbooks: {doc}`/cookbook/fastapi_columnar_bodies`, {doc}`/cookbook/fastapi_observability`, {doc}`/cookbook/fastapi_background_tasks`, {doc}`/cookbook/async_lazy_pipeline`. Copy layout from `docs/examples/fastapi/service_layout/`. Tests: **`pydantable.testing.fastapi`**. Troubleshooting: {doc}`TROUBLESHOOTING`.
 - **Data workflows**: start with {doc}`DATAFRAMEMODEL`, then {doc}`IO_DECISION_TREE` and {doc}`IO_OVERVIEW`. Optional pandas-like names: {doc}`PANDAS_UI`.
 - **Library/interop**: start with {doc}`INTERFACE_CONTRACT` and {doc}`VERSIONING`, then {doc}`PLAN_AND_PLUGINS`.
-- **Third-party execution backends**: {doc}`CUSTOM_ENGINE_PACKAGE` (ship your own `ExecutionEngine` package with `pydantable-protocol`). Optional Moltres SQL engine: {doc}`MOLTRES_SQL` (**`SqlDataFrame`** / **`SqlDataFrameModel`**, **`pydantable[moltres]`**).
+- **Third-party execution backends**: {doc}`CUSTOM_ENGINE_PACKAGE` (ship your own `ExecutionEngine` package with `pydantable-protocol`). Optional Moltres SQL engine: {doc}`MOLTRES_SQL` (**`SqlDataFrame`** / **`SqlDataFrameModel`**, **`pydantable[moltres]`**). Optional Mongo engine: {doc}`MONGO_ENGINE` (**`EnteiDataFrame`** / **`EnteiDataFrameModel`**, **`pydantable[mongo]`**).
 - `DataFrameModel` transform chains can return typed after-schema models directly (no `to_dict()` materialization step). **mypy** with the plugin infers many chains; **Pyright**, **Pylance**, and **Astral `ty`** use shipped stubs — call `as_model(...)` (see {doc}`DATAFRAMEMODEL`).
 - Typing guide: {doc}`TYPING` (mypy plugin vs stub-based checkers, including **`ty`**).
 
@@ -124,6 +124,7 @@ ADR-engines
 CUSTOM_ENGINE_PACKAGE
 ISP_ENGINE_PROTOCOL_RFC
 MOLTRES_SQL
+MONGO_ENGINE
 DEVELOPER
 TESTING
 COVERAGE_BACKLOG
