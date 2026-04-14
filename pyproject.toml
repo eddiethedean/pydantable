@@ -41,8 +41,8 @@ rap = ["rapcsv>=0.2", "rapfiles>=0.1", "rapsqlite>=0.1"]
 fastapi = ["fastapi>=0.100"]
 # Moltres SQL engine (moltres-core) — SqlDataFrame / SqlDataFrameModel; rapsqlite for async SQLAlchemy URLs
 moltres = ["moltres-core>=1.0.0,<2", "rapsqlite>=0.1", "greenlet>=3.0"]
-# MongoDB: ``entei-core`` (MongoRoot / materialization) + ``pymongo`` (eager I/O + PyMongo Collection for EnteiDataFrame)
-mongo = ["entei-core>=0.2.0,<0.3", "pymongo>=4.6"]
+# MongoDB: ``entei-core``, ``pymongo``, and Beanie (``sync_pymongo_collection``, ``from_beanie``).
+mongo = ["entei-core>=0.2.0,<0.3", "pymongo>=4.6", "beanie>=1.24,<3"]
 dev = [
     "tomli>=1.2.0; python_version < '3.11'",
     "fastapi>=0.100",
@@ -82,6 +82,8 @@ dev = [
     "snowflake-connector-python>=3.0",
     # Mongo: entei-core + pymongo (``tests/mongo/``; same pin as ``[mongo]``).
     "entei-core>=0.2.0,<0.3",
+    # Beanie — bundled in ``[mongo]``; listed for dev installs that do not use ``-e ".[mongo]"``.
+    "beanie>=1.24,<3",
     # SqlDataFrame / SqlDataFrameModel tests (same pin as optional ``[moltres]``).
     "moltres-core>=1.0.0,<2",
     # SQLAlchemy ``create_async_engine`` (rapsqlite smoke test in ``tests/sql/test_sql_moltres.py``).
@@ -103,9 +105,10 @@ docs = [
     # SQLAlchemy forward refs on DataFrameModel I/O methods (matches CI docs job and RTD).
     "sqlalchemy>=2.0,<3",
     "sqlmodel>=0.0.22,<0.1",
-    # Mongo modules (``mongo_entei`` / ``mongo_entei_engine``) for Sphinx (CI ``docs`` job and RTD; same pin as ``[mongo]``).
+    # Mongo modules (``mongo_entei`` / ``mongo_entei_engine`` / ``mongo_beanie``) for Sphinx (CI ``docs`` job and RTD; same pins as ``[mongo]``).
     "entei-core>=0.2.0,<0.3",
     "pymongo>=4.6",
+    "beanie>=1.24,<3",
 ]
 
 [tool.setuptools]
@@ -193,6 +196,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 "python/pydantable/testing/**/*.py" = ["TC003"]
 "python/pydantable/sql_moltres.py" = ["TC003"]
 "python/pydantable/mongo_entei.py" = ["TC003", "F822"]
+"python/pydantable/mongo_beanie.py" = ["TC003"]
 "python/pydantable/pandas_moltres.py" = ["TC003"]
 "python/pydantable/pyspark/sql_moltres.py" = ["TC003", "TC001"]
 "python/pydantable/dataframe/_execution_handle.py" = ["TC003"]
@@ -351,6 +355,15 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "pymongo.*"
+ignore_missing_imports = true
+
+# Optional: ``pydantable[mongo]`` (Beanie).
+[[tool.mypy.overrides]]
+module = "beanie"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "beanie.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

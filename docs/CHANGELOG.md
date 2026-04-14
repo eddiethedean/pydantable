@@ -6,7 +6,17 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Added
 
+- **Mongo / Beanie:** **`pydantable.mongo_beanie.sync_pymongo_collection`** (also a lazy import from **`pydantable`**), **`EnteiDataFrame.from_beanie`**, and **`EnteiDataFrameModel.from_beanie`** for [Beanie](https://github.com/BeanieODM/beanie) **`Document`** models with a **sync** **`pymongo.database.Database`** (Beanie uses async PyMongo). See **`MONGO_ENGINE`**.
+
 - **Mongo I/O:** **`fetch_mongo`**, **`iter_mongo`**, **`write_mongo`** and async **`afetch_mongo`**, **`aiter_mongo`**, **`awrite_mongo`** — eager **`dict[str, list]`** reads/writes against a PyMongo **`Collection`** (same import pattern as SQL I/O). **`pydantable[mongo]`** now includes **pymongo**.
+
+### Documentation
+
+- **Mongo:** position [Beanie](https://github.com/BeanieODM/beanie) **`Document`** models as the **primary** way to use pydantable with MongoDB (**`pydantable[mongo]`**, **`from_beanie`**, **`sync_pymongo_collection`**); Pydantic **`Schema`** + **`from_collection`** documented as a supported alternative. See **`MONGO_ENGINE`**, **README**, and **IO_DECISION_TREE**.
+
+### Changed
+
+- **Optional dependencies:** **`pydantable[mongo]`** now includes **Beanie** (`beanie>=1.24,<3`); the separate **`mongo-beanie`** extra is removed — use **`pip install "pydantable[mongo]"`** for **entei-core**, **pymongo**, and **Beanie**.
 
 ## [1.17.0] — 2026-04-14
 

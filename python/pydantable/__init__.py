@@ -94,6 +94,7 @@ from .schema import DtypeDriftWarning, Schema
 from .types import WKB
 
 if TYPE_CHECKING:
+    from pydantable.mongo_beanie import sync_pymongo_collection
     from pydantable.mongo_entei import (
         EnteiDataFrame,
         EnteiDataFrameModel,
@@ -112,6 +113,10 @@ def __getattr__(name: str) -> Any:
         from pydantable.sql_moltres import SqlDataFrameModel
 
         return SqlDataFrameModel
+    if name == "sync_pymongo_collection":
+        from pydantable.mongo_beanie import sync_pymongo_collection
+
+        return sync_pymongo_collection
     if name in (
         "EnteiDataFrame",
         "EnteiDataFrameModel",
@@ -142,6 +147,7 @@ __all__ = [
     "Schema",
     "SqlDataFrame",
     "SqlDataFrameModel",
+    "sync_pymongo_collection",
     "afetch_mongo",
     "afetch_sql",
     "afetch_sql_raw",

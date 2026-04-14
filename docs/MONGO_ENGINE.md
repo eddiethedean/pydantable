@@ -1,6 +1,10 @@
-# Mongo engine: `EnteiDataFrame` and `EnteiDataFrameModel`
+# Mongo: Beanie, lazy engine, and column-dict I/O
 
-**Topics here:** (1) lazy **`EnteiDataFrame`** / **`EnteiDataFrameModel`** with pydantable’s **`EnteiPydantableEngine`**; (2) eager **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** (and async mirrors) for **PyMongo** column dicts — no **entei-core** required for (2).
+**Primary model for MongoDB with PydanTable:** define collections with [Beanie](https://github.com/BeanieODM/beanie) **`Document`** subclasses, then wire **lazy** **`EnteiDataFrame`** / **`EnteiDataFrameModel`** and **eager** **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** through **`from_beanie`** and **`sync_pymongo_collection`**. Install **`pip install "pydantable[mongo]"`** (**entei-core**, **pymongo**, and **Beanie**).
+
+**Also supported:** Pydantic **`Schema`** / **`EnteiDataFrameModel`** with **`from_collection(coll)`** when you already hold a **sync** PyMongo **`Collection`** and are not using Beanie. That path is fine for tests or thin scripts; for applications, prefer **Beanie** as the single source of truth for collection names, indexes, and document shape.
+
+**Topics here:** (1) lazy **`EnteiDataFrame`** / **`EnteiDataFrameModel`** with pydantable’s **`EnteiPydantableEngine`**; (2) eager column-dict I/O — no **entei-core** required for (2) alone.
 
 This guide covers the **optional** integration between PydanTable,
 [**entei-core**](https://pypi.org/project/entei-core/) (**`MongoRoot`** and
@@ -19,13 +23,10 @@ The parallel SQL-backed story is {doc}`MOLTRES_SQL` (**`SqlDataFrame`** /
 
 **Compatibility (1.17.0):** **`pydantable[mongo]`** pins **`entei-core`** to
 **`>=0.2.0,<0.3`** (see **`pyproject.toml`**). Install a matching **PyPI**
-**`entei-core`** release before using these facades.
+**`entei-core`** release before using lazy **Entei** facades.
 
 ```{note}
-**Install:** ``pip install "pydantable[mongo]"`` (pulls **entei-core**, **pymongo**) or
-``pip install "entei-core>=0.2.0,<0.3"`` and ``pip install pymongo``. The core **pydantable** package does not import
-**entei-core** at import time; ``EnteiDataFrame`` / ``EnteiDataFrameModel`` and the
-lazy aliases below resolve only when accessed.
+**Install:** ``pip install "pydantable[mongo]"`` pulls **entei-core**, **pymongo**, and **Beanie**. The core **pydantable** package does not import **entei-core** at import time; ``EnteiDataFrame`` / ``EnteiDataFrameModel`` and the lazy aliases below resolve only when accessed.
 ```
 
 ## When to use this
@@ -34,14 +35,129 @@ lazy aliases below resolve only when accessed.
 | ---- | --- |
 | Default Polars/Rust execution for in-memory or file-backed workflows | `DataFrame` / `DataFrameModel` (see {doc}`DATAFRAMEMODEL`, {doc}`EXECUTION`). |
 | **Eager** SQL I/O: load columns from a DB into a frame, or write tables | **`from pydantable import …`** — {doc}`IO_SQL` (**`fetch_sqlmodel`**, **`write_sqlmodel`**, …). |
-| **Eager** Mongo I/O: **`dict[str, list]`** in / out of a collection (no **`DataFrame`**) | **`fetch_mongo`**, **`iter_mongo`**, **`write_mongo`** and **`afetch_mongo`**, **`aiter_mongo`**, **`awrite_mongo`** — below. |
+| **Eager** Mongo I/O: **`dict[str, list]`** in / out of a collection (no **`DataFrame`**) | **`fetch_mongo`**, **`iter_mongo`**, **`write_mongo`** — ideally with **`sync_pymongo_collection(MyDocument, sync_db)`** ({ref}`mongo-eager-beanie`). |
 | **Lazy execution** with transforms compiled to **SQL** (Moltres) | **`SqlDataFrame`** / **`SqlDataFrameModel`** — {doc}`MOLTRES_SQL`. |
-| **Lazy execution** over a **MongoDB collection** with the same typed **`DataFrame`** API | **`EnteiDataFrame`** / **`EnteiDataFrameModel`** — this page. |
+| **Lazy execution** over a **MongoDB collection** with the same typed **`DataFrame`** API | **`EnteiDataFrame`** / **`EnteiDataFrameModel`** — **prefer `from_beanie`** with a Beanie **`Document`**; see {ref}`mongo-primary-beanie`. |
 
 Eager SQL helpers materialize **column dicts** in Python; they do not replace
 `DataFrame._engine`. **`EnteiDataFrame`** uses **`EnteiPydantableEngine`** as that engine so
 `select`, `filter`, `collect`, etc. go through the native planner and executor (with
 **`MongoRoot`** materialized via **entei-core** when needed).
+
+(mongo-primary-beanie)=
+## Primary path: Beanie `Document` models
+
+[Beanie](https://github.com/BeanieODM/beanie) is the **recommended** ODM for MongoDB here: one **`Document`** class per collection, Pydantic-shaped fields, and **`get_collection_name()`** after **`init_beanie`**.
+
+Beanie uses PyMongo’s **async** API (`AsyncMongoClient`, `AsyncDatabase`, …). Pydantable’s **`MongoRoot`** / **`fetch_mongo`** paths need a **sync** `pymongo.database.Database` and **`pymongo.collection.Collection`** (`find()`, `insert_many()`). Use a **synchronous** `MongoClient(uri).dbname` whose **database name** matches the **`AsyncDatabase`** you pass to **`await init_beanie(database=...)`**.
+
+- **`EnteiDataFrame[Row].from_beanie(MyDocument, database=sync_db)`** — lazy typed transforms over that collection.
+- **`fetch_mongo(sync_pymongo_collection(MyDocument, sync_db))`** — eager **`dict[str, list]`** without building a **`DataFrame`** plan.
+- **`write_mongo(sync_pymongo_collection(MyDocument, sync_db), data)`** — inserts from a rectangular column dict.
+
+At runtime, :func:`~pydantable.mongo_beanie.sync_pymongo_collection` only needs **pymongo** (or **mongomock** in tests); it does **not** import Beanie—it only calls **`get_collection_name()`** on your class.
+
+```python
+from pymongo import MongoClient
+
+from beanie import Document, init_beanie
+from pydantic import Field
+
+from pydantable import EnteiDataFrame, Schema, fetch_mongo, sync_pymongo_collection, write_mongo
+
+
+class Item(Document):
+    x: int = Field(...)
+    label: str | None = None
+
+
+class Row(Schema):
+    """Pydantic schema for the ``DataFrame`` row type (align fields with ``Item``)."""
+
+    x: int
+    label: str | None = None
+
+
+async def setup(async_client, sync_uri: str) -> None:
+    await init_beanie(database=async_client.myapp, document_models=[Item])
+    # sync client for pydantable — same DB name as ``async_client.myapp``
+    sync_db = MongoClient(sync_uri).myapp
+    df = EnteiDataFrame[Row].from_beanie(Item, database=sync_db)
+    cols = fetch_mongo(sync_pymongo_collection(Item, sync_db))
+    _ = write_mongo(sync_pymongo_collection(Item, sync_db), {"x": [1], "label": ["a"]})
+```
+
+### `EnteiDataFrameModel` with Beanie
+
+Use **`MyModel.from_beanie(Item, database=sync_db)`** on a concrete **`EnteiDataFrameModel`** subclass whose schema matches the documents you read.
+
+(mongo-eager-beanie)=
+### Eager column-dict I/O with Beanie
+
+Prefer **`sync_pymongo_collection(DocumentClass, sync_db)`** as the **`collection`** argument to **`fetch_mongo`**, **`iter_mongo`**, and **`write_mongo`** so collection names stay aligned with Beanie.
+
+| Sync | Async |
+| ---- | ----- |
+| **`fetch_mongo(sync_pymongo_collection(Doc, db), ...)`** → **`dict[str, list]`** | **`await afetch_mongo(...)`** |
+| **`iter_mongo(sync_pymongo_collection(Doc, db), ...)`** | **`async for batch in aiter_mongo(...)`** |
+| **`write_mongo(sync_pymongo_collection(Doc, db), data, ...)`** | **`await awrite_mongo(...)`** |
+
+**`fetch_mongo`** materializes the full cursor in memory; for large scans prefer **`iter_mongo`**.
+
+## Eager column-dict I/O (PyMongo `Collection`)
+
+Same pattern as **SQL** eager helpers ({doc}`IO_SQL`): import **from `pydantable`**
+(not `pydantable.io` in application code). These use **PyMongo** only (they do **not**
+require **entei-core**), but **`pydantable[mongo]`** installs **pymongo** and **Beanie** for you.
+
+If you are **not** using Beanie, pass any **sync** **`Collection`** you already have:
+
+| Sync | Async |
+| ---- | ----- |
+| **`fetch_mongo(collection, match=..., projection=..., sort=..., limit=..., fields=...)`** → **`dict[str, list]`** | **`await afetch_mongo(...)`** |
+| **`iter_mongo(..., batch_size=...)`** → yields rectangular batches | **`async for batch in aiter_mongo(...)`** |
+| **`write_mongo(collection, data, ordered=..., chunk_size=...)`** → inserted row count | **`await awrite_mongo(...)`** |
+
+## Alternative: Pydantic `Schema` only (no Beanie)
+
+You can skip Beanie and pass a **sync** PyMongo **`Collection`** directly. This is supported for **tests**, **prototypes**, or when another layer owns the driver—but **Beanie remains the recommended primary model** for application code.
+
+### `EnteiDataFrame`
+
+```python
+from pydantable import EnteiDataFrame, Schema
+
+
+class Row(Schema):
+    x: int
+    y: str | None = None
+
+
+# coll = mongo_client.db.my_collection  # sync Collection
+df = EnteiDataFrame[Row].from_collection(coll)
+```
+
+Optional **`fields=`** limits which document keys are read (defaults to all keys
+in the schema’s field map). Optional **`engine=`** reuses a single
+**`EnteiPydantableEngine`** across many frames.
+
+Materialization (`collect`, `to_dict`, `acollect`, …) follows {doc}`EXECUTION` and
+uses the engine’s **`execute_plan`** / **`async_execute_plan`** entrypoints.
+
+### `EnteiDataFrameModel`
+
+```python
+from pydantable import EnteiDataFrameModel
+
+
+class RowModel(EnteiDataFrameModel):
+    x: int
+    y: str | None = None
+
+
+m = RowModel.from_collection(coll)
+rows = m.rows()
+```
 
 ## Imports
 
@@ -52,6 +168,7 @@ from pydantable import (
     EnteiDataFrameModel,
     EnteiPydantableEngine,
     MongoRoot,
+    sync_pymongo_collection,
 )
 
 # Explicit (``EnteiPydantableEngine`` is defined in ``pydantable.mongo_entei_engine``)
@@ -66,65 +183,6 @@ from entei_core import MongoRoot
 If **entei-core** is missing, constructing these classes or resolving the lazy
 aliases raises **ImportError** with an install hint (`pydantable[mongo]` or
 `entei-core`).
-
-## Eager column-dict I/O (PyMongo)
-
-Same pattern as **SQL** eager helpers ({doc}`IO_SQL`): import **from `pydantable`**
-(not `pydantable.io` in application code). These use **PyMongo** only (they do **not**
-require **entei-core**), but **`pydantable[mongo]`** installs **pymongo** for you.
-
-| Sync | Async |
-| ---- | ----- |
-| **`fetch_mongo(collection, match=..., projection=..., sort=..., limit=..., fields=...)`** → **`dict[str, list]`** | **`await afetch_mongo(...)`** |
-| **`iter_mongo(..., batch_size=...)`** → yields rectangular batches | **`async for batch in aiter_mongo(...)`** |
-| **`write_mongo(collection, data, ordered=..., chunk_size=...)`** → inserted row count | **`await awrite_mongo(...)`** |
-
-**`fetch_mongo`** materializes the full cursor in memory; for large scans prefer **`iter_mongo`**.
-**`write_mongo`** uses **`insert_many`** from a rectangular column dict (same row count in every column).
-
-## `EnteiDataFrame`
-
-`EnteiDataFrame` subclasses **`DataFrame`**. Define a **`Schema`** subclass, then
-build a lazy frame from a PyMongo **`Collection`**:
-
-```python
-from pydantable import EnteiDataFrame, Schema
-
-
-class Row(Schema):
-    x: int
-    y: str | None = None
-
-
-# coll = mongo_client.db.my_collection
-df = EnteiDataFrame[Row].from_collection(coll)
-```
-
-Optional **`fields=`** limits which document keys are read (defaults to all keys
-in the schema’s field map). Optional **`engine=`** reuses a single
-**`EnteiPydantableEngine`** across many frames.
-
-Materialization (`collect`, `to_dict`, `acollect`, …) follows {doc}`EXECUTION` and
-uses the engine’s **`execute_plan`** / **`async_execute_plan`** entrypoints.
-
-## `EnteiDataFrameModel`
-
-**`EnteiDataFrameModel`** subclasses **`DataFrameModel`** and defaults to
-**`EnteiPydantableEngine`**. Use **`from_collection`** on a concrete model class
-to get a model instance backed by a collection:
-
-```python
-from pydantable import EnteiDataFrameModel
-
-
-class RowModel(EnteiDataFrameModel):
-    x: int
-    y: str | None = None
-
-
-m = RowModel.from_collection(coll)
-rows = m.rows()
-```
 
 ## Engine and `MongoRoot` in application code
 

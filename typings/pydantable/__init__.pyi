@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pydantable.mongo_beanie import sync_pymongo_collection
 from pydantable.mongo_entei import (
     EnteiDataFrame,
     EnteiDataFrameModel,
@@ -164,6 +165,7 @@ __all__ = [
     "set_display_options",
     "set_observer",
     "sqlmodel_columns",
+    "sync_pymongo_collection",
     "write_csv_batches",
     "write_ipc_batches",
     "write_mongo",

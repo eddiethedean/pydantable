@@ -1,11 +1,17 @@
-"""Mongo-backed :class:`~pydantable.dataframe.DataFrame` via **entei-core** + pydantable.
+"""Mongo lazy :class:`~pydantable.dataframe.DataFrame` via **entei-core** + pydantable.
 
-Install with ``pip install "pydantable[mongo]"`` (pulls **entei-core**) or
-``pip install entei-core``. **entei-core** supplies ``MongoRoot`` and columnar
-materialization; :class:`EnteiPydantableEngine` lives in
-:mod:`pydantable.mongo_entei_engine` and implements
-:class:`~pydantable.engine.protocols.ExecutionEngine` by delegating to the native
-planner and scanning Mongo collections into ``dict[str, list]`` at execution time.
+**Recommended:** define collections with `Beanie <https://github.com/BeanieODM/beanie>`__
+``Document`` models and use ``pip install "pydantable[mongo]"`` —
+:meth:`EnteiDataFrame.from_beanie` / :meth:`EnteiDataFrameModel.from_beanie` plus
+:mod:`pydantable.mongo_beanie`. Plain Pydantic :class:`~pydantable.schema.Schema`
+subclasses with :meth:`EnteiDataFrame.from_collection` remain supported when you
+already have a sync PyMongo ``Collection``.
+
+**entei-core** supplies ``MongoRoot`` and columnar materialization;
+:class:`EnteiPydantableEngine` lives in :mod:`pydantable.mongo_entei_engine` and
+implements :class:`~pydantable.engine.protocols.ExecutionEngine` by delegating to
+the native planner and scanning Mongo collections into ``dict[str, list]`` at
+execution time.
 
 This module defines :class:`EnteiDataFrame` and :class:`EnteiDataFrameModel` on the
 pydantable side, mirroring :mod:`pydantable.sql_moltres` and **moltres-core**.
@@ -36,7 +42,10 @@ def _import_entei_engine_types() -> tuple[Any, Any]:
 
 
 class EnteiDataFrame(DataFrame):
-    """Typed dataframe using :class:`~pydantable.mongo_entei_engine.EnteiPydantableEngine`."""
+    """Lazy Mongo ``DataFrame`` (see :mod:`pydantable.mongo_entei_engine`).
+
+    Prefer :meth:`from_beanie` when using Beanie ``Document`` models.
+    """
 
     @classmethod
     def from_collection(
@@ -70,9 +79,36 @@ class EnteiDataFrame(DataFrame):
             engine=eng,
         )
 
+    @classmethod
+    def from_beanie(
+        cls,
+        document_cls: type[Any],
+        *,
+        database: Any,
+        fields: Sequence[str] | None = None,
+        engine: Any | None = None,
+    ) -> Any:
+        """Lazy frame for a Beanie ``Document`` collection (preferred Mongo path).
+
+        Resolves a **sync** PyMongo ``Collection`` via
+        :func:`pydantable.mongo_beanie.sync_pymongo_collection` and delegates to
+        :meth:`from_collection`. ``database`` must be a synchronous
+        ``pymongo.database.Database`` (same **database name** as Beanie was
+        initialized with; Beanie itself uses async PyMongo).
+
+        **Beanie** is installed with ``pip install "pydantable[mongo]"``.
+        """
+        from pydantable.mongo_beanie import sync_pymongo_collection
+
+        coll = sync_pymongo_collection(document_cls, database)
+        return cls.from_collection(coll, fields=fields, engine=engine)
+
 
 class EnteiDataFrameModel(DataFrameModel):
-    """``DataFrameModel`` using :class:`~pydantable.mongo_entei_engine.EnteiPydantableEngine` by default."""
+    """Mongo ``DataFrameModel`` (see :mod:`pydantable.mongo_entei_engine`).
+
+    Prefer :meth:`from_beanie` when using Beanie ``Document`` models.
+    """
 
     _dataframe_cls = EnteiDataFrame
 
@@ -112,6 +148,26 @@ class EnteiDataFrameModel(DataFrameModel):
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel].from_collection(
             collection,
+            fields=fields,
+            engine=engine,
+        )
+        return cls._wrap_inner_df(inner)
+
+    @classmethod
+    def from_beanie(
+        cls,
+        document_cls: type[Any],
+        *,
+        database: Any,
+        fields: Sequence[str] | None = None,
+        engine: Any | None = None,
+    ) -> Any:
+        """Build from Beanie (see :meth:`EnteiDataFrame.from_beanie`)."""
+        cls._dfm_require_subclass_with_schema()
+        dataframe_cls = cast("Any", cls._dataframe_cls)
+        inner = dataframe_cls[cls._SchemaModel].from_beanie(
+            document_cls,
+            database=database,
             fields=fields,
             engine=engine,
         )
