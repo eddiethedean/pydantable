@@ -97,3 +97,12 @@ async def test_aiter_beanie_batches():
     assert len(batches) == 2
     assert batches[0]["id"] == [1]
     assert batches[1]["id"] == [2]
+
+
+@pytest.mark.asyncio
+async def test_afetch_beanie_query_rejects_criteria() -> None:
+    from pydantable.io.beanie import afetch_beanie
+
+    q = _DocCls.find({"x": 10})
+    with pytest.raises(TypeError, match=r"criteria="):
+        await afetch_beanie(q, criteria={"x": 20})

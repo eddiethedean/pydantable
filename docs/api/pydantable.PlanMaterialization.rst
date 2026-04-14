@@ -1,4 +1,4 @@
-﻿pydantable.PlanMaterialization
+pydantable.PlanMaterialization
 ==============================
 
 .. currentmodule:: pydantable

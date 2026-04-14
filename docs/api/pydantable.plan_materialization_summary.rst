@@ -1,4 +1,4 @@
-﻿pydantable.plan\_materialization\_summary
+pydantable.plan\_materialization\_summary
 =========================================
 
 .. currentmodule:: pydantable

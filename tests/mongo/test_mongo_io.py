@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import mongomock
 import pytest
 
+mongomock = pytest.importorskip("mongomock")
 pytest.importorskip("pymongo")
 
-from pydantable import (
+from pydantable import (  # noqa: E402
     afetch_mongo,
     aiter_mongo,
     awrite_mongo,

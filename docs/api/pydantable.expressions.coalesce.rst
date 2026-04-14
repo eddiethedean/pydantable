@@ -1,4 +1,4 @@
-﻿pydantable.expressions.coalesce
+pydantable.expressions.coalesce
 ===============================
 
 .. currentmodule:: pydantable.expressions

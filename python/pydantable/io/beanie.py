@@ -183,6 +183,12 @@ async def afetch_beanie(
             if callable(ndpf):
                 query = ndpf(dict(nesting_depths_per_field))
     else:
+        if criteria is not None:
+            raise TypeError(
+                "criteria= is only supported when document_or_query is a Beanie "
+                "Document class. If you pass a query object, apply criteria to the "
+                "query before calling afetch_beanie()."
+            )
         query = document_or_query
 
     if projection_model is not None and fields is not None:
@@ -252,6 +258,13 @@ async def aiter_beanie(
             ndpf = getattr(query, "nesting_depths_per_field", None)
             if callable(ndpf):
                 query = ndpf(dict(nesting_depths_per_field))
+    else:
+        if criteria is not None:
+            raise TypeError(
+                "criteria= is only supported when document_or_query is a Beanie "
+                "Document class. If you pass a query object, apply criteria to the "
+                "query before calling aiter_beanie()."
+            )
 
     if projection_model is not None and fields is not None:
         raise TypeError("Pass only one of projection_model= or fields=, not both.")

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import mongomock
 import pytest
 
+mongomock = pytest.importorskip("mongomock")
 pytest.importorskip("entei_core")
 
-from pydantable.mongo_beanie import sync_pymongo_collection
+from pydantable.mongo_beanie import sync_pymongo_collection  # noqa: E402
 
 
 class _FakeBeanieDocument:

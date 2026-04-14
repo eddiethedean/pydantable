@@ -1,4 +1,4 @@
-﻿pydantable.expressions.concat
+pydantable.expressions.concat
 =============================
 
 .. currentmodule:: pydantable.expressions

@@ -6,6 +6,7 @@ Input may be column dicts or row sequences (mappings / Pydantic).
 
 from __future__ import annotations
 
+import ast
 import contextlib
 import html
 import sys
@@ -34,6 +35,53 @@ from .schema import (
 
 def _annotation_is_classvar(annotation: Any) -> bool:
     return typing.get_origin(annotation) is typing.ClassVar
+
+
+class _DisallowedAnnotationExpression(Exception):
+    def __init__(self, expr: str, node_type: str) -> None:
+        super().__init__(expr, node_type)
+        self.expr = expr
+        self.node_type = node_type
+
+
+def _safe_eval_annotation_expr(expr: str, *, eval_ns: dict[str, Any]) -> Any:
+    """
+    Evaluate an annotation expression without allowing function calls.
+
+    Supports common typing expressions (`T | None`, `list[int]`, `ClassVar[...]`,
+    `datetime.date`, etc.) while preventing arbitrary code execution via
+    annotations.
+    """
+    tree = ast.parse(expr, mode="eval")
+
+    allowed = (
+        ast.Expression,
+        ast.Name,
+        ast.Attribute,
+        ast.Subscript,
+        ast.BinOp,
+        ast.BitOr,
+        ast.Tuple,
+        ast.List,
+        ast.Dict,
+        ast.Call,
+        ast.Constant,
+        ast.keyword,
+        ast.Load,
+    )
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and not (
+            isinstance(node.func, ast.Name) and node.func.id == "Field"
+        ):
+            raise _DisallowedAnnotationExpression(expr=expr, node_type="Call")
+        if not isinstance(node, allowed):
+            raise _DisallowedAnnotationExpression(
+                expr=expr, node_type=type(node).__name__
+            )
+
+    code = compile(tree, filename="<annotation>", mode="eval")
+    return eval(code, eval_ns, eval_ns)
 
 
 def _field_defs_from_annotations(
@@ -276,16 +324,35 @@ class DataFrameModel(Generic[RowT]):
 
         module = sys.modules.get(cls.__module__)
         globalns = vars(module) if module is not None else {}
+
         eval_ns = dict(vars(typing))
         eval_ns.update(globalns)
 
         raw_annotations = dict(getattr(cls, "__dict__", {}).get("__annotations__", {}))
-        annotations: dict[str, Any] = {}
+        resolved_annotations: dict[str, Any] = {}
         for field_name, field_type in raw_annotations.items():
             if isinstance(field_type, str):
-                resolved = eval(field_type, eval_ns, eval_ns)
+                try:
+                    resolved = _safe_eval_annotation_expr(field_type, eval_ns=eval_ns)
+                except _DisallowedAnnotationExpression as exc:
+                    raise TypeError(
+                        f"DataFrameModel {cls.__name__!r} field {field_name!r} has a "
+                        "string annotation that contains a disallowed expression "
+                        f"({exc.node_type}). Only type expressions are supported; "
+                        "function calls are not allowed in annotations."
+                    ) from None
+                except Exception as exc:
+                    raise TypeError(
+                        f"DataFrameModel {cls.__name__!r} field {field_name!r} has a "
+                        "string annotation that could not be resolved. "
+                        f"Annotation: {field_type!r}"
+                    ) from exc
             else:
                 resolved = field_type
+            resolved_annotations[field_name] = resolved
+
+        annotations: dict[str, Any] = {}
+        for field_name, resolved in resolved_annotations.items():
             if _annotation_is_classvar(resolved):
                 continue
             annotations[field_name] = resolved

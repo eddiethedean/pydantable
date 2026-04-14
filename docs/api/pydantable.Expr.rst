@@ -1,4 +1,4 @@
-﻿pydantable.Expr
+pydantable.Expr
 ===============
 
 .. currentmodule:: pydantable

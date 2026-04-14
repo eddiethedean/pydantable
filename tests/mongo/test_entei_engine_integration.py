@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 
-import mongomock
 import pydantable
 import pytest
 from pydantable import Schema
@@ -13,10 +12,11 @@ from pydantable.engine.protocols import ExecutionEngine, PlanExecutor, SinkWrite
 from pydantable.schema import field_types_for_rust, schema_field_types
 from typing_extensions import get_protocol_members
 
+mongomock = pytest.importorskip("mongomock")
 pytest.importorskip("entei_core")
 
-from entei_core import MongoRoot
-from pydantable.mongo_entei import (
+from entei_core import MongoRoot  # noqa: E402
+from pydantable.mongo_entei import (  # noqa: E402
     EnteiDataFrame,
     EnteiDataFrameModel,
     EnteiPydantableEngine,

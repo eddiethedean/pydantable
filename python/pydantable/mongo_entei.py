@@ -154,7 +154,10 @@ class EnteiDataFrame(DataFrame):
         st = cls._schema_type
         fts = schema_field_types(st)
         plan = eng.make_plan(field_types_for_rust(fts))
-        field_keys = tuple(fields) if fields is not None else tuple(fts.keys())
+        # If the caller doesn't provide `fields`, allow the Beanie materializer to
+        # fetch all keys (including normalized `id` and flattened link keys), and
+        # rely on the plan to project to the schema as needed.
+        field_keys = tuple(fields) if fields is not None else None
         root = BeanieAsyncRoot(
             document_cls=document_cls,
             criteria=criteria,

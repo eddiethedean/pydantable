@@ -1,4 +1,4 @@
-﻿pydantable.DataFrame
+pydantable.DataFrame
 ====================
 
 .. currentmodule:: pydantable

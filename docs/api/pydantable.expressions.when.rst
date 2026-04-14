@@ -1,4 +1,4 @@
-﻿pydantable.expressions.when
+pydantable.expressions.when
 ===========================
 
 .. currentmodule:: pydantable.expressions

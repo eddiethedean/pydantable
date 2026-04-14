@@ -1,4 +1,4 @@
-﻿pydantable.Schema
+pydantable.Schema
 =================
 
 .. currentmodule:: pydantable

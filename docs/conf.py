@@ -60,7 +60,9 @@ templates_path = ["_templates"]
 # Keep internal drafts and build artifacts out of strict (-W) CI builds.
 exclude_patterns = ["_build", "async_ideas/*"]
 
-autosummary_generate = True
+# We commit the API `.rst` pages under `docs/api/` to keep diffs stable and avoid
+# autosummary regenerating files during docs builds.
+autosummary_generate = False
 autodoc_typehints = "description"
 
 source_suffix = {

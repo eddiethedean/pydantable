@@ -1,4 +1,4 @@
-﻿pydantable.expressions.ColumnRef
+pydantable.expressions.ColumnRef
 ================================
 
 .. currentmodule:: pydantable.expressions
