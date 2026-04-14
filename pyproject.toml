@@ -41,7 +41,7 @@ rap = ["rapcsv>=0.2", "rapfiles>=0.1", "rapsqlite>=0.1"]
 fastapi = ["fastapi>=0.100"]
 # Moltres SQL engine (moltres-core) — SqlDataFrame / SqlDataFrameModel; rapsqlite for async SQLAlchemy URLs
 moltres = ["moltres-core>=1.0.0,<2", "rapsqlite>=0.1", "greenlet>=3.0"]
-# MongoDB: ``entei-core`` (lazy EnteiDataFrame) + ``pymongo`` (eager fetch_mongo / write_mongo + driver for Entei)
+# MongoDB: ``entei-core`` (MongoRoot / materialization) + ``pymongo`` (eager I/O + PyMongo Collection for EnteiDataFrame)
 mongo = ["entei-core>=0.2.0,<0.3", "pymongo>=4.6"]
 dev = [
     "tomli>=1.2.0; python_version < '3.11'",
@@ -80,7 +80,7 @@ dev = [
     "rapfiles>=0.1",
     "rapsqlite>=0.1",
     "snowflake-connector-python>=3.0",
-    # Mongo: entei-core (lazy engine tests) + pymongo I/O (same pin as ``[mongo]``).
+    # Mongo: entei-core + pymongo (``tests/mongo/``; same pin as ``[mongo]``).
     "entei-core>=0.2.0,<0.3",
     # SqlDataFrame / SqlDataFrameModel tests (same pin as optional ``[moltres]``).
     "moltres-core>=1.0.0,<2",
@@ -103,7 +103,7 @@ docs = [
     # SQLAlchemy forward refs on DataFrameModel I/O methods (matches CI docs job and RTD).
     "sqlalchemy>=2.0,<3",
     "sqlmodel>=0.0.22,<0.1",
-    # Mongo modules / lazy ``entei_core`` re-exports (CI ``docs`` job and RTD; same pin as ``[mongo]``).
+    # Mongo modules (``mongo_entei`` / ``mongo_entei_engine``) for Sphinx (CI ``docs`` job and RTD; same pin as ``[mongo]``).
     "entei-core>=0.2.0,<0.3",
     "pymongo>=4.6",
 ]
@@ -203,7 +203,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 "tests/mongo/**/*.py" = ["TC003"]
 # ``__all__`` lists lazy ``SqlDataFrame`` / ``SqlDataFrameModel`` from ``__getattr__``.
 "python/pydantable/pandas.py" = ["F822"]
-# ``__all__`` lists lazy ``entei_core`` re-exports from ``__getattr__``.
+# ``__all__`` lists lazy Mongo types (``mongo_entei`` / ``entei_core``) from ``__getattr__``.
 "python/pydantable/__init__.pyi" = ["F822"]
 "typings/pydantable/__init__.pyi" = ["F822"]
 "tests/conftest.py" = ["TC003"]

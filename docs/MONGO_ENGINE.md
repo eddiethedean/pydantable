@@ -54,11 +54,13 @@ from pydantable import (
     MongoRoot,
 )
 
-# Explicit
+# Explicit (``EnteiPydantableEngine`` is defined in ``pydantable.mongo_entei_engine``)
 from pydantable.mongo_entei import (
     EnteiDataFrame,
     EnteiDataFrameModel,
+    EnteiPydantableEngine,
 )
+from entei_core import MongoRoot
 ```
 
 If **entei-core** is missing, constructing these classes or resolving the lazy

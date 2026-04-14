@@ -38,7 +38,7 @@ pip install "pydantable[sql]"      # SQLModel + SQLAlchemy: fetch_sqlmodel, writ
 pip install "pydantable[pandas]"   # pandas-flavored façade (pandas UI doc)
 pip install "pydantable[fastapi]"  # FastAPI integration (pydantable.fastapi)
 pip install "pydantable[moltres]"   # SqlDataFrame / SqlDataFrameModel (sqlalchemy engine)
-pip install "pydantable[mongo]"     # EnteiDataFrame + fetch_mongo/write_mongo (pymongo; entei-core for lazy engine)
+pip install "pydantable[mongo]"     # EnteiDataFrame + fetch_mongo/write_mongo (pymongo + entei-core for MongoRoot)
 ```
 
 ## Quick start
@@ -75,7 +75,7 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 | `DataFrameModel` | Table class with annotated columns (`class Orders(DataFrameModel): ...`). |
 | `DataFrame[Schema]` | Generic API over your own Pydantic `BaseModel`. |
 | `SqlDataFrame` / `SqlDataFrameModel` | Same shapes with **`pydantable[moltres]`** — Moltres compiles plans to SQL so transforms can stay **in the database** (`sql_config=` / `moltres_engine=`); prefer when you are not round-tripping full tables through Python (e.g. write back to the same DB). |
-| `EnteiDataFrame` / `EnteiDataFrameModel` | Same shapes with **`pydantable[mongo]`** — **`entei-core`** executes plans against a **MongoDB** collection (`EnteiDataFrame[Schema].from_collection(coll)` / `MyEnteiModel.from_collection(coll)`); requires **PyMongo** at runtime. See [MONGO_ENGINE](https://pydantable.readthedocs.io/en/latest/MONGO_ENGINE.html). |
+| `EnteiDataFrame` / `EnteiDataFrameModel` | Same shapes with **`pydantable[mongo]`** — lazy frames over a **MongoDB** collection via **`EnteiPydantableEngine`** (pydantable; native planner + executor) and **`MongoRoot`** (**entei-core** materializes the collection to **`dict[str, list]`** before execution). Use `EnteiDataFrame[Schema].from_collection(coll)` / `MyEnteiModel.from_collection(coll)`; **PyMongo** at runtime. See [MONGO_ENGINE](https://pydantable.readthedocs.io/en/latest/MONGO_ENGINE.html). |
 | `Expr` | Typed expressions in `with_columns`, `filter`, etc. |
 | **Errors** | Ingest issues such as column length mismatch raise `ColumnLengthMismatchError` (`ValueError` subclass) from `pydantable.errors` — map to HTTP **400** in FastAPI via `register_exception_handlers`. |
 

@@ -176,7 +176,7 @@ typically expose your own ingestion APIs and **then** construct
 ## See also
 
 - {doc}`MOLTRES_SQL` — **`SqlDataFrame`** / **`SqlDataFrameModel`** with **moltres-core** (**`pydantable[moltres]`**).
-- {doc}`MONGO_ENGINE` — **`EnteiDataFrame`** / **`EnteiDataFrameModel`** with **entei-core** (**`pydantable[mongo]`**); façade **`pydantable.mongo_entei`**. Eager **`fetch_mongo`** / **`write_mongo`** (**PyMongo** column dicts) is separate from **`ExecutionEngine`** — not a third-party engine package.
+- {doc}`MONGO_ENGINE` — **`EnteiDataFrame`** / **`EnteiDataFrameModel`** (**`EnteiPydantableEngine`** in **`pydantable.mongo_entei_engine`**, **`MongoRoot`** from **entei-core**; façade **`pydantable.mongo_entei`**, **`pydantable[mongo]`**). Eager **`fetch_mongo`** / **`write_mongo`** (**PyMongo** column dicts) is separate from **`ExecutionEngine`** — not a third-party engine package.
 - {doc}`ADR-engines` — architecture decisions and extension checklist.
 - {doc}`DEVELOPER` — repository layout and native packaging.
 - {doc}`EXECUTION` — how materialization uses the engine.
