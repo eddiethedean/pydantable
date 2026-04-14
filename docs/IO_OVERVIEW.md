@@ -1,6 +1,6 @@
 # Data I/O by format (overview)
 
-**Default (application code):** use **`DataFrame[Schema]`** and **`DataFrameModel`** for **lazy** **`read_*`** / **`aread_*`**, **`export_*`**, SQL (**`write_sqlmodel`** / **`awrite_sqlmodel`**, or deprecated **`write_sql`** / **`awrite_sql`**), and lazy **`write_*`** (Rust-backed where documented). For **eager** column dicts, import **`materialize_*`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`iter_sqlmodel`** / **`iter_sql_raw`**, … **from `pydantable`** and pass **`dict[str, list]`** into **`MyModel(...)`** / **`DataFrame[Schema](...)`**. (These names are implemented in **`pydantable.io`** but **you should not import `pydantable.io` in application code** — use the package root.) SQL naming and deprecations: {doc}`IO_SQL`.
+**Default (application code):** use **`DataFrame[Schema]`** and **`DataFrameModel`** for **lazy** **`read_*`** / **`aread_*`**, **`export_*`**, SQL (**`write_sqlmodel`** / **`awrite_sqlmodel`**, or deprecated **`write_sql`** / **`awrite_sql`**), and lazy **`write_*`** (Rust-backed where documented). For **eager** column dicts, import **`materialize_*`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`iter_sqlmodel`** / **`iter_sql_raw`**, **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** (MongoDB via **PyMongo**; **`pydantable[mongo]`**), … **from `pydantable`** and pass **`dict[str, list]`** into **`MyModel(...)`** / **`DataFrame[Schema](...)`** (or load from / write to Mongo — {doc}`MONGO_ENGINE`). (These names are implemented in **`pydantable.io`** but **you should not import `pydantable.io` in application code** — use the package root.) SQL naming and deprecations: {doc}`IO_SQL`.
 
 **Same functions** (**`materialize_*`**, **`fetch_sqlmodel`**, URL helpers, iterators, …) are defined in **`pydantable.io`** for the library’s own layering; end users rely on **`from pydantable import …`** or **`DataFrame` / `DataFrameModel`** methods.
 
@@ -57,15 +57,15 @@ Details: {doc}`IO_DECISION_TREE` (**Engine selection**).
 
 ## Public imports (`from pydantable import …`)
 
-Use **`from pydantable import …`** for eager **`materialize_*`**, SQL **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`iter_*`**, and the same names documented in {doc}`IO_SQL`. **Lazy files:** **`MyModel.read_*`** / **`aread_*`**. Only import **`pydantable.io`** directly if you need **`ScanFileRoot`**, **`pydantable.io.extras`**, or symbols not on the root package.
+Use **`from pydantable import …`** for eager **`materialize_*`**, SQL **`fetch_sqlmodel`** / **`fetch_sql_raw`**, Mongo **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** (and async **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`**), **`iter_*`**, and the same names documented in {doc}`IO_SQL`. **Lazy files:** **`MyModel.read_*`** / **`aread_*`**. Only import **`pydantable.io`** directly if you need **`ScanFileRoot`**, **`pydantable.io.extras`**, or symbols not on the root package.
 
 | Layer | Role |
 |-------|------|
 | **`read_*` / `aread_*`** | Lazy **local file** scan → **`ScanFileRoot`** → Polars **`LazyFrame`** in the Rust plan (no full column lists in Python). |
 | **`read_parquet_url` / `aread_parquet_url`** | HTTP(S) download to a **temp Parquet file**, then same lazy root — prefer **`read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** for automatic cleanup ({doc}`IO_HTTP`). |
 | **`materialize_*` / `amaterialize_*`** | Eager **`dict[str, list]`** (Rust and/or PyArrow / stdlib, depending on path). |
-| **`fetch_*_url`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`read_from_object_store`**, **`pydantable.io.extras`** | Other sources that return **`dict[str, list]`** — import **`fetch_*`** from **`pydantable`** where re-exported; **`object_store`** / **`extras`** may still require **`pydantable.io`** (see {doc}`IO_EXTRAS`). |
-| **`export_*` / `aexport_*`**, **`write_sqlmodel`** / **`write_sql_raw`** (deprecated: **`write_sql`**) | Eager writes from an in-memory column dict or your own pipeline. |
+| **`fetch_*_url`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`fetch_mongo`** / **`iter_mongo`**, **`read_from_object_store`**, **`pydantable.io.extras`** | Other sources that return **`dict[str, list]`** — import **`fetch_*`** / **`iter_mongo`** from **`pydantable`** where re-exported; **`object_store`** / **`extras`** may still require **`pydantable.io`** (see {doc}`IO_EXTRAS`). Mongo: {doc}`MONGO_ENGINE`. |
+| **`export_*` / `aexport_*`**, **`write_sqlmodel`** / **`write_sql_raw`** (deprecated: **`write_sql`**), **`write_mongo`** | Eager writes from an in-memory column dict or your own pipeline (Mongo **`insert_many`** for **`write_mongo`**). |
 
 ## Batched column dict I/O (`iter_*`, `write_*_batches`, `aiter_*`)
 
@@ -74,7 +74,7 @@ For **bounded memory** pipelines in plain Python (outside the Rust **`LazyFrame`
 - **Contract:** each yielded batch is **rectangular**. Helpers **`ensure_rectangular`** and **`iter_concat_batches`** live in **`pydantable.io.batches`** (import that path only if you need those helpers; otherwise prefer lazy **`read_*`**).
 - **Core formats:** **`iter_parquet`**, **`iter_ipc`**, **`iter_csv`**, **`iter_ndjson`** (**`iter_json_lines`** is an alias), **`iter_json_array`** — and **`write_parquet_batches`**, **`write_ipc_batches`**, **`write_csv_batches`**, **`write_ndjson_batches`**. **Parquet**, **IPC**, and **JSON-array** batch paths need **`pydantable[arrow]`** (PyArrow). **CSV** / **NDJSON** use the stdlib (plus **`json`**).
 - **IPC file vs stream:** **`iter_ipc`** / **`write_ipc_batches`** take **`as_stream=`**. Defaults differ (**reader** assumes on-disk **file** format; **writer** defaults to **stream** format). For a round-trip, pass the **same** flag on read and write (see {doc}`IO_IPC`).
-- **Async:** **`aiter_parquet`**, **`aiter_ipc`**, **`aiter_csv`**, **`aiter_ndjson`**, **`aiter_json_lines`**, **`aiter_json_array`** mirror the sync iterators (thread offload). **`aiter_sqlmodel`** / **`aiter_sql_raw`** (deprecated: **`aiter_sql`**) stream SQL batches similarly ({doc}`IO_SQL`).
+- **Async:** **`aiter_parquet`**, **`aiter_ipc`**, **`aiter_csv`**, **`aiter_ndjson`**, **`aiter_json_lines`**, **`aiter_json_array`** mirror the sync iterators (thread offload). **`aiter_sqlmodel`** / **`aiter_sql_raw`** (deprecated: **`aiter_sql`**) stream SQL batches similarly ({doc}`IO_SQL`). **`aiter_mongo`** streams Mongo batches ({doc}`MONGO_ENGINE`).
 - **Extras:** **`iter_excel`**, **`iter_delta`**, **`iter_avro`**, **`iter_orc`**, **`iter_bigquery`**, **`iter_snowflake`**, **`iter_kafka_json`** — same column-dict batch shape where the underlying library allows streaming; see {doc}`IO_EXTRAS`.
 - **Imports:** use **`from pydantable import iter_parquet, …`** (see root **`__init__.py`** for the full list).
 

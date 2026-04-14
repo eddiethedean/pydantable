@@ -29,6 +29,8 @@ Cancelling an **`await acollect()`** (etc.) does **not** cancel in-flight native
 
 Service patterns: {doc}`FASTAPI` and {doc}`ROADMAP`. Transport table: {doc}`DATA_IO_SOURCES`.
 
+**Optional engines (1.17.0+):** you can swap **`ExecutionEngine`** implementations while keeping the **`DataFrame`** / **`DataFrameModel`** API — SQL plans via **`pydantable[moltres]`** ({doc}`MOLTRES_SQL`), MongoDB collection roots via **`pydantable[mongo]`** ({doc}`MONGO_ENGINE`, **entei-core** **`EnteiDataFrame`**). Materialization still goes through **`DataFrame._engine`**; behaviour depends on **moltres-core** / **entei-core**. Eager Mongo **`fetch_mongo`** / **`write_mongo`** does **not** use **`DataFrame._engine`** — it is column-dict I/O like **`fetch_sqlmodel`**.
+
 ## Streaming / engine `collect` (Polars)
 
 **Default:** the Rust engine runs Polars **`LazyFrame.collect_with_engine(Engine::InMemory)`** (in-process).

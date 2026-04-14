@@ -2,8 +2,8 @@
 
 * **``read_*`` / ``aread_*``** return :class:`pydantable_native._core.ScanFileRoot` for lazy Polars scans
   (no full Python column lists).
-* **``materialize_*``** (and **``fetch_sql_raw``** / **``fetch_sql``** / **``fetch_*_url``**) return ``dict[str, list]``.
-* **``export_*`` / ``aexport_*``** write column dicts to files. **``amaterialize_*``** uses :class:`asyncio.to_thread`.
+* **``materialize_*``** (and **``fetch_sql_raw``** / **``fetch_sql``** / **``fetch_*_url``** / **``fetch_mongo``**) return ``dict[str, list]``.
+* **``export_*`` / ``aexport_*``** write column dicts to files; **``write_mongo``** inserts into a PyMongo collection. **``amaterialize_*``** / **``afetch_*``** / **``awrite_mongo``** use :class:`asyncio.to_thread` (or an optional executor).
 """
 
 from __future__ import annotations
@@ -76,6 +76,7 @@ from .sql import (
 )
 from .sqlmodel_read import fetch_sqlmodel, iter_sqlmodel
 from .sqlmodel_schema import sqlmodel_columns
+from .mongo import fetch_mongo, iter_mongo, write_mongo
 from .sqlmodel_write import write_sqlmodel
 from .write_batches import (
     write_csv_batches,
@@ -1291,6 +1292,73 @@ async def aiter_json_array(
         yield batch
 
 
+async def afetch_mongo(
+    collection: Any,
+    *,
+    match: Mapping[str, Any] | None = None,
+    projection: Any = None,
+    sort: Sequence[tuple[str, int]] | None = None,
+    limit: int | None = None,
+    fields: Sequence[str] | None = None,
+    executor: Executor | None = None,
+) -> dict[str, list[Any]]:
+    """Async :func:`fetch_mongo` via :func:`asyncio.to_thread` (optional ``Executor``)."""
+    return await _run_io(
+        fetch_mongo,
+        (collection,),
+        {
+            "match": match,
+            "projection": projection,
+            "sort": sort,
+            "limit": limit,
+            "fields": fields,
+        },
+        executor=executor,
+    )
+
+
+async def aiter_mongo(
+    collection: Any,
+    *,
+    match: Mapping[str, Any] | None = None,
+    projection: Any = None,
+    sort: Sequence[tuple[str, int]] | None = None,
+    limit: int | None = None,
+    batch_size: int = 1000,
+    fields: Sequence[str] | None = None,
+    executor: Executor | None = None,
+):
+    """Async batches from :func:`iter_mongo` without blocking the event loop."""
+    it = iter_mongo(
+        collection,
+        match=match,
+        projection=projection,
+        sort=sort,
+        limit=limit,
+        batch_size=batch_size,
+        fields=fields,
+    )
+    async for batch in _aiter_from_iter(it, executor=executor):
+        yield batch
+
+
+async def awrite_mongo(
+    collection: Any,
+    data: dict[str, list[Any]],
+    *,
+    ordered: bool = True,
+    chunk_size: int | None = None,
+    executor: Executor | None = None,
+) -> int:
+    """Async :func:`write_mongo` via :func:`asyncio.to_thread` (optional ``Executor``)."""
+    return await _run_io(
+        write_mongo,
+        (collection, data),
+        {"ordered": ordered, "chunk_size": chunk_size},
+        executor=executor,
+    )
+
+
 async def awrite_sql(
     data: dict[str, list[Any]],
     table_name: str,
@@ -1498,6 +1566,7 @@ __all__ = [
     "aexport_json",
     "aexport_ndjson",
     "aexport_parquet",
+    "afetch_mongo",
     "afetch_sql",
     "afetch_sql_raw",
     "afetch_sqlmodel",
@@ -1505,6 +1574,7 @@ __all__ = [
     "aiter_ipc",
     "aiter_json_array",
     "aiter_json_lines",
+    "aiter_mongo",
     "aiter_ndjson",
     "aiter_parquet",
     "aiter_sql",
@@ -1524,6 +1594,7 @@ __all__ = [
     "aread_parquet_url",
     "aread_parquet_url_ctx",
     "arrow_table_to_column_dict",
+    "awrite_mongo",
     "awrite_sql",
     "awrite_sql_batches",
     "awrite_sql_raw",
@@ -1539,6 +1610,7 @@ __all__ = [
     "fetch_csv_url",
     "fetch_ndjson_url",
     "fetch_parquet_url",
+    "fetch_mongo",
     "fetch_sql",
     "fetch_sql_raw",
     "fetch_sqlmodel",
@@ -1553,6 +1625,7 @@ __all__ = [
     "iter_json_array",
     "iter_json_lines",
     "iter_kafka_json",
+    "iter_mongo",
     "iter_ndjson",
     "iter_orc",
     "iter_parquet",
@@ -1589,6 +1662,7 @@ __all__ = [
     "write_ipc_batches",
     "write_ndjson_batches",
     "write_parquet_batches",
+    "write_mongo",
     "write_sql",
     "write_sql_batches",
     "write_sql_raw",
@@ -1610,9 +1684,11 @@ register_reader("materialize_json", materialize_json, stable=True)
 register_reader("fetch_sql", fetch_sql, requires_extra="sql", stable=False)
 register_reader("fetch_sql_raw", fetch_sql_raw, requires_extra="sql", stable=True)
 register_reader("fetch_sqlmodel", fetch_sqlmodel, requires_extra="sql", stable=True)
+register_reader("fetch_mongo", fetch_mongo, requires_extra="mongo", stable=True)
 register_reader("iter_sql", iter_sql, requires_extra="sql", stable=False)
 register_reader("iter_sql_raw", iter_sql_raw, requires_extra="sql", stable=True)
 register_reader("iter_sqlmodel", iter_sqlmodel, requires_extra="sql", stable=True)
+register_reader("iter_mongo", iter_mongo, requires_extra="mongo", stable=True)
 
 register_writer("export_parquet", export_parquet, stable=True)
 register_writer("export_csv", export_csv, stable=True)
@@ -1622,3 +1698,4 @@ register_writer("export_json", export_json, stable=True)
 register_writer("write_sql", write_sql, requires_extra="sql", stable=False)
 register_writer("write_sql_raw", write_sql_raw, requires_extra="sql", stable=True)
 register_writer("write_sqlmodel", write_sqlmodel, requires_extra="sql", stable=True)
+register_writer("write_mongo", write_mongo, requires_extra="mongo", stable=True)

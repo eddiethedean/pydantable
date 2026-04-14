@@ -48,6 +48,7 @@ from .iter_file import (
     iter_ndjson,
     iter_parquet,
 )
+from .mongo import fetch_mongo, iter_mongo, write_mongo
 from .rap_support import aread_csv_rap, rap_csv_available
 from .sql import (
     StreamingColumns,
@@ -370,6 +371,35 @@ async def aiter_json_array(
     encoding: str = "utf-8",
     executor: Executor | None = None,
 ): ...
+async def afetch_mongo(
+    collection: Any,
+    *,
+    match: Mapping[str, Any] | None = None,
+    projection: Any = None,
+    sort: Sequence[tuple[str, int]] | None = None,
+    limit: int | None = None,
+    fields: Sequence[str] | None = None,
+    executor: Executor | None = None,
+) -> dict[str, list[Any]]: ...
+async def aiter_mongo(
+    collection: Any,
+    *,
+    match: Mapping[str, Any] | None = None,
+    projection: Any = None,
+    sort: Sequence[tuple[str, int]] | None = None,
+    limit: int | None = None,
+    batch_size: int = 1000,
+    fields: Sequence[str] | None = None,
+    executor: Executor | None = None,
+): ...
+async def awrite_mongo(
+    collection: Any,
+    data: dict[str, list[Any]],
+    *,
+    ordered: bool = True,
+    chunk_size: int | None = None,
+    executor: Executor | None = None,
+) -> int: ...
 async def awrite_sql(
     data: dict[str, list[Any]],
     table_name: str,
@@ -452,6 +482,7 @@ __all__ = [
     "aexport_json",
     "aexport_ndjson",
     "aexport_parquet",
+    "afetch_mongo",
     "afetch_sql",
     "afetch_sql_raw",
     "afetch_sqlmodel",
@@ -459,6 +490,7 @@ __all__ = [
     "aiter_ipc",
     "aiter_json_array",
     "aiter_json_lines",
+    "aiter_mongo",
     "aiter_ndjson",
     "aiter_parquet",
     "aiter_sql",
@@ -478,6 +510,7 @@ __all__ = [
     "aread_parquet_url",
     "aread_parquet_url_ctx",
     "arrow_table_to_column_dict",
+    "awrite_mongo",
     "awrite_sql",
     "awrite_sql_batches",
     "awrite_sql_raw",
@@ -491,6 +524,7 @@ __all__ = [
     "extras",
     "fetch_bytes",
     "fetch_csv_url",
+    "fetch_mongo",
     "fetch_ndjson_url",
     "fetch_parquet_url",
     "fetch_sql",
@@ -507,6 +541,7 @@ __all__ = [
     "iter_json_array",
     "iter_json_lines",
     "iter_kafka_json",
+    "iter_mongo",
     "iter_ndjson",
     "iter_orc",
     "iter_parquet",
@@ -541,6 +576,7 @@ __all__ = [
     "write_csv_batches",
     "write_csv_stdout",
     "write_ipc_batches",
+    "write_mongo",
     "write_ndjson_batches",
     "write_parquet_batches",
     "write_sql",

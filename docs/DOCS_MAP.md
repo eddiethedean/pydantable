@@ -8,6 +8,7 @@ Use this page when you know **what you need to do**, but not **where it is docum
 - **Build an API with FastAPI**: {doc}`GOLDEN_PATH_FASTAPI` (shortest runnable path), then {doc}`FASTAPI` (common patterns + reference tables), and {doc}`FASTAPI_ADVANCED` (less-common async/I/O patterns). Roadmap → {doc}`FASTAPI_ENHANCEMENTS`; observability → {doc}`/cookbook/fastapi_observability`; background **`submit`** → {doc}`/cookbook/fastapi_background_tasks`; lazy async scans → {doc}`/cookbook/async_lazy_pipeline`. **Example layout:** `docs/examples/fastapi/service_layout/`. **Integration tests:** **`pydantable.testing.fastapi`** (**`fastapi_test_client`**, **`fastapi_app_with_executor`**).
 - **Understand execution/materialization costs**: {doc}`EXECUTION`; **four plan materialization modes** (blocking / async / deferred / chunked): {doc}`MATERIALIZATION`.
 - **Choose an I/O entrypoint**: {doc}`IO_DECISION_TREE`, then the per-format pages under {doc}`IO_OVERVIEW`.
+- **Optional swap-in engines (keep the `DataFrame` API; different backends)**: {doc}`MOLTRES_SQL` (**`pydantable[moltres]`**, SQL), {doc}`MONGO_ENGINE` (**`pydantable[mongo]`** — lazy **entei-core** **`EnteiDataFrame`**; eager **PyMongo** **`fetch_mongo`** / **`write_mongo`** does not use **`ExecutionEngine`**), {doc}`CUSTOM_ENGINE_PACKAGE` (ship your own **`ExecutionEngine`**).
 - **Know what behavior is guaranteed (joins/nulls/windows/order)**: {doc}`INTERFACE_CONTRACT`.
 - **Understand versioning/semver expectations**: {doc}`VERSIONING`.
 - **Learn supported dtypes and edge cases**: {doc}`SUPPORTED_TYPES`.
@@ -47,7 +48,7 @@ Use this page when you know **what you need to do**, but not **where it is docum
 - **Execution engine abstraction (ADR)**: {doc}`ADR-engines`
 - **Custom engine package (third-party backends)**: {doc}`CUSTOM_ENGINE_PACKAGE`
 - **Moltres SQL engine (`SqlDataFrame` / `SqlDataFrameModel`, optional `pydantable[moltres]`)**: {doc}`MOLTRES_SQL`
-- **Mongo engine (`EnteiDataFrame` / `EnteiDataFrameModel`, optional `pydantable[mongo]` or `entei-core`)**: {doc}`MONGO_ENGINE`
+- **Mongo engine (`EnteiDataFrame` / `EnteiDataFrameModel`, optional `pydantable[mongo]` or `entei-core`)**: {doc}`MONGO_ENGINE` (also eager **`fetch_mongo`** / **`write_mongo`** and async mirrors — **pymongo** column dict I/O).
 - **Performance notes**: {doc}`PERFORMANCE`
 - **Changelog**: {doc}`CHANGELOG`
 - **Troubleshooting / FAQ**: {doc}`TROUBLESHOOTING`

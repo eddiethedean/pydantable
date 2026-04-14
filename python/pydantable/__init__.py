@@ -7,9 +7,10 @@ subclasses :class:`Schema`.
 **Facades:** :mod:`pydantable.pandas` (pandas-like names) and
 :mod:`pydantable.pyspark` (PySpark-like names) wrap the same engine.
 
-**I/O:** eager loaders, iterators, and SQL helpers are imported from this package
-(``from pydantable import fetch_sqlmodel, materialize_parquet, materialize_json,
-iter_sql_raw, write_sql_raw, …``); :mod:`pydantable.io` is the implementation module.
+**I/O:** eager loaders, iterators, SQL helpers, and optional Mongo column-dict helpers
+are imported from this package (``from pydantable import fetch_sqlmodel, fetch_mongo,
+materialize_parquet, iter_sql_raw, write_mongo, …``); :mod:`pydantable.io` is the
+implementation module.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from .display import get_repr_html_limits, reset_display_options, set_display_op
 from .errors import ColumnLengthMismatchError, PydantableUserError
 from .expressions import Expr
 from .io import (
+    afetch_mongo,
     afetch_sql,
     afetch_sql_raw,
     afetch_sqlmodel,
@@ -35,6 +37,7 @@ from .io import (
     aiter_ipc,
     aiter_json_array,
     aiter_json_lines,
+    aiter_mongo,
     aiter_ndjson,
     aiter_parquet,
     aiter_sql,
@@ -44,10 +47,12 @@ from .io import (
     amaterialize_parquet,
     aread_parquet,
     aread_parquet_url,
+    awrite_mongo,
     awrite_sql_raw,
     awrite_sqlmodel,
     awrite_sqlmodel_batches,
     export_parquet,
+    fetch_mongo,
     fetch_sql,
     fetch_sql_raw,
     fetch_sqlmodel,
@@ -60,6 +65,7 @@ from .io import (
     iter_json_array,
     iter_json_lines,
     iter_kafka_json,
+    iter_mongo,
     iter_ndjson,
     iter_orc,
     iter_parquet,
@@ -76,6 +82,7 @@ from .io import (
     write_csv_batches,
     write_ipc_batches,
     write_ndjson_batches,
+    write_mongo,
     write_parquet_batches,
     write_sql_raw,
     write_sqlmodel,
@@ -135,6 +142,7 @@ __all__ = [
     "Schema",
     "SqlDataFrame",
     "SqlDataFrameModel",
+    "afetch_mongo",
     "afetch_sql",
     "afetch_sql_raw",
     "afetch_sqlmodel",
@@ -142,6 +150,7 @@ __all__ = [
     "aiter_ipc",
     "aiter_json_array",
     "aiter_json_lines",
+    "aiter_mongo",
     "aiter_ndjson",
     "aiter_parquet",
     "aiter_sql",
@@ -151,10 +160,12 @@ __all__ = [
     "amaterialize_parquet",
     "aread_parquet",
     "aread_parquet_url",
+    "awrite_mongo",
     "awrite_sql_raw",
     "awrite_sqlmodel",
     "awrite_sqlmodel_batches",
     "export_parquet",
+    "fetch_mongo",
     "fetch_sql",
     "fetch_sql_raw",
     "fetch_sqlmodel",
@@ -169,6 +180,7 @@ __all__ = [
     "iter_json_array",
     "iter_json_lines",
     "iter_kafka_json",
+    "iter_mongo",
     "iter_ndjson",
     "iter_orc",
     "iter_parquet",
@@ -193,6 +205,7 @@ __all__ = [
     "write_csv_batches",
     "write_ipc_batches",
     "write_ndjson_batches",
+    "write_mongo",
     "write_parquet_batches",
     "write_sql_raw",
     "write_sqlmodel",

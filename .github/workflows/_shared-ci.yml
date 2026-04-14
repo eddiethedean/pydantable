@@ -390,6 +390,7 @@ jobs:
             "kafka-python>=2.0" "google-cloud-bigquery>=3.0" "snowflake-connector-python>=3.0" \
             "rapcsv>=0.2" "rapfiles>=0.1" "rapsqlite>=0.1" \
             "moltres-core>=1.0.0,<2" \
+            "entei-core>=0.2.0,<0.3" "pymongo>=4.6" \
             "greenlet>=3.0"
           $PY -m pip install pyright
 
@@ -398,8 +399,6 @@ jobs:
           $PY -m pip install -e ./pydantable-protocol
           (cd pydantable-native && $PY -m maturin develop --release)
           $PY -m pip install -e .
-          # ``tests/mongo/`` needs ``entei_core`` from PyPI ``entei-core``.
-          $PY -m pip install "entei-core==0.1.0"
         env:
           VIRTUAL_ENV: ${{ github.workspace }}/.venv
 
@@ -476,6 +475,7 @@ jobs:
             "kafka-python>=2.0" "google-cloud-bigquery>=3.0" "snowflake-connector-python>=3.0" \
             "rapcsv>=0.2" "rapfiles>=0.1" "rapsqlite>=0.1" \
             "moltres-core>=1.0.0,<2" \
+            "entei-core>=0.2.0,<0.3" "pymongo>=4.6" \
             "greenlet>=3.0"
           $PY -m pip install pyright
 
@@ -484,8 +484,6 @@ jobs:
           $PY -m pip install -e ./pydantable-protocol
           (cd pydantable-native && $PY -m maturin develop --release)
           $PY -m pip install -e .
-          # ``tests/mongo/`` needs ``entei_core`` from PyPI ``entei-core``.
-          $PY -m pip install "entei-core==0.1.0"
         env:
           VIRTUAL_ENV: ${{ github.workspace }}/.venv
 

@@ -1,10 +1,11 @@
-"""Mongo-backed :class:`~pydantable.dataframe.DataFrame` via ``entei-core``.
+"""Mongo-backed :class:`~pydantable.dataframe.DataFrame` via **entei-core** + pydantable.
 
 Install with ``pip install "pydantable[mongo]"`` (pulls **entei-core**) or
-``pip install entei-core``. The **entei-core** distribution provides
-:class:`entei_core.engine.EnteiPydantableEngine` (a
-:class:`~pydantable.engine.protocols.ExecutionEngine` over the native planner plus
-Mongo collection materialization) and :class:`entei_core.mongo_root.MongoRoot`.
+``pip install entei-core``. **entei-core** supplies ``MongoRoot`` and columnar
+materialization; :class:`EnteiPydantableEngine` lives in
+:mod:`pydantable.mongo_entei_engine` and implements
+:class:`~pydantable.engine.protocols.ExecutionEngine` by delegating to the native
+planner and scanning Mongo collections into ``dict[str, list]`` at execution time.
 
 This module defines :class:`EnteiDataFrame` and :class:`EnteiDataFrameModel` on the
 pydantable side, mirroring :mod:`pydantable.sql_moltres` and **moltres-core**.
@@ -24,9 +25,9 @@ from .schema import field_types_for_rust, schema_field_types
 def _import_entei_engine_types() -> tuple[Any, Any]:
     try:
         core = importlib.import_module("entei_core")
-        EnteiPydantableEngine = core.EnteiPydantableEngine
         MongoRoot = core.MongoRoot
-    except (ImportError, AttributeError) as exc:
+        from pydantable.mongo_entei_engine import EnteiPydantableEngine
+    except ImportError as exc:
         raise ImportError(
             "EnteiDataFrame / EnteiDataFrameModel require the entei-core package. "
             'Install with: pip install "pydantable[mongo]" or pip install entei-core'
@@ -35,7 +36,7 @@ def _import_entei_engine_types() -> tuple[Any, Any]:
 
 
 class EnteiDataFrame(DataFrame):
-    """Typed dataframe using ``entei_core.EnteiPydantableEngine`` for Mongo roots."""
+    """Typed dataframe using :class:`~pydantable.mongo_entei_engine.EnteiPydantableEngine`."""
 
     @classmethod
     def from_collection(
@@ -71,7 +72,7 @@ class EnteiDataFrame(DataFrame):
 
 
 class EnteiDataFrameModel(DataFrameModel):
-    """``DataFrameModel`` using ``entei_core.EnteiPydantableEngine`` by default."""
+    """``DataFrameModel`` using :class:`~pydantable.mongo_entei_engine.EnteiPydantableEngine` by default."""
 
     _dataframe_cls = EnteiDataFrame
 
@@ -118,7 +119,7 @@ class EnteiDataFrameModel(DataFrameModel):
 
 
 def __getattr__(name: str) -> Any:
-    """Lazy re-exports of engine types from **entei-core** (optional dependency)."""
+    """Lazy re-exports: engine from pydantable, ``MongoRoot`` from **entei-core**."""
     if name == "EnteiPydantableEngine":
         return _import_entei_engine_types()[0]
     if name == "MongoRoot":

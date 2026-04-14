@@ -20,6 +20,8 @@ build:
         "pydantic>=2,<3"
         "typing-extensions>=4.7"
         "sqlalchemy>=2,<3"
+        "entei-core>=0.2.0,<0.3"
+        "pymongo>=4.6"
 
 sphinx:
   builder: html

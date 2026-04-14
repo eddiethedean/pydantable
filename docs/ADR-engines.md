@@ -32,7 +32,7 @@ PydanTable executes typed `DataFrame` operations via the PyO3 extension shipped 
 
 ### Extension checklist (custom backend)
 
-End-to-end guide for shipping a third-party engine on PyPI: {doc}`CUSTOM_ENGINE_PACKAGE`.
+End-to-end guide for shipping a third-party engine on PyPI: {doc}`CUSTOM_ENGINE_PACKAGE`. In-repo optional integrations: {doc}`MOLTRES_SQL` (**moltres-core**), {doc}`MONGO_ENGINE` (**entei-core** for **`EnteiDataFrame`**). Eager Mongo column-dict **`fetch_mongo`** / **`write_mongo`** (**PyMongo** only) is normal I/O, not an **`ExecutionEngine`** swap-in.
 
 1. Implement **`ExecutionEngine`** (see **`pydantable_protocol`**, re-exported under **`pydantable.engine.protocols`**) — mirror **`NativePolarsEngine`** for operations you support.
 2. Return accurate **`capabilities`** (set **`backend`** to **`"custom"`** when not native/stub).

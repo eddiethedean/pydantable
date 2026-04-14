@@ -41,8 +41,8 @@ rap = ["rapcsv>=0.2", "rapfiles>=0.1", "rapsqlite>=0.1"]
 fastapi = ["fastapi>=0.100"]
 # Moltres SQL engine (moltres-core) — SqlDataFrame / SqlDataFrameModel; rapsqlite for async SQLAlchemy URLs
 moltres = ["moltres-core>=1.0.0,<2", "rapsqlite>=0.1", "greenlet>=3.0"]
-# MongoDB engine (PyPI ``entei-core``) — EnteiDataFrame / EnteiPydantableEngine / MongoRoot
-mongo = ["entei-core>=0.1.0,<0.2"]
+# MongoDB: ``entei-core`` (lazy EnteiDataFrame) + ``pymongo`` (eager fetch_mongo / write_mongo + driver for Entei)
+mongo = ["entei-core>=0.2.0,<0.3", "pymongo>=4.6"]
 dev = [
     "tomli>=1.2.0; python_version < '3.11'",
     "fastapi>=0.100",
@@ -80,6 +80,8 @@ dev = [
     "rapfiles>=0.1",
     "rapsqlite>=0.1",
     "snowflake-connector-python>=3.0",
+    # Mongo: entei-core (lazy engine tests) + pymongo I/O (same pin as ``[mongo]``).
+    "entei-core>=0.2.0,<0.3",
     # SqlDataFrame / SqlDataFrameModel tests (same pin as optional ``[moltres]``).
     "moltres-core>=1.0.0,<2",
     # SQLAlchemy ``create_async_engine`` (rapsqlite smoke test in ``tests/sql/test_sql_moltres.py``).
@@ -101,6 +103,9 @@ docs = [
     # SQLAlchemy forward refs on DataFrameModel I/O methods (matches CI docs job and RTD).
     "sqlalchemy>=2.0,<3",
     "sqlmodel>=0.0.22,<0.1",
+    # Mongo modules / lazy ``entei_core`` re-exports (CI ``docs`` job and RTD; same pin as ``[mongo]``).
+    "entei-core>=0.2.0,<0.3",
+    "pymongo>=4.6",
 ]
 
 [tool.setuptools]

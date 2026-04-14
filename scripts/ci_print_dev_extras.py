@@ -40,7 +40,8 @@ def main() -> None:
         print(line)
     print(
         "\n# CI installs a flattened subset via _shared-ci.yml "
-        "(plus pyright; moltres-core/greenlet must match [dev] / [moltres])."
+        "(plus pyright; moltres-core/greenlet must match [dev] / [moltres]; "
+        "entei-core/pymongo must match [dev] / [mongo])."
     )
 
 
