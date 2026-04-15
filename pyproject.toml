@@ -48,6 +48,9 @@ rap = ["rapcsv>=0.2", "rapfiles>=0.1", "rapsqlite>=0.1"]
 fastapi = ["fastapi>=0.100"]
 # MongoDB: PyMongo + Beanie + optional Mongo plan roots (``sync_pymongo_collection``, ``MongoDataFrame.from_beanie``).
 mongo = ["entei-core>=0.2.0,<0.3", "pymongo>=4.6", "beanie>=1.24,<3"]
+# Spark: `SparkDataFrame` / `SparkDataFrameModel` (raikou-core bridge).
+# NOTE: Spark 4.x requires newer Java; we pin <4 for broad compatibility.
+spark = ["raikou-core==0.1.0", "pyspark>=3.4,<4"]
 dev = [
     "tomli>=1.2.0; python_version < '3.11'",
     "fastapi>=0.100",
@@ -391,6 +394,7 @@ markers = [
     "slow: performance guardrails (timing-based; exclude with -m 'not slow')",
     "network: uses loopback HTTP server or similar (exclude with -m 'not network')",
     "optional_cloud: requires optional cloud/extra deps (may skip via importorskip)",
+    "spark: requires pyspark + a working local Java runtime",
     "asyncio: async tests (pytest-asyncio)",
 ]
 

@@ -7,6 +7,7 @@ from pydantable.mongo_dataframe import (
     MongoPydantableEngine,
     MongoRoot,
 )
+from pydantable.spark_dataframe import SparkDataFrame, SparkDataFrameModel
 from pydantable.sql_dataframe import SqlDataFrame, SqlDataFrameModel
 
 from . import pandas as pandas
@@ -112,6 +113,8 @@ __all__ = [
     "PlanMaterialization",
     "PydantableUserError",
     "Schema",
+    "SparkDataFrame",
+    "SparkDataFrameModel",
     "SqlDataFrame",
     "SqlDataFrameModel",
     "afetch_beanie",

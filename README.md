@@ -10,17 +10,12 @@
 
 **Current release: 1.17.0** — highlights in the [changelog](https://pydantable.readthedocs.io/en/latest/CHANGELOG.html).
 
-## Why PydanTable
+## What it is
 
-- **One schema, many surfaces:** define columns with Pydantic models; use `DataFrameModel` (SQLModel-style) or `DataFrame[YourSchema]`.
-- **Typed expressions:** `Expr` and transform chains are validated and lowered in Rust; many errors fail fast at build/plan time.
-- **Familiar operations:** `select`, `filter`, `join`, `group_by`, windows, melt/pivot, and pandas-flavored helpers where they help.
-- **Flexible materialization:** row models via `collect()` / `rows()`, columnar `dict[str, list]`, or Polars/PyArrow with the right extras.
-- **I/O:** lazy `read_*` / `aread_*`, streaming writes, NDJSON/JSON Lines, Parquet, CSV, IPC, HTTP, SQL (SQLModel-first `fetch_sqlmodel` / `write_sqlmodel`, explicit string SQL `fetch_sql_raw` / `write_sql_raw`, or deprecated unprefixed names), MongoDB eager `fetch_mongo` / `write_mongo` (and async mirrors) with `pydantable[mongo]` — [I/O overview](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html), [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html), [MONGO_ENGINE](https://pydantable.readthedocs.io/en/latest/MONGO_ENGINE.html), [SQLModel roadmap](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html), and [decision tree](https://pydantable.readthedocs.io/en/latest/IO_DECISION_TREE.html).
-- **JSON & struct columns:** struct expressions, JSON encode/decode helpers, unnest/nested models — [IO_JSON](https://pydantable.readthedocs.io/en/latest/IO_JSON.html), [SELECTORS](https://pydantable.readthedocs.io/en/latest/SELECTORS.html).
-- **FastAPI (optional):** shared executor lifespan, NDJSON streaming from `astream()`, OpenAPI-friendly columnar bodies, `register_exception_handlers` (**503** / **400** / **422**). Start with the [golden path](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html) and [FastAPI guide](https://pydantable.readthedocs.io/en/latest/FASTAPI.html).
-- **Lazy SQL DataFrame (optional):** install **`pydantable[sql]`** for **`SqlDataFrame`** / **`SqlDataFrameModel`** with the SQLAlchemy lazy-SQL **`ExecutionEngine`** ([`pydantable-protocol`](https://pypi.org/project/pydantable-protocol/)). The goal is to **keep transforms on the SQL side** (plans compiled to SQL) instead of loading whole tables into Python—especially when you **write results back to the same database**. Guide: [MOLTRES_SQL](https://pydantable.readthedocs.io/en/latest/MOLTRES_SQL.html); protocol authors: [Custom engine packages](https://pydantable.readthedocs.io/en/latest/CUSTOM_ENGINE_PACKAGE.html).
-- **Mongo engine (optional, 1.17.0+):** **`pip install "pydantable[mongo]"`** — **PyMongo**, **Beanie**, and the Mongo plan stack for lazy frames. Define collections with [Beanie](https://github.com/BeanieODM/beanie) **`Document`** models, then **`MongoDataFrame.from_beanie`** / **`fetch_mongo(sync_pymongo_collection(...))`** (see [MONGO_ENGINE](https://pydantable.readthedocs.io/en/latest/MONGO_ENGINE.html)). Pydantic **`Schema`** + **`from_collection`** remains supported if you use a raw **`Collection`**. Under the hood: **`MongoPydantableEngine`** (pydantable) and **`MongoRoot`** from the plan stack.
+- **Typed tables**: define columns with Pydantic models (`DataFrameModel` or `DataFrame[Schema]`). See [DATAFRAMEMODEL](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) and [QUICKSTART](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html).
+- **Typed expressions + lazy plans**: transforms build a plan that’s validated/lowered in Rust. See [EXECUTION](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) and [INTERFACE_CONTRACT](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html).
+- **Materialize when you choose**: `collect()` (row models) or `to_dict()` (columnar), plus Arrow/Polars with extras. See [MATERIALIZATION](https://pydantable.readthedocs.io/en/latest/MATERIALIZATION.html).
+- **I/O + services**: file/HTTP/SQL I/O, and optional FastAPI integration patterns. Start at [IO_OVERVIEW](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html) and [GOLDEN_PATH_FASTAPI](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html).
 
 ## Install
 
@@ -38,6 +33,7 @@ pip install "pydantable[sql]"      # SQLModel + SQLAlchemy + moltres-core lazy S
 pip install "pydantable[pandas]"   # pandas-flavored façade (pandas UI doc)
 pip install "pydantable[fastapi]"  # FastAPI integration (pydantable.fastapi)
 pip install "pydantable[mongo]"     # pymongo + Beanie + Mongo plan stack (lazy MongoDataFrame + I/O + from_beanie)
+pip install "pydantable[spark]"    # SparkDataFrame / SparkDataFrameModel (raikou-core + pyspark)
 ```
 
 ## Quick start
@@ -67,66 +63,15 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 [{'id': 1, 'age2': 40}]
 ```
 
-## Core concepts
+## Where to go next (ReadTheDocs)
 
-| Piece | Role |
-| ----- | ---- |
-| `DataFrameModel` | Table class with annotated columns (`class Orders(DataFrameModel): ...`). |
-| `DataFrame[Schema]` | Generic API over your own Pydantic `BaseModel`. |
-| `SqlDataFrame` / `SqlDataFrameModel` | Same shapes with **`pydantable[sql]`** — the lazy-SQL bridge compiles plans to SQL so transforms can stay **in the database** (`sql_config=` / `sql_engine=`); prefer when you are not round-tripping full tables through Python (e.g. write back to the same DB). |
-| `MongoDataFrame` / `MongoDataFrameModel` | **Primary:** **`pydantable[mongo]`** — [Beanie](https://github.com/BeanieODM/beanie) **`Document`** + **`from_beanie`** / **`sync_pymongo_collection`** for I/O. **Also:** Pydantic **`Schema`** with **`from_collection(sync_collection)`** without wiring Beanie. Lazy execution uses **`MongoPydantableEngine`** and **`MongoRoot`**. See [MONGO_ENGINE](https://pydantable.readthedocs.io/en/latest/MONGO_ENGINE.html). |
-| `Expr` | Typed expressions in `with_columns`, `filter`, etc. |
-| **Errors** | Ingest issues such as column length mismatch raise `ColumnLengthMismatchError` (`ValueError` subclass) from `pydantable.errors` — map to HTTP **400** in FastAPI via `register_exception_handlers`. |
-
-**Static typing**
-
-- **mypy:** schema-evolving return types for many chains via the bundled [mypy plugin](https://github.com/eddiethedean/pydantable/blob/main/python/pydantable/mypy_plugin.py) (`plugins` in `pyproject.toml`).
-- **Pyright / Pylance:** use committed stubs under `typings/`; for explicit targets, `as_model(...)` / `try_as_model(...)` / `assert_model(...)` and typed escape hatches like `agg_as_model(...)` / `rolling_agg_as_model(...)`. See [TYPING](https://pydantable.readthedocs.io/en/latest/TYPING.html).
-
-**Rich column types** (`Literal`, `ipaddress`, `WKB`, `Annotated`, …) are covered in [SUPPORTED_TYPES](https://pydantable.readthedocs.io/en/latest/SUPPORTED_TYPES.html).
-
-**Materialization:** `collect()` / `rows()` → row models; `to_dict()` → `dict[str, list]`; `to_polars()` / `to_arrow()` with matching extras.
-
-## I/O at a glance
-
-- **`DataFrameModel` / `DataFrame[Schema]`:** lazy `read_*` / `aread_*`, `export_*`, `write_*`, and SQLModel helpers (`fetch_sqlmodel`, `write_sqlmodel`, …). For eager column loads, import **`materialize_*`**, **`fetch_sqlmodel`**, **`iter_sqlmodel`**, … from **`pydantable`** (same entrypoints as the internal `pydantable.io` package) and pass `dict[str, list]` into constructors.
-- **SQL details:** [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html) (recommended APIs, `*_raw`, deprecations) and [SQLMODEL_SQL_ROADMAP](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html) (phased migration).
-- Large files & NDJSON patterns: [IO_JSON](https://pydantable.readthedocs.io/en/latest/IO_JSON.html), [IO_NDJSON](https://pydantable.readthedocs.io/en/latest/IO_NDJSON.html), [EXECUTION](https://pydantable.readthedocs.io/en/latest/EXECUTION.html).
-
-## Validation controls
-
-- Strict by default on constructors.
-- Optional ingest controls: `trusted_mode`, `ignore_errors`, `on_validation_errors`.
-- Missing optional fields: `fill_missing_optional` (default `True`).
-- Validation presets: `validation_profile=...` (or `__pydantable__ = {"validation_profile": "..."}`).
-- Per-column and nested strictness: [STRICTNESS](https://pydantable.readthedocs.io/en/latest/STRICTNESS.html) (field policies + profile defaults).
-
-## Documentation
-
-| Topic | Link |
-| ----- | ---- |
-| Docs home | [pydantable.readthedocs.io](https://pydantable.readthedocs.io/en/latest/) |
-| Map of all pages | [DOCS_MAP](https://pydantable.readthedocs.io/en/latest/DOCS_MAP.html) |
-| Quickstart | [QUICKSTART](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html) |
-| `DataFrameModel` | [DATAFRAMEMODEL](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) |
-| Typing (mypy vs Pyright) | [TYPING](https://pydantable.readthedocs.io/en/latest/TYPING.html) |
-| I/O overview | [IO_OVERVIEW](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html) |
-| SQL (SQLModel, raw string SQL) | [IO_SQL](https://pydantable.readthedocs.io/en/latest/IO_SQL.html) · [SQLMODEL_SQL_ROADMAP](https://pydantable.readthedocs.io/en/latest/SQLMODEL_SQL_ROADMAP.html) |
-| Lazy SQL DataFrame | [MOLTRES_SQL](https://pydantable.readthedocs.io/en/latest/MOLTRES_SQL.html) |
-| MongoDB (lazy **MongoDataFrame** + eager **`fetch_mongo`**) | [MONGO_ENGINE](https://pydantable.readthedocs.io/en/latest/MONGO_ENGINE.html) |
-| Pandas-like API | [PANDAS_UI](https://pydantable.readthedocs.io/en/latest/PANDAS_UI.html) |
-| FastAPI path | [GOLDEN_PATH_FASTAPI](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html) → [FASTAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) → [FASTAPI_ENHANCEMENTS](https://pydantable.readthedocs.io/en/latest/FASTAPI_ENHANCEMENTS.html) |
-| Service ergonomics (OpenAPI, aliases, redaction) | [SERVICE_ERGONOMICS](https://pydantable.readthedocs.io/en/latest/SERVICE_ERGONOMICS.html) |
-| Custom dtypes | [CUSTOM_DTYPES](https://pydantable.readthedocs.io/en/latest/CUSTOM_DTYPES.html) |
-| Strictness | [STRICTNESS](https://pydantable.readthedocs.io/en/latest/STRICTNESS.html) |
-| Cookbooks | [Cookbook index](https://pydantable.readthedocs.io/en/latest/cookbook/index.html) (FastAPI, lazy pipelines, JSON logs, …) |
-| Example multi-router app | `docs/examples/fastapi/service_layout/` in this repo |
-| Test helpers | `pydantable.testing.fastapi` — see [FASTAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html) |
-| Execution & async | [EXECUTION](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) · [MATERIALIZATION](https://pydantable.readthedocs.io/en/latest/MATERIALIZATION.html) |
-| Behavioral contract | [INTERFACE_CONTRACT](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html) |
-| Troubleshooting | [TROUBLESHOOTING](https://pydantable.readthedocs.io/en/latest/TROUBLESHOOTING.html) |
-| Versioning | [VERSIONING](https://pydantable.readthedocs.io/en/latest/VERSIONING.html) |
-| Changelog | [CHANGELOG](https://pydantable.readthedocs.io/en/latest/CHANGELOG.html) |
+- **Start**: [QUICKSTART](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html) · [DATAFRAMEMODEL](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html)
+- **Typing**: [TYPING](https://pydantable.readthedocs.io/en/latest/TYPING.html) (mypy plugin vs stubs / Pyright / ty)
+- **Execution & semantics**: [EXECUTION](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) · [MATERIALIZATION](https://pydantable.readthedocs.io/en/latest/MATERIALIZATION.html) · [INTERFACE_CONTRACT](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html)
+- **I/O**: [IO_DECISION_TREE](https://pydantable.readthedocs.io/en/latest/IO_DECISION_TREE.html) → [IO_OVERVIEW](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html) (CSV/Parquet/NDJSON/JSON/IPC/HTTP/SQL)
+- **FastAPI**: [GOLDEN_PATH_FASTAPI](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html) → [FASTAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html)
+- **Optional engines**: [MOLTRES_SQL](https://pydantable.readthedocs.io/en/latest/MOLTRES_SQL.html) (SQL) · [MONGO_ENGINE](https://pydantable.readthedocs.io/en/latest/MONGO_ENGINE.html) (Mongo) · [SPARK_ENGINE](https://pydantable.readthedocs.io/en/latest/SPARK_ENGINE.html) (Spark)
+- **Everything**: [DOCS_MAP](https://pydantable.readthedocs.io/en/latest/DOCS_MAP.html)
 
 ## Development
 

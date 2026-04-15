@@ -319,6 +319,7 @@ class DataFrameModel(Generic[RowT]):
             "PandasDataFrameModel",
             "SqlDataFrameModel",
             "MongoDataFrameModel",
+            "SparkDataFrameModel",
         ):
             return
 

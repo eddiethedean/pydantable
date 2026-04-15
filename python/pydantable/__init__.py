@@ -109,6 +109,7 @@ if TYPE_CHECKING:
         MongoPydantableEngine,
         MongoRoot,
     )
+    from pydantable.spark_dataframe import SparkDataFrame, SparkDataFrameModel
     from pydantable.sql_dataframe import SqlDataFrame, SqlDataFrameModel
 
 
@@ -123,6 +124,14 @@ def __getattr__(name: str) -> Any:
         from pydantable.sql_dataframe import SqlDataFrameModel
 
         return SqlDataFrameModel
+    if name == "SparkDataFrame":
+        from pydantable.spark_dataframe import SparkDataFrame
+
+        return SparkDataFrame
+    if name == "SparkDataFrameModel":
+        from pydantable.spark_dataframe import SparkDataFrameModel
+
+        return SparkDataFrameModel
     if name == "sync_pymongo_collection":
         from pydantable.mongo_beanie import sync_pymongo_collection
 
@@ -174,6 +183,8 @@ __all__ = [
     "PlanMaterialization",
     "PydantableUserError",
     "Schema",
+    "SparkDataFrame",
+    "SparkDataFrameModel",
     "SqlDataFrame",
     "SqlDataFrameModel",
     "afetch_beanie",
