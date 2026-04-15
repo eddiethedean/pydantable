@@ -3,7 +3,7 @@
 * **``read_*`` / ``aread_*``** return :class:`pydantable_native._core.ScanFileRoot` for lazy Polars scans
   (no full Python column lists).
 * **``materialize_*``** (and **``fetch_sql_raw``** / **``fetch_sql``** / **``fetch_*_url``** / **``fetch_mongo``**) return ``dict[str, list]``.
-* **``export_*`` / ``aexport_*``** write column dicts to files; **``write_mongo``** inserts into a PyMongo collection. **``amaterialize_*``** / **``afetch_*``** / **``awrite_mongo``** use :class:`asyncio.to_thread` (or an optional executor).
+* **``export_*`` / ``aexport_*``** write column dicts to files; **``write_mongo``** inserts into a PyMongo collection. **``afetch_mongo``** / **``aiter_mongo``** / **``awrite_mongo``** use the native PyMongo async API when given an **async** collection; otherwise **``asyncio.to_thread``** (or an optional executor) for sync **``pymongo.collection.Collection``**.
 """
 
 from __future__ import annotations
@@ -65,7 +65,15 @@ from .iter_file import (
     iter_ndjson,
     iter_parquet,
 )
-from .mongo import fetch_mongo, iter_mongo, write_mongo
+from .mongo import (
+    afetch_mongo_async,
+    aiter_mongo_async,
+    awrite_mongo_async,
+    fetch_mongo,
+    is_async_mongo_collection,
+    iter_mongo,
+    write_mongo,
+)
 from .rap_support import aread_csv_rap, rap_csv_available
 from .sql import (
     StreamingColumns,
@@ -1299,11 +1307,30 @@ async def afetch_mongo(
     match: Mapping[str, Any] | None = None,
     projection: Any = None,
     sort: Sequence[tuple[str, int]] | None = None,
+    skip: int | None = None,
     limit: int | None = None,
     fields: Sequence[str] | None = None,
+    session: Any | None = None,
+    max_time_ms: int | None = None,
     executor: Executor | None = None,
 ) -> dict[str, list[Any]]:
-    """Async :func:`fetch_mongo` via :func:`asyncio.to_thread` (optional ``Executor``)."""
+    """Async :func:`fetch_mongo`.
+
+    Uses PyMongo's async driver for :class:`~pymongo.asynchronous.collection.AsyncCollection`;
+    otherwise :func:`asyncio.to_thread` (optional ``Executor``) for sync collections.
+    """
+    if is_async_mongo_collection(collection):
+        return await afetch_mongo_async(
+            collection,
+            match=match,
+            projection=projection,
+            sort=sort,
+            skip=skip,
+            limit=limit,
+            fields=fields,
+            session=session,
+            max_time_ms=max_time_ms,
+        )
     return await _run_io(
         fetch_mongo,
         (collection,),
@@ -1311,8 +1338,11 @@ async def afetch_mongo(
             "match": match,
             "projection": projection,
             "sort": sort,
+            "skip": skip,
             "limit": limit,
             "fields": fields,
+            "session": session,
+            "max_time_ms": max_time_ms,
         },
         executor=executor,
     )
@@ -1324,20 +1354,41 @@ async def aiter_mongo(
     match: Mapping[str, Any] | None = None,
     projection: Any = None,
     sort: Sequence[tuple[str, int]] | None = None,
+    skip: int | None = None,
     limit: int | None = None,
     batch_size: int = 1000,
     fields: Sequence[str] | None = None,
+    session: Any | None = None,
+    max_time_ms: int | None = None,
     executor: Executor | None = None,
 ):
-    """Async batches from :func:`iter_mongo` without blocking the event loop."""
+    """Async batches from :func:`iter_mongo` (native async or thread-backed)."""
+    if is_async_mongo_collection(collection):
+        async for batch in aiter_mongo_async(
+            collection,
+            match=match,
+            projection=projection,
+            sort=sort,
+            skip=skip,
+            limit=limit,
+            batch_size=batch_size,
+            fields=fields,
+            session=session,
+            max_time_ms=max_time_ms,
+        ):
+            yield batch
+        return
     it = iter_mongo(
         collection,
         match=match,
         projection=projection,
         sort=sort,
+        skip=skip,
         limit=limit,
         batch_size=batch_size,
         fields=fields,
+        session=session,
+        max_time_ms=max_time_ms,
     )
     async for batch in _aiter_from_iter(it, executor=executor):
         yield batch
@@ -1349,13 +1400,22 @@ async def awrite_mongo(
     *,
     ordered: bool = True,
     chunk_size: int | None = None,
+    session: Any | None = None,
     executor: Executor | None = None,
 ) -> int:
-    """Async :func:`write_mongo` via :func:`asyncio.to_thread` (optional ``Executor``)."""
+    """Async :func:`write_mongo` (native async or thread-backed)."""
+    if is_async_mongo_collection(collection):
+        return await awrite_mongo_async(
+            collection,
+            data,
+            ordered=ordered,
+            chunk_size=chunk_size,
+            session=session,
+        )
     return await _run_io(
         write_mongo,
         (collection, data),
-        {"ordered": ordered, "chunk_size": chunk_size},
+        {"ordered": ordered, "chunk_size": chunk_size, "session": session},
         executor=executor,
     )
 
@@ -1570,6 +1630,7 @@ __all__ = [
     "aexport_parquet",
     "afetch_beanie",
     "afetch_mongo",
+    "afetch_mongo_async",
     "afetch_sql",
     "afetch_sql_raw",
     "afetch_sqlmodel",
@@ -1579,6 +1640,7 @@ __all__ = [
     "aiter_json_array",
     "aiter_json_lines",
     "aiter_mongo",
+    "aiter_mongo_async",
     "aiter_ndjson",
     "aiter_parquet",
     "aiter_sql",
@@ -1600,6 +1662,7 @@ __all__ = [
     "arrow_table_to_column_dict",
     "awrite_beanie",
     "awrite_mongo",
+    "awrite_mongo_async",
     "awrite_sql",
     "awrite_sql_batches",
     "awrite_sql_raw",
@@ -1620,6 +1683,7 @@ __all__ = [
     "fetch_sql_raw",
     "fetch_sqlmodel",
     "http",
+    "is_async_mongo_collection",
     "iter_avro",
     "iter_bigquery",
     "iter_chain_batches",

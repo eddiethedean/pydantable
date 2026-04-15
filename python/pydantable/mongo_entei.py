@@ -3,9 +3,13 @@
 **Recommended:** define collections with `Beanie <https://github.com/BeanieODM/beanie>`__
 ``Document`` models and use ``pip install "pydantable[mongo]"`` —
 :meth:`EnteiDataFrame.from_beanie` / :meth:`EnteiDataFrameModel.from_beanie` plus
-:mod:`pydantable.mongo_beanie`. Plain Pydantic :class:`~pydantable.schema.Schema`
-subclasses with :meth:`EnteiDataFrame.from_collection` remain supported when you
-already have a sync PyMongo ``Collection``.
+:mod:`pydantable.mongo_beanie` for collection resolution. **Sync** lazy paths use
+**entei-core** ``MongoRoot`` (PyMongo ``find``), not Beanie's ODM query API — use
+:meth:`EnteiDataFrame.from_beanie_async` or :func:`pydantable.io.beanie.afetch_beanie`
+for Beanie-level reads (links, projections, pre-built queries). Plain Pydantic
+:class:`~pydantable.schema.Schema` subclasses with
+:meth:`EnteiDataFrame.from_collection` remain supported when you already have a
+sync PyMongo ``Collection``.
 
 **entei-core** supplies ``MongoRoot`` and columnar materialization;
 :class:`EnteiPydantableEngine` lives in :mod:`pydantable.mongo_entei_engine` and
@@ -34,12 +38,14 @@ class BeanieAsyncRoot:
     """Async Beanie-backed root for async-only materialization.
 
     Unlike ``entei_core.MongoRoot`` (sync PyMongo), this root is materialized by
-    calling Beanie queries in
+    calling :func:`~pydantable.io.beanie.afetch_beanie` in
     :class:`~pydantable.mongo_entei_engine.EnteiPydantableEngine` async execution
-    paths.
+    paths. The first field matches **afetch_beanie**'s ``document_or_query``: a
+    Beanie ``Document`` **class** or a **pre-built query** (e.g.
+    ``Doc.find(...).sort(...)``).
     """
 
-    document_cls: type[Any]
+    document_or_query: Any
     criteria: Any | None = None
     fields: tuple[str, ...] | None = None
     fetch_links: bool = False
@@ -113,11 +119,13 @@ class EnteiDataFrame(DataFrame):
 
         Resolves a **sync** PyMongo ``Collection`` via
         :func:`pydantable.mongo_beanie.sync_pymongo_collection` and delegates to
-        :meth:`from_collection`. ``database`` must be a synchronous
-        ``pymongo.database.Database`` (same **database name** as Beanie was
-        initialized with; Beanie itself uses async PyMongo).
+        :meth:`from_collection`. Reads use **entei-core** ``MongoRoot`` (driver-level
+        ``find``), not Beanie's ODM ``find`` / ``fetch_links`` — for those, use
+        :meth:`from_beanie_async` or :func:`~pydantable.io.beanie.afetch_beanie`.
 
-        **Beanie** is installed with ``pip install "pydantable[mongo]"``.
+        ``database`` must be a synchronous ``pymongo.database.Database`` (same
+        **database name** as Beanie was initialized with; Beanie itself uses async
+        PyMongo). **Beanie** is installed with ``pip install "pydantable[mongo]"``.
         """
         from pydantable.mongo_beanie import sync_pymongo_collection
 
@@ -127,7 +135,7 @@ class EnteiDataFrame(DataFrame):
     @classmethod
     def from_beanie_async(
         cls,
-        document_cls: type[Any],
+        document_or_query: Any,
         *,
         criteria: Any | None = None,
         fields: Sequence[str] | None = None,
@@ -138,7 +146,12 @@ class EnteiDataFrame(DataFrame):
         id_column: Literal["id", "_id"] = "id",
         engine: Any | None = None,
     ) -> Any:
-        """Async-first lazy frame for a Beanie ``Document`` collection.
+        """Async-first lazy frame over Beanie reads (``afetch_beanie`` entrypoints).
+
+        Pass a Beanie ``Document`` **class** (optionally with ``criteria=``) **or**
+        a **pre-built query** (e.g. ``MyDocument.find(...).sort(...)``). Pre-built
+        queries follow :func:`~pydantable.io.beanie.afetch_beanie` rules (do not pass
+        ``criteria=`` for a query object).
 
         This path supports **async materialization only** (``acollect`` / ``ato_dict`` /
         ``astream``). Calling sync terminals (``collect``, ``to_dict``) will raise
@@ -159,7 +172,7 @@ class EnteiDataFrame(DataFrame):
         # rely on the plan to project to the schema as needed.
         field_keys = tuple(fields) if fields is not None else None
         root = BeanieAsyncRoot(
-            document_cls=document_cls,
+            document_or_query=document_or_query,
             criteria=criteria,
             fields=field_keys,
             fetch_links=fetch_links,
@@ -249,7 +262,7 @@ class EnteiDataFrameModel(DataFrameModel):
     @classmethod
     def from_beanie_async(
         cls,
-        document_cls: type[Any],
+        document_or_query: Any,
         *,
         criteria: Any | None = None,
         fields: Sequence[str] | None = None,
@@ -263,7 +276,7 @@ class EnteiDataFrameModel(DataFrameModel):
         cls._dfm_require_subclass_with_schema()
         dataframe_cls = cast("Any", cls._dataframe_cls)
         inner = dataframe_cls[cls._SchemaModel].from_beanie_async(
-            document_cls,
+            document_or_query,
             criteria=criteria,
             fields=fields,
             fetch_links=fetch_links,

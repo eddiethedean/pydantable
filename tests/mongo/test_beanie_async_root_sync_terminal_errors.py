@@ -15,7 +15,7 @@ def test_beanie_async_root_rejects_sync_collect() -> None:
     class Row(Schema):
         x: int
 
-    root = BeanieAsyncRoot(document_cls=type("Doc", (), {}))
+    root = BeanieAsyncRoot(document_or_query=type("Doc", (), {}))
     # Need a real engine instance for `_from_plan` construction; the error is raised
     # by EnteiPydantableEngine when it sees BeanieAsyncRoot on sync terminals.
     from pydantable.mongo_entei import EnteiPydantableEngine

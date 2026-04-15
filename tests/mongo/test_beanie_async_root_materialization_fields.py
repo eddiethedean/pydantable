@@ -10,7 +10,7 @@ async def test_beanie_async_root_materialization_passes_fields_none() -> None:
     from pydantable.mongo_entei import BeanieAsyncRoot
     from pydantable.mongo_entei_engine import _amaterialize_root_data
 
-    root = BeanieAsyncRoot(document_cls=type("Doc", (), {}), fields=None)
+    root = BeanieAsyncRoot(document_or_query=type("Doc", (), {}), fields=None)
 
     mock = AsyncMock(return_value={"x": [1]})
     with patch("pydantable.io.beanie.afetch_beanie", mock):
@@ -26,7 +26,7 @@ async def test_beanie_async_root_materialization_passes_fields_list() -> None:
     from pydantable.mongo_entei import BeanieAsyncRoot
     from pydantable.mongo_entei_engine import _amaterialize_root_data
 
-    root = BeanieAsyncRoot(document_cls=type("Doc", (), {}), fields=("a", "b"))
+    root = BeanieAsyncRoot(document_or_query=type("Doc", (), {}), fields=("a", "b"))
 
     mock = AsyncMock(return_value={"a": [1], "b": [2]})
     with patch("pydantable.io.beanie.afetch_beanie", mock):

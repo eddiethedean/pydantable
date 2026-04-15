@@ -118,9 +118,27 @@ If you are **not** using Beanie, pass any **sync** **`Collection`** you already 
 
 | Sync | Async |
 | ---- | ----- |
-| **`fetch_mongo(collection, match=..., projection=..., sort=..., limit=..., fields=...)`** → **`dict[str, list]`** | **`await afetch_mongo(...)`** |
+| **`fetch_mongo(collection, match=..., projection=..., sort=..., skip=..., limit=..., fields=..., session=..., max_time_ms=...)`** → **`dict[str, list]`** | **`await afetch_mongo(...)`** |
 | **`iter_mongo(..., batch_size=...)`** → yields rectangular batches | **`async for batch in aiter_mongo(...)`** |
-| **`write_mongo(collection, data, ordered=..., chunk_size=...)`** → inserted row count | **`await awrite_mongo(...)`** |
+| **`write_mongo(collection, data, ordered=..., chunk_size=..., session=...)`** → inserted row count | **`await awrite_mongo(...)`** |
+
+### PyMongo surface area (what pydantable wraps)
+
+Pydantable’s optional Mongo helpers are built for **rectangular column dicts** and the same **typed DataFrame** story as SQL I/O — not a full mirror of the [PyMongo](https://pymongo.readthedocs.io/en/stable/) API.
+
+**Wrapped for sync `pymongo.collection.Collection`:**
+
+- Reads: `find` → optional `sort`, `skip`, `limit`, cursor `batch_size`, `max_time_ms`, and optional **`ClientSession`** via `session=`.
+- Writes: chunked `insert_many` with `ordered=` and optional `session=`.
+
+**Async helpers (`afetch_mongo`, `aiter_mongo`, `awrite_mongo`):**
+
+- If `collection` is a **`pymongo.asynchronous.collection.AsyncCollection`**, pydantable uses the **native async** PyMongo API (`async for` on the cursor, `await insert_many`). Use **`is_async_mongo_collection(collection)`** to branch in application code.
+- If `collection` is a **sync** `Collection`, these functions still offload blocking I/O with **`asyncio.to_thread`** (or an optional **`Executor`**), same as before.
+
+**Low-level helpers** (also importable from **`pydantable`**): **`afetch_mongo_async`**, **`aiter_mongo_async`**, **`awrite_mongo_async`** — identical semantics but **only** for async collections.
+
+**Out of scope** (use PyMongo or Beanie directly): aggregation pipelines, change streams, GridFS, CSFLE, `bulk_write` / upserts, collations and other `find` options not listed above, and lazy **Entei** scan tuning inside **entei-core**’s `MongoRoot`.
 
 ## Async-first Beanie ODM I/O (no sync Collection required)
 
@@ -151,7 +169,7 @@ When you call **`afetch_beanie(..., fetch_links=True)`**, nested documents are f
 
 If you want the **lazy** `EnteiDataFrame` / `EnteiDataFrameModel` API over a Beanie `Document` without wiring a sync PyMongo client, use:
 
-- **`EnteiDataFrame[Row].from_beanie_async(MyDocument, ...)`**
+- **`EnteiDataFrame[Row].from_beanie_async(MyDocument, ...)`** — first argument can also be a **pre-built Beanie query** (e.g. `MyDocument.find(...).sort(...)`) with the same semantics as **`afetch_beanie`**.
 - **`MyModel.from_beanie_async(MyDocument, ...)`** (where `MyModel` subclasses `EnteiDataFrameModel`)
 
 This root is **async-only**: materialize with **`await acollect()`** / **`await ato_dict()`**. Sync terminals (`collect`, `to_dict`, `write_parquet`, ...) will raise.

@@ -17,6 +17,8 @@ or **lazy DataFrame transforms**.
 | **Eager** column-dict I/O using Beanie async ODM features (no sync client) | `afetch_beanie` / `aiter_beanie` / `awrite_beanie` |
 | **Lazy** `DataFrame` API over a Mongo collection (typed transforms, then materialize) | `EnteiDataFrame` / `EnteiDataFrameModel` |
 
+For which PyMongo operations pydantable wraps on sync vs async collections (and what remains “use the driver directly”), see the **PyMongo surface area** subsection in {doc}`MONGO_ENGINE`.
+
 This page focuses on the Beanie-first pieces. For the engine details and the
 entei-core `MongoRoot` story, see {doc}`MONGO_ENGINE`.
 
@@ -157,6 +159,9 @@ class Row(Schema):
     x: int
 
 df = EnteiDataFrame[Row].from_beanie_async(MyDocument, criteria=MyDocument.x > 0)
+
+# Or pass a pre-built Beanie query (chains like ``.sort()`` / ``.project()`` — same rules as ``afetch_beanie``):
+# df = EnteiDataFrame[Row].from_beanie_async(MyDocument.find(MyDocument.x > 0).sort("-name"))
 
 # IMPORTANT: async-only materialization
 rows = await df.acollect()

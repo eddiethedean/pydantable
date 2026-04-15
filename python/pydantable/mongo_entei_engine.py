@@ -34,7 +34,7 @@ async def _amaterialize_root_data(data: Any) -> Any:
         from pydantable.io.beanie import afetch_beanie
 
         return await afetch_beanie(
-            data.document_cls,
+            data.document_or_query,
             criteria=data.criteria,
             fields=list(data.fields) if data.fields is not None else None,
             fetch_links=data.fetch_links,

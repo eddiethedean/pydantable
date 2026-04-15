@@ -5,7 +5,12 @@ import pytest
 mongomock = pytest.importorskip("mongomock")
 pytest.importorskip("pymongo")
 
-from pydantable import fetch_mongo, iter_mongo, write_mongo  # noqa: E402
+from pydantable import (  # noqa: E402
+    fetch_mongo,
+    is_async_mongo_collection,
+    iter_mongo,
+    write_mongo,
+)
 
 
 @pytest.fixture
@@ -64,3 +69,29 @@ def test_write_mongo_rejects_non_rectangular(
 ) -> None:
     with pytest.raises(ValueError):
         write_mongo(coll, {"a": [1, 2], "b": [3]})
+
+
+def test_is_async_mongo_collection_sync_vs_fake_async() -> None:
+    client = mongomock.MongoClient()
+    assert is_async_mongo_collection(client.db.t) is False
+
+    class _FakeAsync:
+        __module__ = "pymongo.asynchronous.collection"
+
+    assert is_async_mongo_collection(_FakeAsync()) is True
+
+
+def test_fetch_mongo_skip(
+    coll: mongomock.collection.Collection,
+) -> None:
+    coll.insert_many([{"n": i} for i in range(5)])
+    out = fetch_mongo(coll, sort=[("n", 1)], skip=2, limit=2)
+    assert out["n"] == [2, 3]
+
+
+def test_fetch_mongo_max_time_ms(
+    coll: mongomock.collection.Collection,
+) -> None:
+    coll.insert_one({"x": 1})
+    out = fetch_mongo(coll, max_time_ms=5000)
+    assert out["x"] == [1]

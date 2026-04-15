@@ -145,4 +145,44 @@ async def test_real_mongo_entei_from_beanie_async(mongo_uri: str, db_name: str) 
     out = await df.ato_dict()
     assert out == {"name": ["alpha"]}
 
+    # Pre-built Beanie query object (same semantics as ``afetch_beanie``).
+    q = Item.find(Item.name == "beta")
+    df2 = EnteiDataFrame[Row].from_beanie_async(q)
+    out2 = await df2.ato_dict()
+    assert out2 == {"name": ["beta"]}
+
     await aclient.close()
+
+
+@pytest.mark.asyncio
+async def test_real_mongo_afetch_mongo_uses_native_async_driver(
+    mongo_uri: str, db_name: str
+) -> None:
+    """PyMongo ``AsyncCollection`` uses native async I/O (not threads)."""
+    pytest.importorskip("pymongo")
+    from pydantable import (
+        afetch_mongo,
+        aiter_mongo,
+        awrite_mongo,
+        is_async_mongo_collection,
+    )
+    from pymongo.asynchronous.mongo_client import AsyncMongoClient
+
+    client = AsyncMongoClient(mongo_uri)
+    coll = client[db_name]["pydantable_afetch_native"]
+    await coll.delete_many({})
+
+    assert is_async_mongo_collection(coll) is True
+
+    n = await awrite_mongo(coll, {"k": [1, 2, 3], "v": [10, 20, 30]})
+    assert n == 3
+
+    out = await afetch_mongo(
+        coll, sort=[("k", 1)], skip=1, limit=1, fields=["k", "v"]
+    )
+    assert out == {"k": [2], "v": [20]}
+
+    batches = [b async for b in aiter_mongo(coll, batch_size=2)]
+    assert sum(len(next(iter(b.values()))) for b in batches) == 3
+
+    await client.aclose()
