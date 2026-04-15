@@ -393,6 +393,7 @@ jobs:
             "rapcsv>=0.2" "rapfiles>=0.1" "rapsqlite>=0.1" \
             "moltres-core>=1.0.0,<2" \
             "entei-core>=0.2.0,<0.3" "pymongo>=4.6" "mongomock>=4.3" "beanie>=1.24,<3" \
+            "raikou-core==0.1.0" "pyspark>=3.4,<4" \
             "greenlet>=3.0"
           $PY -m pip install pyright
 
@@ -478,6 +479,7 @@ jobs:
             "rapcsv>=0.2" "rapfiles>=0.1" "rapsqlite>=0.1" \
             "moltres-core>=1.0.0,<2" \
             "entei-core>=0.2.0,<0.3" "pymongo>=4.6" "beanie>=1.24,<3" \
+            "raikou-core==0.1.0" "pyspark>=3.4,<4" \
             "greenlet>=3.0"
           $PY -m pip install pyright
 

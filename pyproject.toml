@@ -117,6 +117,9 @@ docs = [
     "entei-core>=0.2.0,<0.3",
     "pymongo>=4.6",
     "beanie>=1.24,<3",
+    # Spark modules (``spark_dataframe``) for Sphinx/RTD imports (same pins as ``[spark]``).
+    "raikou-core==0.1.0",
+    "pyspark>=3.4,<4",
 ]
 
 [tool.setuptools]
