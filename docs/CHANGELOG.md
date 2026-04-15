@@ -4,34 +4,24 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.17.0] — 2026-04-14
+
 ### Added
 
+- **Mongo engine (entei-core):** **`pydantable.mongo_dataframe`** — **`MongoDataFrame`** / **`MongoDataFrameModel`** facades (same pattern as **`pydantable.sql_dataframe`** + **moltres-core**). **`entei-core`** supplies **`MongoRoot`** (and materialization helpers); **`MongoPydantableEngine`** is implemented in **`pydantable.mongo_dataframe_engine`**.
 - **Mongo / Beanie:** **`pydantable.mongo_beanie.sync_pymongo_collection`** (also a lazy import from **`pydantable`**), **`MongoDataFrame.from_beanie`**, and **`MongoDataFrameModel.from_beanie`** for [Beanie](https://github.com/BeanieODM/beanie) **`Document`** models with a **sync** **`pymongo.database.Database`** (Beanie uses async PyMongo). See **`MONGO_ENGINE`**.
-
-- **Mongo I/O:** **`fetch_mongo`**, **`iter_mongo`**, **`write_mongo`** and async **`afetch_mongo`**, **`aiter_mongo`**, **`awrite_mongo`** — eager **`dict[str, list]`** reads/writes against a PyMongo **`Collection`** (same import pattern as SQL I/O). **`pydantable[mongo]`** now includes **pymongo**.
+- **Mongo I/O:** **`fetch_mongo`**, **`iter_mongo`**, **`write_mongo`** and async **`afetch_mongo`**, **`aiter_mongo`**, **`awrite_mongo`** — eager **`dict[str, list]`** reads/writes against a PyMongo **`Collection`** (same import pattern as SQL I/O). **`pydantable[mongo]`** includes **pymongo**.
 
 ### Documentation
 
+- **`MONGO_ENGINE`** — user guide for the optional Mongo engine (**`MongoDataFrame`** / **`MongoDataFrameModel`**, **`pydantable[mongo]`**).
 - **Mongo:** position [Beanie](https://github.com/BeanieODM/beanie) **`Document`** models as the **primary** way to use pydantable with MongoDB (**`pydantable[mongo]`**, **`from_beanie`**, **`sync_pymongo_collection`**); Pydantic **`Schema`** + **`from_collection`** documented as a supported alternative. See **`MONGO_ENGINE`**, **README**, and **IO_DECISION_TREE**.
 
 ### Changed
 
 - **Public API naming (SQL / Mongo):** **`MongoDataFrame`**, **`MongoDataFrameModel`**, **`MongoPydantableEngine`** replace **`Entei*`**; modules **`pydantable.mongo_dataframe`**, **`pydantable.sql_dataframe`** are canonical (legacy paths **`mongo_entei`**, **`sql_moltres`** re-export). **`sql_engine_from_config`** and **`sql_engine=`** replace **`moltres_engine_*`**. **`pydantable[sql]`** includes eager SQLModel I/O, **moltres-core**, and the lazy **`SqlDataFrame`** stack (the separate **`lazy-sql`** and **`moltres`** extras are removed). **`Entei*`** and **`moltres_engine`** remain available with **`DeprecationWarning`**. User docs describe **SQLAlchemy**, **PyMongo**, and **Beanie** without third-party stack marketing names.
-
-- **Optional dependencies:** **`pydantable[mongo]`** now includes **Beanie** (`beanie>=1.24,<3`); the separate **`mongo-beanie`** extra is removed — use **`pip install "pydantable[mongo]"`** for the Mongo plan stack, **pymongo**, and **Beanie**.
-
-- **Optional dependencies:** **`rapsqlite`** is no longer pulled in by **`pydantable[sql]`** — install a driver for your database URL yourself (``pip install rapsqlite`` only if you want the ``sqlite+rapsqlite`` dialect).
-
-## [1.17.0] — 2026-04-14
-
-### Added
-
-- **Mongo (entei-core):** **`pydantable.mongo_dataframe`** — **`MongoDataFrame`** / **`MongoDataFrameModel`** facades (same pattern as **`pydantable.sql_dataframe`** + **moltres-core**). **`entei-core`** supplies **`MongoRoot`** (and materialization helpers); **`MongoPydantableEngine`** is implemented in **`pydantable.mongo_dataframe_engine`**.
-- **Documentation:** **`MONGO_ENGINE`** — user guide for the optional Mongo engine (**`MongoDataFrame`** / **`MongoDataFrameModel`**, **`pydantable[mongo]`**).
-
-### Changed
-
-- **Optional dependencies:** **`pydantable[mongo]`** pins **`entei-core`** to **`>=0.2.0,<0.3`** (PyPI package **`entei-core`** is versioned independently of **pydantable** **1.x**).
+- **Optional dependencies:** **`pydantable[mongo]`** includes **Beanie** (`beanie>=1.24,<3`) and pins **`entei-core`** to **`>=0.2.0,<0.3`** (PyPI **`entei-core`** is versioned independently of **pydantable** **1.x**). The separate **`mongo-beanie`** extra is removed — use **`pip install "pydantable[mongo]"`**.
+- **Optional dependencies:** **`rapsqlite`** is not bundled in **`pydantable[sql]`** — install a DB-API driver for your database URL yourself (``pip install rapsqlite`` only if you want the ``sqlite+rapsqlite`` dialect).
 
 ### Version bump
 
