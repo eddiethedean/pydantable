@@ -102,11 +102,11 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Added
 
-- **Optional Moltres integration:** extra **`pydantable[lazy-sql]`** pulls [**moltres-core**](https://pypi.org/project/moltres-core/). New **`SqlDataFrame`** and **`SqlDataFrameModel`** in **`pydantable.sql_dataframe`** (also available as **`pydantable.SqlDataFrame`** / **`SqlDataFrameModel`** via lazy import) bind **`moltres_core.MoltresPydantableEngine`** using **`sql_config=`** (**`moltres_core.EngineConfig`**) or **`moltres_engine=`**. Helper **`moltres_engine_from_sql_config`**. User guide: {doc}`MOLTRES_SQL`; protocol story: {doc}`CUSTOM_ENGINE_PACKAGE`.
+- **Optional Moltres integration:** extra **`pydantable[lazy-sql]`** *(install **`pydantable[sql]`** today — optional extras were consolidated)* pulls [**moltres-core**](https://pypi.org/project/moltres-core/). New **`SqlDataFrame`** and **`SqlDataFrameModel`** in **`pydantable.sql_dataframe`** (also available as **`pydantable.SqlDataFrame`** / **`SqlDataFrameModel`** via lazy import) bind **`moltres_core.MoltresPydantableEngine`** using **`sql_config=`** (**`moltres_core.EngineConfig`**) or **`moltres_engine=`**. Helper **`moltres_engine_from_sql_config`**. User guide: {doc}`MOLTRES_SQL`; protocol story: {doc}`CUSTOM_ENGINE_PACKAGE`.
 
 ### Changed
 
-- **`pydantable[lazy-sql]`** and **`[dev]`** now include **`greenlet`** so SQLAlchemy **`create_async_engine`** (for example **`sqlite+rapsqlite`** smoke tests and async SQLAlchemy workflows) works without an extra manual install.
+- **`pydantable[lazy-sql]`** *(today **`pydantable[sql]`**)* and **`[dev]`** now include **`greenlet`** so SQLAlchemy **`create_async_engine`** (for example **`sqlite+rapsqlite`** smoke tests and async SQLAlchemy workflows) works without an extra manual install.
 
 - **Version bump:** Align Python package metadata (**`pydantable`**, **`pydantable-protocol`**, **`pydantable-native`**), Rust crate **`pydantable-core`**, and published **`__version__`** values to **1.15.0**.
 

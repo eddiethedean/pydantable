@@ -34,7 +34,7 @@ Common extras:
 pip install "pydantable[polars]"   # to_polars
 pip install "pydantable[arrow]"    # to_arrow / Arrow constructors
 pip install "pydantable[io]"       # full file I/O convenience (arrow + polars)
-pip install "pydantable[sql]"      # SQLModel + SQLAlchemy I/O + moltres-core lazy SqlDataFrame / SqlDataFrameModel
+pip install "pydantable[sql]"      # SQLModel + SQLAlchemy + moltres-core lazy SqlDataFrame; add a DB-API driver for your URL
 pip install "pydantable[pandas]"   # pandas-flavored façade (pandas UI doc)
 pip install "pydantable[fastapi]"  # FastAPI integration (pydantable.fastapi)
 pip install "pydantable[mongo]"     # pymongo + Beanie + Mongo plan stack (lazy MongoDataFrame + I/O + from_beanie)
@@ -99,7 +99,7 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 - Optional ingest controls: `trusted_mode`, `ignore_errors`, `on_validation_errors`.
 - Missing optional fields: `fill_missing_optional` (default `True`).
 - Validation presets: `validation_profile=...` (or `__pydantable__ = {"validation_profile": "..."}`).
-- Per-column and nested strictness: {doc}`STRICTNESS` (field policies + profile defaults).
+- Per-column and nested strictness: [STRICTNESS](https://pydantable.readthedocs.io/en/latest/STRICTNESS.html) (field policies + profile defaults).
 
 ## Documentation
 
