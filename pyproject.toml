@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pydantable"
-version = "1.17.0"
+version = "1.18.0"
 description = "Strongly-typed DataFrames for Python, powered by Rust."
 readme = "README.md"
 license = { text = "MIT" }
@@ -19,8 +19,8 @@ classifiers = [
 ]
 dependencies = [
     "pydantic>=2.0,<3",
-    "pydantable-protocol==1.17.0",
-    "pydantable-native==1.17.0",
+    "pydantable-protocol==1.18.0",
+    "pydantable-native==1.18.0",
     "typing-extensions>=4.7",
 ]
 
@@ -155,6 +155,8 @@ allowed-unresolved-imports = [
     "starlette.**",
     "moltres_core.**",
     "rapsqlite.**",
+    "pyspark.**",
+    "raikou_core.**",
 ]
 
 [tool.ty.rules]
