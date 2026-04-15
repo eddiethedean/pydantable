@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from pydantable.mongo_beanie import sync_pymongo_collection
-from pydantable.mongo_entei import (
-    EnteiDataFrame,
-    EnteiDataFrameModel,
-    EnteiPydantableEngine,
+from pydantable.mongo_dataframe import (
+    MongoDataFrame,
+    MongoDataFrameModel,
+    MongoPydantableEngine,
     MongoRoot,
 )
-from pydantable.sql_moltres import SqlDataFrame, SqlDataFrameModel
+from pydantable.sql_dataframe import SqlDataFrame, SqlDataFrameModel
 
 from . import pandas as pandas
 from . import plugins as plugins
@@ -103,11 +103,11 @@ __all__ = [
     "DataFrame",
     "DataFrameModel",
     "DtypeDriftWarning",
-    "EnteiDataFrame",
-    "EnteiDataFrameModel",
-    "EnteiPydantableEngine",
     "Expr",
     "MissingRustExtensionError",
+    "MongoDataFrame",
+    "MongoDataFrameModel",
+    "MongoPydantableEngine",
     "MongoRoot",
     "PlanMaterialization",
     "PydantableUserError",

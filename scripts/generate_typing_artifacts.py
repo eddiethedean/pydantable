@@ -390,21 +390,24 @@ def main(argv: list[str] | None = None) -> int:
     )
     pandas_stub = _render_module_stub(pkg / "pandas.py", include_all_public_defs=True)
     # ``pandas.py`` lazy-exports SQL facades via ``__getattr__`` (no TYPE_CHECKING
-    # import: circular with ``pandas_moltres``). Stub needs explicit symbols for
+    # import: circular with ``pandas_sql_dataframe``). Stub needs explicit symbols for
     # ``__all__`` / Ruff F822.
     _pandas_src = (pkg / "pandas.py").read_text(encoding="utf-8")
     _pandas_all = _parse_all_names(ast.parse(_pandas_src))
     if (
         _pandas_all
         and "SqlDataFrame" in _pandas_all
-        and "from .pandas_moltres import SqlDataFrame" not in pandas_stub
+        and "from .pandas_sql_dataframe import SqlDataFrame" not in pandas_stub
     ):
         _marker = "def wide_to_long("
         _pos = pandas_stub.find(_marker)
         if _pos != -1:
             pandas_stub = (
                 pandas_stub[:_pos]
-                + "from .pandas_moltres import SqlDataFrame, SqlDataFrameModel\n\n"
+                + (
+                    "from .pandas_sql_dataframe import "
+                    "SqlDataFrame, SqlDataFrameModel\n\n"
+                )
                 + pandas_stub[_pos:]
             )
     pyspark_sql_functions_stub = _render_module_stub(

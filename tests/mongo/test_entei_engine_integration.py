@@ -1,4 +1,4 @@
-"""Integration tests: ``entei-core`` as a pydantable ``ExecutionEngine`` (mongomock)."""
+"""Integration tests: Mongo plan stack as pydantable ``ExecutionEngine`` (mongomock)."""
 
 from __future__ import annotations
 
@@ -16,10 +16,10 @@ mongomock = pytest.importorskip("mongomock")
 pytest.importorskip("entei_core")
 
 from entei_core import MongoRoot  # noqa: E402
-from pydantable.mongo_entei import (  # noqa: E402
-    EnteiDataFrame,
-    EnteiDataFrameModel,
-    EnteiPydantableEngine,
+from pydantable.mongo_dataframe import (  # noqa: E402
+    MongoDataFrame,
+    MongoDataFrameModel,
+    MongoPydantableEngine,
 )
 
 
@@ -28,7 +28,7 @@ class Row(Schema):
     y: str | None = None
 
 
-class RowEnteiModel(EnteiDataFrameModel):
+class RowMongoModel(MongoDataFrameModel):
     """Concrete model; bridge class is not ``DataFrameModel[T]``-subscriptable."""
 
     x: int
@@ -36,15 +36,15 @@ class RowEnteiModel(EnteiDataFrameModel):
 
 
 def test_entei_exposes_all_execution_engine_protocol_members() -> None:
-    """Protocol drift guard for ``EnteiPydantableEngine`` vs ``ExecutionEngine``."""
+    """Protocol drift guard for ``MongoPydantableEngine`` vs ``ExecutionEngine``."""
     names = get_protocol_members(ExecutionEngine)
-    eng = EnteiPydantableEngine()
+    eng = MongoPydantableEngine()
     missing = [n for n in names if not hasattr(eng, n)]
-    assert not missing, f"EnteiPydantableEngine missing protocol members: {missing}"
+    assert not missing, f"MongoPydantableEngine missing protocol members: {missing}"
 
 
 def test_entei_is_structural_execution_engine_plan_executor_sink_writer() -> None:
-    eng = EnteiPydantableEngine()
+    eng = MongoPydantableEngine()
     assert isinstance(eng, ExecutionEngine)
     assert isinstance(eng, PlanExecutor)
     assert isinstance(eng, SinkWriter)
@@ -52,7 +52,7 @@ def test_entei_is_structural_execution_engine_plan_executor_sink_writer() -> Non
 
 def test_entei_capabilities_custom_backend_reflects_native_feature_flags() -> None:
     """``backend`` is ``custom``; flags mirror native (delegation)."""
-    entei = EnteiPydantableEngine()
+    entei = MongoPydantableEngine()
     native = native_engine_capabilities()
     c = entei.capabilities
     assert c.backend == "custom"
@@ -70,13 +70,13 @@ def test_entei_capabilities_custom_backend_reflects_native_feature_flags() -> No
 
 
 def test_entei_rust_core_is_native_binding() -> None:
-    entei = EnteiPydantableEngine()
+    entei = MongoPydantableEngine()
     native = NativePolarsEngine()
     assert entei.rust_core is native.rust_core
 
 
 def test_entei_async_flags_match_instance_methods() -> None:
-    eng = EnteiPydantableEngine()
+    eng = MongoPydantableEngine()
     caps = native_engine_capabilities()
     assert eng.has_async_execute_plan() == caps.has_async_execute_plan
     assert eng.has_async_collect_plan_batches() == caps.has_async_collect_plan_batches
@@ -87,7 +87,7 @@ def test_execute_plan_in_memory_dict_matches_native_polars() -> None:
     fts = schema_field_types(Row)
     field_types = field_types_for_rust(fts)
     data = {"x": [3, 1, 2], "y": ["a", None, "c"]}
-    entei = EnteiPydantableEngine()
+    entei = MongoPydantableEngine()
     native = NativePolarsEngine()
     pe = entei.make_plan(field_types)
     pn = native.make_plan(field_types)
@@ -102,7 +102,7 @@ def test_execute_plan_mongo_root_materializes_like_column_dict() -> None:
     coll.insert_many([{"x": 1, "y": "a"}, {"x": 2, "y": "b"}])
     fts = schema_field_types(Row)
     field_types = field_types_for_rust(fts)
-    entei = EnteiPydantableEngine()
+    entei = MongoPydantableEngine()
     plan = entei.make_plan(field_types)
     root = MongoRoot(coll, fields=("x", "y"))
     out_root = entei.execute_plan(plan, root, as_python_lists=True)
@@ -114,10 +114,10 @@ def test_execute_plan_mongo_root_materializes_like_column_dict() -> None:
     assert out_root == out_dict
 
 
-def test_pydantable_lazy_exports_alias_entei_core() -> None:
-    assert pydantable.EnteiDataFrame is EnteiDataFrame
-    assert pydantable.EnteiDataFrameModel is EnteiDataFrameModel
-    assert pydantable.EnteiPydantableEngine is EnteiPydantableEngine
+def test_pydantable_lazy_exports_mongo_symbols() -> None:
+    assert pydantable.MongoDataFrame is MongoDataFrame
+    assert pydantable.MongoDataFrameModel is MongoDataFrameModel
+    assert pydantable.MongoPydantableEngine is MongoPydantableEngine
     assert pydantable.MongoRoot is MongoRoot
 
 
@@ -125,7 +125,7 @@ def test_entei_dataframe_sort_head_collect() -> None:
     client = mongomock.MongoClient()
     coll = client.db.items
     coll.insert_many([{"x": 3}, {"x": 1}, {"x": 2}])
-    df = EnteiDataFrame[Row].from_collection(coll)
+    df = MongoDataFrame[Row].from_collection(coll)
     out = df.sort("x", descending=True).head(2).collect(as_lists=True)
     assert out["x"] == [3, 2]
 
@@ -134,7 +134,7 @@ def test_entei_dataframe_model_from_collection_rows() -> None:
     client = mongomock.MongoClient()
     coll = client.db.items
     coll.insert_many([{"x": 10, "y": "z"}])
-    m = RowEnteiModel.from_collection(coll)
+    m = RowMongoModel.from_collection(coll)
     rows = m.rows()
     assert len(rows) == 1
     assert rows[0].x == 10
@@ -146,7 +146,7 @@ async def test_entei_dataframe_acollect() -> None:
     client = mongomock.MongoClient()
     coll = client.db.items
     coll.insert_many([{"x": 7}])
-    df = EnteiDataFrame[Row].from_collection(coll)
+    df = MongoDataFrame[Row].from_collection(coll)
     out = await df.acollect(as_lists=True)
     assert out == {"x": [7], "y": [None]}
 
@@ -157,7 +157,7 @@ def test_async_execute_plan_matches_sync_for_mongo_root() -> None:
     coll.insert_many([{"x": 5}])
     fts = schema_field_types(Row)
     field_types = field_types_for_rust(fts)
-    eng = EnteiPydantableEngine()
+    eng = MongoPydantableEngine()
     plan = eng.make_plan(field_types)
     root = MongoRoot(coll, fields=("x", "y"))
 

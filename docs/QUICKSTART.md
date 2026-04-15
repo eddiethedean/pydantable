@@ -64,3 +64,4 @@ Use `to_polars()` / `to_arrow()` when the optional extras are installed ({doc}`E
 - {doc}`INTERFACE_CONTRACT` — semantics (joins, nulls, `shape` vs executed rows)
 - {doc}`IO_DECISION_TREE` — pick lazy vs eager I/O; prefer **`DataFrameModel`** / **`DataFrame[Schema]`** classmethods over raw **`pydantable.io`**
 - {doc}`IO_OVERVIEW` — per-format tables (Parquet, CSV, NDJSON, JSON, IPC, HTTP, SQL)
+- {doc}`MONGO_ENGINE` / {doc}`BEANIE` — optional **`pydantable[mongo]`** (lazy **`MongoDataFrame`**, eager **`fetch_mongo`** / **`afetch_mongo`**, Beanie ODM helpers)

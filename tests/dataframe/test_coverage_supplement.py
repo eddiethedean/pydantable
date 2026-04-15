@@ -130,7 +130,7 @@ def test_dtypes_register_and_list() -> None:
     assert Tag in names
 
 
-def test_pyspark_init_getattr_sql_moltres() -> None:
+def test_pyspark_init_getattr_sql_dataframe() -> None:
     pytest.importorskip("moltres_core")
     import pydantable.pyspark as ps
 

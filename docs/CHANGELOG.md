@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Added
 
-- **Mongo / Beanie:** **`pydantable.mongo_beanie.sync_pymongo_collection`** (also a lazy import from **`pydantable`**), **`EnteiDataFrame.from_beanie`**, and **`EnteiDataFrameModel.from_beanie`** for [Beanie](https://github.com/BeanieODM/beanie) **`Document`** models with a **sync** **`pymongo.database.Database`** (Beanie uses async PyMongo). See **`MONGO_ENGINE`**.
+- **Mongo / Beanie:** **`pydantable.mongo_beanie.sync_pymongo_collection`** (also a lazy import from **`pydantable`**), **`MongoDataFrame.from_beanie`**, and **`MongoDataFrameModel.from_beanie`** for [Beanie](https://github.com/BeanieODM/beanie) **`Document`** models with a **sync** **`pymongo.database.Database`** (Beanie uses async PyMongo). See **`MONGO_ENGINE`**.
 
 - **Mongo I/O:** **`fetch_mongo`**, **`iter_mongo`**, **`write_mongo`** and async **`afetch_mongo`**, **`aiter_mongo`**, **`awrite_mongo`** — eager **`dict[str, list]`** reads/writes against a PyMongo **`Collection`** (same import pattern as SQL I/O). **`pydantable[mongo]`** now includes **pymongo**.
 
@@ -16,14 +16,18 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Changed
 
-- **Optional dependencies:** **`pydantable[mongo]`** now includes **Beanie** (`beanie>=1.24,<3`); the separate **`mongo-beanie`** extra is removed — use **`pip install "pydantable[mongo]"`** for **entei-core**, **pymongo**, and **Beanie**.
+- **Public API naming (SQL / Mongo):** **`MongoDataFrame`**, **`MongoDataFrameModel`**, **`MongoPydantableEngine`** replace **`Entei*`**; modules **`pydantable.mongo_dataframe`**, **`pydantable.sql_dataframe`** are canonical (legacy paths **`mongo_entei`**, **`sql_moltres`** re-export). **`sql_engine_from_config`** and **`sql_engine=`** replace **`moltres_engine_*`**. **`pydantable[sql]`** includes eager SQLModel I/O, **moltres-core**, and the lazy **`SqlDataFrame`** stack (the separate **`lazy-sql`** and **`moltres`** extras are removed). **`Entei*`** and **`moltres_engine`** remain available with **`DeprecationWarning`**. User docs describe **SQLAlchemy**, **PyMongo**, and **Beanie** without third-party stack marketing names.
+
+- **Optional dependencies:** **`pydantable[mongo]`** now includes **Beanie** (`beanie>=1.24,<3`); the separate **`mongo-beanie`** extra is removed — use **`pip install "pydantable[mongo]"`** for the Mongo plan stack, **pymongo**, and **Beanie**.
+
+- **Optional dependencies:** **`rapsqlite`** is no longer pulled in by **`pydantable[sql]`** — install a driver for your database URL yourself (``pip install rapsqlite`` only if you want the ``sqlite+rapsqlite`` dialect).
 
 ## [1.17.0] — 2026-04-14
 
 ### Added
 
-- **Mongo (entei-core):** **`pydantable.mongo_entei`** — **`EnteiDataFrame`** / **`EnteiDataFrameModel`** facades (same pattern as **`pydantable.sql_moltres`** + **moltres-core**). **`entei-core`** supplies **`MongoRoot`** (and materialization helpers); **`EnteiPydantableEngine`** is implemented in **`pydantable.mongo_entei_engine`**.
-- **Documentation:** **`MONGO_ENGINE`** — user guide for the optional Mongo engine (**`EnteiDataFrame`** / **`EnteiDataFrameModel`**, **`pydantable[mongo]`**).
+- **Mongo (entei-core):** **`pydantable.mongo_dataframe`** — **`MongoDataFrame`** / **`MongoDataFrameModel`** facades (same pattern as **`pydantable.sql_dataframe`** + **moltres-core**). **`entei-core`** supplies **`MongoRoot`** (and materialization helpers); **`MongoPydantableEngine`** is implemented in **`pydantable.mongo_dataframe_engine`**.
+- **Documentation:** **`MONGO_ENGINE`** — user guide for the optional Mongo engine (**`MongoDataFrame`** / **`MongoDataFrameModel`**, **`pydantable[mongo]`**).
 
 ### Changed
 
@@ -98,11 +102,11 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Added
 
-- **Optional Moltres integration:** extra **`pydantable[moltres]`** pulls [**moltres-core**](https://pypi.org/project/moltres-core/). New **`SqlDataFrame`** and **`SqlDataFrameModel`** in **`pydantable.sql_moltres`** (also available as **`pydantable.SqlDataFrame`** / **`SqlDataFrameModel`** via lazy import) bind **`moltres_core.MoltresPydantableEngine`** using **`sql_config=`** (**`moltres_core.EngineConfig`**) or **`moltres_engine=`**. Helper **`moltres_engine_from_sql_config`**. User guide: {doc}`MOLTRES_SQL`; protocol story: {doc}`CUSTOM_ENGINE_PACKAGE`.
+- **Optional Moltres integration:** extra **`pydantable[lazy-sql]`** pulls [**moltres-core**](https://pypi.org/project/moltres-core/). New **`SqlDataFrame`** and **`SqlDataFrameModel`** in **`pydantable.sql_dataframe`** (also available as **`pydantable.SqlDataFrame`** / **`SqlDataFrameModel`** via lazy import) bind **`moltres_core.MoltresPydantableEngine`** using **`sql_config=`** (**`moltres_core.EngineConfig`**) or **`moltres_engine=`**. Helper **`moltres_engine_from_sql_config`**. User guide: {doc}`MOLTRES_SQL`; protocol story: {doc}`CUSTOM_ENGINE_PACKAGE`.
 
 ### Changed
 
-- **`pydantable[moltres]`** and **`[dev]`** now include **`greenlet`** so SQLAlchemy **`create_async_engine`** (for example **`sqlite+rapsqlite`** smoke tests and async SQLAlchemy workflows) works without an extra manual install.
+- **`pydantable[lazy-sql]`** and **`[dev]`** now include **`greenlet`** so SQLAlchemy **`create_async_engine`** (for example **`sqlite+rapsqlite`** smoke tests and async SQLAlchemy workflows) works without an extra manual install.
 
 - **Version bump:** Align Python package metadata (**`pydantable`**, **`pydantable-protocol`**, **`pydantable-native`**), Rust crate **`pydantable-core`**, and published **`__version__`** values to **1.15.0**.
 

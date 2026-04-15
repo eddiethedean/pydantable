@@ -14,7 +14,7 @@ For editor setup, linting, and type checking, see {doc}`DEVELOPER` and {doc}`TYP
 
   or equivalently `pip install -e ./pydantable-protocol`, `(cd pydantable-native && maturin develop --release)`, then `pip install -e ".[dev]"`.
 
-- **CI parity:** The GitHub Actions job installs test dependencies with an explicit `pip install` list that mirrors `pyproject.toml` **`[project.optional-dependencies] dev`** (plus `moltres-core` / `greenlet` for SQL engine tests). To compare the declared extras with what CI installs, run:
+- **CI parity:** The GitHub Actions job installs test dependencies with an explicit `pip install` list that mirrors `pyproject.toml` **`[project.optional-dependencies] dev`** (plus the lazy-SQL bridge / `greenlet` for SQL engine tests). To compare the declared extras with what CI installs, run:
 
   ```bash
   python scripts/ci_print_dev_extras.py

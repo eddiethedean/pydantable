@@ -5,8 +5,8 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_amaterialize_root_data_beanie_async_root_uses_afetch_beanie(monkeypatch):
-    from pydantable.mongo_entei import BeanieAsyncRoot
-    from pydantable.mongo_entei_engine import _amaterialize_root_data
+    from pydantable.mongo_dataframe import BeanieAsyncRoot
+    from pydantable.mongo_dataframe_engine import _amaterialize_root_data
 
     calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
 
@@ -51,8 +51,8 @@ async def test_amaterialize_root_data_beanie_async_root_uses_afetch_beanie(monke
 async def test_amaterialize_root_data_beanie_async_root_accepts_query_object(
     monkeypatch,
 ):
-    from pydantable.mongo_entei import BeanieAsyncRoot
-    from pydantable.mongo_entei_engine import _amaterialize_root_data
+    from pydantable.mongo_dataframe import BeanieAsyncRoot
+    from pydantable.mongo_dataframe_engine import _amaterialize_root_data
 
     calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
 
@@ -91,14 +91,14 @@ async def test_amaterialize_root_data_beanie_async_root_accepts_query_object(
 
 def test_sync_engine_rejects_beanie_async_root_for_sync_terminals():
     from pydantable.errors import UnsupportedEngineOperationError
-    from pydantable.mongo_entei import BeanieAsyncRoot
-    from pydantable.mongo_entei_engine import EnteiPydantableEngine
+    from pydantable.mongo_dataframe import BeanieAsyncRoot
+    from pydantable.mongo_dataframe_engine import MongoPydantableEngine
 
     class Doc:
         pass
 
     root = BeanieAsyncRoot(document_or_query=Doc)
-    eng = EnteiPydantableEngine()
+    eng = MongoPydantableEngine()
 
     with pytest.raises(UnsupportedEngineOperationError, match="async materialization"):
         eng.execute_plan(plan=object(), data=root)

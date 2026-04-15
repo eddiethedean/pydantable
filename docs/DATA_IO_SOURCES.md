@@ -182,6 +182,13 @@ Pydantable already executes typed plans in **Rust** (Polars-backed). Putting **f
 
 - Pydantable’s **`afetch_*`** SQL helpers are still **thread-offloaded sync** SQLAlchemy. If you already use **`AsyncSession`** / **`AsyncConnection`**, you can **`await conn.stream(text(sql))`** yourself, build **`dict[str, list]`**, and pass that to constructors—or call **`fetch_sql_raw`** from a thread pool for simplicity.
 
+### MongoDB (optional)
+
+- **Install:** **`pip install "pydantable[mongo]"`** (**PyMongo**, **Beanie**, Mongo plan stack). **Guide:** {doc}`MONGO_ENGINE` (lazy **`MongoDataFrame`** / **`MongoDataFrameModel`**, eager **`dict[str, list]`** I/O, **PyMongo surface area** — **`skip`**, **`session`**, **`max_time_ms`**, sync vs **`AsyncCollection`**).
+- **Lazy typed transforms:** **`from_beanie`** / **`from_beanie_async`**, **`from_collection`**, **`sync_pymongo_collection`**.
+- **Eager column dicts:** **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** and **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`** (native async when the handle is **`pymongo.asynchronous.AsyncCollection`**).
+- **Beanie ODM reads/writes (hooks, validation-on-save):** {doc}`BEANIE` (**`afetch_beanie`**, **`awrite_beanie`**, …). **Which helper?** {doc}`IO_DECISION_TREE` → Mongo rows.
+
 ---
 
 ## Tier 2 — Very common in enterprises

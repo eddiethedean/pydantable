@@ -1,6 +1,6 @@
 # Data I/O by format (overview)
 
-**Default (application code):** use **`DataFrame[Schema]`** and **`DataFrameModel`** for **lazy** **`read_*`** / **`aread_*`**, **`export_*`**, SQL (**`write_sqlmodel`** / **`awrite_sqlmodel`**, or deprecated **`write_sql`** / **`awrite_sql`**), and lazy **`write_*`** (Rust-backed where documented). For **eager** column dicts, import **`materialize_*`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`iter_sqlmodel`** / **`iter_sql_raw`**, **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** (MongoDB via **PyMongo**; for app code prefer **Beanie** **`Document`** + **`sync_pymongo_collection`** with **`pydantable[mongo]`** — {doc}`MONGO_ENGINE`), … **from `pydantable`** and pass **`dict[str, list]`** into **`MyModel(...)`** / **`DataFrame[Schema](...)`** (or load from / write to Mongo — {doc}`MONGO_ENGINE`). (These names are implemented in **`pydantable.io`** but **you should not import `pydantable.io` in application code** — use the package root.) SQL naming and deprecations: {doc}`IO_SQL`.
+**Default (application code):** use **`DataFrame[Schema]`** and **`DataFrameModel`** for **lazy** **`read_*`** / **`aread_*`**, **`export_*`**, SQL (**`write_sqlmodel`** / **`awrite_sqlmodel`**, or deprecated **`write_sql`** / **`awrite_sql`**), and lazy **`write_*`** (Rust-backed where documented). For **eager** column dicts, import **`materialize_*`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`iter_sqlmodel`** / **`iter_sql_raw`**, **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** and **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`** (MongoDB via **PyMongo** — sync **`Collection`** or **`pymongo.asynchronous.AsyncCollection`**; app models: **Beanie** **`Document`** with **`from_beanie`** / **`from_beanie_async`**, **`sync_pymongo_collection`**, ODM **`afetch_beanie`** / … — {doc}`MONGO_ENGINE`, {doc}`BEANIE`), … **from `pydantable`** and pass **`dict[str, list]`** into **`MyModel(...)`** / **`DataFrame[Schema](...)`** (or load from / write to Mongo — {doc}`MONGO_ENGINE`). (These names are implemented in **`pydantable.io`** but **you should not import `pydantable.io` in application code** — use the package root.) SQL naming and deprecations: {doc}`IO_SQL`.
 
 **Same functions** (**`materialize_*`**, **`fetch_sqlmodel`**, URL helpers, iterators, …) are defined in **`pydantable.io`** for the library’s own layering; end users rely on **`from pydantable import …`** or **`DataFrame` / `DataFrameModel`** methods.
 
@@ -64,7 +64,7 @@ Use **`from pydantable import …`** for eager **`materialize_*`**, SQL **`fetch
 | **`read_*` / `aread_*`** | Lazy **local file** scan → **`ScanFileRoot`** → Polars **`LazyFrame`** in the Rust plan (no full column lists in Python). |
 | **`read_parquet_url` / `aread_parquet_url`** | HTTP(S) download to a **temp Parquet file**, then same lazy root — prefer **`read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** for automatic cleanup ({doc}`IO_HTTP`). |
 | **`materialize_*` / `amaterialize_*`** | Eager **`dict[str, list]`** (Rust and/or PyArrow / stdlib, depending on path). |
-| **`fetch_*_url`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`fetch_mongo`** / **`iter_mongo`**, **`read_from_object_store`**, **`pydantable.io.extras`** | Other sources that return **`dict[str, list]`** — import **`fetch_*`** / **`iter_mongo`** from **`pydantable`** where re-exported; **`object_store`** / **`extras`** may still require **`pydantable.io`** (see {doc}`IO_EXTRAS`). Mongo: {doc}`MONGO_ENGINE`. |
+| **`fetch_*_url`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`fetch_mongo`** / **`iter_mongo`**, **`afetch_mongo`** / **`aiter_mongo`**, **`read_from_object_store`**, **`pydantable.io.extras`** | Other sources that return **`dict[str, list]`** — import **`fetch_*`** / **`iter_mongo`** from **`pydantable`** where re-exported; **`object_store`** / **`extras`** may still require **`pydantable.io`** (see {doc}`IO_EXTRAS`). Mongo helpers accept **`skip`**, **`session`**, **`max_time_ms`** on **`find`**-backed reads ({doc}`MONGO_ENGINE`). |
 | **`export_*` / `aexport_*`**, **`write_sqlmodel`** / **`write_sql_raw`** (deprecated: **`write_sql`**), **`write_mongo`** | Eager writes from an in-memory column dict or your own pipeline (Mongo **`insert_many`** for **`write_mongo`**). |
 
 ## Batched column dict I/O (`iter_*`, `write_*_batches`, `aiter_*`)
@@ -103,6 +103,7 @@ This layer is **orthogonal** to **lazy **`read_*`** / **`write_*`** on **`DataFr
 | **Arrow IPC / Feather file** | {doc}`IO_IPC` |
 | **HTTP(S), object stores** | {doc}`IO_HTTP` |
 | **SQL** (SQLAlchemy) | {doc}`IO_SQL` |
+| **MongoDB** (Beanie, lazy Mongo `DataFrame`, PyMongo column dicts) | {doc}`MONGO_ENGINE`, {doc}`BEANIE` |
 | **Excel, Delta, Avro, ORC, cloud warehouses, Kafka, stdin/stdout** | {doc}`IO_EXTRAS` |
 
 ## Runnable example

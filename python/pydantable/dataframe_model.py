@@ -318,7 +318,7 @@ class DataFrameModel(Generic[RowT]):
             "DataFrameModel",
             "PandasDataFrameModel",
             "SqlDataFrameModel",
-            "EnteiDataFrameModel",
+            "MongoDataFrameModel",
         ):
             return
 

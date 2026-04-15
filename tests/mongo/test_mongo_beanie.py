@@ -1,4 +1,4 @@
-"""Tests for :mod:`pydantable.mongo_beanie` and :meth:`EnteiDataFrame.from_beanie`."""
+"""Tests for :mod:`pydantable.mongo_beanie` and :meth:`MongoDataFrame.from_beanie`."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def test_sync_pymongo_collection_rejects_empty_name() -> None:
 
 def test_entei_from_beanie_collects_like_from_collection() -> None:
     import pydantable
-    from pydantable import EnteiDataFrame, Schema
+    from pydantable import MongoDataFrame, Schema
     from pydantable.engine import NativePolarsEngine
 
     if NativePolarsEngine is None:
@@ -72,7 +72,7 @@ def test_entei_from_beanie_collects_like_from_collection() -> None:
     class ItemDoc(_FakeBeanieDocument):
         pass
 
-    df = EnteiDataFrame[Row].from_beanie(ItemDoc, database=db)
+    df = MongoDataFrame[Row].from_beanie(ItemDoc, database=db)
     out = df.sort("x").collect(as_lists=True)
     assert out["x"] == [1, 2]
     assert out["y"] == ["a", "b"]

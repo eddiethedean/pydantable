@@ -14,13 +14,14 @@ or **lazy DataFrame transforms**.
 | Goal | Recommended API |
 |------|------------------|
 | **Eager** column-dict I/O with a sync PyMongo `Collection` | `fetch_mongo` / `iter_mongo` / `write_mongo` |
-| **Eager** column-dict I/O using Beanie async ODM features (no sync client) | `afetch_beanie` / `aiter_beanie` / `awrite_beanie` |
-| **Lazy** `DataFrame` API over a Mongo collection (typed transforms, then materialize) | `EnteiDataFrame` / `EnteiDataFrameModel` |
+| **Eager** column-dict I/O with `pymongo.asynchronous.AsyncCollection` | `afetch_mongo` / `aiter_mongo` / `awrite_mongo` (native async; see **PyMongo surface area** in {doc}`MONGO_ENGINE`) |
+| **Eager** column-dict I/O using Beanie async ODM features (full query DSL / hooks) | `afetch_beanie` / `aiter_beanie` / `awrite_beanie` |
+| **Lazy** `DataFrame` API over a Mongo collection (typed transforms, then materialize) | `MongoDataFrame` / `MongoDataFrameModel` (`from_beanie`, `from_beanie_async`, …) |
 
 For which PyMongo operations pydantable wraps on sync vs async collections (and what remains “use the driver directly”), see the **PyMongo surface area** subsection in {doc}`MONGO_ENGINE`.
 
 This page focuses on the Beanie-first pieces. For the engine details and the
-entei-core `MongoRoot` story, see {doc}`MONGO_ENGINE`.
+`MongoRoot` plan story, see {doc}`MONGO_ENGINE`.
 
 ## Install
 
@@ -32,7 +33,7 @@ This installs:
 
 - **Beanie** (ODM)
 - **pymongo** (driver)
-- **entei-core** (lazy Mongo roots + columnar materialization used by the Entei engine)
+- **Mongo plan stack** (lazy Mongo roots + columnar materialization used by **`MongoPydantableEngine`**)
 
 ## Beanie settings that matter
 
@@ -138,30 +139,30 @@ inserted = await awrite_beanie(MyDocument, {"x": [1, 2], "y": ["a", "b"]}, optio
 ```
 
 ```{important}
-`write_mongo` / `awrite_mongo` are driver-level `insert_many` helpers on a sync
-PyMongo collection. They **do not** run Beanie validation-on-save or event hooks.
+`write_mongo` / `awrite_mongo` are driver-level `insert_many` helpers on a PyMongo
+collection (sync or async). They **do not** run Beanie validation-on-save or event hooks.
 Use `awrite_beanie` when you need ODM semantics.
 ```
 
-## Lazy execution over Mongo (Entei) without a sync client
+## Lazy execution over Mongo without a sync client
 
 If you want the **typed lazy DataFrame API** over a Beanie `Document` without
 creating a sync PyMongo client, use the async-root constructors:
 
-- `EnteiDataFrame[Schema].from_beanie_async(...)`
-- `EnteiDataFrameModel.from_beanie_async(...)`
+- `MongoDataFrame[Schema].from_beanie_async(...)`
+- `MongoDataFrameModel.from_beanie_async(...)`
 
 ```python
-from pydantable import EnteiDataFrame, Schema
+from pydantable import MongoDataFrame, Schema
 
 class Row(Schema):
     id: str
     x: int
 
-df = EnteiDataFrame[Row].from_beanie_async(MyDocument, criteria=MyDocument.x > 0)
+df = MongoDataFrame[Row].from_beanie_async(MyDocument, criteria=MyDocument.x > 0)
 
 # Or pass a pre-built Beanie query (chains like ``.sort()`` / ``.project()`` — same rules as ``afetch_beanie``):
-# df = EnteiDataFrame[Row].from_beanie_async(MyDocument.find(MyDocument.x > 0).sort("-name"))
+# df = MongoDataFrame[Row].from_beanie_async(MyDocument.find(MyDocument.x > 0).sort("-name"))
 
 # IMPORTANT: async-only materialization
 rows = await df.acollect()

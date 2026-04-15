@@ -103,22 +103,24 @@ from .types import WKB
 
 if TYPE_CHECKING:
     from pydantable.mongo_beanie import sync_pymongo_collection
-    from pydantable.mongo_entei import (
-        EnteiDataFrame,
-        EnteiDataFrameModel,
-        EnteiPydantableEngine,
+    from pydantable.mongo_dataframe import (
+        MongoDataFrame,
+        MongoDataFrameModel,
+        MongoPydantableEngine,
         MongoRoot,
     )
-    from pydantable.sql_moltres import SqlDataFrame, SqlDataFrameModel
+    from pydantable.sql_dataframe import SqlDataFrame, SqlDataFrameModel
 
 
 def __getattr__(name: str) -> Any:
+    import warnings
+
     if name == "SqlDataFrame":
-        from pydantable.sql_moltres import SqlDataFrame
+        from pydantable.sql_dataframe import SqlDataFrame
 
         return SqlDataFrame
     if name == "SqlDataFrameModel":
-        from pydantable.sql_moltres import SqlDataFrameModel
+        from pydantable.sql_dataframe import SqlDataFrameModel
 
         return SqlDataFrameModel
     if name == "sync_pymongo_collection":
@@ -126,13 +128,31 @@ def __getattr__(name: str) -> Any:
 
         return sync_pymongo_collection
     if name in (
+        "MongoDataFrame",
+        "MongoDataFrameModel",
+        "MongoPydantableEngine",
+        "MongoRoot",
+    ):
+        import pydantable.mongo_dataframe as mongo_df
+
+        return getattr(mongo_df, name)
+    if name in (
         "EnteiDataFrame",
         "EnteiDataFrameModel",
         "EnteiPydantableEngine",
-        "MongoRoot",
     ):
         from pydantable import mongo_entei
 
+        _mongo_rename = {
+            "EnteiDataFrame": "MongoDataFrame",
+            "EnteiDataFrameModel": "MongoDataFrameModel",
+            "EnteiPydantableEngine": "MongoPydantableEngine",
+        }
+        warnings.warn(
+            f"{name} is deprecated; use {_mongo_rename[name]} instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return getattr(mongo_entei, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
@@ -145,11 +165,11 @@ __all__ = [
     "DataFrame",
     "DataFrameModel",
     "DtypeDriftWarning",
-    "EnteiDataFrame",
-    "EnteiDataFrameModel",
-    "EnteiPydantableEngine",
     "Expr",
     "MissingRustExtensionError",
+    "MongoDataFrame",
+    "MongoDataFrameModel",
+    "MongoPydantableEngine",
     "MongoRoot",
     "PlanMaterialization",
     "PydantableUserError",

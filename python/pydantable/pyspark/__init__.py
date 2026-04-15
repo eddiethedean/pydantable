@@ -16,16 +16,16 @@ from . import sql
 from .dataframe import DataFrame, DataFrameModel
 
 if TYPE_CHECKING:
-    from pydantable.pyspark.sql_moltres import SqlDataFrame, SqlDataFrameModel
+    from pydantable.pyspark.sql_dataframe import SqlDataFrame, SqlDataFrameModel
 
 
 def __getattr__(name: str) -> Any:
     if name == "SqlDataFrame":
-        from pydantable.pyspark.sql_moltres import SqlDataFrame as _SqlDataFrame
+        from pydantable.pyspark.sql_dataframe import SqlDataFrame as _SqlDataFrame
 
         return _SqlDataFrame
     if name == "SqlDataFrameModel":
-        from pydantable.pyspark.sql_moltres import (
+        from pydantable.pyspark.sql_dataframe import (
             SqlDataFrameModel as _SqlDataFrameModel,
         )
 

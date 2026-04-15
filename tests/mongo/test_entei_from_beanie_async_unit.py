@@ -1,4 +1,4 @@
-"""Unit tests for :meth:`EnteiDataFrame.from_beanie_async` and :class:`BeanieAsyncRoot`.
+"""Unit tests for :meth:`MongoDataFrame.from_beanie_async` and :class:`BeanieAsyncRoot`.
 
 These tests avoid a live MongoDB server; async materialization uses a patched
 ``afetch_beanie`` where execution coverage is needed.
@@ -13,7 +13,11 @@ import pytest
 pytest.importorskip("entei_core")
 
 from pydantable.engine import NativePolarsEngine
-from pydantable.mongo_entei import BeanieAsyncRoot, EnteiDataFrame, EnteiDataFrameModel
+from pydantable.mongo_dataframe import (
+    BeanieAsyncRoot,
+    MongoDataFrame,
+    MongoDataFrameModel,
+)
 from pydantable.schema import Schema
 
 
@@ -40,7 +44,7 @@ def test_from_beanie_async_requires_schema_parameterization() -> None:
     _require_native()
 
     with pytest.raises(TypeError, match="from_beanie_async"):
-        EnteiDataFrame.from_beanie_async(_Doc)  # type: ignore[call-arg]
+        MongoDataFrame.from_beanie_async(_Doc)  # type: ignore[call-arg]
 
 
 def test_from_beanie_async_beanie_async_root_document_class_and_kwargs() -> None:
@@ -48,7 +52,7 @@ def test_from_beanie_async_beanie_async_root_document_class_and_kwargs() -> None
 
     crit = object()
     ndpf = {"a": 2}
-    df = EnteiDataFrame[Row].from_beanie_async(
+    df = MongoDataFrame[Row].from_beanie_async(
         _Doc,
         criteria=crit,
         fields=("x", "label"),
@@ -74,7 +78,7 @@ def test_from_beanie_async_beanie_async_root_query_object() -> None:
     _require_native()
 
     query = object()
-    df = EnteiDataFrame[Row].from_beanie_async(
+    df = MongoDataFrame[Row].from_beanie_async(
         query,
         criteria=None,
         fields=None,
@@ -89,21 +93,21 @@ def test_from_beanie_async_beanie_async_root_query_object() -> None:
 def test_from_beanie_async_fields_none_passes_through() -> None:
     _require_native()
 
-    df = EnteiDataFrame[Row].from_beanie_async(_Doc, fields=None)
+    df = MongoDataFrame[Row].from_beanie_async(_Doc, fields=None)
     assert df._root_data.fields is None
 
 
 def test_from_beanie_async_uses_explicit_engine_instance() -> None:
     _require_native()
 
-    from pydantable.mongo_entei import EnteiPydantableEngine
+    from pydantable.mongo_dataframe import MongoPydantableEngine
 
-    eng = EnteiPydantableEngine()
-    df = EnteiDataFrame[Row].from_beanie_async(_Doc, engine=eng)
+    eng = MongoPydantableEngine()
+    df = MongoDataFrame[Row].from_beanie_async(_Doc, engine=eng)
     assert df._engine is eng
 
 
-class RowEnteiModel(EnteiDataFrameModel):
+class RowMongoModel(MongoDataFrameModel):
     x: int
     label: str | None = None
 
@@ -111,7 +115,7 @@ class RowEnteiModel(EnteiDataFrameModel):
 def test_entei_dataframe_model_from_beanie_async_wraps_inner_root() -> None:
     _require_native()
 
-    m = RowEnteiModel.from_beanie_async(_Doc, criteria=None, fields=("x",))
+    m = RowMongoModel.from_beanie_async(_Doc, criteria=None, fields=("x",))
     inner = m._df
     root = inner._root_data
     assert isinstance(root, BeanieAsyncRoot)
@@ -135,7 +139,7 @@ async def test_from_beanie_async_ato_dict_with_patched_afetch(monkeypatch: Any) 
     monkeypatch.setattr("pydantable.io.beanie.afetch_beanie", _fake_afetch)
 
     crit = object()
-    df = EnteiDataFrame[Row].from_beanie_async(
+    df = MongoDataFrame[Row].from_beanie_async(
         _Doc,
         criteria=crit,
         fetch_links=True,
@@ -161,7 +165,7 @@ async def test_from_beanie_async_acollect_with_patched_afetch(monkeypatch: Any) 
 
     monkeypatch.setattr("pydantable.io.beanie.afetch_beanie", _fake_afetch)
 
-    df = EnteiDataFrame[Row].from_beanie_async(_Doc)
+    df = MongoDataFrame[Row].from_beanie_async(_Doc)
     rows = await df.acollect()
     assert len(rows) == 1
     assert rows[0].model_dump() == {"x": 1, "label": None}
@@ -177,7 +181,7 @@ async def test_from_beanie_async_query_plus_criteria_raises_from_afetch(
     # Ensure we exercise real validation in pydantable.io.beanie (imports beanie).
     pytest.importorskip("beanie")
 
-    df = EnteiDataFrame[Row].from_beanie_async(
+    df = MongoDataFrame[Row].from_beanie_async(
         object(),
         criteria={"illegal": True},
     )
@@ -201,7 +205,7 @@ async def test_from_beanie_async_schema_mismatch_after_fetch_raises(
 
     monkeypatch.setattr("pydantable.io.beanie.afetch_beanie", _wrong_shape)
 
-    df = EnteiDataFrame[Row].from_beanie_async(_Doc)
+    df = MongoDataFrame[Row].from_beanie_async(_Doc)
     with pytest.raises(KeyError, match="required column"):
         await df.ato_dict()
 
@@ -215,6 +219,6 @@ async def test_from_beanie_async_afetch_error_propagates(monkeypatch: Any) -> No
 
     monkeypatch.setattr("pydantable.io.beanie.afetch_beanie", _boom)
 
-    df = EnteiDataFrame[Row].from_beanie_async(_Doc)
+    df = MongoDataFrame[Row].from_beanie_async(_Doc)
     with pytest.raises(RuntimeError, match="simulated fetch failure"):
         await df.ato_dict()

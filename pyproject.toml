@@ -29,8 +29,15 @@ arrow = ["pyarrow>=14.0"]
 polars = ["polars>=1.0.0,<2"]
 io = ["pyarrow>=14.0", "polars>=1.0.0,<2"]
 # read_sql / write_sql — SQLAlchemy 2.x; install DBAPI drivers for your URLs separately.
-# fetch_sqlmodel / iter_sqlmodel require SQLModel (install pydantable[sql]).
-sql = ["sqlalchemy>=2.0,<3", "sqlmodel>=0.0.22,<0.1"]
+# fetch_sqlmodel / iter_sqlmodel require SQLModel. Same extra includes lazy ``SqlDataFrame`` /
+# ``SqlDataFrameModel`` (moltres-core bridge) + ``greenlet`` for SQLAlchemy async helpers.
+# Install DB-API drivers for your URLs separately (``psycopg``, ``aiosqlite``, optional ``rapsqlite``, …).
+sql = [
+    "sqlalchemy>=2.0,<3",
+    "sqlmodel>=0.0.22,<0.1",
+    "moltres-core>=1.0.0,<2",
+    "greenlet>=3.0",
+]
 cloud = ["fsspec>=2023.0"]
 excel = ["openpyxl>=3.1"]
 kafka = ["kafka-python>=2.0"]
@@ -39,9 +46,7 @@ snowflake = ["snowflake-connector-python>=3.0"]
 rap = ["rapcsv>=0.2", "rapfiles>=0.1", "rapsqlite>=0.1"]
 # FastAPI integration helpers (pydantable.fastapi); optional at runtime.
 fastapi = ["fastapi>=0.100"]
-# Moltres SQL engine (moltres-core) — SqlDataFrame / SqlDataFrameModel; rapsqlite for async SQLAlchemy URLs
-moltres = ["moltres-core>=1.0.0,<2", "rapsqlite>=0.1", "greenlet>=3.0"]
-# MongoDB: ``entei-core``, ``pymongo``, and Beanie (``sync_pymongo_collection``, ``from_beanie``).
+# MongoDB: PyMongo + Beanie + optional Mongo plan roots (``sync_pymongo_collection``, ``MongoDataFrame.from_beanie``).
 mongo = ["entei-core>=0.2.0,<0.3", "pymongo>=4.6", "beanie>=1.24,<3"]
 dev = [
     "tomli>=1.2.0; python_version < '3.11'",
@@ -84,7 +89,7 @@ dev = [
     "entei-core>=0.2.0,<0.3",
     # Beanie — bundled in ``[mongo]``; listed for dev installs that do not use ``-e ".[mongo]"``.
     "beanie>=1.24,<3",
-    # SqlDataFrame / SqlDataFrameModel tests (same pin as optional ``[moltres]``).
+    # SqlDataFrame / SqlDataFrameModel tests (same pin as optional ``[sql]``).
     "moltres-core>=1.0.0,<2",
     # SQLAlchemy ``create_async_engine`` (rapsqlite smoke test in ``tests/sql/test_sql_moltres.py``).
     "greenlet>=3.0",
@@ -105,7 +110,7 @@ docs = [
     # SQLAlchemy forward refs on DataFrameModel I/O methods (matches CI docs job and RTD).
     "sqlalchemy>=2.0,<3",
     "sqlmodel>=0.0.22,<0.1",
-    # Mongo modules (``mongo_entei`` / ``mongo_entei_engine`` / ``mongo_beanie``) for Sphinx (CI ``docs`` job and RTD; same pins as ``[mongo]``).
+    # Mongo modules (``mongo_dataframe`` / ``mongo_dataframe_engine`` / ``mongo_beanie``) for Sphinx (CI ``docs`` job and RTD; same pins as ``[mongo]``).
     "entei-core>=0.2.0,<0.3",
     "pymongo>=4.6",
     "beanie>=1.24,<3",
@@ -195,10 +200,14 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 "tests/dataframe/test_async_materialization.py" = ["TC003"]
 "python/pydantable/testing/**/*.py" = ["TC003"]
 "python/pydantable/sql_moltres.py" = ["TC003"]
+"python/pydantable/sql_dataframe.py" = ["TC003"]
+"python/pydantable/mongo_dataframe.py" = ["TC003", "F822"]
 "python/pydantable/mongo_entei.py" = ["TC003", "F822"]
 "python/pydantable/mongo_beanie.py" = ["TC003"]
 "python/pydantable/pandas_moltres.py" = ["TC003"]
+"python/pydantable/pandas_sql_dataframe.py" = ["TC003"]
 "python/pydantable/pyspark/sql_moltres.py" = ["TC003", "TC001"]
+"python/pydantable/pyspark/sql_dataframe.py" = ["TC003", "TC001"]
 "python/pydantable/dataframe/_execution_handle.py" = ["TC003"]
 "python/pydantable/dataframe/_materialize_scan_fallback.py" = ["TC003"]
 "python/pydantable/dataframe/grouped.py" = ["TC003"]
@@ -207,7 +216,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 "tests/mongo/**/*.py" = ["TC003"]
 # ``__all__`` lists lazy ``SqlDataFrame`` / ``SqlDataFrameModel`` from ``__getattr__``.
 "python/pydantable/pandas.py" = ["F822"]
-# ``__all__`` lists lazy Mongo types (``mongo_entei`` / ``entei_core``) from ``__getattr__``.
+# ``__all__`` lists lazy Mongo types (``mongo_dataframe``) from ``__getattr__``.
 "python/pydantable/__init__.pyi" = ["F822"]
 "typings/pydantable/__init__.pyi" = ["F822"]
 "tests/conftest.py" = ["TC003"]
@@ -339,7 +348,7 @@ ignore_missing_imports = true
 module = "starlette.*"
 ignore_missing_imports = true
 
-# Optional: ``pydantable[moltres]`` / ``moltres-core``.
+# Optional: ``pydantable[sql]`` / ``moltres-core``.
 [[tool.mypy.overrides]]
 module = "moltres_core"
 ignore_missing_imports = true

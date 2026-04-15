@@ -1,32 +1,31 @@
 # Mongo: Beanie, lazy engine, and column-dict I/O
 
-**Primary model for MongoDB with PydanTable:** define collections with [Beanie](https://github.com/BeanieODM/beanie) **`Document`** subclasses, then wire **lazy** **`EnteiDataFrame`** / **`EnteiDataFrameModel`** and **eager** **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** through **`from_beanie`** and **`sync_pymongo_collection`**. Install **`pip install "pydantable[mongo]"`** (**entei-core**, **pymongo**, and **Beanie**).
+**Primary model for MongoDB with PydanTable:** define collections with [Beanie](https://github.com/BeanieODM/beanie) **`Document`** subclasses, then wire **lazy** **`MongoDataFrame`** / **`MongoDataFrameModel`** (**`from_beanie`**, **`from_beanie_async`**) and **eager** **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** (and async **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`**) through **`sync_pymongo_collection`** where you use a sync DB. Install **`pip install "pydantable[mongo]"`** (pulls **PyMongo**, **Beanie**, and the optional Mongo plan stack used by lazy frames). ODM-first patterns: {doc}`BEANIE`.
 
-**Also supported:** Pydantic **`Schema`** / **`EnteiDataFrameModel`** with **`from_collection(coll)`** when you already hold a **sync** PyMongo **`Collection`** and are not using Beanie. That path is fine for tests or thin scripts; for applications, prefer **Beanie** as the single source of truth for collection names, indexes, and document shape.
+**Also supported:** Pydantic **`Schema`** / **`MongoDataFrameModel`** with **`from_collection(coll)`** when you already hold a **sync** PyMongo **`Collection`** and are not using Beanie. That path is fine for tests or thin scripts; for applications, prefer **Beanie** as the single source of truth for collection names, indexes, and document shape.
 
-**Topics here:** (1) lazy **`EnteiDataFrame`** / **`EnteiDataFrameModel`** with pydantable’s **`EnteiPydantableEngine`**; (2) eager column-dict I/O — no **entei-core** required for (2) alone.
+**Topics here:** (1) lazy **`MongoDataFrame`** / **`MongoDataFrameModel`** with pydantable’s **`MongoPydantableEngine`**; (2) eager column-dict I/O — the plan stack is **not** required for (2) alone.
 
-This guide covers the **optional** integration between PydanTable,
-[**entei-core**](https://pypi.org/project/entei-core/) (**`MongoRoot`** and
-columnar scans), and **`pydantable.mongo_entei_engine.EnteiPydantableEngine`**, which
-implements the same **`ExecutionEngine`** protocol as **`pydantable.engine.protocols`**
-(from [**pydantable-protocol**](https://pypi.org/project/pydantable-protocol/) on PyPI;
+This guide covers the **optional** integration between PydanTable, the Mongo plan
+library ( **`MongoRoot`** and columnar scans — installed with **`[mongo]`**), and
+**`pydantable.mongo_dataframe_engine.MongoPydantableEngine`**, which implements the
+same **`ExecutionEngine`** protocol as **`pydantable.engine.protocols`** (from
+[**pydantable-protocol**](https://pypi.org/project/pydantable-protocol/) on PyPI;
 see {doc}`CUSTOM_ENGINE_PACKAGE`).
 
-**`MongoRoot`** (from **entei-core**) is a plan root that binds materialization to a
-MongoDB collection (via PyMongo). Planning still uses the **native** Rust planner;
-at execution time **`EnteiPydantableEngine`** turns **`MongoRoot`** into columnar
-**`dict[str, list]`** via **entei-core**, then runs the native executor.
+**`MongoRoot`** is a plan root that binds materialization to a MongoDB collection
+(via PyMongo). Planning still uses the **native** Rust planner; at execution time
+**`MongoPydantableEngine`** turns **`MongoRoot`** into columnar **`dict[str, list]`**
+via the plan library, then runs the native executor.
 
 The parallel SQL-backed story is {doc}`MOLTRES_SQL` (**`SqlDataFrame`** /
-**`SqlDataFrameModel`** with **moltres-core**).
+**`SqlDataFrameModel`** with the lazy-SQL stack).
 
-**Compatibility (1.17.0):** **`pydantable[mongo]`** pins **`entei-core`** to
-**`>=0.2.0,<0.3`** (see **`pyproject.toml`**). Install a matching **PyPI**
-**`entei-core`** release before using lazy **Entei** facades.
+**Compatibility (1.17.0):** **`pydantable[mongo]`** pins the Mongo plan package to
+**`>=0.2.0,<0.3`** (see **`pyproject.toml`**). Install matching releases before using lazy **`MongoDataFrame`** facades.
 
 ```{note}
-**Install:** ``pip install "pydantable[mongo]"`` pulls **entei-core**, **pymongo**, and **Beanie**. The core **pydantable** package does not import **entei-core** at import time; ``EnteiDataFrame`` / ``EnteiDataFrameModel`` and the lazy aliases below resolve only when accessed.
+**Install:** ``pip install "pydantable[mongo]"`` pulls **pymongo**, **Beanie**, and the Mongo plan stack. The core **pydantable** package does not import the plan stack at import time; ``MongoDataFrame`` / ``MongoDataFrameModel`` resolve only when accessed.
 ```
 
 ## When to use this
@@ -35,14 +34,14 @@ The parallel SQL-backed story is {doc}`MOLTRES_SQL` (**`SqlDataFrame`** /
 | ---- | --- |
 | Default Polars/Rust execution for in-memory or file-backed workflows | `DataFrame` / `DataFrameModel` (see {doc}`DATAFRAMEMODEL`, {doc}`EXECUTION`). |
 | **Eager** SQL I/O: load columns from a DB into a frame, or write tables | **`from pydantable import …`** — {doc}`IO_SQL` (**`fetch_sqlmodel`**, **`write_sqlmodel`**, …). |
-| **Eager** Mongo I/O: **`dict[str, list]`** in / out of a collection (no **`DataFrame`**) | **`fetch_mongo`**, **`iter_mongo`**, **`write_mongo`** — ideally with **`sync_pymongo_collection(MyDocument, sync_db)`** ({ref}`mongo-eager-beanie`). |
-| **Lazy execution** with transforms compiled to **SQL** (Moltres) | **`SqlDataFrame`** / **`SqlDataFrameModel`** — {doc}`MOLTRES_SQL`. |
-| **Lazy execution** over a **MongoDB collection** with the same typed **`DataFrame`** API | **`EnteiDataFrame`** / **`EnteiDataFrameModel`** — **prefer `from_beanie`** with a Beanie **`Document`**; see {ref}`mongo-primary-beanie`. |
+| **Eager** Mongo I/O: **`dict[str, list]`** in / out of a collection (no **`DataFrame`**) | **`fetch_mongo`**, **`iter_mongo`**, **`write_mongo`** and **`afetch_mongo`**, **`aiter_mongo`**, **`awrite_mongo`** — ideally with **`sync_pymongo_collection(MyDocument, sync_db)`** for sync **`Collection`** ({ref}`mongo-eager-beanie`); **`AsyncCollection`** uses native async (see **PyMongo surface area** below). |
+| **Lazy execution** with transforms compiled to **SQL** (lazy-SQL bridge) | **`SqlDataFrame`** / **`SqlDataFrameModel`** — {doc}`MOLTRES_SQL`. |
+| **Lazy execution** over a **MongoDB collection** with the same typed **`DataFrame`** API | **`MongoDataFrame`** / **`MongoDataFrameModel`** — **`from_beanie`** or **`from_beanie_async`** with a Beanie **`Document`** (or **`from_collection`**); see {ref}`mongo-primary-beanie` and {doc}`BEANIE`. |
 
 Eager SQL helpers materialize **column dicts** in Python; they do not replace
-`DataFrame._engine`. **`EnteiDataFrame`** uses **`EnteiPydantableEngine`** as that engine so
+`DataFrame._engine`. **`MongoDataFrame`** uses **`MongoPydantableEngine`** as that engine so
 `select`, `filter`, `collect`, etc. go through the native planner and executor (with
-**`MongoRoot`** materialized via **entei-core** when needed).
+**`MongoRoot`** materialized via the plan library when needed).
 
 (mongo-primary-beanie)=
 ## Primary path: Beanie `Document` models
@@ -51,7 +50,7 @@ Eager SQL helpers materialize **column dicts** in Python; they do not replace
 
 Beanie uses PyMongo’s **async** API (`AsyncMongoClient`, `AsyncDatabase`, …). Pydantable’s **`MongoRoot`** / **`fetch_mongo`** paths need a **sync** `pymongo.database.Database` and **`pymongo.collection.Collection`** (`find()`, `insert_many()`). Use a **synchronous** `MongoClient(uri).dbname` whose **database name** matches the **`AsyncDatabase`** you pass to **`await init_beanie(database=...)`**.
 
-- **`EnteiDataFrame[Row].from_beanie(MyDocument, database=sync_db)`** — lazy typed transforms over that collection.
+- **`MongoDataFrame[Row].from_beanie(MyDocument, database=sync_db)`** — lazy typed transforms over that collection.
 - **`fetch_mongo(sync_pymongo_collection(MyDocument, sync_db))`** — eager **`dict[str, list]`** without building a **`DataFrame`** plan.
 - **`write_mongo(sync_pymongo_collection(MyDocument, sync_db), data)`** — inserts from a rectangular column dict.
 
@@ -63,7 +62,7 @@ from pymongo import MongoClient
 from beanie import Document, init_beanie
 from pydantic import Field
 
-from pydantable import EnteiDataFrame, Schema, fetch_mongo, sync_pymongo_collection, write_mongo
+from pydantable import MongoDataFrame, Schema, fetch_mongo, sync_pymongo_collection, write_mongo
 
 
 class Item(Document):
@@ -82,14 +81,14 @@ async def setup(async_client, sync_uri: str) -> None:
     await init_beanie(database=async_client.myapp, document_models=[Item])
     # sync client for pydantable — same DB name as ``async_client.myapp``
     sync_db = MongoClient(sync_uri).myapp
-    df = EnteiDataFrame[Row].from_beanie(Item, database=sync_db)
+    df = MongoDataFrame[Row].from_beanie(Item, database=sync_db)
     cols = fetch_mongo(sync_pymongo_collection(Item, sync_db))
     _ = write_mongo(sync_pymongo_collection(Item, sync_db), {"x": [1], "label": ["a"]})
 ```
 
-### `EnteiDataFrameModel` with Beanie
+### `MongoDataFrameModel` with Beanie
 
-Use **`MyModel.from_beanie(Item, database=sync_db)`** on a concrete **`EnteiDataFrameModel`** subclass whose schema matches the documents you read.
+Use **`MyModel.from_beanie(Item, database=sync_db)`** on a concrete **`MongoDataFrameModel`** subclass whose schema matches the documents you read.
 
 (mongo-eager-beanie)=
 ### Eager column-dict I/O with Beanie
@@ -112,7 +111,7 @@ Prefer **`sync_pymongo_collection(DocumentClass, sync_db)`** as the **`collectio
 
 Same pattern as **SQL** eager helpers ({doc}`IO_SQL`): import **from `pydantable`**
 (not `pydantable.io` in application code). These use **PyMongo** only (they do **not**
-require **entei-core**), but **`pydantable[mongo]`** installs **pymongo** and **Beanie** for you.
+require the Mongo plan stack), but **`pydantable[mongo]`** installs **pymongo** and **Beanie** for you.
 
 If you are **not** using Beanie, pass any **sync** **`Collection`** you already have:
 
@@ -138,7 +137,7 @@ Pydantable’s optional Mongo helpers are built for **rectangular column dicts**
 
 **Low-level helpers** (also importable from **`pydantable`**): **`afetch_mongo_async`**, **`aiter_mongo_async`**, **`awrite_mongo_async`** — identical semantics but **only** for async collections.
 
-**Out of scope** (use PyMongo or Beanie directly): aggregation pipelines, change streams, GridFS, CSFLE, `bulk_write` / upserts, collations and other `find` options not listed above, and lazy **Entei** scan tuning inside **entei-core**’s `MongoRoot`.
+**Out of scope** (use PyMongo or Beanie directly): aggregation pipelines, change streams, GridFS, CSFLE, `bulk_write` / upserts, collations and other `find` options not listed above, and lazy scan tuning inside the plan library’s `MongoRoot`.
 
 ## Async-first Beanie ODM I/O (no sync Collection required)
 
@@ -165,12 +164,12 @@ Beanie can prefetch linked documents with ``fetch_links=True`` (and optional nes
 
 When you call **`afetch_beanie(..., fetch_links=True)`**, nested documents are flattened into **dot-path columns** by default (for example ``door.height``).
 
-## Async-first lazy execution (`EnteiDataFrame.from_beanie_async`)
+## Async-first lazy execution (`MongoDataFrame.from_beanie_async`)
 
-If you want the **lazy** `EnteiDataFrame` / `EnteiDataFrameModel` API over a Beanie `Document` without wiring a sync PyMongo client, use:
+If you want the **lazy** `MongoDataFrame` / `MongoDataFrameModel` API over a Beanie `Document` without wiring a sync PyMongo client, use:
 
-- **`EnteiDataFrame[Row].from_beanie_async(MyDocument, ...)`** — first argument can also be a **pre-built Beanie query** (e.g. `MyDocument.find(...).sort(...)`) with the same semantics as **`afetch_beanie`**.
-- **`MyModel.from_beanie_async(MyDocument, ...)`** (where `MyModel` subclasses `EnteiDataFrameModel`)
+- **`MongoDataFrame[Row].from_beanie_async(MyDocument, ...)`** — first argument can also be a **pre-built Beanie query** (e.g. `MyDocument.find(...).sort(...)`) with the same semantics as **`afetch_beanie`**.
+- **`MyModel.from_beanie_async(MyDocument, ...)`** (where `MyModel` subclasses `MongoDataFrameModel`)
 
 This root is **async-only**: materialize with **`await acollect()`** / **`await ato_dict()`**. Sync terminals (`collect`, `to_dict`, `write_parquet`, ...) will raise.
 
@@ -178,10 +177,10 @@ This root is **async-only**: materialize with **`await acollect()`** / **`await 
 
 You can skip Beanie and pass a **sync** PyMongo **`Collection`** directly. This is supported for **tests**, **prototypes**, or when another layer owns the driver—but **Beanie remains the recommended primary model** for application code.
 
-### `EnteiDataFrame`
+### `MongoDataFrame`
 
 ```python
-from pydantable import EnteiDataFrame, Schema
+from pydantable import MongoDataFrame, Schema
 
 
 class Row(Schema):
@@ -190,23 +189,23 @@ class Row(Schema):
 
 
 # coll = mongo_client.db.my_collection  # sync Collection
-df = EnteiDataFrame[Row].from_collection(coll)
+df = MongoDataFrame[Row].from_collection(coll)
 ```
 
 Optional **`fields=`** limits which document keys are read (defaults to all keys
 in the schema’s field map). Optional **`engine=`** reuses a single
-**`EnteiPydantableEngine`** across many frames.
+**`MongoPydantableEngine`** across many frames.
 
 Materialization (`collect`, `to_dict`, `acollect`, …) follows {doc}`EXECUTION` and
 uses the engine’s **`execute_plan`** / **`async_execute_plan`** entrypoints.
 
-### `EnteiDataFrameModel`
+### `MongoDataFrameModel`
 
 ```python
-from pydantable import EnteiDataFrameModel
+from pydantable import MongoDataFrameModel
 
 
-class RowModel(EnteiDataFrameModel):
+class RowModel(MongoDataFrameModel):
     x: int
     y: str | None = None
 
@@ -218,33 +217,33 @@ rows = m.rows()
 ## Imports
 
 ```python
-# Lazy (no entei-core import until accessed)
+# Lazy (Mongo plan stack not imported until accessed)
 from pydantable import (
-    EnteiDataFrame,
-    EnteiDataFrameModel,
-    EnteiPydantableEngine,
+    MongoDataFrame,
+    MongoDataFrameModel,
+    MongoPydantableEngine,
     MongoRoot,
     sync_pymongo_collection,
 )
 
-# Explicit (``EnteiPydantableEngine`` is defined in ``pydantable.mongo_entei_engine``)
-from pydantable.mongo_entei import (
-    EnteiDataFrame,
-    EnteiDataFrameModel,
-    EnteiPydantableEngine,
+# Explicit (``MongoPydantableEngine`` is defined in ``pydantable.mongo_dataframe_engine``)
+from pydantable.mongo_dataframe import (
+    MongoDataFrame,
+    MongoDataFrameModel,
+    MongoPydantableEngine,
 )
+# ``MongoRoot`` is defined by the optional Mongo plan package (``pip install "pydantable[mongo]"``).
 from entei_core import MongoRoot
 ```
 
-If **entei-core** is missing, constructing these classes or resolving the lazy
-aliases raises **ImportError** with an install hint (`pydantable[mongo]` or
-`entei-core`).
+If the Mongo plan stack is missing, constructing these classes or resolving the lazy
+aliases raises **ImportError** with an install hint (`pydantable[mongo]`).
 
 ## Engine and `MongoRoot` in application code
 
-For low-level tests or custom wiring, import **`EnteiPydantableEngine`** from
-**`pydantable`** (lazy) or **`pydantable.mongo_entei_engine`**, and **`MongoRoot`**
-from **`pydantable`** (lazy) or **`entei_core`**. **`MongoRoot(collection, fields=...)`**
+For low-level tests or custom wiring, import **`MongoPydantableEngine`** from
+**`pydantable`** (lazy) or **`pydantable.mongo_dataframe_engine`**, and **`MongoRoot`**
+from **`pydantable`** (lazy) or from the Mongo plan package module (``entei_core`` after ``[mongo]``). **`MongoRoot(collection, fields=...)`**
 is the root object passed into plan execution when data should be read from MongoDB
 rather than from an in-memory column dict.
 
@@ -254,4 +253,4 @@ rather than from an in-memory column dict.
 - {doc}`CUSTOM_ENGINE_PACKAGE` — third-party **`ExecutionEngine`** packages.
 - {doc}`ADR-engines` — engine abstraction overview.
 - {doc}`DEVELOPER` — **`make test-mongo`** runs **`tests/mongo/`** (e.g. **mongomock**);
-  **entei-core**’s own tests ship with that distribution.
+  the Mongo plan package’s own tests ship with that distribution.

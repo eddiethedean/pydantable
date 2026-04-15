@@ -2,11 +2,11 @@
 
 This is the **recommended** integration surface for MongoDB: define **Beanie**
 models, then use :func:`sync_pymongo_collection` and
-:meth:`pydantable.mongo_entei.EnteiDataFrame.from_beanie`.
+:meth:`pydantable.mongo_dataframe.MongoDataFrame.from_beanie`.
 
 `Beanie <https://beanie-odm.dev/>`_ drives collections through PyMongo's **async**
 API (``AsyncMongoClient``, ``AsyncDatabase``, ``AsyncCollection``). Pydantable's
-lazy :class:`~pydantable.mongo_entei.EnteiDataFrame` and eager helpers in
+lazy :class:`~pydantable.mongo_dataframe.MongoDataFrame` and eager helpers in
 :mod:`pydantable.io.mongo` use **sync** ``pymongo.collection.Collection``
 (``find()``, ``insert_many``, …).
 

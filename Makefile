@@ -102,7 +102,7 @@ diff-cover:
 test-moltres:
 	$(PYTHON) -m pytest -q -n auto tests/sql/test_sql_moltres.py
 
-# Mongo integration (``pydantable.mongo_entei`` + optional PyPI ``entei-core``); install ``entei-core`` / ``pydantable[mongo]``.
+# Mongo integration (``pydantable.mongo_dataframe``); install ``pydantable[mongo]``.
 test-mongo:
 	$(PYTHON) -m pytest -q tests/mongo
 

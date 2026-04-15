@@ -3182,11 +3182,13 @@ class DataFrameModel(PandasDataFrameModel):
 
 def __getattr__(name: str) -> Any:
     if name == "SqlDataFrame":
-        from pydantable.pandas_moltres import SqlDataFrame as _SqlDataFrame
+        from pydantable.pandas_sql_dataframe import SqlDataFrame as _SqlDataFrame
 
         return _SqlDataFrame
     if name == "SqlDataFrameModel":
-        from pydantable.pandas_moltres import SqlDataFrameModel as _SqlDataFrameModel
+        from pydantable.pandas_sql_dataframe import (
+            SqlDataFrameModel as _SqlDataFrameModel,
+        )
 
         return _SqlDataFrameModel
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

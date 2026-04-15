@@ -10,7 +10,7 @@ def test_sql_dataframe_model_concat_validates_inputs():
 
     _ = moltres  # keep importorskip referenced for clarity
 
-    from pydantable.pandas_moltres import SqlDataFrameModel
+    from pydantable.pandas_sql_dataframe import SqlDataFrameModel
 
     with pytest.raises(ValueError, match="at least two"):
         SqlDataFrameModel.concat([])

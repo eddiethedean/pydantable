@@ -1,12 +1,12 @@
-"""SqlDataFrame / SqlDataFrameModel (moltres-core) with SQLite and rapsqlite.
+"""SqlDataFrame / SqlDataFrameModel (lazy-SQL stack) with SQLite and rapsqlite.
 
-``MoltresPydantableEngine`` uses Moltres' synchronous :class:`sqlalchemy.engine.Engine`
+The optional lazy-SQL engine uses a synchronous :class:`sqlalchemy.engine.Engine`
 (``EngineConfig(dsn=...)``). Use **sync** SQLite URLs such as ``sqlite:///:memory:``.
 
 **rapsqlite** provides the ``sqlite+rapsqlite`` dialect for **async** SQLAlchemy
 (``create_async_engine``). That path is exercised here for async SQL I/O smoke tests;
 ``SqlDataFrame`` / ``SqlDataFrameModel`` async *terminals* (``ato_dict``, ``acollect``)
-still run against the sync engine (Moltres executes SQL in a thread pool).
+still run against the sync engine (SQL runs in a worker thread pool).
 """
 
 from __future__ import annotations
@@ -19,16 +19,16 @@ pytest.importorskip("moltres_core")
 
 from moltres_core import ConnectionManager, EngineConfig
 from pydantable import Schema
-from pydantable.sql_moltres import (
+from pydantable.sql_dataframe import (
     SqlDataFrame,
     SqlDataFrameModel,
-    moltres_engine_from_sql_config,
+    sql_engine_from_config,
 )
 from pydantable_protocol import UnsupportedEngineOperationError
 
-# Sync SQLAlchemy + stdlib sqlite — what ``moltres_engine_from_sql_config`` uses.
+# Sync SQLAlchemy + stdlib sqlite — what ``sql_engine_from_config`` uses.
 SQLITE_SYNC_MEMORY = "sqlite:///:memory:"
-# Async SQLAlchemy + rapsqlite (``pip install rapsqlite`` / ``pydantable[moltres]``).
+# Async SQLAlchemy + rapsqlite (``pip install rapsqlite``; optional, not in ``[sql]``).
 SQLITE_RAPSQLITE_ASYNC = "sqlite+rapsqlite:///:memory:"
 
 
@@ -54,8 +54,8 @@ def _sync_config() -> EngineConfig:
     return EngineConfig(dsn=SQLITE_SYNC_MEMORY)
 
 
-def test_moltres_engine_from_sql_config() -> None:
-    eng = moltres_engine_from_sql_config(_sync_config())
+def test_sql_engine_from_config() -> None:
+    eng = sql_engine_from_config(_sync_config())
     assert eng.capabilities.backend == "custom"
     assert eng.capabilities.has_async_execute_plan is True
 
@@ -65,15 +65,15 @@ def test_sql_dataframe_sql_config() -> None:
     assert df.to_dict() == {"id": [1, 2]}
 
 
-def test_sql_dataframe_explicit_moltres_engine() -> None:
-    eng = moltres_engine_from_sql_config(_sync_config())
-    df = SqlDataFrame[_S]({"id": [3]}, moltres_engine=eng)
+def test_sql_dataframe_explicit_sql_engine() -> None:
+    eng = sql_engine_from_config(_sync_config())
+    df = SqlDataFrame[_S]({"id": [3]}, sql_engine=eng)
     assert df.to_dict() == {"id": [3]}
 
 
 def test_sql_dataframe_engine_kwarg_wins_over_sql_config() -> None:
     """``engine=`` is resolved first; ``sql_config=`` may still be passed."""
-    eng = moltres_engine_from_sql_config(_sync_config())
+    eng = sql_engine_from_config(_sync_config())
     other = EngineConfig(dsn="sqlite:///:memory:")
     df = SqlDataFrame[_S]({"id": [7]}, engine=eng, sql_config=other)
     assert df.to_dict() == {"id": [7]}
@@ -137,7 +137,7 @@ async def test_sql_dataframe_model_acollect() -> None:
 
 @pytest.mark.asyncio
 async def test_rapsqlite_async_engine_smoke() -> None:
-    """Async SQLAlchemy + ``sqlite+rapsqlite`` (separate from Moltres sync pool)."""
+    """Async SQLAlchemy + ``sqlite+rapsqlite`` (separate from lazy-SQL sync pool)."""
     pytest.importorskip("rapsqlite")
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
@@ -150,10 +150,10 @@ async def test_rapsqlite_async_engine_smoke() -> None:
         await eng.dispose()
 
 
-def test_shared_moltres_engine_two_frames() -> None:
-    eng = moltres_engine_from_sql_config(_sync_config())
-    a = SqlDataFrame[_S]({"id": [1]}, moltres_engine=eng)
-    b = SqlDataFrame[_S]({"id": [2]}, moltres_engine=eng)
+def test_shared_sql_engine_two_frames() -> None:
+    eng = sql_engine_from_config(_sync_config())
+    a = SqlDataFrame[_S]({"id": [1]}, sql_engine=eng)
+    b = SqlDataFrame[_S]({"id": [2]}, sql_engine=eng)
     assert a.to_dict() == {"id": [1]}
     assert b.to_dict() == {"id": [2]}
 
@@ -175,7 +175,7 @@ def test_sql_dataframe_from_sql_table_lazy_file(tmp_path: Path) -> None:
 
     db_path = tmp_path / "lazy.db"
     cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
-    eng = moltres_engine_from_sql_config(cfg)
+    eng = sql_engine_from_config(cfg)
     cm = ConnectionManager(cfg)
     md = MetaData()
     t = Table(
@@ -189,7 +189,7 @@ def test_sql_dataframe_from_sql_table_lazy_file(tmp_path: Path) -> None:
         conn.execute(insert(t).values(id=1, label="x"))
         conn.commit()
 
-    df = SqlDataFrame[_W].from_sql_table(t, moltres_engine=eng)
+    df = SqlDataFrame[_W].from_sql_table(t, sql_engine=eng)
     assert type(df._root_data).__name__ == "SqlRootData"
     assert df.to_dict() == {"id": [1], "label": ["x"]}
     slim = df.select("id")
@@ -201,7 +201,7 @@ def test_sql_dataframe_model_read_sql_table_lazy(tmp_path: Path) -> None:
 
     db_path = tmp_path / "lazy2.db"
     cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
-    eng = moltres_engine_from_sql_config(cfg)
+    eng = sql_engine_from_config(cfg)
     cm = ConnectionManager(cfg)
     md = MetaData()
     t = Table(
@@ -215,12 +215,12 @@ def test_sql_dataframe_model_read_sql_table_lazy(tmp_path: Path) -> None:
         conn.execute(insert(t).values(id=2, label="y"))
         conn.commit()
 
-    m = _MW.read_sql_table(t, moltres_engine=eng)
+    m = _MW.read_sql_table(t, sql_engine=eng)
     assert m.to_dict() == {"id": [2], "label": ["y"]}
 
 
 def test_sql_dataframe_drop_slice_sort_in_memory() -> None:
-    """Documented Moltres-safe transforms: drop, head, slice, sort."""
+    """Documented lazy-SQL-safe transforms: drop, head, slice, sort."""
     df = SqlDataFrame[_W](
         {"id": [3, 1, 2], "label": ["c", "a", "b"]},
         sql_config=_sync_config(),
@@ -244,7 +244,7 @@ def test_sql_dataframe_from_sql_table_three_rows_sort_filter_not_used(
 
     db_path = tmp_path / "multi.db"
     cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
-    eng = moltres_engine_from_sql_config(cfg)
+    eng = sql_engine_from_config(cfg)
     cm = ConnectionManager(cfg)
     md = MetaData()
     t = Table(
@@ -259,7 +259,7 @@ def test_sql_dataframe_from_sql_table_three_rows_sort_filter_not_used(
             conn.execute(insert(t).values(id=i, label=lab))
         conn.commit()
 
-    df = SqlDataFrame[_W].from_sql_table(t, moltres_engine=eng)
+    df = SqlDataFrame[_W].from_sql_table(t, sql_engine=eng)
     assert df.sort("id").to_dict() == {"id": [1, 2, 3], "label": ["a", "b", "c"]}
     # Unordered SELECT: do not assert raw ``head`` row order; chain ``sort`` first.
     assert df.sort("id").head(2).to_dict() == {"id": [1, 2], "label": ["a", "b"]}
@@ -268,7 +268,7 @@ def test_sql_dataframe_from_sql_table_three_rows_sort_filter_not_used(
 def test_from_sql_table_accepts_sql_config_instead_of_engine(
     tmp_path: Path,
 ) -> None:
-    """``from_sql_table(..., sql_config=)`` must resolve a Moltres engine internally."""
+    """``from_sql_table(..., sql_config=)`` resolves a lazy-SQL engine internally."""
     from sqlalchemy import Column, Integer, MetaData, String, Table, insert
 
     db_path = tmp_path / "cfg_only.db"
@@ -318,7 +318,7 @@ async def test_sql_dataframe_model_async_chain_select(tmp_path: Path) -> None:
 
     db_path = tmp_path / "async_chain.db"
     cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
-    eng = moltres_engine_from_sql_config(cfg)
+    eng = sql_engine_from_config(cfg)
     cm = ConnectionManager(cfg)
     md = MetaData()
     t = Table(
@@ -332,7 +332,7 @@ async def test_sql_dataframe_model_async_chain_select(tmp_path: Path) -> None:
         conn.execute(insert(t).values(id=1, label="p"))
         conn.commit()
 
-    m = _MW.read_sql_table(t, moltres_engine=eng)
+    m = _MW.read_sql_table(t, sql_engine=eng)
     slim = m.select("id")
     assert await slim.ato_dict() == {"id": [1]}
 
@@ -348,7 +348,7 @@ def test_sqlmodel_table_lazy_read_sql_dataframe(tmp_path: Path) -> None:
 
     db_path = tmp_path / "sqlmodel.db"
     cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
-    eng = moltres_engine_from_sql_config(cfg)
+    eng = sql_engine_from_config(cfg)
     cm = ConnectionManager(cfg)
 
     SQLModel.metadata.create_all(cm.engine)
@@ -356,13 +356,13 @@ def test_sqlmodel_table_lazy_read_sql_dataframe(tmp_path: Path) -> None:
         session.add(Item(id=7, label="sm"))
         session.commit()
 
-    df = SqlDataFrame[_W].from_sql_table(Item.__table__, moltres_engine=eng)
+    df = SqlDataFrame[_W].from_sql_table(Item.__table__, sql_engine=eng)
     assert df.to_dict() == {"id": [7], "label": ["sm"]}
     assert df.select("label").to_dict() == {"label": ["sm"]}
 
 
 def test_sql_dataframe_expr_unsupported_message_consistent() -> None:
-    """Multiple Expr entrypoints surface Moltres in the error."""
+    """Multiple Expr entrypoints surface the backend name in the error."""
     df = SqlDataFrame[_W](
         {"id": [1], "label": ["x"]},
         sql_config=_sync_config(),
@@ -383,7 +383,7 @@ def test_sql_dataframe_from_sql_table_then_select_preserves_engine(
 
     db_path = tmp_path / "chain.db"
     cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
-    eng = moltres_engine_from_sql_config(cfg)
+    eng = sql_engine_from_config(cfg)
     cm = ConnectionManager(cfg)
     md = MetaData()
     t = Table(
@@ -397,7 +397,7 @@ def test_sql_dataframe_from_sql_table_then_select_preserves_engine(
         conn.execute(insert(t).values(id=1, label="z"))
         conn.commit()
 
-    base = SqlDataFrame[_W].from_sql_table(t, moltres_engine=eng)
+    base = SqlDataFrame[_W].from_sql_table(t, sql_engine=eng)
     slim = base.select("id")
     assert slim.to_dict() == {"id": [1]}
     assert slim.collect()[0].model_dump() == {"id": 1}
@@ -405,25 +405,25 @@ def test_sql_dataframe_from_sql_table_then_select_preserves_engine(
 
 def test_pandas_module_lazy_sql_exports() -> None:
     import pydantable.pandas as pd
-    from pydantable.pandas_moltres import SqlDataFrame as PandasSqlDF
+    from pydantable.pandas_sql_dataframe import SqlDataFrame as PandasSqlDF
 
     assert pd.SqlDataFrame is PandasSqlDF
 
 
 def test_pyspark_module_lazy_sql_exports() -> None:
     from pydantable import pyspark as ps
-    from pydantable.pyspark.sql_moltres import SqlDataFrame as SparkSqlDF
+    from pydantable.pyspark.sql_dataframe import SqlDataFrame as SparkSqlDF
 
     assert ps.SqlDataFrame is SparkSqlDF
 
 
 def test_pandas_moltres_sql_dataframe_sort_values(tmp_path: Path) -> None:
-    from pydantable.pandas_moltres import SqlDataFrame as PandasSqlDF
+    from pydantable.pandas_sql_dataframe import SqlDataFrame as PandasSqlDF
 
-    eng = moltres_engine_from_sql_config(
+    eng = sql_engine_from_config(
         EngineConfig(dsn=f"sqlite:///{tmp_path}/t.db"),
     )
-    df = PandasSqlDF[_S]({"id": [2, 1]}, moltres_engine=eng)
+    df = PandasSqlDF[_S]({"id": [2, 1]}, sql_engine=eng)
     out = df.sort_values("id")
     assert isinstance(out, PandasSqlDF)
     assert out.to_dict() == {"id": [1, 2]}
@@ -432,13 +432,13 @@ def test_pandas_moltres_sql_dataframe_sort_values(tmp_path: Path) -> None:
 def test_pyspark_moltres_sql_dataframe_order_by_preserves_engine(
     tmp_path: Path,
 ) -> None:
-    """``_as_pyspark_df`` keeps Moltres engine on the frame."""
-    from pydantable.pyspark.sql_moltres import SqlDataFrame as SparkSqlDF
+    """``_as_pyspark_df`` keeps the lazy-SQL engine on the frame."""
+    from pydantable.pyspark.sql_dataframe import SqlDataFrame as SparkSqlDF
 
-    eng = moltres_engine_from_sql_config(
+    eng = sql_engine_from_config(
         EngineConfig(dsn=f"sqlite:///{tmp_path}/w.db"),
     )
-    df = SparkSqlDF[_S]({"id": [2, 1]}, moltres_engine=eng)
+    df = SparkSqlDF[_S]({"id": [2, 1]}, sql_engine=eng)
     before = df._engine
     out = df.orderBy("id")
     assert isinstance(out, SparkSqlDF)
@@ -448,12 +448,12 @@ def test_pyspark_moltres_sql_dataframe_order_by_preserves_engine(
 
 def test_pyspark_moltres_sql_dataframe_to_df_preserves_engine(tmp_path: Path) -> None:
     """``toDF`` passes ``engine=`` through; materialize needs matching root columns."""
-    from pydantable.pyspark.sql_moltres import SqlDataFrame as SparkSqlDF
+    from pydantable.pyspark.sql_dataframe import SqlDataFrame as SparkSqlDF
 
-    eng = moltres_engine_from_sql_config(
+    eng = sql_engine_from_config(
         EngineConfig(dsn=f"sqlite:///{tmp_path}/todb.db"),
     )
-    df = SparkSqlDF[_S]({"id": [1]}, moltres_engine=eng)
+    df = SparkSqlDF[_S]({"id": [1]}, sql_engine=eng)
     out = df.toDF("pk")
     assert isinstance(out, SparkSqlDF)
     assert out._engine is df._engine

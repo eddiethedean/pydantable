@@ -116,12 +116,14 @@ async def test_real_mongo_beanie_fetch_links_flattening(
 
 
 @pytest.mark.asyncio
-async def test_real_mongo_entei_from_beanie_async(mongo_uri: str, db_name: str) -> None:
+async def test_real_mongo_dataframe_from_beanie_async(
+    mongo_uri: str, db_name: str
+) -> None:
     pytest.importorskip("entei_core")
     pytest.importorskip("beanie")
 
     from beanie import Document, init_beanie
-    from pydantable import EnteiDataFrame, Schema
+    from pydantable import MongoDataFrame, Schema
     from pymongo import AsyncMongoClient
 
     class Item(Document):
@@ -141,13 +143,13 @@ async def test_real_mongo_entei_from_beanie_async(mongo_uri: str, db_name: str) 
     class Row(Schema):
         name: str
 
-    df = EnteiDataFrame[Row].from_beanie_async(Item, criteria=(Item.name == "alpha"))
+    df = MongoDataFrame[Row].from_beanie_async(Item, criteria=(Item.name == "alpha"))
     out = await df.ato_dict()
     assert out == {"name": ["alpha"]}
 
     # Pre-built Beanie query object (same semantics as ``afetch_beanie``).
     q = Item.find(Item.name == "beta")
-    df2 = EnteiDataFrame[Row].from_beanie_async(q)
+    df2 = MongoDataFrame[Row].from_beanie_async(q)
     out2 = await df2.ato_dict()
     assert out2 == {"name": ["beta"]}
 

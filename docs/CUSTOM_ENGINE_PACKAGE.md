@@ -76,10 +76,8 @@ time, static checkers and :func:`isinstance` (with
 - **`NativePolarsEngine`** in **`pydantable-native`**: full implementation over
   **`pydantable_native._core`**.
 
-- **Third-party:** [**moltres-core**](https://pypi.org/project/moltres-core/) (PyPI)
-  ships **`MoltresPydantableEngine`** for SQL-backed execution in the Moltres stack;
-  see the upstream repository’s **`docs/PYDANTABLE_ENGINE.md`**. PydanTable user guide:
-  {doc}`MOLTRES_SQL` (**`SqlDataFrame`**, **`SqlDataFrameModel`**, **`pydantable[moltres]`**).
+- **Third-party:** the **lazy-SQL** optional stack (SQLAlchemy bridge + **`ExecutionEngine`**) ships alongside pydantable’s **`SqlDataFrame`** / **`SqlDataFrameModel`** path; see the bridge’s PyPI page and **`docs/PYDANTABLE_ENGINE.md`**. PydanTable user guide:
+  {doc}`MOLTRES_SQL` (**`SqlDataFrame`**, **`SqlDataFrameModel`**, **`pydantable[sql]`**).
 
 When **PydanTable** adds new protocol members, contract tests in this project
 (exercising **`typing_extensions.get_protocol_members`**) and release notes
@@ -175,8 +173,8 @@ typically expose your own ingestion APIs and **then** construct
 
 ## See also
 
-- {doc}`MOLTRES_SQL` — **`SqlDataFrame`** / **`SqlDataFrameModel`** with **moltres-core** (**`pydantable[moltres]`**).
-- {doc}`MONGO_ENGINE` — **`EnteiDataFrame`** / **`EnteiDataFrameModel`** (**`EnteiPydantableEngine`** in **`pydantable.mongo_entei_engine`**, **`MongoRoot`** from **entei-core**; façade **`pydantable.mongo_entei`**, **`pydantable[mongo]`**). Eager **`fetch_mongo`** / **`write_mongo`** (**PyMongo** column dicts) is separate from **`ExecutionEngine`** — not a third-party engine package.
+- {doc}`MOLTRES_SQL` — **`SqlDataFrame`** / **`SqlDataFrameModel`** with the lazy-SQL stack (**`pydantable[sql]`**).
+- {doc}`MONGO_ENGINE` — **`MongoDataFrame`** / **`MongoDataFrameModel`** (**`MongoPydantableEngine`** in **`pydantable.mongo_dataframe_engine`**, **`MongoRoot`** from the Mongo plan stack; façade **`pydantable.mongo_dataframe`**, **`pydantable[mongo]`**). Eager **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** and **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`** (**PyMongo** column dicts) are separate from **`ExecutionEngine`** — not a third-party engine package.
 - {doc}`ADR-engines` — architecture decisions and extension checklist.
 - {doc}`DEVELOPER` — repository layout and native packaging.
 - {doc}`EXECUTION` — how materialization uses the engine.

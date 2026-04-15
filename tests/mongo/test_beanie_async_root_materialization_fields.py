@@ -7,8 +7,8 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_beanie_async_root_materialization_passes_fields_none() -> None:
-    from pydantable.mongo_entei import BeanieAsyncRoot
-    from pydantable.mongo_entei_engine import _amaterialize_root_data
+    from pydantable.mongo_dataframe import BeanieAsyncRoot
+    from pydantable.mongo_dataframe_engine import _amaterialize_root_data
 
     root = BeanieAsyncRoot(document_or_query=type("Doc", (), {}), fields=None)
 
@@ -23,8 +23,8 @@ async def test_beanie_async_root_materialization_passes_fields_none() -> None:
 
 @pytest.mark.asyncio
 async def test_beanie_async_root_materialization_passes_fields_list() -> None:
-    from pydantable.mongo_entei import BeanieAsyncRoot
-    from pydantable.mongo_entei_engine import _amaterialize_root_data
+    from pydantable.mongo_dataframe import BeanieAsyncRoot
+    from pydantable.mongo_dataframe_engine import _amaterialize_root_data
 
     root = BeanieAsyncRoot(document_or_query=type("Doc", (), {}), fields=("a", "b"))
 

@@ -8,8 +8,8 @@ Use this page when you know **what you need to do**, but not **where it is docum
 - **Build an API with FastAPI**: {doc}`GOLDEN_PATH_FASTAPI` (shortest runnable path), then {doc}`FASTAPI` (common patterns + reference tables), and {doc}`FASTAPI_ADVANCED` (less-common async/I/O patterns). Roadmap → {doc}`FASTAPI_ENHANCEMENTS`; observability → {doc}`/cookbook/fastapi_observability`; background **`submit`** → {doc}`/cookbook/fastapi_background_tasks`; lazy async scans → {doc}`/cookbook/async_lazy_pipeline`. **Example layout:** `docs/examples/fastapi/service_layout/`. **Integration tests:** **`pydantable.testing.fastapi`** (**`fastapi_test_client`**, **`fastapi_app_with_executor`**).
 - **Understand execution/materialization costs**: {doc}`EXECUTION`; **four plan materialization modes** (blocking / async / deferred / chunked): {doc}`MATERIALIZATION`.
 - **Choose an I/O entrypoint**: {doc}`IO_DECISION_TREE`, then the per-format pages under {doc}`IO_OVERVIEW`.
-- **Optional swap-in engines (keep the `DataFrame` API; different backends)**: {doc}`MOLTRES_SQL` (**`pydantable[moltres]`**, SQL), {doc}`MONGO_ENGINE` (**`pydantable[mongo]`** — **entei-core**, **pymongo**, **Beanie**; prefer [Beanie](https://github.com/BeanieODM/beanie) **`Document`** for lazy **`EnteiDataFrame`** / eager I/O), {doc}`CUSTOM_ENGINE_PACKAGE` (ship your own **`ExecutionEngine`**).
-- **Beanie-specific Mongo patterns** (async ODM I/O, projections, links, hooks): {doc}`BEANIE`.
+- **Optional swap-in engines (keep the `DataFrame` API; different backends)**: {doc}`MOLTRES_SQL` (**`pydantable[sql]`**, SQL), {doc}`MONGO_ENGINE` (**`pydantable[mongo]`** — **PyMongo**, **Beanie**, Mongo plan stack; lazy **`MongoDataFrame`** via **`from_beanie`** / **`from_beanie_async`** / **`from_collection`**; eager **`dict[str, list]`** via **`fetch_mongo`** / **`write_mongo`** and async mirrors — see **PyMongo surface area** there), {doc}`CUSTOM_ENGINE_PACKAGE` (ship your own **`ExecutionEngine`**).
+- **Beanie-first Mongo** (ODM queries, projections, links, hooks, **`afetch_beanie`** / **`awrite_beanie`**): {doc}`BEANIE`.
 - **Know what behavior is guaranteed (joins/nulls/windows/order)**: {doc}`INTERFACE_CONTRACT`.
 - **Understand versioning/semver expectations**: {doc}`VERSIONING`.
 - **Learn supported dtypes and edge cases**: {doc}`SUPPORTED_TYPES`.
@@ -48,8 +48,8 @@ Use this page when you know **what you need to do**, but not **where it is docum
 - **Developer guide**: {doc}`DEVELOPER`
 - **Execution engine abstraction (ADR)**: {doc}`ADR-engines`
 - **Custom engine package (third-party backends)**: {doc}`CUSTOM_ENGINE_PACKAGE`
-- **Moltres SQL engine (`SqlDataFrame` / `SqlDataFrameModel`, optional `pydantable[moltres]`)**: {doc}`MOLTRES_SQL`
-- **Mongo engine (`pydantable[mongo]` + Beanie `Document` preferred)**: {doc}`MONGO_ENGINE` (**`EnteiPydantableEngine`**, **entei-core** **`MongoRoot`**; **`from_beanie`** / **`sync_pymongo_collection`**; eager **`fetch_mongo`** / **`write_mongo`**).
+- **Lazy SQL DataFrame (`SqlDataFrame` / `SqlDataFrameModel`, optional `pydantable[sql]`)**: {doc}`MOLTRES_SQL`
+- **Mongo engine (`pydantable[mongo]` + Beanie `Document` preferred)**: {doc}`MONGO_ENGINE` (**`MongoPydantableEngine`**, **`MongoRoot`** from the Mongo plan stack; **`from_beanie`** / **`from_beanie_async`** / **`sync_pymongo_collection`**; eager **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`**, **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`**, optional **`is_async_mongo_collection`** / **`*_mongo_async`**).
 - **Performance notes**: {doc}`PERFORMANCE`
 - **Changelog**: {doc}`CHANGELOG`
 - **Troubleshooting / FAQ**: {doc}`TROUBLESHOOTING`
