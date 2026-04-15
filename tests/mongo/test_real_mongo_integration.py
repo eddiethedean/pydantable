@@ -177,9 +177,7 @@ async def test_real_mongo_afetch_mongo_uses_native_async_driver(
     n = await awrite_mongo(coll, {"k": [1, 2, 3], "v": [10, 20, 30]})
     assert n == 3
 
-    out = await afetch_mongo(
-        coll, sort=[("k", 1)], skip=1, limit=1, fields=["k", "v"]
-    )
+    out = await afetch_mongo(coll, sort=[("k", 1)], skip=1, limit=1, fields=["k", "v"])
     assert out == {"k": [2], "v": [20]}
 
     batches = [b async for b in aiter_mongo(coll, batch_size=2)]

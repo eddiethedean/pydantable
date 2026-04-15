@@ -49,7 +49,15 @@ from .iter_file import (
     iter_ndjson,
     iter_parquet,
 )
-from .mongo import fetch_mongo, iter_mongo, write_mongo
+from .mongo import (
+    afetch_mongo_async,
+    aiter_mongo_async,
+    awrite_mongo_async,
+    fetch_mongo,
+    is_async_mongo_collection,
+    iter_mongo,
+    write_mongo,
+)
 from .rap_support import aread_csv_rap, rap_csv_available
 from .sql import (
     StreamingColumns,
@@ -378,8 +386,11 @@ async def afetch_mongo(
     match: Mapping[str, Any] | None = None,
     projection: Any = None,
     sort: Sequence[tuple[str, int]] | None = None,
+    skip: int | None = None,
     limit: int | None = None,
     fields: Sequence[str] | None = None,
+    session: Any | None = None,
+    max_time_ms: int | None = None,
     executor: Executor | None = None,
 ) -> dict[str, list[Any]]: ...
 async def aiter_mongo(
@@ -388,9 +399,12 @@ async def aiter_mongo(
     match: Mapping[str, Any] | None = None,
     projection: Any = None,
     sort: Sequence[tuple[str, int]] | None = None,
+    skip: int | None = None,
     limit: int | None = None,
     batch_size: int = 1000,
     fields: Sequence[str] | None = None,
+    session: Any | None = None,
+    max_time_ms: int | None = None,
     executor: Executor | None = None,
 ): ...
 async def awrite_mongo(
@@ -399,6 +413,7 @@ async def awrite_mongo(
     *,
     ordered: bool = True,
     chunk_size: int | None = None,
+    session: Any | None = None,
     executor: Executor | None = None,
 ) -> int: ...
 async def awrite_sql(
@@ -486,6 +501,7 @@ __all__ = [
     "aexport_parquet",
     "afetch_beanie",
     "afetch_mongo",
+    "afetch_mongo_async",
     "afetch_sql",
     "afetch_sql_raw",
     "afetch_sqlmodel",
@@ -495,6 +511,7 @@ __all__ = [
     "aiter_json_array",
     "aiter_json_lines",
     "aiter_mongo",
+    "aiter_mongo_async",
     "aiter_ndjson",
     "aiter_parquet",
     "aiter_sql",
@@ -516,6 +533,7 @@ __all__ = [
     "arrow_table_to_column_dict",
     "awrite_beanie",
     "awrite_mongo",
+    "awrite_mongo_async",
     "awrite_sql",
     "awrite_sql_batches",
     "awrite_sql_raw",
@@ -536,6 +554,7 @@ __all__ = [
     "fetch_sql_raw",
     "fetch_sqlmodel",
     "http",
+    "is_async_mongo_collection",
     "iter_avro",
     "iter_bigquery",
     "iter_chain_batches",
