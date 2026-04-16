@@ -54,6 +54,12 @@ python docs/examples/io/csv_lazy_roundtrip.py
 
 --8<-- "examples/io/csv_lazy_roundtrip.py"
 
+### Output
+
+```text
+--8<-- "examples/io/csv_lazy_roundtrip.py.out.txt"
+```
+
 ## See also
 
 [IO_OVERVIEW](/io/overview.md) · [IO_HTTP](/io/http.md) · [EXECUTION](/user-guide/execution.md)

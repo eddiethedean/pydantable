@@ -1,0 +1,1 @@
+extras_stdin_stdout: ok

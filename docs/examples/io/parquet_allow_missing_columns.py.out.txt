@@ -1,0 +1,1 @@
+parquet_allow_missing_columns: ok

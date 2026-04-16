@@ -119,6 +119,12 @@ From a source tree without installing the package, set **`PYTHONPATH=python`** (
 
 --8<-- "examples/io/overview_roundtrip.py"
 
+### Output
+
+```text
+--8<-- "examples/io/overview_roundtrip.py.out.txt"
+```
+
 ## Lazy **`scan_kwargs`** and sink **`write_kwargs`**
 
 Optional Polars scan/write options are accepted as **`**scan_kwargs`** on lazy file reads and **`write_kwargs={...}`** on lazy file writes (same on **`DataFrame`** / **`DataFrameModel`**). Allowed keys are validated in Rust; unknown keys raise **`ValueError`**. The full matrix lives in [DATA_IO_SOURCES](/io/data-io-sources.md) (**Lazy read `**scan_kwargs` and write `write_kwargs`**).

@@ -54,6 +54,12 @@ python docs/examples/io/extras_stdin_stdout.py
 
 --8<-- "examples/io/extras_stdin_stdout.py"
 
+#### Output
+
+```text
+--8<-- "examples/io/extras_stdin_stdout.py.out.txt"
+```
+
 ### Optional: Excel (`pydantable[excel]`)
 
 Install **`pydantable[excel]`** (openpyxl). **`read_excel`** / **`iter_excel`** live in **`pydantable.io.extras`**; they return **`dict[str, list]`** batches (not a Polars lazy scan). Wrap with **`DataFrameModel(...)`** for typed rows. See the module docstrings for **`experimental=True`** and **`batch_size`**.

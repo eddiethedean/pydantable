@@ -1,0 +1,1 @@
+parquet_partitioned_write: ok

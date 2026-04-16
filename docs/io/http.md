@@ -64,6 +64,12 @@ The script uses **`read_parquet_url`** from **`pydantable.io`** so it can **`os.
 
 --8<-- "examples/io/http_local_fetch.py"
 
+### Output
+
+```text
+--8<-- "examples/io/http_local_fetch.py.out.txt"
+```
+
 ## See also
 
 [IO_OVERVIEW](/io/overview.md) · [IO_PARQUET](/io/parquet.md) · [IO_CSV](/io/csv.md) · [IO_NDJSON](/io/ndjson.md) · [FASTAPI](/integrations/fastapi/fastapi.md) (thread-pool patterns for I/O)

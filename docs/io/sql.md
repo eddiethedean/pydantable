@@ -127,8 +127,29 @@ Requires **`pydantable[sql]`** (SQLModel + SQLAlchemy). Uses a **`SQLModel`** cl
 python docs/examples/io/sql_sqlite_sqlmodel_roundtrip.py
 ```
 
+??? note "Setup (optional: create a temp SQLite DB)"
+
+    The example script is fully runnable as-is. The setup is just a temp directory + engine:
+
+    ```python
+    import tempfile
+    from pathlib import Path
+
+    from sqlmodel import create_engine
+
+    with tempfile.TemporaryDirectory() as td:
+        db = Path(td) / "app.db"
+        eng = create_engine(f"sqlite:///{db}")
+    ```
+
 
 --8<-- "examples/io/sql_sqlite_sqlmodel_roundtrip.py"
+
+### Output
+
+```text
+--8<-- "examples/io/sql_sqlite_sqlmodel_roundtrip.py.out.txt"
+```
 
 **Raw string SQL** (**`fetch_sql_raw`**, **`iter_sql_raw`**, **`write_sql_raw`**) and **streaming batches** are documented in the reference sections above; they are not duplicated as separate runnable snippets here.
 

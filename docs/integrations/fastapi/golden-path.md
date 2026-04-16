@@ -54,6 +54,18 @@ cd docs/examples/fastapi
 uvicorn golden_path_app:app --reload
 ```
 
+### Script output (running the file)
+
+If you run the example file directly (without starting a server), it executes a small self-check:
+
+```bash
+PYTHONPATH=python python docs/examples/fastapi/golden_path_app.py
+```
+
+```text
+--8<-- "examples/fastapi/golden_path_app.py.out.txt"
+```
+
 ```bash
 curl -s localhost:8000/health
 curl -s localhost:8000/api/v1/users \

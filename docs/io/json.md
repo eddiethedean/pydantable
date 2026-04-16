@@ -36,6 +36,12 @@ python docs/examples/io/large_ndjson_patterns.py
 
 --8<-- "examples/io/large_ndjson_patterns.py"
 
+### Output
+
+```text
+--8<-- "examples/io/large_ndjson_patterns.py.out.txt"
+```
+
 ## NDJSON scan kwargs (presets)
 
 Typed and untyped lazy reads accept **``**scan_kwargs``** forwarded to Polars (see [DATA_IO_SOURCES](/io/data-io-sources.md)). **``read_json``** uses the same allowlist as **``read_ndjson``**. For **NDJSON / JSON Lines**, allowed keys include:

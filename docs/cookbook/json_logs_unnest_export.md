@@ -18,7 +18,7 @@ PYTHONPATH=python python docs/examples/cookbook/json_logs_unnest_export.py
 ```
 
 ```text
-json_logs_unnest_export: ok
+--8<-- "examples/cookbook/json_logs_unnest_export.py.out.txt"
 ```
 
 ## Notes

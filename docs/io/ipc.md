@@ -52,6 +52,12 @@ python docs/examples/io/ipc_roundtrip.py
 
 --8<-- "examples/io/ipc_roundtrip.py"
 
+### Output
+
+```text
+--8<-- "examples/io/ipc_roundtrip.py.out.txt"
+```
+
 ## See also
 
 [IO_OVERVIEW](/io/overview.md) · [EXECUTION](/user-guide/execution.md) · [SUPPORTED_TYPES](/user-guide/supported-types.md) (Arrow interchange)

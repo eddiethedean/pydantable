@@ -90,6 +90,12 @@ python docs/examples/io/parquet_lazy_roundtrip.py
 
 --8<-- "examples/io/parquet_lazy_roundtrip.py"
 
+### Output
+
+```text
+--8<-- "examples/io/parquet_lazy_roundtrip.py.out.txt"
+```
+
 **Partitioned write → hive read**:
 
 ```bash
@@ -98,6 +104,12 @@ python docs/examples/io/parquet_partitioned_write.py
 
 
 --8<-- "examples/io/parquet_partitioned_write.py"
+
+### Output
+
+```text
+--8<-- "examples/io/parquet_partitioned_write.py.out.txt"
+```
 
 ## See also
 

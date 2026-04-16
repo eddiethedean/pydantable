@@ -52,6 +52,12 @@ python docs/examples/io/ndjson_roundtrip.py
 
 --8<-- "examples/io/ndjson_roundtrip.py"
 
+### Output
+
+```text
+--8<-- "examples/io/ndjson_roundtrip.py.out.txt"
+```
+
 Large-file patterns (lazy scan; optional **`iter_ndjson`** batches in [IO_JSON](/io/json.md)): **`python docs/examples/io/large_ndjson_patterns.py`**.
 
 ## See also
