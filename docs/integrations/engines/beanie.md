@@ -14,14 +14,14 @@ or **lazy DataFrame transforms**.
 | Goal | Recommended API |
 |------|------------------|
 | **Eager** column-dict I/O with a sync PyMongo `Collection` | `fetch_mongo` / `iter_mongo` / `write_mongo` |
-| **Eager** column-dict I/O with `pymongo.asynchronous.AsyncCollection` | `afetch_mongo` / `aiter_mongo` / `awrite_mongo` (native async; see **PyMongo surface area** in [MONGO_ENGINE](/integrations/engines/mongo.md)) |
+| **Eager** column-dict I/O with `pymongo.asynchronous.AsyncCollection` | `afetch_mongo` / `aiter_mongo` / `awrite_mongo` (native async; see **PyMongo surface area** in [MONGO_ENGINE](/integrations/engines/mongo/)) |
 | **Eager** column-dict I/O using Beanie async ODM features (full query DSL / hooks) | `afetch_beanie` / `aiter_beanie` / `awrite_beanie` |
 | **Lazy** `DataFrame` API over a Mongo collection (typed transforms, then materialize) | `MongoDataFrame` / `MongoDataFrameModel` (`from_beanie`, `from_beanie_async`, …) |
 
-For which PyMongo operations pydantable wraps on sync vs async collections (and what remains “use the driver directly”), see the **PyMongo surface area** subsection in [MONGO_ENGINE](/integrations/engines/mongo.md).
+For which PyMongo operations pydantable wraps on sync vs async collections (and what remains “use the driver directly”), see the **PyMongo surface area** subsection in [MONGO_ENGINE](/integrations/engines/mongo/).
 
 This page focuses on the Beanie-first pieces. For the engine details and the
-`MongoRoot` plan story, see [MONGO_ENGINE](/integrations/engines/mongo.md).
+`MongoRoot` plan story, see [MONGO_ENGINE](/integrations/engines/mongo/).
 
 ## Install
 
@@ -185,5 +185,5 @@ PydanTable does not run migrations for you, but the recommended workflow is:
 - run Beanie migrations when document shape changes
 - keep your pydantable `Schema` / `DataFrameModel` types aligned with the *post-migration* shape
 
-For engine-backed lazy execution details, see [MONGO_ENGINE](/integrations/engines/mongo.md).
+For engine-backed lazy execution details, see [MONGO_ENGINE](/integrations/engines/mongo/).
 

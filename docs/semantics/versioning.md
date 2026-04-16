@@ -1,13 +1,13 @@
 # Versioning and stability (0.x and 1.x)
 
-PydanTable is **1.x** today. This page states how maintainers use **semver** on the stable train. **Behavioral** guarantees for transforms, nulls, joins, windows, materialization, and interchange live in [INTERFACE_CONTRACT](/semantics/interface-contract.md)—treat that document as the semantics source of truth.
+PydanTable is **1.x** today. This page states how maintainers use **semver** on the stable train. **Behavioral** guarantees for transforms, nulls, joins, windows, materialization, and interchange live in [INTERFACE_CONTRACT](/semantics/interface-contract/)—treat that document as the semantics source of truth.
 
 ## 0.x.y releases (historical)
 
 - **Patch (`y`)** — Bug fixes, documentation-only updates, internal refactors, and test hardening that do **not** change documented public behavior.
 - **Minor (`0.x`)** — **Additive** changes: new `Expr` methods, new optional parameters with safe defaults, new documented APIs, or clarified contracts that align docs with long-standing behavior. **Changelog** entries should call out anything users might need to adopt consciously.
 
-**Breaking changes before 1.0** should be rare. When they are necessary, ship them in a **minor** bump with explicit **migration** notes in [CHANGELOG](/project/changelog.md) (and, if large, a short section in [ROADMAP](/project/roadmap.md)).
+**Breaking changes before 1.0** should be rare. When they are necessary, ship them in a **minor** bump with explicit **migration** notes in [CHANGELOG](/project/changelog/) (and, if large, a short section in [ROADMAP](/project/roadmap/)).
 
 ## Python package and Rust extension
 
@@ -15,7 +15,7 @@ PydanTable is **1.x** today. This page states how maintainers use **semver** on 
 
 ## Path to 1.0
 
-The production-ready **`v1.0.0`** bar—semver policy for 1.x, packaging checklist, support matrix, and comms—is described under **Planned v1.0.0** in [ROADMAP](/project/roadmap.md).
+The production-ready **`v1.0.0`** bar—semver policy for 1.x, packaging checklist, support matrix, and comms—is described under **Planned v1.0.0** in [ROADMAP](/project/roadmap/).
 
 ## 1.x policy (effective at `v1.0.0`)
 
@@ -23,7 +23,7 @@ For **1.x**, `pydantable` follows semantic versioning with the boundaries below.
 
 ### Source of truth
 
-- **Behavioral semantics** (joins, null handling, windows, materialization, reshape rules) are defined in [INTERFACE_CONTRACT](/semantics/interface-contract.md).
+- **Behavioral semantics** (joins, null handling, windows, materialization, reshape rules) are defined in [INTERFACE_CONTRACT](/semantics/interface-contract/).
 - **Versioning policy** (what kind of release is required for a change) is defined here.
 - If these documents conflict, maintainers must update one of them before release.
 
@@ -51,7 +51,7 @@ Major releases are required for breaking changes, including:
 
 - Removing/renaming public methods or parameters.
 - Changing default behavior in a way that can alter outputs or errors for existing code.
-- Changing documented semantics in [INTERFACE_CONTRACT](/semantics/interface-contract.md) incompatibly.
+- Changing documented semantics in [INTERFACE_CONTRACT](/semantics/interface-contract/) incompatibly.
 
 ### Rust extension boundary (`pydantable_native._core`)
 
@@ -71,12 +71,12 @@ The following deprecated parameters are scheduled for removal in **`2.0.0`** (a 
 
 - **`as_polars=`** on **`DataFrame.collect`**, **`DataFrame.acollect`**, and the **`DataFrameModel`** collection shims — use **`to_polars()`** / **`ato_polars()`** (and **`collect(as_lists=True)`** / **`to_dict()`** for columnar dicts).
 
-The following **legacy string-SQL I/O** names are **deprecated** as of **v1.13.0**; they emit **`DeprecationWarning`** at runtime. Use **`fetch_sql_raw`**, **`iter_sql_raw`**, **`write_sql_raw`**, **`afetch_sql_raw`**, **`aiter_sql_raw`**, **`awrite_sql_raw`**, or SQLModel-first **`fetch_sqlmodel`** / **`iter_sqlmodel`** / **`write_sqlmodel`** (and **`DataFrameModel`** mirrors) instead. These aliases are scheduled for removal in **`2.0.0`** (exact timeline subject to [SQLMODEL_SQL_ROADMAP](/project/sqlmodel-sql-roadmap.md)):
+The following **legacy string-SQL I/O** names are **deprecated** as of **v1.13.0**; they emit **`DeprecationWarning`** at runtime. Use **`fetch_sql_raw`**, **`iter_sql_raw`**, **`write_sql_raw`**, **`afetch_sql_raw`**, **`aiter_sql_raw`**, **`awrite_sql_raw`**, or SQLModel-first **`fetch_sqlmodel`** / **`iter_sqlmodel`** / **`write_sqlmodel`** (and **`DataFrameModel`** mirrors) instead. These aliases are scheduled for removal in **`2.0.0`** (exact timeline subject to [SQLMODEL_SQL_ROADMAP](/project/sqlmodel-sql-roadmap/)):
 
 - **`fetch_sql`**, **`iter_sql`**, **`write_sql`**, **`afetch_sql`**, **`aiter_sql`**, **`awrite_sql`**, **`write_sql_batches`**, **`awrite_sql_batches`**
 
 ## Related documentation
 
-- [INTERFACE_CONTRACT](/semantics/interface-contract.md) — guaranteed behavior for the typed API.
-- [CHANGELOG](/project/changelog.md) — release-by-release highlights.
-- [DEVELOPER](/project/developer.md) — build, test, and tagging workflow.
+- [INTERFACE_CONTRACT](/semantics/interface-contract/) — guaranteed behavior for the typed API.
+- [CHANGELOG](/project/changelog/) — release-by-release highlights.
+- [DEVELOPER](/project/developer/) — build, test, and tagging workflow.

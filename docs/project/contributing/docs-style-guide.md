@@ -18,19 +18,19 @@ Avoid mixing older terms like “read_* returns dict-of-lists” in new docs; th
 
 - Every recipe/tutorial should be **copy/paste runnable**.
 - Prefer **small deterministic assertions**.
-- When row order is not guaranteed, sort by identity keys before comparing (see [INTERFACE_CONTRACT](/semantics/interface-contract.md)).
+- When row order is not guaranteed, sort by identity keys before comparing (see [INTERFACE_CONTRACT](/semantics/interface-contract/)).
 - Keep snippets **offline** (no network). For HTTP examples, show structure but don’t require a live URL.
 
 ## Cross-linking
 
-- When documenting behavior, link to [INTERFACE_CONTRACT](/semantics/interface-contract.md).
-- When discussing performance/materialization, link to [EXECUTION](/user-guide/execution.md).
-- When discussing I/O entrypoints, link to [IO_DECISION_TREE](/io/decision-tree.md).
+- When documenting behavior, link to [INTERFACE_CONTRACT](/semantics/interface-contract/).
+- When discussing performance/materialization, link to [EXECUTION](/user-guide/execution/).
+- When discussing I/O entrypoints, link to [IO_DECISION_TREE](/io/decision-tree/).
 
 ## Versioning notes
 
 - For 1.x, avoid language like “might change” on stable surfaces unless explicitly marked experimental.
-- If a behavior is a hard guarantee, write it once in [INTERFACE_CONTRACT](/semantics/interface-contract.md) and reference it elsewhere.
+- If a behavior is a hard guarantee, write it once in [INTERFACE_CONTRACT](/semantics/interface-contract/) and reference it elsewhere.
 
 ## PR checklist (docs)
 

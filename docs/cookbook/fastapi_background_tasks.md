@@ -2,7 +2,7 @@
 
 Use Starlette **`BackgroundTasks`** when you want to return an HTTP response **before**
 finishing heavy **`collect()`** work, and **`DataFrame.submit()`** when that work should run
-from a **thread-pool future** (see [EXECUTION](/user-guide/execution.md)).
+from a **thread-pool future** (see [EXECUTION](/user-guide/execution/)).
 
 ## End-to-end pattern
 
@@ -76,19 +76,19 @@ async def enqueue(
     return EnqueueResponse(accepted_rows=n, request_id=rid)
 ```
 
-Add **`RequestIdMiddleware`** from [fastapi_observability](/cookbook/fastapi_observability.md) if you want **`request_id`**
+Add **`RequestIdMiddleware`** from [fastapi_observability](/cookbook/fastapi_observability/) if you want **`request_id`**
 populated; without it, **`rid`** is **`None`** while the rest still works.
 
 ## Semantics and limits
 
 - **`await handle.result()`** blocks the Starlette background worker until the engine finishes;
   size your **`ThreadPoolExecutor`** accordingly (and avoid huge frames in **`BackgroundTasks`**).
-- Cancelling **`await acollect()`** / **`result()`** does **not** cancel in-flight Rust work—see [EXECUTION](/user-guide/execution.md).
+- Cancelling **`await acollect()`** / **`result()`** does **not** cancel in-flight Rust work—see [EXECUTION](/user-guide/execution/).
 - For jobs that must survive process restarts, use a real queue (Celery, RQ, SQS, …);
   **`BackgroundTasks`** is **in-process** and **best-effort** only.
 
 ## See also
 
-- [MATERIALIZATION](/user-guide/materialization.md) — four terminal modes
-- [fastapi_observability](/cookbook/fastapi_observability.md) — request IDs for correlating background logs
+- [MATERIALIZATION](/user-guide/materialization/) — four terminal modes
+- [fastapi_observability](/cookbook/fastapi_observability/) — request IDs for correlating background logs
 - **`docs/examples/fastapi/service_layout/`** — routers + lifespan in the repo

@@ -1,6 +1,6 @@
 # Optional formats and bridges (`pydantable.io.extras`)
 
-**Primary:** pass returned **`dict[str, list]`** to **`DataFrame[Schema](cols)`** or **`MyModel(cols)`** (see [DATAFRAMEMODEL](/user-guide/dataframemodel.md)). **Secondary:** **`pydantable.io.extras`** helpers (also re-exported on **`pydantable.io`** where applicable). Many are **experimental**; pass **`experimental=True`** or set **`PYDANTABLE_IO_EXPERIMENTAL=1`**.
+**Primary:** pass returned **`dict[str, list]`** to **`DataFrame[Schema](cols)`** or **`MyModel(cols)`** (see [DATAFRAMEMODEL](/user-guide/dataframemodel/)). **Secondary:** **`pydantable.io.extras`** helpers (also re-exported on **`pydantable.io`** where applicable). Many are **experimental**; pass **`experimental=True`** or set **`PYDANTABLE_IO_EXPERIMENTAL=1`**.
 
 There are **no** **`DataFrameModel.read_excel`** (or similar) classmethods — extras always return a column dict first.
 
@@ -32,7 +32,7 @@ After **`read_excel`**, **`read_delta`**, **`read_bigquery`**, …:
 ### Streaming / messaging
 
 - **`read_kafka_json_batch(topic, *, bootstrap_servers, max_messages=100, experimental=True, **consumer_config)`** — **`pydantable[kafka]`**.
-- **Batch iterators (1.5.0+):** when a backend supports chunked reads, **`iter_excel`**, **`iter_delta`**, **`iter_avro`**, **`iter_orc`**, **`iter_bigquery`**, **`iter_snowflake`**, and **`iter_kafka_json`** yield the same **`dict[str, list]`** shape as **`iter_csv`** / **`iter_parquet`** (see [IO_OVERVIEW](/io/overview.md)). Some sources still buffer internally (e.g. full JSON-array loads); check docstrings and optional extras.
+- **Batch iterators (1.5.0+):** when a backend supports chunked reads, **`iter_excel`**, **`iter_delta`**, **`iter_avro`**, **`iter_orc`**, **`iter_bigquery`**, **`iter_snowflake`**, and **`iter_kafka_json`** yield the same **`dict[str, list]`** shape as **`iter_csv`** / **`iter_parquet`** (see [IO_OVERVIEW](/io/overview/)). Some sources still buffer internally (e.g. full JSON-array loads); check docstrings and optional extras.
 
 ### Stdin / stdout
 
@@ -41,7 +41,7 @@ After **`read_excel`**, **`read_delta`**, **`read_bigquery`**, …:
 
 ### Async CSV (RAP)
 
-**`pydantable.io.rap_support.aread_csv_rap`** — see [IO_CSV](/io/csv.md).
+**`pydantable.io.rap_support.aread_csv_rap`** — see [IO_CSV](/io/csv/).
 
 ## Runnable examples
 
@@ -68,4 +68,4 @@ Other helpers follow the same pattern: install the matching extra, then call the
 
 ## See also
 
-[IO_OVERVIEW](/io/overview.md) · [IO_CSV](/io/csv.md) · [DATA_IO_SOURCES](/io/data-io-sources.md) (tiering) · **`pyproject.toml`** optional dependency groups
+[IO_OVERVIEW](/io/overview/) · [IO_CSV](/io/csv/) · [DATA_IO_SOURCES](/io/data-io-sources/) (tiering) · **`pyproject.toml`** optional dependency groups

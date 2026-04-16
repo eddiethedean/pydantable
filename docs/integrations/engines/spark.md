@@ -1,6 +1,6 @@
 # Spark engine (raikou-core) and SparkDantic
 
-**Import note:** `import pydantable.pyspark` (the PySpark-**shaped** façade — see [PySpark UI](/integrations/alternate-surfaces/pyspark-ui.md)) works with the **core** package only. This page’s **SparkDantic** helpers (`pydantable.pyspark.sparkdantic`) and **raikou-core** `SparkDataFrame` types require `pip install "pydantable[spark]"` (and a JVM for PySpark sessions).
+**Import note:** `import pydantable.pyspark` (the PySpark-**shaped** façade — see [PySpark UI](/integrations/alternate-surfaces/pyspark-ui/)) works with the **core** package only. This page’s **SparkDantic** helpers (`pydantable.pyspark.sparkdantic`) and **raikou-core** `SparkDataFrame` types require `pip install "pydantable[spark]"` (and a JVM for PySpark sessions).
 
 This page covers **two related ideas**:
 
@@ -10,7 +10,7 @@ This page covers **two related ideas**:
    pydantable `Schema` / `DataFrameModel` row types).
 
 The **PySpark-shaped façade** (`pydantable.pyspark` — `withColumn`, `F.col`, …) is **not** a Spark
-cluster client; it uses the in-process Rust engine. See [PYSPARK_UI](/integrations/alternate-surfaces/pyspark-ui.md) for that surface. This
+cluster client; it uses the in-process Rust engine. See [PYSPARK_UI](/integrations/alternate-surfaces/pyspark-ui/) for that surface. This
 page is about **real PySpark** and **schema interchange**.
 
 ## Install
@@ -130,5 +130,5 @@ def rows_to_spark_df(spark, rows: list[dict]):
 
 - The Spark engine stack is **lazy-imported**; `import pydantable` does not load PySpark or
   raikou-core.
-- For behaviour guarantees (joins, nulls, windows) on the **default** engine, see [INTERFACE_CONTRACT](/semantics/interface-contract.md).
+- For behaviour guarantees (joins, nulls, windows) on the **default** engine, see [INTERFACE_CONTRACT](/semantics/interface-contract/).
   Spark-backed frames follow the **Spark / raikou-core** execution path documented in raikou-core.

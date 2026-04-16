@@ -79,7 +79,7 @@ contracts or **`DataFrameModel`**-centric I/O.
 
 `pydantable` focuses on **service-shaped** workflows: **typed** scan roots (**`aread_*`**),
 schema evolution through transforms, **`acollect` / `ato_dict`**, and docs aimed at
-**FastAPI** ([GOLDEN_PATH_FASTAPI](/integrations/fastapi/golden-path.md), [FASTAPI](/integrations/fastapi/fastapi.md)). You can use Polars as an engine
+**FastAPI** ([GOLDEN_PATH_FASTAPI](/integrations/fastapi/golden-path/), [FASTAPI](/integrations/fastapi/fastapi/)). You can use Polars as an engine
 under the hood without exposing Polars APIs at your HTTP boundary.
 
 ## Decision guide

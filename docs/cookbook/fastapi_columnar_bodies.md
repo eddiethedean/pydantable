@@ -73,10 +73,10 @@ def ingest_users_batch(
 
 Row-array JSON bodies: **`rows_dependency(User)`** (same **`trusted_mode`** kwargs).
 
-See [FASTAPI](/integrations/fastapi/fastapi.md) **Columnar OpenAPI and Depends** and **`tests/test_pydantable_fastapi_columnar.py`**.
+See [FASTAPI](/integrations/fastapi/fastapi/) **Columnar OpenAPI and Depends** and **`tests/test_pydantable_fastapi_columnar.py`**.
 
 ## Pitfalls
 
 - **Length mismatches** across columns: Pydantic may accept the JSON, then **`DataFrameModel`** raises **`ColumnLengthMismatchError`**. With **`register_exception_handlers`**, FastAPI returns **400**; otherwise you often see **500**. Validate lengths explicitly if you need a custom **4xx** body.
-- **Validation cost** depends on `trusted_mode` (see [DATAFRAMEMODEL](/user-guide/dataframemodel.md)).
-- **Nested** row fields become **`list[NestedModel]`** in columnar JSON (see [FASTAPI](/integrations/fastapi/fastapi.md) **Columnar OpenAPI and Depends**).
+- **Validation cost** depends on `trusted_mode` (see [DATAFRAMEMODEL](/user-guide/dataframemodel/)).
+- **Nested** row fields become **`list[NestedModel]`** in columnar JSON (see [FASTAPI](/integrations/fastapi/fastapi/) **Columnar OpenAPI and Depends**).

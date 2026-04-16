@@ -1,12 +1,12 @@
 # PydanTable roadmap (shipped → v1.0.0)
 
-**Latest release: `1.18.0`.** The **Planned v1.0.0** checklist (below) is **complete** for that tag. **Shipped in 0.23.0** adds **lazy `read_*` / `aread_*` file roots** (Parquet, CSV, NDJSON, IPC, **JSON**), **`DataFrame.write_*`** lazy pipeline output, **`export_*`** for eager dict→file, **`DataFrameModel`** glue (**`from_sql`**, **`write_sql`**, **`read_parquet_url_ctx`**), **HTTP/object-store `max_bytes`**, **`MissingRustExtensionError`**, and **breaking renames** (**`materialize_*`**, **`fetch_sql`**, **`fetch_*_url`**)—see **Shipped in 0.23.0** below and [IO_OVERVIEW](/io/overview.md). **0.22.0** introduced the **`pydantable.io`** package (vocabulary evolved in **0.23.0**; see [CHANGELOG](/project/changelog.md)). Earlier **0.20.0** / **0.21.0** items (**UX** docs, **Streamlit** interchange, …) remain in their sections. **ipywidgets** / interactive explorers remain **Later** unless promoted. This document also summarizes shipped history and **Later** / **After v1.0.0** backlogs.
+**Latest release: `1.18.0`.** The **Planned v1.0.0** checklist (below) is **complete** for that tag. **Shipped in 0.23.0** adds **lazy `read_*` / `aread_*` file roots** (Parquet, CSV, NDJSON, IPC, **JSON**), **`DataFrame.write_*`** lazy pipeline output, **`export_*`** for eager dict→file, **`DataFrameModel`** glue (**`from_sql`**, **`write_sql`**, **`read_parquet_url_ctx`**), **HTTP/object-store `max_bytes`**, **`MissingRustExtensionError`**, and **breaking renames** (**`materialize_*`**, **`fetch_sql`**, **`fetch_*_url`**)—see **Shipped in 0.23.0** below and [IO_OVERVIEW](/io/overview/). **0.22.0** introduced the **`pydantable.io`** package (vocabulary evolved in **0.23.0**; see [CHANGELOG](/project/changelog/)). Earlier **0.20.0** / **0.21.0** items (**UX** docs, **Streamlit** interchange, …) remain in their sections. **ipywidgets** / interactive explorers remain **Later** unless promoted. This document also summarizes shipped history and **Later** / **After v1.0.0** backlogs.
 
-Release history (high level): [`CHANGELOG.md`](/project/changelog.md).
+Release history (high level): [`CHANGELOG.md`](/project/changelog/).
 
 For Polars-style API parity at the method level, see
-[`POLARS_TRANSFORMATIONS_ROADMAP.md`](/user-guide/polars-alignment/transformations-roadmap.md). **Future Expr /
-table methods** we may add next are under [**Future method candidates**](#future-expr-and-dataframe-method-candidates-not-scheduled) (below). Window **RANGE** rules for multi-column `orderBy` are documented in [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics.md) (PostgreSQL-style first-key axis; not universal SQL parity).
+[`POLARS_TRANSFORMATIONS_ROADMAP.md`](/user-guide/polars-alignment/transformations-roadmap/). **Future Expr /
+table methods** we may add next are under [**Future method candidates**](#future-expr-and-dataframe-method-candidates-not-scheduled) (below). Window **RANGE** rules for multi-column `orderBy` are documented in [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics/) (PostgreSQL-style first-key axis; not universal SQL parity).
 
 ---
 
@@ -20,9 +20,9 @@ The public API stays **SQLModel-like**:
 - Every transform returns a **new** model type (schema migration).
 - `with_columns(...)` uses **replacement** semantics when names collide.
 
-Details: [`DATAFRAMEMODEL.md`](/user-guide/dataframemodel.md).
+Details: [`DATAFRAMEMODEL.md`](/user-guide/dataframemodel/).
 
-**FastAPI / ASGI:** [`FASTAPI.md`](/integrations/fastapi/fastapi.md) covers `response_model`, row-list and **column-shaped** bodies, **`trusted_mode`**, **`TestClient`** recipes, joins/aggregations, **sync** and **`async` materialization** (`acollect` / `ato_dict` / `ato_arrow` / …), **`lifespan`** + executor patterns, **multipart Parquet** uploads, **`Depends`**-injected pools, **background tasks**, **HTTP status** guidance, and streaming notes (**0.16.0** for file/interchange docs—see **Shipped in 0.16.0**).
+**FastAPI / ASGI:** [`FASTAPI.md`](/integrations/fastapi/fastapi/) covers `response_model`, row-list and **column-shaped** bodies, **`trusted_mode`**, **`TestClient`** recipes, joins/aggregations, **sync** and **`async` materialization** (`acollect` / `ato_dict` / `ato_arrow` / …), **`lifespan`** + executor patterns, **multipart Parquet** uploads, **`Depends`**-injected pools, **background tasks**, **HTTP status** guidance, and streaming notes (**0.16.0** for file/interchange docs—see **Shipped in 0.16.0**).
 
 ---
 
@@ -36,7 +36,7 @@ Details: [`DATAFRAMEMODEL.md`](/user-guide/dataframemodel.md).
 - **`to_polars()`** when the **`[polars]`** extra is installed.
 - The Rust engine talks to Python via **dict-of-lists**; normal execution does not require `import polars` in user code.
 
-More context: [`EXECUTION.md`](/user-guide/execution.md).
+More context: [`EXECUTION.md`](/user-guide/execution/).
 
 ### Core platform (original phases 0–7)
 
@@ -59,7 +59,7 @@ Originally: **MVP** end of Phase 3, **beta** end of Phase 6, **v1.0.0** targeted
 
 Beyond the original Phase 7 checklist, **0.5.0** also ships:
 
-- **Nested `BaseModel` columns** (struct dtypes, Polars struct I/O, conservative struct typing in `Expr`). See [`SUPPORTED_TYPES.md`](/user-guide/supported-types.md).
+- **Nested `BaseModel` columns** (struct dtypes, Polars struct I/O, conservative struct typing in `Expr`). See [`SUPPORTED_TYPES.md`](/user-guide/supported-types/).
 - **`Expr.struct_field(...)`** for field projection.
 - **PySpark UI:** nested `StructType` from annotations for nested models.
 - **Homogeneous `list[T]`** columns, descriptors, Polars list I/O, **`explode()`**.
@@ -75,12 +75,12 @@ No single “Phase 8” gate is defined here. **v1.0.0** is the **production-rea
 
 Practical inputs that feed that phase:
 
-- Close or explicitly defer remaining gaps in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](/user-guide/polars-alignment/transformations-roadmap.md) (and related parity docs: [`PARITY_SCORECARD.md`](/user-guide/polars-alignment/parity-scorecard.md), [`PYSPARK_PARITY.md`](/integrations/alternate-surfaces/pyspark-parity.md)).
+- Close or explicitly defer remaining gaps in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](/user-guide/polars-alignment/transformations-roadmap/) (and related parity docs: [`PARITY_SCORECARD.md`](/user-guide/polars-alignment/parity-scorecard/), [`PYSPARK_PARITY.md`](/integrations/alternate-surfaces/pyspark-parity/)).
 - Keep CI green across supported Python versions and platforms; keep extension + optional **`[polars]`** matrices exercised in CI.
-- **Constructor ingest:** **`validate_data`** was removed in **0.15.0**; use **`trusted_mode`** only ([`DATAFRAMEMODEL.md`](/user-guide/dataframemodel.md)).
-- Optional: consolidated **migration guide** if semver ever jumps in a breaking way; keep [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md) the semantics source of truth.
-- **Async I/O:** **0.15.0** ships **`acollect` / `ato_dict` / `ato_polars`** (and **`DataFrameModel`** **`arows` / `ato_dicts`**) using **`asyncio.to_thread`** or a custom executor; **0.16.0** adds **`ato_arrow`** and synchronous Parquet/IPC readers into **`dict[str, list]`** ( **`materialize_*`** since **0.23.0**); **0.23.0** adds **`read_*`** + **`DataFrame.write_*`** for out-of-core paths (see [`EXECUTION.md`](/user-guide/execution.md), [`FASTAPI.md`](/integrations/fastapi/fastapi.md)).
-- **FastAPI integration maturity:** treat [`FASTAPI.md`](/integrations/fastapi/fastapi.md) as the **canonical service guide**. **0.14.0** added **`TestClient`** / OpenAPI notes; **0.15.0** added **`async`** route examples and **`lifespan`**; **0.16.0** documents **multipart** Parquet/IPC, **`Depends`** executors, **background tasks**, and **422 vs application errors**.
+- **Constructor ingest:** **`validate_data`** was removed in **0.15.0**; use **`trusted_mode`** only ([`DATAFRAMEMODEL.md`](/user-guide/dataframemodel/)).
+- Optional: consolidated **migration guide** if semver ever jumps in a breaking way; keep [`INTERFACE_CONTRACT.md`](/semantics/interface-contract/) the semantics source of truth.
+- **Async I/O:** **0.15.0** ships **`acollect` / `ato_dict` / `ato_polars`** (and **`DataFrameModel`** **`arows` / `ato_dicts`**) using **`asyncio.to_thread`** or a custom executor; **0.16.0** adds **`ato_arrow`** and synchronous Parquet/IPC readers into **`dict[str, list]`** ( **`materialize_*`** since **0.23.0**); **0.23.0** adds **`read_*`** + **`DataFrame.write_*`** for out-of-core paths (see [`EXECUTION.md`](/user-guide/execution/), [`FASTAPI.md`](/integrations/fastapi/fastapi/)).
+- **FastAPI integration maturity:** treat [`FASTAPI.md`](/integrations/fastapi/fastapi/) as the **canonical service guide**. **0.14.0** added **`TestClient`** / OpenAPI notes; **0.15.0** added **`async`** route examples and **`lifespan`**; **0.16.0** documents **multipart** Parquet/IPC, **`Depends`** executors, **background tasks**, and **422 vs application errors**.
 - **Release train:** **0.20.0** → **Planned v1.0.0** (below); dates are not committed here. The **1.0.0** tag waits until the **Planned v1.0.0** checklist is satisfied, unless scope slips.
 
 ---
@@ -107,7 +107,7 @@ Practical inputs that feed that phase:
 - [x] **Global row count** without a column (`global_row_count`, PySpark `count()` with no arg).
 - [x] **`str` → `date` / `datetime`** `cast` (Polars); `strptime` remains the fixed-format path.
 - [x] **Map ops:** `map_get`, `map_contains_key` (string keys; physical list-of-struct).
-- [x] **Window min/max** over partitions; **`WindowFrame::Rows`** in Rust IR (serialization-ready). **Framed execution** (`rowsBetween` / `rangeBetween`) shipped in **0.9.0+**; see [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md).
+- [x] **Window min/max** over partitions; **`WindowFrame::Rows`** in Rust IR (serialization-ready). **Framed execution** (`rowsBetween` / `rangeBetween`) shipped in **0.9.0+**; see [`INTERFACE_CONTRACT.md`](/semantics/interface-contract/).
 
 ---
 
@@ -123,7 +123,7 @@ Practical inputs that feed that phase:
 
 - [x] **Framed windows expanded:** `window_mean`, `window_min`, `window_max`, `lag`, `lead`, `rank`, and `dense_rank`.
 - [x] **Map utilities:** `map_keys()`, `map_values()`, and `map_entries()`.
-- [x] **Range frame guardrails:** `rangeBetween` aggregate windows require at least one `orderBy` key; multi-key ordering is allowed starting in **0.12.0** (see [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics.md)).
+- [x] **Range frame guardrails:** `rangeBetween` aggregate windows require at least one `orderBy` key; multi-key ordering is allowed starting in **0.12.0** (see [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics/)).
 - [x] **Parity and interop hardening:** expanded PySpark parity wrappers/tests and trusted constructor coverage.
 
 ---
@@ -139,7 +139,7 @@ Practical inputs that feed that phase:
 
 ## Shipped in 0.12.0 (multi-key range + contract cleanup)
 
-- [x] **Multi-key `rangeBetween`:** lexicographic `orderBy`; range offsets on the **first** sort column (PostgreSQL-style); see [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics.md).
+- [x] **Multi-key `rangeBetween`:** lexicographic `orderBy`; range offsets on the **first** sort column (PostgreSQL-style); see [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics/).
 - [x] **Trusted `strict` nested dtypes:** stricter Polars dtype checks for list / struct / map columns in trusted ingest; columnar Python paths get nested shape checks for list / dict / struct cells.
 - [x] **Docs:** `INTERFACE_CONTRACT`, PySpark UI / parity scorecard, `map_from_entries` duplicate-key policy (`SUPPORTED_TYPES`), `validate_data` → `trusted_mode` migration notes (`DATAFRAMEMODEL`, `SUPPORTED_TYPES`).
 - [x] **Regression tests:** multi-key range (asc/desc/mixed order, partitions, `date`/`datetime` axis, `window_mean`/`window_min`); PySpark mirror tests; strict nested + map duplicate-key cases; `DataFrame` / `DataFrameModel` strict parity.
@@ -153,14 +153,14 @@ Practical inputs that feed that phase:
 **Themes:** absorb **0.12.0** feedback, tighten docs and CI, clarify sync-only I/O and FastAPI patterns (including bulk / Polars / Arrow trust boundaries), document window null / peer semantics, and harden **PyArrow** **`strict`** ingest.
 
 - [x] **Hardening / audit:** `make check-full` and full **pytest** on a **release** extension build; no regressions requiring code changes in that cycle (follow-up patches ship in later **0.13.x** releases as needed).
-- [x] **Docs:** cross-links and “related documentation” sections in [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics.md) and [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md); [`README.md`](/project/repository-readme.md) and doc site [`index.md`](/index.md) aligned with current behavior.
-- [x] **FastAPI guide:** [`FASTAPI.md`](/integrations/fastapi/fastapi.md) — **`trusted_mode`**, column-shaped JSON bodies, large-table / Polars / Arrow trust boundaries, links to [`DATAFRAMEMODEL.md`](/user-guide/dataframemodel.md) / [`SUPPORTED_TYPES.md`](/user-guide/supported-types.md), **sync** handlers and **0.15.0** async pointer.
+- [x] **Docs:** cross-links and “related documentation” sections in [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics/) and [`INTERFACE_CONTRACT.md`](/semantics/interface-contract/); [`README.md`](/project/repository-readme/) and doc site [`index.md`](/) aligned with current behavior.
+- [x] **FastAPI guide:** [`FASTAPI.md`](/integrations/fastapi/fastapi/) — **`trusted_mode`**, column-shaped JSON bodies, large-table / Polars / Arrow trust boundaries, links to [`DATAFRAMEMODEL.md`](/user-guide/dataframemodel/) / [`SUPPORTED_TYPES.md`](/user-guide/supported-types/), **sync** handlers and **0.15.0** async pointer.
 - [x] **CI and tooling:** reviewed **GitHub Actions** (`actions/checkout@v5`, `actions/setup-python@v6`, `actions/cache@v5`); documented **`cargo audit`** ignore for **RUSTSEC-2025-0141** in [`.github/workflows/ci.yml`](https://github.com/eddiethedean/pydantable/blob/main/.github/workflows/ci.yml).
 - [x] **Tests / examples:** extended [`scripts/verify_doc_examples.py`](https://github.com/eddiethedean/pydantable/blob/main/scripts/verify_doc_examples.py) for new FastAPI patterns; no trivial remaining **PySpark**/**pandas** one-line façade gaps identified in that release.
-- [x] **I/O documentation:** [`EXECUTION.md`](/user-guide/execution.md) and [`PERFORMANCE.md`](/project/performance.md) label **sync-only** materialization/interchange and point to **0.15.0** async work; [`PERFORMANCE.md`](/project/performance.md) cross-links **FastAPI** bulk guidance.
-- [x] **Window polish (docs):** null ordering and **`CURRENT ROW`** / peer framing in [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics.md) and [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md); module docstring on `Window` in [`window_spec.py`](https://github.com/eddiethedean/pydantable/blob/main/python/pydantable/window_spec.py). User-facing **`NULLS FIRST` / `LAST`** via **`orderBy(..., nulls_last=...)`** shipped in **0.14.0**.
+- [x] **I/O documentation:** [`EXECUTION.md`](/user-guide/execution/) and [`PERFORMANCE.md`](/project/performance/) label **sync-only** materialization/interchange and point to **0.15.0** async work; [`PERFORMANCE.md`](/project/performance/) cross-links **FastAPI** bulk guidance.
+- [x] **Window polish (docs):** null ordering and **`CURRENT ROW`** / peer framing in [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics/) and [`INTERFACE_CONTRACT.md`](/semantics/interface-contract/); module docstring on `Window` in [`window_spec.py`](https://github.com/eddiethedean/pydantable/blob/main/python/pydantable/window_spec.py). User-facing **`NULLS FIRST` / `LAST`** via **`orderBy(..., nulls_last=...)`** shipped in **0.14.0**.
 - [x] **Trusted ingest:** **`strict`** dtype checks for **PyArrow** `Array` / `ChunkedArray` columns (including **decimal** and **enum**-compatible Arrow types); accept all concrete Arrow array classes in trusted column buffers (`isinstance(..., pa.Array)`). Tests in `tests/test_trusted_strict_pyarrow.py`; **`pyarrow`** added to **`[dev]`** and CI install. **`shape_only`** dtype-drift **`DtypeDriftWarning`** shipped in **0.14.0**.
-- [x] **Performance:** [`framed_window_bench.py`](https://github.com/eddiethedean/pydantable/blob/main/benchmarks/framed_window_bench.py) and [`trusted_polars_ingest_bench.py`](https://github.com/eddiethedean/pydantable/blob/main/benchmarks/trusted_polars_ingest_bench.py); [`PERFORMANCE.md`](/project/performance.md) table updated.
+- [x] **Performance:** [`framed_window_bench.py`](https://github.com/eddiethedean/pydantable/blob/main/benchmarks/framed_window_bench.py) and [`trusted_polars_ingest_bench.py`](https://github.com/eddiethedean/pydantable/blob/main/benchmarks/trusted_polars_ingest_bench.py); [`PERFORMANCE.md`](/project/performance/) table updated.
 
 ---
 
@@ -168,13 +168,13 @@ Practical inputs that feed that phase:
 
 **Themes:** window null ordering, trusted-ingest warnings, PySpark façade helpers, **`validate_data`** deprecation, FastAPI testing docs/tests, and selective **Hypothesis** expansion.
 
-- [x] **Window API:** **`Window.orderBy(..., nulls_last=...)`** (**NULLS FIRST** / **LAST** per key; framed windows honor all keys; unframed Polars `.over` uses the first key’s flag for **`SortOptions`** — see [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics.md)).
+- [x] **Window API:** **`Window.orderBy(..., nulls_last=...)`** (**NULLS FIRST** / **LAST** per key; framed windows honor all keys; unframed Polars `.over` uses the first key’s flag for **`SortOptions`** — see [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics/)).
 - [x] **Trusted ingest:** **`DtypeDriftWarning`** when **`trusted_mode='shape_only'`** would accept data **`strict`** would reject; opt-out env **`PYDANTABLE_SUPPRESS_SHAPE_ONLY_DRIFT_WARNINGS=1`**.
-- [x] **Polars parity docs:** scorecard and [`POLARS_TRANSFORMATIONS_ROADMAP.md`](/user-guide/polars-alignment/transformations-roadmap.md) updated for **0.14.0** (transformation phases P1–P7 remain complete; this release is façade / contract polish).
+- [x] **Polars parity docs:** scorecard and [`POLARS_TRANSFORMATIONS_ROADMAP.md`](/user-guide/polars-alignment/transformations-roadmap/) updated for **0.14.0** (transformation phases P1–P7 remain complete; this release is façade / contract polish).
 - [x] **PySpark façade:** **`dayofmonth`**, **`lower`**, **`upper`** in **`pydantable.pyspark.sql.functions`** (thin wrappers over core **`Expr`**).
-- [x] **Hypothesis:** additional pipeline property (`with_columns` identity) in `tests/test_hypothesis_properties.py`; documented in [`DEVELOPER.md`](/project/developer.md).
+- [x] **Hypothesis:** additional pipeline property (`with_columns` identity) in `tests/test_hypothesis_properties.py`; documented in [`DEVELOPER.md`](/project/developer/).
 - [x] **`validate_data` policy:** **`DeprecationWarning`** when **`validate_data=`** is passed without **`trusted_mode`** in **0.14.x**; **`validate_data`** removed in **0.15.0**.
-- [x] **FastAPI testing & DX:** **`TestClient`** / columnar body examples in [`FASTAPI.md`](/integrations/fastapi/fastapi.md); **`tests/test_fastapi_recipes.py`**; **`fastapi`** / **`httpx`** in **`[dev]`** and CI pytest install.
+- [x] **FastAPI testing & DX:** **`TestClient`** / columnar body examples in [`FASTAPI.md`](/integrations/fastapi/fastapi/); **`tests/test_fastapi_recipes.py`**; **`fastapi`** / **`httpx`** in **`[dev]`** and CI pytest install.
 - [x] **Regression tests:** **`tests/test_v014_features.py`** (deprecation, drift, windows, PySpark, FastAPI); extra Hypothesis coverage for **`shape_only`** without drift on int columns.
 
 ---
@@ -184,11 +184,11 @@ Practical inputs that feed that phase:
 **Themes:** non-blocking materialization, Arrow **`map<utf8, …>`** ingest for **`dict[str, T]`**, more PySpark-named helpers, and removal of the legacy **`validate_data`** constructor argument (**`trusted_mode`** only).
 
 - [x] **Maps and keys:** **Arrow-native `map`** columns (PyArrow **`MapType`** with **string keys**) ingest on constructors (**including `trusted_mode='off'`** after conversion); cells become Python **`dict`**. **`strict`** checks scalar map **value** types against Arrow (nested value dtypes: best-effort / documented limits). **Heterogeneous map keys** (e.g. **`dict[int, T]`**) remain **out of scope** for this release—see **Later** below.
-- [x] **Async materialization:** **`acollect`**, **`ato_dict`**, **`ato_polars`** on **`DataFrame`**; **`DataFrameModel`** adds the same plus **`arows`** and **`ato_dicts`**. Blocking Rust/Polars work runs in **`asyncio.to_thread`** or **`executor=`**. Documented limits: cancellation does not stop in-flight engine work; **`ato_polars`** still materializes a Python dict first. [`EXECUTION.md`](/user-guide/execution.md), [`FASTAPI.md`](/integrations/fastapi/fastapi.md).
+- [x] **Async materialization:** **`acollect`**, **`ato_dict`**, **`ato_polars`** on **`DataFrame`**; **`DataFrameModel`** adds the same plus **`arows`** and **`ato_dicts`**. Blocking Rust/Polars work runs in **`asyncio.to_thread`** or **`executor=`**. Documented limits: cancellation does not stop in-flight engine work; **`ato_polars`** still materializes a Python dict first. [`EXECUTION.md`](/user-guide/execution/), [`FASTAPI.md`](/integrations/fastapi/fastapi/).
 - [x] **FastAPI `async` routes:** **`async def`** examples, **`lifespan`** + **`ThreadPoolExecutor`**, **`StreamingResponse`** guidance (manual chunking; no built-in async row iterator). Tests: **`tests/test_fastapi_recipes.py`**, **`scripts/verify_doc_examples.py`**.
 - [x] **Spark façade depth:** **`trim`**, **`abs`**, **`round`**, **`floor`**, **`ceil`** in **`pydantable.pyspark.sql.functions`** (still **not** a distributed Spark engine).
 - [x] **Constructor API:** **`validate_data`** removed from **`DataFrame.__init__`** and **`DataFrameModel.__init__`**; passing it raises **`TypeError`**. Removed schema helpers **`_VALIDATE_DATA_KW_UNSET`**, **`_warn_validate_data_kw_deprecated`**, **`_coerce_validate_data_kw`**, and internal **`_skip_validate_data_deprecation`** / bridge kwargs; trimmed **`validate_columns_strict`** docstring. Source: `python/pydantable/dataframe.py`, `python/pydantable/dataframe_model.py`, `python/pydantable/schema.py`.
-- [x] **Docs:** [`CHANGELOG.md`](/project/changelog.md) **0.15.0**; **`DATAFRAMEMODEL`**, **`FASTAPI`**, **`SUPPORTED_TYPES`**, **`PERFORMANCE`**, **`INTERFACE_CONTRACT`**, **`index`**, **`README`**.
+- [x] **Docs:** [`CHANGELOG.md`](/project/changelog/) **0.15.0**; **`DATAFRAMEMODEL`**, **`FASTAPI`**, **`SUPPORTED_TYPES`**, **`PERFORMANCE`**, **`INTERFACE_CONTRACT`**, **`index`**, **`README`**.
 - [x] **Regression tests:** **`tests/test_async_materialization.py`**, **`tests/test_pyarrow_map_ingest.py`**, **`tests/test_v015_features.py`**, **`tests/test_v015_constructor_api.py`**; **`tests/test_v014_features.py`**, **`tests/test_dataframe_model.py`**, **`tests/test_dataframe_ops.py`** (constructor **`TypeError`** coverage).
 
 ---
@@ -197,10 +197,10 @@ Practical inputs that feed that phase:
 
 **Themes:** PyArrow **Parquet / IPC** read helpers, **`to_arrow` / `ato_arrow`**, **`Table` / `RecordBatch`** constructor ingest, and **FastAPI** deployment patterns.
 
-- [x] **Interchange:** **`pydantable.read_parquet`** and **`read_ipc`** ( **`as_stream`** for streaming IPC) return **`dict[str, list]`** (**renamed** **`materialize_*`** in **0.23.0**); **`DataFrame.to_arrow`** / **`ato_arrow`** and **`DataFrameModel`** mirrors materialize a PyArrow **`Table`** after the same path as **`to_dict`** (documented copies; not zero-copy). **`pyproject`** **`[arrow]`** extra (**`pyarrow>=14`**). [`EXECUTION.md`](/user-guide/execution.md), [`SUPPORTED_TYPES.md`](/user-guide/supported-types.md), [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md).
+- [x] **Interchange:** **`pydantable.read_parquet`** and **`read_ipc`** ( **`as_stream`** for streaming IPC) return **`dict[str, list]`** (**renamed** **`materialize_*`** in **0.23.0**); **`DataFrame.to_arrow`** / **`ato_arrow`** and **`DataFrameModel`** mirrors materialize a PyArrow **`Table`** after the same path as **`to_dict`** (documented copies; not zero-copy). **`pyproject`** **`[arrow]`** extra (**`pyarrow>=14`**). [`EXECUTION.md`](/user-guide/execution/), [`SUPPORTED_TYPES.md`](/user-guide/supported-types/), [`INTERFACE_CONTRACT.md`](/semantics/interface-contract/).
 - [x] **Constructors:** **`validate_columns_strict`** and **`DataFrameModel`** accept **`pa.Table`** / **`RecordBatch`** when **`pyarrow`** is installed (convert to Python lists, then existing validation).
 - [x] **Async:** **`ato_arrow`** uses the same thread-offload model as **`ato_polars`**. Parquet/IPC readers remain synchronous (document **`asyncio.to_thread`** / executor for large files from async routes).
-- [x] **FastAPI:** [`FASTAPI.md`](/integrations/fastapi/fastapi.md) — **multipart** Parquet upload example, **`Depends`** executor injection, **background tasks** caveats, **422 vs `HTTPException` / uncaught constructor errors**; **`python-multipart`** in **`[dev]`** and CI. **`tests/test_fastapi_recipes.py`**: multipart + **422** on bad row types; **`scripts/verify_doc_examples.py`**: Parquet + **`to_arrow`** smoke ( **`materialize_parquet`** after **0.23.0**).
+- [x] **FastAPI:** [`FASTAPI.md`](/integrations/fastapi/fastapi/) — **multipart** Parquet upload example, **`Depends`** executor injection, **background tasks** caveats, **422 vs `HTTPException` / uncaught constructor errors**; **`python-multipart`** in **`[dev]`** and CI. **`tests/test_fastapi_recipes.py`**: multipart + **422** on bad row types; **`scripts/verify_doc_examples.py`**: Parquet + **`to_arrow`** smoke ( **`materialize_parquet`** after **0.23.0**).
 - [x] **Tests:** **`tests/test_arrow_interchange.py`** (read/write helpers, **`to_arrow` / `ato_arrow`**, **`Table` / `RecordBatch` constructors); **`tests/test_fastapi_recipes.py`** (multipart Parquet, **422** where applicable); **`scripts/verify_doc_examples.py`** (Parquet + **`to_arrow`** smoke).
 
 ---
@@ -217,8 +217,8 @@ Practical inputs that feed that phase:
 **Themes:** **String-keyed** maps only—deepen **Arrow map** ingest + **`Expr`** contracts; thin **PySpark** wrappers over existing core **`Expr`**; refresh **parity** docs.
 
 - [x] **Maps / keys (string-keyed):** Documented **`map_get`** / **`map_contains_key`** after PyArrow **`map<string, …>`** ingest (missing key → null). Regression: **`tests/test_pyarrow_map_ingest.py`**. **Non-string** Python **`dict[int, T]`** / non-string Arrow map keys **deferred** (see **Later**).
-- [x] **PySpark façade:** New **`pydantable.pyspark.sql.functions`** wrappers where core **`Expr`** already implements the op ([`PYSPARK_PARITY.md`](/integrations/alternate-surfaces/pyspark-parity.md)); execution remains the **Polars-backed** core (**facade only**).
-- [x] **Parity documentation:** [`PARITY_SCORECARD.md`](/user-guide/polars-alignment/parity-scorecard.md), [`POLARS_TRANSFORMATIONS_ROADMAP.md`](/user-guide/polars-alignment/transformations-roadmap.md), [`SUPPORTED_TYPES.md`](/user-guide/supported-types.md) updated for **0.17.0**; no **`PERFORMANCE.md`** number refresh in this release.
+- [x] **PySpark façade:** New **`pydantable.pyspark.sql.functions`** wrappers where core **`Expr`** already implements the op ([`PYSPARK_PARITY.md`](/integrations/alternate-surfaces/pyspark-parity/)); execution remains the **Polars-backed** core (**facade only**).
+- [x] **Parity documentation:** [`PARITY_SCORECARD.md`](/user-guide/polars-alignment/parity-scorecard/), [`POLARS_TRANSFORMATIONS_ROADMAP.md`](/user-guide/polars-alignment/transformations-roadmap/), [`SUPPORTED_TYPES.md`](/user-guide/supported-types/) updated for **0.17.0**; no **`PERFORMANCE.md`** number refresh in this release.
 
 ---
 
@@ -226,11 +226,11 @@ Practical inputs that feed that phase:
 
 **Themes:** stable user-facing API; clearer **Rust / Polars** error context for **grouped** execution; explicit **deferral** of non-string map keys; documentation and light **Hypothesis** smoke tests—no new **`Expr`** or PySpark façade methods.
 
-- [x] **Rust plan / Python boundary:** [`polars_err_ctx`](https://github.com/eddiethedean/pydantable/blob/main/pydantable-core/src/plan/execute_polars/common.rs) prefixes Polars **`collect()`** failures during **`group_by().agg()`** with **`(group_by().agg())`** in the **`ValueError`** message. [`DEVELOPER.md`](/project/developer.md) updated.
-- [x] **Polars transformations:** Phases **P1–P7** in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](/user-guide/polars-alignment/transformations-roadmap.md) remain complete; **post–P7** note—future parity is **additive** (`Expr` / transforms), not a new phase backlog. [`PARITY_SCORECARD.md`](/user-guide/polars-alignment/parity-scorecard.md) and [`PYSPARK_PARITY.md`](/integrations/alternate-surfaces/pyspark-parity.md) refreshed for **0.18.0** (no new façade rows).
-- [x] **Maps:** **Non-string map keys** explicitly **not** in **0.18.0**; [`SUPPORTED_TYPES.md`](/user-guide/supported-types.md) and **Later** (below) updated.
+- [x] **Rust plan / Python boundary:** [`polars_err_ctx`](https://github.com/eddiethedean/pydantable/blob/main/pydantable-core/src/plan/execute_polars/common.rs) prefixes Polars **`collect()`** failures during **`group_by().agg()`** with **`(group_by().agg())`** in the **`ValueError`** message. [`DEVELOPER.md`](/project/developer/) updated.
+- [x] **Polars transformations:** Phases **P1–P7** in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](/user-guide/polars-alignment/transformations-roadmap/) remain complete; **post–P7** note—future parity is **additive** (`Expr` / transforms), not a new phase backlog. [`PARITY_SCORECARD.md`](/user-guide/polars-alignment/parity-scorecard/) and [`PYSPARK_PARITY.md`](/integrations/alternate-surfaces/pyspark-parity/) refreshed for **0.18.0** (no new façade rows).
+- [x] **Maps:** **Non-string map keys** explicitly **not** in **0.18.0**; [`SUPPORTED_TYPES.md`](/user-guide/supported-types/) and **Later** (below) updated.
 - [x] **CI and quality:** Hypothesis + integration tests for **`group_by().agg()`** and **`join`** (`tests/test_hypothesis_properties.py`, `tests/test_v018_features.py`); Rust **`polars_err_ctx`** format tests in `execute_polars/common.rs`.
-- [x] **Docs:** [`CHANGELOG.md`](/project/changelog.md); [`EXECUTION.md`](/user-guide/execution.md) and [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md) note on grouped **`group_by().agg()`** Polars error wording. Aggregation **semantics** unchanged.
+- [x] **Docs:** [`CHANGELOG.md`](/project/changelog/); [`EXECUTION.md`](/user-guide/execution/) and [`INTERFACE_CONTRACT.md`](/semantics/interface-contract/) note on grouped **`group_by().agg()`** Polars error wording. Aggregation **semantics** unchanged.
 
 ---
 
@@ -238,11 +238,11 @@ Practical inputs that feed that phase:
 
 **Themes:** documentation and process gate before **v1.0.0**—no large new **`Expr`** or PySpark façade surface; align parity docs, semver story, and release hygiene.
 
-- [x] **v1.0 readiness review:** Re-read **Toward v1.0.0** and **Planned v1.0.0**; items that belong on the **1.0.0** tag itself (**full** semver policy for 1.x, SBOM, PyPI dry-run comms, support matrix as a **1.0.x** commitment) remain under **Planned v1.0.0** below—**explicitly deferred** to the major release with rationale in [`CHANGELOG.md`](/project/changelog.md) **0.19.0**. **0.19.0** delivers the **0.x** policy doc and doc-site clarity so the path to 1.0 is obvious.
-- [x] **Contract and semver:** [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md) audited against **windows**, **trusted ingest**, **async** materialization, and **interchange**; [`VERSIONING.md`](/semantics/versioning.md) documents **0.x** patch vs minor expectations and points here for behavior.
-- [x] **Parity and roadmap docs:** Pass on [`POLARS_TRANSFORMATIONS_ROADMAP.md`](/user-guide/polars-alignment/transformations-roadmap.md), [`PARITY_SCORECARD.md`](/user-guide/polars-alignment/parity-scorecard.md), [`PYSPARK_PARITY.md`](/integrations/alternate-surfaces/pyspark-parity.md), [`README.md`](/project/repository-readme.md), and doc site [`index.md`](/index.md)—**current release** and **0.19 → 1.0** narrative updated.
-- [x] **Performance and ops:** [`PERFORMANCE.md`](/project/performance.md) — key benchmark scripts spot-checked under a **release** build on supported Polars; narrative note for **0.19.0** (no material numeric refresh required vs **0.18.x** execution paths).
-- [x] **Release hygiene:** **`make check-full`**, **`cargo test --all-features`**, **`cargo check --no-default-features`**, and **`pytest`** (with **`-n auto`** where CI uses it) on a **release** extension build before tagging; [`.github/workflows/_shared-ci.yml`](https://github.com/eddiethedean/pydantable/blob/main/.github/workflows/_shared-ci.yml) install list checked against [`DEVELOPER.md`](/project/developer.md) / **`pyproject.toml`** **`[dev]`** (no drift found in this cycle).
+- [x] **v1.0 readiness review:** Re-read **Toward v1.0.0** and **Planned v1.0.0**; items that belong on the **1.0.0** tag itself (**full** semver policy for 1.x, SBOM, PyPI dry-run comms, support matrix as a **1.0.x** commitment) remain under **Planned v1.0.0** below—**explicitly deferred** to the major release with rationale in [`CHANGELOG.md`](/project/changelog/) **0.19.0**. **0.19.0** delivers the **0.x** policy doc and doc-site clarity so the path to 1.0 is obvious.
+- [x] **Contract and semver:** [`INTERFACE_CONTRACT.md`](/semantics/interface-contract/) audited against **windows**, **trusted ingest**, **async** materialization, and **interchange**; [`VERSIONING.md`](/semantics/versioning/) documents **0.x** patch vs minor expectations and points here for behavior.
+- [x] **Parity and roadmap docs:** Pass on [`POLARS_TRANSFORMATIONS_ROADMAP.md`](/user-guide/polars-alignment/transformations-roadmap/), [`PARITY_SCORECARD.md`](/user-guide/polars-alignment/parity-scorecard/), [`PYSPARK_PARITY.md`](/integrations/alternate-surfaces/pyspark-parity/), [`README.md`](/project/repository-readme/), and doc site [`index.md`](/)—**current release** and **0.19 → 1.0** narrative updated.
+- [x] **Performance and ops:** [`PERFORMANCE.md`](/project/performance/) — key benchmark scripts spot-checked under a **release** build on supported Polars; narrative note for **0.19.0** (no material numeric refresh required vs **0.18.x** execution paths).
+- [x] **Release hygiene:** **`make check-full`**, **`cargo test --all-features`**, **`cargo check --no-default-features`**, and **`pytest`** (with **`-n auto`** where CI uses it) on a **release** extension build before tagging; [`.github/workflows/_shared-ci.yml`](https://github.com/eddiethedean/pydantable/blob/main/.github/workflows/_shared-ci.yml) install list checked against [`DEVELOPER.md`](/project/developer/) / **`pyproject.toml`** **`[dev]`** (no drift found in this cycle).
 - [x] **Tests:** **`group_by`** integration tests sort grouped output before assert where row order is not API-guaranteed (CI **`pytest-xdist`** stability); see **`tests/test_v018_features.py`**.
 
 ---
@@ -253,36 +253,36 @@ Practical inputs that feed that phase:
 
 ### String representation (`repr`)
 
-- [x] **`DataFrame` / `DataFrameModel` / grouped handles:** multi-line **`repr`** and **`_repr_html_`** (schema, column dtypes, wide-schema truncation; no row count in **`repr`**). See [`EXECUTION.md`](/user-guide/execution.md), [`CHANGELOG.md`](/project/changelog.md) **0.20.0**, **`tests/test_dataframe_repr.py`**.
+- [x] **`DataFrame` / `DataFrameModel` / grouped handles:** multi-line **`repr`** and **`_repr_html_`** (schema, column dtypes, wide-schema truncation; no row count in **`repr`**). See [`EXECUTION.md`](/user-guide/execution/), [`CHANGELOG.md`](/project/changelog/) **0.20.0**, **`tests/test_dataframe_repr.py`**.
 - [x] **`Expr` and related:** **`__repr__`** for **`Expr`**, **`ColumnRef`**, literals, **`WhenChain`**, and pending window builders (AST snippet + dtype / referenced columns). **`tests/test_expr_repr.py`**.
-- [x] **Docs / tests:** [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md) **Introspection**; discovery tests in **`tests/test_dataframe_discovery.py`**.
+- [x] **Docs / tests:** [`INTERFACE_CONTRACT.md`](/semantics/interface-contract/) **Introspection**; discovery tests in **`tests/test_dataframe_discovery.py`**.
 
 ### Discovery and convenience (core + façades)
 
-- [x] **Core API:** **`columns`**, **`shape`**, **`empty`**, **`dtypes`** on **`DataFrame`** / **`DataFrameModel`** (root-buffer semantics for **`shape[0]`**—see **Introspection** in [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md)).
+- [x] **Core API:** **`columns`**, **`shape`**, **`empty`**, **`dtypes`** on **`DataFrame`** / **`DataFrameModel`** (root-buffer semantics for **`shape[0]`**—see **Introspection** in [`INTERFACE_CONTRACT.md`](/semantics/interface-contract/)).
 - [x] **`info()`** — multi-line **str** with schema and column list (row count when consistent with **`shape`** policy).
-- [x] **`describe()`** — **numeric** **`int` / `float`**, **bool**, **str**, **`date`**, and **`datetime`** summaries; materializes via **`to_dict()`** once; see [`EXECUTION.md`](/user-guide/execution.md).
-- [x] **PySpark façade:** **`DataFrame.show()`** (text table; **`head`**-like), **`summary()`** → same string contract as **`describe()`**. See [`PYSPARK_UI.md`](/integrations/alternate-surfaces/pyspark-ui.md), [`PYSPARK_PARITY.md`](/integrations/alternate-surfaces/pyspark-parity.md).
+- [x] **`describe()`** — **numeric** **`int` / `float`**, **bool**, **str**, **`date`**, and **`datetime`** summaries; materializes via **`to_dict()`** once; see [`EXECUTION.md`](/user-guide/execution/).
+- [x] **PySpark façade:** **`DataFrame.show()`** (text table; **`head`**-like), **`summary()`** → same string contract as **`describe()`**. See [`PYSPARK_UI.md`](/integrations/alternate-surfaces/pyspark-ui/), [`PYSPARK_PARITY.md`](/integrations/alternate-surfaces/pyspark-parity/).
 
 ### Notebook utilities (Jupyter, VS Code, Colab)
 
 - [x] **`_repr_html_`** — bounded **HTML** preview (**stdlib** escape only).
-- [x] **Notebook note** — short subsection in [`DEVELOPER.md`](/project/developer.md) (**Notebooks**).
+- [x] **Notebook note** — short subsection in [`DEVELOPER.md`](/project/developer/) (**Notebooks**).
 - [x] **Display options** — **`set_display_options`**, env **`PYDANTABLE_REPR_HTML_*`** (see [`pydantable.display`](https://github.com/eddiethedean/pydantable/blob/main/python/pydantable/display.py)).
 - [ ] **Later:** **ipywidgets** explorers; optional **CI** smoke for **IPython** display hooks.
 
 ### Documentation and extended UX
 
-- [x] **Quickstart:** [`QUICKSTART.md`](/getting-started/quickstart.md), [`notebooks/five_minute_tour.ipynb`](https://github.com/eddiethedean/pydantable/blob/main/notebooks/five_minute_tour.ipynb), links from [`README.md`](/project/repository-readme.md), [`index.md`](/index.md), [`DEVELOPER.md`](/project/developer.md).
-- [x] **Execution guide:** materialization cost table, import-style table, copy-as / interchange in [`EXECUTION.md`](/user-guide/execution.md).
-- [x] **Naming map:** core ↔ pandas ↔ PySpark in [`PANDAS_UI.md`](/integrations/alternate-surfaces/pandas-ui.md) and [`PYSPARK_UI.md`](/integrations/alternate-surfaces/pyspark-ui.md).
+- [x] **Quickstart:** [`QUICKSTART.md`](/getting-started/quickstart/), [`notebooks/five_minute_tour.ipynb`](https://github.com/eddiethedean/pydantable/blob/main/notebooks/five_minute_tour.ipynb), links from [`README.md`](/project/repository-readme/), [`index.md`](/), [`DEVELOPER.md`](/project/developer/).
+- [x] **Execution guide:** materialization cost table, import-style table, copy-as / interchange in [`EXECUTION.md`](/user-guide/execution/).
+- [x] **Naming map:** core ↔ pandas ↔ PySpark in [`PANDAS_UI.md`](/integrations/alternate-surfaces/pandas-ui/) and [`PYSPARK_UI.md`](/integrations/alternate-surfaces/pyspark-ui/).
 - [x] **`value_counts(column)`** on **`DataFrame`** / **`DataFrameModel`**; **`_repr_mimebundle_`** for Jupyter; **`PYDANTABLE_VERBOSE_ERRORS`** for **`execute_plan`** **`ValueError`** context.
 - [x] **Tests:** [`tests/dataframe/test_display_options.py`](https://github.com/eddiethedean/pydantable/blob/main/tests/dataframe/test_display_options.py), [`tests/dataframe/test_rust_engine_verbose_errors.py`](https://github.com/eddiethedean/pydantable/blob/main/tests/dataframe/test_rust_engine_verbose_errors.py).
 
 ### Quality and release
 
 - [x] **Tests:** **`tests/test_dataframe_discovery.py`**, **`tests/test_expr_repr.py`**, **`tests/test_dataframe_repr.py`**.
-- [x] **Docs:** [`README.md`](/project/repository-readme.md), [`index.md`](/index.md), [`PARITY_SCORECARD.md`](/user-guide/polars-alignment/parity-scorecard.md), [`PYSPARK_PARITY.md`](/integrations/alternate-surfaces/pyspark-parity.md), [`PANDAS_UI.md`](/integrations/alternate-surfaces/pandas-ui.md).
+- [x] **Docs:** [`README.md`](/project/repository-readme/), [`index.md`](/), [`PARITY_SCORECARD.md`](/user-guide/polars-alignment/parity-scorecard/), [`PYSPARK_PARITY.md`](/integrations/alternate-surfaces/pyspark-parity/), [`PANDAS_UI.md`](/integrations/alternate-surfaces/pandas-ui/).
 - [x] **Release hygiene:** **`make check-full`**, **`pytest`**, **changelog** **0.20.0**, version bump **`pyproject.toml`** / **`__init__.py`** / **`pydantable-core/Cargo.toml`**.
 
 **Explicitly not in 0.20.0:** new **Expr** analytics transforms beyond **`describe`** / **`value_counts`**; **non-string map keys**; **distributed** Spark; **ipywidgets**-heavy UIs.
@@ -296,7 +296,7 @@ Practical inputs that feed that phase:
 **Goal (shipped): first-class Streamlit ergonomics**
 
 - [x] **Interchange protocol (preferred path):** implemented **`__dataframe__`** on **`DataFrame`** (and **`DataFrameModel`** via delegation) so **`st.dataframe(df)`** works without manual conversion where Streamlit’s stack supports the exported Arrow-backed interchange (documented dtype / nullability limits and materialization costs).
-- [x] **Fallback documentation:** documented **`st.dataframe(df.to_polars())`**, **`st.dataframe(df.to_arrow())`**, **`st.data_editor(df.to_arrow())`** (editing fallback), and **`st.write`** behavior in **`STREAMLIT.md`** and an [EXECUTION](/user-guide/execution.md) interchange subsection.
+- [x] **Fallback documentation:** documented **`st.dataframe(df.to_polars())`**, **`st.dataframe(df.to_arrow())`**, **`st.data_editor(df.to_arrow())`** (editing fallback), and **`st.write`** behavior in **`STREAMLIT.md`** and an [EXECUTION](/user-guide/execution/) interchange subsection.
 - [x] **Tests:** CI smoke coverage using Streamlit’s built-in app testing harness (`streamlit.testing.v1.AppTest`) for **`st.write`** / **`st.dataframe`** and the supported **`st.data_editor(df.to_arrow())`** fallback.
 - [x] **Packaging:** documented **`pip install streamlit`** alongside **`pydantable[arrow]`** / **`pydantable[polars]`**; CI pins a supported Streamlit range.
 - [x] **Changelog + README:** Streamlit integration called out in **changelog** and **README**.
@@ -314,7 +314,7 @@ Practical inputs that feed that phase:
 - [x] **Docs:** **`DATA_IO_SOURCES.md`**, **`EXECUTION.md`**, **`FASTAPI.md`**, **`CHANGELOG.md`**, this section.
 - [x] **Tests:** **`tests/test_io_comprehensive.py`**.
 
-**Deferred / not in-tree:** Rust **`sqlx`** drivers (documented SQLAlchemy-first). Engine materialization can use **`pyo3-async-runtimes`** + Tokio (**`async_execute_plan`**); general file/SQL I/O still prefers thread offload unless documented otherwise ([EXECUTION](/user-guide/execution.md)).
+**Deferred / not in-tree:** Rust **`sqlx`** drivers (documented SQLAlchemy-first). Engine materialization can use **`pyo3-async-runtimes`** + Tokio (**`async_execute_plan`**); general file/SQL I/O still prefers thread offload unless documented otherwise ([EXECUTION](/user-guide/execution/)).
 
 ---
 
@@ -323,8 +323,8 @@ Practical inputs that feed that phase:
 - [x] **Lazy file entry:** **`read_parquet`**, **`read_csv`**, **`read_ndjson`**, **`read_ipc`** (+ **`aread_*`**) return **`ScanFileRoot`**; engine builds Polars **`LazyFrame`** from the path without a full Python **`dict[str, list]`** for the scanned table.
 - [x] **Lazy write:** **`DataFrame.write_parquet`** / **`DataFrameModel.write_parquet`** (and **`write_csv`**, **`write_ipc`**, **`write_ndjson`**) — Rust pipeline output (internal **`sink_*`** symbols).
 - [x] **Breaking renames:** file **`read_*` / `aread_*`** → **`materialize_*` / `amaterialize_*`**; **`read_sql` / `aread_sql`** → **`fetch_sql` / `afetch_sql`**; HTTP **`read_*_url`** → **`fetch_*_url`**. **`DataFrameModel`** classmethods follow the same names.
-- [x] **Limitations:** **join**, **concat**, **group_by**, **melt**, **pivot**, **explode**, **unnest**, **dynamic group** on lazy file roots: see [`EXECUTION.md`](/user-guide/execution.md) matrix (evolves with Polars).
-- [x] **Docs + tests:** [`EXECUTION.md`](/user-guide/execution.md), [`DATA_IO_SOURCES.md`](/io/data-io-sources.md), [`FASTAPI.md`](/integrations/fastapi/fastapi.md), [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md); **`tests/test_io_comprehensive.py`** (**`test_read_parquet_filter_write_roundtrip`**, HTTP **`fetch_*`**, SQL **`Connection`**); **`tests/test_io_improvements.py`** (JSON, **`max_bytes`**, URL context managers, **`MissingRustExtensionError`** subprocess, async I/O + **`DataFrameModel`** SQL shims); **`tests/test_hypothesis_properties.py`** (bounded lazy Parquet **`read_*` + filter**).
+- [x] **Limitations:** **join**, **concat**, **group_by**, **melt**, **pivot**, **explode**, **unnest**, **dynamic group** on lazy file roots: see [`EXECUTION.md`](/user-guide/execution/) matrix (evolves with Polars).
+- [x] **Docs + tests:** [`EXECUTION.md`](/user-guide/execution/), [`DATA_IO_SOURCES.md`](/io/data-io-sources/), [`FASTAPI.md`](/integrations/fastapi/fastapi/), [`INTERFACE_CONTRACT.md`](/semantics/interface-contract/); **`tests/test_io_comprehensive.py`** (**`test_read_parquet_filter_write_roundtrip`**, HTTP **`fetch_*`**, SQL **`Connection`**); **`tests/test_io_improvements.py`** (JSON, **`max_bytes`**, URL context managers, **`MissingRustExtensionError`** subprocess, async I/O + **`DataFrameModel`** SQL shims); **`tests/test_hypothesis_properties.py`** (bounded lazy Parquet **`read_*` + filter**).
 
 **Later:** Polars **`streaming`** / **`PYDANTABLE_ENGINE_STREAMING`** knob; **`collect_batches`**; scan-backed joins.
 
@@ -332,7 +332,7 @@ Practical inputs that feed that phase:
 
 ## Shipped in 1.9.0 (PySpark `DataFrame` surface + temporal + `describe`)
 
-- [x] **PySpark UI:** **`groupBy`** / grouped **`pivot`** / dict-form **`agg`**, **`crossJoin`**, frame **`count()`**, **`unionByName`**, set-style **`intersect`** / **`subtract`** / **`exceptAll`**, **`fillna`** / **`dropna`** / **`.na`**, **`printSchema`**, **`explain`**, **`toPandas`** (and **`DataFrameModel`** parity). See [CHANGELOG](/project/changelog.md) **1.9.0**, [PYSPARK_UI](/integrations/alternate-surfaces/pyspark-ui.md), [PYSPARK_PARITY](/integrations/alternate-surfaces/pyspark-parity.md).
+- [x] **PySpark UI:** **`groupBy`** / grouped **`pivot`** / dict-form **`agg`**, **`crossJoin`**, frame **`count()`**, **`unionByName`**, set-style **`intersect`** / **`subtract`** / **`exceptAll`**, **`fillna`** / **`dropna`** / **`.na`**, **`printSchema`**, **`explain`**, **`toPandas`** (and **`DataFrameModel`** parity). See [CHANGELOG](/project/changelog/) **1.9.0**, [PYSPARK_UI](/integrations/alternate-surfaces/pyspark-ui/), [PYSPARK_PARITY](/integrations/alternate-surfaces/pyspark-parity/).
 - [x] **Engine typing:** **`cast`** accepts **`Literal(None)`** for nullable null-padding (e.g. **`unionByName(..., allowMissingColumns=True)`**).
 - [x] **Temporal helpers:** **`Expr.dt_dayofyear`**, **`Expr.from_unix_time`**, **`F.dayofyear`**, **`F.from_unixtime`** (Rust **`TemporalPart::DayOfYear`**, **`ExprNode::FromUnixTime`**).
 - [x] **Discovery:** **`describe()`** **`date`** / **`datetime`** stats ( **`summary()`** on the PySpark façade is unchanged as an alias).
@@ -341,21 +341,21 @@ Practical inputs that feed that phase:
 
 ## Shipped in 1.10.0 (JSON processing & struct ergonomics)
 
-- [x] **Struct expressions (Polars):** **`Expr.struct_json_encode`**, **`struct_json_path_match`**, **`struct_rename_fields`**, **`struct_with_fields`**; PySpark **`struct_json_encode`** / **`struct_json_path_match`**. See [CHANGELOG](/project/changelog.md) **1.10.0**.
+- [x] **Struct expressions (Polars):** **`Expr.struct_json_encode`**, **`struct_json_path_match`**, **`struct_rename_fields`**, **`struct_with_fields`**; PySpark **`struct_json_encode`** / **`struct_json_path_match`**. See [CHANGELOG](/project/changelog/) **1.10.0**.
 - [x] **JSON decode:** **`Expr.str_json_decode`** (string → struct or homogeneous map).
 - [x] **I/O & tests:** nested **`materialize_json`**, **`export_json`** round-trip; **`tests/test_json_io_phase_a.py`** and related coverage.
-- [x] **Docs:** [IO_JSON](/io/json.md), [SUPPORTED_TYPES](/user-guide/supported-types.md), [SELECTORS](/user-guide/selectors.md), NDJSON cookbook; Phase D/E narrative in [CHANGELOG](/project/changelog.md) **1.10.0**.
+- [x] **Docs:** [IO_JSON](/io/json/), [SUPPORTED_TYPES](/user-guide/supported-types/), [SELECTORS](/user-guide/selectors/), NDJSON cookbook; Phase D/E narrative in [CHANGELOG](/project/changelog/) **1.10.0**.
 
 ---
 
 ## Shipped in 1.11.0 (local I/O ↔ Polars parity)
 
-- [x] **Multi-file & directory reads:** **`scan_kwargs`** for **Parquet** (hive-style partitions, lineage, row index), **CSV** directory/glob + **`LazyCsvReader`** options, **NDJSON** (**`glob`** and related), **IPC** multi-file, **`read_json`** path semantics — see [CHANGELOG](/project/changelog.md) **1.11.0**, [IO_OVERVIEW](/io/overview.md), [DATA_IO_SOURCES](/io/data-io-sources.md), [IO_DECISION_TREE](/io/decision-tree.md), {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`.
-- [x] **Partitioned / dataset writes:** **Parquet** **`partition_by`** hive-style layout; **`write_*_batches`** directory vs single-file semantics — see [CHANGELOG](/project/changelog.md) **1.11.0**, [IO_PARQUET](/io/parquet.md).
-- [x] **Eager & iterators:** **`materialize_*`** single-file contract; **`iter_*`** patterns and **`iter_chain_batches`** — see [CHANGELOG](/project/changelog.md) **1.11.0**, [IO_OVERVIEW](/io/overview.md).
-- [x] **Docs & tests:** examples under **`docs/examples/io/`**, [CHANGELOG](/project/changelog.md) **1.11.0**, **kwargs** allowlist tests.
+- [x] **Multi-file & directory reads:** **`scan_kwargs`** for **Parquet** (hive-style partitions, lineage, row index), **CSV** directory/glob + **`LazyCsvReader`** options, **NDJSON** (**`glob`** and related), **IPC** multi-file, **`read_json`** path semantics — see [CHANGELOG](/project/changelog/) **1.11.0**, [IO_OVERVIEW](/io/overview/), [DATA_IO_SOURCES](/io/data-io-sources/), [IO_DECISION_TREE](/io/decision-tree/), {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`.
+- [x] **Partitioned / dataset writes:** **Parquet** **`partition_by`** hive-style layout; **`write_*_batches`** directory vs single-file semantics — see [CHANGELOG](/project/changelog/) **1.11.0**, [IO_PARQUET](/io/parquet/).
+- [x] **Eager & iterators:** **`materialize_*`** single-file contract; **`iter_*`** patterns and **`iter_chain_batches`** — see [CHANGELOG](/project/changelog/) **1.11.0**, [IO_OVERVIEW](/io/overview/).
+- [x] **Docs & tests:** examples under **`docs/examples/io/`**, [CHANGELOG](/project/changelog/) **1.11.0**, **kwargs** allowlist tests.
 
-**Summary:** [CHANGELOG](/project/changelog.md) **1.11.0** documents user-visible local I/O changes.
+**Summary:** [CHANGELOG](/project/changelog/) **1.11.0** documents user-visible local I/O changes.
 
 ---
 
@@ -363,13 +363,13 @@ Practical inputs that feed that phase:
 
 **Goal (achieved for `v1.0.0`):** a **stable public API** under **semver**, **documented** semantics, and **repeatable** release quality—not a large new feature dump.
 
-- [x] **Precondition:** **Shipped in 0.19.0** and **0.20.0** (above) are complete or any remaining gap is noted in this file or [`CHANGELOG.md`](/project/changelog.md).
-- [x] **Semver contract:** publish a **1.0** policy (expand [`VERSIONING.md`](/semantics/versioning.md) and/or [`README.md`](/project/repository-readme.md)): what counts as **patch** vs **minor** vs **major** for **1.x** for `DataFrame` / `DataFrameModel` / `Expr` / Rust extension boundaries; confirm [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md) is the behavioral source of truth. (**0.x** expectations already live in [`VERSIONING.md`](/semantics/versioning.md).)
+- [x] **Precondition:** **Shipped in 0.19.0** and **0.20.0** (above) are complete or any remaining gap is noted in this file or [`CHANGELOG.md`](/project/changelog/).
+- [x] **Semver contract:** publish a **1.0** policy (expand [`VERSIONING.md`](/semantics/versioning/) and/or [`README.md`](/project/repository-readme/)): what counts as **patch** vs **minor** vs **major** for **1.x** for `DataFrame` / `DataFrameModel` / `Expr` / Rust extension boundaries; confirm [`INTERFACE_CONTRACT.md`](/semantics/interface-contract/) is the behavioral source of truth. (**0.x** expectations already live in [`VERSIONING.md`](/semantics/versioning/).)
 - [x] **Packaging and versions:** **`pyproject.toml`** / **`Cargo.toml`** / extension **`rust_version()`** alignment; **Maturin** release workflow (e.g. [`.github/workflows/release.yml`](https://github.com/eddiethedean/pydantable/blob/main/.github/workflows/release.yml)) exercised or dry-run validated; **PyPI** **sdist + wheels** for declared platforms; optional **SBOM** or supply-chain notes if policy requires them.
 - [x] **Quality bar:** full **`make check-full`**, **`cargo test --all-features`**, **`cargo check --no-default-features`**, and **pytest** (including optional-deps legs that match **CI**) on the **exact** commit tagged **`v1.0.0`**; **no known P0/P1** regressions against **INTERFACE_CONTRACT**.
 - [x] **Security tooling:** **`cargo audit`** / **`cargo deny`** (or documented exceptions) current; policy for how **1.x** will handle **RUSTSEC** / advisory bumps.
 - [x] **Documentation and comms:** **README** + doc site **`index`** lead with **1.0** positioning; **changelog** **`1.0.0`** section highlights stability scope; **upgrade path** from **0.20.x** in one place (even if “no breaking changes from last 0.20”).
-- [x] **Support matrix:** state supported **Python** versions and **Polars** optional-extra expectations for **1.0.x**; link [`DEVELOPER.md`](/project/developer.md) for contributors.
+- [x] **Support matrix:** state supported **Python** versions and **Polars** optional-extra expectations for **1.0.x**; link [`DEVELOPER.md`](/project/developer/) for contributors.
 
 **Out of scope for the 1.0.0 tag itself:** new execution engines (**Spark**, SQL backend, etc.)—those stay under **After v1.0.0** unless a maintainer explicitly promotes an exception.
 
@@ -379,9 +379,9 @@ Practical inputs that feed that phase:
 
 Work **not** scheduled in the **0.17.0–0.20.0** shipped sections or **Planned v1.0.0** above, or explicitly deferred when scope slips:
 
-- [ ] **Non-string map keys** (**`dict[int, T]`** and Arrow maps whose keys are not UTF-8 strings): still **not shipped** after **0.20.0** (explicitly deferred; see **Shipped in 0.18.0** / **0.19.0** and [`SUPPORTED_TYPES.md`](/user-guide/supported-types.md)). **Heterogeneous** keys / full **Arrow + expression** parity may be revisited after **v1.0.0** unless promoted earlier.
+- [ ] **Non-string map keys** (**`dict[int, T]`** and Arrow maps whose keys are not UTF-8 strings): still **not shipped** after **0.20.0** (explicitly deferred; see **Shipped in 0.18.0** / **0.19.0** and [`SUPPORTED_TYPES.md`](/user-guide/supported-types/)). **Heterogeneous** keys / full **Arrow + expression** parity may be revisited after **v1.0.0** unless promoted earlier.
 - [ ] Items deferred from earlier releases when priorities change.
-- [x] **Chunked async iterator (`astream`):** **`DataFrame.astream`** / **`DataFrameModel.astream`** yield column **`dict`** chunks after one engine collect (same as **`collect_batches`** semantics — not incremental scan streaming). See [EXECUTION](/user-guide/execution.md), [INTERFACE_CONTRACT](/semantics/interface-contract.md).
+- [x] **Chunked async iterator (`astream`):** **`DataFrame.astream`** / **`DataFrameModel.astream`** yield column **`dict`** chunks after one engine collect (same as **`collect_batches`** semantics — not incremental scan streaming). See [EXECUTION](/user-guide/execution/), [INTERFACE_CONTRACT](/semantics/interface-contract/).
 - [ ] **JSON-native** incremental async iterators (line-delimited / array streaming without full **`dict`** materialization first) — not shipped.
 - [ ] Longer-horizon experiments that do not fit the **pre-1.0** train (**0.17–0.19**) or the **v1.0.0** production gate.
 - [ ] **FastAPI ecosystem (optional):** thin **`pydantable[fastapi]`** extra with **pinned** **`fastapi` / `starlette`**, **middleware**, or **router** kits—**only** if demand and maintenance bandwidth are clear.
@@ -453,7 +453,7 @@ contract tests. Order is **not** priority order.
   name).
 - [x] **`struct_json_encode`** / **`struct_json_path_match`** symmetry with string JSON
   helpers.
-- [x] **`str_json_decode`** (string JSON → struct / **`dict[str, T]`**; see [CHANGELOG](/project/changelog.md) **1.10.0**).
+- [x] **`str_json_decode`** (string JSON → struct / **`dict[str, T]`**; see [CHANGELOG](/project/changelog/) **1.10.0**).
 - [ ] **Map transforms:** **`map_filter`**, **`map_entries_sorted`**, **`map_zip`** where
   Polars exposes stable operations and our schema story stays **`dict[str, T]`**.
 

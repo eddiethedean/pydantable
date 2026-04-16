@@ -12,7 +12,7 @@ For behavior contracts (nulls, joins, ordering), see `INTERFACE_CONTRACT.md`.
 
 ## JSON (RFC 8259) vs column types
 
-When data is **JSON on the wire** (files, HTTP bodies), use this mapping from JSON value kinds to pydantable fields. For **lazy** JSON Lines scans vs **eager** array files, see [IO_JSON](/io/json.md).
+When data is **JSON on the wire** (files, HTTP bodies), use this mapping from JSON value kinds to pydantable fields. For **lazy** JSON Lines scans vs **eager** array files, see [IO_JSON](/io/json/).
 
 | JSON kind | Model as | Notes |
 |-----------|----------|--------|
@@ -82,7 +82,7 @@ from pydantable.dtypes import register_scalar
 register_scalar(ULID, base="str")
 ```
 
-See [CUSTOM_DTYPES](/user-guide/custom-dtypes.md) for the full guide.
+See [CUSTOM_DTYPES](/user-guide/custom-dtypes/) for the full guide.
 
 ### Practical notes (1.2.0 scalars)
 
@@ -158,7 +158,7 @@ Rust maps these to **struct** dtypes and Polars **struct** columns. **Expression
 support for whole-struct ops is conservative** (no arithmetic on whole structs;
 equality is allowed only when struct shapes match). Use **`Expr.struct_field(...)`**
 for scalar field projection, plus struct helpers below (all **Polars-backed**;
-see [INTERFACE_CONTRACT](/semantics/interface-contract.md) row-wise notes).
+see [INTERFACE_CONTRACT](/semantics/interface-contract/) row-wise notes).
 
 ## Map-like columns (`dict[str, T]`)
 
@@ -178,7 +178,7 @@ wins (Polars map semantics); do not rely on raising an error for duplicates.
 
 **0.17.0 — Map expressions after Arrow ingest:** After ingest, the column is a normal **`dict[str, T]`** map for planning and **`Expr`**: **`map_get(key)`** yields **null** when the key is absent (or the whole map cell is null); **`map_contains_key(key)`** is boolean. Same rules apply to maps built from Python dict cells. See **`tests/test_pyarrow_map_ingest.py`** (`test_arrow_map_ingest_then_map_get_and_contains`).
 
-**0.18.0 / 0.19.0 / 0.20.0 — Non-string map keys:** **`dict[int, T]`**, other non-string Python keys, and Arrow **`map`** types whose keys are not **`string` / `large_string`** remain **unsupported**. That work is explicitly deferred; see [ROADMAP](/project/roadmap.md) **Later**. **0.20.0** does not change map dtypes or ingest.
+**0.18.0 / 0.19.0 / 0.20.0 — Non-string map keys:** **`dict[int, T]`**, other non-string Python keys, and Arrow **`map`** types whose keys are not **`string` / `large_string`** remain **unsupported**. That work is explicitly deferred; see [ROADMAP](/project/roadmap/) **Later**. **0.20.0** does not change map dtypes or ingest.
 
 ## Homogeneous list columns (`list[T]` / `List[T]`)
 
@@ -252,7 +252,7 @@ Beyond generic arithmetic and comparisons, the following are supported (see
 `Expr` in the Python API):
 
 - **Numeric:** `abs()`, `round(decimals=...)`, `floor()`, `ceil()` on `int` / `float` columns.
-- **String:** `strip()`, `upper()`, `lower()`, `str_reverse()`, `str_pad_start(len, fill_char=" ")`, `str_pad_end(len, fill_char=" ")`, `str_zfill(len)`, `str_extract_regex(pattern, group_index=1)` (Rust **`regex`** dialect; group 0 = whole match), `str_json_path_match(path)` (Polars JSONPath; result **`str`**, null on miss/invalid JSON per engine), **`str_json_decode(dtype)`** (Polars **`str.json_decode`**: JSON text → **struct** or **`dict[str, T]`**; null text → null; invalid JSON typically **errors at `collect()`** in Polars **0.53**—see [INTERFACE_CONTRACT](/semantics/interface-contract.md); map JSON must be an **array of `{key,value}` objects**), `str_replace(old, new, literal=True)` (default: literal substring; `literal=False` uses **Rust `regex`**, not Python `re`), `starts_with`, `ends_with`, `str_contains` (literal substring), `str_contains_pat(pattern, literal=False)` (regex when `literal=False`), `str_split(delimiter)` → **`list[str]`**, `strip_prefix`, `strip_suffix`, `strip_chars`, plus `substr`, `char_length`, `concat`.
+- **String:** `strip()`, `upper()`, `lower()`, `str_reverse()`, `str_pad_start(len, fill_char=" ")`, `str_pad_end(len, fill_char=" ")`, `str_zfill(len)`, `str_extract_regex(pattern, group_index=1)` (Rust **`regex`** dialect; group 0 = whole match), `str_json_path_match(path)` (Polars JSONPath; result **`str`**, null on miss/invalid JSON per engine), **`str_json_decode(dtype)`** (Polars **`str.json_decode`**: JSON text → **struct** or **`dict[str, T]`**; null text → null; invalid JSON typically **errors at `collect()`** in Polars **0.53**—see [INTERFACE_CONTRACT](/semantics/interface-contract/); map JSON must be an **array of `{key,value}` objects**), `str_replace(old, new, literal=True)` (default: literal substring; `literal=False` uses **Rust `regex`**, not Python `re`), `starts_with`, `ends_with`, `str_contains` (literal substring), `str_contains_pat(pattern, literal=False)` (regex when `literal=False`), `str_split(delimiter)` → **`list[str]`**, `strip_prefix`, `strip_suffix`, `strip_chars`, plus `substr`, `char_length`, `concat`.
 - **Boolean:** `&`, `|`, `~` for combining boolean-typed expressions.
 - **Datetime / date / time:** `dt_year()` … `dt_day()` on **`date`** or **`datetime`**; **`dt_weekday()`** (ISO weekday: Monday = 1 … Sunday = 7, same as Polars) and **`dt_quarter()`** (1–4) on **`date`** or **`datetime`**; **`dt_week()`** (ISO 8601 week number 1–53, same as Polars **`dt.week()`** and Python **`date.isocalendar().week`**); **`dt_dayofyear()`** (day of year 1–366; Polars **`dt.ordinal_day()`**) on **`date`** or **`datetime`**; `dt_hour()` … **`dt_nanosecond()`** on **`datetime`** or **`time`**; **`dt_date()`** on **`datetime`** (calendar `date`). **`strptime(format, to_datetime=...)`** parses **`str`** → **`date`** or **`datetime`**. **`unix_timestamp(unit=...)`** returns epoch **`int`** from **`date`** / **`datetime`**. **`from_unix_time(unit=...)`** on **`int`** / **`float`** columns yields UTC-naive **`datetime`** (inverse of **`unix_timestamp`** for typical values). **`datetime ± timedelta`** and **`date ± timedelta`** use typed binary ops (see Rust `infer_arith_dtype`).
 - **Homogeneous lists:** `list_len()`, **`list_get(index)`** (int index; OOB → null), **`list_contains(value)`**, **`list_min()`** / **`list_max()`** / **`list_sum()`** / **`list_mean()`** on `list[int]` or `list[float]` (**`list_mean`** result is **`float`**; empty list cells yield null); **`list_join(separator, ignore_nulls=False)`** for **`list[str]`** → **`str`**; **`list_sort(...)`** and **`list_unique(stable=False)`** for lists whose elements are sortable scalars (see below).
@@ -261,7 +261,7 @@ Beyond generic arithmetic and comparisons, the following are supported (see
 - **Binary (`bytes`):** **`binary_len()`** (per-row byte length).
 - **Cast:** `cast(T)` supports the usual primitive conversions plus `datetime` → `date` / `str` and `date` → `str`, and **`str` → `date` / `datetime`** using Polars’ string parsing (ISO-8601-shaped strings; behavior follows Polars). For a **fixed format**, use **`strptime(format, ...)`** instead of `cast`.
 
-**Lazy Parquet vs model validation:** A **`read_parquet`** directory/glob scan builds a **Polars** lazy schema (including **`allow_missing_columns`** behavior for files that omit columns—see [IO_PARQUET](/io/parquet.md)). **Pydantic** validation of cell values still happens when you **materialize** into a **`DataFrameModel`** / **`DataFrame`**; align dtypes with **`cast`** / **`strptime`** in the plan if files disagree on representations.
+**Lazy Parquet vs model validation:** A **`read_parquet`** directory/glob scan builds a **Polars** lazy schema (including **`allow_missing_columns`** behavior for files that omit columns—see [IO_PARQUET](/io/parquet/)). **Pydantic** validation of cell values still happens when you **materialize** into a **`DataFrameModel`** / **`DataFrame`**; align dtypes with **`cast`** / **`strptime`** in the plan if files disagree on representations.
 
 Temporal part extraction and `dt_date()` on timezone-aware `datetime` values follow Polars’ interpretation of the stored dtype.
 
@@ -297,7 +297,7 @@ Temporal part extraction and `dt_date()` on timezone-aware `datetime` values fol
 
 - **`str_extract_regex`**: empty **`pattern`** raises **`ValueError`** when the expression is built. Uses Polars **`str.extract`** (Rust regex). **`group_index`** **`0`** is the full match; **`1+`** are capture groups. **Out-of-range** **`group_index`** or non-matching rows typically yield **null** at execution (no error per row).
 - **`str_json_path_match`**: **`path`** uses Polars JSONPath (**`$...`** style). Empty **`path`** raises **`ValueError`**. Each cell must hold JSON text; **malformed JSON** or **no match** typically yields **null** (engine-dependent). The output dtype is **`str`** (matched fragment as string, e.g. JSON scalars without quotes per Polars). Use a **`str`** column whose values are JSON documents (or JSON embedded in a string literal), not a separate JSON dtype.
-- **`str_json_decode`**: supply a **nested model type** or **`dict[str, T]`** as **`dtype`** (same style as **`cast`**). Prefer pairing with **`struct_json_encode`** for round trips on struct columns. **Map** values in JSON must use Polars’ physical encoding: a JSON **array** of objects with **`key`** / **`value`** fields (not a single JSON object with arbitrary keys). Invalid JSON handling differs from **`str_json_path_match`**—see [INTERFACE_CONTRACT](/semantics/interface-contract.md).
+- **`str_json_decode`**: supply a **nested model type** or **`dict[str, T]`** as **`dtype`** (same style as **`cast`**). Prefer pairing with **`struct_json_encode`** for round trips on struct columns. **Map** values in JSON must use Polars’ physical encoding: a JSON **array** of objects with **`key`** / **`value`** fields (not a single JSON object with arbitrary keys). Invalid JSON handling differs from **`str_json_path_match`**—see [INTERFACE_CONTRACT](/semantics/interface-contract/).
 - **`struct_json_path_match`**: same JSONPath dialect and typical **null** behavior, applied after encoding each **struct** cell as JSON text (see **`struct_json_encode`**). Prefer this over nesting **`struct_json_encode()`** and **`str_json_path_match(...)`** in user code when both are on the same struct column.
 
 ## Not supported as schema column types
@@ -343,14 +343,14 @@ compatible row objects). Lists may be plain `list`, `tuple`, or
 **0.16.0 — PyArrow `Table` / `RecordBatch`:** When **`pyarrow`** is installed, you may pass a **`pa.Table`** or **`RecordBatch`** as **`DataFrame` / `DataFrameModel`** input. It is converted to **`dict[str, list]`** via **`to_pylist()`** per column (copies), then the usual validation runs. **``materialize_parquet``** / **``materialize_ipc``** (**``from pydantable import …``**) produce the same column shape for file/bytes sources. **`DataFrame.to_arrow()`** goes the other way: execute the plan as for **`to_dict()`**, then **`pyarrow.Table.from_pydict`**. Supported cell types are those that already round-trip through list materialization (scalars, **JSON-friendly** nested shapes per engine limits); exotic Arrow extension types may not map cleanly—validate with **`trusted_mode='off'`** when in doubt.
 
 With **`trusted_mode="shape_only"`** or **`"strict"`**, trusted bulk paths may pass **NumPy**, **PyArrow**,
-or a **Polars `DataFrame`** as documented in [EXECUTION](/user-guide/execution.md) and [PERFORMANCE](/project/performance.md);
+or a **Polars `DataFrame`** as documented in [EXECUTION](/user-guide/execution/) and [PERFORMANCE](/project/performance/);
 scalar dtypes must still match the schema. **`trusted_mode`** on **`DataFrame` /
 `DataFrameModel`** selects **`shape_only`** vs **`strict`** checks (**0.11.0**; **0.12.0** extends **`strict`** to nested list / dict / struct shapes on
 Polars and columnar Python paths; **0.13.0** adds **`strict`** dtype checks for **PyArrow**
 `Array` / `ChunkedArray` columns and accepts concrete Arrow array classes as trusted
 buffers). See **`schema.validate_columns_strict`** for the low-level API (**`validate_elements`** remains a bridge for direct callers).
 
-See [DATAFRAMEMODEL](/user-guide/dataframemodel.md) (“Trusted ingest”). The legacy **`validate_data`** constructor argument was removed in **0.15.0**.
+See [DATAFRAMEMODEL](/user-guide/dataframemodel/) (“Trusted ingest”). The legacy **`validate_data`** constructor argument was removed in **0.15.0**.
 
 **0.14.0 — `shape_only` dtype drift:** when **`trusted_mode="shape_only"`**, pydantable
 may emit **`pydantable.DtypeDriftWarning`** if a column would be **rejected under
@@ -360,6 +360,6 @@ noisy pipelines.
 
 ## See also
 
-- [DATAFRAMEMODEL](/user-guide/dataframemodel.md) — `DataFrameModel` and row vs column inputs
-- [INTERFACE_CONTRACT](/semantics/interface-contract.md) — null semantics, joins, reshape constraints
+- [DATAFRAMEMODEL](/user-guide/dataframemodel/) — `DataFrameModel` and row vs column inputs
+- [INTERFACE_CONTRACT](/semantics/interface-contract/) — null semantics, joins, reshape constraints
 - `pydantable-core/src/dtype.rs` — mapping from Python annotations to internal dtypes
