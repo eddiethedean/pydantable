@@ -363,8 +363,9 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
+        # Keep the Python test matrix lean: we only need `cargo`/`rustc` for maturin.
+        # Installing extra components (clippy/rustfmt) has caused sporadic rustup
+        # component conflicts on macOS runners.
 
       - name: Cache cargo
         uses: actions/cache@v5
