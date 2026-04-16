@@ -48,9 +48,13 @@ rap = ["rapcsv>=0.2", "rapfiles>=0.1", "rapsqlite>=0.1"]
 fastapi = ["fastapi>=0.100"]
 # MongoDB: PyMongo + Beanie + optional Mongo plan roots (``sync_pymongo_collection``, ``MongoDataFrame.from_beanie``).
 mongo = ["entei-core>=0.2.0,<0.3", "pymongo>=4.6", "beanie>=1.24,<3"]
-# Spark: `SparkDataFrame` / `SparkDataFrameModel` (raikou-core bridge).
+# Spark: `SparkDataFrame` / `SparkDataFrameModel` (raikou-core bridge) + SparkDantic schemas.
 # NOTE: Spark 4.x requires newer Java; we pin <4 for broad compatibility.
-spark = ["raikou-core==0.1.0", "pyspark>=3.4,<4"]
+spark = [
+    "raikou-core==0.1.0",
+    "pyspark>=3.4,<4",
+    "sparkdantic>=2.0,<3",
+]
 dev = [
     "tomli>=1.2.0; python_version < '3.11'",
     "fastapi>=0.100",
@@ -96,6 +100,8 @@ dev = [
     "moltres-core>=1.0.0,<2",
     # SQLAlchemy ``create_async_engine`` (rapsqlite smoke test in ``tests/sql/test_sql_moltres.py``).
     "greenlet>=3.0",
+    # SparkDantic (same pin as optional ``[spark]``); JVM schema helpers in ``pydantable.pyspark.sparkdantic``.
+    "sparkdantic>=2.0,<3",
 ]
 benchmark = [
     "maturin>=1.4,<2.0",
@@ -120,6 +126,7 @@ docs = [
     # Spark modules (``spark_dataframe``) for Sphinx/RTD imports (same pins as ``[spark]``).
     "raikou-core==0.1.0",
     "pyspark>=3.4,<4",
+    "sparkdantic>=2.0,<3",
 ]
 
 [tool.setuptools]
@@ -160,6 +167,7 @@ allowed-unresolved-imports = [
     "rapsqlite.**",
     "pyspark.**",
     "raikou_core.**",
+    "sparkdantic.**",
 ]
 
 [tool.ty.rules]
@@ -381,6 +389,15 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "beanie.*"
+ignore_missing_imports = true
+
+# Optional: ``pydantable[spark]`` (SparkDantic JVM schema helpers).
+[[tool.mypy.overrides]]
+module = "sparkdantic"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "sparkdantic.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

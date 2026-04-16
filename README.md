@@ -33,7 +33,7 @@ pip install "pydantable[sql]"      # SQLModel + SQLAlchemy + moltres-core lazy S
 pip install "pydantable[pandas]"   # pandas-flavored façade (pandas UI doc)
 pip install "pydantable[fastapi]"  # FastAPI integration (pydantable.fastapi)
 pip install "pydantable[mongo]"     # pymongo + Beanie + Mongo plan stack (lazy MongoDataFrame + I/O + from_beanie)
-pip install "pydantable[spark]"    # SparkDataFrame / SparkDataFrameModel (raikou-core + pyspark)
+pip install "pydantable[spark]"    # SparkDataFrame / SparkDataFrameModel (raikou-core + pyspark + sparkdantic)
 ```
 
 ## Quick start

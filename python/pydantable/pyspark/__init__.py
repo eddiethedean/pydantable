@@ -30,6 +30,10 @@ def __getattr__(name: str) -> Any:
         )
 
         return _SqlDataFrameModel
+    if name == "sparkdantic":
+        from . import sparkdantic as _sparkdantic
+
+        return _sparkdantic
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -40,5 +44,6 @@ __all__ = [
     "Schema",
     "SqlDataFrame",
     "SqlDataFrameModel",
+    "sparkdantic",
     "sql",
 ]
