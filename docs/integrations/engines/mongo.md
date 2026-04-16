@@ -34,16 +34,16 @@ The parallel SQL-backed story is [SQL_ENGINE](../../integrations/engines/sql.md)
 | ---- | --- |
 | Default Polars/Rust execution for in-memory or file-backed workflows | `DataFrame` / `DataFrameModel` (see [DATAFRAMEMODEL](../../user-guide/dataframemodel.md), [EXECUTION](../../user-guide/execution.md)). |
 | **Eager** SQL I/O: load columns from a DB into a frame, or write tables | **`from pydantable import …`** — [IO_SQL](../../io/sql.md) (**`fetch_sqlmodel`**, **`write_sqlmodel`**, …). |
-| **Eager** Mongo I/O: **`dict[str, list]`** in / out of a collection (no **`DataFrame`**) | **`fetch_mongo`**, **`iter_mongo`**, **`write_mongo`** and **`afetch_mongo`**, **`aiter_mongo`**, **`awrite_mongo`** — ideally with **`sync_pymongo_collection(MyDocument, sync_db)`** for sync **`Collection`** ({ref}`mongo-eager-beanie`); **`AsyncCollection`** uses native async (see **PyMongo surface area** below). |
+| **Eager** Mongo I/O: **`dict[str, list]`** in / out of a collection (no **`DataFrame`**) | **`fetch_mongo`**, **`iter_mongo`**, **`write_mongo`** and **`afetch_mongo`**, **`aiter_mongo`**, **`awrite_mongo`** — ideally with **`sync_pymongo_collection(MyDocument, sync_db)`** for sync **`Collection`** (see [Eager + Beanie](#mongo-eager-beanie)); **`AsyncCollection`** uses native async (see **PyMongo surface area** below). |
 | **Lazy execution** with transforms compiled to **SQL** (lazy-SQL bridge) | **`SqlDataFrame`** / **`SqlDataFrameModel`** — [SQL_ENGINE](../../integrations/engines/sql.md). |
-| **Lazy execution** over a **MongoDB collection** with the same typed **`DataFrame`** API | **`MongoDataFrame`** / **`MongoDataFrameModel`** — **`from_beanie`** or **`from_beanie_async`** with a Beanie **`Document`** (or **`from_collection`**); see {ref}`mongo-primary-beanie` and [BEANIE](../../integrations/engines/beanie.md). |
+| **Lazy execution** over a **MongoDB collection** with the same typed **`DataFrame`** API | **`MongoDataFrame`** / **`MongoDataFrameModel`** — **`from_beanie`** or **`from_beanie_async`** with a Beanie **`Document`** (or **`from_collection`**); see [Primary path (Beanie)](#mongo-primary-beanie) and [BEANIE](../../integrations/engines/beanie.md). |
 
 Eager SQL helpers materialize **column dicts** in Python; they do not replace
 `DataFrame._engine`. **`MongoDataFrame`** uses **`MongoPydantableEngine`** as that engine so
 `select`, `filter`, `collect`, etc. go through the native planner and executor (with
 **`MongoRoot`** materialized via the plan library when needed).
 
-(mongo-primary-beanie)=
+<a id="mongo-primary-beanie"></a>
 ## Primary path: Beanie `Document` models
 
 [Beanie](https://github.com/BeanieODM/beanie) is the **recommended** ODM for MongoDB here: one **`Document`** class per collection, Pydantic-shaped fields, and **`get_collection_name()`** after **`init_beanie`**.
@@ -90,7 +90,7 @@ async def setup(async_client, sync_uri: str) -> None:
 
 Use **`MyModel.from_beanie(Item, database=sync_db)`** on a concrete **`MongoDataFrameModel`** subclass whose schema matches the documents you read.
 
-(mongo-eager-beanie)=
+<a id="mongo-eager-beanie"></a>
 ### Eager column-dict I/O with Beanie
 
 Prefer **`sync_pymongo_collection(DocumentClass, sync_db)`** as the **`collection`** argument to **`fetch_mongo`**, **`iter_mongo`**, and **`write_mongo`** so collection names stay aligned with Beanie.

@@ -44,7 +44,7 @@ Use this page when you know **what you need to do**, but not **where it is docum
 - **Custom dtypes**: [CUSTOM_DTYPES](../user-guide/custom-dtypes.md) — semantic scalar types via Pydantic v2 CoreSchema + `pydantable.dtypes.register_scalar`.
 - **Strictness**: [STRICTNESS](../user-guide/strictness.md) — per-column and nested validation strictness (Phase 4).
 - **Service ergonomics**: [SERVICE_ERGONOMICS](../user-guide/service-ergonomics.md) — OpenAPI enrichments, alias ingestion, and redaction defaults (Phase 5).
-- **JSON & structs (1.10.0) and local I/O (1.11.0):** release narratives in [CHANGELOG](../project/changelog.md) **1.10.0** / **1.11.0**; ongoing work in [ROADMAP](../project/roadmap.md); NDJSON cookbook [json_logs_unnest_export](../cookbook/json_logs_unnest_export.md); lazy scan audit {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`; entrypoints [IO_OVERVIEW](../io/overview.md), [IO_DECISION_TREE](../io/decision-tree.md), [DATA_IO_SOURCES](../io/data-io-sources.md).
+- **JSON & structs (1.10.0) and local I/O (1.11.0):** release narratives in [CHANGELOG](../project/changelog.md) **1.10.0** / **1.11.0**; ongoing work in [ROADMAP](../project/roadmap.md); NDJSON cookbook [json_logs_unnest_export](../cookbook/json_logs_unnest_export.md); lazy scan audit: [Polars 0.53 vs pydantable scan audit](../io/data-io-sources.md#audit-polars-053x-vs-pydantable-1110-phase-a); entrypoints [IO_OVERVIEW](../io/overview.md), [IO_DECISION_TREE](../io/decision-tree.md), [DATA_IO_SOURCES](../io/data-io-sources.md).
 - **Developer guide**: [DEVELOPER](../project/developer.md)
 - **Execution engine abstraction (ADR)**: [ADR-engines](../project/adrs/engines.md)
 - **Custom engine package (third-party backends)**: [CUSTOM_ENGINE_PACKAGE](../integrations/engines/custom-engine-package.md)
@@ -56,5 +56,5 @@ Use this page when you know **what you need to do**, but not **where it is docum
 
 ### Errors and HTTP mapping (services)
 
-- **`pydantable.errors`**: **`ColumnLengthMismatchError`**, **`PydantableUserError`** — used by strict column validation and mapped by **`register_exception_handlers`** in [FASTAPI](../integrations/fastapi/fastapi.md) (see {ref}`fastapi-errors` there).
+- **`pydantable.errors`**: **`ColumnLengthMismatchError`**, **`PydantableUserError`** — used by strict column validation and mapped by **`register_exception_handlers`** in [FASTAPI](../integrations/fastapi/fastapi.md) (see [HTTP errors and exception handlers](../integrations/fastapi/fastapi.md#http-errors-and-exception-handlers) there).
 

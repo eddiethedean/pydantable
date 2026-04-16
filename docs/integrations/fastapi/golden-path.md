@@ -22,7 +22,7 @@ integration guide and error-handling table.
 |-------|------|
 | **`executor_lifespan`** | Attaches a `ThreadPoolExecutor` to **`app.state.executor`** so **`acollect(executor=...)`**, **`pydantable.io`** `amaterialize_*` / `afetch_sql`, and similar offload work off the asyncio loop **without** starving the default thread pool under load. |
 | **`get_executor`** + **`Depends`** | Injects that pool into handlers; **`None`** if you skip lifespan (still valid for **`acollect`**). |
-| **`register_exception_handlers`** | **`MissingRustExtensionError` → 503**, **`ColumnLengthMismatchError` → 400**, in-route **`pydantic.ValidationError` → 422** (see {ref}`fastapi-errors`). |
+| **`register_exception_handlers`** | **`MissingRustExtensionError` → 503**, **`ColumnLengthMismatchError` → 400**, in-route **`pydantic.ValidationError` → 422** (see [HTTP errors and exception handlers](fastapi.md#http-errors-and-exception-handlers)). |
 | **Typed routes** | **`list[DataFrameModel.RowModel]`** bodies and **`response_model=list[YourRow]`** keep OpenAPI and clients aligned. |
 | **Streaming** | **`astream()`** + **`ndjson_streaming_response`** from **`pydantable.fastapi`** for NDJSON (one JSON object per line). See [FASTAPI_ENHANCEMENTS](../../integrations/fastapi/enhancements.md) (NDJSON semantics, production **lifespan** snippet, troubleshooting). |
 
@@ -95,7 +95,7 @@ Expected output (example):
 - Multi-router example (routers + lifespan): `docs/examples/fastapi/service_layout/` (README in that folder)
 - Roadmap and “when to use what”: [FASTAPI_ENHANCEMENTS](../../integrations/fastapi/enhancements.md)
 - Full FastAPI guide: [FASTAPI](../../integrations/fastapi/fastapi.md)
-- HTTP status mapping: {ref}`fastapi-errors` (in [FASTAPI](../../integrations/fastapi/fastapi.md))
+- HTTP status mapping: [HTTP errors and exception handlers](fastapi.md#http-errors-and-exception-handlers)
 - Columnar JSON bodies: [fastapi_columnar_bodies](../../cookbook/fastapi_columnar_bodies.md)
 - Async materialization: [fastapi_async_materialization](../../cookbook/fastapi_async_materialization.md)
 - Lazy async file pipeline: [async_lazy_pipeline](../../cookbook/async_lazy_pipeline.md)

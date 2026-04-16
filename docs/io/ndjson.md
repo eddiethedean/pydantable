@@ -25,7 +25,7 @@ Each line of the file is one JSON object; the scanner infers or aligns columns a
 
 Use **`glob=True`** (or omit it) when reading a **directory** or a **glob pattern** so your call matches **Parquet** / **CSV** lazy reads. Polars **0.53** builds NDJSON lazy scans with **`UnifiedScanArgs { glob: true, … }`** internally; **glob expansion cannot be disabled** from the **`LazyJsonLineReader`** API. Passing **`glob=False`** raises **`ValueError`** from pydantable.
 
-**Hive-style partitions** are **disabled** for NDJSON in Polars **0.53** (no partition columns from paths). A single glob such as **`*.jsonl`** only matches that extension; use another pattern or a second read for **`.ndjson`** files. Details: {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`.
+**Hive-style partitions** are **disabled** for NDJSON in Polars **0.53** (no partition columns from paths). A single glob such as **`*.jsonl`** only matches that extension; use another pattern or a second read for **`.ndjson`** files. Details: [Polars 0.53 vs pydantable scan audit](data-io-sources.md#audit-polars-053x-vs-pydantable-1110-phase-a).
 
 ## Write (targets)
 

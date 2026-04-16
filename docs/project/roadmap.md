@@ -350,7 +350,7 @@ Practical inputs that feed that phase:
 
 ## Shipped in 1.11.0 (local I/O ↔ Polars parity)
 
-- [x] **Multi-file & directory reads:** **`scan_kwargs`** for **Parquet** (hive-style partitions, lineage, row index), **CSV** directory/glob + **`LazyCsvReader`** options, **NDJSON** (**`glob`** and related), **IPC** multi-file, **`read_json`** path semantics — see [CHANGELOG](../project/changelog.md) **1.11.0**, [IO_OVERVIEW](../io/overview.md), [DATA_IO_SOURCES](../io/data-io-sources.md), [IO_DECISION_TREE](../io/decision-tree.md), {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`.
+- [x] **Multi-file & directory reads:** **`scan_kwargs`** for **Parquet** (hive-style partitions, lineage, row index), **CSV** directory/glob + **`LazyCsvReader`** options, **NDJSON** (**`glob`** and related), **IPC** multi-file, **`read_json`** path semantics — see [CHANGELOG](../project/changelog.md) **1.11.0**, [IO_OVERVIEW](../io/overview.md), [DATA_IO_SOURCES](../io/data-io-sources.md), [IO_DECISION_TREE](../io/decision-tree.md), and the [Polars 0.53 vs pydantable scan audit](../io/data-io-sources.md#audit-polars-053x-vs-pydantable-1110-phase-a).
 - [x] **Partitioned / dataset writes:** **Parquet** **`partition_by`** hive-style layout; **`write_*_batches`** directory vs single-file semantics — see [CHANGELOG](../project/changelog.md) **1.11.0**, [IO_PARQUET](../io/parquet.md).
 - [x] **Eager & iterators:** **`materialize_*`** single-file contract; **`iter_*`** patterns and **`iter_chain_batches`** — see [CHANGELOG](../project/changelog.md) **1.11.0**, [IO_OVERVIEW](../io/overview.md).
 - [x] **Docs & tests:** examples under **`docs/examples/io/`**, [CHANGELOG](../project/changelog.md) **1.11.0**, **kwargs** allowlist tests.

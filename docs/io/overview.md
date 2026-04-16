@@ -4,7 +4,7 @@
 
 **Same functions** (**`materialize_*`**, **`fetch_sqlmodel`**, URL helpers, iterators, …) are defined in **`pydantable.io`** for the library’s own layering; end users rely on **`from pydantable import …`** or **`DataFrame` / `DataFrameModel`** methods.
 
-For **execution semantics** (lazy vs collect, Rust engine), see [EXECUTION](../user-guide/execution.md). For **roadmap-style** “what to support next,” see [DATA_IO_SOURCES](../io/data-io-sources.md). **Polars 0.53 scan kwargs vs pydantable** (paths, globs, hive): {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`. **Which API should I call?** See [IO_DECISION_TREE](../io/decision-tree.md).
+For **execution semantics** (lazy vs collect, Rust engine), see [EXECUTION](../user-guide/execution.md). For **roadmap-style** “what to support next,” see [DATA_IO_SOURCES](../io/data-io-sources.md). **Polars 0.53 scan kwargs vs pydantable** (paths, globs, hive): see [Polars 0.53 vs pydantable scan audit](data-io-sources.md#audit-polars-053x-vs-pydantable-1110-phase-a). **Which API should I call?** See [IO_DECISION_TREE](../io/decision-tree.md).
 
 (full-api-in-pydantableio)=
 ## Internal layout: `pydantable.io`

@@ -12,13 +12,13 @@ If you want the shortest runnable service first, start with [GOLDEN_PATH_FASTAPI
 ## How to read this page (quick map)
 
 - If you’re building a service **today**, read:
-  - {ref}`fastapi-install`
-  - {ref}`fastapi-fast-path` (the “golden path” + cookbooks)
-  - {ref}`fastapi-errors` (422 vs 400 vs 503)
-  - {ref}`fastapi-testing` (lifespan-aware `TestClient`)
+  - [Install](#install-what-to-pip-install)
+  - [Fast path for services](#fast-path-for-services-recommended-order) (the “golden path” + cookbooks)
+  - [HTTP errors and exception handlers](#http-errors-and-exception-handlers) (422 vs 400 vs 503)
+  - [Testing note](#testing-note-lifespan-and-testclient) (lifespan-aware `TestClient`)
 - If you’re deciding **row vs column** payloads, jump to:
-  - {ref}`columnar-openapi-fastapi` (OpenAPI columnar models + `Depends`)
-  - {ref}`column-shaped-json-request-bodies` (columnar bodies without helpers)
+  - [Columnar OpenAPI and `Depends`](#columnar-openapi-and-depends) (OpenAPI columnar models + `Depends`)
+  - [Column-shaped JSON request bodies](#column-shaped-json-request-bodies) (columnar bodies without helpers)
 - If you’re tuning **async / executors / streaming**, jump to:
   - [FASTAPI_ADVANCED](../../integrations/fastapi/advanced.md) (four modes + I/O patterns)
   - [EXECUTION](../../user-guide/execution.md) and [MATERIALIZATION](../../user-guide/materialization.md) (deep dive)
@@ -52,7 +52,7 @@ pip install "pydantable[io]"
 3. Decide response size:
    - Small/medium: `collect()` / `to_dict()`
    - Large: `astream()` + `ndjson_streaming_response` ([FASTAPI_ENHANCEMENTS](../../integrations/fastapi/enhancements.md))
-4. Lock down your error mapping: {ref}`fastapi-errors`.
+4. Lock down your error mapping: [HTTP errors and exception handlers](#http-errors-and-exception-handlers).
 
 ## Optional `pydantable.fastapi` helpers
 
@@ -66,7 +66,7 @@ Then import `pydantable.fastapi` (not required for basic FastAPI usage):
 
 - **`executor_lifespan(app, max_workers=..., thread_name_prefix=...)`** — async context manager that attaches a `ThreadPoolExecutor` to **`app.state.executor`** for **`acollect(executor=...)`** and **`pydantable.io`** helpers.
 - **`get_executor(request)`** — for **`Depends(get_executor)`**, returning **`request.app.state.executor`** (or **`None`** if unset).
-- **`register_exception_handlers(app)`** — registers HTTP handlers for **`MissingRustExtensionError`** (**503**), **`ColumnLengthMismatchError`** (**400**), and in-handler **`pydantic.ValidationError`** (**422**); see {ref}`fastapi-errors`.
+- **`register_exception_handlers(app)`** — registers HTTP handlers for **`MissingRustExtensionError`** (**503**), **`ColumnLengthMismatchError`** (**400**), and in-handler **`pydantic.ValidationError`** (**422**); see [HTTP errors and exception handlers](#http-errors-and-exception-handlers).
 - **`ingest_error_response(failures, status_code=..., title=...)`** — build a structured JSON payload for batch ingest failures (typically produced by `ignore_errors=True` + `on_validation_errors=...`). This is meant for *in-handler* validation failures, not request parsing errors (which remain FastAPI’s **422**).
 - **`ndjson_streaming_response(astream_iter)`** / **`ndjson_chunk_bytes(astream_iter)`** — build **`application/x-ndjson`** **`StreamingResponse`** from **`await df.astream(...)`** without duplicating JSON line encoding; see [FASTAPI_ENHANCEMENTS](../../integrations/fastapi/enhancements.md).
 - **`columnar_body_model`**, **`columnar_body_model_from_dataframe_model`** — build a Pydantic model whose fields are **`list[T]`** per column (OpenAPI-friendly **`dict[str, list]`**). Optional **`example=`** / **`json_schema_extra=`** for Swagger examples.
@@ -107,7 +107,7 @@ For **row-array** JSON bodies, use **`rows_dependency(User)`**; OpenAPI document
 
 **Map-like columns** (**`dict[str, T]`**) use the same columnar encoding: each field is **`list[dict]`**-compatible per row (parallel **`dict`** values at each index), matching **`to_dict()`** after ingest. See **Map-like columns** in [SUPPORTED_TYPES](../../user-guide/supported-types.md). For the JSON value-kind mapping (nested object vs map vs list), see **JSON (RFC 8259) vs column types** in [SUPPORTED_TYPES](../../user-guide/supported-types.md). File-based JSON loading (array vs JSON Lines, eager vs lazy) is described in [IO_JSON](../../io/json.md)—HTTP columnar bodies use the same **logical** shapes as **`materialize_json`** / **`to_dict()`**.
 
-**Validation layers:** Pydantic validates each column as **`list[T]`** (wrong element types → **422** before your handler). **Row/column length consistency** is enforced when constructing **`DataFrameModel`** inside the dependency; mismatched lengths raise **`ColumnLengthMismatchError`** (subclass of **`ValueError`**). With **`register_exception_handlers`**, that maps to **400**; without it, you typically see **500**—see {ref}`fastapi-errors`.
+**Validation layers:** Pydantic validates each column as **`list[T]`** (wrong element types → **422** before your handler). **Row/column length consistency** is enforced when constructing **`DataFrameModel`** inside the dependency; mismatched lengths raise **`ColumnLengthMismatchError`** (subclass of **`ValueError`**). With **`register_exception_handlers`**, that maps to **400**; without it, you typically see **500**—see [HTTP errors and exception handlers](#http-errors-and-exception-handlers).
 
 **NDJSON** streaming responses do not get a per-chunk OpenAPI schema (same as any streaming body); columnar **`response_model`** applies to single JSON **`to_dict()`** responses only.
 

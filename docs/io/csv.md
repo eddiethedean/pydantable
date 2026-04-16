@@ -21,7 +21,7 @@
 
 ### Paths, directories, and `glob`
 
-**`glob`** defaults to **`true`** in Polars **`LazyCsvReader`**; pass **`glob=False`** via **`scan_kwargs`** to scan a single path literally. A **directory path** or a pattern such as **`*.csv`** expands to **multiple files**; rows are **concatenated** in Polars scan order (see tests **`tests/test_csv_scan_directory_b2.py`**). In Polars **0.53**, the lazy CSV scan wires **`HiveOptions::new_disabled()`** into the unified scan, so **hive-style partition columns from directory paths are not** applied for CSV—see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`.
+**`glob`** defaults to **`true`** in Polars **`LazyCsvReader`**; pass **`glob=False`** via **`scan_kwargs`** to scan a single path literally. A **directory path** or a pattern such as **`*.csv`** expands to **multiple files**; rows are **concatenated** in Polars scan order (see tests **`tests/test_csv_scan_directory_b2.py`**). In Polars **0.53**, the lazy CSV scan wires **`HiveOptions::new_disabled()`** into the unified scan, so **hive-style partition columns from directory paths are not** applied for CSV—see [Polars 0.53 vs pydantable scan audit](data-io-sources.md#audit-polars-053x-vs-pydantable-1110-phase-a).
 
 **`use_rap=True`** ( **`materialize_csv`** only): uses **`aread_csv_rap`** when **no** event loop; in async code **`await aread_csv_rap(path)`** from **`pydantable.io.rap_support`**.
 

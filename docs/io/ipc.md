@@ -23,7 +23,7 @@ This covers **Arrow IPC file** (`.arrow` / `.feather`-style single file), not ar
 
 ### Paths, directories, and multi-file
 
-Lazy **`read_ipc`** uses Polars **`LazyFrame::scan_ipc`** with pydantable-built **`IpcScanOptions`** and **`UnifiedScanArgs`** (defaults match Polars **`Default`**: **`glob: true`**, hive options **enabled**). Tune **`glob`** / hive / lineage kwargs like other **`read_*`** roots—see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`.
+Lazy **`read_ipc`** uses Polars **`LazyFrame::scan_ipc`** with pydantable-built **`IpcScanOptions`** and **`UnifiedScanArgs`** (defaults match Polars **`Default`**: **`glob: true`**, hive options **enabled**). Tune **`glob`** / hive / lineage kwargs like other **`read_*`** roots—see [Polars 0.53 vs pydantable scan audit](data-io-sources.md#audit-polars-053x-vs-pydantable-1110-phase-a).
 
 **`as_stream=False`** (default): local file paths can use Rust; otherwise PyArrow. **`as_stream=True`** uses PyArrow stream decoding. Install **`pydantable[arrow]`** when the path goes through PyArrow.
 
