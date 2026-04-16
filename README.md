@@ -14,9 +14,9 @@ PydanTable combines **Pydantic schemas** with a **Polars-backed Rust execution e
 
 ## Documentation
 
-- **Docs (latest):** `https://pydantable.readthedocs.io/en/latest/`
-- **Quickstart:** `https://pydantable.readthedocs.io/en/latest/getting-started/quickstart/`
-- **Docs map:** `https://pydantable.readthedocs.io/en/latest/getting-started/docs-map/`
+- **Docs (latest):** [pydantable.readthedocs.io](https://pydantable.readthedocs.io/en/latest/)
+- **Quickstart:** [Getting started → Quickstart](https://pydantable.readthedocs.io/en/latest/getting-started/quickstart/)
+- **Docs map:** [Getting started → Docs map](https://pydantable.readthedocs.io/en/latest/getting-started/docs-map/)
 
 ## What you get
 
@@ -27,11 +27,11 @@ PydanTable combines **Pydantic schemas** with a **Polars-backed Rust execution e
 
 Key references:
 
-- **DataFrameModel:** `https://pydantable.readthedocs.io/en/latest/user-guide/dataframemodel/`
-- **Execution:** `https://pydantable.readthedocs.io/en/latest/user-guide/execution/`
-- **Materialization:** `https://pydantable.readthedocs.io/en/latest/user-guide/materialization/`
-- **Interface contract:** `https://pydantable.readthedocs.io/en/latest/semantics/interface-contract/`
-- **I/O overview:** `https://pydantable.readthedocs.io/en/latest/io/overview/`
+- **DataFrameModel:** [User guide → DataFrameModel](https://pydantable.readthedocs.io/en/latest/user-guide/dataframemodel/)
+- **Execution:** [User guide → Execution](https://pydantable.readthedocs.io/en/latest/user-guide/execution/)
+- **Materialization:** [User guide → Materialization](https://pydantable.readthedocs.io/en/latest/user-guide/materialization/)
+- **Interface contract:** [Semantics → Interface contract](https://pydantable.readthedocs.io/en/latest/semantics/interface-contract/)
+- **I/O overview:** [I/O → Overview](https://pydantable.readthedocs.io/en/latest/io/overview/)
 
 ## Install
 
@@ -81,15 +81,15 @@ Output (one run):
 
 ## Next steps
 
-- **Start here:** `https://pydantable.readthedocs.io/en/latest/getting-started/quickstart/`
-- **Typing guide:** `https://pydantable.readthedocs.io/en/latest/user-guide/typing/`
-- **I/O decision tree:** `https://pydantable.readthedocs.io/en/latest/io/decision-tree/`
-- **FastAPI golden path:** `https://pydantable.readthedocs.io/en/latest/integrations/fastapi/golden-path/`
-- **Engines:** `https://pydantable.readthedocs.io/en/latest/integrations/engines/sql/` · `https://pydantable.readthedocs.io/en/latest/integrations/engines/mongo/` · `https://pydantable.readthedocs.io/en/latest/integrations/engines/spark/`
+- **Start here:** [Quickstart](https://pydantable.readthedocs.io/en/latest/getting-started/quickstart/)
+- **Typing guide:** [User guide → Typing](https://pydantable.readthedocs.io/en/latest/user-guide/typing/)
+- **I/O decision tree:** [I/O → Decision tree](https://pydantable.readthedocs.io/en/latest/io/decision-tree/)
+- **FastAPI golden path:** [Integrations → FastAPI → Golden path](https://pydantable.readthedocs.io/en/latest/integrations/fastapi/golden-path/)
+- **Engines:** [SQL](https://pydantable.readthedocs.io/en/latest/integrations/engines/sql/) · [Mongo](https://pydantable.readthedocs.io/en/latest/integrations/engines/mongo/) · [Spark](https://pydantable.readthedocs.io/en/latest/integrations/engines/spark/)
 
 ## Development
 
-Use a virtual environment at **`.venv`** in the repo root (the `Makefile` defaults to `.venv/bin/python`). Full contributor setup, native builds, and contributor notes: `https://pydantable.readthedocs.io/en/latest/project/developer/`.
+Use a virtual environment at **`.venv`** in the repo root (the `Makefile` defaults to `.venv/bin/python`). Full contributor setup, native builds, and contributor notes: [Project → Developer](https://pydantable.readthedocs.io/en/latest/project/developer/).
 
 ```bash
 make check-full      # ruff, ty, pyright, typing snippet tests, MkDocs, Rust
