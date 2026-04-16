@@ -19,10 +19,12 @@ class WithStruct(Schema):
 
 def main() -> None:
     df = DataFrame[WithList]({"id": [1, 2], "tags": [[1, 2], [3]]})
-    print(df.explode_all().to_dict())
+    d1 = df.explode_all().to_dict()
+    print({k: d1[k] for k in sorted(d1)})
 
     df2 = DataFrame[WithStruct]({"id": [1], "addr": [{"street": "x"}]})
-    print(df2.unnest_all().to_dict())
+    d2 = df2.unnest_all().to_dict()
+    print({k: d2[k] for k in sorted(d2)})
 
 
 if __name__ == "__main__":

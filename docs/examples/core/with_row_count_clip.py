@@ -17,4 +17,5 @@ df2 = df.with_row_count()  # adds `row_nr: int`
 # Clamp numeric values (optionally with subset=... as names or selectors).
 df3 = df2.clip(lower=0, upper=3)
 
-print(df3.to_dict())
+d = df3.to_dict()
+print({k: d[k] for k in sorted(d)})
