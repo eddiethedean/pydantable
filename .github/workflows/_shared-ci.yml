@@ -413,11 +413,15 @@ jobs:
           # ``local[*]`` PySpark needs a JVM + Hadoop Windows shim (winutils); GHA Windows
           # runners are unreliable for that stack. Façade tests under ``tests/third_party/``
           # still run everywhere; only ``@pytest.mark.spark`` integration tests are skipped.
-          MARKEXPR=""
+          #
+          # On Windows, default xdist ``--dist=load`` plus flaky CPU detection has been seen
+          # to yield pytest exit code 5; ``--dist=loadfile`` and ``--maxprocesses`` keep
+          # parallelism while reducing that failure mode.
           if [ "$MATRIX_OS" = "windows-latest" ]; then
-            MARKEXPR="-m not spark"
+            $PY -m pytest -q -n auto --maxprocesses=8 --dist=loadfile $COV_ARGS -m "not spark"
+          else
+            $PY -m pytest -q -n auto $COV_ARGS
           fi
-          $PY -m pytest -q -n auto $COV_ARGS $MARKEXPR
 
       - name: Upload coverage XML (Ubuntu Python 3.11)
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
