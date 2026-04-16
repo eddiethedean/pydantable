@@ -4,7 +4,7 @@ Run from the repository root::
 
     PYTHONPATH=python .venv/bin/python scripts/verify_doc_examples.py
 
-Fails on assertion errors or import failures so README and Sphinx snippets stay
+Fails on assertion errors or import failures so README and documentation snippets stay
 in sync with the API.
 
 Runnable scripts under ``docs/examples/`` are also executed by

@@ -1,6 +1,6 @@
 # Pandas UI (`pydantable.pandas`)
 
-The **pandas UI** is an optional import surface that layers **pandas-like method and property names** on top of pydantable’s typed logical DataFrame. It does **not** wrap a `pandas.DataFrame` for the schema-driven `DataFrame` / `DataFrameModel` types; execution uses the same **Rust engine** as the default export (see [Execution](EXECUTION.md)).
+The **pandas UI** is an optional import surface that layers **pandas-like method and property names** on top of pydantable’s typed logical DataFrame. It does **not** wrap a `pandas.DataFrame` for the schema-driven `DataFrame` / `DataFrameModel` types; execution uses the same **Rust engine** as the default export (see [Execution](/EXECUTION.md)).
 
 ## Index-light model and lazy vs eager
 
@@ -116,7 +116,7 @@ Unknown keyword arguments raise **`TypeError`**.
 
 ### Introspection
 
-The **default** **`pydantable.DataFrame`** (and **`DataFrameModel`**) now exposes the same **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, and **`describe()`** helpers (**0.20.0+**). The pandas façade inherits them unchanged; use either import path—see {doc}`INTERFACE_CONTRACT` **Introspection** for **`shape`** vs materialized row count.
+The **default** **`pydantable.DataFrame`** (and **`DataFrameModel`**) now exposes the same **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, and **`describe()`** helpers (**0.20.0+**). The pandas façade inherits them unchanged; use either import path—see [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md) **Introspection** for **`shape`** vs materialized row count.
 
 | Member | Behavior |
 |--------|----------|
@@ -259,7 +259,7 @@ Supported shape:
 
 ### `pivot(...)` (lazy; core contract)
 
-**`pivot`** on this façade is a thin wrapper around the **typed core** `pivot` (explicit **`index`**, **`columns`**, **`values`**, **`aggregate_function`**). Output column names follow the deterministic rules in {doc}`INTERFACE_CONTRACT` (e.g. `<pivot_value>_<agg>` such as **`A_first`**, **`B_first`** when **`aggregate_function="first"`**). This is **not** pandas’ unconstrained dynamic pivot; use **`to_pandas()`** if you need full pandas reshape semantics.
+**`pivot`** on this façade is a thin wrapper around the **typed core** `pivot` (explicit **`index`**, **`columns`**, **`values`**, **`aggregate_function`**). Output column names follow the deterministic rules in [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md) (e.g. `<pivot_value>_<agg>` such as **`A_first`**, **`B_first`** when **`aggregate_function="first"`**). This is **not** pandas’ unconstrained dynamic pivot; use **`to_pandas()`** if you need full pandas reshape semantics.
 
 ### `rolling(window=..., min_periods=...)` (lazy, row-based)
 
@@ -275,7 +275,7 @@ Supported shape:
 - `max(...)`
 - `count(...)`
 
-**Not on this façade yet:** time/index-based rolling matching pandas `rolling(on=...)` for datetime columns; use core **`rolling_agg`** (see {doc}`EXECUTION`) where the typed API exposes it.
+**Not on this façade yet:** time/index-based rolling matching pandas `rolling(on=...)` for datetime columns; use core **`rolling_agg`** (see [EXECUTION](/EXECUTION.md)) where the typed API exposes it.
 
 **Engine:** Implemented in the Polars-backed executor; builds without the Polars engine will not be able to execute rolling plans. `min_periods` must not exceed `window` (Polars validates this at execution time).
 
@@ -318,7 +318,7 @@ These names match pandas where possible but are **typed** and sometimes **strict
 | `corr(method="pearson")` | **Eager**; needs **NumPy**; at least two numeric columns; returns a correlation **matrix** as a typed `DataFrame` (dynamic schema). |
 | `cov()` | Same pattern for sample covariance matrix. |
 
-**`describe()`** on the core frame may append **skew / kurtosis / sem** (when NumPy is available and \(n \ge 4\)) for numeric columns; **`date`** / **`datetime`** columns get non-null **count**, **min**, **max**, and **null** counts—see {doc}`INTERFACE_CONTRACT` **Introspection** and `dataframe/_impl.py`.
+**`describe()`** on the core frame may append **skew / kurtosis / sem** (when NumPy is available and \(n \ge 4\)) for numeric columns; **`date`** / **`datetime`** columns get non-null **count**, **min**, **max**, and **null** counts—see [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md) **Introspection** and `dataframe/_impl.py`.
 
 ### Transforms (facade and `Expr`)
 
@@ -379,7 +379,7 @@ Additional pandas parameters are accepted but may raise `NotImplementedError` (e
 
 ### Core `value_counts` (dict return)
 
-The typed **`DataFrame.value_counts(column, ...)`** returns a **`dict`** (count per key), not a pandas **`Series`**—see [Interface contract](INTERFACE_CONTRACT.md) and core docstrings.
+The typed **`DataFrame.value_counts(column, ...)`** returns a **`dict`** (count per key), not a pandas **`Series`**—see [Interface contract](/INTERFACE_CONTRACT.md) and core docstrings.
 
 ### `nlargest(n, columns, keep="all")` / `nsmallest(n, columns, keep="all")`
 
@@ -432,7 +432,7 @@ Properties **`columns`**, **`shape`**, **`empty`**, **`dtypes`** read from the i
 
 ## Naming map (core ↔ pandas ↔ PySpark)
 
-Same engine; different method names. PySpark column is in {doc}`PYSPARK_UI`.
+Same engine; different method names. PySpark column is in [PYSPARK_UI](/PYSPARK_UI.md).
 
 | Operation | Core / default | Pandas UI | PySpark UI |
 |-----------|----------------|-----------|------------|
@@ -449,6 +449,6 @@ Same engine; different method names. PySpark column is in {doc}`PYSPARK_UI`.
 
 ## Further reading
 
-- [Interface contract](INTERFACE_CONTRACT.md) — null semantics, join rules, duplicate detection, pivot naming.
-- [Execution](EXECUTION.md) — Rust engine overview.
+- [Interface contract](/INTERFACE_CONTRACT.md) — null semantics, join rules, duplicate detection, pivot naming.
+- [Execution](/EXECUTION.md) — Rust engine overview.
 - Tests: **`tests/test_pandas_ui.py`**, **`tests/test_pandas_ui_popular_features.py`** (duplicates, dummies, binning, factorize, ewm, pivot).

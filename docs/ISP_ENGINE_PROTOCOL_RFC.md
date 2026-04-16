@@ -6,7 +6,7 @@
 
 ## Context
 
-Today, **`PlanExecutor`**, **`SinkWriter`**, and **`ExecutionEngine`** (composition of the two plus plan builders) live in **`pydantable-protocol`**. Implementations that only need execution can still satisfy **`ExecutionEngine`** by raising **`UnsupportedEngineOperationError`** for sinks or unsupported plan ops—see {doc}`CUSTOM_ENGINE_PACKAGE`.
+Today, **`PlanExecutor`**, **`SinkWriter`**, and **`ExecutionEngine`** (composition of the two plus plan builders) live in **`pydantable-protocol`**. Implementations that only need execution can still satisfy **`ExecutionEngine`** by raising **`UnsupportedEngineOperationError`** for sinks or unsupported plan ops—see [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md).
 
 ## Problem
 
@@ -27,5 +27,5 @@ Do **not** undertake this without:
 
 ## Related
 
-- {doc}`ADR-engines`
-- {doc}`CUSTOM_ENGINE_PACKAGE`
+- [ADR-engines](/ADR-engines.md)
+- [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md)

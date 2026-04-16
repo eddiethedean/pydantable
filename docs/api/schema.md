@@ -1,0 +1,3 @@
+# Schema
+
+::: pydantable.Schema

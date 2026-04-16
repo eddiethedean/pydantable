@@ -32,7 +32,7 @@ PydanTable executes typed `DataFrame` operations via the PyO3 extension shipped 
 
 ### Extension checklist (custom backend)
 
-End-to-end guide for shipping a third-party engine on PyPI: {doc}`CUSTOM_ENGINE_PACKAGE`. In-repo optional integrations: {doc}`MOLTRES_SQL` (lazy-SQL stack), {doc}`MONGO_ENGINE` (**`MongoPydantableEngine`** in **pydantable**, **`MongoRoot`** from the Mongo plan stack for **`MongoDataFrame`**). Eager Mongo column-dict helpers (**`fetch_mongo`** / **`write_mongo`**, **`afetch_mongo`** / **`awrite_mongo`**, … — **PyMongo**) are normal I/O, not a third-party **`ExecutionEngine`** package.
+End-to-end guide for shipping a third-party engine on PyPI: [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md). In-repo optional integrations: [MOLTRES_SQL](/MOLTRES_SQL.md) (lazy-SQL stack), [MONGO_ENGINE](/MONGO_ENGINE.md) (**`MongoPydantableEngine`** in **pydantable**, **`MongoRoot`** from the Mongo plan stack for **`MongoDataFrame`**). Eager Mongo column-dict helpers (**`fetch_mongo`** / **`write_mongo`**, **`afetch_mongo`** / **`awrite_mongo`**, … — **PyMongo**) are normal I/O, not a third-party **`ExecutionEngine`** package.
 
 1. Implement **`ExecutionEngine`** (see **`pydantable_protocol`**, re-exported under **`pydantable.engine.protocols`**) — mirror **`NativePolarsEngine`** for operations you support.
 2. Return accurate **`capabilities`** (set **`backend`** to **`"custom"`** when not native/stub).

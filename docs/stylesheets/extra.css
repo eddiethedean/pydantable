@@ -1,0 +1,54 @@
+/* Material for MkDocs — typography and rhythm (Polars-style product docs). */
+
+html {
+  scroll-behavior: smooth;
+}
+
+.md-typeset {
+  font-feature-settings: "kern";
+  line-height: 1.65;
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 {
+  letter-spacing: -0.01em;
+}
+
+.md-typeset h2 {
+  margin-top: 2.25rem;
+}
+
+/* Comfortable reading width on large screens */
+.md-grid {
+  max-width: 100%;
+}
+
+.md-content__inner {
+  max-width: 52rem;
+}
+
+/* Inline code */
+.md-typeset code {
+  border-radius: 0.25rem;
+}
+
+/* Code blocks */
+.md-typeset pre {
+  border-radius: 0.5rem;
+}
+
+/* Card grid hover (home page) */
+.grid.cards > ul > li {
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  border-radius: 0.5rem;
+}
+
+.grid.cards > ul > li:hover {
+  box-shadow: 0 0.35rem 1.1rem rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+[data-md-color-scheme="slate"] .grid.cards > ul > li:hover {
+  box-shadow: 0 0.4rem 1.2rem rgba(0, 0, 0, 0.45);
+}

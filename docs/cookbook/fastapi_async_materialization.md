@@ -5,7 +5,7 @@ APIs (**`await df.collect()`**, **`await df.to_dict()`**) which mirror sync **`c
 **`to_dict`** but do not block the event loop. The **`a*`** names (**`acollect`**, **`ato_dict`**,
 …) remain available and behave the same.
 
-For **lazy file reads** chained before materialization, see {doc}`/cookbook/async_lazy_pipeline`.
+For **lazy file reads** chained before materialization, see [async_lazy_pipeline](/cookbook/async_lazy_pipeline.md).
 
 ## Recipe
 
@@ -41,4 +41,4 @@ asyncio.run(run())
 ## Pitfalls
 
 - **Cancellation**: cancelling the awaiting task does **not** cancel in-flight native work.
-- **Thread pools**: you can pass a custom `executor=`; see {doc}`/FASTAPI` for patterns.
+- **Thread pools**: you can pass a custom `executor=`; see [FASTAPI](/FASTAPI.md) for patterns.

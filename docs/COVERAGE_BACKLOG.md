@@ -1,6 +1,6 @@
 # Coverage backlog (`python/pydantable`)
 
-This document snapshots **statement-line gaps** by area and complements [Testing](TESTING.md). **`mypy_plugin.py`** is omitted from measurement ([`pyproject.toml`](../pyproject.toml) `[tool.coverage.run] omit`).
+This document snapshots **statement-line gaps** by area and complements [Testing](/TESTING.md). **`mypy_plugin.py`** is omitted from measurement ([`pyproject.toml`](../pyproject.toml) `[tool.coverage.run] omit`).
 
 ## Baseline (full suite, `--cov-fail-under=0`)
 
@@ -46,4 +46,4 @@ Rough ordering by **Miss** column (largest gaps first; numbers drift each run):
 - Prefer **`# pragma: no cover`** only for truly unreachable defensive code.
 - Raise **`--cov-fail-under`** in CI only after the full suite is green at the new floor (see [`.github/workflows/_shared-ci.yml`](../.github/workflows/_shared-ci.yml)).
 - **Next numeric gate:** increase **`83` → `84`** once **`pytest-cov` total coverage is ≥ 84.0%** on the Ubuntu + Python 3.11 leg (local numbers may differ slightly).
-- **Large PRs:** run **`make test-cov`** (or download **`coverage.xml`** from CI), then **`make diff-cover`** so new/changed lines stay covered vs **`origin/main`** (see [Testing](TESTING.md)). The Makefile uses **`--fail-under=85`** on touched lines; raise that gradually as overall coverage climbs so new code stays tighter than legacy gaps.
+- **Large PRs:** run **`make test-cov`** (or download **`coverage.xml`** from CI), then **`make diff-cover`** so new/changed lines stay covered vs **`origin/main`** (see [Testing](/TESTING.md)). The Makefile uses **`--fail-under=85`** on touched lines; raise that gradually as overall coverage climbs so new code stays tighter than legacy gaps.

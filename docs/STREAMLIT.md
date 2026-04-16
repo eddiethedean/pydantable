@@ -48,5 +48,5 @@ st.data_editor(df.to_arrow())
 
 ## Costs and limitations
 
-- `pydantable`’s `__dataframe__` path **materializes** the current lazy plan (same cost class as {doc}`EXECUTION` → `to_arrow()`), then delegates to PyArrow’s protocol implementation. It is **not** a zero-copy export of internal engine buffers.
+- `pydantable`’s `__dataframe__` path **materializes** the current lazy plan (same cost class as [EXECUTION](/EXECUTION.md) → `to_arrow()`), then delegates to PyArrow’s protocol implementation. It is **not** a zero-copy export of internal engine buffers.
 - For large frames, prefer applying a lazy `head(...)` / `slice(...)` before displaying.

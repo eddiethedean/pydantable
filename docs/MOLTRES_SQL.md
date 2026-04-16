@@ -2,7 +2,7 @@
 
 This guide covers the **optional** SQLAlchemy-backed lazy execution path: typed
 `DataFrame` / `DataFrameModel` instances whose **execution engine** comes from the
-same optional stack installed with ``pip install "pydantable[sql]"`` (SQLAlchemy **2.x** connection plumbing plus pydantable’s bridge to **`ExecutionEngine`** — see {doc}`CUSTOM_ENGINE_PACKAGE`).
+same optional stack installed with ``pip install "pydantable[sql]"`` (SQLAlchemy **2.x** connection plumbing plus pydantable’s bridge to **`ExecutionEngine`** — see [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md)).
 
 The reason to use a **SQL** execution engine is to keep **transformations on the
 database side** for as long as possible: the lazy-SQL bridge compiles the typed plan to SQL
@@ -12,13 +12,13 @@ the pipeline writes back to the same database** — there is little benefit in
 round-tripping the full dataset through the app when the work can stay in the
 server.
 
-```{note}
-**Install:** ``pip install "pydantable[sql]"`` (SQLAlchemy bridge; add a **DB-API** driver for your DSN — e.g. **psycopg** / **asyncpg** for Postgres, **aiosqlite** or optional **rapsqlite** for async SQLite). The
-core **pydantable** package does not import the optional SQL bridge at import time;
-``SqlDataFrame`` / ``SqlDataFrameModel`` are loaded lazily from the root package
-(``from pydantable import SqlDataFrame``) or imported explicitly from
-``pydantable.sql_dataframe``.
-```
+!!! note
+    **Install:** ``pip install "pydantable[sql]"`` (SQLAlchemy bridge; add a **DB-API** driver for your DSN — e.g. **psycopg** / **asyncpg** for Postgres, **aiosqlite** or optional **rapsqlite** for async SQLite). The
+    core **pydantable** package does not import the optional SQL bridge at import time;
+    ``SqlDataFrame`` / ``SqlDataFrameModel`` are loaded lazily from the root package
+    (``from pydantable import SqlDataFrame``) or imported explicitly from
+    ``pydantable.sql_dataframe``.
+
 
 ## SQLite: sync (lazy-SQL bridge) vs async (rapsqlite)
 
@@ -37,20 +37,20 @@ So **you cannot** point ``sql_config=`` at an async-only URL and expect PydanTab
 ### If you need async SQLAlchemy today
 
 - Use **sync** DSNs with ``SqlDataFrame`` / ``sql_engine=`` as documented here.
-- Use **async** engines and sessions (e.g. ``sqlite+rapsqlite://…``, ``postgresql+asyncpg://…``) in **FastAPI / SQLAlchemy** code paths that **do not** go through the lazy-SQL ``ExecutionEngine``, or use the eager SQL I/O helpers in {doc}`IO_SQL` with your own session/engine.
+- Use **async** engines and sessions (e.g. ``sqlite+rapsqlite://…``, ``postgresql+asyncpg://…``) in **FastAPI / SQLAlchemy** code paths that **do not** go through the lazy-SQL ``ExecutionEngine``, or use the eager SQL I/O helpers in [IO_SQL](/IO_SQL.md) with your own session/engine.
 
 ### Roadmap (upstream)
 
 **Native** async driver support for this path would require the SQL bridge to expose an async-first engine so plan execution uses ``AsyncQueryExecutor`` + ``AsyncConnectionManager`` and ``async_execute_plan`` awaits real async I/O. When that exists, PydanTable can add matching constructors (e.g. async ``sql_config`` resolution) without duplicating SQL logic here.
 
-Until then, ``ato_dict`` / ``acollect`` on ``SqlDataFrame`` still use the engine’s ``async_execute_plan`` entrypoint (thread offload) — see {doc}`EXECUTION`.
+Until then, ``ato_dict`` / ``acollect`` on ``SqlDataFrame`` still use the engine’s ``async_execute_plan`` entrypoint (thread offload) — see [EXECUTION](/EXECUTION.md).
 
 ## When to use this
 
 | Goal | Use |
 | ---- | --- |
-| Default Polars/Rust execution for in-memory or file-backed workflows | `DataFrame` / `DataFrameModel` (see {doc}`DATAFRAMEMODEL`, {doc}`EXECUTION`). |
-| **Eager** SQL I/O: load columns from a DB into a frame, or write tables | **`from pydantable import …`** — {doc}`IO_SQL` (**SQLModel-first:** **`fetch_sqlmodel`**, **`write_sqlmodel`**, …; **string SQL:** **`fetch_sql_raw`**, **`write_sql_raw`**, …). |
+| Default Polars/Rust execution for in-memory or file-backed workflows | `DataFrame` / `DataFrameModel` (see [DATAFRAMEMODEL](/DATAFRAMEMODEL.md), [EXECUTION](/EXECUTION.md)). |
+| **Eager** SQL I/O: load columns from a DB into a frame, or write tables | **`from pydantable import …`** — [IO_SQL](/IO_SQL.md) (**SQLModel-first:** **`fetch_sqlmodel`**, **`write_sqlmodel`**, …; **string SQL:** **`fetch_sql_raw`**, **`write_sql_raw`**, …). |
 | **Lazy execution** with transforms staying **in SQL** where the engine supports it (plans compiled to SQL; avoid full-table pulls when you only need a terminal write or small materialization) | **`SqlDataFrame`** / **`SqlDataFrameModel`** with **`sql_config=`** or **`sql_engine=`**. |
 
 The SQL I/O helpers materialize **column dicts** in Python; they do not replace
@@ -178,18 +178,16 @@ from moltres_core import EngineConfig
 from pydantable import SqlDataFrame
 
 cfg = EngineConfig(dsn="sqlite:///:memory:")
-df = SqlDataFrame[Row](
-    {"id": [1, 2], "name": ["a", "b"]},
-    sql_config=cfg,
-)
+df = SqlDataFrame[Row]({"id": [1, 2], "name": ["a", "b"]},
+    sql_config=cfg,)
 ```
 
 Constructor flags (`trusted_mode`, `fill_missing_optional`, validation hooks,
-etc.) match `DataFrame` — see {doc}`DATAFRAMEMODEL` and {doc}`STRICTNESS`.
+etc.) match `DataFrame` — see [DATAFRAMEMODEL](/DATAFRAMEMODEL.md) and [STRICTNESS](/STRICTNESS.md).
 
 ### DataFrame transformations (lazy-SQL engine)
 
-`SqlDataFrame` / `SqlDataFrameModel` use the same **method names** as {doc}`DATAFRAMEMODEL` / {doc}`EXECUTION`, but the SQL bridge only implements a subset of the full Polars/Rust pipeline.
+`SqlDataFrame` / `SqlDataFrameModel` use the same **method names** as [DATAFRAMEMODEL](/DATAFRAMEMODEL.md) / [EXECUTION](/EXECUTION.md), but the SQL bridge only implements a subset of the full Polars/Rust pipeline.
 
 **Generally work** (the bridge can execute or fold these into the SQL plan where supported):
 
@@ -197,7 +195,7 @@ etc.) match `DataFrame` — see {doc}`DATAFRAMEMODEL` and {doc}`STRICTNESS`.
 - **Row windows:** `head`, `slice`
 - **Order:** `sort` (and related ordering helpers your SQL bridge version exposes)
 - **Terminals:** `collect`, `to_dict`, `to_dicts` (materialize rows or column dicts)
-- **Async terminals:** `ato_dict`, `acollect`, `ato_dicts`, … (SQL work may run on a thread pool; see {doc}`EXECUTION`)
+- **Async terminals:** `ato_dict`, `acollect`, `ato_dicts`, … (SQL work may run on a thread pool; see [EXECUTION](/EXECUTION.md))
 
 **Example (sync):**
 
@@ -214,16 +212,14 @@ class Row(BaseModel):
 
 
 cfg = EngineConfig(dsn="sqlite:///:memory:")
-df = SqlDataFrame[Row](
-    {"id": [3, 1, 2], "name": ["c", "a", "b"]},
-    sql_config=cfg,
-)
+df = SqlDataFrame[Row]({"id": [3, 1, 2], "name": ["c", "a", "b"]},
+    sql_config=cfg,)
 assert df.select("name").to_dict() == {"name": ["c", "a", "b"]}
 assert df.head(2).to_dict() == {"id": [3, 1], "name": ["c", "a"]}
 assert df.sort("id").to_dict() == {"id": [1, 2, 3], "name": ["a", "b", "c"]}
 ```
 
-**Not supported today:** `filter` / `with_columns` / other paths that require the **native** `Expr` runtime raise **`UnsupportedEngineOperationError`** (see **Expressions** below). For **Expr**-heavy work, use the default **Polars/Rust** engine or materialize with {doc}`IO_SQL` helpers first.
+**Not supported today:** `filter` / `with_columns` / other paths that require the **native** `Expr` runtime raise **`UnsupportedEngineOperationError`** (see **Expressions** below). For **Expr**-heavy work, use the default **Polars/Rust** engine or materialize with [IO_SQL](/IO_SQL.md) helpers first.
 
 ## `SqlDataFrameModel`
 
@@ -250,7 +246,7 @@ users = Users({"id": [1], "name": ["Ada"]}, sql_config=cfg)
 
 Install **`pydantable[fastapi,sql]`** (or your project’s equivalent). Build **one** shared lazy-SQL engine per process (or pool) and reuse **`sql_engine=`** on frames — do **not** create a fresh `EngineConfig(dsn="sqlite:///:memory:")` per request, or each handler would see an **empty** database.
 
-The pattern below stores the engine on **`app.state`** at startup and returns columnar JSON with **`await …ato_dict()`** (async terminal). Sync routes can call **`to_dict()`** directly. See {doc}`FASTAPI` and {doc}`EXECUTION` for wider FastAPI + pydantable guidance.
+The pattern below stores the engine on **`app.state`** at startup and returns columnar JSON with **`await …ato_dict()`** (async terminal). Sync routes can call **`to_dict()`** directly. See [FASTAPI](/FASTAPI.md) and [EXECUTION](/EXECUTION.md) for wider FastAPI + pydantable guidance.
 
 ```python
 from contextlib import asynccontextmanager
@@ -293,7 +289,7 @@ async def user_names():
 Rust core when the default engine is `NativePolarsEngine`. With **only** the
 lazy-SQL engine bound to your frame, expression-heavy APIs may raise
 `UnsupportedEngineOperationError` unless you integrate a compatible expression
-runtime — see **Expressions** in {doc}`CUSTOM_ENGINE_PACKAGE` and {doc}`ADR-engines`.
+runtime — see **Expressions** in [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md) and [ADR-engines](/ADR-engines.md).
 
 Prefer operations your SQL bridge version documents as supported, or use
 the native engine for expression-heavy paths.
@@ -303,20 +299,20 @@ the native engine for expression-heavy paths.
 Lazy **`read_*`** paths can still use **pydantable-native** for local files; that
 is separate from **`DataFrame._engine`**. A custom SQL engine does **not**
 automatically route `read_parquet` through the database. See **File I/O vs
-execution engine** in {doc}`CUSTOM_ENGINE_PACKAGE`.
+execution engine** in [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md).
 
 ## Versioning
 
 The SQL bridge declares a dependency on **pydantable-protocol** compatible
 with your **pydantable** release line. Keep **pydantable**, **pydantable-protocol**,
-and the bridge package on mutually supported combinations (see {doc}`VERSIONING`).
+and the bridge package on mutually supported combinations (see [VERSIONING](/VERSIONING.md)).
 
 ## See also
 
-- {doc}`CUSTOM_ENGINE_PACKAGE` — third-party `ExecutionEngine` packages (reference implementations ship alongside the SQL bridge).
-- {doc}`IO_SQL` — eager SQL **I/O** (**SQLModel-first:** `fetch_sqlmodel`, `write_sqlmodel`, …; **string SQL:** `*_raw` helpers).
-- {doc}`SQLMODEL_SQL_ROADMAP` — SQLModel-first API history and design notes.
-- {doc}`FASTAPI` — columnar bodies, NDJSON, and service patterns (works alongside **`SqlDataFrameModel`**).
-- {doc}`ADR-engines` — engine abstraction and extension points.
-- {doc}`EXECUTION` — materialization and engines.
-- {doc}`DATAFRAMEMODEL` — `DataFrameModel` patterns shared by `SqlDataFrameModel`.
+- [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md) — third-party `ExecutionEngine` packages (reference implementations ship alongside the SQL bridge).
+- [IO_SQL](/IO_SQL.md) — eager SQL **I/O** (**SQLModel-first:** `fetch_sqlmodel`, `write_sqlmodel`, …; **string SQL:** `*_raw` helpers).
+- [SQLMODEL_SQL_ROADMAP](/SQLMODEL_SQL_ROADMAP.md) — SQLModel-first API history and design notes.
+- [FASTAPI](/FASTAPI.md) — columnar bodies, NDJSON, and service patterns (works alongside **`SqlDataFrameModel`**).
+- [ADR-engines](/ADR-engines.md) — engine abstraction and extension points.
+- [EXECUTION](/EXECUTION.md) — materialization and engines.
+- [DATAFRAMEMODEL](/DATAFRAMEMODEL.md) — `DataFrameModel` patterns shared by `SqlDataFrameModel`.

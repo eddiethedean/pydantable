@@ -1,0 +1,3 @@
+# ColumnRef
+
+::: pydantable.expressions.ColumnRef

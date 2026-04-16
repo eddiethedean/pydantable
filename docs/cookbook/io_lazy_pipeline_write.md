@@ -23,5 +23,5 @@ out.write_parquet("users_filtered.parquet")
 
 - Validation options on lazy roots (`trusted_mode`, `ignore_errors`, `on_validation_errors`)
   apply when you materialize (or when you write, since writing requires execution).
-- See {doc}`/EXECUTION` for the lazy/eager I/O vocabulary and the streaming engine knobs.
+- See [EXECUTION](/EXECUTION.md) for the lazy/eager I/O vocabulary and the streaming engine knobs.
 

@@ -112,20 +112,19 @@ benchmark = [
 ]
 pandas = ["pandas>=2.0"]
 docs = [
-    "sphinx",
-    "myst-parser",
-    "sphinx-autodoc-typehints",
-    "sphinx-copybutton",
-    "pydata-sphinx-theme",
-    # Optional at runtime, but required for Sphinx + sphinx-autodoc-typehints to resolve
+    "mkdocs-material>=9.5,<10",
+    "mkdocstrings[python]>=0.25,<1",
+    "mkdocstrings-python>=1.10,<2",
+    "pymdown-extensions>=10.14,<11",
+    # Optional at runtime, but required for mkdocstrings to resolve
     # SQLAlchemy forward refs on DataFrameModel I/O methods (matches CI docs job and RTD).
     "sqlalchemy>=2.0,<3",
     "sqlmodel>=0.0.22,<0.1",
-    # Mongo modules (``mongo_dataframe`` / ``mongo_dataframe_engine`` / ``mongo_beanie``) for Sphinx (CI ``docs`` job and RTD; same pins as ``[mongo]``).
+    # Mongo modules (``mongo_dataframe`` / ``mongo_dataframe_engine`` / ``mongo_beanie``) for mkdocstrings (CI ``docs`` job and RTD; same pins as ``[mongo]``).
     "entei-core>=0.2.0,<0.3",
     "pymongo>=4.6",
     "beanie>=1.24,<3",
-    # Spark modules (``spark_dataframe``) for Sphinx/RTD imports (same pins as ``[spark]``).
+    # Spark modules (``spark_dataframe``) for mkdocstrings / RTD imports (same pins as ``[spark]``).
     "raikou-core==0.1.0",
     "pyspark>=3.4,<4",
     "sparkdantic>=2.0,<3",

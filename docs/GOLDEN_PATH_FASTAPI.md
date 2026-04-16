@@ -13,7 +13,7 @@ pip install "pydantable[fastapi]"
 pip install "python-multipart"
 ```
 
-The **`[fastapi]`** extra installs **FastAPI** only. See {doc}`/FASTAPI` for the full
+The **`[fastapi]`** extra installs **FastAPI** only. See [FASTAPI](/FASTAPI.md) for the full
 integration guide and error-handling table.
 
 ## What you ship
@@ -24,7 +24,7 @@ integration guide and error-handling table.
 | **`get_executor`** + **`Depends`** | Injects that pool into handlers; **`None`** if you skip lifespan (still valid for **`acollect`**). |
 | **`register_exception_handlers`** | **`MissingRustExtensionError` → 503**, **`ColumnLengthMismatchError` → 400**, in-route **`pydantic.ValidationError` → 422** (see {ref}`fastapi-errors`). |
 | **Typed routes** | **`list[DataFrameModel.RowModel]`** bodies and **`response_model=list[YourRow]`** keep OpenAPI and clients aligned. |
-| **Streaming** | **`astream()`** + **`ndjson_streaming_response`** from **`pydantable.fastapi`** for NDJSON (one JSON object per line). See {doc}`/FASTAPI_ENHANCEMENTS` (NDJSON semantics, production **lifespan** snippet, troubleshooting). |
+| **Streaming** | **`astream()`** + **`ndjson_streaming_response`** from **`pydantable.fastapi`** for NDJSON (one JSON object per line). See [FASTAPI_ENHANCEMENTS](/FASTAPI_ENHANCEMENTS.md) (NDJSON semantics, production **lifespan** snippet, troubleshooting). |
 
 ## Async I/O beyond this page
 
@@ -32,7 +32,7 @@ This golden path uses **in-memory** frames so you can run it without a Parquet f
 In production you usually chain **lazy** readers:
 
 - **`await MyModel.aread_parquet(path)`** (or **`Async.read_parquet`**) → **`select` / `filter`** → **`await …acollect()`**
-- Prefer **`aread_*`** for **non-blocking** open/scan setup; use **`amaterialize_*`** only when you need a full **`dict[str, list]`** in memory first ({doc}`/FASTAPI`, {doc}`/IO_OVERVIEW`).
+- Prefer **`aread_*`** for **non-blocking** open/scan setup; use **`amaterialize_*`** only when you need a full **`dict[str, list]`** in memory first ([FASTAPI](/FASTAPI.md), [IO_OVERVIEW](/IO_OVERVIEW.md)).
 
 That **async read + lazy plan + async materialize** path is where pydantable differs
 from hand-rolling **`asyncio.to_thread`** around pandas or Polars alone.
@@ -46,10 +46,8 @@ It includes:
 - **`POST /api/v1/users`** — row-list body, **`select`** then **`acollect(executor=...)`**.
 - **`GET /api/v1/users/stream`** — NDJSON chunks from **`astream`**.
 
-```{literalinclude} examples/fastapi/golden_path_app.py
-:language: python
-:linenos:
-```
+
+--8<-- "examples/fastapi/golden_path_app.py"
 
 ```bash
 cd docs/examples/fastapi
@@ -75,18 +73,18 @@ Expected output (example):
 
 ## Production checklist
 
-- **Paths:** If you accept filesystem paths from clients, **allowlist** directories and reject **`..`** and symlinks where unsafe; see {doc}`/FASTAPI` Parquet examples.
+- **Paths:** If you accept filesystem paths from clients, **allowlist** directories and reject **`..`** and symlinks where unsafe; see [FASTAPI](/FASTAPI.md) Parquet examples.
 - **`trusted_mode`:** Use **`trusted_mode="shape_only"`** only when upstream already guarantees schema; default validation for untrusted sources.
-- **Executor size:** Set **`max_workers`** from env (see {doc}`/cookbook/fastapi_settings`); match CPU and expected concurrent heavy requests.
-- **Cancellation:** `await acollect()` does **not** cancel in-flight Rust/Polars work when the client disconnects; see {doc}`/EXECUTION`.
+- **Executor size:** Set **`max_workers`** from env (see [fastapi_settings](/cookbook/fastapi_settings.md)); match CPU and expected concurrent heavy requests.
+- **Cancellation:** `await acollect()` does **not** cancel in-flight Rust/Polars work when the client disconnects; see [EXECUTION](/EXECUTION.md).
 
 ## Related docs
 
 - Multi-router example (routers + lifespan): `docs/examples/fastapi/service_layout/` (README in that folder)
-- Roadmap and “when to use what”: {doc}`/FASTAPI_ENHANCEMENTS`
-- Full FastAPI guide: {doc}`/FASTAPI`
-- HTTP status mapping: {ref}`fastapi-errors` (in {doc}`/FASTAPI`)
-- Columnar JSON bodies: {doc}`/cookbook/fastapi_columnar_bodies`
-- Async materialization: {doc}`/cookbook/fastapi_async_materialization`
-- Lazy async file pipeline: {doc}`/cookbook/async_lazy_pipeline`
-- Settings (`pydantic-settings`): {doc}`/cookbook/fastapi_settings`
+- Roadmap and “when to use what”: [FASTAPI_ENHANCEMENTS](/FASTAPI_ENHANCEMENTS.md)
+- Full FastAPI guide: [FASTAPI](/FASTAPI.md)
+- HTTP status mapping: {ref}`fastapi-errors` (in [FASTAPI](/FASTAPI.md))
+- Columnar JSON bodies: [fastapi_columnar_bodies](/cookbook/fastapi_columnar_bodies.md)
+- Async materialization: [fastapi_async_materialization](/cookbook/fastapi_async_materialization.md)
+- Lazy async file pipeline: [async_lazy_pipeline](/cookbook/async_lazy_pipeline.md)
+- Settings (`pydantic-settings`): [fastapi_settings](/cookbook/fastapi_settings.md)

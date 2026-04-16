@@ -4,9 +4,9 @@ This page lays out a roadmap for the **highest-signal remaining Polars parity ga
 
 It complements:
 
-- Current-state tracking: {doc}`PARITY_SCORECARD`
-- 1.8.0 roadmap history: {doc}`POLARS_PARITY_1_8`
-- Behavior contract: {doc}`INTERFACE_CONTRACT`
+- Current-state tracking: [PARITY_SCORECARD](/PARITY_SCORECARD.md)
+- 1.8.0 roadmap history: [POLARS_PARITY_1_8](/POLARS_PARITY_1_8.md)
+- Behavior contract: [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md)
 
 ## Principles
 
@@ -33,7 +33,7 @@ Support `join(validate=...)` for scan roots **without forcing Python materializa
 
 ### Deliverables
 - Extend join execution to accept `validate` and enforce:\n  - `one_to_one`, `one_to_many`, `many_to_one`, `many_to_many`\n  - also accept `1:1`, `1:m`, `m:1`, `m:m`
-- Contract tests:\n  - scan-root join validation succeeds/fails correctly\n  - error messages include which side violates uniqueness\n  - coverage for multi-key joins\n- Docs:\n  - update {doc}`INTERFACE_CONTRACT` join validation section with scan-root support + cost model\n  - update {doc}`PARITY_SCORECARD` status from Partial → Implemented (or “Partial: scan-root supported for …” if any constraints remain)\n+
+- Contract tests:\n  - scan-root join validation succeeds/fails correctly\n  - error messages include which side violates uniqueness\n  - coverage for multi-key joins\n- Docs:\n  - update [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md) join validation section with scan-root support + cost model\n  - update [PARITY_SCORECARD](/PARITY_SCORECARD.md) status from Partial → Implemented (or “Partial: scan-root supported for …” if any constraints remain)\n+
 ### Acceptance criteria
 - `join(validate=...)` behaves the same for in-memory and scan roots (modulo documented performance/streaming constraints).
 
@@ -43,7 +43,7 @@ Support `join(validate=...)` for scan roots **without forcing Python materializa
 Bring `coalesce=` behavior in line with Polars expectations (within schema-first constraints).
 
 ### Deliverables
-- Define and implement explicit semantics for:\n  - same-named key joins vs `left_on`/`right_on`\n  - output key columns when inputs differ\n- Add tests that pin:\n  - output columns present/absent\n  - nullability rules\n  - name collision behavior\n- Docs:\n  - clarify coalesce semantics in {doc}`INTERFACE_CONTRACT`\n  - update {doc}`PARITY_SCORECARD`\n+
+- Define and implement explicit semantics for:\n  - same-named key joins vs `left_on`/`right_on`\n  - output key columns when inputs differ\n- Add tests that pin:\n  - output columns present/absent\n  - nullability rules\n  - name collision behavior\n- Docs:\n  - clarify coalesce semantics in [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md)\n  - update [PARITY_SCORECARD](/PARITY_SCORECARD.md)\n+
 ## Phase 3 — Selector DSL expansion (targeted, schema-first)
 
 ### Goal
@@ -54,7 +54,7 @@ Expand Selector DSL to cover the *most-used* selector patterns from Polars docs 
 - **API coverage**: selectors in more places where Polars users expect them:\n  - `rename` mapping helpers (e.g. rename all columns matching a selector)\n  - `with_columns` conveniences (selector-driven passthrough is likely a non-goal; consider selector-driven `cast`/`fill_null` patterns only if they stay typed)\n- **Better diagnostics**: error messages that include the available schema columns and/or the selector expression summary.
 
 ### Deliverables
-- Extend `pydantable.selectors` surface with new selectors and tests.\n- Update {doc}`SELECTORS` with the expanded catalog.\n+
+- Extend `pydantable.selectors` surface with new selectors and tests.\n- Update [SELECTORS](/SELECTORS.md) with the expanded catalog.\n+
 ## Phase 4 — Long-tail popular DataFrame methods (schema-first shortlist)
 
 ### Goal
@@ -66,4 +66,4 @@ Implement additional high-usage Polars DataFrame methods and arguments that map 
 - **Reshape**: additional melt/unpivot/pivot conveniences (naming options, column selection ergonomics).\n- **Join**: more join argument parity beyond validate/coalesce (where it doesn’t break typing).\n- **Core ergonomics**: small helpers that reduce verbosity in schema-first workflows.\n+
 ## Tracking
 
-- Update {doc}`PARITY_SCORECARD` for every delivered item.\n- Add a “shipped in X.Y.Z” note to the relevant changelog section when released.\n+
+- Update [PARITY_SCORECARD](/PARITY_SCORECARD.md) for every delivered item.\n- Add a “shipped in X.Y.Z” note to the relevant changelog section when released.\n+

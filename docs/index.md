@@ -1,144 +1,72 @@
 # PydanTable
 
-**Strongly-typed DataFrame layer for FastAPI and Pydantic services**, with a Rust-powered execution core (Polars-backed inside the native extension).
+**Strongly-typed DataFrame layer for FastAPI and Pydantic services**, with a Rust execution core (Polars-backed inside the native extension). This site is the **full manual**; the repository **README** is the short entrypoint for install one-liners.
 
-```{note}
-This **documentation site** is the detailed manual. The repository **README** on your Git host is the short entrypoint; both should stay aligned for install commands and version. **Current release:** **1.18.0** (see {doc}`CHANGELOG`) — stable **1.x** API under the policy in {doc}`VERSIONING`. Roadmap history and the completed **v1.0.0** gate checklist live in {doc}`ROADMAP`. SQLModel-first SQL I/O phases and milestones: {doc}`SQLMODEL_SQL_ROADMAP`.
+!!! abstract "See also"
+    Execution builds on [Polars](https://docs.pola.rs/) (see their [user guide](https://docs.pola.rs/user-guide/)) and ships as a native Rust extension. PydanTable adds **Pydantic-first** schemas, **SQLModel**-style tabular models, and **service / data** I/O patterns on top.
+
+
+!!! note
+    **Current release:** see [CHANGELOG](/CHANGELOG.md) — stable **1.x** under [VERSIONING](/VERSIONING.md). Roadmap: [ROADMAP](/ROADMAP.md); SQLModel milestones: [SQLMODEL_SQL_ROADMAP](/SQLMODEL_SQL_ROADMAP.md).
+
+
+## Minimal example
+
+```python
+from pydantable import DataFrame, Schema
+
+
+class Row(Schema):
+    id: int
+    score: float
+
+
+df = DataFrame[Row]({"id": [1, 2], "score": [10.0, 20.5]})
 ```
- 
 
 ## Choose your path
 
-- **Services (FastAPI)**: {doc}`GOLDEN_PATH_FASTAPI` (shortest runnable path), then {doc}`FASTAPI` (common patterns), {doc}`FASTAPI_ADVANCED` (less common patterns), {doc}`FASTAPI_ENHANCEMENTS` (roadmap + “when to use what”), {doc}`DATAFRAMEMODEL`, and {doc}`EXECUTION`. Use **`register_exception_handlers`** for HTTP **503** / **400** / **422** (`ColumnLengthMismatchError` → **400**). Cookbooks: {doc}`/cookbook/fastapi_columnar_bodies`, {doc}`/cookbook/fastapi_observability`, {doc}`/cookbook/fastapi_background_tasks`, {doc}`/cookbook/async_lazy_pipeline`. Copy layout from `docs/examples/fastapi/service_layout/`. Tests: **`pydantable.testing.fastapi`**. Troubleshooting: {doc}`TROUBLESHOOTING`.
-- **Data workflows**: start with {doc}`DATAFRAMEMODEL`, then {doc}`IO_DECISION_TREE` and {doc}`IO_OVERVIEW`. Optional pandas-like names: {doc}`PANDAS_UI`.
-- **Library/interop**: start with {doc}`INTERFACE_CONTRACT` and {doc}`VERSIONING`, then {doc}`PLAN_AND_PLUGINS`.
-- **Third-party execution backends**: {doc}`CUSTOM_ENGINE_PACKAGE` (ship your own `ExecutionEngine` package with `pydantable-protocol`). Optional lazy SQL DataFrame: {doc}`MOLTRES_SQL` (**`SqlDataFrame`** / **`SqlDataFrameModel`**, **`pydantable[sql]`**). Optional Mongo: {doc}`MONGO_ENGINE` — **`pydantable[mongo]`** (**PyMongo**, **Beanie**, Mongo plan stack for lazy frames). Optional Spark: {doc}`SPARK_ENGINE` (**`SparkDataFrame`** / **`SparkDataFrameModel`**, **`pydantable[spark]`**, powered by **raikou-core**). **Prefer** [Beanie](https://github.com/BeanieODM/beanie) **`Document`** for app models (**`from_beanie`**, **`from_beanie_async`**, **`sync_pymongo_collection`**); Pydantic **`Schema`** + **`from_collection`** remains supported. **Eager column-dict I/O:** **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** and **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`** — sync **`pymongo.collection.Collection`** (thread offload in async helpers) or **native** PyMongo **async** on **`pymongo.asynchronous.AsyncCollection`** (**`is_async_mongo_collection`**). ODM reads/writes: {doc}`BEANIE` (**`afetch_beanie`**, **`awrite_beanie`**, …). **Which helper?** {doc}`IO_DECISION_TREE` → Mongo rows.
-- `DataFrameModel` transform chains can return typed after-schema models directly (no `to_dict()` materialization step). **mypy** with the plugin infers many chains; **Pyright**, **Pylance**, and **Astral `ty`** use shipped stubs — call `as_model(...)` (see {doc}`DATAFRAMEMODEL`).
-- Typing guide: {doc}`TYPING` (mypy plugin vs stub-based checkers, including **`ty`**).
+<div class="grid cards" markdown="1">
 
-If you’re not sure where something is documented, use {doc}`DOCS_MAP`.
+-   __Services (FastAPI)__
 
-```{toctree}
-:titlesonly:
-:hidden:
-:caption: Getting started
+    ---
 
-QUICKSTART
-TYPING
-DATAFRAMEMODEL
-SUPPORTED_TYPES
-CUSTOM_DTYPES
-STRICTNESS
-SERVICE_ERGONOMICS
-GOLDEN_PATH_FASTAPI
-FASTAPI
-FASTAPI_ADVANCED
-FASTAPI_ENHANCEMENTS
-EXECUTION
-MATERIALIZATION
-DATA_IO_SOURCES
-STREAMLIT
-DOCS_MAP
-TROUBLESHOOTING
-```
+    Shortest runnable path, HTTP patterns, **`register_exception_handlers`** (**503** / **400** / **422**), and cookbooks. Tests: **`pydantable.testing.fastapi`**. Troubleshooting: [TROUBLESHOOTING](/TROUBLESHOOTING.md).
 
-```{toctree}
-:titlesonly:
-:hidden:
-:caption: Data I/O (by format)
+    [Golden path →](/GOLDEN_PATH_FASTAPI.md)
 
-IO_OVERVIEW
-IO_DECISION_TREE
-IO_PARQUET
-IO_CSV
-IO_NDJSON
-IO_JSON
-IO_IPC
-IO_HTTP
-IO_SQL
-IO_EXTRAS
-```
+-   __Data & I/O__
 
-```{toctree}
-:titlesonly:
-:hidden:
-:caption: Cookbook
+    ---
 
-cookbook/index
-```
+    `DataFrameModel`, lazy vs eager I/O, [IO_OVERVIEW](/IO_OVERVIEW.md), and format guides (Parquet, CSV, SQL, …). Pandas-like helpers: [PANDAS_UI](/PANDAS_UI.md).
 
-```{toctree}
-:titlesonly:
-:hidden:
-:caption: Semantics and contracts
+    [I/O decision tree →](/IO_DECISION_TREE.md)
 
-INTERFACE_CONTRACT
-VERSIONING
-WINDOW_SQL_SEMANTICS
-WHY_NOT_POLARS
-```
+-   __Library & contracts__
 
-```{toctree}
-:titlesonly:
-:hidden:
-:caption: Introspection and extensions
+    ---
 
-PLAN_AND_PLUGINS
-```
+    Public API guarantees, [VERSIONING](/VERSIONING.md), plans/plugins ([PLAN_AND_PLUGINS](/PLAN_AND_PLUGINS.md)), and custom engine packages ([CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md)).
 
-```{toctree}
-:titlesonly:
-:hidden:
-:caption: Alternate import surfaces
+    [Interface contract →](/INTERFACE_CONTRACT.md)
 
-PANDAS_UI
-PYSPARK_UI
-PYSPARK_INTERFACE
-PYSPARK_PARITY
-```
+-   __Optional engines__
 
-```{toctree}
-:titlesonly:
-:hidden:
-:caption: Polars alignment
+    ---
 
-PARITY_SCORECARD
-POLARS_WORKFLOWS
-SELECTORS
-POLARS_TRANSFORMATIONS_ROADMAP
-POLARS_PARITY_1_8
-POLARS_PARITY_NEXT
-```
+    **SQL** ([MOLTRES_SQL](/MOLTRES_SQL.md), **`pydantable[sql]`**), **Mongo** ([MONGO_ENGINE](/MONGO_ENGINE.md), **`pydantable[mongo]`**), **Spark** ([SPARK_ENGINE](/SPARK_ENGINE.md), **`pydantable[spark]`**). Beanie: [BEANIE](/BEANIE.md). PySpark façade: [PYSPARK_UI](/PYSPARK_UI.md).
 
-```{toctree}
-:titlesonly:
-:hidden:
-:caption: Project
+    [Spark engine →](/SPARK_ENGINE.md)
 
-ROADMAP
-SQLMODEL_SQL_ROADMAP
-README
-pydantable_plan
-ARCHITECTURE
-ADR-engines
-CUSTOM_ENGINE_PACKAGE
-ISP_ENGINE_PROTOCOL_RFC
-MOLTRES_SQL
-MONGO_ENGINE
-SPARK_ENGINE
-BEANIE
-DEVELOPER
-TESTING
-COVERAGE_BACKLOG
-DOCS_STYLE_GUIDE
-PERFORMANCE
-CHANGELOG
-```
+</div>
 
-```{toctree}
-:titlesonly:
-:hidden:
-:caption: Reference
+## Guide map
 
-api/index
-```
+- **Services:** [GOLDEN_PATH_FASTAPI](/GOLDEN_PATH_FASTAPI.md) → [FASTAPI](/FASTAPI.md) → [FASTAPI_ADVANCED](/FASTAPI_ADVANCED.md) → [FASTAPI_ENHANCEMENTS](/FASTAPI_ENHANCEMENTS.md) → [DATAFRAMEMODEL](/DATAFRAMEMODEL.md) → [EXECUTION](/EXECUTION.md). Cookbooks: [fastapi_columnar_bodies](/cookbook/fastapi_columnar_bodies.md), [fastapi_observability](/cookbook/fastapi_observability.md), [fastapi_background_tasks](/cookbook/fastapi_background_tasks.md), [async_lazy_pipeline](/cookbook/async_lazy_pipeline.md). Layout: `docs/examples/fastapi/service_layout/`.
+- **Data workflows:** [DATAFRAMEMODEL](/DATAFRAMEMODEL.md) → [IO_DECISION_TREE](/IO_DECISION_TREE.md) → [IO_OVERVIEW](/IO_OVERVIEW.md).
+- **Typing:** [TYPING](/TYPING.md) — mypy plugin vs **Pyright** / **Pylance** / Astral **`ty`**, and **`as_model(...)`** on transform chains.
+- **Third-party execution:** [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md). **Mongo** helpers and **Beanie** reads/writes: [IO_DECISION_TREE](/IO_DECISION_TREE.md) and [BEANIE](/BEANIE.md).
+- **Not sure where something lives?** [DOCS_MAP](/DOCS_MAP.md).
+

@@ -3,11 +3,11 @@
 This guide is the **navigation + reference** for using pydantable inside FastAPI:
 validated request bodies, typed transforms, async materialization, and streaming.
 
-If you want the shortest runnable service first, start with {doc}`GOLDEN_PATH_FASTAPI`.
+If you want the shortest runnable service first, start with [GOLDEN_PATH_FASTAPI](/GOLDEN_PATH_FASTAPI.md).
 
-**Start here:** {doc}`GOLDEN_PATH_FASTAPI` (one runnable async app: lifespan, `Depends`, `acollect`, streaming).
+**Start here:** [GOLDEN_PATH_FASTAPI](/GOLDEN_PATH_FASTAPI.md) (one runnable async app: lifespan, `Depends`, `acollect`, streaming).
 
-**Related recipes:** {doc}`/cookbook/fastapi_columnar_bodies` (column-shaped JSON bodies), {doc}`/cookbook/fastapi_async_materialization`, {doc}`/cookbook/fastapi_observability` (request IDs + **`observe`**), {doc}`/cookbook/fastapi_background_tasks` (**`BackgroundTasks`** + **`submit`**), {doc}`/cookbook/async_lazy_pipeline` (lazy `aread_*` → transforms → materialize). Example **service layout** (routers + lifespan): `docs/examples/fastapi/service_layout/` in the repo. **Roadmap / “when to use what”:** {doc}`/FASTAPI_ENHANCEMENTS`.
+**Related recipes:** [fastapi_columnar_bodies](/cookbook/fastapi_columnar_bodies.md) (column-shaped JSON bodies), [fastapi_async_materialization](/cookbook/fastapi_async_materialization.md), [fastapi_observability](/cookbook/fastapi_observability.md) (request IDs + **`observe`**), [fastapi_background_tasks](/cookbook/fastapi_background_tasks.md) (**`BackgroundTasks`** + **`submit`**), [async_lazy_pipeline](/cookbook/async_lazy_pipeline.md) (lazy `aread_*` → transforms → materialize). Example **service layout** (routers + lifespan): `docs/examples/fastapi/service_layout/` in the repo. **Roadmap / “when to use what”:** [FASTAPI_ENHANCEMENTS](/FASTAPI_ENHANCEMENTS.md).
 
 ## How to read this page (quick map)
 
@@ -20,8 +20,8 @@ If you want the shortest runnable service first, start with {doc}`GOLDEN_PATH_FA
   - {ref}`columnar-openapi-fastapi` (OpenAPI columnar models + `Depends`)
   - {ref}`column-shaped-json-request-bodies` (columnar bodies without helpers)
 - If you’re tuning **async / executors / streaming**, jump to:
-  - {doc}`FASTAPI_ADVANCED` (four modes + I/O patterns)
-  - {doc}`EXECUTION` and {doc}`MATERIALIZATION` (deep dive)
+  - [FASTAPI_ADVANCED](/FASTAPI_ADVANCED.md) (four modes + I/O patterns)
+  - [EXECUTION](/EXECUTION.md) and [MATERIALIZATION](/MATERIALIZATION.md) (deep dive)
 
 (fastapi-install)=
 ## Install (what to `pip install`)
@@ -45,13 +45,13 @@ pip install "pydantable[io]"
 (fastapi-fast-path)=
 ## Fast path for services (recommended order)
 
-1. Run {doc}`GOLDEN_PATH_FASTAPI` end-to-end.
+1. Run [GOLDEN_PATH_FASTAPI](/GOLDEN_PATH_FASTAPI.md) end-to-end.
 2. Pick your payload shape:
    - **Row list**: `list[YourDF.RowModel]` in requests + `response_model=list[YourDTO]` in responses.
-   - **Columnar JSON**: `dict[str, list]` shapes; see {doc}`/cookbook/fastapi_columnar_bodies`.
+   - **Columnar JSON**: `dict[str, list]` shapes; see [fastapi_columnar_bodies](/cookbook/fastapi_columnar_bodies.md).
 3. Decide response size:
    - Small/medium: `collect()` / `to_dict()`
-   - Large: `astream()` + `ndjson_streaming_response` ({doc}`FASTAPI_ENHANCEMENTS`)
+   - Large: `astream()` + `ndjson_streaming_response` ([FASTAPI_ENHANCEMENTS](/FASTAPI_ENHANCEMENTS.md))
 4. Lock down your error mapping: {ref}`fastapi-errors`.
 
 ## Optional `pydantable.fastapi` helpers
@@ -68,7 +68,7 @@ Then import `pydantable.fastapi` (not required for basic FastAPI usage):
 - **`get_executor(request)`** — for **`Depends(get_executor)`**, returning **`request.app.state.executor`** (or **`None`** if unset).
 - **`register_exception_handlers(app)`** — registers HTTP handlers for **`MissingRustExtensionError`** (**503**), **`ColumnLengthMismatchError`** (**400**), and in-handler **`pydantic.ValidationError`** (**422**); see {ref}`fastapi-errors`.
 - **`ingest_error_response(failures, status_code=..., title=...)`** — build a structured JSON payload for batch ingest failures (typically produced by `ignore_errors=True` + `on_validation_errors=...`). This is meant for *in-handler* validation failures, not request parsing errors (which remain FastAPI’s **422**).
-- **`ndjson_streaming_response(astream_iter)`** / **`ndjson_chunk_bytes(astream_iter)`** — build **`application/x-ndjson`** **`StreamingResponse`** from **`await df.astream(...)`** without duplicating JSON line encoding; see {doc}`/FASTAPI_ENHANCEMENTS`.
+- **`ndjson_streaming_response(astream_iter)`** / **`ndjson_chunk_bytes(astream_iter)`** — build **`application/x-ndjson`** **`StreamingResponse`** from **`await df.astream(...)`** without duplicating JSON line encoding; see [FASTAPI_ENHANCEMENTS](/FASTAPI_ENHANCEMENTS.md).
 - **`columnar_body_model`**, **`columnar_body_model_from_dataframe_model`** — build a Pydantic model whose fields are **`list[T]`** per column (OpenAPI-friendly **`dict[str, list]`**). Optional **`example=`** / **`json_schema_extra=`** for Swagger examples.
 - **`columnar_dependency(model_cls, ...)`**, **`rows_dependency(model_cls, ...)`** — **`Depends(...)`** factories that validate the request body and return a **`DataFrameModel`** instance (columnar JSON or **`list[RowModel]`**), forwarding **`trusted_mode`** and related **`DataFrameModel`** kwargs. `validation_profile=` is also supported as a preset layer over `trusted_mode` / `fill_missing_optional` / `ignore_errors`. Phase 5 adds `generate_examples=` (OpenAPI enrichment) and `input_key_mode=` (alias-aware columnar ingestion).
 
@@ -105,7 +105,7 @@ For **row-array** JSON bodies, use **`rows_dependency(User)`**; OpenAPI document
 
 **Nested row fields** (e.g. **`inner: NestedModel`**) become **`list[NestedModel]`** in columnar JSON (one nested object per row index). That shape is valid but can be heavy on the wire; prefer flat columns when you can.
 
-**Map-like columns** (**`dict[str, T]`**) use the same columnar encoding: each field is **`list[dict]`**-compatible per row (parallel **`dict`** values at each index), matching **`to_dict()`** after ingest. See **Map-like columns** in {doc}`SUPPORTED_TYPES`. For the JSON value-kind mapping (nested object vs map vs list), see **JSON (RFC 8259) vs column types** in {doc}`SUPPORTED_TYPES`. File-based JSON loading (array vs JSON Lines, eager vs lazy) is described in {doc}`IO_JSON`—HTTP columnar bodies use the same **logical** shapes as **`materialize_json`** / **`to_dict()`**.
+**Map-like columns** (**`dict[str, T]`**) use the same columnar encoding: each field is **`list[dict]`**-compatible per row (parallel **`dict`** values at each index), matching **`to_dict()`** after ingest. See **Map-like columns** in [SUPPORTED_TYPES](/SUPPORTED_TYPES.md). For the JSON value-kind mapping (nested object vs map vs list), see **JSON (RFC 8259) vs column types** in [SUPPORTED_TYPES](/SUPPORTED_TYPES.md). File-based JSON loading (array vs JSON Lines, eager vs lazy) is described in [IO_JSON](/IO_JSON.md)—HTTP columnar bodies use the same **logical** shapes as **`materialize_json`** / **`to_dict()`**.
 
 **Validation layers:** Pydantic validates each column as **`list[T]`** (wrong element types → **422** before your handler). **Row/column length consistency** is enforced when constructing **`DataFrameModel`** inside the dependency; mismatched lengths raise **`ColumnLengthMismatchError`** (subclass of **`ValueError`**). With **`register_exception_handlers`**, that maps to **400**; without it, you typically see **500**—see {ref}`fastapi-errors`.
 
@@ -116,7 +116,7 @@ For **row-array** JSON bodies, use **`rows_dependency(User)`**; OpenAPI document
 (fastapi-testing)=
 ### Testing note (lifespan and `TestClient`)
 
-FastAPI’s `TestClient` is synchronous; if your app uses a lifespan function (including `executor_lifespan`), prefer `pydantable.testing.fastapi.fastapi_test_client(app)` so the lifespan runs and `Depends(get_executor)` works. See {doc}`FASTAPI_ENHANCEMENTS` (Phase 7).
+FastAPI’s `TestClient` is synchronous; if your app uses a lifespan function (including `executor_lifespan`), prefer `pydantable.testing.fastapi.fastapi_test_client(app)` so the lifespan runs and `Depends(get_executor)` works. See [FASTAPI_ENHANCEMENTS](/FASTAPI_ENHANCEMENTS.md) (Phase 7).
 
 ## Testing routes (`TestClient`)
 
@@ -170,7 +170,7 @@ assert r.json() == [{"id": 1, "age": 20}]
 
 ## Common building blocks (what most services use)
 
-- **Request bodies**: `list[YourDF.RowModel]` (row list) or columnar JSON via {doc}`/cookbook/fastapi_columnar_bodies`.
+- **Request bodies**: `list[YourDF.RowModel]` (row list) or columnar JSON via [fastapi_columnar_bodies](/cookbook/fastapi_columnar_bodies.md).
 - **Responses**:
   - `collect()` / `await acollect()` → `list[Row]` (best with `response_model=list[YourDTO]`)
   - `to_dict()` / `await ato_dict()` → `dict[str, list]` (columnar JSON)
@@ -178,7 +178,7 @@ assert r.json() == [{"id": 1, "age": 20}]
 - **Async routes**: use `await ...acollect(...)` so the loop stays responsive; prefer a bounded executor via `executor_lifespan` + `Depends(get_executor)`.
 - **Testing**: use `pydantable.testing.fastapi.fastapi_test_client(app)` so lifespan runs.
 
-If you need deeper I/O/materialization patterns, see {doc}`FASTAPI_ADVANCED` and the cookbook index ({doc}`/cookbook/index`).
+If you need deeper I/O/materialization patterns, see [FASTAPI_ADVANCED](/FASTAPI_ADVANCED.md) and the cookbook index ([index](/cookbook/index.md)).
 
 ## Responses: columnar vs row-shaped
 
@@ -191,7 +191,7 @@ If you need deeper I/O/materialization patterns, see {doc}`FASTAPI_ADVANCED` and
 ## Advanced topics
 
 If you need deeper async + I/O patterns (four materialization modes, `DataFrameModel` I/O in `async def`,
-experimental URL transports, etc.), see {doc}`FASTAPI_ADVANCED`.
+experimental URL transports, etc.), see [FASTAPI_ADVANCED](/FASTAPI_ADVANCED.md).
 
 ## Trusted ingest (`trusted_mode`)
 
@@ -200,10 +200,10 @@ For **`DataFrameModel(...)`** and **`DataFrame[Schema](...)`**, ingestion defaul
 | Mode | Meaning |
 |------|---------|
 | **`trusted_mode="off"`** | Default: full Pydantic validation per cell (same as omitting the argument). |
-| **`trusted_mode="shape_only"`** | Skip element validation; still checks column names and row counts. May emit **`DtypeDriftWarning`** when payloads would fail **`strict`** (see {doc}`SUPPORTED_TYPES`). |
+| **`trusted_mode="shape_only"`** | Skip element validation; still checks column names and row counts. May emit **`DtypeDriftWarning`** when payloads would fail **`strict`** (see [SUPPORTED_TYPES](/SUPPORTED_TYPES.md)). |
 | **`trusted_mode="strict"`** | Trusted bulk input plus dtype / nested-shape checks against the schema (including Polars columns). |
 
-Details: [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md), [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md).
+Details: [`DATAFRAMEMODEL.md`](/DATAFRAMEMODEL.md), [`SUPPORTED_TYPES.md`](/SUPPORTED_TYPES.md).
 
 ```python
 from pydantable import DataFrameModel
@@ -249,11 +249,11 @@ body = UsersColumnarBody(id=[1, 2], age=[20, None])
 df = UserDF({"id": body.id, "age": body.age})
 ```
 
-Same schema rules apply as for columnar constructors in [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md) (equal-length columns, types per field).
+Same schema rules apply as for columnar constructors in [`DATAFRAMEMODEL.md`](/DATAFRAMEMODEL.md) (equal-length columns, types per field).
 
 ## Parquet and Arrow IPC uploads (multipart)
-For upload routes and deeper async I/O patterns, see {doc}`FASTAPI_ADVANCED` and the I/O docs:
-{doc}`IO_OVERVIEW`, {doc}`IO_HTTP`, and the cookbook pages under {doc}`/cookbook/index`.
+For upload routes and deeper async I/O patterns, see [FASTAPI_ADVANCED](/FASTAPI_ADVANCED.md) and the I/O docs:
+[IO_OVERVIEW](/IO_OVERVIEW.md), [IO_HTTP](/IO_HTTP.md), and the cookbook pages under [index](/cookbook/index.md).
 
 ## Injectable executor with `Depends`
 
@@ -358,9 +358,9 @@ Without a custom executor, **`await df.acollect()`** is enough: pydantable uses 
 
 ### Chunked column dicts (`stream` / `astream`)
 
-Full **`StreamingResponse`** examples (sync **`def`** + **`stream`**, **`async def`** + **`astream`**) are in {doc}`FASTAPI_ADVANCED` (four materialization modes).
+Full **`StreamingResponse`** examples (sync **`def`** + **`stream`**, **`async def`** + **`astream`**) are in [FASTAPI_ADVANCED](/FASTAPI_ADVANCED.md) (four materialization modes).
 
-**`DataFrame.stream()`** and **`DataFrame.astream()`** yield **`dict[str, list]`** batches after **one** engine collect (same contract as **`collect_batches`**; see {doc}`EXECUTION`). They do **not** avoid holding the full materialized result in memory before chunking—use **pagination** or **external storage** when the table is too large for one collect. If you need **one** blob first, **`await df.ato_dict()`** / **`await df.arows()`** and then build your own response shape is still valid.
+**`DataFrame.stream()`** and **`DataFrame.astream()`** yield **`dict[str, list]`** batches after **one** engine collect (same contract as **`collect_batches`**; see [EXECUTION](/EXECUTION.md)). They do **not** avoid holding the full materialized result in memory before chunking—use **pagination** or **external storage** when the table is too large for one collect. If you need **one** blob first, **`await df.ato_dict()`** / **`await df.arows()`** and then build your own response shape is still valid.
 
 ## Large tables, Polars, Arrow, and trust boundaries
 
@@ -372,7 +372,7 @@ Full **`StreamingResponse`** examples (sync **`def`** + **`stream`**, **`async d
 |-----------|----------------|--------|
 | Internal service-to-service batch (same org, authN/Z at gateway) | `shape_only` or `strict` | You still enforce column names and row counts; `strict` adds dtype / nested-shape checks for Polars and columnar buffers. |
 | Upstream already validated rows (e.g. warehouse export, replay from your own DB) | `shape_only` | Fastest path; assumes wire format matches schema. |
-| Polars `DataFrame` or NumPy / **PyArrow** columns built **inside** your stack | `strict` | Checks Polars dtypes (and Python column buffers where implemented) against annotations; see [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md) (“Runtime column payloads”). |
+| Polars `DataFrame` or NumPy / **PyArrow** columns built **inside** your stack | `strict` | Checks Polars dtypes (and Python column buffers where implemented) against annotations; see [`SUPPORTED_TYPES.md`](/SUPPORTED_TYPES.md) (“Runtime column payloads”). |
 
 **Who may skip full `RowModel` validation**
 
@@ -381,14 +381,14 @@ Full **`StreamingResponse`** examples (sync **`def`** + **`stream`**, **`async d
 
 **Polars and Arrow in handlers**
 
-- Passing a **Polars `DataFrame`** requires trusted mode (`shape_only` or `strict`); see [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md).
+- Passing a **Polars `DataFrame`** requires trusted mode (`shape_only` or `strict`); see [`DATAFRAMEMODEL.md`](/DATAFRAMEMODEL.md).
 - **`strict`** rejects Polars columns whose dtypes do not match the schema (including nested list / struct / map shapes). Prefer **`strict`** when the frame comes from Arrow/Parquet/IPC and you want a safety net without per-cell Pydantic.
-- For performance characteristics (validation vs ingest vs `collect()`), see [`PERFORMANCE.md`](PERFORMANCE.md) and [`EXECUTION.md`](EXECUTION.md).
+- For performance characteristics (validation vs ingest vs `collect()`), see [`PERFORMANCE.md`](/PERFORMANCE.md) and [`EXECUTION.md`](/EXECUTION.md).
 
 ## End-to-end examples (moved to cookbook)
 
 The longer “Example 1/2/3” service patterns live in the cookbook now:
-{doc}`/cookbook/fastapi_end_to_end_examples`.
+[fastapi_end_to_end_examples](/cookbook/fastapi_end_to_end_examples.md).
 
 ## Error timing and API safety
 

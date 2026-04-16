@@ -1,0 +1,211 @@
+# Material for MkDocs — Polars-style product docs (see docs/mkdocs_hooks.py for RTD import path).
+site_name: pydantable
+site_description: Strongly-typed DataFrames for FastAPI and Pydantic, Rust/Polars execution core.
+site_author: pydantable contributors
+site_url: https://pydantable.readthedocs.io/en/latest/
+
+repo_url: https://github.com/eddiethedean/pydantable
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+
+# Allow links to repo files outside ``docs/`` (``../``) used in ROADMAP / PERFORMANCE.
+validation:
+  links:
+    unrecognized_links: ignore
+    not_found: ignore
+
+hooks:
+  - docs/mkdocs_hooks.py
+
+exclude_docs: |
+  async_ideas/**
+  examples/fastapi/service_layout/README.md
+
+theme:
+  name: material
+  language: en
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [python, pydantable-protocol/python]
+          options:
+            docstring_style: google
+            docstring_section_style: table
+            show_root_heading: true
+            show_root_full_path: true
+            show_symbol_type_heading: true
+            show_source: true
+            show_if_no_docstring: false
+            members_order: source
+            separate_signature: true
+            line_length: 100
+
+markdown_extensions:
+  - meta
+  - md_in_html
+  - toc:
+      permalink: true
+  - tables
+  - attr_list
+  - def_list
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      # Repo root for ``README.md`` include; ``docs/`` for ``examples/...`` snippets.
+      base_path: [".", "docs"]
+      check_paths: true
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - QUICKSTART.md
+      - TYPING.md
+      - DATAFRAMEMODEL.md
+      - SUPPORTED_TYPES.md
+      - CUSTOM_DTYPES.md
+      - STRICTNESS.md
+      - SERVICE_ERGONOMICS.md
+      - GOLDEN_PATH_FASTAPI.md
+      - FASTAPI.md
+      - FASTAPI_ADVANCED.md
+      - FASTAPI_ENHANCEMENTS.md
+      - EXECUTION.md
+      - MATERIALIZATION.md
+      - DATA_IO_SOURCES.md
+      - STREAMLIT.md
+      - DOCS_MAP.md
+      - TROUBLESHOOTING.md
+  - Data I/O (by format):
+      - IO_OVERVIEW.md
+      - IO_DECISION_TREE.md
+      - IO_PARQUET.md
+      - IO_CSV.md
+      - IO_NDJSON.md
+      - IO_JSON.md
+      - IO_IPC.md
+      - IO_HTTP.md
+      - IO_SQL.md
+      - IO_EXTRAS.md
+  - Cookbook:
+      - cookbook/index.md
+      - cookbook/async_lazy_pipeline.md
+      - cookbook/fastapi_columnar_bodies.md
+      - cookbook/fastapi_async_materialization.md
+      - cookbook/fastapi_end_to_end_examples.md
+      - cookbook/fastapi_background_tasks.md
+      - cookbook/fastapi_observability.md
+      - cookbook/fastapi_settings.md
+      - cookbook/io_lazy_pipeline_write.md
+      - cookbook/io_http_parquet_ctx.md
+      - cookbook/json_logs_unnest_export.md
+      - cookbook/transforms_join_groupby.md
+      - cookbook/windows_framing_primer.md
+  - Semantics and contracts:
+      - INTERFACE_CONTRACT.md
+      - VERSIONING.md
+      - WINDOW_SQL_SEMANTICS.md
+      - WHY_NOT_POLARS.md
+  - Introspection and extensions:
+      - PLAN_AND_PLUGINS.md
+  - Alternate import surfaces:
+      - PANDAS_UI.md
+      - PYSPARK_UI.md
+      - PYSPARK_INTERFACE.md
+      - PYSPARK_PARITY.md
+  - Polars alignment:
+      - PARITY_SCORECARD.md
+      - POLARS_WORKFLOWS.md
+      - SELECTORS.md
+      - POLARS_TRANSFORMATIONS_ROADMAP.md
+      - POLARS_PARITY_1_8.md
+      - POLARS_PARITY_NEXT.md
+  - Project:
+      - ROADMAP.md
+      - SQLMODEL_SQL_ROADMAP.md
+      - Repository README: REPOSITORY_README.md
+      - pydantable_plan.md
+      - ARCHITECTURE.md
+      - ADR-engines.md
+      - CUSTOM_ENGINE_PACKAGE.md
+      - ISP_ENGINE_PROTOCOL_RFC.md
+      - MOLTRES_SQL.md
+      - MONGO_ENGINE.md
+      - SPARK_ENGINE.md
+      - BEANIE.md
+      - DEVELOPER.md
+      - TESTING.md
+      - COVERAGE_BACKLOG.md
+      - DOCS_STYLE_GUIDE.md
+      - PERFORMANCE.md
+      - CHANGELOG.md
+  - Reference:
+      - api/index.md
+      - DataFrame: api/dataframe.md
+      - DataFrameModel: api/dataframemodel.md
+      - Expr: api/expr.md
+      - PlanMaterialization: api/plan_materialization.md
+      - plan_materialization_summary: api/plan_materialization_summary.md
+      - Schema: api/schema.md
+      - afetch_beanie: api/afetch_beanie.md
+      - aiter_beanie: api/aiter_beanie.md
+      - awrite_beanie: api/awrite_beanie.md
+      - BeanieWriteOptions: api/beanie_write_options.md
+      - ColumnRef: api/column_ref.md
+      - expressions.when: api/when.md
+      - expressions.coalesce: api/coalesce.md
+      - expressions.concat: api/concat.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/eddiethedean/pydantable
+    - icon: fontawesome/solid/box
+      link: https://pypi.org/project/pydantable/

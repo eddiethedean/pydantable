@@ -264,7 +264,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
     ) -> DataFrame[Any]:
         """Lazy Parquet read after HTTP(S) download to a temp file.
 
-        See {doc}`DATA_IO_SOURCES`.
+        See the DATA_IO_SOURCES guide (project docs).
         """
         from ._impl_lazy_sources import read_parquet_url as _read_parquet_url
 
@@ -962,7 +962,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         """Multi-line summary string (schema, dtypes, :attr:`shape` caveat).
 
         **Cost:** does not materialize row data; uses schema and root-buffer
-        :attr:`shape` only. See {doc}`EXECUTION` **Materialization costs**.
+        :attr:`shape` only. See the EXECUTION guide (project docs) **Materialization costs**.
         """
         schema_qn = getattr(
             self._current_schema_type,
@@ -987,7 +987,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         """Summary statistics for int, float, bool, str, and date/datetime columns.
 
         **Cost:** one full :meth:`to_dict()` materialization. String columns
-        ``n_unique`` scans all non-null strings. See {doc}`EXECUTION`.
+        ``n_unique`` scans all non-null strings. See the EXECUTION guide (project docs).
         """
         numeric = [
             n for n, a in self._current_field_types.items() if _is_describe_numeric(a)
@@ -1093,7 +1093,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         """Count rows per distinct value in ``column`` (group-by aggregation).
 
         **Cost:** engine aggregation (same path as :meth:`group_by` / :meth:`agg`).
-        See {doc}`EXECUTION`.
+        See the EXECUTION guide (project docs).
 
         Returns a dict sorted by count descending, then ``repr(key)``. When
         ``normalize=True``, values are fractions in ``[0, 1]`` (``float``).
@@ -1177,7 +1177,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         Row/column/cell limits default to module constants but can be set via
         :mod:`pydantable.display` or ``PYDANTABLE_REPR_HTML_*`` env vars.
         **Cost:** same as :meth:`head` for the bounded slice plus :meth:`to_dict`
-        on that slice. See {doc}`EXECUTION` **Jupyter / HTML**.
+        on that slice. See the EXECUTION guide (project docs) **Jupyter / HTML**.
         """
         try:
             return self._repr_html_impl()
@@ -2040,7 +2040,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
         Materialize the result with :meth:`to_dict` or :meth:`collect`.
         **Cost:** extends the logical plan only until you materialize. See
-        {doc}`EXECUTION` **Materialization costs**.
+        the EXECUTION guide (project docs) **Materialization costs**.
         """
         return self.slice(0, n)
 
@@ -3464,7 +3464,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         Materialize this typed logical DataFrame.
 
         **Cost:** full engine execution on the current thread (same as :meth:`to_dict`
-        when returning rows or lists). See {doc}`EXECUTION` **Materialization costs**.
+        when returning rows or lists). See the EXECUTION guide (project docs) **Materialization costs**.
 
         By default returns a list of Pydantic models, one per row, validated
         against :attr:`schema_type` (the current projected schema).
@@ -3526,7 +3526,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
     ) -> dict[str, list[Any]]:
         """Columnar materialization (alias for ``collect(as_lists=True)`` shape).
 
-        **Cost:** full Rust execution for the current plan. See {doc}`EXECUTION`.
+        **Cost:** full Rust execution for the current plan. See the EXECUTION guide (project docs).
         Pass ``streaming=`` or set ``PYDANTABLE_ENGINE_STREAMING`` like :meth:`collect`.
         """
         use_streaming = _resolve_engine_streaming(
@@ -3755,7 +3755,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
     ) -> list[Any]:
         """Return Polars ``DataFrame`` chunks after one engine collect.
 
-        See {doc}`EXECUTION`.
+        See the EXECUTION guide (project docs).
         """
         use_streaming = _resolve_engine_streaming(
             streaming=streaming,
@@ -3817,7 +3817,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         Python package: ``pip install 'pydantable[polars]'``).
 
         **Cost:** builds a columnar dict via the Rust engine, then a Polars frame.
-        See {doc}`EXECUTION`. Optional ``streaming=`` matches :meth:`collect`.
+        See the EXECUTION guide (project docs). Optional ``streaming=`` matches :meth:`collect`.
         """
         try:
             pl = importlib.import_module("polars")

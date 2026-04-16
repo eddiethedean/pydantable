@@ -8,9 +8,9 @@ PydanTable **1.8.0**, focused on the **core** API:
 
 It complements:
 
-- The current-state table: {doc}`PARITY_SCORECARD`
-- The long-horizon parity history: {doc}`POLARS_TRANSFORMATIONS_ROADMAP`
-- The behavioral guarantees: {doc}`INTERFACE_CONTRACT`
+- The current-state table: [PARITY_SCORECARD](/PARITY_SCORECARD.md)
+- The long-horizon parity history: [POLARS_TRANSFORMATIONS_ROADMAP](/POLARS_TRANSFORMATIONS_ROADMAP.md)
+- The behavioral guarantees: [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md)
 
 ## Scope and constraints
 
@@ -24,11 +24,11 @@ It complements:
 ### Out of scope (1.8.0)
 
 - Accepting arbitrary Polars dtypes that do not correspond to supported typed columns
-  (the schema remains Pydantic-first; see {doc}`SUPPORTED_TYPES`).
+  (the schema remains Pydantic-first; see [SUPPORTED_TYPES](/SUPPORTED_TYPES.md)).
 - Selector DSL parity (e.g. full `pl.col("^re$")`, wildcard selectors) beyond explicit,
   schema-driven helpers.
 - Index-like semantics (no implicit row index; no pandas-style alignment).
-- A Python `polars.LazyFrame` escape hatch (see {doc}`INTERFACE_CONTRACT`).
+- A Python `polars.LazyFrame` escape hatch (see [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md)).
 
 ## “Most popular” definition
 
@@ -48,7 +48,7 @@ The table below is the **deliverable checklist**. Each row should land with:
 - API behavior in Python
 - engine wiring (Rust) when required
 - contract tests
-- docs updates (this page + {doc}`PARITY_SCORECARD` and sometimes {doc}`INTERFACE_CONTRACT`)
+- docs updates (this page + [PARITY_SCORECARD](/PARITY_SCORECARD.md) and sometimes [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md))
 
 | Area | Target | Arguments / details | Implementation notes |
 |---|---|---|---|
@@ -57,7 +57,7 @@ The table below is the **deliverable checklist**. Each row should land with:
 | Core | `DataFrame.sort` argument parity | broadcast validation (`descending`, `nulls_last`), consistent errors; consider `maintain_order=` if engine supports | Must keep existing `engine_streaming` story. |
 | Core | `drop` / `rename` missing-column behavior | add `strict=` / `errors=` behavior for missing columns | Must be consistent with typed contract; document defaults. |
 | Core | `unique` / `distinct` options | clarify allowed `keep`; consider `maintain_order=` | If engine lacks support, document as unsupported. |
-| GroupBy | `GroupedDataFrame` convenience methods | `sum/mean/min/max/count/len` style shortcuts + deterministic naming | Must not change all-null group semantics (see {doc}`INTERFACE_CONTRACT`). |
+| GroupBy | `GroupedDataFrame` convenience methods | `sum/mean/min/max/count/len` style shortcuts + deterministic naming | Must not change all-null group semantics (see [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md)). |
 | GroupBy | Group-by arguments | `maintain_order=` / `drop_nulls=` where feasible | If not feasible, define explicit non-support. |
 | Join | Join argument parity | `coalesce=` and stricter `on/left_on/right_on` validation; consider `validate=` checks | Prefer “documented constraints” over partial silent behavior. |
 | Reshape | `pivot` argument parity | `sort_columns=`, `separator=`, etc. where feasible | Preserve deterministic output naming contract. |
@@ -74,6 +74,6 @@ The table below is the **deliverable checklist**. Each row should land with:
 
 When features land:
 
-- Update {doc}`PARITY_SCORECARD` (status + notes).
-- Add or refresh examples in {doc}`POLARS_WORKFLOWS` for newly-added common patterns.
+- Update [PARITY_SCORECARD](/PARITY_SCORECARD.md) (status + notes).
+- Add or refresh examples in [POLARS_WORKFLOWS](/POLARS_WORKFLOWS.md) for newly-added common patterns.
 

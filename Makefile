@@ -18,7 +18,7 @@ NATIVE_PYPROJECT ?= pydantable-native/pyproject.toml
 # Source roots on PYTHONPATH for Rust ``cargo test`` (Polars in venv + editable packages).
 RUST_PYTHONPATH ?= $(CURDIR)/python:$(CURDIR)/pydantable-protocol/python:$(CURDIR)/pydantable-native/python
 
-.PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check engine-bypass-check ty-check ty-check-minimal pyright-check pyright-check-strict sphinx-check docs-api-rst-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
+.PHONY: check-full check-python check-rust check-docs ruff-format-check ruff-check engine-bypass-check ty-check ty-check-minimal pyright-check pyright-check-strict mkdocs-check rust-fmt-check rust-clippy rust-check-no-default-features rust-test
 .PHONY: native-develop native-develop-fast native-wheel install-editable dev-setup install-dev help
 .PHONY: test test-fast test-cov test-moltres test-mongo diff-cover
 .PHONY: gen-typing check-typing
@@ -27,7 +27,7 @@ check-full: check-python check-docs check-rust
 
 check-python: ruff-format-check ruff-check engine-bypass-check ty-check ty-check-minimal pyright-check check-typing
 
-check-docs: docs-api-rst-check sphinx-check
+check-docs: mkdocs-check
 
 ruff-format-check:
 	$(RUFF) format --check .
@@ -59,12 +59,9 @@ pyright-check:
 pyright-check-strict:
 	$(PYRIGHT) --project pyrightconfig-strict.json
 
-# Matches CI "Docs (sphinx -W)" check.
-sphinx-check:
-	$(PYTHON) -m sphinx -W -b html docs docs/_build/html
-
-docs-api-rst-check:
-	$(PYTHON) scripts/check_docs_api_rst.py
+# Matches CI "Docs (mkdocs --strict)" check.
+mkdocs-check:
+	$(PYTHON) -m mkdocs build --strict
 
 gen-typing:
 	$(PYTHON) scripts/generate_typing_artifacts.py

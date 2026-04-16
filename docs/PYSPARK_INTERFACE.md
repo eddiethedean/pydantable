@@ -132,7 +132,7 @@ Supported operation families mirror the default interface, including core table
 ops, joins/group-by, reshape (`melt`/`pivot`), rolling/dynamic windows, temporal
 columns/literals, **global `select` aggregates** (`F.sum`, `F.avg`, `F.count`, `F.min`,
 `F.max`), and **window** functions (`row_number`, `lag`, `lead`, …). Details:
-[`PYSPARK_PARITY.md`](PYSPARK_PARITY.md).
+[`PYSPARK_PARITY.md`](/PYSPARK_PARITY.md).
 
 ## Regression tests
 

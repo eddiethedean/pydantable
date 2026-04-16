@@ -7,16 +7,16 @@ build:
   jobs:
     pre_install:
       - pip install -U pip
-      # Do not `pip install .[docs]` here: that runs maturin and compiles the full Rust
-      # crate (Polars, etc.), which often OOMs or times out on RTD builders. The Sphinx
-      # config adds `python/` to sys.path; pydantable imports without `pydantable._core`.
+      # Do not ``pip install .[docs]`` here: that runs maturin and compiles the full Rust
+      # crate (Polars, etc.), which often OOMs or times out on RTD builders. ``mkdocs_hooks.py``
+      # adds ``python/`` and ``pydantable-protocol/python/`` to ``sys.path``; pydantable imports
+      # without ``pydantable._core``.
       - >-
         pip install
-        "sphinx>=7,<9"
-        "myst-parser>=3"
-        sphinx-autodoc-typehints
-        sphinx-copybutton
-        pydata-sphinx-theme
+        "mkdocs-material>=9.5,<10"
+        "mkdocstrings[python]>=0.25,<1"
+        "mkdocstrings-python>=1.10,<2"
+        "pymdown-extensions>=10.14,<11"
         "pydantic>=2,<3"
         "typing-extensions>=4.7"
         "sqlalchemy>=2,<3"
@@ -24,8 +24,6 @@ build:
         "pymongo>=4.6"
         "beanie>=1.24,<3"
 
-sphinx:
-  builder: html
-  configuration: docs/conf.py
+mkdocs:
+  configuration: mkdocs.yml
   fail_on_warning: true
-

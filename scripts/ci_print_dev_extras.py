@@ -3,8 +3,8 @@
 
 The GitHub Actions ``python-tests`` jobs install ``pip install -e ".[dev]"``
 (plus ``raikou-core`` and ``pyspark`` for JVM Spark tests) after building the
-native extension — see ``.github/workflows/_shared-ci.yml``. This script lists
-what ``[dev]`` contains for review when editing extras.
+native extension — see ``.github/workflows/_shared-ci.yml``. Documentation builds
+use **MkDocs** + **Material** (``mkdocs.yml``) with ``pip install -e ".[docs]"``.
 
     python scripts/ci_print_dev_extras.py
 
@@ -39,7 +39,7 @@ def main() -> None:
         print(line)
     print(
         '\n# CI: maturin develop, then pip install -e ".[dev]" '
-        "raikou-core pyspark (see _shared-ci.yml)."
+        "raikou-core pyspark (see _shared-ci.yml). Docs: mkdocs build --strict."
     )
 
 

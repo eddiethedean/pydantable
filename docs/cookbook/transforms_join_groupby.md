@@ -39,6 +39,6 @@ assert set(out.keys()) == {"country", "total", "n_orders"}
 
 ## Pitfalls
 
-- **Row order is not guaranteed** for many operations; compare using sorted keys (see {doc}`/INTERFACE_CONTRACT`).
-- **All-null groups**: `sum/mean/min/max/...` yield `None`; `count` yields `0` (see {doc}`/INTERFACE_CONTRACT`).
+- **Row order is not guaranteed** for many operations; compare using sorted keys (see [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md)).
+- **All-null groups**: `sum/mean/min/max/...` yield `None`; `count` yields `0` (see [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md)).
 

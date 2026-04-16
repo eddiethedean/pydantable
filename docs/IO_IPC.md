@@ -4,7 +4,7 @@
 
 This covers **Arrow IPC file** (`.arrow` / `.feather`-style single file), not arbitrary **streaming IPC** on a socket unless you materialize through PyArrow yourself.
 
-**Batch iterators / writers (1.5.0+):** **`iter_ipc`** and **`write_ipc_batches`** take **`as_stream=`**. Use the **same** value on read and write: on-disk IPC **file** format is **`as_stream=False`**; IPC **stream** bytes are **`as_stream=True`** (the **`write_ipc_batches`** default). See {doc}`IO_OVERVIEW` (**Batched column dict I/O**).
+**Batch iterators / writers (1.5.0+):** **`iter_ipc`** and **`write_ipc_batches`** take **`as_stream=`**. Use the **same** value on read and write: on-disk IPC **file** format is **`as_stream=False`**; IPC **stream** bytes are **`as_stream=True`** (the **`write_ipc_batches`** default). See [IO_OVERVIEW](/IO_OVERVIEW.md) (**Batched column dict I/O**).
 
 ## Read (sources)
 
@@ -19,7 +19,7 @@ This covers **Arrow IPC file** (`.arrow` / `.feather`-style single file), not ar
 - **`read_ipc`**, **`aread_ipc`**
 - **`materialize_ipc`**, **`amaterialize_ipc`**
 
-**`scan_kwargs`:** forwarded to **`IpcScanOptions`** (**`record_batch_statistics`**) and **`UnifiedScanArgs`** (**`glob`**, **`cache`**, **`rechunk`**, **`n_rows`**, **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`**). Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
+**`scan_kwargs`:** forwarded to **`IpcScanOptions`** (**`record_batch_statistics`**) and **`UnifiedScanArgs`** (**`glob`**, **`cache`**, **`rechunk`**, **`n_rows`**, **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`**). Unknown keys raise **`ValueError`**. See [DATA_IO_SOURCES](/DATA_IO_SOURCES.md).
 
 ### Paths, directories, and multi-file
 
@@ -43,16 +43,15 @@ IPC sink options are intentionally narrow: use top-level **`compression=`**. **N
 
 ## Runnable example
 
-Run conventions: {doc}`IO_OVERVIEW` (**Runnable example**).
+Run conventions: [IO_OVERVIEW](/IO_OVERVIEW.md) (**Runnable example**).
 
 ```bash
 python docs/examples/io/ipc_roundtrip.py
 ```
 
-```{literalinclude} examples/io/ipc_roundtrip.py
-:language: python
-```
+
+--8<-- "examples/io/ipc_roundtrip.py"
 
 ## See also
 
-{doc}`IO_OVERVIEW` · {doc}`EXECUTION` · {doc}`SUPPORTED_TYPES` (Arrow interchange)
+[IO_OVERVIEW](/IO_OVERVIEW.md) · [EXECUTION](/EXECUTION.md) · [SUPPORTED_TYPES](/SUPPORTED_TYPES.md) (Arrow interchange)

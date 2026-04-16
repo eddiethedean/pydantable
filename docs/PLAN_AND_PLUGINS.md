@@ -59,7 +59,7 @@ print(events[-1])
 For a minimal default, set `PYDANTABLE_TRACE=1` to emit trace events to stderr when
 no observer is configured.
 
-**Schema drift across Parquet files:** the lazy **`read_parquet`** path does not emit a dedicated “schemas differ” event; Polars handles union and **`allow_missing_columns`** at scan/collect time (see {doc}`IO_PARQUET`). For custom checks—e.g. comparing PyArrow **`schema`** per file before building a plan—run that logic in application code and optionally **`set_observer`** on your own steps so events stay explicit and testable.
+**Schema drift across Parquet files:** the lazy **`read_parquet`** path does not emit a dedicated “schemas differ” event; Polars handles union and **`allow_missing_columns`** at scan/collect time (see [IO_PARQUET](/IO_PARQUET.md)). For custom checks—e.g. comparing PyArrow **`schema`** per file before building a plan—run that logic in application code and optionally **`set_observer`** on your own steps so events stay explicit and testable.
 
 ## `pydantable.plugins` — registry for I/O extension
 

@@ -1,6 +1,6 @@
 # Mongo: Beanie, lazy engine, and column-dict I/O
 
-**Primary model for MongoDB with PydanTable:** define collections with [Beanie](https://github.com/BeanieODM/beanie) **`Document`** subclasses, then wire **lazy** **`MongoDataFrame`** / **`MongoDataFrameModel`** (**`from_beanie`**, **`from_beanie_async`**) and **eager** **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** (and async **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`**) through **`sync_pymongo_collection`** where you use a sync DB. Install **`pip install "pydantable[mongo]"`** (pulls **PyMongo**, **Beanie**, and the optional Mongo plan stack used by lazy frames). ODM-first patterns: {doc}`BEANIE`.
+**Primary model for MongoDB with PydanTable:** define collections with [Beanie](https://github.com/BeanieODM/beanie) **`Document`** subclasses, then wire **lazy** **`MongoDataFrame`** / **`MongoDataFrameModel`** (**`from_beanie`**, **`from_beanie_async`**) and **eager** **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** (and async **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`**) through **`sync_pymongo_collection`** where you use a sync DB. Install **`pip install "pydantable[mongo]"`** (pulls **PyMongo**, **Beanie**, and the optional Mongo plan stack used by lazy frames). ODM-first patterns: [BEANIE](/BEANIE.md).
 
 **Also supported:** Pydantic **`Schema`** / **`MongoDataFrameModel`** with **`from_collection(coll)`** when you already hold a **sync** PyMongo **`Collection`** and are not using Beanie. That path is fine for tests or thin scripts; for applications, prefer **Beanie** as the single source of truth for collection names, indexes, and document shape.
 
@@ -11,32 +11,32 @@ library ( **`MongoRoot`** and columnar scans — installed with **`[mongo]`**), 
 **`pydantable.mongo_dataframe_engine.MongoPydantableEngine`**, which implements the
 same **`ExecutionEngine`** protocol as **`pydantable.engine.protocols`** (from
 [**pydantable-protocol**](https://pypi.org/project/pydantable-protocol/) on PyPI;
-see {doc}`CUSTOM_ENGINE_PACKAGE`).
+see [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md)).
 
 **`MongoRoot`** is a plan root that binds materialization to a MongoDB collection
 (via PyMongo). Planning still uses the **native** Rust planner; at execution time
 **`MongoPydantableEngine`** turns **`MongoRoot`** into columnar **`dict[str, list]`**
 via the plan library, then runs the native executor.
 
-The parallel SQL-backed story is {doc}`MOLTRES_SQL` (**`SqlDataFrame`** /
+The parallel SQL-backed story is [MOLTRES_SQL](/MOLTRES_SQL.md) (**`SqlDataFrame`** /
 **`SqlDataFrameModel`** with the lazy-SQL stack).
 
 **Compatibility (1.17.0):** **`pydantable[mongo]`** pins the Mongo plan package to
 **`>=0.2.0,<0.3`** (see **`pyproject.toml`**). Install matching releases before using lazy **`MongoDataFrame`** facades.
 
-```{note}
-**Install:** ``pip install "pydantable[mongo]"`` pulls **pymongo**, **Beanie**, and the Mongo plan stack. The core **pydantable** package does not import the plan stack at import time; ``MongoDataFrame`` / ``MongoDataFrameModel`` resolve only when accessed.
-```
+!!! note
+    **Install:** ``pip install "pydantable[mongo]"`` pulls **pymongo**, **Beanie**, and the Mongo plan stack. The core **pydantable** package does not import the plan stack at import time; ``MongoDataFrame`` / ``MongoDataFrameModel`` resolve only when accessed.
+
 
 ## When to use this
 
 | Goal | Use |
 | ---- | --- |
-| Default Polars/Rust execution for in-memory or file-backed workflows | `DataFrame` / `DataFrameModel` (see {doc}`DATAFRAMEMODEL`, {doc}`EXECUTION`). |
-| **Eager** SQL I/O: load columns from a DB into a frame, or write tables | **`from pydantable import …`** — {doc}`IO_SQL` (**`fetch_sqlmodel`**, **`write_sqlmodel`**, …). |
+| Default Polars/Rust execution for in-memory or file-backed workflows | `DataFrame` / `DataFrameModel` (see [DATAFRAMEMODEL](/DATAFRAMEMODEL.md), [EXECUTION](/EXECUTION.md)). |
+| **Eager** SQL I/O: load columns from a DB into a frame, or write tables | **`from pydantable import …`** — [IO_SQL](/IO_SQL.md) (**`fetch_sqlmodel`**, **`write_sqlmodel`**, …). |
 | **Eager** Mongo I/O: **`dict[str, list]`** in / out of a collection (no **`DataFrame`**) | **`fetch_mongo`**, **`iter_mongo`**, **`write_mongo`** and **`afetch_mongo`**, **`aiter_mongo`**, **`awrite_mongo`** — ideally with **`sync_pymongo_collection(MyDocument, sync_db)`** for sync **`Collection`** ({ref}`mongo-eager-beanie`); **`AsyncCollection`** uses native async (see **PyMongo surface area** below). |
-| **Lazy execution** with transforms compiled to **SQL** (lazy-SQL bridge) | **`SqlDataFrame`** / **`SqlDataFrameModel`** — {doc}`MOLTRES_SQL`. |
-| **Lazy execution** over a **MongoDB collection** with the same typed **`DataFrame`** API | **`MongoDataFrame`** / **`MongoDataFrameModel`** — **`from_beanie`** or **`from_beanie_async`** with a Beanie **`Document`** (or **`from_collection`**); see {ref}`mongo-primary-beanie` and {doc}`BEANIE`. |
+| **Lazy execution** with transforms compiled to **SQL** (lazy-SQL bridge) | **`SqlDataFrame`** / **`SqlDataFrameModel`** — [MOLTRES_SQL](/MOLTRES_SQL.md). |
+| **Lazy execution** over a **MongoDB collection** with the same typed **`DataFrame`** API | **`MongoDataFrame`** / **`MongoDataFrameModel`** — **`from_beanie`** or **`from_beanie_async`** with a Beanie **`Document`** (or **`from_collection`**); see {ref}`mongo-primary-beanie` and [BEANIE](/BEANIE.md). |
 
 Eager SQL helpers materialize **column dicts** in Python; they do not replace
 `DataFrame._engine`. **`MongoDataFrame`** uses **`MongoPydantableEngine`** as that engine so
@@ -101,15 +101,15 @@ Prefer **`sync_pymongo_collection(DocumentClass, sync_db)`** as the **`collectio
 | **`iter_mongo(sync_pymongo_collection(Doc, db), ...)`** | **`async for batch in aiter_mongo(...)`** |
 | **`write_mongo(sync_pymongo_collection(Doc, db), data, ...)`** | **`await awrite_mongo(...)`** |
 
-```{note}
-**ODM hooks:** ``write_mongo`` / ``awrite_mongo`` are **driver-level** inserts (PyMongo) from a rectangular column dict. They do **not** run Beanie's ``validate_on_save`` or event-based actions. For ODM-aware inserts that execute Beanie hooks, use **`await awrite_beanie(MyDocument, data)`** (see below).
-```
+!!! note
+    **ODM hooks:** ``write_mongo`` / ``awrite_mongo`` are **driver-level** inserts (PyMongo) from a rectangular column dict. They do **not** run Beanie's ``validate_on_save`` or event-based actions. For ODM-aware inserts that execute Beanie hooks, use **`await awrite_beanie(MyDocument, data)`** (see below).
+
 
 **`fetch_mongo`** materializes the full cursor in memory; for large scans prefer **`iter_mongo`**.
 
 ## Eager column-dict I/O (PyMongo `Collection`)
 
-Same pattern as **SQL** eager helpers ({doc}`IO_SQL`): import **from `pydantable`**
+Same pattern as **SQL** eager helpers ([IO_SQL](/IO_SQL.md)): import **from `pydantable`**
 (not `pydantable.io` in application code). These use **PyMongo** only (they do **not**
 require the Mongo plan stack), but **`pydantable[mongo]`** installs **pymongo** and **Beanie** for you.
 
@@ -196,7 +196,7 @@ Optional **`fields=`** limits which document keys are read (defaults to all keys
 in the schema’s field map). Optional **`engine=`** reuses a single
 **`MongoPydantableEngine`** across many frames.
 
-Materialization (`collect`, `to_dict`, `acollect`, …) follows {doc}`EXECUTION` and
+Materialization (`collect`, `to_dict`, `acollect`, …) follows [EXECUTION](/EXECUTION.md) and
 uses the engine’s **`execute_plan`** / **`async_execute_plan`** entrypoints.
 
 ### `MongoDataFrameModel`
@@ -249,8 +249,8 @@ rather than from an in-memory column dict.
 
 ## See also
 
-- {doc}`IO_OVERVIEW` — where **`fetch_mongo`** / **`iter_mongo`** fit in the broader I/O surface.
-- {doc}`CUSTOM_ENGINE_PACKAGE` — third-party **`ExecutionEngine`** packages.
-- {doc}`ADR-engines` — engine abstraction overview.
-- {doc}`DEVELOPER` — **`make test-mongo`** runs **`tests/mongo/`** (e.g. **mongomock**);
+- [IO_OVERVIEW](/IO_OVERVIEW.md) — where **`fetch_mongo`** / **`iter_mongo`** fit in the broader I/O surface.
+- [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md) — third-party **`ExecutionEngine`** packages.
+- [ADR-engines](/ADR-engines.md) — engine abstraction overview.
+- [DEVELOPER](/DEVELOPER.md) — **`make test-mongo`** runs **`tests/mongo/`** (e.g. **mongomock**);
   the Mongo plan package’s own tests ship with that distribution.

@@ -4,7 +4,7 @@
 
 **Explicit raw string SQL:** **`fetch_sql_raw`**, **`iter_sql_raw`**, **`write_sql_raw`**, **`afetch_sql_raw`**, **`aiter_sql_raw`**, **`awrite_sql_raw`** — use these when the query or destination is **not** a mapped **`SQLModel`** table (dynamic SQL, ad hoc reporting, migrations, string **`table_name`** writes). Same semantics as the deprecated unprefixed names, without **`DeprecationWarning`**.
 
-**Deprecated (compatibility):** **`fetch_sql`**, **`afetch_sql`**, **`iter_sql`**, **`aiter_sql`**, **`write_sql`**, **`awrite_sql`**, **`write_sql_batches`**, **`awrite_sql_batches`** emit **`DeprecationWarning`** (see {doc}`VERSIONING`); migrate to **`*_raw`** or SQLModel APIs. For **app / service** code with a stable table schema, prefer **`fetch_sqlmodel` / `iter_sqlmodel` / `write_sqlmodel`** and the **`DataFrameModel`** mirrors below.
+**Deprecated (compatibility):** **`fetch_sql`**, **`afetch_sql`**, **`iter_sql`**, **`aiter_sql`**, **`write_sql`**, **`awrite_sql`**, **`write_sql_batches`**, **`awrite_sql_batches`** emit **`DeprecationWarning`** (see [VERSIONING](/VERSIONING.md)); migrate to **`*_raw`** or SQLModel APIs. For **app / service** code with a stable table schema, prefer **`fetch_sqlmodel` / `iter_sqlmodel` / `write_sqlmodel`** and the **`DataFrameModel`** mirrors below.
 
 **Write path:** **`write_sqlmodel`** / **`awrite_sqlmodel`** for schema-driven tables, **`MyModel.write_sqlmodel_data`** / **`await MyModel.awrite_sqlmodel_data`** for dict payloads, **`my_frame.write_sqlmodel(...)`** / **`await my_frame.awrite_sqlmodel(...)`** using the frame’s **`to_dict()`**, **`write_sql_raw`** / **`await awrite_sql_raw`** for string table names, or deprecated **`MyModel.write_sql`** / **`await MyModel.awrite_sql`** (same warning as the legacy **`pydantable.io`** entrypoints).
 
@@ -53,7 +53,7 @@ Use **`sqlmodel_columns`** (**``from pydantable import sqlmodel_columns``**) to 
 **Read (typed), SQLModel-first**
 
 - **`MyModel.fetch_sqlmodel(UserTable, bind, *, trusted_mode=..., ...)`** — same validation kwargs as lazy file readers (**`trusted_mode`**, **`fill_missing_optional`**, **`ignore_errors`**, **`on_validation_errors`**).
-- **`await MyModel.afetch_sqlmodel(UserTable, bind, ...)`** → **`AwaitableDataFrameModel`**: **`await …`** for a concrete frame (see {doc}`DATAFRAMEMODEL`).
+- **`await MyModel.afetch_sqlmodel(UserTable, bind, ...)`** → **`AwaitableDataFrameModel`**: **`await …`** for a concrete frame (see [DATAFRAMEMODEL](/DATAFRAMEMODEL.md)).
 - **`MyModel.iter_sqlmodel(...)`** / **`async for batch in MyModel.aiter_sqlmodel(...)`** — typed batches.
 
 **Read (raw SQL)**
@@ -71,7 +71,7 @@ Use **`sqlmodel_columns`** (**``from pydantable import sqlmodel_columns``**) to 
 
 ## Reference (implementation module `pydantable.io`)
 
-The following signatures are defined on **`pydantable.io`** for Sphinx and extension authors. **Application code** imports the same names **from `pydantable`** (see the root **`__init__.py`**).
+The following signatures are defined on **`pydantable.io`** for documentation and extension authors. **Application code** imports the same names **from `pydantable`** (see the root **`__init__.py`**).
 
 **Read**
 
@@ -117,7 +117,7 @@ Set these before importing callers if you want process-wide defaults (invalid va
 
 ## Runnable example (SQLModel-first)
 
-Doc examples focus on **lazy file execution** ({doc}`IO_OVERVIEW`); SQL I/O does not use a Polars **`LazyFrame`**, but the runnable script below follows the same **SQLModel-first** style as application code.
+Doc examples focus on **lazy file execution** ([IO_OVERVIEW](/IO_OVERVIEW.md)); SQL I/O does not use a Polars **`LazyFrame`**, but the runnable script below follows the same **SQLModel-first** style as application code.
 
 Requires **`pydantable[sql]`** (SQLModel + SQLAlchemy). Uses a **`SQLModel`** class with **`table=True`** and **`DataFrameModel`** helpers.
 
@@ -127,12 +127,11 @@ Requires **`pydantable[sql]`** (SQLModel + SQLAlchemy). Uses a **`SQLModel`** cl
 python docs/examples/io/sql_sqlite_sqlmodel_roundtrip.py
 ```
 
-```{literalinclude} examples/io/sql_sqlite_sqlmodel_roundtrip.py
-:language: python
-```
+
+--8<-- "examples/io/sql_sqlite_sqlmodel_roundtrip.py"
 
 **Raw string SQL** (**`fetch_sql_raw`**, **`iter_sql_raw`**, **`write_sql_raw`**) and **streaming batches** are documented in the reference sections above; they are not duplicated as separate runnable snippets here.
 
 ## See also
 
-{doc}`IO_OVERVIEW` · {doc}`DATA_IO_SOURCES` (async stacks) · {doc}`FASTAPI`
+[IO_OVERVIEW](/IO_OVERVIEW.md) · [DATA_IO_SOURCES](/DATA_IO_SOURCES.md) (async stacks) · [FASTAPI](/FASTAPI.md)

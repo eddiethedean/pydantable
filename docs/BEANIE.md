@@ -14,14 +14,14 @@ or **lazy DataFrame transforms**.
 | Goal | Recommended API |
 |------|------------------|
 | **Eager** column-dict I/O with a sync PyMongo `Collection` | `fetch_mongo` / `iter_mongo` / `write_mongo` |
-| **Eager** column-dict I/O with `pymongo.asynchronous.AsyncCollection` | `afetch_mongo` / `aiter_mongo` / `awrite_mongo` (native async; see **PyMongo surface area** in {doc}`MONGO_ENGINE`) |
+| **Eager** column-dict I/O with `pymongo.asynchronous.AsyncCollection` | `afetch_mongo` / `aiter_mongo` / `awrite_mongo` (native async; see **PyMongo surface area** in [MONGO_ENGINE](/MONGO_ENGINE.md)) |
 | **Eager** column-dict I/O using Beanie async ODM features (full query DSL / hooks) | `afetch_beanie` / `aiter_beanie` / `awrite_beanie` |
 | **Lazy** `DataFrame` API over a Mongo collection (typed transforms, then materialize) | `MongoDataFrame` / `MongoDataFrameModel` (`from_beanie`, `from_beanie_async`, …) |
 
-For which PyMongo operations pydantable wraps on sync vs async collections (and what remains “use the driver directly”), see the **PyMongo surface area** subsection in {doc}`MONGO_ENGINE`.
+For which PyMongo operations pydantable wraps on sync vs async collections (and what remains “use the driver directly”), see the **PyMongo surface area** subsection in [MONGO_ENGINE](/MONGO_ENGINE.md).
 
 This page focuses on the Beanie-first pieces. For the engine details and the
-`MongoRoot` plan story, see {doc}`MONGO_ENGINE`.
+`MongoRoot` plan story, see [MONGO_ENGINE](/MONGO_ENGINE.md).
 
 ## Install
 
@@ -138,11 +138,11 @@ opts = BeanieWriteOptions(skip_actions=None, link_rule=None)
 inserted = await awrite_beanie(MyDocument, {"x": [1, 2], "y": ["a", "b"]}, options=opts)
 ```
 
-```{important}
-`write_mongo` / `awrite_mongo` are driver-level `insert_many` helpers on a PyMongo
-collection (sync or async). They **do not** run Beanie validation-on-save or event hooks.
-Use `awrite_beanie` when you need ODM semantics.
-```
+!!! important
+    `write_mongo` / `awrite_mongo` are driver-level `insert_many` helpers on a PyMongo
+    collection (sync or async). They **do not** run Beanie validation-on-save or event hooks.
+    Use `awrite_beanie` when you need ODM semantics.
+
 
 ## Lazy execution over Mongo without a sync client
 
@@ -169,11 +169,11 @@ rows = await df.acollect()
 cols = await df.ato_dict()
 ```
 
-```{warning}
-`from_beanie_async(...)` is **async-only**. Calling sync terminals like `collect()`,
-`to_dict()`, or sync lazy sinks will raise. Use `await acollect()` / `await ato_dict()`
-instead.
-```
+!!! warning
+    `from_beanie_async(...)` is **async-only**. Calling sync terminals like `collect()`,
+    `to_dict()`, or sync lazy sinks will raise. Use `await acollect()` / `await ato_dict()`
+    instead.
+
 
 ## Migrations and schema evolution
 
@@ -185,5 +185,5 @@ PydanTable does not run migrations for you, but the recommended workflow is:
 - run Beanie migrations when document shape changes
 - keep your pydantable `Schema` / `DataFrameModel` types aligned with the *post-migration* shape
 
-For engine-backed lazy execution details, see {doc}`MONGO_ENGINE`.
+For engine-backed lazy execution details, see [MONGO_ENGINE](/MONGO_ENGINE.md).
 

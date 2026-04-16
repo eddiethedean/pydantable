@@ -2,7 +2,7 @@
 
 This document describes how to run the Python test suite for `pydantable`, how it aligns with CI, and how optional dependencies and markers are used.
 
-For editor setup, linting, and type checking, see {doc}`DEVELOPER` and {doc}`TYPING`.
+For editor setup, linting, and type checking, see [DEVELOPER](/DEVELOPER.md) and [TYPING](/TYPING.md).
 
 ## Prerequisites
 
@@ -69,7 +69,7 @@ pytest -q -n auto \
 
 `Makefile` target **`make test-cov`** runs the same arguments (see `Makefile`).
 
-**Gap tracking:** Per-area backlog and how to regenerate the baseline report are in {doc}`COVERAGE_BACKLOG`.
+**Gap tracking:** Per-area backlog and how to regenerate the baseline report are in [COVERAGE_BACKLOG](/COVERAGE_BACKLOG.md).
 
 **PRs (recommended for large changes):** After `coverage.xml` exists (from `test-cov` or CI artifacts), run **`make diff-cover`** to compare **changed lines** on the current branch against **`origin/main`** (`diff-cover` is in **`[dev]`**). The Makefile uses **`--fail-under=85`** on touched lines; increase that over time as overall coverage improves (see `COVERAGE_BACKLOG.md`).
 
@@ -85,4 +85,4 @@ A scheduled CI job may run the full suite with **pytest-randomly** installed to 
 
 Tests live under `tests/` with domain subdirectories (`io/`, `dataframe/`, `sql/`, …). A short map of file naming patterns is in `tests/README.md`.
 
-Rust tests for `pydantable-core` are separate (`cargo test` / `make rust-test`); see {doc}`DEVELOPER`.
+Rust tests for `pydantable-core` are separate (`cargo test` / `make rust-test`); see [DEVELOPER](/DEVELOPER.md).

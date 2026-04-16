@@ -259,7 +259,7 @@ def read_parquet_url(
     """Download Parquet from ``url`` (HTTP(S)) to a temp file; return ``ScanFileRoot``.
 
     The file is **not** removed automatically: delete it when the pipeline finishes
-    (see {doc}`DATA_IO_SOURCES`).
+    (see the DATA_IO_SOURCES guide (project docs)).
     """
     data = fetch_bytes(url, experimental=experimental, **kwargs)
     fd, name = tempfile.mkstemp(suffix=".parquet")

@@ -1,0 +1,3 @@
+# concat
+
+::: pydantable.expressions.concat

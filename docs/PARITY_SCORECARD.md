@@ -10,7 +10,7 @@ Status definitions:
 
 ## 1.8.0 parity targets (reference)
 
-**1.8.0** shipped the selector/ergonomics work below (see {doc}`POLARS_PARITY_1_8` and {doc}`CHANGELOG` **1.8.0**). This table remains the checklist-style reference for what landed in that minor.
+**1.8.0** shipped the selector/ergonomics work below (see [POLARS_PARITY_1_8](/POLARS_PARITY_1_8.md) and [CHANGELOG](/CHANGELOG.md) **1.8.0**). This table remains the checklist-style reference for what landed in that minor.
 
 | Area | Target | Status | Notes |
 |---|---|---|---|
@@ -45,7 +45,7 @@ Status definitions:
 | Reshape | `melt/unpivot`, `pivot`, `pivot_longer/pivot_wider` | Implemented | Deterministic output naming and validation rules; `pivot_longer/pivot_wider` are aliases. Selectors supported across reshape args (schema-driven). |
 | Pandas UI | `duplicated`, `drop_duplicates(keep=False)`, `get_dummies`, `cut`/`qcut`, `factorize_column`, `ewm().mean()`, façade `pivot` | Partial / Implemented | Duplicate mask + drop-duplicate-groups are plan steps on the Polars engine (`is_unique` / `is_first_distinct` features); encoding/binning/ewm paths are eager and may require **pandas** at runtime. Tests: `tests/test_pandas_ui.py`, `tests/test_pandas_ui_popular_features.py`. |
 | Reshape | `explode`, `unnest`, `explode_all/unnest_all` | Implemented | Polars-backed; multi-column explode, empty lists, struct `unnest` naming, and mismatch errors are contract-tested. `explode_all/unnest_all` are schema-driven helpers (list/struct dtype groups). Typed-schema rules (homogeneous lists, nested models as structs) are the intentional boundary vs raw Polars. |
-| Window/time | `row_number`/`rank`/`dense_rank`/`window_sum`/`window_mean`/`window_min`/`window_max`/`lag`/`lead` + `WindowSpec`, `rolling_agg`, `group_by_dynamic(...).agg(...)` | Implemented | `Window.orderBy(..., nulls_last=...)` (**NULLS FIRST/LAST**); `row_number` requires `order_by`; `lag`/`lead` require `order_by`; generic `Expr.over(partition_by=..., order_by=...)` raises `TypeError` (use named window fns + `WindowSpec`). `rowsBetween` / `rangeBetween` framed windows use the Rust executor path; `rangeBetween` uses the first `orderBy` column as the range axis ([`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md)). Unframed multi-key `.over`: Polars accepts one `SortOptions` for all order columns—**mixed** per-key `ascending` / `nulls_last` raises **`ValueError`**; use matching options on every key or a framed window. |
+| Window/time | `row_number`/`rank`/`dense_rank`/`window_sum`/`window_mean`/`window_min`/`window_max`/`lag`/`lead` + `WindowSpec`, `rolling_agg`, `group_by_dynamic(...).agg(...)` | Implemented | `Window.orderBy(..., nulls_last=...)` (**NULLS FIRST/LAST**); `row_number` requires `order_by`; `lag`/`lead` require `order_by`; generic `Expr.over(partition_by=..., order_by=...)` raises `TypeError` (use named window fns + `WindowSpec`). `rowsBetween` / `rangeBetween` framed windows use the Rust executor path; `rangeBetween` uses the first `orderBy` column as the range axis ([`WINDOW_SQL_SEMANTICS.md`](/WINDOW_SQL_SEMANTICS.md)). Unframed multi-key `.over`: Polars accepts one `SortOptions` for all order columns—**mixed** per-key `ascending` / `nulls_last` raises **`ValueError`**; use matching options on every key or a framed window. |
 | Temporal typing | `datetime`, `date`, `duration`, `time` (+ nullable) | Implemented | End-to-end descriptor roundtrip and execution materialization paths. |
 | Globals in `select` | `sum`/`mean`/`count`/`min`/`max` over a column, **`global_row_count`** / `count(*)` | Implemented | Single-row `DataFrame.select`; see `INTERFACE_CONTRACT`. |
 | Expr helpers | `strptime`, `unix_timestamp`, `from_unix_time`, `dt_dayofyear`, `cast(str→date/datetime)`, `isin/is_in`, `matches`, string empty/blank helpers, list/map predicate conveniences, `map_len`/`map_get`/`map_contains_key`, `binary_len`, `dt_nanosecond` | Implemented | Rust `ExprNode` + composed Python Expr helpers; contract tests. |
@@ -55,11 +55,11 @@ Status definitions:
 ## Remaining parity gaps
 
 - Arbitrary Polars **nested/list dtypes** without a matching Pydantic `list[T]` / struct annotation are out of scope; the engine stays schema-first.
-- Window frame semantics match the documented **PostgreSQL-style** `RANGE` rules for multi-key `orderBy`, not every SQL dialect; see [`WINDOW_SQL_SEMANTICS.md`](WINDOW_SQL_SEMANTICS.md).
+- Window frame semantics match the documented **PostgreSQL-style** `RANGE` rules for multi-key `orderBy`, not every SQL dialect; see [`WINDOW_SQL_SEMANTICS.md`](/WINDOW_SQL_SEMANTICS.md).
 - Additional advanced analytical APIs outside the current roadmap scope.
 
-**0.18.0:** No new table methods or PySpark `functions` rows; this release focused on internals (clearer **group_by**/**Polars** error context), documentation, and deferred non-string **map** keys—see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.18.0**.
+**0.18.0:** No new table methods or PySpark `functions` rows; this release focused on internals (clearer **group_by**/**Polars** error context), documentation, and deferred non-string **map** keys—see [`ROADMAP.md`](/ROADMAP.md) **Shipped in 0.18.0**.
 
-**0.19.0:** Scorecard matrix **unchanged**—pre-1.0 doc consolidation, [`VERSIONING.md`](VERSIONING.md), and CI-stable grouped tests; see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.19.0**.
+**0.19.0:** Scorecard matrix **unchanged**—pre-1.0 doc consolidation, [`VERSIONING.md`](/VERSIONING.md), and CI-stable grouped tests; see [`ROADMAP.md`](/ROADMAP.md) **Shipped in 0.19.0**.
 
-**0.20.0:** One ecosystem row update (see table)—UX / discovery on core + PySpark **`show`** / **`summary`**, plus **`value_counts`**, **`pydantable.display`**, **`_repr_mimebundle_`**, optional verbose plan errors; see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.20.0**.
+**0.20.0:** One ecosystem row update (see table)—UX / discovery on core + PySpark **`show`** / **`summary`**, plus **`value_counts`**, **`pydantable.display`**, **`_repr_mimebundle_`**, optional verbose plan errors; see [`ROADMAP.md`](/ROADMAP.md) **Shipped in 0.20.0**.

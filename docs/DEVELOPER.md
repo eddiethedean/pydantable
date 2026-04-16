@@ -25,13 +25,13 @@ python3 -m venv .venv
 
 Minimal alternative (narrower deps): **`pip install maturin pytest pytest-asyncio ruff`** then **`pip install -e .`** — you still need **`maturin develop`** from `pydantable-native` (or to install a published `pydantable-native` wheel) for native execution.
 
-**`make check-full`** (from repo root) runs Ruff on the whole tree, Astral **`ty`** on the three first-party trees (see **`[tool.ty]`** in **`pyproject.toml`**), a minimal **`ty`** venv (no NumPy/PyArrow), Pyright, typing-artifact checks, Sphinx, and Rust **`cargo fmt` / clippy / test**. **`make rust-test`** prepends **`python/`**, **`pydantable-protocol/python`**, and **`pydantable-native/python`** to **`PYTHONPATH`** (then the venv’s **`site-packages`**) so PyO3 tests resolve **`pydantable`**, **`pydantable_protocol`**, and **`polars`** consistently without relying on editable installs alone. **`make native-develop`** runs **`pip install -e ./pydantable-protocol`** before **`maturin develop`**. **`mypy`** remains in **`[dev]`** for the optional schema-evolving plugin and **`tests/test_mypy_*.py`** subprocess checks.
+**`make check-full`** (from repo root) runs Ruff on the whole tree, Astral **`ty`** on the three first-party trees (see **`[tool.ty]`** in **`pyproject.toml`**), a minimal **`ty`** venv (no NumPy/PyArrow), Pyright, typing-artifact checks, MkDocs (**`mkdocs build --strict`**), and Rust **`cargo fmt` / clippy / test**. **`make rust-test`** prepends **`python/`**, **`pydantable-protocol/python`**, and **`pydantable-native/python`** to **`PYTHONPATH`** (then the venv’s **`site-packages`**) so PyO3 tests resolve **`pydantable`**, **`pydantable_protocol`**, and **`polars`** consistently without relying on editable installs alone. **`make native-develop`** runs **`pip install -e ./pydantable-protocol`** before **`maturin develop`**. **`mypy`** remains in **`[dev]`** for the optional schema-evolving plugin and **`tests/test_mypy_*.py`** subprocess checks.
 
-For **which checker runs where**, **`ty`** vs **mypy** vs **Pyright**, phased strictness, and public-vs-internal **`Any`**, see {doc}`TYPING` (contributor section).
+For **which checker runs where**, **`ty`** vs **mypy** vs **Pyright**, phased strictness, and public-vs-internal **`Any`**, see [TYPING](/TYPING.md) (contributor section).
 
 ### Architecture notes (SOLID-oriented)
 
-Contributors should keep boundaries clear so the codebase stays testable and third-party engines remain possible (see {doc}`CUSTOM_ENGINE_PACKAGE` and {doc}`ADR-engines`).
+Contributors should keep boundaries clear so the codebase stays testable and third-party engines remain possible (see [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md) and [ADR-engines](/ADR-engines.md)).
 
 | Principle | In this repo |
 |-----------|----------------|
@@ -72,11 +72,11 @@ The crate’s `[features]` block in `pydantable-core/Cargo.toml` gates the Polar
 - `python/pydantable/engine/`: execution engine abstraction; the native backend ships in **`pydantable-native`**, which depends **only** on **`pydantable-protocol`** and wraps **`pydantable_native._core`**. **`pydantable`** requires **`pydantable-native`** on PyPI, so **`get_default_engine()`** works after **`pip install pydantable`**. **`rust_engine.py`** remains a thin compatibility shim delegating to the default engine.
 - `pydantable-core/src/`: Rust core (`dtype`, `expr`, `plan`, PyO3 exports)
 - `tests/`: Python integration/unit tests for behavior contracts
-- `docs/`: product docs + roadmap/spec docs (built with **Sphinx** + MyST; see below)
+- `docs/`: product docs + roadmap/spec docs (built with **MkDocs** + Material; see below)
 
 ### Adding another execution engine
 
-Authoritative guide for **separate PyPI packages**: {doc}`CUSTOM_ENGINE_PACKAGE`.
+Authoritative guide for **separate PyPI packages**: [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md).
 
 Implement **`ExecutionEngine`** from **`pydantable_protocol`** (also re-exported as **`pydantable.engine.protocols`**): plan transforms, **`execute_plan`** / async variants, sinks, **`capabilities`**. Raise **`pydantable_protocol.UnsupportedEngineOperationError`** (or **`pydantable.errors.UnsupportedEngineOperationError`**, which inherits from it) when the backend cannot support a call. Set **`EngineCapabilities.backend`** to **`"custom"`** (or **`"stub"`** for test doubles) and populate feature flags honestly.
 
@@ -92,10 +92,10 @@ Implement **`ExecutionEngine`** from **`pydantable_protocol`** (also re-exported
 
 **Tests:** Prefer patching **`NativePolarsEngine`** on the class when replacing engine behavior for frames that use the default engine. See **`StubExecutionEngine`** and **`tests/test_engine_stub.py`**.
 
-**Guardrail:** Run **`python scripts/check_engine_bypass.py`** (included in **`make check-python`** as **`engine-bypass-check`**) after changes under **`python/pydantable/`**. It rejects direct native-extension imports and **`get_default_engine().rust_core`** outside the allowlist documented in {doc}`ADR-engines`.
+**Guardrail:** Run **`python scripts/check_engine_bypass.py`** (included in **`make check-python`** as **`engine-bypass-check`**) after changes under **`python/pydantable/`**. It rejects direct native-extension imports and **`get_default_engine().rust_core`** outside the allowlist documented in [ADR-engines](/ADR-engines.md).
 
 - **Protocols:** `PlanExecutor`, `SinkWriter`, and **`ExecutionEngine`** in **`pydantable_protocol`** (thin re-export in `python/pydantable/engine/protocols.py`). **`EngineCapabilities`** includes **`backend`** and optional-feature flags.
-- **ADR:** See {doc}`ADR-engines` for design notes and Track B (portable IR).
+- **ADR:** See [ADR-engines](/ADR-engines.md) for design notes and Track B (portable IR).
 
 ### Engine injection (dependency inversion)
 
@@ -105,37 +105,29 @@ Prefer **explicit** engines over relying on the process-wide default when you ne
 - **Process default:** **`get_default_engine()`** / **`set_default_engine(...)`** in **`pydantable.engine`** (used when **`engine=`** is omitted). Use **`set_default_engine(None)`** in test teardown to restore lazy construction of the native engine.
 - **Future option:** a **`contextvars`-scoped override** could be added without removing the global API; it is not implemented today—if you need thread-local engines, pass **`engine=`** per frame or open a design discussion.
 
-For third-party **`ExecutionEngine`** packages, see {doc}`CUSTOM_ENGINE_PACKAGE`.
+For third-party **`ExecutionEngine`** packages, see [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md).
 
-(docs-sphinx-build)=
+## Documentation builds (MkDocs + Material) {#docs-mkdocs-build}
 
-## Documentation builds (Sphinx)
-
-**Read the Docs** (configured via `.readthedocs.yaml` at the repository root) uses **Sphinx only**, not MkDocs. The published site is the single source of truth for navigation and cross-links. RTD installs **Sphinx + theme deps** plus the Mongo plan stack / **`pymongo`** / **Beanie** (same pins as **`pydantable[docs]`** / **`[mongo]`**) so Mongo-related modules resolve under autodoc — it does **not** run **`pip install -e .[docs]`** or **maturin**, because compiling the native extension typically **exceeds** RTD memory/time limits. `docs/conf.py` puts `python/` on `sys.path`, so autodoc and `import pydantable` work without `pydantable-native`.
+**Read the Docs** (`.readthedocs.yaml`) builds with **MkDocs** and **Material for MkDocs** (`mkdocs.yml` at the repository root). RTD installs **MkDocs + Material + mkdocstrings + pymdown-extensions** plus the same lightweight typing stack as before (**SQLAlchemy**, **Mongo** / **Beanie**, …) so API pages resolve — it does **not** run **`pip install -e .[docs]`** with **maturin**, because compiling the native extension typically **exceeds** RTD limits. `docs/mkdocs_hooks.py` adds `python/` and `pydantable-protocol/python/` to `sys.path` and applies the same SQLAlchemy **`Engine`** / **`Connection`** patch as the old Sphinx `conf.py`, so imports work without `pydantable-native`.
 
 Local HTML build (from repo root, after `pip install -e ".[docs]"`):
 
 ```bash
-sphinx-build -b html docs docs/_build/html
+mkdocs build
 ```
 
-Strict mode (warnings as errors), matching a tightened RTD config:
+Strict mode (warnings as errors), matching CI:
 
 ```bash
-sphinx-build -W -b html docs docs/_build/html
-```
-
-Check external links (optional):
-
-```bash
-sphinx-build -b linkcheck docs docs/_build/linkcheck
+mkdocs build --strict
 ```
 
 User-facing doc changes should keep the repository `README.md` and `docs/` aligned; run `scripts/verify_doc_examples.py` before merging (see below).
 
 ## Notebooks (Jupyter / VS Code)
 
-Canonical walkthrough: {doc}`QUICKSTART` and **`notebooks/five_minute_tour.ipynb`** at the repo root.
+Canonical walkthrough: [QUICKSTART](/QUICKSTART.md) and **`notebooks/five_minute_tour.ipynb`** at the repo root.
 
 Open the repo’s notebook or a scratch **`.ipynb`** with the venv that has **`pip install -e ".[dev]"`** and `pydantable-native` installed/built. In a cell:
 
@@ -150,9 +142,9 @@ df = DataFrame[Row]({"x": [1, 2, 3]})
 df  # last expression → HTML table in Jupyter / VS Code
 ```
 
-- **`display(df)`** or the last expression in a cell uses **`_repr_html_()`** on **`DataFrame`** / **`DataFrameModel`** (bounded rows/columns; see {doc}`EXECUTION` **Jupyter / HTML**).
-- **`repr(df)`** is the plain-text path (no **`collect()`** for row counts—see {doc}`EXECUTION` **repr**).
-- **`df.shape`**, **`df.info()`**, **`df.describe()`** follow {doc}`INTERFACE_CONTRACT` **Introspection** ( **`describe`** covers **int** / **float** / **bool** / **str** / **`date`** / **`datetime`** per that page).
+- **`display(df)`** or the last expression in a cell uses **`_repr_html_()`** on **`DataFrame`** / **`DataFrameModel`** (bounded rows/columns; see [EXECUTION](/EXECUTION.md) **Jupyter / HTML**).
+- **`repr(df)`** is the plain-text path (no **`collect()`** for row counts—see [EXECUTION](/EXECUTION.md) **repr**).
+- **`df.shape`**, **`df.info()`**, **`df.describe()`** follow [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md) **Introspection** ( **`describe`** covers **int** / **float** / **bool** / **str** / **`date`** / **`datetime`** per that page).
 
 No extra **ipywidgets** dependency is required for the default HTML table.
 
@@ -168,7 +160,7 @@ Current contract direction:
 
 ### SOLID-oriented layout (internals)
 
-- **Rust — `plan/execute_polars/`:** Polars execution is split into `common`, `runner` (`PolarsPlanRunner`), `materialize`, `join_exec`, `groupby_exec`, `concat_exec`, `literal_agg`, and `reshape_exec`, re-exported from `execute_polars/mod.rs`. **`common::polars_err_ctx`** (0.18.0+) labels Polars **`collect()`** failures in **`groupby_exec`** as **`group_by().agg()`** in the Python **`ValueError`** text—see `execute_polars/common.rs` and {doc}`EXECUTION`.
+- **Rust — `plan/execute_polars/`:** Polars execution is split into `common`, `runner` (`PolarsPlanRunner`), `materialize`, `join_exec`, `groupby_exec`, `concat_exec`, `literal_agg`, and `reshape_exec`, re-exported from `execute_polars/mod.rs`. **`common::polars_err_ctx`** (0.18.0+) labels Polars **`collect()`** failures in **`groupby_exec`** as **`group_by().agg()`** in the Python **`ValueError`** text—see `execute_polars/common.rs` and [EXECUTION](/EXECUTION.md).
 - **Rust — `python_api/`:** PyO3 bindings are split into `types` (`PyExpr`, `PyPlan`), `expr_fns`, `plan_fns`, and `exec_fns`; `mod.rs` only registers symbols on `_core`.
 - **Rust — `plan/executor.rs`:** `PhysicalPlanExecutor` dispatches full-plan `execute_plan`. With `polars_engine`, inherent methods on `PolarsExecutor` (`join`, `groupby_agg`, `concat`, `melt`, `pivot`, `explode`, `unnest`, `groupby_dynamic_agg`) forward to `execute_polars::*` so call sites depend on the executor type rather than raw free functions.
 - **Python — `dataframe/` and `schema/`:** Public API stays `pydantable.dataframe` and `pydantable.schema`; implementations live in `_impl.py` inside each package for a single-responsibility split without changing imports.
@@ -354,14 +346,14 @@ When you add or change typing surface area:
 
 **Stub ownership:** Most `python/pydantable/**/*.pyi` files next to sources are **generated** by `generate_typing_artifacts.py` and mirrored under `typings/pydantable/`. **`dataframe_model.pyi`** and **`awaitable_dataframe_model.pyi`** are **hand-maintained** (the generator copies them verbatim); when you add or change `DataFrameModel` / awaitable I/O surface, update those two files and re-run the generator so `typings/` stays in sync.
 
-### Build docs (Sphinx)
+### Build docs (MkDocs)
 
 ```bash
 .venv/bin/python -m pip install -e ".[docs]"
-.venv/bin/python -m sphinx -b html docs docs/_build/html
+.venv/bin/mkdocs build --strict
 ```
 
-See [Documentation builds (Sphinx)](#docs-sphinx-build) for `sphinx-build -W` and `linkcheck`.
+See [Documentation builds (MkDocs + Material)](#docs-mkdocs-build) for `mkdocs build --strict`.
 
 ### Verify runnable doc snippets (README + `docs/`)
 
@@ -471,7 +463,7 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 - [ ] `scripts/verify_doc_examples.py` passes (requires native installed/built)
 - [ ] Rust changes compile in package build path (`maturin build --release`)
 - [ ] Docs updated for behavior/contract changes
-- [ ] `sphinx-build -W -b html docs docs/_build/html` succeeds (matches Read the Docs `fail_on_warning`)
+- [ ] `mkdocs build --strict` succeeds (matches CI / Read the Docs)
 - [ ] Roadmap status updated when a phase milestone changes
 
 ## `v1.0.0` release gate checklist

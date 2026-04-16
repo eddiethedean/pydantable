@@ -14,7 +14,7 @@ By default, URL and cloud-style helpers require **`experimental=True`** on each 
 - **`MyModel.read_parquet_url(...)`** — **`kwargs`** for **`fetch_bytes`** only (not **`scan_kwargs`**).
 - **`pydantable.io.read_parquet_url_ctx`**, **`aread_parquet_url_ctx`**, and **`DataFrameModel.read_parquet_url_ctx`**, **`aread_parquet_url_ctx`** delete the temp file when the context block exits (preferred when you do not need the path yourself).
 
-The temp **`.parquet`** from the non-context **`read_parquet_url`** is **not** auto-deleted; see {doc}`IO_PARQUET` and {doc}`DATA_IO_SOURCES`.
+The temp **`.parquet`** from the non-context **`read_parquet_url`** is **not** auto-deleted; see [IO_PARQUET](/IO_PARQUET.md) and [DATA_IO_SOURCES](/DATA_IO_SOURCES.md).
 
 **Eager URL helpers (column dict)**
 
@@ -53,7 +53,7 @@ Requires **`fsspec`** and a backend (e.g. **`s3fs`**). Install **`pydantable[clo
 
 ## Runnable example
 
-Spawns a **local** **`http.server`** on **127.0.0.1** (no external network). Run conventions: {doc}`IO_OVERVIEW` (**Runnable example**).
+Spawns a **local** **`http.server`** on **127.0.0.1** (no external network). Run conventions: [IO_OVERVIEW](/IO_OVERVIEW.md) (**Runnable example**).
 
 ```bash
 python docs/examples/io/http_local_fetch.py
@@ -61,10 +61,9 @@ python docs/examples/io/http_local_fetch.py
 
 The script uses **`read_parquet_url`** from **`pydantable.io`** so it can **`os.unlink(root.path)`** after **`collect()`**; **`DataFrame.read_parquet_url`** performs the same download but you must arrange cleanup yourself if you need to delete the temp file immediately.
 
-```{literalinclude} examples/io/http_local_fetch.py
-:language: python
-```
+
+--8<-- "examples/io/http_local_fetch.py"
 
 ## See also
 
-{doc}`IO_OVERVIEW` · {doc}`IO_PARQUET` · {doc}`IO_CSV` · {doc}`IO_NDJSON` · {doc}`FASTAPI` (thread-pool patterns for I/O)
+[IO_OVERVIEW](/IO_OVERVIEW.md) · [IO_PARQUET](/IO_PARQUET.md) · [IO_CSV](/IO_CSV.md) · [IO_NDJSON](/IO_NDJSON.md) · [FASTAPI](/FASTAPI.md) (thread-pool patterns for I/O)

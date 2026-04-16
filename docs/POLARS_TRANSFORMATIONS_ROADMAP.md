@@ -6,9 +6,9 @@ Polars while preserving `pydantable`'s typed schema contracts.
 Notes that say **Implemented on branch `v0.5.0`** refer to historical work landed in the 0.5.x line.
 The current release is **1.18.0** (see `docs/CHANGELOG.md`). Older bullets below still record the 0.5.x baseline plus later additions.
 
-**Post–P7 (0.18.0+):** Phases **P1–P7** below are **complete**. Further Polars-style parity is **additive** (new `Expr` methods, transforms, or façade wrappers) and is tracked in [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md), [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md), and [`ROADMAP.md`](ROADMAP.md)—not as a new “P8” checklist unless maintainers add one explicitly.
+**Post–P7 (0.18.0+):** Phases **P1–P7** below are **complete**. Further Polars-style parity is **additive** (new `Expr` methods, transforms, or façade wrappers) and is tracked in [`PARITY_SCORECARD.md`](/PARITY_SCORECARD.md), [`PYSPARK_PARITY.md`](/PYSPARK_PARITY.md), and [`ROADMAP.md`](/ROADMAP.md)—not as a new “P8” checklist unless maintainers add one explicitly.
 
-**Row duplicate plans:** core **`plan_duplicate_mask`** / **`plan_drop_duplicate_groups`** (pandas UI **`duplicated`** / **`drop_duplicates(keep=False)`**) are Polars-backed plan steps; they are **not** part of the historical P1–P7 Expr checklist—see [`PANDAS_UI.md`](PANDAS_UI.md) and [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md).
+**Row duplicate plans:** core **`plan_duplicate_mask`** / **`plan_drop_duplicate_groups`** (pandas UI **`duplicated`** / **`drop_duplicates(keep=False)`**) are Polars-backed plan steps; they are **not** part of the historical P1–P7 Expr checklist—see [`PANDAS_UI.md`](/PANDAS_UI.md) and [`INTERFACE_CONTRACT.md`](/INTERFACE_CONTRACT.md).
 For execution details (Pydantic-first `collect()`, optional Python `polars`), see `docs/EXECUTION.md`.
 
 ## Current baseline (implemented)
@@ -169,14 +169,14 @@ Validation:
 - [x] Full docs pass completed with migration guidance
 
 Progress note:
-- **0.18.0:** Maintainability and docs—contextual Polars errors for **`group_by().agg()`**, explicit deferral of non-string map keys, post–P7 roadmap note — see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.18.0**.
-- **0.19.0:** Pre-1.0 consolidation—[`VERSIONING.md`](VERSIONING.md) for **0.x** semver, parity/README/index pass, **`PERFORMANCE.md`** benchmark spot-check note, release-hygiene alignment — see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.19.0**.
-- **0.20.0:** UX / discovery / docs—core **`columns`** / **`shape`** / **`info`** / **`describe`** (numeric, bool, str), **`Expr`** **`repr`**, PySpark **`show`** / **`summary`**, quickstart + execution guides, **`set_display_options`**, **`value_counts`**, **`_repr_mimebundle_`**, **`PYDANTABLE_VERBOSE_ERRORS`**; no new Polars transform matrix rows—see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.20.0**. (Later releases extend **`describe`**—see {doc}`INTERFACE_CONTRACT` **Introspection**.)
-- **0.17.0:** String-keyed **map** contract tests + docs after PyArrow map ingest; PySpark **`functions`** wrappers for string replace/strip, **`strptime`**, **`binary_len`**, list **`Expr`** helpers — see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.17.0**.
-- **0.16.1:** Map-column arithmetic typing fix — see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.16.1**.
-- **0.16.0:** eager Parquet/IPC **`dict[str, list]`** readers, **`to_arrow` / `ato_arrow`**, **`Table` / `RecordBatch`** constructors, **FastAPI** multipart / **`Depends`** / HTTP-status docs — see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.16.0**. (**0.23.0** renames eager reads to **`materialize_*`**, lazy file entry to **`read_*` / `aread_*`**, lazy output to **`DataFrame.write_*`**, and eager dict→file to **`export_*` / `aexport_*`**.)
-- **0.15.0:** **async** **`acollect` / `ato_dict` / `ato_polars`**, **FastAPI `async` + `lifespan`**, **PyArrow `map`** ingest for **`dict[str, T]`**, PySpark **`trim` / `abs` / `round` / `floor` / `ceil`** — see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.15.0**.
-- **0.14.0:** window **`orderBy` `nulls_last`** (SQL **NULLS FIRST/LAST**), **`DtypeDriftWarning`** for **`shape_only`**, **`validate_data`** deprecation, **Hypothesis** + **FastAPI `TestClient`** coverage, PySpark **`dayofmonth` / `lower` / `upper`** helpers — see [`ROADMAP.md`](ROADMAP.md) **Shipped in 0.14.0**.
+- **0.18.0:** Maintainability and docs—contextual Polars errors for **`group_by().agg()`**, explicit deferral of non-string map keys, post–P7 roadmap note — see [`ROADMAP.md`](/ROADMAP.md) **Shipped in 0.18.0**.
+- **0.19.0:** Pre-1.0 consolidation—[`VERSIONING.md`](/VERSIONING.md) for **0.x** semver, parity/README/index pass, **`PERFORMANCE.md`** benchmark spot-check note, release-hygiene alignment — see [`ROADMAP.md`](/ROADMAP.md) **Shipped in 0.19.0**.
+- **0.20.0:** UX / discovery / docs—core **`columns`** / **`shape`** / **`info`** / **`describe`** (numeric, bool, str), **`Expr`** **`repr`**, PySpark **`show`** / **`summary`**, quickstart + execution guides, **`set_display_options`**, **`value_counts`**, **`_repr_mimebundle_`**, **`PYDANTABLE_VERBOSE_ERRORS`**; no new Polars transform matrix rows—see [`ROADMAP.md`](/ROADMAP.md) **Shipped in 0.20.0**. (Later releases extend **`describe`**—see [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md) **Introspection**.)
+- **0.17.0:** String-keyed **map** contract tests + docs after PyArrow map ingest; PySpark **`functions`** wrappers for string replace/strip, **`strptime`**, **`binary_len`**, list **`Expr`** helpers — see [`ROADMAP.md`](/ROADMAP.md) **Shipped in 0.17.0**.
+- **0.16.1:** Map-column arithmetic typing fix — see [`ROADMAP.md`](/ROADMAP.md) **Shipped in 0.16.1**.
+- **0.16.0:** eager Parquet/IPC **`dict[str, list]`** readers, **`to_arrow` / `ato_arrow`**, **`Table` / `RecordBatch`** constructors, **FastAPI** multipart / **`Depends`** / HTTP-status docs — see [`ROADMAP.md`](/ROADMAP.md) **Shipped in 0.16.0**. (**0.23.0** renames eager reads to **`materialize_*`**, lazy file entry to **`read_*` / `aread_*`**, lazy output to **`DataFrame.write_*`**, and eager dict→file to **`export_*` / `aexport_*`**.)
+- **0.15.0:** **async** **`acollect` / `ato_dict` / `ato_polars`**, **FastAPI `async` + `lifespan`**, **PyArrow `map`** ingest for **`dict[str, T]`**, PySpark **`trim` / `abs` / `round` / `floor` / `ceil`** — see [`ROADMAP.md`](/ROADMAP.md) **Shipped in 0.15.0**.
+- **0.14.0:** window **`orderBy` `nulls_last`** (SQL **NULLS FIRST/LAST**), **`DtypeDriftWarning`** for **`shape_only`**, **`validate_data`** deprecation, **Hypothesis** + **FastAPI `TestClient`** coverage, PySpark **`dayofmonth` / `lower` / `upper`** helpers — see [`ROADMAP.md`](/ROADMAP.md) **Shipped in 0.14.0**.
 - Implemented on branch `v0.5.0`:
   - Added docs parity scorecard (`Implemented`/`Partial`/`Missing`) and linked it in docs nav.
   - Added end-to-end Polars-style workflow examples for join/groupby, reshape, and time-series operations.

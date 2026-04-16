@@ -1,0 +1,3 @@
+# DataFrameModel
+
+::: pydantable.DataFrameModel

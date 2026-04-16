@@ -41,7 +41,7 @@ df.select(s.wkbs())
 
 ## Nested structs: selector, `unnest`, and `struct_field`
 
-Use **`s.structs()`** to project **only struct-typed** columns (nested Pydantic / **`Schema`** fields). Then **`unnest`** expands one struct column into top-level columns named **`{parent}_{field}`** (see {doc}`INTERFACE_CONTRACT`). To read a single subfield without unnesting, use **`Expr.struct_field(...)`** on the struct column.
+Use **`s.structs()`** to project **only struct-typed** columns (nested Pydantic / **`Schema`** fields). Then **`unnest`** expands one struct column into top-level columns named **`{parent}_{field}`** (see [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md)). To read a single subfield without unnesting, use **`Expr.struct_field(...)`** on the struct column.
 
 ```python
 from pydantable import DataFrame, Schema
@@ -58,15 +58,13 @@ class Row(Schema):
     payload: Payload
 
 
-df = DataFrame[Row](
-    {
+df = DataFrame[Row]({
         "id": [1, 2],
         "payload": [
             {"score": 10, "label": "a"},
             {"score": 20, "label": None},
         ],
-    }
-)
+    })
 
 # Project struct columns only, then flatten `payload` into `payload_*` top-level columns.
 flat = df.select(s.structs()).unnest("payload")
@@ -74,7 +72,7 @@ flat = df.select(s.structs()).unnest("payload")
 one = df.with_columns(lbl=df.payload.struct_field("label"))
 ```
 
-Nested modeling and nullability are described in {doc}`SUPPORTED_TYPES`. Prefer **`struct_field`** when you need one inner column; prefer **`unnest`** when you want flat top-level columns for **`select`** / joins.
+Nested modeling and nullability are described in [SUPPORTED_TYPES](/SUPPORTED_TYPES.md). Prefer **`struct_field`** when you need one inner column; prefer **`unnest`** when you want flat top-level columns for **`select`** / joins.
 
 ## Composition
 

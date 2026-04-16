@@ -6,9 +6,8 @@ Append-only **NDJSON** (one JSON object per line) is a common log and CDC shape.
 
 The runnable script lives in the repository at `docs/examples/cookbook/json_logs_unnest_export.py` (same code as below).
 
-```{literalinclude} ../examples/cookbook/json_logs_unnest_export.py
-:language: python
-```
+
+--8<-- "examples/cookbook/json_logs_unnest_export.py"
 
 ### Example output
 
@@ -24,11 +23,11 @@ json_logs_unnest_export: ok
 
 ## Notes
 
-- **Lazy read / write:** `read_ndjson` keeps a scan root until `collect` / `write_ndjson` / other terminals (see {doc}`/EXECUTION` and {doc}`/IO_JSON`).
-- **Unnest naming:** columns become `meta_region`, `meta_code`, … per {doc}`/INTERFACE_CONTRACT`.
-- **Selectors:** to pick all struct columns before unnesting, use `s.structs()` as in {doc}`/SELECTORS` (**Nested structs**).
-- **Egress:** this recipe uses **`write_ndjson`** ({doc}`/IO_NDJSON`). For a single JSON **array** file, use **`DataFrameModel.export_json`** (eager column dict → file; see {doc}`/IO_JSON`).
+- **Lazy read / write:** `read_ndjson` keeps a scan root until `collect` / `write_ndjson` / other terminals (see [EXECUTION](/EXECUTION.md) and [IO_JSON](/IO_JSON.md)).
+- **Unnest naming:** columns become `meta_region`, `meta_code`, … per [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md).
+- **Selectors:** to pick all struct columns before unnesting, use `s.structs()` as in [SELECTORS](/SELECTORS.md) (**Nested structs**).
+- **Egress:** this recipe uses **`write_ndjson`** ([IO_NDJSON](/IO_NDJSON.md)). For a single JSON **array** file, use **`DataFrameModel.export_json`** (eager column dict → file; see [IO_JSON](/IO_JSON.md)).
 
 ## See also
 
-{doc}`/IO_JSON` · {doc}`/IO_NDJSON` · {doc}`/SELECTORS` · {doc}`/CHANGELOG` (**1.10.0**)
+[IO_JSON](/IO_JSON.md) · [IO_NDJSON](/IO_NDJSON.md) · [SELECTORS](/SELECTORS.md) · [CHANGELOG](/CHANGELOG.md) (**1.10.0**)

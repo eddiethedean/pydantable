@@ -4,32 +4,32 @@ All materialization — `collect()`, joins, group-by, reshape, etc. — runs thr
 **compiled Rust extension** (`pydantable_native._core`, shipped by `pydantable-native`), which uses Polars for physical execution
 inside the native extension. Python does **not** require the `polars` package for core use.
 
-**Four materialization modes** (blocking sync, async await, deferred **`submit`**, chunked **`stream`** / **`astream`**) are the main ways to run terminal work on the same logical plan. See {doc}`MATERIALIZATION` for the overview table and the **`PlanMaterialization`** enum.
+**Four materialization modes** (blocking sync, async await, deferred **`submit`**, chunked **`stream`** / **`astream`**) are the main ways to run terminal work on the same logical plan. See [MATERIALIZATION](/MATERIALIZATION.md) for the overview table and the **`PlanMaterialization`** enum.
 
 **Synchronous materialization (default):** **`collect()`**, **`to_dict()`**, **`collect(as_lists=True)`**, **`collect(as_numpy=True)`**, optional **`to_polars()`**, and optional **`to_arrow()`** run **blocking** Rust + Polars work on the **current thread** ( **`to_arrow()`** then builds a PyArrow **`Table`** from the materialized columnar **`dict`** in Python).
 
-**Async materialization (0.15.0+):** **`await acollect()`**, **`await ato_dict()`**, **`await ato_polars()`**, and **`await ato_arrow()`** on **`DataFrame`** run the same logic as sync materialization. When **`pydantable_native._core`** exposes **`async_execute_plan`**, the engine call is awaited as a **Rust coroutine** built with **`pyo3-async-runtimes`** and **Tokio** (`spawn_blocking` around **`execute_plan`**). If that symbol is absent (older wheels), work falls back to **`asyncio.to_thread`** or a **`concurrent.futures.Executor`** passed as **`executor=`**. **`DataFrameModel`** mirrors **`acollect`**, **`ato_dict`**, **`ato_polars`**, **`ato_arrow`**, **`arows`**, and **`ato_dicts`**. For a diagram of **sync lazy vs async lazy vs eager I/O**, see {doc}`/DATAFRAMEMODEL` **Three layers**.
+**Async materialization (0.15.0+):** **`await acollect()`**, **`await ato_dict()`**, **`await ato_polars()`**, and **`await ato_arrow()`** on **`DataFrame`** run the same logic as sync materialization. When **`pydantable_native._core`** exposes **`async_execute_plan`**, the engine call is awaited as a **Rust coroutine** built with **`pyo3-async-runtimes`** and **Tokio** (`spawn_blocking` around **`execute_plan`**). If that symbol is absent (older wheels), work falls back to **`asyncio.to_thread`** or a **`concurrent.futures.Executor`** passed as **`executor=`**. **`DataFrameModel`** mirrors **`acollect`**, **`ato_dict`**, **`ato_polars`**, **`ato_arrow`**, **`arows`**, and **`ato_dicts`**. For a diagram of **sync lazy vs async lazy vs eager I/O**, see [DATAFRAMEMODEL](/DATAFRAMEMODEL.md) **Three layers**.
 
-**`aread_*`** returns **`AwaitableDataFrameModel`**: **`return await MyModel.aread_parquet(path).select(...).acollect()`** — one **`await`** on the terminal async method; transforms chain before the read is resolved. Alternatively **`df = await MyModel.aread_parquet(path)`** then **`await df.acollect()`**, or the older nested form **`await (await MyModel.aread_parquet(path)).select(...).acollect()`** (parentheses required; see {doc}`FASTAPI_ADVANCED`).
+**`aread_*`** returns **`AwaitableDataFrameModel`**: **`return await MyModel.aread_parquet(path).select(...).acollect()`** — one **`await`** on the terminal async method; transforms chain before the read is resolved. Alternatively **`df = await MyModel.aread_parquet(path)`** then **`await df.acollect()`**, or the older nested form **`await (await MyModel.aread_parquet(path)).select(...).acollect()`** (parentheses required; see [FASTAPI_ADVANCED](/FASTAPI_ADVANCED.md)).
 
 **Fire-and-forget (1.6.0+):** **`DataFrame.submit()`** / **`DataFrameModel.submit()`** return an **`ExecutionHandle`**; **`await handle.result()`** matches **`collect()`** for the same arguments. Without **`executor=`**, a daemon thread runs **`collect`**. **`handle.cancel()`** only cancels the backing **`concurrent.futures.Future`** if work has not started; it does **not** stop in-flight Polars execution.
 
-**Chunked iteration (1.6.0+):** **`for batch in df.stream(...)`** (sync) and **`async for batch in df.astream(...)`** (async) yield **`dict[str, list]`** chunks after **one** full engine collect (same slicing strategy as **`collect_batches`** — not Polars’ native lazy batch iterator and **not** out-of-core streaming). Requires **`pydantable[polars]`** for chunk conversion. **`stream()`** suits sync **FastAPI** **`def`** routes with **`StreamingResponse`**; **`astream()`** suits **`async def`** routes. See {doc}`FASTAPI`.
+**Chunked iteration (1.6.0+):** **`for batch in df.stream(...)`** (sync) and **`async for batch in df.astream(...)`** (async) yield **`dict[str, list]`** chunks after **one** full engine collect (same slicing strategy as **`collect_batches`** — not Polars’ native lazy batch iterator and **not** out-of-core streaming). Requires **`pydantable[polars]`** for chunk conversion. **`stream()`** suits sync **FastAPI** **`def`** routes with **`StreamingResponse`**; **`astream()`** suits **`async def`** routes. See [FASTAPI](/FASTAPI.md).
 
 Cancelling an **`await acollect()`** (etc.) does **not** cancel in-flight native work. The **GIL** still serializes some Python callbacks; **`ato_polars()`** and **`ato_arrow()`** both build their respective outputs from a materialized columnar **`dict`** (extra allocation vs calling Polars or PyArrow alone on raw buffers).
 
-**File / I/O:** use **`DataFrameModel`** / **`DataFrame[Schema]`** for lazy **`read_*`** / **`aread_*`** and SQL (**`write_sqlmodel`** / **`awrite_sqlmodel`**, or deprecated **`write_sql`** / **`awrite_sql`**). Eager **`materialize_*`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`iter_sqlmodel`** / **`iter_sql_raw`**, … are imported **from `pydantable`** — pass **`dict[str, list]`** into **`MyModel(...)`** for typed frames. **`ScanFileRoot`** and other untyped scan handles are internal to **`pydantable.io`** — see {doc}`IO_OVERVIEW`. **Which entrypoint?** {doc}`IO_DECISION_TREE`.
+**File / I/O:** use **`DataFrameModel`** / **`DataFrame[Schema]`** for lazy **`read_*`** / **`aread_*`** and SQL (**`write_sqlmodel`** / **`awrite_sqlmodel`**, or deprecated **`write_sql`** / **`awrite_sql`**). Eager **`materialize_*`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`iter_sqlmodel`** / **`iter_sql_raw`**, … are imported **from `pydantable`** — pass **`dict[str, list]`** into **`MyModel(...)`** for typed frames. **`ScanFileRoot`** and other untyped scan handles are internal to **`pydantable.io`** — see [IO_OVERVIEW](/IO_OVERVIEW.md). **Which entrypoint?** [IO_DECISION_TREE](/IO_DECISION_TREE.md).
 
-- **`read_*` / `aread_*`:** return a native **`ScanFileRoot`** (local path + format). Use **`MyModel.read_parquet(...)`** / **`await MyModel.aread_parquet(...)`** so transforms run on a Polars **`LazyFrame`** without loading the whole file into **`dict[str, list]`** first. **`DataFrame.write_parquet`**, **`write_csv`**, **`write_ipc`**, and **`write_ndjson`** write the lazy result from Rust (no giant Python column dict on those paths). **`read_parquet_url`** / **`aread_parquet_url`** download HTTP(S) Parquet to a **temp file** you should delete — **`read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** ({doc}`IO_HTTP`, {doc}`DATA_IO_SOURCES`) unlink it when the block exits. For **large local NDJSON** logs, prefer **`read_ndjson`** / **`read_json`** roots and optional **`streaming=True`** on **`collect()`** / **`write_*`** — patterns in {doc}`IO_JSON`.
+- **`read_*` / `aread_*`:** return a native **`ScanFileRoot`** (local path + format). Use **`MyModel.read_parquet(...)`** / **`await MyModel.aread_parquet(...)`** so transforms run on a Polars **`LazyFrame`** without loading the whole file into **`dict[str, list]`** first. **`DataFrame.write_parquet`**, **`write_csv`**, **`write_ipc`**, and **`write_ndjson`** write the lazy result from Rust (no giant Python column dict on those paths). **`read_parquet_url`** / **`aread_parquet_url`** download HTTP(S) Parquet to a **temp file** you should delete — **`read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** ([IO_HTTP](/IO_HTTP.md), [DATA_IO_SOURCES](/DATA_IO_SOURCES.md)) unlink it when the block exits. For **large local NDJSON** logs, prefer **`read_ndjson`** / **`read_json`** roots and optional **`streaming=True`** on **`collect()`** / **`write_*`** — patterns in [IO_JSON](/IO_JSON.md).
 -  For typed lazy reads (**`DataFrame[Schema].read_*` / `aread_*`**, **`DataFrameModel.read_*` / `aread_*`**), ingest validation options (`trusted_mode`, `fill_missing_optional`, `ignore_errors`, `on_validation_errors`) are applied at **materialization time** (after the engine produces columns, before returning dicts/rows). By default (`fill_missing_optional=True`), missing optional fields (`Optional[T]` / `T | None`) are filled with `None` values; with `fill_missing_optional=False`, missing optionals raise unless the schema field has an explicit default (in which case that default is filled).
-- **`materialize_*` / `amaterialize_*`:** import from **`pydantable`**; returns **`dict[str, list]`** (**Rust** / **PyArrow** / stdlib; **PyArrow** for bytes and streaming IPC). Wrap with **`MyModel(cols, ...)`** for a typed model. See **`materialize_json`** for JSON array-of-objects files ({doc}`IO_JSON`). Async: **`await amaterialize_parquet(...)`** or **`executor=`**.
-- **SQL (`fetch_sqlmodel` / `fetch_sql_raw`, `iter_sqlmodel` / `iter_sql_raw`, async mirrors; deprecated unprefixed names):** SQLAlchemy → **`dict[str, list]`** (or batches) via **`from pydantable import …`**; **`MyModel(cols)`** for typed frames. **`write_sqlmodel`** / deprecated **`write_sql`** on **`DataFrameModel`** delegate to the same implementation module — {doc}`IO_SQL`.
+- **`materialize_*` / `amaterialize_*`:** import from **`pydantable`**; returns **`dict[str, list]`** (**Rust** / **PyArrow** / stdlib; **PyArrow** for bytes and streaming IPC). Wrap with **`MyModel(cols, ...)`** for a typed model. See **`materialize_json`** for JSON array-of-objects files ([IO_JSON](/IO_JSON.md)). Async: **`await amaterialize_parquet(...)`** or **`executor=`**.
+- **SQL (`fetch_sqlmodel` / `fetch_sql_raw`, `iter_sqlmodel` / `iter_sql_raw`, async mirrors; deprecated unprefixed names):** SQLAlchemy → **`dict[str, list]`** (or batches) via **`from pydantable import …`**; **`MyModel(cols)`** for typed frames. **`write_sqlmodel`** / deprecated **`write_sql`** on **`DataFrameModel`** delegate to the same implementation module — [IO_SQL](/IO_SQL.md).
 - **`export_*` / `aexport_*`:** take column dicts and write files eagerly; install **`pydantable[polars]`** for the Rust-backed export path where documented.
-- **Extension present:** lazy scans, lazy sinks, and **`execute_plan`** require a built `pydantable-native` extension. If the extension is missing, those paths may raise **`MissingRustExtensionError`** (**`NotImplementedError`** subclass) — {doc}`CHANGELOG`.
+- **Extension present:** lazy scans, lazy sinks, and **`execute_plan`** require a built `pydantable-native` extension. If the extension is missing, those paths may raise **`MissingRustExtensionError`** (**`NotImplementedError`** subclass) — [CHANGELOG](/CHANGELOG.md).
 
-Service patterns: {doc}`FASTAPI` and {doc}`ROADMAP`. Transport table: {doc}`DATA_IO_SOURCES`.
+Service patterns: [FASTAPI](/FASTAPI.md) and [ROADMAP](/ROADMAP.md). Transport table: [DATA_IO_SOURCES](/DATA_IO_SOURCES.md).
 
-**Optional engines (1.17.0+):** you can swap **`ExecutionEngine`** implementations while keeping the **`DataFrame`** / **`DataFrameModel`** API — SQL plans via **`pydantable[sql]`** ({doc}`MOLTRES_SQL`), Mongo collection-backed frames via **`pydantable[mongo]`** ({doc}`MONGO_ENGINE`: **`MongoPydantableEngine`** subclasses **`NativePolarsEngine`**; the Mongo plan stack supplies **`MongoRoot`** / materialization only). Physical execution remains the **native** Rust core; the lazy-SQL bridge affects SQL compilation, not Mongo. Eager Mongo column-dict helpers (**`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`**, **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`**) do **not** use **`DataFrame._engine`** — same pattern as **`fetch_sqlmodel`** (sync collections run under **`asyncio.to_thread`** in async helpers unless the collection is **`pymongo.asynchronous.AsyncCollection`** — see **PyMongo surface area** in {doc}`MONGO_ENGINE`).
+**Optional engines (1.17.0+):** you can swap **`ExecutionEngine`** implementations while keeping the **`DataFrame`** / **`DataFrameModel`** API — SQL plans via **`pydantable[sql]`** ([MOLTRES_SQL](/MOLTRES_SQL.md)), Mongo collection-backed frames via **`pydantable[mongo]`** ([MONGO_ENGINE](/MONGO_ENGINE.md): **`MongoPydantableEngine`** subclasses **`NativePolarsEngine`**; the Mongo plan stack supplies **`MongoRoot`** / materialization only). Physical execution remains the **native** Rust core; the lazy-SQL bridge affects SQL compilation, not Mongo. Eager Mongo column-dict helpers (**`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`**, **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`**) do **not** use **`DataFrame._engine`** — same pattern as **`fetch_sqlmodel`** (sync collections run under **`asyncio.to_thread`** in async helpers unless the collection is **`pymongo.asynchronous.AsyncCollection`** — see **PyMongo surface area** in [MONGO_ENGINE](/MONGO_ENGINE.md)).
 
 ## Streaming / engine `collect` (Polars)
 
@@ -56,7 +56,7 @@ Service patterns: {doc}`FASTAPI` and {doc}`ROADMAP`. Transport table: {doc}`DATA
 
 **`collect_batches()`** runs one full engine collect, then splits rows into Polars **`DataFrame`** chunks (IPC round-trip to Python). It is **not** Polars’ native lazy batch iterator; use it for bounded batch-wise work after materialization.
 
-For **HTTP** materialization, **`fetch_*_url`** / **`read_from_object_store`** still return **`dict[str, list]`** (optional **`max_bytes`** on fetch/object-store paths — {doc}`IO_HTTP`). For **lazy** HTTP Parquet, use **`read_parquet_url`** or a context manager (temp file lifecycle in {doc}`DATA_IO_SOURCES`).
+For **HTTP** materialization, **`fetch_*_url`** / **`read_from_object_store`** still return **`dict[str, list]`** (optional **`max_bytes`** on fetch/object-store paths — [IO_HTTP](/IO_HTTP.md)). For **lazy** HTTP Parquet, use **`read_parquet_url`** or a context manager (temp file lifecycle in [DATA_IO_SOURCES](/DATA_IO_SOURCES.md)).
 
 By default, `collect()` returns a **list of Pydantic models** (one per row), validated
 against the current projected schema. Use **`to_dict()`** or **`collect(as_lists=True)`**
@@ -72,7 +72,7 @@ if you need a Polars **`DataFrame`** in Python. Install **`pydantable[arrow]`** 
 | **`_repr_html_()`** / Jupyter HTML | Materializes **`head(N)`** + **`to_dict()`** for the preview bounds (see **Display options**). |
 | **`describe()`** | One **`to_dict()`** on the current plan; string columns compute **`n_unique`** with a full scan of non-null values; **`date`** / **`datetime`** columns report min/max over non-null values. |
 | **`info()`**, **`repr()`** | Schema / root-buffer **`shape`** only; no row data materialization. |
-| **Async** **`acollect`** / **`ato_dict`** / … | Same work as sync; prefers Rust/Tokio awaitable when available, else thread pool ({doc}`FASTAPI`). |
+| **Async** **`acollect`** / **`ato_dict`** / … | Same work as sync; prefers Rust/Tokio awaitable when available, else thread pool ([FASTAPI](/FASTAPI.md)). |
 | **`submit`** / **`ExecutionHandle.result`** | Same as **`collect`**; background thread or **`executor.submit`**. |
 | **`stream`** / **`astream`** | One full collect, then **`dict[str, list]`** row slices (like **`collect_batches`**). |
 
@@ -84,11 +84,11 @@ All three use the **same** Rust engine; only **names** and **import paths** diff
 
 | Style | Import | Method flavor | When it helps |
 |-------|--------|---------------|---------------|
-| **Default (Polars-shaped)** | **`from pydantable import DataFrame`** | **`with_columns`**, **`filter`**, **`select`** | New code and docs; matches {doc}`INTERFACE_CONTRACT` vocabulary. |
-| **Pandas-shaped** | **`from pydantable.pandas import DataFrame`** | **`assign`**, **`merge`**, pandas-like **`head`**, duplicate masks / **`get_dummies`** / **`cut`/`qcut`** / **`ewm().mean()`** (see {doc}`PANDAS_UI`) | Porting pandas tutorials or muscle memory. |
+| **Default (Polars-shaped)** | **`from pydantable import DataFrame`** | **`with_columns`**, **`filter`**, **`select`** | New code and docs; matches [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md) vocabulary. |
+| **Pandas-shaped** | **`from pydantable.pandas import DataFrame`** | **`assign`**, **`merge`**, pandas-like **`head`**, duplicate masks / **`get_dummies`** / **`cut`/`qcut`** / **`ewm().mean()`** (see [PANDAS_UI](/PANDAS_UI.md)) | Porting pandas tutorials or muscle memory. |
 | **PySpark-shaped** | **`from pydantable.pyspark import DataFrame`** | **`withColumn`**, **`where`**, **`show`** | Spark mental model; still in-process (not a Spark cluster). |
 
-See {doc}`PANDAS_UI`, {doc}`PYSPARK_UI`, and **Naming map (core ↔ pandas ↔ PySpark)** there.
+See [PANDAS_UI](/PANDAS_UI.md), [PYSPARK_UI](/PYSPARK_UI.md), and **Naming map (core ↔ pandas ↔ PySpark)** there.
 
 ## Copy as / interchange
 
@@ -108,12 +108,12 @@ Some tools (including Streamlit’s `st.dataframe`) can render interactive table
 
 As of **0.21.0**, `pydantable` implements `__dataframe__` on `DataFrame` (and `DataFrameModel` via delegation). This path **materializes** to a PyArrow `Table` first (same cost class as `to_arrow()`), then delegates to PyArrow’s interchange export.
 
-See {doc}`STREAMLIT` for install notes, fallbacks (including `st.data_editor(df.to_arrow())`), and limitations.
+See [STREAMLIT](/STREAMLIT.md) for install notes, fallbacks (including `st.data_editor(df.to_arrow())`), and limitations.
 
 The Python module `python/pydantable/rust_engine.py` is the thin wrapper that invokes
 `execute_plan`, `execute_join`, and related functions on `_core` (no alternate engines).
 
-**0.18.0 — Grouped execution errors:** When Polars **`collect()`** fails during **`group_by().agg()`**, the raised **`ValueError`** may include the prefix **`Polars execution error (group_by().agg()):`** so the failure is identifiable as grouped aggregation rather than a generic plan step. This does not change aggregation results or schema rules ({doc}`INTERFACE_CONTRACT`).
+**0.18.0 — Grouped execution errors:** When Polars **`collect()`** fails during **`group_by().agg()`**, the raised **`ValueError`** may include the prefix **`Polars execution error (group_by().agg()):`** so the failure is identifiable as grouped aggregation rather than a generic plan step. This does not change aggregation results or schema rules ([INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md)).
 
 Optional **UI modules** (`pydantable.pandas`, `pydantable.pyspark`) only change **method
 names and imports** (e.g. `assign` vs `withColumn`). They do not select a different
@@ -122,8 +122,8 @@ execution engine.
 **Typed expressions** (`Expr`, `Column`, PySpark `F.col(...)`) are validated in Rust
 (`ExprNode`), then lowered to Polars inside the extension. The expression and window surface
 has grown across releases (globals, framed windows, maps, temporal helpers, multi-key
-**`rangeBetween`**, etc.). The authoritative feature list and semantics are {doc}`INTERFACE_CONTRACT`,
-{doc}`WINDOW_SQL_SEMANTICS`, {doc}`SUPPORTED_TYPES`, and {doc}`CHANGELOG`.
+**`rangeBetween`**, etc.). The authoritative feature list and semantics are [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md),
+[WINDOW_SQL_SEMANTICS](/WINDOW_SQL_SEMANTICS.md), [SUPPORTED_TYPES](/SUPPORTED_TYPES.md), and [CHANGELOG](/CHANGELOG.md).
 
 Use the default package exports for Polars-style names:
 
@@ -162,7 +162,7 @@ This is for **REPLs, logs, and tracebacks**—not a substitute for materializing
 
 ## `info()` and `describe()` (**0.20.0+**)
 
-- **`info()`** returns a **multi-line string** listing logical column names, **dtype** annotations, and a **row count** aligned with **`shape[0]`** (root-buffer semantics—see {doc}`INTERFACE_CONTRACT` **Introspection**). It does **not** force a full **`collect()`** beyond what **`shape`** already implies for buffer-backed frames.
+- **`info()`** returns a **multi-line string** listing logical column names, **dtype** annotations, and a **row count** aligned with **`shape[0]`** (root-buffer semantics—see [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md) **Introspection**). It does **not** force a full **`collect()`** beyond what **`shape`** already implies for buffer-backed frames.
 - **`describe()`** (**0.20.0+**): one **`to_dict()`** materialization, then Python-side stats for **int**, **float**, **bool**, **str**, **`date`**, and **`datetime`** columns (nullable forms included). Numeric: mean/min/max/std where applicable. Bool: true/false/null counts. String: row count, **`n_unique`** (full scan of non-null strings), min/max **length**, null count. **`date` / `datetime`**: non-null count, min, max, null count. Other dtypes are omitted.
 
 ## Jupyter / HTML (`_repr_html_`) and display options

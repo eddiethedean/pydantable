@@ -1,6 +1,6 @@
 # Async lazy pipeline (`Async.read_*` → `await collect()`)
 
-End-to-end pattern for **`async def`** code: **lazy scan** → **transforms** → **one await** on a terminal async method. Prefer **`MyModel.Async.read_parquet`** (same as **`aread_parquet`**) and **`await …collect()`** / **`to_dict()`** (aliases of **`acollect`** / **`ato_dict`**) so names stay async-first. See {doc}`/DATAFRAMEMODEL` **Three layers** and {doc}`/EXECUTION` for costs and threading.
+End-to-end pattern for **`async def`** code: **lazy scan** → **transforms** → **one await** on a terminal async method. Prefer **`MyModel.Async.read_parquet`** (same as **`aread_parquet`**) and **`await …collect()`** / **`to_dict()`** (aliases of **`acollect`** / **`ato_dict`**) so names stay async-first. See [DATAFRAMEMODEL](/DATAFRAMEMODEL.md) **Three layers** and [EXECUTION](/EXECUTION.md) for costs and threading.
 
 ## Minimal example
 
@@ -44,14 +44,14 @@ async def load_two(path_a: str, path_b: str):
 
 ## Executor
 
-Pass **`executor=`** to **`Async.read_*`** / **`aread_*`** (and to **`collect()`** / **`acollect()`** on a concrete model) to pin blocking file setup and engine work to a shared **`ThreadPoolExecutor`** — see {doc}`/FASTAPI` and {doc}`/MATERIALIZATION`.
+Pass **`executor=`** to **`Async.read_*`** / **`aread_*`** (and to **`collect()`** / **`acollect()`** on a concrete model) to pin blocking file setup and engine work to a shared **`ThreadPoolExecutor`** — see [FASTAPI](/FASTAPI.md) and [MATERIALIZATION](/MATERIALIZATION.md).
 
 ## Lazy metadata caveat
 
-**`await adf.columns`**, **`shape`**, **`empty`**, **`dtypes`** on a **pending** chain do not materialize row data; for file-backed scans **`shape`** may show **zero rows** until **`collect()`**. See the warning in {doc}`/DATAFRAMEMODEL` **Three layers**.
+**`await adf.columns`**, **`shape`**, **`empty`**, **`dtypes`** on a **pending** chain do not materialize row data; for file-backed scans **`shape`** may show **zero rows** until **`collect()`**. See the warning in [DATAFRAMEMODEL](/DATAFRAMEMODEL.md) **Three layers**.
 
 ## Related
 
-- {doc}`/FASTAPI` — routes, **`StreamingResponse`**, uploads.
-- {doc}`/cookbook/fastapi_async_materialization` — **`collect`** / **`acollect`** on a concrete model.
-- {doc}`/MATERIALIZATION` — four terminal modes.
+- [FASTAPI](/FASTAPI.md) — routes, **`StreamingResponse`**, uploads.
+- [fastapi_async_materialization](/cookbook/fastapi_async_materialization.md) — **`collect`** / **`acollect`** on a concrete model.
+- [MATERIALIZATION](/MATERIALIZATION.md) — four terminal modes.

@@ -28,7 +28,7 @@ For **`rowsBetween`** and **`rangeBetween`**, the engine evaluates frames over r
 - **`CURRENT ROW`** in SQL terms corresponds to the row being evaluated; peer rows share the same **sort key vector** (for unframed ranking functions, ties get the same rank where `rank` / `dense_rank` semantics apply).
 - **Framed** aggregates include or exclude peers based on the frame bounds; exact inclusion for ties at frame edges follows Polars’ window implementation. Do not assume identical edge behavior vs Spark or ANSI SQL without testing your partition/`orderBy`/frame combination.
 
-See [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) for the supported window API surface.
+See [`INTERFACE_CONTRACT.md`](/INTERFACE_CONTRACT.md) for the supported window API surface.
 
 ## Spark / PySpark notes
 
@@ -36,7 +36,7 @@ Apache Spark’s `rangeBetween` also uses the **ordering expression** for frame 
 
 ## Related
 
-- [`INTERFACE_CONTRACT.md`](INTERFACE_CONTRACT.md) — supported window API surface.
-- [`PYSPARK_PARITY.md`](PYSPARK_PARITY.md) — façade coverage vs Spark names.
-- [`DATAFRAMEMODEL.md`](DATAFRAMEMODEL.md) / [`SUPPORTED_TYPES.md`](SUPPORTED_TYPES.md) — trusted ingest (**`strict`**) and nested column rules when building dataframes used in windowed queries.
-- [`ROADMAP.md`](ROADMAP.md) — release train; async I/O is **not** part of window semantics today.
+- [`INTERFACE_CONTRACT.md`](/INTERFACE_CONTRACT.md) — supported window API surface.
+- [`PYSPARK_PARITY.md`](/PYSPARK_PARITY.md) — façade coverage vs Spark names.
+- [`DATAFRAMEMODEL.md`](/DATAFRAMEMODEL.md) / [`SUPPORTED_TYPES.md`](/SUPPORTED_TYPES.md) — trusted ingest (**`strict`**) and nested column rules when building dataframes used in windowed queries.
+- [`ROADMAP.md`](/ROADMAP.md) — release train; async I/O is **not** part of window semantics today.

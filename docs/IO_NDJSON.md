@@ -17,9 +17,9 @@ Each line of the file is one JSON object; the scanner infers or aligns columns a
 - **`read_ndjson`**, **`aread_ndjson`**
 - **`materialize_ndjson`**, **`amaterialize_ndjson`**
 - **`fetch_ndjson_url`** — HTTP(S) → temp file → read
-- **`iter_ndjson`**, **`iter_json_lines`** (alias), **`aiter_ndjson`**, **`aiter_json_lines`**, **`write_ndjson_batches`** — JSON-object lines batched into **`dict[str, list]`** ({doc}`IO_OVERVIEW`).
+- **`iter_ndjson`**, **`iter_json_lines`** (alias), **`aiter_ndjson`**, **`aiter_json_lines`**, **`write_ndjson_batches`** — JSON-object lines batched into **`dict[str, list]`** ([IO_OVERVIEW](/IO_OVERVIEW.md)).
 
-**`scan_kwargs`:** **`low_memory`**, **`rechunk`**, **`ignore_errors`**, **`n_rows`**, **`infer_schema_length`**, **`glob`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`**. Unknown keys raise **`ValueError`**. See {doc}`DATA_IO_SOURCES`.
+**`scan_kwargs`:** **`low_memory`**, **`rechunk`**, **`ignore_errors`**, **`n_rows`**, **`infer_schema_length`**, **`glob`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`**. Unknown keys raise **`ValueError`**. See [DATA_IO_SOURCES](/DATA_IO_SOURCES.md).
 
 ### Paths, directories, and `glob`
 
@@ -34,7 +34,7 @@ Use **`glob=True`** (or omit it) when reading a **directory** or a **glob patter
 - **`df.write_ndjson(path, *, write_kwargs=..., streaming=...)`**
 - **`model.write_ndjson(...)`**
 
-**`write_kwargs`:** **`json_format`** (**`"lines"`** / **`"json"`**). See {doc}`DATA_IO_SOURCES`.
+**`write_kwargs`:** **`json_format`** (**`"lines"`** / **`"json"`**). See [DATA_IO_SOURCES](/DATA_IO_SOURCES.md).
 
 ### `pydantable.io`
 
@@ -43,18 +43,17 @@ Use **`glob=True`** (or omit it) when reading a **directory** or a **glob patter
 
 ## Runnable example
 
-Run conventions: {doc}`IO_OVERVIEW` (**Runnable example**).
+Run conventions: [IO_OVERVIEW](/IO_OVERVIEW.md) (**Runnable example**).
 
 ```bash
 python docs/examples/io/ndjson_roundtrip.py
 ```
 
-```{literalinclude} examples/io/ndjson_roundtrip.py
-:language: python
-```
 
-Large-file patterns (lazy scan; optional **`iter_ndjson`** batches in {doc}`IO_JSON`): **`python docs/examples/io/large_ndjson_patterns.py`**.
+--8<-- "examples/io/ndjson_roundtrip.py"
+
+Large-file patterns (lazy scan; optional **`iter_ndjson`** batches in [IO_JSON](/IO_JSON.md)): **`python docs/examples/io/large_ndjson_patterns.py`**.
 
 ## See also
 
-{doc}`IO_OVERVIEW` · {doc}`IO_HTTP` · {doc}`EXECUTION`
+[IO_OVERVIEW](/IO_OVERVIEW.md) · [IO_HTTP](/IO_HTTP.md) · [EXECUTION](/EXECUTION.md)
