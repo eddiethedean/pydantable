@@ -962,7 +962,8 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         """Multi-line summary string (schema, dtypes, :attr:`shape` caveat).
 
         **Cost:** does not materialize row data; uses schema and root-buffer
-        :attr:`shape` only. See the EXECUTION guide (project docs) **Materialization costs**.
+        :attr:`shape` only. See the EXECUTION guide (project docs)
+        **Materialization costs**.
         """
         schema_qn = getattr(
             self._current_schema_type,
@@ -3464,7 +3465,8 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         Materialize this typed logical DataFrame.
 
         **Cost:** full engine execution on the current thread (same as :meth:`to_dict`
-        when returning rows or lists). See the EXECUTION guide (project docs) **Materialization costs**.
+        when returning rows or lists). See the EXECUTION guide (project docs)
+        **Materialization costs**.
 
         By default returns a list of Pydantic models, one per row, validated
         against :attr:`schema_type` (the current projected schema).
@@ -3526,7 +3528,8 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
     ) -> dict[str, list[Any]]:
         """Columnar materialization (alias for ``collect(as_lists=True)`` shape).
 
-        **Cost:** full Rust execution for the current plan. See the EXECUTION guide (project docs).
+        **Cost:** full Rust execution for the current plan. See the EXECUTION guide
+        (project docs).
         Pass ``streaming=`` or set ``PYDANTABLE_ENGINE_STREAMING`` like :meth:`collect`.
         """
         use_streaming = _resolve_engine_streaming(
@@ -3817,7 +3820,8 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         Python package: ``pip install 'pydantable[polars]'``).
 
         **Cost:** builds a columnar dict via the Rust engine, then a Polars frame.
-        See the EXECUTION guide (project docs). Optional ``streaming=`` matches :meth:`collect`.
+        See the EXECUTION guide (project docs). Optional ``streaming=`` matches
+        :meth:`collect`.
         """
         try:
             pl = importlib.import_module("polars")
