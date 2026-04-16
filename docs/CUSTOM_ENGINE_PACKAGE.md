@@ -77,7 +77,7 @@ time, static checkers and :func:`isinstance` (with
   **`pydantable_native._core`**.
 
 - **Third-party:** the **lazy-SQL** optional stack (SQLAlchemy bridge + **`ExecutionEngine`**) ships alongside pydantable’s **`SqlDataFrame`** / **`SqlDataFrameModel`** path; see the bridge’s PyPI page and **`docs/PYDANTABLE_ENGINE.md`**. PydanTable user guide:
-  [MOLTRES_SQL](/MOLTRES_SQL.md) (**`SqlDataFrame`**, **`SqlDataFrameModel`**, **`pydantable[sql]`**).
+  [SQL_ENGINE](/SQL_ENGINE.md) (**`SqlDataFrame`**, **`SqlDataFrameModel`**, **`pydantable[sql]`**).
 
 When **PydanTable** adds new protocol members, contract tests in this project
 (exercising **`typing_extensions.get_protocol_members`**) and release notes
@@ -173,7 +173,7 @@ typically expose your own ingestion APIs and **then** construct
 
 ## See also
 
-- [MOLTRES_SQL](/MOLTRES_SQL.md) — **`SqlDataFrame`** / **`SqlDataFrameModel`** with the lazy-SQL stack (**`pydantable[sql]`**).
+- [SQL_ENGINE](/SQL_ENGINE.md) — **`SqlDataFrame`** / **`SqlDataFrameModel`** with the lazy-SQL stack (**`pydantable[sql]`**).
 - [MONGO_ENGINE](/MONGO_ENGINE.md) — **`MongoDataFrame`** / **`MongoDataFrameModel`** (**`MongoPydantableEngine`** in **`pydantable.mongo_dataframe_engine`**, **`MongoRoot`** from the Mongo plan stack; façade **`pydantable.mongo_dataframe`**, **`pydantable[mongo]`**). Eager **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** and **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`** (**PyMongo** column dicts) are separate from **`ExecutionEngine`** — not a third-party engine package.
 - [ADR-engines](/ADR-engines.md) — architecture decisions and extension checklist.
 - [DEVELOPER](/DEVELOPER.md) — repository layout and native packaging.

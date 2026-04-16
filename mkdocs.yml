@@ -176,7 +176,7 @@ nav:
       - ADR-engines.md
       - CUSTOM_ENGINE_PACKAGE.md
       - ISP_ENGINE_PROTOCOL_RFC.md
-      - MOLTRES_SQL.md
+      - SQL_ENGINE.md
       - MONGO_ENGINE.md
       - SPARK_ENGINE.md
       - BEANIE.md

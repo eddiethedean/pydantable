@@ -338,7 +338,7 @@ async def test_sql_dataframe_model_async_chain_select(tmp_path: Path) -> None:
 
 
 def test_sqlmodel_table_lazy_read_sql_dataframe(tmp_path: Path) -> None:
-    """``SQLModel.__table__`` with ``from_sql_table`` (same idea as MOLTRES_SQL.md)."""
+    """``SQLModel.__table__`` with ``from_sql_table`` (same idea as SQL_ENGINE.md)."""
     pytest.importorskip("sqlmodel")
     from sqlmodel import Field, Session, SQLModel
 

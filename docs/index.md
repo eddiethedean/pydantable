@@ -56,7 +56,7 @@ df = DataFrame[Row]({"id": [1, 2], "score": [10.0, 20.5]})
 
     ---
 
-    **SQL** ([MOLTRES_SQL](/MOLTRES_SQL.md), **`pydantable[sql]`**), **Mongo** ([MONGO_ENGINE](/MONGO_ENGINE.md), **`pydantable[mongo]`**), **Spark** ([SPARK_ENGINE](/SPARK_ENGINE.md), **`pydantable[spark]`**). Beanie: [BEANIE](/BEANIE.md). PySpark façade: [PYSPARK_UI](/PYSPARK_UI.md).
+    **SQL** ([SQL_ENGINE](/SQL_ENGINE.md), **`pydantable[sql]`**), **Mongo** ([MONGO_ENGINE](/MONGO_ENGINE.md), **`pydantable[mongo]`**), **Spark** ([SPARK_ENGINE](/SPARK_ENGINE.md), **`pydantable[spark]`**). Beanie: [BEANIE](/BEANIE.md). PySpark façade: [PYSPARK_UI](/PYSPARK_UI.md).
 
     [Spark engine →](/SPARK_ENGINE.md)
 

@@ -70,7 +70,7 @@ Output (exact values depend on filtering; this matches `scripts/verify_doc_examp
 - **Execution & semantics**: [EXECUTION](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) · [MATERIALIZATION](https://pydantable.readthedocs.io/en/latest/MATERIALIZATION.html) · [INTERFACE_CONTRACT](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html)
 - **I/O**: [IO_DECISION_TREE](https://pydantable.readthedocs.io/en/latest/IO_DECISION_TREE.html) → [IO_OVERVIEW](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html) (CSV/Parquet/NDJSON/JSON/IPC/HTTP/SQL)
 - **FastAPI**: [GOLDEN_PATH_FASTAPI](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html) → [FASTAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html)
-- **Optional engines**: [MOLTRES_SQL](https://pydantable.readthedocs.io/en/latest/MOLTRES_SQL.html) (SQL) · [MONGO_ENGINE](https://pydantable.readthedocs.io/en/latest/MONGO_ENGINE.html) (Mongo) · [SPARK_ENGINE](https://pydantable.readthedocs.io/en/latest/SPARK_ENGINE.html) (Spark)
+- **Optional engines**: [SQL_ENGINE](https://pydantable.readthedocs.io/en/latest/SQL_ENGINE.html) (SQL) · [MONGO_ENGINE](https://pydantable.readthedocs.io/en/latest/MONGO_ENGINE.html) (Mongo) · [SPARK_ENGINE](https://pydantable.readthedocs.io/en/latest/SPARK_ENGINE.html) (Spark)
 - **Everything**: [DOCS_MAP](https://pydantable.readthedocs.io/en/latest/DOCS_MAP.html)
 
 ## Development

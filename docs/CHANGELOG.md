@@ -92,7 +92,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Added
 
-- **Optional Moltres integration:** extra **`pydantable[lazy-sql]`** *(install **`pydantable[sql]`** today — optional extras were consolidated)* pulls [**moltres-core**](https://pypi.org/project/moltres-core/). New **`SqlDataFrame`** and **`SqlDataFrameModel`** in **`pydantable.sql_dataframe`** (also available as **`pydantable.SqlDataFrame`** / **`SqlDataFrameModel`** via lazy import) bind **`moltres_core.MoltresPydantableEngine`** using **`sql_config=`** (**`moltres_core.EngineConfig`**) or **`moltres_engine=`**. Helper **`moltres_engine_from_sql_config`**. User guide: [MOLTRES_SQL](/MOLTRES_SQL.md); protocol story: [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md).
+- **Optional Moltres integration:** extra **`pydantable[lazy-sql]`** *(install **`pydantable[sql]`** today — optional extras were consolidated)* pulls [**moltres-core**](https://pypi.org/project/moltres-core/). New **`SqlDataFrame`** and **`SqlDataFrameModel`** in **`pydantable.sql_dataframe`** (also available as **`pydantable.SqlDataFrame`** / **`SqlDataFrameModel`** via lazy import) bind **`moltres_core.MoltresPydantableEngine`** using **`sql_config=`** (**`moltres_core.EngineConfig`**) or **`moltres_engine=`**. Helper **`moltres_engine_from_sql_config`**. User guide: [SQL_ENGINE](/SQL_ENGINE.md); protocol story: [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md).
 
 ### Changed
 

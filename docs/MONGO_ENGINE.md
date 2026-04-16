@@ -18,7 +18,7 @@ see [CUSTOM_ENGINE_PACKAGE](/CUSTOM_ENGINE_PACKAGE.md)).
 **`MongoPydantableEngine`** turns **`MongoRoot`** into columnar **`dict[str, list]`**
 via the plan library, then runs the native executor.
 
-The parallel SQL-backed story is [MOLTRES_SQL](/MOLTRES_SQL.md) (**`SqlDataFrame`** /
+The parallel SQL-backed story is [SQL_ENGINE](/SQL_ENGINE.md) (**`SqlDataFrame`** /
 **`SqlDataFrameModel`** with the lazy-SQL stack).
 
 **Compatibility (1.17.0):** **`pydantable[mongo]`** pins the Mongo plan package to
@@ -35,7 +35,7 @@ The parallel SQL-backed story is [MOLTRES_SQL](/MOLTRES_SQL.md) (**`SqlDataFrame
 | Default Polars/Rust execution for in-memory or file-backed workflows | `DataFrame` / `DataFrameModel` (see [DATAFRAMEMODEL](/DATAFRAMEMODEL.md), [EXECUTION](/EXECUTION.md)). |
 | **Eager** SQL I/O: load columns from a DB into a frame, or write tables | **`from pydantable import …`** — [IO_SQL](/IO_SQL.md) (**`fetch_sqlmodel`**, **`write_sqlmodel`**, …). |
 | **Eager** Mongo I/O: **`dict[str, list]`** in / out of a collection (no **`DataFrame`**) | **`fetch_mongo`**, **`iter_mongo`**, **`write_mongo`** and **`afetch_mongo`**, **`aiter_mongo`**, **`awrite_mongo`** — ideally with **`sync_pymongo_collection(MyDocument, sync_db)`** for sync **`Collection`** ({ref}`mongo-eager-beanie`); **`AsyncCollection`** uses native async (see **PyMongo surface area** below). |
-| **Lazy execution** with transforms compiled to **SQL** (lazy-SQL bridge) | **`SqlDataFrame`** / **`SqlDataFrameModel`** — [MOLTRES_SQL](/MOLTRES_SQL.md). |
+| **Lazy execution** with transforms compiled to **SQL** (lazy-SQL bridge) | **`SqlDataFrame`** / **`SqlDataFrameModel`** — [SQL_ENGINE](/SQL_ENGINE.md). |
 | **Lazy execution** over a **MongoDB collection** with the same typed **`DataFrame`** API | **`MongoDataFrame`** / **`MongoDataFrameModel`** — **`from_beanie`** or **`from_beanie_async`** with a Beanie **`Document`** (or **`from_collection`**); see {ref}`mongo-primary-beanie` and [BEANIE](/BEANIE.md). |
 
 Eager SQL helpers materialize **column dicts** in Python; they do not replace
