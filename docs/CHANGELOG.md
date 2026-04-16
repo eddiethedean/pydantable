@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.18.0] — 2026-04-15
+
+### Added
+
+- **PySpark (optional `pydantable[spark]`):** **`SparkDataFrame`** / **`SparkDataFrameModel`** façade on **raikou-core**, with lazy **`pydantable.pyspark.sparkdantic`** integration for **SparkDantic**-based JVM schemas. Documentation and tests: **SPARK_ENGINE**, **PYSPARK_UI**, **PYSPARK_PARITY**, and related coverage.
+
+### Documentation
+
+- **MkDocs + Material for MkDocs** replace Sphinx for the published manual; **Read the Docs** and CI use **`mkdocs build --strict`** (`mkdocs.yml`, **`docs/mkdocs_hooks.py`**).
+- Lazy-SQL user guide file renamed **`MOLTRES_SQL.md` → `SQL_ENGINE.md`** (links and nav updated; content unchanged).
+
+### CI
+
+- Test installs use **`pip install -e ".[dev]"`** plus **raikou-core** / **pyspark** where needed; **Windows** skips **`@pytest.mark.spark`** (JVM / **winutils** constraints). Docs jobs include Spark stack for mkdocstrings imports.
+
+### Version bump
+
+- Align **pydantable**, **pydantable-protocol**, **pydantable-native**, **pydantable-core**, and published **`__version__`** values to **1.18.0**.
+
 ## [1.17.0] — 2026-04-14
 
 ### Added
