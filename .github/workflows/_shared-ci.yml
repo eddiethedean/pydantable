@@ -414,7 +414,14 @@ jobs:
           if [ "$MATRIX_OS" = "ubuntu-latest" ] && [ "$PYVER" = "3.11" ]; then
             COV_ARGS="--cov=pydantable --cov-report=xml --cov-report=term-missing:skip-covered --cov-fail-under=83"
           fi
-          $PY -m pytest -q -n auto $COV_ARGS
+          # ``local[*]`` PySpark needs a JVM + Hadoop Windows shim (winutils); GHA Windows
+          # runners are unreliable for that stack. Façade tests under ``tests/third_party/``
+          # still run everywhere; only ``@pytest.mark.spark`` integration tests are skipped.
+          MARKEXPR=""
+          if [ "$MATRIX_OS" = "windows-latest" ]; then
+            MARKEXPR="-m not spark"
+          fi
+          $PY -m pytest -q -n auto $COV_ARGS $MARKEXPR
 
       - name: Upload coverage XML (Ubuntu Python 3.11)
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
