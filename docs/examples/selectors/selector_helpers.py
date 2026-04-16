@@ -12,6 +12,7 @@ class S(Schema):
 
 df = DataFrame[S]({"a": [None, 1], "b": [2, None]})
 
+
 def _sorted_dict(d: dict[str, list]) -> dict[str, list]:
     return {k: d[k] for k in sorted(d)}
 

@@ -44,6 +44,20 @@ df.info()
 print(df.describe())
 ```
 
+Runnable script:
+
+```bash
+python docs/examples/getting_started/quickstart_discovery_helpers.py
+```
+
+--8<-- "examples/getting_started/quickstart_discovery_helpers.py"
+
+### Output
+
+```text
+--8<-- "examples/getting_started/quickstart_discovery_helpers.py.out.txt"
+```
+
 ## 4. Filter and materialize
 
 ```python

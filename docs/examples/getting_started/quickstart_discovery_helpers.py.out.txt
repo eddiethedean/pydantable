@@ -1,0 +1,19 @@
+df.columns = ['id', 'score', 'label']
+df.shape = (3, 3)
+
+DataFrame[Row]
+  schema: Row
+  columns: 3
+  shape (root buffer): 3 x 3
+  Note: after lazy transforms (e.g. filter), root row count may not match materialized rows; use to_dict() or collect() for true count.
+
+dtypes:
+  id: int
+  score: float
+  label: str
+
+describe() — one to_dict(); int/float/bool/str/date/datetime columns.
+
+id: count=3 mean=2 std=1 min=1 max=3
+score: count=3 mean=12.5 std=7.08872 min=7.0 max=20.5
+label: count=3 n_unique=2 min_len=1 max_len=1 null=0
