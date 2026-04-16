@@ -25,7 +25,7 @@ This document lists **common and useful** places applications read and write tab
 
 For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **presets**, and how **`read_json`** relates to **`read_ndjson`**, see [IO_JSON](../io/json.md) (**Large files**, **NDJSON scan kwargs**).
 
-(local-io-audit)=
+<a id="local-io-audit"></a>
 ### Audit: Polars 0.53.x vs pydantable (1.11.0 Phase A)
 
 **Scope:** Polars Rust **0.53.0** (the version pinned by **`pydantable-core`**) compared to the kwargs pydantable forwards from **`pydantable-core/src/plan/execute_polars/scan_kw.rs`** (`dispatch_file_scan`). The matrix and summary table below reflect **1.11.0** behavior: **Parquet** hive / lineage / row index; **CSV** directory/glob and **`LazyCsvReader`** options; **NDJSON** **`glob`** / **`include_file_paths`** / **`row_index_*`**; **IPC** **`IpcScanOptions`** + **`UnifiedScanArgs`**; **`read_json`** as **`read_ndjson`** alias; **partitioned Parquet writes** (**`partition_by`**) and **`write_*_batches`** path semantics; multi-file Parquet **`allow_missing_columns`**. Remaining gaps (e.g. **`ScanArgsParquet.schema`**, **`HiveOptions.schema`**) are tracked in [ROADMAP](../project/roadmap.md).

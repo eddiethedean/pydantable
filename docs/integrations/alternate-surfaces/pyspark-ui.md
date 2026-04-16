@@ -111,7 +111,7 @@ Core operations (`collect`, `join`, `group_by`, typed `filter`, …) behave like
 | `show(n=20, truncate=True, vertical=False)` | **0.20.0+** — prints a bounded text table (`head`-like sample). |
 | `summary()` | **0.20.0+** — see [**`summary` vs Spark**](#summary-vs-apache-spark) below. |
 
-(summary-vs-apache-spark)=
+<a id="summary-vs-apache-spark"></a>
 ### `summary` vs Apache Spark
 
 Spark’s **`DataFrame.summary()`** returns another **DataFrame** of statistics (and accepts optional stat names). In pydantable, PySpark **`summary()`** is deliberately a thin alias of core **`describe()`**: it returns a **single multi-line string**, not a table-shaped frame.

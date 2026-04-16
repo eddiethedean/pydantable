@@ -54,7 +54,7 @@ Beanie uses PyMongo’s **async** API (`AsyncMongoClient`, `AsyncDatabase`, …)
 - **`fetch_mongo(sync_pymongo_collection(MyDocument, sync_db))`** — eager **`dict[str, list]`** without building a **`DataFrame`** plan.
 - **`write_mongo(sync_pymongo_collection(MyDocument, sync_db), data)`** — inserts from a rectangular column dict.
 
-At runtime, :func:`~pydantable.mongo_beanie.sync_pymongo_collection` only needs **pymongo** (or **mongomock** in tests); it does **not** import Beanie—it only calls **`get_collection_name()`** on your class.
+At runtime, `sync_pymongo_collection` only needs **pymongo** (or **mongomock** in tests); it does **not** import Beanie—it only calls **`get_collection_name()`** on your class.
 
 ```python
 from pymongo import MongoClient

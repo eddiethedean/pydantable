@@ -39,7 +39,7 @@ In **Jupyter** / **VS Code**, the last expression in a cell can render as HTML v
 
 ```python
 df.columns
-df.shape  # root-buffer semantics after lazy transforms—see [INTERFACE_CONTRACT](/semantics/interface-contract/)
+df.shape  # root-buffer semantics after lazy transforms—see [INTERFACE_CONTRACT](../semantics/interface-contract/)
 df.info()
 print(df.describe())
 ```

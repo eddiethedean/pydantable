@@ -6,7 +6,7 @@
 
 For **execution semantics** (lazy vs collect, Rust engine), see [EXECUTION](../user-guide/execution.md). For **roadmap-style** “what to support next,” see [DATA_IO_SOURCES](../io/data-io-sources.md). **Polars 0.53 scan kwargs vs pydantable** (paths, globs, hive): see [Polars 0.53 vs pydantable scan audit](data-io-sources.md#audit-polars-053x-vs-pydantable-1110-phase-a). **Which API should I call?** See [IO_DECISION_TREE](../io/decision-tree.md).
 
-(full-api-in-pydantableio)=
+<a id="full-api-in-pydantableio"></a>
 ## Internal layout: `pydantable.io`
 
 The **`pydantable.io`** package holds the concrete implementations; **application code** imports from **`pydantable`** (see the root **`__init__.py`**) or calls **`DataFrame` / `DataFrameModel`** classmethods. Only **extension authors** or **contributors** should import **`pydantable.io`** directly (e.g. **`ScanFileRoot`**, **`pydantable.io.extras`**, batch helpers in **`pydantable.io.batches`** when not re-exported).

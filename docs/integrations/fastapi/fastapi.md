@@ -23,7 +23,7 @@ If you want the shortest runnable service first, start with [GOLDEN_PATH_FASTAPI
   - [FASTAPI_ADVANCED](../../integrations/fastapi/advanced.md) (four modes + I/O patterns)
   - [EXECUTION](../../user-guide/execution.md) and [MATERIALIZATION](../../user-guide/materialization.md) (deep dive)
 
-(fastapi-install)=
+<a id="fastapi-install"></a>
 ## Install (what to `pip install`)
 
 ```bash
@@ -42,7 +42,7 @@ For I/O-heavy service routes (Arrow buffers, Parquet/IPC helpers, streaming writ
 pip install "pydantable[io]"
 ```
 
-(fastapi-fast-path)=
+<a id="fastapi-fast-path"></a>
 ## Fast path for services (recommended order)
 
 1. Run [GOLDEN_PATH_FASTAPI](../../integrations/fastapi/golden-path.md) end-to-end.
@@ -74,7 +74,7 @@ Then import `pydantable.fastapi` (not required for basic FastAPI usage):
 
 Inbound request validation is still FastAPI’s default **`RequestValidationError`** (**422**) when the *request body* fails to parse.
 
-(columnar-openapi-fastapi)=
+<a id="columnar-openapi-fastapi"></a>
 ## Columnar OpenAPI and `Depends`
 
 Use **`columnar_body_model_from_dataframe_model(MyDF)`** as **`Body`** / **`response_model`** when clients send or receive column-shaped JSON (same shape as **`to_dict()`**). For routes, prefer **`columnar_dependency`** so you inject a **`MyDF`** directly:
@@ -113,7 +113,7 @@ For **row-array** JSON bodies, use **`rows_dependency(User)`**; OpenAPI document
 
 **Testing:** **`pydantable.testing.fastapi`** provides **`fastapi_app_with_executor()`** and **`fastapi_test_client(app)`** (context manager) so **`executor_lifespan`** runs under **`TestClient`** and **`get_executor`** works. Use **`TestClient(..., raise_server_exceptions=False)`** when asserting **500** responses from dependencies. See **`tests/test_pydantable_fastapi_columnar.py`**.
 
-(fastapi-testing)=
+<a id="fastapi-testing"></a>
 ### Testing note (lifespan and `TestClient`)
 
 FastAPI’s `TestClient` is synchronous; if your app uses a lifespan function (including `executor_lifespan`), prefer `pydantable.testing.fastapi.fastapi_test_client(app)` so the lifespan runs and `Depends(get_executor)` works. See [FASTAPI_ENHANCEMENTS](../../integrations/fastapi/enhancements.md) (Phase 7).
@@ -157,7 +157,7 @@ assert r.json() == [{"id": 1, "age": 20}]
 
 **Column-shaped bodies** are plain **`dict[str, list]`** JSON; use a **`dict`** parameter (or a Pydantic model wrapping that shape) and construct **`DataFrameModel(..., trusted_mode="shape_only")`** when the payload is trusted.
 
-(fastapi-errors)=
+<a id="fastapi-errors"></a>
 ## HTTP errors and exception handlers
 
 | Situation | Typical exception | HTTP status | Notes |
@@ -187,7 +187,7 @@ If you need deeper I/O/materialization patterns, see [FASTAPI_ADVANCED](../../in
 - **`to_dicts()`** / **`await ato_dicts()`** — `list[dict]` from row models when you want plain dicts without a separate DTO class.
 - **`await ato_polars()`** — optional Polars **`DataFrame`** when the **`[polars]`** extra is installed (same semantics as **`to_polars()`**).
 
-(fastapi-advanced)=
+<a id="fastapi-advanced"></a>
 ## Advanced topics
 
 If you need deeper async + I/O patterns (four materialization modes, `DataFrameModel` I/O in `async def`,
@@ -221,7 +221,7 @@ df = UserDF(
 )
 ```
 
-(column-shaped-json-request-bodies)=
+<a id="column-shaped-json-request-bodies"></a>
 ## Column-shaped JSON request bodies
 
 Row lists are natural for OpenAPI (`list[YourRowModel]`). Some clients send **columnar** JSON (`parallel arrays`). Model that with a Pydantic body whose fields are lists, then pass a **`dict[str, list]`** into **`DataFrameModel`**:
@@ -309,7 +309,7 @@ Use Starlette **`BackgroundTasks`** for work that must run **after** the respons
 
 Recommend validating **untrusted** JSON with default **`trusted_mode`**; reserve **`shape_only`** / **`strict`** for authenticated internal pipelines or files you control.
 
-(async-routes-executors-and-lifespan)=
+<a id="async-routes-executors-and-lifespan"></a>
 
 ## Async routes, executors, and lifespan
 

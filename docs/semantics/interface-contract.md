@@ -13,7 +13,7 @@ Versioning expectations (0.x and 1.x policy, extension alignment) are summarized
 order of that list follows the same non-guarantee as columnar materialization unless
 documented otherwise for a specific op.
 
-(ordering)=
+<a id="ordering"></a>
 ## Ordering
 
 Columnar materialization (`to_dict()`, `collect(as_lists=True)`) output order is **not a stable API guarantee**.

@@ -1,7 +1,7 @@
 # Custom execution engine packages
 
 This guide is for **authors of separate Python packages** that implement
-:class:`~pydantable.engine.protocols.ExecutionEngine` (defined in
+`pydantable.engine.protocols.ExecutionEngine` (defined in
 `pydantable_protocol`, re-exported under `pydantable.engine.protocols`) so end users can run
 PydanTable’s typed `DataFrame` / `DataFrameModel` API on top of **your** backend
 (for example a SQL engine, a remote service, or another dataframe library).
@@ -9,7 +9,7 @@ PydanTable’s typed `DataFrame` / `DataFrameModel` API on top of **your** backe
 For design rationale and guardrails inside this repository, see
 [ADR-engines](../../project/adrs/engines.md). For day-to-day contributor setup, see [DEVELOPER](../../project/developer.md).
 
-(custom-engine-deps)=
+<a id="custom-engine-deps"></a>
 
 ## Dependencies
 
@@ -35,14 +35,14 @@ For design rationale and guardrails inside this repository, see
   drivers, HTTP clients, etc.). They might also install **`pydantable-native`**
   if they want the default Polars-backed engine for file I/O or mixed stacks.
 
-(custom-engine-implement)=
+<a id="custom-engine-implement"></a>
 
 ## Implementing `ExecutionEngine`
 
 The interface is a `typing.Protocol`: **no inheritance required**. At import
-time, static checkers and :func:`isinstance` (with
+time, static checkers and `isinstance` (with
 `@runtime_checkable`) can verify your class against
-:class:`~pydantable.engine.protocols.ExecutionEngine`.
+`pydantable.engine.protocols.ExecutionEngine`.
 
 1. **Plan construction** — Implement **`make_plan`**, **`plan_*`**, expression
    helpers (**`make_literal`**, **`expr_is_global_agg`**, …) for the operations
@@ -83,7 +83,7 @@ When **PydanTable** adds new protocol members, contract tests in this project
 (exercising **`typing_extensions.get_protocol_members`**) and release notes
 will flag required updates — pin **`pydantable-protocol`** accordingly.
 
-(custom-engine-wiring)=
+<a id="custom-engine-wiring"></a>
 
 ## Wiring your engine in applications
 
@@ -104,7 +104,7 @@ will flag required updates — pin **`pydantable-protocol`** accordingly.
 **Global state:** the default engine and expression runtime (below) are process-wide;
 document thread and testing implications for your users if they use multiple engines.
 
-(custom-engine-expressions)=
+<a id="custom-engine-expressions"></a>
 
 ## Expressions (`Expr`)
 
@@ -121,7 +121,7 @@ For a **non-native default**, either:
 
 Otherwise PydanTable raises **`UnsupportedEngineOperationError`** when building expressions.
 
-(custom-engine-io)=
+<a id="custom-engine-io"></a>
 
 ## File I/O vs execution engine
 
@@ -132,7 +132,7 @@ through your backend. If your product needs “everything goes to SQL”, you
 typically expose your own ingestion APIs and **then** construct
 **`DataFrame`** instances already bound to your **`engine=`**.
 
-(custom-engine-errors)=
+<a id="custom-engine-errors"></a>
 
 ## Errors
 
@@ -144,7 +144,7 @@ typically expose your own ingestion APIs and **then** construct
 - **`pydantable_protocol.MissingRustExtensionError`**: reserved for missing or
   incomplete **native** extension scenarios; custom engines normally do not raise it.
 
-(custom-engine-testing)=
+<a id="custom-engine-testing"></a>
 
 ## Testing checklist
 
@@ -157,7 +157,7 @@ typically expose your own ingestion APIs and **then** construct
 4. **Version matrix** — CI over the **`pydantable`** / **`pydantable-protocol`**
    versions you claim to support.
 
-(custom-engine-publishing)=
+<a id="custom-engine-publishing"></a>
 
 ## Publishing
 
