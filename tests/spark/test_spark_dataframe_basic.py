@@ -6,6 +6,12 @@ import sys
 import pytest
 from pydantable import Schema
 
+# SparkDataFrame needs raikou-core (``pydantable[spark]``), not only pyspark.
+pytest.importorskip(
+    "raikou_core",
+    reason='pip install "pydantable[spark]"',
+)
+
 pytestmark = pytest.mark.spark
 
 

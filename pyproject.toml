@@ -74,6 +74,8 @@ dev = [
     "pytest-cov>=4.0",
     "pytest-xdist>=3.0",
     "pytest-timeout>=2.0",
+    # Weekly randomized-order suite in CI (``python-tests-random-order``).
+    "pytest-randomly>=3.0",
     "ruff>=0.8.0",
     "ty>=0.0.28",
     "mypy>=1.0",
@@ -235,6 +237,9 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]
 # ``__all__`` lists lazy Mongo types (``mongo_dataframe``) from ``__getattr__``.
 "python/pydantable/__init__.pyi" = ["F822"]
 "typings/pydantable/__init__.pyi" = ["F822"]
+# ``sparkdantic`` is lazy-exported via ``__getattr__`` (optional ``[spark]`` extra).
+"python/pydantable/pyspark/__init__.pyi" = ["F822"]
+"typings/pydantable/pyspark/__init__.pyi" = ["F822"]
 "tests/conftest.py" = ["TC003"]
 "tests/io/test_docs_example_scripts.py" = ["TC003"]
 "tests/io/test_scan_column_error_parsing.py" = ["E501"]

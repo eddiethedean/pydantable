@@ -13,7 +13,7 @@ How to run the suite, markers, coverage, and CI alignment are documented in [Tes
 | `tests/fastapi/` | FastAPI integration and columnar helpers |
 | `tests/typing/` | mypy / Pyright subprocess contracts, typing runtime checks |
 | `tests/third_party/` | Pandas UI, PySpark façade, SparkDantic bridge, engine contracts, Streamlit, Polars workflow examples |
-| `tests/spark/` | JVM `SparkSession` + `SparkDataFrame` / raikou-core (`@pytest.mark.spark`) |
+| `tests/spark/` | JVM `SparkSession` + `SparkDataFrame` / raikou-core (`@pytest.mark.spark`). On **GitHub Actions Windows**, `pytest` runs with `-m not spark` (local Spark is unreliable there); Linux and macOS matrices still run these tests. |
 
 Shared helpers live in `tests/_support/`. Pytest plugins and fixtures are in `tests/conftest.py`.
 

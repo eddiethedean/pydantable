@@ -4,6 +4,12 @@ The **PySpark UI** is an optional import surface that adds **Apache Spark–styl
 
 Execution uses pydantable’s Rust/Polars core (see [Execution](EXECUTION.md)).
 
+## Install: base package vs `pydantable[spark]`
+
+- **`import pydantable.pyspark`** (this façade — `DataFrame`, `DataFrameModel`, `pydantable.pyspark.sql`, …) works with **only** the core `pip install pydantable` dependencies. It does **not** require PySpark, SparkDantic, or raikou-core at import time.
+- **`pydantable.pyspark.sparkdantic`** (JVM schema helpers from [SparkDantic](https://github.com/mitchelllisle/sparkdantic)) is loaded **lazily** and needs `pip install "pydantable[spark]"` (pulls in `sparkdantic`, `pyspark`, `raikou-core`, …). Accessing `pydantable.pyspark.sparkdantic` without those packages installed raises `ModuleNotFoundError` for the missing optional dependency.
+- **Real PySpark execution** (`SparkDataFrame`, `SparkDataFrameModel` over a `pyspark.sql.DataFrame`) is documented in [Spark engine](SPARK_ENGINE.md) and requires the same `[spark]` stack plus a JVM.
+
 ## Release context (1.8.0 vs 1.9.0)
 
 - **1.8.0** focused on **core** ergonomics (selectors, joins, `drop_nulls`, reshape parity, etc.)—the same engine every import style uses; see the {doc}`CHANGELOG` **1.8.0** section.

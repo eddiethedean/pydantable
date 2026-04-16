@@ -1,5 +1,7 @@
 # Spark engine (raikou-core) and SparkDantic
 
+**Import note:** `import pydantable.pyspark` (the PySpark-**shaped** façade — see [PySpark UI](PYSPARK_UI.md)) works with the **core** package only. This page’s **SparkDantic** helpers (`pydantable.pyspark.sparkdantic`) and **raikou-core** `SparkDataFrame` types require `pip install "pydantable[spark]"` (and a JVM for PySpark sessions).
+
 This page covers **two related ideas**:
 
 1. **Optional PySpark execution** (`raikou-core`) — run the same typed `DataFrame` API on a real

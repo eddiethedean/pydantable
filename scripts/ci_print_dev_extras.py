@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Print ``[project.optional-dependencies] dev`` packages.
 
-Used for CI / docs alignment checks. The GitHub Actions ``python-tests`` job
-installs dependencies with an explicit
-``pip install`` line in ``.github/workflows/_shared-ci.yml``. Keep that list in
-sync with ``pyproject.toml`` ``[project.optional-dependencies] dev`` (same
-versions where applicable). Run this script after editing either side:
+The GitHub Actions ``python-tests`` jobs install ``pip install -e ".[dev]"``
+(plus ``raikou-core`` and ``pyspark`` for JVM Spark tests) after building the
+native extension — see ``.github/workflows/_shared-ci.yml``. This script lists
+what ``[dev]`` contains for review when editing extras.
 
     python scripts/ci_print_dev_extras.py
 
@@ -39,9 +38,8 @@ def main() -> None:
     for line in lines:
         print(line)
     print(
-        "\n# CI installs a flattened subset via _shared-ci.yml "
-        "(plus pyright; moltres-core/greenlet must match [dev] / [sql]; "
-        "entei-core/pymongo/beanie must match [dev] / [mongo])."
+        '\n# CI: maturin develop, then pip install -e ".[dev]" '
+        "raikou-core pyspark (see _shared-ci.yml)."
     )
 
 
