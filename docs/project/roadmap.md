@@ -6,7 +6,7 @@ Release history (high level): [`CHANGELOG.md`](/project/changelog.md).
 
 For Polars-style API parity at the method level, see
 [`POLARS_TRANSFORMATIONS_ROADMAP.md`](/user-guide/polars-alignment/transformations-roadmap.md). **Future Expr /
-table methods** we may add next are under [**Future method candidates**](future-expr-and-dataframe-method-candidates-not-scheduled) (below). Window **RANGE** rules for multi-column `orderBy` are documented in [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics.md) (PostgreSQL-style first-key axis; not universal SQL parity).
+table methods** we may add next are under [**Future method candidates**](#future-expr-and-dataframe-method-candidates-not-scheduled) (below). Window **RANGE** rules for multi-column `orderBy` are documented in [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics.md) (PostgreSQL-style first-key axis; not universal SQL parity).
 
 ---
 
@@ -155,12 +155,12 @@ Practical inputs that feed that phase:
 - [x] **Hardening / audit:** `make check-full` and full **pytest** on a **release** extension build; no regressions requiring code changes in that cycle (follow-up patches ship in later **0.13.x** releases as needed).
 - [x] **Docs:** cross-links and “related documentation” sections in [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics.md) and [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md); [`README.md`](/project/repository-readme.md) and doc site [`index.md`](/index.md) aligned with current behavior.
 - [x] **FastAPI guide:** [`FASTAPI.md`](/integrations/fastapi/fastapi.md) — **`trusted_mode`**, column-shaped JSON bodies, large-table / Polars / Arrow trust boundaries, links to [`DATAFRAMEMODEL.md`](/user-guide/dataframemodel.md) / [`SUPPORTED_TYPES.md`](/user-guide/supported-types.md), **sync** handlers and **0.15.0** async pointer.
-- [x] **CI and tooling:** reviewed **GitHub Actions** (`actions/checkout@v5`, `actions/setup-python@v6`, `actions/cache@v5`); documented **`cargo audit`** ignore for **RUSTSEC-2025-0141** in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
-- [x] **Tests / examples:** extended [`scripts/verify_doc_examples.py`](../scripts/verify_doc_examples.py) for new FastAPI patterns; no trivial remaining **PySpark**/**pandas** one-line façade gaps identified in that release.
+- [x] **CI and tooling:** reviewed **GitHub Actions** (`actions/checkout@v5`, `actions/setup-python@v6`, `actions/cache@v5`); documented **`cargo audit`** ignore for **RUSTSEC-2025-0141** in [`.github/workflows/ci.yml`](https://github.com/eddiethedean/pydantable/blob/main/.github/workflows/ci.yml).
+- [x] **Tests / examples:** extended [`scripts/verify_doc_examples.py`](https://github.com/eddiethedean/pydantable/blob/main/scripts/verify_doc_examples.py) for new FastAPI patterns; no trivial remaining **PySpark**/**pandas** one-line façade gaps identified in that release.
 - [x] **I/O documentation:** [`EXECUTION.md`](/user-guide/execution.md) and [`PERFORMANCE.md`](/project/performance.md) label **sync-only** materialization/interchange and point to **0.15.0** async work; [`PERFORMANCE.md`](/project/performance.md) cross-links **FastAPI** bulk guidance.
-- [x] **Window polish (docs):** null ordering and **`CURRENT ROW`** / peer framing in [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics.md) and [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md); module docstring on `Window` in [`window_spec.py`](../python/pydantable/window_spec.py). User-facing **`NULLS FIRST` / `LAST`** via **`orderBy(..., nulls_last=...)`** shipped in **0.14.0**.
+- [x] **Window polish (docs):** null ordering and **`CURRENT ROW`** / peer framing in [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics.md) and [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md); module docstring on `Window` in [`window_spec.py`](https://github.com/eddiethedean/pydantable/blob/main/python/pydantable/window_spec.py). User-facing **`NULLS FIRST` / `LAST`** via **`orderBy(..., nulls_last=...)`** shipped in **0.14.0**.
 - [x] **Trusted ingest:** **`strict`** dtype checks for **PyArrow** `Array` / `ChunkedArray` columns (including **decimal** and **enum**-compatible Arrow types); accept all concrete Arrow array classes in trusted column buffers (`isinstance(..., pa.Array)`). Tests in `tests/test_trusted_strict_pyarrow.py`; **`pyarrow`** added to **`[dev]`** and CI install. **`shape_only`** dtype-drift **`DtypeDriftWarning`** shipped in **0.14.0**.
-- [x] **Performance:** [`framed_window_bench.py`](../benchmarks/framed_window_bench.py) and [`trusted_polars_ingest_bench.py`](../benchmarks/trusted_polars_ingest_bench.py); [`PERFORMANCE.md`](/project/performance.md) table updated.
+- [x] **Performance:** [`framed_window_bench.py`](https://github.com/eddiethedean/pydantable/blob/main/benchmarks/framed_window_bench.py) and [`trusted_polars_ingest_bench.py`](https://github.com/eddiethedean/pydantable/blob/main/benchmarks/trusted_polars_ingest_bench.py); [`PERFORMANCE.md`](/project/performance.md) table updated.
 
 ---
 
@@ -226,7 +226,7 @@ Practical inputs that feed that phase:
 
 **Themes:** stable user-facing API; clearer **Rust / Polars** error context for **grouped** execution; explicit **deferral** of non-string map keys; documentation and light **Hypothesis** smoke tests—no new **`Expr`** or PySpark façade methods.
 
-- [x] **Rust plan / Python boundary:** [`polars_err_ctx`](../pydantable-core/src/plan/execute_polars/common.rs) prefixes Polars **`collect()`** failures during **`group_by().agg()`** with **`(group_by().agg())`** in the **`ValueError`** message. [`DEVELOPER.md`](/project/developer.md) updated.
+- [x] **Rust plan / Python boundary:** [`polars_err_ctx`](https://github.com/eddiethedean/pydantable/blob/main/pydantable-core/src/plan/execute_polars/common.rs) prefixes Polars **`collect()`** failures during **`group_by().agg()`** with **`(group_by().agg())`** in the **`ValueError`** message. [`DEVELOPER.md`](/project/developer.md) updated.
 - [x] **Polars transformations:** Phases **P1–P7** in [`POLARS_TRANSFORMATIONS_ROADMAP.md`](/user-guide/polars-alignment/transformations-roadmap.md) remain complete; **post–P7** note—future parity is **additive** (`Expr` / transforms), not a new phase backlog. [`PARITY_SCORECARD.md`](/user-guide/polars-alignment/parity-scorecard.md) and [`PYSPARK_PARITY.md`](/integrations/alternate-surfaces/pyspark-parity.md) refreshed for **0.18.0** (no new façade rows).
 - [x] **Maps:** **Non-string map keys** explicitly **not** in **0.18.0**; [`SUPPORTED_TYPES.md`](/user-guide/supported-types.md) and **Later** (below) updated.
 - [x] **CI and quality:** Hypothesis + integration tests for **`group_by().agg()`** and **`join`** (`tests/test_hypothesis_properties.py`, `tests/test_v018_features.py`); Rust **`polars_err_ctx`** format tests in `execute_polars/common.rs`.
@@ -242,7 +242,7 @@ Practical inputs that feed that phase:
 - [x] **Contract and semver:** [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md) audited against **windows**, **trusted ingest**, **async** materialization, and **interchange**; [`VERSIONING.md`](/semantics/versioning.md) documents **0.x** patch vs minor expectations and points here for behavior.
 - [x] **Parity and roadmap docs:** Pass on [`POLARS_TRANSFORMATIONS_ROADMAP.md`](/user-guide/polars-alignment/transformations-roadmap.md), [`PARITY_SCORECARD.md`](/user-guide/polars-alignment/parity-scorecard.md), [`PYSPARK_PARITY.md`](/integrations/alternate-surfaces/pyspark-parity.md), [`README.md`](/project/repository-readme.md), and doc site [`index.md`](/index.md)—**current release** and **0.19 → 1.0** narrative updated.
 - [x] **Performance and ops:** [`PERFORMANCE.md`](/project/performance.md) — key benchmark scripts spot-checked under a **release** build on supported Polars; narrative note for **0.19.0** (no material numeric refresh required vs **0.18.x** execution paths).
-- [x] **Release hygiene:** **`make check-full`**, **`cargo test --all-features`**, **`cargo check --no-default-features`**, and **`pytest`** (with **`-n auto`** where CI uses it) on a **release** extension build before tagging; [`.github/workflows/_shared-ci.yml`](../.github/workflows/_shared-ci.yml) install list checked against [`DEVELOPER.md`](/project/developer.md) / **`pyproject.toml`** **`[dev]`** (no drift found in this cycle).
+- [x] **Release hygiene:** **`make check-full`**, **`cargo test --all-features`**, **`cargo check --no-default-features`**, and **`pytest`** (with **`-n auto`** where CI uses it) on a **release** extension build before tagging; [`.github/workflows/_shared-ci.yml`](https://github.com/eddiethedean/pydantable/blob/main/.github/workflows/_shared-ci.yml) install list checked against [`DEVELOPER.md`](/project/developer.md) / **`pyproject.toml`** **`[dev]`** (no drift found in this cycle).
 - [x] **Tests:** **`group_by`** integration tests sort grouped output before assert where row order is not API-guaranteed (CI **`pytest-xdist`** stability); see **`tests/test_v018_features.py`**.
 
 ---
@@ -268,16 +268,16 @@ Practical inputs that feed that phase:
 
 - [x] **`_repr_html_`** — bounded **HTML** preview (**stdlib** escape only).
 - [x] **Notebook note** — short subsection in [`DEVELOPER.md`](/project/developer.md) (**Notebooks**).
-- [x] **Display options** — **`set_display_options`**, env **`PYDANTABLE_REPR_HTML_*`** (see [`pydantable.display`](../python/pydantable/display.py)).
+- [x] **Display options** — **`set_display_options`**, env **`PYDANTABLE_REPR_HTML_*`** (see [`pydantable.display`](https://github.com/eddiethedean/pydantable/blob/main/python/pydantable/display.py)).
 - [ ] **Later:** **ipywidgets** explorers; optional **CI** smoke for **IPython** display hooks.
 
 ### Documentation and extended UX
 
-- [x] **Quickstart:** [`QUICKSTART.md`](/getting-started/quickstart.md), [`notebooks/five_minute_tour.ipynb`](../notebooks/five_minute_tour.ipynb), links from [`README.md`](/project/repository-readme.md), [`index.md`](/index.md), [`DEVELOPER.md`](/project/developer.md).
+- [x] **Quickstart:** [`QUICKSTART.md`](/getting-started/quickstart.md), [`notebooks/five_minute_tour.ipynb`](https://github.com/eddiethedean/pydantable/blob/main/notebooks/five_minute_tour.ipynb), links from [`README.md`](/project/repository-readme.md), [`index.md`](/index.md), [`DEVELOPER.md`](/project/developer.md).
 - [x] **Execution guide:** materialization cost table, import-style table, copy-as / interchange in [`EXECUTION.md`](/user-guide/execution.md).
 - [x] **Naming map:** core ↔ pandas ↔ PySpark in [`PANDAS_UI.md`](/integrations/alternate-surfaces/pandas-ui.md) and [`PYSPARK_UI.md`](/integrations/alternate-surfaces/pyspark-ui.md).
 - [x] **`value_counts(column)`** on **`DataFrame`** / **`DataFrameModel`**; **`_repr_mimebundle_`** for Jupyter; **`PYDANTABLE_VERBOSE_ERRORS`** for **`execute_plan`** **`ValueError`** context.
-- [x] **Tests:** [`tests/dataframe/test_display_options.py`](../tests/dataframe/test_display_options.py), [`tests/dataframe/test_rust_engine_verbose_errors.py`](../tests/dataframe/test_rust_engine_verbose_errors.py).
+- [x] **Tests:** [`tests/dataframe/test_display_options.py`](https://github.com/eddiethedean/pydantable/blob/main/tests/dataframe/test_display_options.py), [`tests/dataframe/test_rust_engine_verbose_errors.py`](https://github.com/eddiethedean/pydantable/blob/main/tests/dataframe/test_rust_engine_verbose_errors.py).
 
 ### Quality and release
 
@@ -365,7 +365,7 @@ Practical inputs that feed that phase:
 
 - [x] **Precondition:** **Shipped in 0.19.0** and **0.20.0** (above) are complete or any remaining gap is noted in this file or [`CHANGELOG.md`](/project/changelog.md).
 - [x] **Semver contract:** publish a **1.0** policy (expand [`VERSIONING.md`](/semantics/versioning.md) and/or [`README.md`](/project/repository-readme.md)): what counts as **patch** vs **minor** vs **major** for **1.x** for `DataFrame` / `DataFrameModel` / `Expr` / Rust extension boundaries; confirm [`INTERFACE_CONTRACT.md`](/semantics/interface-contract.md) is the behavioral source of truth. (**0.x** expectations already live in [`VERSIONING.md`](/semantics/versioning.md).)
-- [x] **Packaging and versions:** **`pyproject.toml`** / **`Cargo.toml`** / extension **`rust_version()`** alignment; **Maturin** release workflow (e.g. [`.github/workflows/release.yml`](../.github/workflows/release.yml)) exercised or dry-run validated; **PyPI** **sdist + wheels** for declared platforms; optional **SBOM** or supply-chain notes if policy requires them.
+- [x] **Packaging and versions:** **`pyproject.toml`** / **`Cargo.toml`** / extension **`rust_version()`** alignment; **Maturin** release workflow (e.g. [`.github/workflows/release.yml`](https://github.com/eddiethedean/pydantable/blob/main/.github/workflows/release.yml)) exercised or dry-run validated; **PyPI** **sdist + wheels** for declared platforms; optional **SBOM** or supply-chain notes if policy requires them.
 - [x] **Quality bar:** full **`make check-full`**, **`cargo test --all-features`**, **`cargo check --no-default-features`**, and **pytest** (including optional-deps legs that match **CI**) on the **exact** commit tagged **`v1.0.0`**; **no known P0/P1** regressions against **INTERFACE_CONTRACT**.
 - [x] **Security tooling:** **`cargo audit`** / **`cargo deny`** (or documented exceptions) current; policy for how **1.x** will handle **RUSTSEC** / advisory bumps.
 - [x] **Documentation and comms:** **README** + doc site **`index`** lead with **1.0** positioning; **changelog** **`1.0.0`** section highlights stability scope; **upgrade path** from **0.20.x** in one place (even if “no breaking changes from last 0.20”).
@@ -388,7 +388,7 @@ Work **not** scheduled in the **0.17.0–0.20.0** shipped sections or **Planned 
 
 ---
 
-(future-expr-and-dataframe-method-candidates-not-scheduled)=
+<a id="future-expr-and-dataframe-method-candidates-not-scheduled"></a>
 ## Future Expr and DataFrame method candidates (not scheduled)
 
 **Additive** APIs aligned with Polars / PySpark ergonomics. Each needs Rust IR + typing +

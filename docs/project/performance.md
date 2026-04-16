@@ -31,10 +31,10 @@ HTTP handlers that build `DataFrameModel` from **large** or **pre-validated** ta
 
 | Script | Purpose |
 |--------|---------|
-| [`benchmarks/profile_breakdown.py`](../benchmarks/profile_breakdown.py) | Wall-time split: validation vs `DataFrame` construction vs transform+`collect()` |
-| [`benchmarks/micro_collect_only.py`](../benchmarks/micro_collect_only.py) | Mean time for `collect()` only on a pre-built `DataFrame` (execution + egress) |
-| [`benchmarks/framed_window_bench.py`](../benchmarks/framed_window_bench.py) | Mean time for `collect()` on a framed `rowsBetween` + `window_sum` pipeline |
-| [`benchmarks/trusted_polars_ingest_bench.py`](../benchmarks/trusted_polars_ingest_bench.py) | Polars root + `trusted_mode="strict"` ingest plus trivial `select` + `collect()` |
+| [`benchmarks/profile_breakdown.py`](https://github.com/eddiethedean/pydantable/blob/main/benchmarks/profile_breakdown.py) | Wall-time split: validation vs `DataFrame` construction vs transform+`collect()` |
+| [`benchmarks/micro_collect_only.py`](https://github.com/eddiethedean/pydantable/blob/main/benchmarks/micro_collect_only.py) | Mean time for `collect()` only on a pre-built `DataFrame` (execution + egress) |
+| [`benchmarks/framed_window_bench.py`](https://github.com/eddiethedean/pydantable/blob/main/benchmarks/framed_window_bench.py) | Mean time for `collect()` on a framed `rowsBetween` + `window_sum` pipeline |
+| [`benchmarks/trusted_polars_ingest_bench.py`](https://github.com/eddiethedean/pydantable/blob/main/benchmarks/trusted_polars_ingest_bench.py) | Polars root + `trusted_mode="strict"` ingest plus trivial `select` + `collect()` |
 | `python -m cProfile` / `py-spy` | Deeper Python stacks; Rust: `perf` / Instruments on the `_core` shared library |
 
 Run `profile_breakdown.py --cprofile` for a cumulative profile of one pipeline.
@@ -54,4 +54,4 @@ Wheels and `maturin develop --release` use Cargo’s `release` profile. Optional
 
 ## 0.19.0 validation
 
-**0.19.0** spot-checked [`benchmarks/profile_breakdown.py`](../benchmarks/profile_breakdown.py), [`benchmarks/micro_collect_only.py`](../benchmarks/micro_collect_only.py), [`benchmarks/framed_window_bench.py`](../benchmarks/framed_window_bench.py), and [`benchmarks/trusted_polars_ingest_bench.py`](../benchmarks/trusted_polars_ingest_bench.py) under a **release** extension build on the supported Polars stack; **0.18.x** did not change materialization or grouped execution hot paths in ways that require refreshed headline numbers here. Re-run these scripts locally when upgrading Polars or changing the Rust execution path.
+**0.19.0** spot-checked [`benchmarks/profile_breakdown.py`](https://github.com/eddiethedean/pydantable/blob/main/benchmarks/profile_breakdown.py), [`benchmarks/micro_collect_only.py`](https://github.com/eddiethedean/pydantable/blob/main/benchmarks/micro_collect_only.py), [`benchmarks/framed_window_bench.py`](https://github.com/eddiethedean/pydantable/blob/main/benchmarks/framed_window_bench.py), and [`benchmarks/trusted_polars_ingest_bench.py`](https://github.com/eddiethedean/pydantable/blob/main/benchmarks/trusted_polars_ingest_bench.py) under a **release** extension build on the supported Polars stack; **0.18.x** did not change materialization or grouped execution hot paths in ways that require refreshed headline numbers here. Re-run these scripts locally when upgrading Polars or changing the Rust execution path.
