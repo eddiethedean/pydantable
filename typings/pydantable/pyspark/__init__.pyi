@@ -4,8 +4,7 @@ from pydantable.expressions import Expr
 from pydantable.pyspark.sql_dataframe import SqlDataFrame, SqlDataFrameModel
 from pydantable.schema import Schema
 
-from . import sparkdantic
-from . import sql
+from . import sparkdantic, sql
 from .dataframe import DataFrame, DataFrameModel
 
 __all__ = [

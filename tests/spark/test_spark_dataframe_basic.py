@@ -45,3 +45,37 @@ def test_from_spark_dataframe_select_filter(spark) -> None:
     df = SparkDataFrame[Row].from_spark_dataframe(sdf)
     out = df.filter(df.spark_col("x") > 1).select("y").to_dict()
     assert out == {"y": ["b"]}
+
+
+def test_spark_col_returns_pyspark_column(spark) -> None:
+    pytest.importorskip("raikou_core")
+    from pydantable import SparkDataFrame
+    from pyspark.sql import Column
+
+    sdf = spark.createDataFrame([{"x": 1, "y": "a"}])
+    df = SparkDataFrame[Row].from_spark_dataframe(sdf)
+    c = df.spark_col("x")
+    assert isinstance(c, Column)
+
+
+def test_filter_rejects_native_pydantable_expr(spark) -> None:
+    pytest.importorskip("raikou_core")
+    from pydantable import DataFrame, SparkDataFrame
+
+    sdf = spark.createDataFrame([{"x": 1, "y": "a"}])
+    dfp = SparkDataFrame[Row].from_spark_dataframe(sdf)
+    core = DataFrame[Row]({"x": [1], "y": ["a"]})
+    native_expr = core.x > 0
+    with pytest.raises(TypeError, match="pyspark Column"):
+        dfp.filter(native_expr)
+
+
+def test_with_columns_accepts_spark_column(spark) -> None:
+    pytest.importorskip("raikou_core")
+    from pydantable import SparkDataFrame
+    from pyspark.sql import functions as F
+
+    sdf = spark.createDataFrame([{"x": 1, "y": "a"}])
+    df = SparkDataFrame[Row].from_spark_dataframe(sdf)
+    out = df.with_columns(z=F.lit(99)).select("x", "z").to_dict()
+    assert out == {"x": [1], "z": [99]}

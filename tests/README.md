@@ -12,7 +12,8 @@ How to run the suite, markers, coverage, and CI alignment are documented in [Tes
 | `tests/sql/` | SQLModel I/O, string-SQL deprecation, Moltres / `SqlDataFrame` |
 | `tests/fastapi/` | FastAPI integration and columnar helpers |
 | `tests/typing/` | mypy / Pyright subprocess contracts, typing runtime checks |
-| `tests/third_party/` | Pandas UI, PySpark façade, Streamlit, Polars workflow examples |
+| `tests/third_party/` | Pandas UI, PySpark façade, SparkDantic bridge, engine contracts, Streamlit, Polars workflow examples |
+| `tests/spark/` | JVM `SparkSession` + `SparkDataFrame` / raikou-core (`@pytest.mark.spark`) |
 
 Shared helpers live in `tests/_support/`. Pytest plugins and fixtures are in `tests/conftest.py`.
 

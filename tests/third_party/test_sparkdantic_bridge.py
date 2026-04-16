@@ -11,6 +11,7 @@ from pydantable.pyspark.sparkdantic import (
     SparkField,
     SparkModel,
     TypeConversionError,
+    create_spark_schema,
     dataframe_model_to_pyspark_struct_type,
     dataframe_model_to_spark_ddl_schema,
     dataframe_model_to_spark_json_schema,
@@ -103,3 +104,76 @@ def test_type_conversion_error_surfaces() -> None:
 
     with pytest.raises(TypeConversionError):
         to_spark_json_schema(Bad)
+
+
+def test_to_pyspark_struct_type_matches_create_spark_schema() -> None:
+    pytest.importorskip("pyspark")
+    assert to_pyspark_struct_type(User) == create_spark_schema(User)
+
+
+def test_safe_casting_maps_integer_to_long_in_json() -> None:
+    class N(Schema):
+        n: int
+
+    loose = to_spark_json_schema(N, safe_casting=False)
+    safe = to_spark_json_schema(N, safe_casting=True)
+    t0 = next(f["type"] for f in loose["fields"] if f["name"] == "n")
+    t1 = next(f["type"] for f in safe["fields"] if f["name"] == "n")
+    assert t0 == "integer"
+    assert t1 == "long"
+
+
+def test_by_alias_controls_spark_field_names() -> None:
+    class Aliased(Schema):
+        uid: int = Field(alias="user_id")
+
+    with_names = to_spark_json_schema(Aliased, by_alias=True)
+    with_attrs = to_spark_json_schema(Aliased, by_alias=False)
+    assert [f["name"] for f in with_names["fields"]] == ["user_id"]
+    assert [f["name"] for f in with_attrs["fields"]] == ["uid"]
+
+
+def test_nested_struct_in_json_schema() -> None:
+    class Inner(Schema):
+        a: int
+
+    class Outer(Schema):
+        inner: Inner
+
+    js = to_spark_json_schema(Outer)
+    inner_field = js["fields"][0]
+    assert inner_field["name"] == "inner"
+    assert inner_field["type"]["type"] == "struct"
+    assert [f["name"] for f in inner_field["type"]["fields"]] == ["a"]
+
+
+def test_array_column_in_json_schema() -> None:
+    class T(Schema):
+        xs: list[int]
+
+    js = to_spark_json_schema(T)
+    arr = js["fields"][0]["type"]
+    assert arr["type"] == "array"
+    assert arr["elementType"] == "integer"
+
+
+def test_dataframe_model_helpers_reject_non_subclass() -> None:
+    class NotDFM:
+        pass
+
+    with pytest.raises(TypeError, match="RowModel"):
+        dataframe_model_to_spark_json_schema(NotDFM)
+
+
+def test_sparkdantic_import_error_when_pyspark_missing_for_struct(monkeypatch) -> None:
+    """``to_pyspark_struct_type`` delegates to sparkdantic which requires PySpark."""
+    pytest.importorskip("pyspark")
+    import pydantable.pyspark.sparkdantic as sd
+    from sparkdantic import exceptions as sd_exc
+
+    def boom(*_a: object, **_k: object) -> None:
+        raise sd_exc.SparkdanticImportError("no pyspark")
+
+    monkeypatch.setattr(sd, "create_spark_schema", boom)
+    with pytest.raises(sd_exc.SparkdanticImportError):
+        to_pyspark_struct_type(User)
