@@ -1,6 +1,6 @@
 # Pydantable API Specification
 
-**Status:** Sketch. **Canonical API:** [EXECUTION.md](../EXECUTION.md), package **`DataFrame`** / **`DataFrameModel`**.
+**Status:** Sketch. **Canonical API:** [EXECUTION.md](../user-guide/execution.md), package **`DataFrame`** / **`DataFrameModel`**.
 
 ## Execution Modes
 

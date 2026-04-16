@@ -1,8 +1,8 @@
 # FastAPI end-to-end examples
 
 These examples are longer, **copy/paste-friendly** patterns for realistic services.
-For the shortest runnable app, start with [GOLDEN_PATH_FASTAPI](/GOLDEN_PATH_FASTAPI.md). For reference
-tables and routing patterns, see [FASTAPI](/FASTAPI.md).
+For the shortest runnable app, start with [GOLDEN_PATH_FASTAPI](/integrations/fastapi/golden-path.md). For reference
+tables and routing patterns, see [FASTAPI](/integrations/fastapi/fastapi.md).
 
 ## Example 1: Router + multi-table body — revenue by country
 

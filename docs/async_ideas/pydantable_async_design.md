@@ -1,6 +1,6 @@
 # Pydantable Async Execution Design
 
-**Status:** Design notes. **Canonical behavior:** [EXECUTION.md](../EXECUTION.md), [INTERFACE_CONTRACT.md](../INTERFACE_CONTRACT.md). The extension uses **`pyo3-async-runtimes`** (not the legacy **`pyo3-asyncio`** crate name).
+**Status:** Design notes. **Canonical behavior:** [EXECUTION.md](../user-guide/execution.md), [INTERFACE_CONTRACT.md](../semantics/interface-contract.md). The extension uses **`pyo3-async-runtimes`** (not the legacy **`pyo3-asyncio`** crate name).
 
 ## Overview
 This document defines the async execution model for Pydantable, a Rust-backed DataFrame engine with Python bindings.

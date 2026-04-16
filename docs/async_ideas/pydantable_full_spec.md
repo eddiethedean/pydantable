@@ -1,6 +1,6 @@
 # Pydantable Production-Grade Execution & Async Architecture Spec
 
-**Status:** Architecture sketch. **Shipped subset:** [EXECUTION.md](../EXECUTION.md) (**`acollect`**, **`submit`**, **`astream`**, Rust **`async_execute_plan`**). **Not shipped here:** distributed execution, Arrow Flight, adaptive planning (see [ROADMAP.md](../ROADMAP.md)).
+**Status:** Architecture sketch. **Shipped subset:** [EXECUTION.md](../user-guide/execution.md) (**`acollect`**, **`submit`**, **`astream`**, Rust **`async_execute_plan`**). **Not shipped here:** distributed execution, Arrow Flight, adaptive planning (see [ROADMAP.md](../project/roadmap.md)).
 
 ## 1. Vision
 

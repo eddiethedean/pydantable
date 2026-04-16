@@ -98,10 +98,10 @@ you pass to **`span(...)`** onto span attributes.
   fields so concurrent requests stay separable in logs.
 - **`PYDANTABLE_TRACE=1`** prints minimal trace lines to stderr when no observer is set—useful
   locally, not in production.
-- Heavy work should still use **`executor`** / **`acollect(executor=...)`** as in [GOLDEN_PATH_FASTAPI](/GOLDEN_PATH_FASTAPI.md),
+- Heavy work should still use **`executor`** / **`acollect(executor=...)`** as in [GOLDEN_PATH_FASTAPI](/integrations/fastapi/golden-path.md),
   not block the event loop inside **`span`**.
 
 ## See also
 
-- [FASTAPI](/FASTAPI.md) — integration guide and **`register_exception_handlers`**
+- [FASTAPI](/integrations/fastapi/fastapi.md) — integration guide and **`register_exception_handlers`**
 - [fastapi_background_tasks](/cookbook/fastapi_background_tasks.md) — deferred work with **`submit`**

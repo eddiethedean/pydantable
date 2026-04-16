@@ -23,11 +23,11 @@ json_logs_unnest_export: ok
 
 ## Notes
 
-- **Lazy read / write:** `read_ndjson` keeps a scan root until `collect` / `write_ndjson` / other terminals (see [EXECUTION](/EXECUTION.md) and [IO_JSON](/IO_JSON.md)).
-- **Unnest naming:** columns become `meta_region`, `meta_code`, … per [INTERFACE_CONTRACT](/INTERFACE_CONTRACT.md).
-- **Selectors:** to pick all struct columns before unnesting, use `s.structs()` as in [SELECTORS](/SELECTORS.md) (**Nested structs**).
-- **Egress:** this recipe uses **`write_ndjson`** ([IO_NDJSON](/IO_NDJSON.md)). For a single JSON **array** file, use **`DataFrameModel.export_json`** (eager column dict → file; see [IO_JSON](/IO_JSON.md)).
+- **Lazy read / write:** `read_ndjson` keeps a scan root until `collect` / `write_ndjson` / other terminals (see [EXECUTION](/user-guide/execution.md) and [IO_JSON](/io/json.md)).
+- **Unnest naming:** columns become `meta_region`, `meta_code`, … per [INTERFACE_CONTRACT](/semantics/interface-contract.md).
+- **Selectors:** to pick all struct columns before unnesting, use `s.structs()` as in [SELECTORS](/user-guide/selectors.md) (**Nested structs**).
+- **Egress:** this recipe uses **`write_ndjson`** ([IO_NDJSON](/io/ndjson.md)). For a single JSON **array** file, use **`DataFrameModel.export_json`** (eager column dict → file; see [IO_JSON](/io/json.md)).
 
 ## See also
 
-[IO_JSON](/IO_JSON.md) · [IO_NDJSON](/IO_NDJSON.md) · [SELECTORS](/SELECTORS.md) · [CHANGELOG](/CHANGELOG.md) (**1.10.0**)
+[IO_JSON](/io/json.md) · [IO_NDJSON](/io/ndjson.md) · [SELECTORS](/user-guide/selectors.md) · [CHANGELOG](/project/changelog.md) (**1.10.0**)

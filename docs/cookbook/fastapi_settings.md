@@ -68,5 +68,5 @@ Tune **`executor_max_workers`** from CPU count, expected concurrent long-running
 
 ## See also
 
-- [GOLDEN_PATH_FASTAPI](/GOLDEN_PATH_FASTAPI.md)
-- [FASTAPI](/FASTAPI.md)
+- [GOLDEN_PATH_FASTAPI](/integrations/fastapi/golden-path.md)
+- [FASTAPI](/integrations/fastapi/fastapi.md)

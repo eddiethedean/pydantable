@@ -41,4 +41,4 @@ asyncio.run(run())
 ## Pitfalls
 
 - **Cancellation**: cancelling the awaiting task does **not** cancel in-flight native work.
-- **Thread pools**: you can pass a custom `executor=`; see [FASTAPI](/FASTAPI.md) for patterns.
+- **Thread pools**: you can pass a custom `executor=`; see [FASTAPI](/integrations/fastapi/fastapi.md) for patterns.

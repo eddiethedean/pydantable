@@ -25,5 +25,5 @@ with User.read_parquet_url_ctx(url) as df:
 ## Pitfalls
 
 - Do not keep a lazy frame alive after the context exits; the backing file is deleted.
-- For safety limits on HTTP reads, see [IO_HTTP](/IO_HTTP.md) (`max_bytes`).
+- For safety limits on HTTP reads, see [IO_HTTP](/io/http.md) (`max_bytes`).
 

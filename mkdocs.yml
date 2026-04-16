@@ -106,34 +106,62 @@ extra_css:
 nav:
   - Home: index.md
   - Getting started:
-      - QUICKSTART.md
-      - TYPING.md
-      - DATAFRAMEMODEL.md
-      - SUPPORTED_TYPES.md
-      - CUSTOM_DTYPES.md
-      - STRICTNESS.md
-      - SERVICE_ERGONOMICS.md
-      - GOLDEN_PATH_FASTAPI.md
-      - FASTAPI.md
-      - FASTAPI_ADVANCED.md
-      - FASTAPI_ENHANCEMENTS.md
-      - EXECUTION.md
-      - MATERIALIZATION.md
-      - DATA_IO_SOURCES.md
-      - STREAMLIT.md
-      - DOCS_MAP.md
-      - TROUBLESHOOTING.md
-  - Data I/O (by format):
-      - IO_OVERVIEW.md
-      - IO_DECISION_TREE.md
-      - IO_PARQUET.md
-      - IO_CSV.md
-      - IO_NDJSON.md
-      - IO_JSON.md
-      - IO_IPC.md
-      - IO_HTTP.md
-      - IO_SQL.md
-      - IO_EXTRAS.md
+      - getting-started/index.md
+      - getting-started/quickstart.md
+      - getting-started/troubleshooting.md
+      - getting-started/docs-map.md
+  - User guide:
+      - user-guide/index.md
+      - user-guide/dataframemodel.md
+      - user-guide/typing.md
+      - user-guide/supported-types.md
+      - user-guide/custom-dtypes.md
+      - user-guide/strictness.md
+      - user-guide/service-ergonomics.md
+      - user-guide/execution.md
+      - user-guide/materialization.md
+      - user-guide/selectors.md
+      - user-guide/plan-and-plugins.md
+      - Polars alignment:
+          - user-guide/polars-alignment/workflows.md
+          - user-guide/polars-alignment/parity-scorecard.md
+          - user-guide/polars-alignment/transformations-roadmap.md
+          - user-guide/polars-alignment/polars-parity-1-8.md
+          - user-guide/polars-alignment/polars-parity-next.md
+  - I/O:
+      - io/index.md
+      - io/overview.md
+      - io/decision-tree.md
+      - Formats:
+          - io/parquet.md
+          - io/csv.md
+          - io/ndjson.md
+          - io/json.md
+          - io/ipc.md
+      - Transports:
+          - io/http.md
+          - io/sql.md
+      - io/extras.md
+      - io/data-io-sources.md
+  - Integrations:
+      - integrations/index.md
+      - FastAPI:
+          - integrations/fastapi/golden-path.md
+          - integrations/fastapi/fastapi.md
+          - integrations/fastapi/advanced.md
+          - integrations/fastapi/enhancements.md
+      - Engines:
+          - integrations/engines/sql.md
+          - integrations/engines/mongo.md
+          - integrations/engines/spark.md
+          - integrations/engines/beanie.md
+          - integrations/engines/custom-engine-package.md
+      - Alternate surfaces:
+          - integrations/alternate-surfaces/pandas-ui.md
+          - integrations/alternate-surfaces/pyspark-ui.md
+          - integrations/alternate-surfaces/pyspark-interface.md
+          - integrations/alternate-surfaces/pyspark-parity.md
+      - integrations/streamlit.md
   - Cookbook:
       - cookbook/index.md
       - cookbook/async_lazy_pipeline.md
@@ -148,44 +176,30 @@ nav:
       - cookbook/json_logs_unnest_export.md
       - cookbook/transforms_join_groupby.md
       - cookbook/windows_framing_primer.md
-  - Semantics and contracts:
-      - INTERFACE_CONTRACT.md
-      - VERSIONING.md
-      - WINDOW_SQL_SEMANTICS.md
-      - WHY_NOT_POLARS.md
-  - Introspection and extensions:
-      - PLAN_AND_PLUGINS.md
-  - Alternate import surfaces:
-      - PANDAS_UI.md
-      - PYSPARK_UI.md
-      - PYSPARK_INTERFACE.md
-      - PYSPARK_PARITY.md
-  - Polars alignment:
-      - PARITY_SCORECARD.md
-      - POLARS_WORKFLOWS.md
-      - SELECTORS.md
-      - POLARS_TRANSFORMATIONS_ROADMAP.md
-      - POLARS_PARITY_1_8.md
-      - POLARS_PARITY_NEXT.md
+  - Semantics & contracts:
+      - semantics/index.md
+      - semantics/interface-contract.md
+      - semantics/window-sql-semantics.md
+      - semantics/versioning.md
+      - semantics/why-not-polars.md
   - Project:
-      - ROADMAP.md
-      - SQLMODEL_SQL_ROADMAP.md
-      - Repository README: REPOSITORY_README.md
-      - pydantable_plan.md
-      - ARCHITECTURE.md
-      - ADR-engines.md
-      - CUSTOM_ENGINE_PACKAGE.md
-      - ISP_ENGINE_PROTOCOL_RFC.md
-      - SQL_ENGINE.md
-      - MONGO_ENGINE.md
-      - SPARK_ENGINE.md
-      - BEANIE.md
-      - DEVELOPER.md
-      - TESTING.md
-      - COVERAGE_BACKLOG.md
-      - DOCS_STYLE_GUIDE.md
-      - PERFORMANCE.md
-      - CHANGELOG.md
+      - project/index.md
+      - project/roadmap.md
+      - project/changelog.md
+      - project/architecture.md
+      - project/developer.md
+      - project/testing.md
+      - project/performance.md
+      - project/sqlmodel-sql-roadmap.md
+      - Repository README: project/repository-readme.md
+      - project/design/pydantable-plan.md
+      - ADRs:
+          - project/adrs/engines.md
+      - RFCs:
+          - project/rfcs/isp-engine-protocol.md
+      - Contributing:
+          - project/contributing/docs-style-guide.md
+      - project/coverage-backlog.md
   - Reference:
       - api/index.md
       - DataFrame: api/dataframe.md
