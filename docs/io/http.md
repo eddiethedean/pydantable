@@ -14,7 +14,7 @@ By default, URL and cloud-style helpers require **`experimental=True`** on each 
 - **`MyModel.read_parquet_url(...)`** — **`kwargs`** for **`fetch_bytes`** only (not **`scan_kwargs`**).
 - **`pydantable.io.read_parquet_url_ctx`**, **`aread_parquet_url_ctx`**, and **`DataFrameModel.read_parquet_url_ctx`**, **`aread_parquet_url_ctx`** delete the temp file when the context block exits (preferred when you do not need the path yourself).
 
-The temp **`.parquet`** from the non-context **`read_parquet_url`** is **not** auto-deleted; see [IO_PARQUET](/io/parquet/) and [DATA_IO_SOURCES](/io/data-io-sources/).
+The temp **`.parquet`** from the non-context **`read_parquet_url`** is **not** auto-deleted; see [IO_PARQUET](../io/parquet.md) and [DATA_IO_SOURCES](../io/data-io-sources.md).
 
 **Eager URL helpers (column dict)**
 
@@ -53,7 +53,7 @@ Requires **`fsspec`** and a backend (e.g. **`s3fs`**). Install **`pydantable[clo
 
 ## Runnable example
 
-Spawns a **local** **`http.server`** on **127.0.0.1** (no external network). Run conventions: [IO_OVERVIEW](/io/overview/) (**Runnable example**).
+Spawns a **local** **`http.server`** on **127.0.0.1** (no external network). Run conventions: [IO_OVERVIEW](../io/overview.md) (**Runnable example**).
 
 ```bash
 python docs/examples/io/http_local_fetch.py
@@ -72,4 +72,4 @@ The script uses **`read_parquet_url`** from **`pydantable.io`** so it can **`os.
 
 ## See also
 
-[IO_OVERVIEW](/io/overview/) · [IO_PARQUET](/io/parquet/) · [IO_CSV](/io/csv/) · [IO_NDJSON](/io/ndjson/) · [FASTAPI](/integrations/fastapi/fastapi/) (thread-pool patterns for I/O)
+[IO_OVERVIEW](../io/overview.md) · [IO_PARQUET](../io/parquet.md) · [IO_CSV](../io/csv.md) · [IO_NDJSON](../io/ndjson.md) · [FASTAPI](../integrations/fastapi/fastapi.md) (thread-pool patterns for I/O)

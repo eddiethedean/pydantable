@@ -4,7 +4,7 @@ This page is the **mental model** for how pydantable works in production.
 
 ## Core execution flow
 
-Terminal work on a lazy plan can follow **four** materialization modes (blocking, async, deferred **`submit`**, chunked **`stream`** / **`astream`**); see [MATERIALIZATION](/user-guide/materialization/).
+Terminal work on a lazy plan can follow **four** materialization modes (blocking, async, deferred **`submit`**, chunked **`stream`** / **`astream`**); see [MATERIALIZATION](../user-guide/materialization.md).
 
 ```
 flowchart LR
@@ -42,10 +42,10 @@ flowchart LR
 
 ## Execution engine seam
 
-Lazy transforms and materialization go through **`DataFrame._engine`** (**`ExecutionEngine`**); the default engine is provided by the optional **`pydantable-native`** distribution (it pins **`pydantable-protocol`** only, not **`pydantable`**) and wraps **`pydantable_native._core`**. Alternate backends implement the same protocol. **`scripts/check_engine_bypass.py`** (see [ADR-engines](/project/adrs/engines/) and [DEVELOPER](/project/developer/)) rejects new direct native-extension imports from the core package.
+Lazy transforms and materialization go through **`DataFrame._engine`** (**`ExecutionEngine`**); the default engine is provided by the optional **`pydantable-native`** distribution (it pins **`pydantable-protocol`** only, not **`pydantable`**) and wraps **`pydantable_native._core`**. Alternate backends implement the same protocol. **`scripts/check_engine_bypass.py`** (see [ADR-engines](../project/adrs/engines.md) and [DEVELOPER](../project/developer.md)) rejects new direct native-extension imports from the core package.
 
 ## Notes
 
 - **`read_*`** returns a lazy scan root (`ScanFileRoot`) and defers ingest validation until materialization.
 - **`materialize_*`** returns a Python column dict immediately and can be validated on construction.
-- **Row order is not a stable guarantee** unless explicitly documented; compare on keys when testing (see [INTERFACE_CONTRACT](/semantics/interface-contract/)).
+- **Row order is not a stable guarantee** unless explicitly documented; compare on keys when testing (see [INTERFACE_CONTRACT](../semantics/interface-contract.md)).

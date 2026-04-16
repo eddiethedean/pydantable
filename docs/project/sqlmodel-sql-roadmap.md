@@ -175,19 +175,19 @@ This project already has users of:
 
 **Deliverables (documentation / policy)**
 
-- Update docs to recommend **SQLModel-first** and describe **raw SQL** as the advanced / migration path — see [IO_SQL](/io/sql/), [DATAFRAMEMODEL](/user-guide/dataframemodel/), and this page.
+- Update docs to recommend **SQLModel-first** and describe **raw SQL** as the advanced / migration path — see [IO_SQL](../io/sql.md), [DATAFRAMEMODEL](../user-guide/dataframemodel.md), and this page.
 - Keep legacy string-SQL APIs (**`fetch_sql`**, **`iter_sql`**, **`write_sql`**, and async mirrors) for compatibility. **`pydantable[sql]`** remains the single extra for SQL I/O (it bundles **SQLModel**); there is no separate extra split for “raw SQL only.”
 
 **Deliverables (runtime migration path, v1.13.0)**
 
 - Deprecation warnings on legacy string-SQL APIs, with replacements **`fetch_sql_raw`**, **`iter_sql_raw`**, **`write_sql_raw`**, **`afetch_sql_raw`**, **`aiter_sql_raw`**, **`awrite_sql_raw`** (and deprecation of **`write_sql_batches`** / **`awrite_sql_batches`**).
-- Explicit **`*_raw`** naming for string-SQL I/O (see [IO_SQL](/io/sql/)).
+- Explicit **`*_raw`** naming for string-SQL I/O (see [IO_SQL](../io/sql.md)).
 
 **Status (v1.13.0): Implemented** — docs and **`DataFrameModel`** pointers in place; warnings in **`python/pydantable/io/sql.py`** and **`python/pydantable/io/__init__.py`**; tests **`tests/test_sql_string_deprecation.py`**; suite-wide **`DeprecationWarning`** filter in **`pyproject.toml`** for existing tests; plugin registry marks legacy readers/writers **`stable=False`** and **`*_raw`** as **`stable=True`**.
 
 **Removal policy**
 
-- Legacy names remain until a **major** release (no earlier than **`2.0.0`**); see [VERSIONING](/semantics/versioning/).
+- Legacy names remain until a **major** release (no earlier than **`2.0.0`**); see [VERSIONING](../semantics/versioning.md).
 
 **Acceptance criteria**
 
@@ -206,7 +206,7 @@ This project already has users of:
 - `MyDF.assert_sqlmodel_compatible(UserTable, *, direction="read"|"write", column_map=None, read_keys=None)` — dev-time check; `direction="write"` enforces exact key parity with the table (after `column_map`); `direction="read"` requires every mapped dataframe field to appear in the expected result keys (default: full table, or pass `read_keys` for `fetch_sqlmodel(..., columns=...)`).
 - Optional `column_map: dict[str, str]` mapping **dataframe field name → SQL column key** when names differ.
 
-**Status (v1.13.0): Implemented** — `python/pydantable/io/sqlmodel_schema.py`, `DataFrameModel.assert_sqlmodel_compatible` in `python/pydantable/dataframe_model.py`; tests `tests/test_sqlmodel_bridge_phase05.py`; docs [IO_SQL](/io/sql/), [DATAFRAMEMODEL](/user-guide/dataframemodel/).
+**Status (v1.13.0): Implemented** — `python/pydantable/io/sqlmodel_schema.py`, `DataFrameModel.assert_sqlmodel_compatible` in `python/pydantable/dataframe_model.py`; tests `tests/test_sqlmodel_bridge_phase05.py`; docs [IO_SQL](../io/sql.md), [DATAFRAMEMODEL](../user-guide/dataframemodel.md).
 
 ---
 
@@ -214,7 +214,7 @@ This project already has users of:
 
 **Docs**
 
-- Update [IO_SQL](/io/sql/) to reflect SQLModel-first APIs and the `replace_ok` safety knob.
+- Update [IO_SQL](../io/sql.md) to reflect SQLModel-first APIs and the `replace_ok` safety knob.
 - Add a runnable example:
   - SQLite round-trip using SQLModel table + pydantable `DataFrameModel`
   - streaming example mirroring the existing `iter_sql` example
@@ -233,7 +233,7 @@ This project already has users of:
 - `make check-full` green on the release commit
 - docs examples validated (if you keep example-verification tooling)
 
-**Status (v1.13.0): Implemented** — [IO_SQL](/io/sql/) documents **raw string SQL** vs **SQLModel-first** APIs; the runnable doc example is **`docs/examples/io/sql_sqlite_sqlmodel_roundtrip.py`** (**`tests/test_doc_io_examples.py`**). SQLModel I/O behavior is covered by **`tests/test_sqlmodel_io_phase01.py`**, **`tests/test_sqlmodel_io_phase02.py`**, **`tests/test_sqlmodel_dataframe_model.py`**.
+**Status (v1.13.0): Implemented** — [IO_SQL](../io/sql.md) documents **raw string SQL** vs **SQLModel-first** APIs; the runnable doc example is **`docs/examples/io/sql_sqlite_sqlmodel_roundtrip.py`** (**`tests/test_doc_io_examples.py`**). SQLModel I/O behavior is covered by **`tests/test_sqlmodel_io_phase01.py`**, **`tests/test_sqlmodel_io_phase02.py`**, **`tests/test_sqlmodel_dataframe_model.py`**.
 
 ---
 

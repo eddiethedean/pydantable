@@ -8,7 +8,7 @@ The goal is to keep the query-building/typing story (`select`, `with_columns`,
 `filter`) while making DataFrames feel native in typical Pydantic/FastAPI
 workflows.
 
-For pandas-style method names (**`assign`**, **`merge`**, **`duplicated`**, **`get_dummies`**, …) import **`DataFrameModel`** from **`pydantable.pandas`**; execution remains the same Rust core ([PANDAS_UI](/integrations/alternate-surfaces/pandas-ui/)).
+For pandas-style method names (**`assign`**, **`merge`**, **`duplicated`**, **`get_dummies`**, …) import **`DataFrameModel`** from **`pydantable.pandas`**; execution remains the same Rust core ([PANDAS_UI](../integrations/alternate-surfaces/pandas-ui.md)).
 
 ## Terms
 
@@ -106,7 +106,7 @@ See **`SUPPORTED_TYPES.md`** for the full matrix and practical notes (especially
 #### Custom dtypes (semantic scalar types)
 
 If you want a domain-specific scalar type (e.g. `ULID`) that is validated/coerced by
-Pydantic v2 but treated as a supported scalar in pydantable schemas, see [CUSTOM_DTYPES](/user-guide/custom-dtypes/).
+Pydantic v2 but treated as a supported scalar in pydantable schemas, see [CUSTOM_DTYPES](../user-guide/custom-dtypes.md).
 
 #### Strictness and profiles
 
@@ -116,7 +116,7 @@ For services, pydantable supports:
 - **Validation profiles** (preset layer over `trusted_mode` / `ignore_errors` / etc.)
 - **Per-column and nested strictness** via field policies (opt-in)
 
-See [STRICTNESS](/user-guide/strictness/) for the strictness keys and semantics.
+See [STRICTNESS](../user-guide/strictness.md) for the strictness keys and semantics.
 
 If you declare an unsupported annotation (for example `int | str`, or a `dict[...]` with non-`str` keys), pydantable raises **`TypeError` while the class body is executing**—before instances can be constructed—so bad schemas fail at import/definition time. Plain **`Schema`** subclasses used with **`DataFrame[Schema]`** do not get this early check; see **`SUPPORTED_TYPES.md`** (“When unsupported field types fail”).
 
@@ -126,18 +126,18 @@ From this definition, `DataFrameModel` generates:
 
 ## `repr` and notebooks
 
-**`repr(user_df)`** / **`print(user_df)`** shows the **`DataFrameModel`** subclass name on the first line, then an indented **`DataFrame[…Schema]`** block with the same schema and column dtype lines as **`DataFrame`** (see [EXECUTION](/user-guide/execution/) **repr**). Row counts are not shown—use **`to_dict()`**, **`collect()`**, or **`len(user_df.collect())`** when you need the number of rows.
+**`repr(user_df)`** / **`print(user_df)`** shows the **`DataFrameModel`** subclass name on the first line, then an indented **`DataFrame[…Schema]`** block with the same schema and column dtype lines as **`DataFrame`** (see [EXECUTION](../user-guide/execution.md) **repr**). Row counts are not shown—use **`to_dict()`**, **`collect()`**, or **`len(user_df.collect())`** when you need the number of rows.
 
-In **Jupyter** / **VS Code** notebooks, **`user_df`** (or the last expression in a cell) can render as an **HTML table** via **`_repr_html_()`**—see [EXECUTION](/user-guide/execution/) **Jupyter / HTML** (bounded preview; materializes like **`head()`** + **`to_dict()`**).
+In **Jupyter** / **VS Code** notebooks, **`user_df`** (or the last expression in a cell) can render as an **HTML table** via **`_repr_html_()`**—see [EXECUTION](../user-guide/execution.md) **Jupyter / HTML** (bounded preview; materializes like **`head()`** + **`to_dict()`**).
 
-**Discovery (`0.20.0+`):** **`DataFrameModel`** delegates **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, and **`describe()`** to the inner **`DataFrame`**—same semantics as the core API ([INTERFACE_CONTRACT](/semantics/interface-contract/) **Introspection**, [EXECUTION](/user-guide/execution/) **`info()` / `describe()`**).
+**Discovery (`0.20.0+`):** **`DataFrameModel`** delegates **`columns`**, **`shape`**, **`empty`**, **`dtypes`**, **`info()`**, and **`describe()`** to the inner **`DataFrame`**—same semantics as the core API ([INTERFACE_CONTRACT](../semantics/interface-contract.md) **Introspection**, [EXECUTION](../user-guide/execution.md) **`info()` / `describe()`**).
 
 ## Classmethod I/O (`0.23.0+`)
 
 ### Three layers (sync lazy, async lazy, eager)
 
 !!! note
-    **Rule of thumb:** In **`async def`** code, prefer **`MyModel.Async.read_*`** (or **`aread_*`**) → transforms → **`await …collect()`** / **`to_dict()`**. In **sync** code, use **`read_*`** → **`collect()`** / **`to_dict()`**. For **SQL** with a **`SQLModel`** table, prefer **`MyModel.fetch_sqlmodel` / `afetch_sqlmodel` / `iter_sqlmodel` / `aiter_sqlmodel`** and **`write_sqlmodel` / `awrite_sqlmodel`** (or **`write_sqlmodel_data` / `awrite_sqlmodel_data`**) — see [IO_SQL](/io/sql/). Call **`MyModel.assert_sqlmodel_compatible(UserTable, direction='write')`** (or **`'read'`**, optional **`column_map`** / **`read_keys`**) in tests or startup to catch column-name drift before **`fetch_sqlmodel`** / **`write_sqlmodel`**. When you need a full Python **`dict[str, list]`** before **`MyModel`** from **raw SQL** or files, use **`pydantable.io`** (**`materialize_*`**, **`fetch_sql_raw`**, **`iter_sql_raw`**, …) and pass the result to **`MyModel(...)`** (deprecated unprefixed **`fetch_sql`** / **`iter_sql`** still work but warn).
+    **Rule of thumb:** In **`async def`** code, prefer **`MyModel.Async.read_*`** (or **`aread_*`**) → transforms → **`await …collect()`** / **`to_dict()`**. In **sync** code, use **`read_*`** → **`collect()`** / **`to_dict()`**. For **SQL** with a **`SQLModel`** table, prefer **`MyModel.fetch_sqlmodel` / `afetch_sqlmodel` / `iter_sqlmodel` / `aiter_sqlmodel`** and **`write_sqlmodel` / `awrite_sqlmodel`** (or **`write_sqlmodel_data` / `awrite_sqlmodel_data`**) — see [IO_SQL](../io/sql.md). Call **`MyModel.assert_sqlmodel_compatible(UserTable, direction='write')`** (or **`'read'`**, optional **`column_map`** / **`read_keys`**) in tests or startup to catch column-name drift before **`fetch_sqlmodel`** / **`write_sqlmodel`**. When you need a full Python **`dict[str, list]`** before **`MyModel`** from **raw SQL** or files, use **`pydantable.io`** (**`materialize_*`**, **`fetch_sql_raw`**, **`iter_sql_raw`**, …) and pass the result to **`MyModel(...)`** (deprecated unprefixed **`fetch_sql`** / **`iter_sql`** still work but warn).
 
 
 ```text
@@ -147,12 +147,12 @@ eager:       pydantable.io materialize_* / fetch_sql_raw  →  MyModel(dict)
 ```
 
 !!! warning
-    On **lazy file scans**, **`shape`**, **`empty`**, and related introspection may reflect **plan/root metadata** (e.g. zero rows until materialization), not the row count after **`collect()`**. Treat **`collect()`** / **`to_dict()`** as ground truth for row data; see [EXECUTION](/user-guide/execution/) (async reads and **`info()`** / **`describe()`**).
+    On **lazy file scans**, **`shape`**, **`empty`**, and related introspection may reflect **plan/root metadata** (e.g. zero rows until materialization), not the row count after **`collect()`**. Treat **`collect()`** / **`to_dict()`** as ground truth for row data; see [EXECUTION](../user-guide/execution.md) (async reads and **`info()`** / **`describe()`**).
 
 
-**Default I/O:** use **`DataFrameModel`** classmethods for lazy **`read_*` / `aread_*`**, lazy **`read_parquet_url`** and **`read_parquet_url_ctx` / `aread_parquet_url_ctx`**, eager **`export_*` / `aexport_*`**, **SQLModel** **`fetch_sqlmodel` / `afetch_sqlmodel` / `iter_sqlmodel` / `aiter_sqlmodel`**, dict **`write_sqlmodel_data` / `awrite_sqlmodel_data`**, instance **`write_sqlmodel` / `awrite_sqlmodel`**, and string-table **`write_sql_raw` / `awrite_sql_raw`** (deprecated: **`write_sql` / `awrite_sql`**, **`write_sql_batches` / `awrite_sql_batches`**). **`aread_*`** and **`afetch_sqlmodel`** return **`AwaitableDataFrameModel`**: chain transforms, then **`await …acollect()`** / **`ato_dict()`** (or unprefixed **`await …collect()`** / **`to_dict()`**) (or **`await`** the awaitable alone for a concrete model — same pattern as **`aread_parquet`**). **`MyModel.Async.read_parquet`** (and **`read_csv`**, …) is the same as **`aread_parquet`**; **`MyModel.Async.write_sql`** / **`Async.write_sqlmodel`** / **`Async.export_*`** match **`awrite_sql`** / **`awrite_sqlmodel_data`** / **`aexport_*`** — the **`Async`** namespace avoids clashing with sync **`read_*`**, sync **`write_sql`**, and sync **`export_*`**. You can **`await …columns`** / **`shape`** / **`empty`** / **`dtypes`** for lazy metadata, add **`.then(fn)`** for a custom step, or **`AwaitableDataFrameModel.concat(...)`** to merge frames. For eager **`dict[str, list]`** loads (**`materialize_*`**, **`fetch_sql_raw`**, **`iter_sql_raw`**, …), call **`pydantable.io`** and pass the result to **`MyModel(...)`** — see [IO_OVERVIEW](/io/overview/), [IO_SQL](/io/sql/), and per-format guides under **Data I/O** in the toctree.
+**Default I/O:** use **`DataFrameModel`** classmethods for lazy **`read_*` / `aread_*`**, lazy **`read_parquet_url`** and **`read_parquet_url_ctx` / `aread_parquet_url_ctx`**, eager **`export_*` / `aexport_*`**, **SQLModel** **`fetch_sqlmodel` / `afetch_sqlmodel` / `iter_sqlmodel` / `aiter_sqlmodel`**, dict **`write_sqlmodel_data` / `awrite_sqlmodel_data`**, instance **`write_sqlmodel` / `awrite_sqlmodel`**, and string-table **`write_sql_raw` / `awrite_sql_raw`** (deprecated: **`write_sql` / `awrite_sql`**, **`write_sql_batches` / `awrite_sql_batches`**). **`aread_*`** and **`afetch_sqlmodel`** return **`AwaitableDataFrameModel`**: chain transforms, then **`await …acollect()`** / **`ato_dict()`** (or unprefixed **`await …collect()`** / **`to_dict()`**) (or **`await`** the awaitable alone for a concrete model — same pattern as **`aread_parquet`**). **`MyModel.Async.read_parquet`** (and **`read_csv`**, …) is the same as **`aread_parquet`**; **`MyModel.Async.write_sql`** / **`Async.write_sqlmodel`** / **`Async.export_*`** match **`awrite_sql`** / **`awrite_sqlmodel_data`** / **`aexport_*`** — the **`Async`** namespace avoids clashing with sync **`read_*`**, sync **`write_sql`**, and sync **`export_*`**. You can **`await …columns`** / **`shape`** / **`empty`** / **`dtypes`** for lazy metadata, add **`.then(fn)`** for a custom step, or **`AwaitableDataFrameModel.concat(...)`** to merge frames. For eager **`dict[str, list]`** loads (**`materialize_*`**, **`fetch_sql_raw`**, **`iter_sql_raw`**, …), call **`pydantable.io`** and pass the result to **`MyModel(...)`** — see [IO_OVERVIEW](../io/overview.md), [IO_SQL](../io/sql.md), and per-format guides under **Data I/O** in the toctree.
 
-**Typing:** To annotate helpers that accept **either** a concrete **`DataFrameModel`** **or** a lazy **`AwaitableDataFrameModel`** chain and only need **`await …acollect()`**, use **`SupportsLazyAsyncMaterialize`** ([TYPING](/user-guide/typing/)). It models **`acollect`**, not sync **`collect`**.
+**Typing:** To annotate helpers that accept **either** a concrete **`DataFrameModel`** **or** a lazy **`AwaitableDataFrameModel`** chain and only need **`await …acollect()`**, use **`SupportsLazyAsyncMaterialize`** ([TYPING](../user-guide/typing.md)). It models **`acollect`**, not sync **`collect`**.
 
 ### Lazy reads and ingest validation
 
@@ -237,7 +237,7 @@ For **`DataFrameModel`** and **`DataFrame[Schema]`**, use **`trusted_mode`** to 
 | Trusted bulk input plus light dtype checks (including nested list/struct/map shapes for Polars columns) | `trusted_mode="strict"` |
 
 Under **`trusted_mode="shape_only"`**, **`DtypeDriftWarning`** may be emitted when data
-would fail **`strict`** checks; see [SUPPORTED_TYPES](/user-guide/supported-types/) (“Runtime column payloads”).
+would fail **`strict`** checks; see [SUPPORTED_TYPES](../user-guide/supported-types.md) (“Runtime column payloads”).
 
 **Row list vs column dict:** If you pass a **sequence of row mappings or models** (not a
 column dictionary), each row is still validated with **`RowModel.model_validate`** first.
@@ -415,7 +415,7 @@ def grouped(df: Events) -> ByGroup:
     return df.group_by("g").agg_as_model(ByGroup, total=("sum", "v"))
 ```
 
-See [TYPING](/user-guide/typing/) for the full typing story (mypy plugin vs explicit after-model).
+See [TYPING](../user-guide/typing.md) for the full typing story (mypy plugin vs explicit after-model).
 
 #### Enabling the mypy plugin
 
@@ -607,12 +607,12 @@ and filters the response to that schema (see `docs/integrations/fastapi/fastapi.
 
 ## Materializing row models
 
-For how these APIs fit the **four** terminal materialization modes (blocking, async, **`submit`**, **`stream`** / **`astream`**), see [MATERIALIZATION](/user-guide/materialization/).
+For how these APIs fit the **four** terminal materialization modes (blocking, async, **`submit`**, **`stream`** / **`astream`**), see [MATERIALIZATION](../user-guide/materialization.md).
 
 When you need row-wise output (e.g. for response serialization), the DataFrameModel
 produces:
 
-- `df.collect()` -> `Any` (shape depends on flags like `as_lists` / `as_numpy`; prefer **`to_polars()`** / **`ato_polars()`** instead of deprecated **`as_polars=`** on **`collect`** / **`acollect`** — see [VERSIONING](/semantics/versioning/))
+- `df.collect()` -> `Any` (shape depends on flags like `as_lists` / `as_numpy`; prefer **`to_polars()`** / **`ato_polars()`** instead of deprecated **`as_polars=`** on **`collect`** / **`acollect`** — see [VERSIONING](../semantics/versioning.md))
 - `df.rows()` -> `list[RowModel]` (typed materialization API; validated against the current schema)
 - `df.to_dict()` -> columnar `dict[str, list]` (use for column-shaped API responses)
 - `df.to_dicts(**model_dump_kwargs)` -> list of dicts (JSON-friendly), derived from row models via Pydantic `model_dump`

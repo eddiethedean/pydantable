@@ -33,7 +33,7 @@ df = DataFrame[Row]({
 
 In a terminal, `repr(df)` shows the schema and column dtypes (no row count—plans may be lazy).
 
-In **Jupyter** / **VS Code**, the last expression in a cell can render as HTML via `_repr_html_()` (bounded preview; same cost class as `head()` + `to_dict()` for the slice). See [EXECUTION](/user-guide/execution/) **Jupyter / HTML** and **Display options**.
+In **Jupyter** / **VS Code**, the last expression in a cell can render as HTML via `_repr_html_()` (bounded preview; same cost class as `head()` + `to_dict()` for the slice). See [EXECUTION](../user-guide/execution.md) **Jupyter / HTML** and **Display options**.
 
 ## 3. Discovery helpers
 
@@ -52,14 +52,14 @@ rows = filtered.collect()  # list[Pydantic row models]
 cols = filtered.to_dict()  # dict[str, list]
 ```
 
-Use `to_polars()` / `to_arrow()` when the optional extras are installed ([EXECUTION](/user-guide/execution/) **Copy as / interchange**).
+Use `to_polars()` / `to_arrow()` when the optional extras are installed ([EXECUTION](../user-guide/execution.md) **Copy as / interchange**).
 
 ## Where to read next
 
-- [DATAFRAMEMODEL](/user-guide/dataframemodel/) — `DataFrameModel`, validation, transforms
-- [PANDAS_UI](/integrations/alternate-surfaces/pandas-ui/) — optional **`pydantable.pandas`** import (`assign`, `merge`, cleaning helpers)
-- [EXECUTION](/user-guide/execution/) — materialization cost, async, display limits
-- [INTERFACE_CONTRACT](/semantics/interface-contract/) — semantics (joins, nulls, `shape` vs executed rows)
-- [IO_DECISION_TREE](/io/decision-tree/) — pick lazy vs eager I/O; prefer **`DataFrameModel`** / **`DataFrame[Schema]`** classmethods over raw **`pydantable.io`**
-- [IO_OVERVIEW](/io/overview/) — per-format tables (Parquet, CSV, NDJSON, JSON, IPC, HTTP, SQL)
-- [MONGO_ENGINE](/integrations/engines/mongo/) / [BEANIE](/integrations/engines/beanie/) — optional **`pydantable[mongo]`** (lazy **`MongoDataFrame`**, eager **`fetch_mongo`** / **`afetch_mongo`**, Beanie ODM helpers)
+- [DATAFRAMEMODEL](../user-guide/dataframemodel.md) — `DataFrameModel`, validation, transforms
+- [PANDAS_UI](../integrations/alternate-surfaces/pandas-ui.md) — optional **`pydantable.pandas`** import (`assign`, `merge`, cleaning helpers)
+- [EXECUTION](../user-guide/execution.md) — materialization cost, async, display limits
+- [INTERFACE_CONTRACT](../semantics/interface-contract.md) — semantics (joins, nulls, `shape` vs executed rows)
+- [IO_DECISION_TREE](../io/decision-tree.md) — pick lazy vs eager I/O; prefer **`DataFrameModel`** / **`DataFrame[Schema]`** classmethods over raw **`pydantable.io`**
+- [IO_OVERVIEW](../io/overview.md) — per-format tables (Parquet, CSV, NDJSON, JSON, IPC, HTTP, SQL)
+- [MONGO_ENGINE](../integrations/engines/mongo.md) / [BEANIE](../integrations/engines/beanie.md) — optional **`pydantable[mongo]`** (lazy **`MongoDataFrame`**, eager **`fetch_mongo`** / **`afetch_mongo`**, Beanie ODM helpers)

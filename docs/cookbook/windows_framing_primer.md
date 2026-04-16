@@ -7,7 +7,7 @@ This recipe is a short mental model for window functions and framing in pydantab
 - **Unframed** windows behave like “compute over partition/order context” (Polars-style).
 - **Framed** windows (`rowsBetween`, `rangeBetween`) define an explicit frame around each row.
 
-See [WINDOW_SQL_SEMANTICS](/semantics/window-sql-semantics/) for the detailed rules, including multi-key `rangeBetween`
+See [WINDOW_SQL_SEMANTICS](../semantics/window-sql-semantics.md) for the detailed rules, including multi-key `rangeBetween`
 axis behavior.
 
 ## Recipe: rank within partition
@@ -31,5 +31,5 @@ assert "rn" in out
 
 ## Pitfalls
 
-- Prefer the named window APIs (`Window.partitionBy(...).orderBy(...)`) over generic `Expr.over(...)` (see [INTERFACE_CONTRACT](/semantics/interface-contract/)).
+- Prefer the named window APIs (`Window.partitionBy(...).orderBy(...)`) over generic `Expr.over(...)` (see [INTERFACE_CONTRACT](../semantics/interface-contract.md)).
 

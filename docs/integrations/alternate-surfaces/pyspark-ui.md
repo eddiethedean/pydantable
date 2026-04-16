@@ -2,18 +2,18 @@
 
 The **PySpark UI** is an optional import surface that adds **Apache Spark–style names** (`withColumn`, `where`, `orderBy`, …) and a small **`pyspark.sql`-like** submodule on top of pydantable’s typed logical DataFrame. It is **not** the Apache Spark `DataFrame`; there is no JVM, no `SparkSession`, and no runtime dependency on the `pyspark` package.
 
-Execution uses pydantable’s Rust/Polars core (see [Execution](/user-guide/execution/)).
+Execution uses pydantable’s Rust/Polars core (see [Execution](../../user-guide/execution.md)).
 
 ## Install: base package vs `pydantable[spark]`
 
 - **`import pydantable.pyspark`** (this façade — `DataFrame`, `DataFrameModel`, `pydantable.pyspark.sql`, …) works with **only** the core `pip install pydantable` dependencies. It does **not** require PySpark, SparkDantic, or raikou-core at import time.
 - **`pydantable.pyspark.sparkdantic`** (JVM schema helpers from [SparkDantic](https://github.com/mitchelllisle/sparkdantic)) is loaded **lazily** and needs `pip install "pydantable[spark]"` (pulls in `sparkdantic`, `pyspark`, `raikou-core`, …). Accessing `pydantable.pyspark.sparkdantic` without those packages installed raises `ModuleNotFoundError` for the missing optional dependency.
-- **Real PySpark execution** (`SparkDataFrame`, `SparkDataFrameModel` over a `pyspark.sql.DataFrame`) is documented in [Spark engine](/integrations/engines/spark/) and requires the same `[spark]` stack plus a JVM.
+- **Real PySpark execution** (`SparkDataFrame`, `SparkDataFrameModel` over a `pyspark.sql.DataFrame`) is documented in [Spark engine](../../integrations/engines/spark.md) and requires the same `[spark]` stack plus a JVM.
 
 ## Release context (1.8.0 vs 1.9.0)
 
-- **1.8.0** focused on **core** ergonomics (selectors, joins, `drop_nulls`, reshape parity, etc.)—the same engine every import style uses; see the [CHANGELOG](/project/changelog/) **1.8.0** section.
-- **1.9.0** adds the **Spark-shaped `DataFrame` / `DataFrameModel` surface** in this document: `groupBy`, frame `count()`, `crossJoin`, `unionByName`, set-style helpers, `fillna` / `dropna` / `.na`, `printSchema`, `explain`, `toPandas`, **`F.dayofyear`** / **`F.from_unixtime`**, and related typing/stubs. Core **`describe()`** (and PySpark **`summary()`**) include **`date`** / **`datetime`** summary lines when those columns exist. Behavior and limitations are summarized in [PySpark parity](/integrations/alternate-surfaces/pyspark-parity/) and [Interface contract](/semantics/interface-contract/).
+- **1.8.0** focused on **core** ergonomics (selectors, joins, `drop_nulls`, reshape parity, etc.)—the same engine every import style uses; see the [CHANGELOG](../../project/changelog.md) **1.8.0** section.
+- **1.9.0** adds the **Spark-shaped `DataFrame` / `DataFrameModel` surface** in this document: `groupBy`, frame `count()`, `crossJoin`, `unionByName`, set-style helpers, `fillna` / `dropna` / `.na`, `printSchema`, `explain`, `toPandas`, **`F.dayofyear`** / **`F.from_unixtime`**, and related typing/stubs. Core **`describe()`** (and PySpark **`summary()`**) include **`date`** / **`datetime`** summary lines when those columns exist. Behavior and limitations are summarized in [PySpark parity](../../integrations/alternate-surfaces/pyspark-parity.md) and [Interface contract](../../semantics/interface-contract.md).
 
 ## Tests
 
@@ -122,7 +122,7 @@ For distributional stats Spark’s **`summary`** column set, use Polars or panda
 
 ### Naming map (core ↔ pandas ↔ PySpark)
 
-See [PANDAS_UI](/integrations/alternate-surfaces/pandas-ui/) **Naming map** for **`with_columns` / `assign` / `withColumn`**, **`filter`**, joins, and sorts—same Rust engine for all three import styles.
+See [PANDAS_UI](../../integrations/alternate-surfaces/pandas-ui.md) **Naming map** for **`with_columns` / `assign` / `withColumn`**, **`filter`**, joins, and sorts—same Rust engine for all three import styles.
 
 ### Schema and columns
 
@@ -152,21 +152,21 @@ from pydantable.pyspark.sql import functions as F, Column, IntegerType, StructTy
 
 This block only checks that imports resolve; it has no printed output.
 
-- **`functions`** — `lit`, typed **`col(..., dtype=...)`**, `isnull` / `isnotnull`, `coalesce`, `when` / `otherwise`, `cast`, `between`, `isin`, `concat`, `substring`, `length`, **`explode`** (raises **`TypeError`**; use **`DataFrame.explode`** / **`posexplode`**), **date/time:** `year`, `month`, `day`, `dayofmonth`, `dayofweek`, `quarter`, `weekofyear`, `dayofyear`, `hour`, `minute`, `second`, `nanosecond`, `to_date`, `strptime`, `unix_timestamp`, `from_unixtime` (see **[PySpark parity](/integrations/alternate-surfaces/pyspark-parity/)** Phase B for semantics), global **`sum`/`avg`/`mean`/`count`/`min`/`max`** for **`select`**, and window helpers.
+- **`functions`** — `lit`, typed **`col(..., dtype=...)`**, `isnull` / `isnotnull`, `coalesce`, `when` / `otherwise`, `cast`, `between`, `isin`, `concat`, `substring`, `length`, **`explode`** (raises **`TypeError`**; use **`DataFrame.explode`** / **`posexplode`**), **date/time:** `year`, `month`, `day`, `dayofmonth`, `dayofweek`, `quarter`, `weekofyear`, `dayofyear`, `hour`, `minute`, `second`, `nanosecond`, `to_date`, `strptime`, `unix_timestamp`, `from_unixtime` (see **[PySpark parity](../../integrations/alternate-surfaces/pyspark-parity.md)** Phase B for semantics), global **`sum`/`avg`/`mean`/`count`/`min`/`max`** for **`select`**, and window helpers.
 - **`Column`** — type alias for pydantable **`Expr`**.
 - **`types`** — simple `IntegerType`, `StringType`, `StructField`, `StructType`, … for documentation and `schema` views.
 
-Full coverage vs Spark is summarized in **[PySpark parity matrix](/integrations/alternate-surfaces/pyspark-parity/)**.
+Full coverage vs Spark is summarized in **[PySpark parity matrix](../../integrations/alternate-surfaces/pyspark-parity.md)**.
 
 ## What is intentionally out of scope
 
 - **`SparkSession`**, **`spark.sql("...")`**, streaming, catalogs.
-- **SQL window frames** (`rowsBetween` / `rangeBetween`): partition + order via **`Window`** / **`WindowSpec`** are supported (see `pydantable.pyspark.sql.window`); frames execute on the Polars-backed core per [`INTERFACE_CONTRACT.md`](/semantics/interface-contract/) (including `rangeBetween` multi-key rules in [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics/)).
+- **SQL window frames** (`rowsBetween` / `rangeBetween`): partition + order via **`Window`** / **`WindowSpec`** are supported (see `pydantable.pyspark.sql.window`); frames execute on the Polars-backed core per [`INTERFACE_CONTRACT.md`](../../semantics/interface-contract.md) (including `rangeBetween` multi-key rules in [`WINDOW_SQL_SEMANTICS.md`](../../semantics/window-sql-semantics.md)).
 - Untyped **`F.col("x")`** without **`dtype=`** (pydantable requires static types at build time).
 - Interop with a real **`pyspark.sql.DataFrame`** unless a dedicated integration is added later.
 
 ## Further reading
 
-- [PySpark parity matrix](/integrations/alternate-surfaces/pyspark-parity/)
-- [Execution](/user-guide/execution/)
-- [Interface contract](/semantics/interface-contract/)
+- [PySpark parity matrix](../../integrations/alternate-surfaces/pyspark-parity.md)
+- [Execution](../../user-guide/execution.md)
+- [Interface contract](../../semantics/interface-contract.md)

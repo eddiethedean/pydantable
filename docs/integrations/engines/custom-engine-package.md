@@ -7,7 +7,7 @@ PydanTable’s typed `DataFrame` / `DataFrameModel` API on top of **your** backe
 (for example a SQL engine, a remote service, or another dataframe library).
 
 For design rationale and guardrails inside this repository, see
-[ADR-engines](/project/adrs/engines/). For day-to-day contributor setup, see [DEVELOPER](/project/developer/).
+[ADR-engines](../../project/adrs/engines.md). For day-to-day contributor setup, see [DEVELOPER](../../project/developer.md).
 
 (custom-engine-deps)=
 
@@ -17,7 +17,7 @@ For design rationale and guardrails inside this repository, see
 
 - Add **`pydantable-protocol`** as a normal dependency, with a **version pin**
   that matches the PydanTable releases you support (same `1.x.y` as
-  **`pydantable`** on PyPI — see [VERSIONING](/semantics/versioning/)).
+  **`pydantable`** on PyPI — see [VERSIONING](../../semantics/versioning.md)).
 - You do **not** need to depend on **`pydantable`** to **define** your engine
   class: implement the structural protocol from **`pydantable_protocol`** and
   raise **`pydantable_protocol.UnsupportedEngineOperationError`** (or a
@@ -54,7 +54,7 @@ time, static checkers and :func:`isinstance` (with
 2. **Execution** — Implement **`execute_plan`**, **`async_execute_plan`**,
    **`collect_batches`**, **`async_collect_plan_batches`**, and any
    **`execute_join`**, **`execute_groupby_agg`**, … helpers that your users will
-   trigger. Match documented semantics where you claim parity ([INTERFACE_CONTRACT](/semantics/interface-contract/)).
+   trigger. Match documented semantics where you claim parity ([INTERFACE_CONTRACT](../../semantics/interface-contract.md)).
 
 3. **Sinks** — Implement **`write_parquet`**, **`write_csv`**, **`write_ipc`**,
    **`write_ndjson`** if users can export through your backend; otherwise raise
@@ -77,7 +77,7 @@ time, static checkers and :func:`isinstance` (with
   **`pydantable_native._core`**.
 
 - **Third-party:** the **lazy-SQL** optional stack (SQLAlchemy bridge + **`ExecutionEngine`**) ships alongside pydantable’s **`SqlDataFrame`** / **`SqlDataFrameModel`** path; see the bridge’s PyPI page and **`docs/PYDANTABLE_ENGINE.md`**. PydanTable user guide:
-  [SQL_ENGINE](/integrations/engines/sql/) (**`SqlDataFrame`**, **`SqlDataFrameModel`**, **`pydantable[sql]`**).
+  [SQL_ENGINE](../../integrations/engines/sql.md) (**`SqlDataFrame`**, **`SqlDataFrameModel`**, **`pydantable[sql]`**).
 
 When **PydanTable** adds new protocol members, contract tests in this project
 (exercising **`typing_extensions.get_protocol_members`**) and release notes
@@ -117,7 +117,7 @@ For a **non-native default**, either:
 - call **`pydantable.engine.set_expression_runtime(lambda: ...)`** to supply an
   object compatible with how **`Expr`** is built in your stack, or
 - steer users away from **`Expr`**-heavy APIs until a portable expression IR exists
-  ([ADR-engines](/project/adrs/engines/), Track B).
+  ([ADR-engines](../../project/adrs/engines.md), Track B).
 
 Otherwise PydanTable raises **`UnsupportedEngineOperationError`** when building expressions.
 
@@ -125,7 +125,7 @@ Otherwise PydanTable raises **`UnsupportedEngineOperationError`** when building 
 
 ## File I/O vs execution engine
 
-Many **lazy `read_*`** entry points (see [IO_OVERVIEW](/io/overview/)) can use **pydantable-native** for
+Many **lazy `read_*`** entry points (see [IO_OVERVIEW](../../io/overview.md)) can use **pydantable-native** for
 fast local scans. That path is **separate** from **`DataFrame._engine`**: shipping
 a custom **`ExecutionEngine`** does not automatically redirect Parquet/CSV reads
 through your backend. If your product needs “everything goes to SQL”, you
@@ -173,10 +173,10 @@ typically expose your own ingestion APIs and **then** construct
 
 ## See also
 
-- [SQL_ENGINE](/integrations/engines/sql/) — **`SqlDataFrame`** / **`SqlDataFrameModel`** with the lazy-SQL stack (**`pydantable[sql]`**).
-- [MONGO_ENGINE](/integrations/engines/mongo/) — **`MongoDataFrame`** / **`MongoDataFrameModel`** (**`MongoPydantableEngine`** in **`pydantable.mongo_dataframe_engine`**, **`MongoRoot`** from the Mongo plan stack; façade **`pydantable.mongo_dataframe`**, **`pydantable[mongo]`**). Eager **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** and **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`** (**PyMongo** column dicts) are separate from **`ExecutionEngine`** — not a third-party engine package.
-- [ADR-engines](/project/adrs/engines/) — architecture decisions and extension checklist.
-- [DEVELOPER](/project/developer/) — repository layout and native packaging.
-- [EXECUTION](/user-guide/execution/) — how materialization uses the engine.
-- [INTERFACE_CONTRACT](/semantics/interface-contract/) — behavioural guarantees users may expect.
-- [VERSIONING](/semantics/versioning/) — aligning **`pydantable`**, **`pydantable-protocol`**, and native versions.
+- [SQL_ENGINE](../../integrations/engines/sql.md) — **`SqlDataFrame`** / **`SqlDataFrameModel`** with the lazy-SQL stack (**`pydantable[sql]`**).
+- [MONGO_ENGINE](../../integrations/engines/mongo.md) — **`MongoDataFrame`** / **`MongoDataFrameModel`** (**`MongoPydantableEngine`** in **`pydantable.mongo_dataframe_engine`**, **`MongoRoot`** from the Mongo plan stack; façade **`pydantable.mongo_dataframe`**, **`pydantable[mongo]`**). Eager **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** and **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`** (**PyMongo** column dicts) are separate from **`ExecutionEngine`** — not a third-party engine package.
+- [ADR-engines](../../project/adrs/engines.md) — architecture decisions and extension checklist.
+- [DEVELOPER](../../project/developer.md) — repository layout and native packaging.
+- [EXECUTION](../../user-guide/execution.md) — how materialization uses the engine.
+- [INTERFACE_CONTRACT](../../semantics/interface-contract.md) — behavioural guarantees users may expect.
+- [VERSIONING](../../semantics/versioning.md) — aligning **`pydantable`**, **`pydantable-protocol`**, and native versions.

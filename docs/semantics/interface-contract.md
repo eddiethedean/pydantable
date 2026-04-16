@@ -7,7 +7,7 @@ at the *type/semantics* level, while allowing implementation-specific physical o
 
 ## Semver and stability (0.x / 1.x)
 
-Versioning expectations (0.x and 1.x policy, extension alignment) are summarized in [VERSIONING](/semantics/versioning/). **This document** records what the library **does** for joins, nulls, windows, grouped aggregation, trusted ingest, async materialization, and Arrow interchange—not which release added each surface. For **1.x**, this file is the behavioral source of truth referenced by the semver policy.
+Versioning expectations (0.x and 1.x policy, extension alignment) are summarized in [VERSIONING](../semantics/versioning.md). **This document** records what the library **does** for joins, nulls, windows, grouped aggregation, trusted ingest, async materialization, and Arrow interchange—not which release added each surface. For **1.x**, this file is the behavioral source of truth referenced by the semver policy.
 
 **Row models:** `collect()` with default arguments returns a **list of Pydantic models**;
 order of that list follows the same non-guarantee as columnar materialization unless
@@ -40,10 +40,10 @@ These flags are supported by the Polars engine. When you need deterministic comp
 ## Introspection (`shape`, `columns`, `dtypes`, `info`, `describe`)
 
 - **`columns`** and **`dtypes`** reflect the **current logical schema** (projected column names and Pydantic field annotations).
-- **`shape`** and **`empty`** are derived from the **root** ingested column buffers when present (same idea as the pandas UI table in [PANDAS_UI](/integrations/alternate-surfaces/pandas-ui/)). When the logical plan applies filters or other transforms **without** replacing that root buffer, **`shape[0]`** may **not** equal the number of rows returned by **`to_dict()`**, **`collect()`**, or **`head()`** after execution. Use materialized output for an accurate row count.
+- **`shape`** and **`empty`** are derived from the **root** ingested column buffers when present (same idea as the pandas UI table in [PANDAS_UI](../integrations/alternate-surfaces/pandas-ui.md)). When the logical plan applies filters or other transforms **without** replacing that root buffer, **`shape[0]`** may **not** equal the number of rows returned by **`to_dict()`**, **`collect()`**, or **`head()`** after execution. Use materialized output for an accurate row count.
 - **`info()`** returns a multi-line **string** summarizing column names, dtypes, and row count consistent with the **`shape`** policy above (not a full **`collect()`** unless documented elsewhere).
 - **`describe()`** (**0.20.0+**) returns a multi-line **string** after one **`to_dict()`** pass: **int** / **float** (mean, min, max, std where applicable), **bool** (true/false/null counts), **str** (counts, **`n_unique`**, min/max string length, nulls), **`date`** / **`datetime`** (non-null count, min, max, null count). Other dtypes are omitted.
-- **`value_counts(column)`** (**0.20.0+**) returns per-value counts via group-by aggregation (engine path) as a Python **`dict`** (value → count), not a pandas **`Series`**; optional **`normalize=True`** returns fractions. The pandas UI does not change this core return type—see [PANDAS_UI](/integrations/alternate-surfaces/pandas-ui/) (**Core `value_counts`**).
+- **`value_counts(column)`** (**0.20.0+**) returns per-value counts via group-by aggregation (engine path) as a Python **`dict`** (value → count), not a pandas **`Series`**; optional **`normalize=True`** returns fractions. The pandas UI does not change this core return type—see [PANDAS_UI](../integrations/alternate-surfaces/pandas-ui.md) (**Core `value_counts`**).
 
 ## Join semantics (collision + keys)
 
@@ -187,7 +187,7 @@ The output field nullability is preserved/derived accordingly:
 - nullable aggregates above are typed as `Optional[...]`
 - `count` and `n_unique` outputs remain non-optional integers
 
-**Polars runtime errors (0.18.0+):** On **`collect()`** failure during **`group_by().agg()`**, the raised **`ValueError`** may include **`(group_by().agg())`** in the message (Rust **`polars_err_ctx`**) so the error is attributable to grouped aggregation. This does not change the aggregation rules above; see [EXECUTION](/user-guide/execution/).
+**Polars runtime errors (0.18.0+):** On **`collect()`** failure during **`group_by().agg()`**, the raised **`ValueError`** may include **`(group_by().agg())`** in the message (Rust **`polars_err_ctx`**) so the error is attributable to grouped aggregation. This does not change the aggregation rules above; see [EXECUTION](../user-guide/execution.md).
 
 ### `drop_nulls`
 
@@ -202,7 +202,7 @@ The output field nullability is preserved/derived accordingly:
 - **`duplicated(subset=..., keep="first"|"last"|False)`**: returns a single-column boolean frame **`duplicated`** with pandas-aligned semantics (**`keep=False`** marks every row that belongs to a non-unique group).
 - **`drop_duplicate_groups(subset=...)`**: removes **all** rows whose key appears in a duplicate group (equivalent to pandas **`drop_duplicates(keep=False)`** on the pandas UI).
 
-These compile to Rust plan steps when the Polars engine is enabled; the row-wise executor implements the same semantics when Polars is disabled. See [PANDAS_UI](/integrations/alternate-surfaces/pandas-ui/) (**`drop_duplicates` / `duplicated`**) and tests **`tests/test_pandas_ui.py`**, **`tests/test_pandas_ui_popular_features.py`**.
+These compile to Rust plan steps when the Polars engine is enabled; the row-wise executor implements the same semantics when Polars is disabled. See [PANDAS_UI](../integrations/alternate-surfaces/pandas-ui.md) (**`drop_duplicates` / `duplicated`**) and tests **`tests/test_pandas_ui.py`**, **`tests/test_pandas_ui_popular_features.py`**.
 
 ## Reshaping semantics
 
@@ -265,7 +265,7 @@ Supported reshape methods:
 - **Homogeneous list** columns (`list[T]` / `List[T]` with supported `T`) are modeled end-to-end; `explode(columns)` unwraps **one** list level and updates the schema to the inner dtype (**always nullable** after explode, matching Polars’ post-explode nullability for element cells). Execution uses Polars `explode` with `empty_as_null=false` and `keep_nulls=true` (same defaults as the Rust engine’s Polars call).
 - **Multi-column explode:** all named columns must be list-typed; Polars requires **matching list lengths per row**. Mismatched lengths for the same row raise at execution (contract-tested).
 - **Empty lists:** an empty list cell yields **no output rows** for that input row (Polars behavior); other columns are not replicated for that row.
-- **`unnest`** for **struct** columns (nested model columns) uses Polars `unnest` with separator **`_`**: each struct field becomes a top-level column named **`{parent}_{field}`** (e.g. `addr_street`). The logical schema follows that naming; struct nullability is propagated to field columns per the Rust descriptor rules. See [`SUPPORTED_TYPES.md`](/user-guide/supported-types/).
+- **`unnest`** for **struct** columns (nested model columns) uses Polars `unnest` with separator **`_`**: each struct field becomes a top-level column named **`{parent}_{field}`** (e.g. `addr_street`). The logical schema follows that naming; struct nullability is propagated to field columns per the Rust descriptor rules. See [`SUPPORTED_TYPES.md`](../user-guide/supported-types.md).
 - `explode(columns=...)` and `unnest(columns=...)` accept schema-driven `Selector` objects; an empty match raises `ValueError` with available columns.
 
 ## Row-wise expression evaluation (`polars_engine` disabled)
@@ -276,9 +276,9 @@ When the extension is built **without** the Polars execution engine, a small sub
 
 Supported P6 API surface:
 - Generic **`Expr.over(partition_by=..., order_by=...)`** (keyword form) is **not supported**: passing either argument raises **`TypeError`**. Use **named window functions** with **`Window.partitionBy(...).orderBy(...)`** (and optional `.rowsBetween` / `.rangeBetween`).
-- **Named window functions** (`row_number`, `rank`, `dense_rank`, `window_sum`, `window_mean`, `window_min`, `window_max`, `lag`, `lead`) use Rust `ExprNode::Window` and lower to Polars **`.over_with_options(..., WindowMapping::default())`** when no frame is present. **`Window.orderBy(..., nulls_last=...)`** controls **NULLS FIRST / LAST** per sort key (default **`nulls_last=False`**). Unframed multi-key windows: Polars allows only **one** **`SortOptions`** for the combined sort—if sort keys disagree on **`ascending`** or **`nulls_last`**, pydantable raises **`ValueError`** (use matching flags on all keys or a framed window, which honors per-key placement; see [WINDOW_SQL_SEMANTICS](/semantics/window-sql-semantics/)). Framed windows use a dedicated executor fallback path:
+- **Named window functions** (`row_number`, `rank`, `dense_rank`, `window_sum`, `window_mean`, `window_min`, `window_max`, `lag`, `lead`) use Rust `ExprNode::Window` and lower to Polars **`.over_with_options(..., WindowMapping::default())`** when no frame is present. **`Window.orderBy(..., nulls_last=...)`** controls **NULLS FIRST / LAST** per sort key (default **`nulls_last=False`**). Unframed multi-key windows: Polars allows only **one** **`SortOptions`** for the combined sort—if sort keys disagree on **`ascending`** or **`nulls_last`**, pydantable raises **`ValueError`** (use matching flags on all keys or a framed window, which honors per-key placement; see [WINDOW_SQL_SEMANTICS](../semantics/window-sql-semantics.md)). Framed windows use a dedicated executor fallback path:
   - `rowsBetween(start, end)`: supported for `row_number`, `rank`, `dense_rank`, `window_sum`, `window_mean`, `window_min`, `window_max`, `lag`, and `lead`.
-- `rangeBetween(start, end)`: supported for numeric aggregates (`window_sum`, `window_mean`, `window_min`, `window_max`) with **at least one** `orderBy` column. Rows are sorted **lexicographically** by all `orderBy` keys; **range bounds apply only to the first** `orderBy` column, which must be numeric, `date`, `datetime`, or `duration` (PostgreSQL-style multi-column `RANGE`; see [`WINDOW_SQL_SEMANTICS.md`](/semantics/window-sql-semantics/)). Bounds use that column’s native unit (for `datetime`/`duration`, microseconds). Identical results across all SQL engines are **not** guaranteed.
+- `rangeBetween(start, end)`: supported for numeric aggregates (`window_sum`, `window_mean`, `window_min`, `window_max`) with **at least one** `orderBy` column. Rows are sorted **lexicographically** by all `orderBy` keys; **range bounds apply only to the first** `orderBy` column, which must be numeric, `date`, `datetime`, or `duration` (PostgreSQL-style multi-column `RANGE`; see [`WINDOW_SQL_SEMANTICS.md`](../semantics/window-sql-semantics.md)). Bounds use that column’s native unit (for `datetime`/`duration`, microseconds). Identical results across all SQL engines are **not** guaranteed.
   - Unsupported framed combinations raise typed errors.
   - Unframed behavior remains unchanged; **`lag` / `lead`** are implemented as **`shift(±n)`** in that window context and require **`order_by`**.
 - `rolling_agg(...)`
@@ -290,7 +290,7 @@ Temporal typing:
 
 ## Struct columns (nested Pydantic models)
 
-- Nested **`Schema` / `BaseModel`** fields are supported as **struct** dtypes in Rust and Polars; see [`SUPPORTED_TYPES.md`](/user-guide/supported-types/) for the descriptor format and expression limits.
+- Nested **`Schema` / `BaseModel`** fields are supported as **struct** dtypes in Rust and Polars; see [`SUPPORTED_TYPES.md`](../user-guide/supported-types.md) for the descriptor format and expression limits.
 - **Pass-through** operations (`select`, `filter`, `sort`, `slice`, `join` on scalar keys, `concat` when schemas align) keep struct columns when the logical schema still matches.
 - **Python type identity** after transforms: when a new Rust descriptor matches the previous column’s annotation, pydantable keeps your original nested class; new or renamed columns, or changed dtypes, may use anonymous `create_model` types while preserving validation shape.
 - **Struct field access**: `Expr.struct_field(name)` (e.g. `df.addr.struct_field("street")`) projects a scalar field; invalid names fail at expression build time.
@@ -304,19 +304,19 @@ Rolling/dynamic contracts:
 
 ## Local lazy file scans (multi-file and `glob`)
 
-- Lazy **`read_*` / `aread_*`** roots delegate **file discovery, glob expansion, and hive-style path handling** to **Polars** according to the Rust **`scan_kwargs`** pydantable forwards (see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`). **Parquet** scans can request **`include_file_paths`**, **`hive_partitioning`**, **`allow_missing_columns`**, and **`row_index_*`** via **`scan_kwargs`**. **CSV** scans can request **`include_file_paths`**, **`row_index_*`**, and other documented **`LazyCsvReader`** options via **`scan_kwargs`**. **NDJSON** scans can request **`glob`** ( **`glob=False`** raises **`ValueError`** ), **`include_file_paths`**, and **`row_index_*`** via **`scan_kwargs`**. **`read_json`** is an alias of **`read_ndjson`** (JSON Lines only; same path and **`scan_kwargs`** semantics). **IPC** scans forward **`IpcScanOptions`** and **`UnifiedScanArgs`** fields documented under **`read_ipc`** (e.g. **`glob`**, **`cache`**, **`rechunk`**, **`n_rows`**, hive kwargs, **`include_file_paths`**, **`row_index_*`**). **Schema union across files** and **partition column dtypes** follow Polars for the pinned version; **`HiveOptions.schema`** overrides are **not** exposed yet. pydantable does **not** issue **warnings** when on-disk schemas differ across files; use **`allow_missing_columns`** / casts as in [IO_PARQUET](/io/parquet/), or external schema probes, if you need predictable unions.
+- Lazy **`read_*` / `aread_*`** roots delegate **file discovery, glob expansion, and hive-style path handling** to **Polars** according to the Rust **`scan_kwargs`** pydantable forwards (see {ref}`Polars 0.53 vs pydantable scan audit <local-io-audit>`). **Parquet** scans can request **`include_file_paths`**, **`hive_partitioning`**, **`allow_missing_columns`**, and **`row_index_*`** via **`scan_kwargs`**. **CSV** scans can request **`include_file_paths`**, **`row_index_*`**, and other documented **`LazyCsvReader`** options via **`scan_kwargs`**. **NDJSON** scans can request **`glob`** ( **`glob=False`** raises **`ValueError`** ), **`include_file_paths`**, and **`row_index_*`** via **`scan_kwargs`**. **`read_json`** is an alias of **`read_ndjson`** (JSON Lines only; same path and **`scan_kwargs`** semantics). **IPC** scans forward **`IpcScanOptions`** and **`UnifiedScanArgs`** fields documented under **`read_ipc`** (e.g. **`glob`**, **`cache`**, **`rechunk`**, **`n_rows`**, hive kwargs, **`include_file_paths`**, **`row_index_*`**). **Schema union across files** and **partition column dtypes** follow Polars for the pinned version; **`HiveOptions.schema`** overrides are **not** exposed yet. pydantable does **not** issue **warnings** when on-disk schemas differ across files; use **`allow_missing_columns`** / casts as in [IO_PARQUET](../io/parquet.md), or external schema probes, if you need predictable unions.
 - **Typed validation** (**`trusted_mode`**, strict cell checks, optional-column filling, …) applies at **materialization** (**`collect()`**, **`to_dict()`**, **`to_arrow()`**, …), not when the **`ScanFileRoot`** is constructed.
 
 ## Arrow interchange (0.16.0)
 
-- **`pydantable.io.materialize_*`** and **`iter_*`** / **`aiter_*`** are **single-source** by design (one file path per call unless you compose iterators in Python). **`pydantable.io.materialize_parquet`** / **`materialize_ipc`** feed **`dict[str, list]`** into **`DataFrameModel(...)`** / **`DataFrame(...)`** constructors. **`materialize_ipc(..., as_stream=True)`** selects the **streaming** IPC format; default is **file** IPC. For lazy local files use **`read_*`** + **`DataFrame.write_parquet`** ([EXECUTION](/user-guide/execution/)).
+- **`pydantable.io.materialize_*`** and **`iter_*`** / **`aiter_*`** are **single-source** by design (one file path per call unless you compose iterators in Python). **`pydantable.io.materialize_parquet`** / **`materialize_ipc`** feed **`dict[str, list]`** into **`DataFrameModel(...)`** / **`DataFrame(...)`** constructors. **`materialize_ipc(..., as_stream=True)`** selects the **streaming** IPC format; default is **file** IPC. For lazy local files use **`read_*`** + **`DataFrame.write_parquet`** ([EXECUTION](../user-guide/execution.md)).
 - **Partitioned Parquet writes:** **`DataFrame.write_parquet(path, partition_by=[...])`** (and **`DataFrameModel`**) emit a **multi-file** hive-style layout under **`path`**. The dataset is **not** written atomically: failures can leave **partial** output (some **`col=value/.../00000000.parquet`** files present, others missing). There is **no** transactional “all-or-nothing” rename unless you implement it outside pydantable.
 - **`DataFrame.to_arrow`** / **`DataFrame.ato_arrow`:** same logical materialization as **`to_dict`**, then build a PyArrow **`Table`** in Python (**not** a zero-copy view of internal Polars buffers). **`DataFrameModel`** exposes the same methods by delegation.
-- **Constructors:** **`pyarrow.Table`** and **`RecordBatch`** are accepted when **`pyarrow`** is installed (converted to Python lists before validation); see [SUPPORTED_TYPES](/user-guide/supported-types/).
+- **Constructors:** **`pyarrow.Table`** and **`RecordBatch`** are accepted when **`pyarrow`** is installed (converted to Python lists before validation); see [SUPPORTED_TYPES](../user-guide/supported-types.md).
 
 ## Four terminal materialization modes
 
-Lazy **`DataFrame`** / **`DataFrameModel`** plans are materialized through one of **four** scheduling patterns: **blocking** (**`collect`**, **`to_dict`**, …), **async** (**`acollect`**, **`ato_dict`**, …), **deferred** (**`submit`** → **`ExecutionHandle`**), or **chunked** (**`stream`** / **`astream`**). They share engine semantics; see [MATERIALIZATION](/user-guide/materialization/) for the full table and **`PlanMaterialization`** labels.
+Lazy **`DataFrame`** / **`DataFrameModel`** plans are materialized through one of **four** scheduling patterns: **blocking** (**`collect`**, **`to_dict`**, …), **async** (**`acollect`**, **`ato_dict`**, …), **deferred** (**`submit`** → **`ExecutionHandle`**), or **chunked** (**`stream`** / **`astream`**). They share engine semantics; see [MATERIALIZATION](../user-guide/materialization.md) for the full table and **`PlanMaterialization`** labels.
 
 ## Async materialization, `submit`, `stream`, and `astream` (1.6.0+)
 
@@ -332,10 +332,10 @@ The compiled extension executes with a Rust Polars **`LazyFrame`**, which is **n
 
 ## Related documentation
 
-- **Multi-key `RANGE` window frames:** [WINDOW_SQL_SEMANTICS](/semantics/window-sql-semantics/) (sort keys vs range axis on the first `orderBy` column).
-- **Trusted ingest (`trusted_mode`):** [DATAFRAMEMODEL](/user-guide/dataframemodel/), [SUPPORTED_TYPES](/user-guide/supported-types/).
-- **Materialization (sync + async + four modes):** [MATERIALIZATION](/user-guide/materialization/), [EXECUTION](/user-guide/execution/), [ROADMAP](/project/roadmap/), [FASTAPI](/integrations/fastapi/fastapi/).
-- **Versioning (0.x):** [VERSIONING](/semantics/versioning/).
+- **Multi-key `RANGE` window frames:** [WINDOW_SQL_SEMANTICS](../semantics/window-sql-semantics.md) (sort keys vs range axis on the first `orderBy` column).
+- **Trusted ingest (`trusted_mode`):** [DATAFRAMEMODEL](../user-guide/dataframemodel.md), [SUPPORTED_TYPES](../user-guide/supported-types.md).
+- **Materialization (sync + async + four modes):** [MATERIALIZATION](../user-guide/materialization.md), [EXECUTION](../user-guide/execution.md), [ROADMAP](../project/roadmap.md), [FASTAPI](../integrations/fastapi/fastapi.md).
+- **Versioning (0.x):** [VERSIONING](../semantics/versioning.md).
 
 ## Migration Notes (Polars -> PydanTable)
 

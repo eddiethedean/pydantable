@@ -3,20 +3,20 @@
 This page contains **less common** FastAPI integration topics: deeper async/I/O patterns,
 experimental URL transports, and “how the pieces fit” when you’re building larger systems.
 
-If you’re looking for the common path, start with [GOLDEN_PATH_FASTAPI](/integrations/fastapi/golden-path/), then the
-short index + reference tables in [FASTAPI](/integrations/fastapi/fastapi/).
+If you’re looking for the common path, start with [GOLDEN_PATH_FASTAPI](../../integrations/fastapi/golden-path.md), then the
+short index + reference tables in [FASTAPI](../../integrations/fastapi/fastapi.md).
 
 ## Four materialization modes (FastAPI)
 
-The same lazy plan can be materialized in **four** ways; see [MATERIALIZATION](/user-guide/materialization/) for the full table and **`PlanMaterialization`**.
+The same lazy plan can be materialized in **four** ways; see [MATERIALIZATION](../../user-guide/materialization.md) for the full table and **`PlanMaterialization`**.
 
 Below, routes read **Parquet** from a **server-local path** (shared volume, artifact from an upstream job, or a temp file you wrote after **`await upload.read()`**). In production, **validate and sandbox** paths (allowlist directories, reject `..`, etc.). **`trusted_mode="shape_only"`** matches typical “file already matches our schema” pipelines; use default **`trusted_mode`** when you need full cell validation.
 
-Row-list JSON bodies are covered in [FASTAPI](/integrations/fastapi/fastapi/) and [fastapi_columnar_bodies](/cookbook/fastapi_columnar_bodies/); **async file routes** should **`await MyModel.aread_*`** (lazy scan, blocking open/read off the event loop) rather than **`await amaterialize_*`**, which builds a full **`dict[str, list]`** first. SQL: **`await afetch_sqlmodel`** / **`await afetch_sql_raw`** as needed ([IO_SQL](/io/sql/)).
+Row-list JSON bodies are covered in [FASTAPI](../../integrations/fastapi/fastapi.md) and [fastapi_columnar_bodies](../../cookbook/fastapi_columnar_bodies.md); **async file routes** should **`await MyModel.aread_*`** (lazy scan, blocking open/read off the event loop) rather than **`await amaterialize_*`**, which builds a full **`dict[str, list]`** first. SQL: **`await afetch_sqlmodel`** / **`await afetch_sql_raw`** as needed ([IO_SQL](../../io/sql.md)).
 
 ### 1. Blocking — sync `def` + lazy `read_parquet` + `collect()` / `to_dict()`
 
-**Sync** **`read_parquet`** keeps work on a Polars **`LazyFrame`** until **`collect()`** / **`to_dict()`** (see [EXECUTION](/user-guide/execution/)).
+**Sync** **`read_parquet`** keeps work on a Polars **`LazyFrame`** until **`collect()`** / **`to_dict()`** (see [EXECUTION](../../user-guide/execution.md)).
 
 ```python
 from fastapi import FastAPI, Query
@@ -167,7 +167,7 @@ async def users_stream_async(path: str = Query(...)):
     return StreamingResponse(ndjson_async(df), media_type="application/x-ndjson")
 ```
 
-These are **chunked replay** responses, not out-of-core Polars streaming; very large tables may need pagination or writing to object storage instead ([EXECUTION](/user-guide/execution/)).
+These are **chunked replay** responses, not out-of-core Polars streaming; very large tables may need pagination or writing to object storage instead ([EXECUTION](../../user-guide/execution.md)).
 
 ## `DataFrameModel` I/O in `async def` routes
 

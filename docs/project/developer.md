@@ -27,11 +27,11 @@ Minimal alternative (narrower deps): **`pip install maturin pytest pytest-asynci
 
 **`make check-full`** (from repo root) runs Ruff on the whole tree, Astral **`ty`** on the three first-party trees (see **`[tool.ty]`** in **`pyproject.toml`**), a minimal **`ty`** venv (no NumPy/PyArrow), Pyright, typing-artifact checks, MkDocs (**`mkdocs build --strict`**), and Rust **`cargo fmt` / clippy / test**. **`make rust-test`** prepends **`python/`**, **`pydantable-protocol/python`**, and **`pydantable-native/python`** to **`PYTHONPATH`** (then the venv’s **`site-packages`**) so PyO3 tests resolve **`pydantable`**, **`pydantable_protocol`**, and **`polars`** consistently without relying on editable installs alone. **`make native-develop`** runs **`pip install -e ./pydantable-protocol`** before **`maturin develop`**. **`mypy`** remains in **`[dev]`** for the optional schema-evolving plugin and **`tests/test_mypy_*.py`** subprocess checks.
 
-For **which checker runs where**, **`ty`** vs **mypy** vs **Pyright**, phased strictness, and public-vs-internal **`Any`**, see [TYPING](/user-guide/typing/) (contributor section).
+For **which checker runs where**, **`ty`** vs **mypy** vs **Pyright**, phased strictness, and public-vs-internal **`Any`**, see [TYPING](../user-guide/typing.md) (contributor section).
 
 ### Architecture notes (SOLID-oriented)
 
-Contributors should keep boundaries clear so the codebase stays testable and third-party engines remain possible (see [CUSTOM_ENGINE_PACKAGE](/integrations/engines/custom-engine-package/) and [ADR-engines](/project/adrs/engines/)).
+Contributors should keep boundaries clear so the codebase stays testable and third-party engines remain possible (see [CUSTOM_ENGINE_PACKAGE](../integrations/engines/custom-engine-package.md) and [ADR-engines](../project/adrs/engines.md)).
 
 | Principle | In this repo |
 |-----------|----------------|
@@ -76,7 +76,7 @@ The crate’s `[features]` block in `pydantable-core/Cargo.toml` gates the Polar
 
 ### Adding another execution engine
 
-Authoritative guide for **separate PyPI packages**: [CUSTOM_ENGINE_PACKAGE](/integrations/engines/custom-engine-package/).
+Authoritative guide for **separate PyPI packages**: [CUSTOM_ENGINE_PACKAGE](../integrations/engines/custom-engine-package.md).
 
 Implement **`ExecutionEngine`** from **`pydantable_protocol`** (also re-exported as **`pydantable.engine.protocols`**): plan transforms, **`execute_plan`** / async variants, sinks, **`capabilities`**. Raise **`pydantable_protocol.UnsupportedEngineOperationError`** (or **`pydantable.errors.UnsupportedEngineOperationError`**, which inherits from it) when the backend cannot support a call. Set **`EngineCapabilities.backend`** to **`"custom"`** (or **`"stub"`** for test doubles) and populate feature flags honestly.
 
@@ -92,10 +92,10 @@ Implement **`ExecutionEngine`** from **`pydantable_protocol`** (also re-exported
 
 **Tests:** Prefer patching **`NativePolarsEngine`** on the class when replacing engine behavior for frames that use the default engine. See **`StubExecutionEngine`** and **`tests/test_engine_stub.py`**.
 
-**Guardrail:** Run **`python scripts/check_engine_bypass.py`** (included in **`make check-python`** as **`engine-bypass-check`**) after changes under **`python/pydantable/`**. It rejects direct native-extension imports and **`get_default_engine().rust_core`** outside the allowlist documented in [ADR-engines](/project/adrs/engines/).
+**Guardrail:** Run **`python scripts/check_engine_bypass.py`** (included in **`make check-python`** as **`engine-bypass-check`**) after changes under **`python/pydantable/`**. It rejects direct native-extension imports and **`get_default_engine().rust_core`** outside the allowlist documented in [ADR-engines](../project/adrs/engines.md).
 
 - **Protocols:** `PlanExecutor`, `SinkWriter`, and **`ExecutionEngine`** in **`pydantable_protocol`** (thin re-export in `python/pydantable/engine/protocols.py`). **`EngineCapabilities`** includes **`backend`** and optional-feature flags.
-- **ADR:** See [ADR-engines](/project/adrs/engines/) for design notes and Track B (portable IR).
+- **ADR:** See [ADR-engines](../project/adrs/engines.md) for design notes and Track B (portable IR).
 
 ### Engine injection (dependency inversion)
 
@@ -105,7 +105,7 @@ Prefer **explicit** engines over relying on the process-wide default when you ne
 - **Process default:** **`get_default_engine()`** / **`set_default_engine(...)`** in **`pydantable.engine`** (used when **`engine=`** is omitted). Use **`set_default_engine(None)`** in test teardown to restore lazy construction of the native engine.
 - **Future option:** a **`contextvars`-scoped override** could be added without removing the global API; it is not implemented today—if you need thread-local engines, pass **`engine=`** per frame or open a design discussion.
 
-For third-party **`ExecutionEngine`** packages, see [CUSTOM_ENGINE_PACKAGE](/integrations/engines/custom-engine-package/).
+For third-party **`ExecutionEngine`** packages, see [CUSTOM_ENGINE_PACKAGE](../integrations/engines/custom-engine-package.md).
 
 ## Documentation builds (MkDocs + Material) {#docs-mkdocs-build}
 
@@ -127,7 +127,7 @@ User-facing doc changes should keep the repository `README.md` and `docs/` align
 
 ## Notebooks (Jupyter / VS Code)
 
-Canonical walkthrough: [QUICKSTART](/getting-started/quickstart/) and **`notebooks/five_minute_tour.ipynb`** at the repo root.
+Canonical walkthrough: [QUICKSTART](../getting-started/quickstart.md) and **`notebooks/five_minute_tour.ipynb`** at the repo root.
 
 Open the repo’s notebook or a scratch **`.ipynb`** with the venv that has **`pip install -e ".[dev]"`** and `pydantable-native` installed/built. In a cell:
 
@@ -142,9 +142,9 @@ df = DataFrame[Row]({"x": [1, 2, 3]})
 df  # last expression → HTML table in Jupyter / VS Code
 ```
 
-- **`display(df)`** or the last expression in a cell uses **`_repr_html_()`** on **`DataFrame`** / **`DataFrameModel`** (bounded rows/columns; see [EXECUTION](/user-guide/execution/) **Jupyter / HTML**).
-- **`repr(df)`** is the plain-text path (no **`collect()`** for row counts—see [EXECUTION](/user-guide/execution/) **repr**).
-- **`df.shape`**, **`df.info()`**, **`df.describe()`** follow [INTERFACE_CONTRACT](/semantics/interface-contract/) **Introspection** ( **`describe`** covers **int** / **float** / **bool** / **str** / **`date`** / **`datetime`** per that page).
+- **`display(df)`** or the last expression in a cell uses **`_repr_html_()`** on **`DataFrame`** / **`DataFrameModel`** (bounded rows/columns; see [EXECUTION](../user-guide/execution.md) **Jupyter / HTML**).
+- **`repr(df)`** is the plain-text path (no **`collect()`** for row counts—see [EXECUTION](../user-guide/execution.md) **repr**).
+- **`df.shape`**, **`df.info()`**, **`df.describe()`** follow [INTERFACE_CONTRACT](../semantics/interface-contract.md) **Introspection** ( **`describe`** covers **int** / **float** / **bool** / **str** / **`date`** / **`datetime`** per that page).
 
 No extra **ipywidgets** dependency is required for the default HTML table.
 
@@ -160,7 +160,7 @@ Current contract direction:
 
 ### SOLID-oriented layout (internals)
 
-- **Rust — `plan/execute_polars/`:** Polars execution is split into `common`, `runner` (`PolarsPlanRunner`), `materialize`, `join_exec`, `groupby_exec`, `concat_exec`, `literal_agg`, and `reshape_exec`, re-exported from `execute_polars/mod.rs`. **`common::polars_err_ctx`** (0.18.0+) labels Polars **`collect()`** failures in **`groupby_exec`** as **`group_by().agg()`** in the Python **`ValueError`** text—see `execute_polars/common.rs` and [EXECUTION](/user-guide/execution/).
+- **Rust — `plan/execute_polars/`:** Polars execution is split into `common`, `runner` (`PolarsPlanRunner`), `materialize`, `join_exec`, `groupby_exec`, `concat_exec`, `literal_agg`, and `reshape_exec`, re-exported from `execute_polars/mod.rs`. **`common::polars_err_ctx`** (0.18.0+) labels Polars **`collect()`** failures in **`groupby_exec`** as **`group_by().agg()`** in the Python **`ValueError`** text—see `execute_polars/common.rs` and [EXECUTION](../user-guide/execution.md).
 - **Rust — `python_api/`:** PyO3 bindings are split into `types` (`PyExpr`, `PyPlan`), `expr_fns`, `plan_fns`, and `exec_fns`; `mod.rs` only registers symbols on `_core`.
 - **Rust — `plan/executor.rs`:** `PhysicalPlanExecutor` dispatches full-plan `execute_plan`. With `polars_engine`, inherent methods on `PolarsExecutor` (`join`, `groupby_agg`, `concat`, `melt`, `pivot`, `explode`, `unnest`, `groupby_dynamic_agg`) forward to `execute_polars::*` so call sites depend on the executor type rather than raw free functions.
 - **Python — `dataframe/` and `schema/`:** Public API stays `pydantable.dataframe` and `pydantable.schema`; implementations live in `_impl.py` inside each package for a single-responsibility split without changing imports.

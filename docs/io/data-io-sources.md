@@ -1,16 +1,16 @@
 # Data sources for read/write (planning reference)
 
-**Per-format API reference:** [IO_OVERVIEW](/io/overview/) — **default:** **`DataFrame` / `DataFrameModel`** classmethods and instance methods; eager **`materialize_*`**, **`iter_*`**, SQL helpers (**`from pydantable import …`**); untyped **`ScanFileRoot`** and other extension hooks live in **`pydantable.io`** (internal / advanced).
+**Per-format API reference:** [IO_OVERVIEW](../io/overview.md) — **default:** **`DataFrame` / `DataFrameModel`** classmethods and instance methods; eager **`materialize_*`**, **`iter_*`**, SQL helpers (**`from pydantable import …`**); untyped **`ScanFileRoot`** and other extension hooks live in **`pydantable.io`** (internal / advanced).
 
 This document lists **common and useful** places applications read and write tabular data. It is intended to guide **0.23.x+** I/O work in pydantable: which formats and transports to support first, and which **async** stacks pair well with **FastAPI** and typed frames.
 
 **Today (0.23.0+)**, the stack has three layers (implementations live under **`pydantable.io`**; **application code** uses **`DataFrame` / `DataFrameModel`** or **`from pydantable import …`**):
 
-1. **`read_*` / `aread_*`** — lazy **local file** roots (**`ScanFileRoot`**) so **`DataFrame` / `DataFrameModel`** can plan on Polars **`LazyFrame`** without loading full columns into Python (**Parquet**, **CSV**, **NDJSON** / **`read_json`** alias, **IPC file**). A JSON **array** of objects in one file is **not** read lazily—use **`materialize_json`** / **`iter_json_array`** (see [IO_JSON](/io/json/)).
+1. **`read_*` / `aread_*`** — lazy **local file** roots (**`ScanFileRoot`**) so **`DataFrame` / `DataFrameModel`** can plan on Polars **`LazyFrame`** without loading full columns into Python (**Parquet**, **CSV**, **NDJSON** / **`read_json`** alias, **IPC file**). A JSON **array** of objects in one file is **not** read lazily—use **`materialize_json`** / **`iter_json_array`** (see [IO_JSON](../io/json.md)).
 2. **`materialize_*` / `amaterialize_*`** — eager **`dict[str, list]`** reads (**Rust** on local paths where possible; **PyArrow** for bytes, HTTP bodies, column subsets, streaming IPC).
 3. **`DataFrame.write_parquet`**, **`write_csv`**, **`write_ipc`**, **`write_ndjson`** (and **`DataFrameModel`** mirrors) — write the lazy pipeline from Rust without a giant Python dict.
 
-4. **Batched `dict[str, list]` I/O (1.5.0+)** — **`iter_*` / `aiter_*`** (**`from pydantable import …`**) and **`write_*_batches`** for pull-style, chunk-sized reads and writes (PyArrow-backed for Parquet/IPC where noted). Each **`iter_*`** call targets **one** path; multi-file batching is composed in Python (see [IO_OVERVIEW](/io/overview/) **Multi-file paths, globs, and memory**). **`write_csv_batches`** / **`write_ndjson_batches`** support **`mode="w"`** (truncate) vs **`"a"`** (append). **`write_parquet_batches`**, **`write_ipc_batches`**, **`write_csv_batches`**, and **`write_ndjson_batches`** require a **single file** path (or stream)—an **existing directory** path raises **`ValueError`**. **`DataFrameModel.write_*_batches`** accepts iterators of column dicts (or row objects with **`to_dict()`**) for the same shapes.
+4. **Batched `dict[str, list]` I/O (1.5.0+)** — **`iter_*` / `aiter_*`** (**`from pydantable import …`**) and **`write_*_batches`** for pull-style, chunk-sized reads and writes (PyArrow-backed for Parquet/IPC where noted). Each **`iter_*`** call targets **one** path; multi-file batching is composed in Python (see [IO_OVERVIEW](../io/overview.md) **Multi-file paths, globs, and memory**). **`write_csv_batches`** / **`write_ndjson_batches`** support **`mode="w"`** (truncate) vs **`"a"`** (append). **`write_parquet_batches`**, **`write_ipc_batches`**, **`write_csv_batches`**, and **`write_ndjson_batches`** require a **single file** path (or stream)—an **existing directory** path raises **`ValueError`**. **`DataFrameModel.write_*_batches`** accepts iterators of column dicts (or row objects with **`to_dict()`**) for the same shapes.
 
 ## Lazy read **`**scan_kwargs`** and write **`write_kwargs`**
 
@@ -23,18 +23,18 @@ This document lists **common and useful** places applications read and write tab
 | **NDJSON** | **`low_memory`**, **`rechunk`**, **`ignore_errors`**, **`n_rows`**, **`infer_schema_length`**, **`glob`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** | **`json_format`** (**`"lines"`** / **`"json"`**) |
 | **IPC** | **`record_batch_statistics`**, **`glob`**, **`cache`**, **`rechunk`**, **`n_rows`**, **`hive_partitioning`**, **`hive_start_idx`**, **`try_parse_hive_dates`**, **`include_file_paths`**, **`row_index_name`**, **`row_index_offset`** | Use top-level **`compression=`** only; extra **`write_kwargs`** are rejected. |
 
-For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **presets**, and how **`read_json`** relates to **`read_ndjson`**, see [IO_JSON](/io/json/) (**Large files**, **NDJSON scan kwargs**).
+For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **presets**, and how **`read_json`** relates to **`read_ndjson`**, see [IO_JSON](../io/json.md) (**Large files**, **NDJSON scan kwargs**).
 
 (local-io-audit)=
 ### Audit: Polars 0.53.x vs pydantable (1.11.0 Phase A)
 
-**Scope:** Polars Rust **0.53.0** (the version pinned by **`pydantable-core`**) compared to the kwargs pydantable forwards from **`pydantable-core/src/plan/execute_polars/scan_kw.rs`** (`dispatch_file_scan`). The matrix and summary table below reflect **1.11.0** behavior: **Parquet** hive / lineage / row index; **CSV** directory/glob and **`LazyCsvReader`** options; **NDJSON** **`glob`** / **`include_file_paths`** / **`row_index_*`**; **IPC** **`IpcScanOptions`** + **`UnifiedScanArgs`**; **`read_json`** as **`read_ndjson`** alias; **partitioned Parquet writes** (**`partition_by`**) and **`write_*_batches`** path semantics; multi-file Parquet **`allow_missing_columns`**. Remaining gaps (e.g. **`ScanArgsParquet.schema`**, **`HiveOptions.schema`**) are tracked in [ROADMAP](/project/roadmap/).
+**Scope:** Polars Rust **0.53.0** (the version pinned by **`pydantable-core`**) compared to the kwargs pydantable forwards from **`pydantable-core/src/plan/execute_polars/scan_kw.rs`** (`dispatch_file_scan`). The matrix and summary table below reflect **1.11.0** behavior: **Parquet** hive / lineage / row index; **CSV** directory/glob and **`LazyCsvReader`** options; **NDJSON** **`glob`** / **`include_file_paths`** / **`row_index_*`**; **IPC** **`IpcScanOptions`** + **`UnifiedScanArgs`**; **`read_json`** as **`read_ndjson`** alias; **partitioned Parquet writes** (**`partition_by`**) and **`write_*_batches`** path semantics; multi-file Parquet **`allow_missing_columns`**. Remaining gaps (e.g. **`ScanArgsParquet.schema`**, **`HiveOptions.schema`**) are tracked in [ROADMAP](../project/roadmap.md).
 
 **Directory and glob semantics**
 
 - Lazy reads pass the path string to Polars **`PlRefPath`** and use **`LazyFrame::scan_*`** (or equivalent) inside the native extension (**`pydantable_native._core`**). **Glob expansion, directory listing, and hive-style path parsing** follow **Polars** for the options pydantable sets on the Rust side.
 - **`ScanArgsParquet::default()`** in Polars uses **`glob: true`** (so a directory or glob pattern is expanded unless **`glob=False`** is passed through **`scan_kwargs`** where supported).
-- **Typed validation** (`trusted_mode`, per-cell checks, etc.) runs at **materialization** (**`collect()`**, **`to_dict()`**, …), not when constructing the lazy root—see [DATAFRAMEMODEL](/user-guide/dataframemodel/) and [INTERFACE_CONTRACT](/semantics/interface-contract/) (**Local lazy file scans**).
+- **Typed validation** (`trusted_mode`, per-cell checks, etc.) runs at **materialization** (**`collect()`**, **`to_dict()`**, …), not when constructing the lazy root—see [DATAFRAMEMODEL](../user-guide/dataframemodel.md) and [INTERFACE_CONTRACT](../semantics/interface-contract.md) (**Local lazy file scans**).
 
 **Parquet — `ScanArgsParquet` (Polars) vs pydantable `scan_kwargs`**
 
@@ -99,12 +99,12 @@ For **when to tune** NDJSON kwargs (large files, dirty logs, sampling), **preset
 These helpers **`fetch_bytes`** from HTTP(S), write a **named temp** **`.parquet`** file, and return **`ScanFileRoot(path, "parquet", columns)`**. The file is **not** deleted when the **`ScanFileRoot`** or **`DataFrame`** is garbage-collected.
 
 - **Delete after use:** when your pipeline finishes (after **`write_*`**, **`collect()`**, etc.), remove the path (e.g. **`os.unlink(root.path)`** if you keep a reference to the native root, or track the temp path you created).
-- **Context managers:** **`DataFrameModel.read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** (same behavior as the lower-level helpers in **`pydantable.io`**) unlink the temp file when the block exits ([IO_HTTP](/io/http/)).
+- **Context managers:** **`DataFrameModel.read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** (same behavior as the lower-level helpers in **`pydantable.io`**) unlink the temp file when the block exits ([IO_HTTP](../io/http.md)).
 - **Async:** **`aread_parquet_url`** runs the same work in a thread pool like other **`aread_*`** helpers.
 
 There is **no** true streaming HTTP Parquet scan without a local file or deeper Polars/object-store integration.
 
-**`export_*` / `aexport_*`** persist column dicts to files (via **`DataFrameModel`** classmethods or **`from pydantable import export_parquet`, …** where re-exported). **SQL:** **`fetch_sqlmodel` / `afetch_sqlmodel`**, **`fetch_sql_raw` / `afetch_sql_raw`**, **`write_sqlmodel` / `awrite_sqlmodel`**, **`write_sql_raw` / `awrite_sql_raw`** (deprecated unprefixed **`fetch_sql`** / **`write_sql`**: [IO_SQL](/io/sql/)) — **SQLAlchemy**; **`[sql]`** extra + your DB driver. **HTTP(S)** uses **`fetch_parquet_url`**, **`fetch_csv_url`**, **`fetch_ndjson_url`**, **`fetch_bytes`** (experimental flag). **Object store:** **`read_from_object_store`**. Optional **Excel**, **Delta**, **Kafka**, **stdin/stdout**: see [IO_EXTRAS](/io/extras/). **Interchange:** **`to_arrow()`** / **`to_polars()`** and constructors (with **`[arrow]`**, **PyArrow** **`Table`** / **`RecordBatch`**).
+**`export_*` / `aexport_*`** persist column dicts to files (via **`DataFrameModel`** classmethods or **`from pydantable import export_parquet`, …** where re-exported). **SQL:** **`fetch_sqlmodel` / `afetch_sqlmodel`**, **`fetch_sql_raw` / `afetch_sql_raw`**, **`write_sqlmodel` / `awrite_sqlmodel`**, **`write_sql_raw` / `awrite_sql_raw`** (deprecated unprefixed **`fetch_sql`** / **`write_sql`**: [IO_SQL](../io/sql.md)) — **SQLAlchemy**; **`[sql]`** extra + your DB driver. **HTTP(S)** uses **`fetch_parquet_url`**, **`fetch_csv_url`**, **`fetch_ndjson_url`**, **`fetch_bytes`** (experimental flag). **Object store:** **`read_from_object_store`**. Optional **Excel**, **Delta**, **Kafka**, **stdin/stdout**: see [IO_EXTRAS](../io/extras.md). **Interchange:** **`to_arrow()`** / **`to_polars()`** and constructors (with **`[arrow]`**, **PyArrow** **`Table`** / **`RecordBatch`**).
 
 ---
 
@@ -143,7 +143,7 @@ Pydantable already executes typed plans in **Rust** (Polars-backed). Putting **f
 ### Async Rust ↔ FastAPI
 
 - **Option A (simplest):** Rust exposes **sync** `read_*` / `write_*` that release the GIL; Python **`aread_*`** = **`asyncio.to_thread`** (same as **`acollect`** today).
-- **Option B (deeper):** **`pyo3-async-runtimes`** + Tokio inside **`pydantable_native._core`** for **`async_execute_plan`** / **`async_collect_plan_batches`** (see [EXECUTION](/user-guide/execution/)). File and SQL **`aread_*`** / **`afetch_*`** still use thread offload by default.
+- **Option B (deeper):** **`pyo3-async-runtimes`** + Tokio inside **`pydantable_native._core`** for **`async_execute_plan`** / **`async_collect_plan_batches`** (see [EXECUTION](../user-guide/execution.md)). File and SQL **`aread_*`** / **`afetch_*`** still use thread offload by default.
 
 ### Tradeoffs to accept
 
@@ -171,11 +171,11 @@ Pydantable already executes typed plans in **Rust** (Polars-backed). Putting **f
 
 ### SQL: pydantable helpers vs async engines
 
-**In pydantable** (SQLModel-first and **`*_raw`** helpers; deprecated unprefixed **`fetch_sql`** / **`write_sql`**: [IO_SQL](/io/sql/))
+**In pydantable** (SQLModel-first and **`*_raw`** helpers; deprecated unprefixed **`fetch_sql`** / **`write_sql`**: [IO_SQL](../io/sql.md))
 
 - **Any SQLAlchemy URL or engine:** e.g. **`postgresql+psycopg://…`**, **`mysql+pymysql://…`**, **`sqlite:///…`**, **`mssql+pyodbc://…`**, etc.
 - **Sync execution** inside SQLAlchemy; from **`async def`** routes use **`afetch_sqlmodel`** / **`afetch_sql_raw`** / **`awrite_sqlmodel`** / **`awrite_sql_raw`** (**`asyncio.to_thread`** or **`executor=`**) so the event loop is not blocked.
-- For **large result sets**, prefer **streaming batches** with **`iter_sqlmodel`** / **`iter_sql_raw`** / **`aiter_*`**, or rely on **`fetch_sql_raw`** / **`afetch_sql_raw`** which may return lazily built **`StreamingColumns`** (see [IO_SQL](/io/sql/)) instead of one giant **`dict[str, list]`**.
+- For **large result sets**, prefer **streaming batches** with **`iter_sqlmodel`** / **`iter_sql_raw`** / **`aiter_*`**, or rely on **`fetch_sql_raw`** / **`afetch_sql_raw`** which may return lazily built **`StreamingColumns`** (see [IO_SQL](../io/sql.md)) instead of one giant **`dict[str, list]`**.
 - **`write_sql_raw` … `if_exists="replace"`** uses generic **DDL** (**`DropTable` / `CreateTable`**); **`write_sqlmodel`** **`replace`** uses **SQLModel** DDL. Exotic dialects or production schemas may still prefer migrations instead.
 
 **Native async SQLAlchemy (asyncpg, …)**
@@ -184,10 +184,10 @@ Pydantable already executes typed plans in **Rust** (Polars-backed). Putting **f
 
 ### MongoDB (optional)
 
-- **Install:** **`pip install "pydantable[mongo]"`** (**PyMongo**, **Beanie**, Mongo plan stack). **Guide:** [MONGO_ENGINE](/integrations/engines/mongo/) (lazy **`MongoDataFrame`** / **`MongoDataFrameModel`**, eager **`dict[str, list]`** I/O, **PyMongo surface area** — **`skip`**, **`session`**, **`max_time_ms`**, sync vs **`AsyncCollection`**).
+- **Install:** **`pip install "pydantable[mongo]"`** (**PyMongo**, **Beanie**, Mongo plan stack). **Guide:** [MONGO_ENGINE](../integrations/engines/mongo.md) (lazy **`MongoDataFrame`** / **`MongoDataFrameModel`**, eager **`dict[str, list]`** I/O, **PyMongo surface area** — **`skip`**, **`session`**, **`max_time_ms`**, sync vs **`AsyncCollection`**).
 - **Lazy typed transforms:** **`from_beanie`** / **`from_beanie_async`**, **`from_collection`**, **`sync_pymongo_collection`**.
 - **Eager column dicts:** **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`** and **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`** (native async when the handle is **`pymongo.asynchronous.AsyncCollection`**).
-- **Beanie ODM reads/writes (hooks, validation-on-save):** [BEANIE](/integrations/engines/beanie/) (**`afetch_beanie`**, **`awrite_beanie`**, …). **Which helper?** [IO_DECISION_TREE](/io/decision-tree/) → Mongo rows.
+- **Beanie ODM reads/writes (hooks, validation-on-save):** [BEANIE](../integrations/engines/beanie.md) (**`afetch_beanie`**, **`awrite_beanie`**, …). **Which helper?** [IO_DECISION_TREE](../io/decision-tree.md) → Mongo rows.
 
 ---
 
@@ -278,6 +278,6 @@ Contrast with common stacks:
 
 ## Related documentation
 
-- [EXECUTION](/user-guide/execution/) — materialization costs and interchange.
-- [FASTAPI](/integrations/fastapi/fastapi/) — async routes, executors, trust boundaries.
-- [SUPPORTED_TYPES](/user-guide/supported-types/) — what schemas can express after ingest.
+- [EXECUTION](../user-guide/execution.md) — materialization costs and interchange.
+- [FASTAPI](../integrations/fastapi/fastapi.md) — async routes, executors, trust boundaries.
+- [SUPPORTED_TYPES](../user-guide/supported-types.md) — what schemas can express after ingest.
