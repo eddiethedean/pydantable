@@ -6,16 +6,32 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/pydantable)](https://pypi.org/project/pydantable/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Strongly typed DataFrames for Python, powered by Rust** — Pydantic schemas, Polars-backed execution in the native extension, and an API built for services (including optional FastAPI integration).
+**Strongly typed DataFrames for Python, powered by Rust.**
 
-**Current release: 1.18.0** — highlights in the [changelog](https://pydantable.readthedocs.io/en/latest/CHANGELOG.html).
+PydanTable combines **Pydantic schemas** with a **Polars-backed Rust execution engine** to provide a typed, service-friendly DataFrame API (with optional integrations for FastAPI, SQL, MongoDB, Spark, and more).
 
-## What it is
+**Current release:** 1.18.0 — highlights in the [changelog](https://pydantable.readthedocs.io/en/latest/project/changelog/).
 
-- **Typed tables**: define columns with Pydantic models (`DataFrameModel` or `DataFrame[Schema]`). See [DATAFRAMEMODEL](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html) and [QUICKSTART](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html).
-- **Typed expressions + lazy plans**: transforms build a plan that’s validated/lowered in Rust. See [EXECUTION](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) and [INTERFACE_CONTRACT](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html).
-- **Materialize when you choose**: `collect()` (row models) or `to_dict()` (columnar), plus Arrow/Polars with extras. See [MATERIALIZATION](https://pydantable.readthedocs.io/en/latest/MATERIALIZATION.html).
-- **I/O + services**: file/HTTP/SQL I/O, and optional FastAPI integration patterns. Start at [IO_OVERVIEW](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html) and [GOLDEN_PATH_FASTAPI](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html).
+## Documentation
+
+- **Docs (latest):** `https://pydantable.readthedocs.io/en/latest/`
+- **Quickstart:** `https://pydantable.readthedocs.io/en/latest/getting-started/quickstart/`
+- **Docs map:** `https://pydantable.readthedocs.io/en/latest/getting-started/docs-map/`
+
+## What you get
+
+- **Typed tables** via Pydantic models: `DataFrameModel` or `DataFrame[Schema]`
+- **Typed expressions + lazy plans** validated/lowered in Rust
+- **Explicit materialization**: `collect()` (rows) or `to_dict()` (columns), plus optional Arrow/Polars exports
+- **File / HTTP / SQL I/O** helpers and integration patterns for services
+
+Key references:
+
+- **DataFrameModel:** `https://pydantable.readthedocs.io/en/latest/user-guide/dataframemodel/`
+- **Execution:** `https://pydantable.readthedocs.io/en/latest/user-guide/execution/`
+- **Materialization:** `https://pydantable.readthedocs.io/en/latest/user-guide/materialization/`
+- **Interface contract:** `https://pydantable.readthedocs.io/en/latest/semantics/interface-contract/`
+- **I/O overview:** `https://pydantable.readthedocs.io/en/latest/io/overview/`
 
 ## Install
 
@@ -23,7 +39,7 @@
 pip install pydantable
 ```
 
-Common extras:
+Optional extras:
 
 ```bash
 pip install "pydantable[polars]"   # to_polars
@@ -32,7 +48,7 @@ pip install "pydantable[io]"       # full file I/O convenience (arrow + polars)
 pip install "pydantable[sql]"      # SQLModel + SQLAlchemy + moltres-core lazy SqlDataFrame; add a DB-API driver for your URL
 pip install "pydantable[pandas]"   # pandas-flavored façade (pandas UI doc)
 pip install "pydantable[fastapi]"  # FastAPI integration (pydantable.fastapi)
-pip install "pydantable[mongo]"     # pymongo + Beanie + Mongo plan stack (lazy MongoDataFrame + I/O + from_beanie)
+pip install "pydantable[mongo]"    # pymongo + Beanie + Mongo plan stack (lazy MongoDataFrame + I/O + from_beanie)
 pip install "pydantable[spark]"    # SparkDataFrame / SparkDataFrameModel (raikou-core + pyspark + sparkdantic)
 ```
 
@@ -56,26 +72,24 @@ print(result.to_dict())
 print([r.model_dump() for r in result.collect()])
 ```
 
-Output (exact values depend on filtering; this matches `scripts/verify_doc_examples.py`):
+Output (one run):
 
 ```text
 {'id': [1], 'age2': [40]}
 [{'id': 1, 'age2': 40}]
 ```
 
-## Where to go next (ReadTheDocs)
+## Next steps
 
-- **Start**: [QUICKSTART](https://pydantable.readthedocs.io/en/latest/QUICKSTART.html) · [DATAFRAMEMODEL](https://pydantable.readthedocs.io/en/latest/DATAFRAMEMODEL.html)
-- **Typing**: [TYPING](https://pydantable.readthedocs.io/en/latest/TYPING.html) (mypy plugin vs stubs / Pyright / ty)
-- **Execution & semantics**: [EXECUTION](https://pydantable.readthedocs.io/en/latest/EXECUTION.html) · [MATERIALIZATION](https://pydantable.readthedocs.io/en/latest/MATERIALIZATION.html) · [INTERFACE_CONTRACT](https://pydantable.readthedocs.io/en/latest/INTERFACE_CONTRACT.html)
-- **I/O**: [IO_DECISION_TREE](https://pydantable.readthedocs.io/en/latest/IO_DECISION_TREE.html) → [IO_OVERVIEW](https://pydantable.readthedocs.io/en/latest/IO_OVERVIEW.html) (CSV/Parquet/NDJSON/JSON/IPC/HTTP/SQL)
-- **FastAPI**: [GOLDEN_PATH_FASTAPI](https://pydantable.readthedocs.io/en/latest/GOLDEN_PATH_FASTAPI.html) → [FASTAPI](https://pydantable.readthedocs.io/en/latest/FASTAPI.html)
-- **Optional engines**: [SQL_ENGINE](https://pydantable.readthedocs.io/en/latest/SQL_ENGINE.html) (SQL) · [MONGO_ENGINE](https://pydantable.readthedocs.io/en/latest/MONGO_ENGINE.html) (Mongo) · [SPARK_ENGINE](https://pydantable.readthedocs.io/en/latest/SPARK_ENGINE.html) (Spark)
-- **Everything**: [DOCS_MAP](https://pydantable.readthedocs.io/en/latest/DOCS_MAP.html)
+- **Start here:** `https://pydantable.readthedocs.io/en/latest/getting-started/quickstart/`
+- **Typing guide:** `https://pydantable.readthedocs.io/en/latest/user-guide/typing/`
+- **I/O decision tree:** `https://pydantable.readthedocs.io/en/latest/io/decision-tree/`
+- **FastAPI golden path:** `https://pydantable.readthedocs.io/en/latest/integrations/fastapi/golden-path/`
+- **Engines:** `https://pydantable.readthedocs.io/en/latest/integrations/engines/sql/` · `https://pydantable.readthedocs.io/en/latest/integrations/engines/mongo/` · `https://pydantable.readthedocs.io/en/latest/integrations/engines/spark/`
 
 ## Development
 
-Use a virtual environment at **`.venv`** in the repo root (the `Makefile` defaults to `.venv/bin/python`). Full contributor setup, Maturin/Rust builds, and release notes: [DEVELOPER](https://pydantable.readthedocs.io/en/latest/DEVELOPER.html).
+Use a virtual environment at **`.venv`** in the repo root (the `Makefile` defaults to `.venv/bin/python`). Full contributor setup, native builds, and contributor notes: `https://pydantable.readthedocs.io/en/latest/project/developer/`.
 
 ```bash
 make check-full      # ruff, ty, pyright, typing snippet tests, MkDocs, Rust
