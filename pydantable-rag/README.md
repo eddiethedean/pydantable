@@ -50,7 +50,7 @@ By default this ingests your repo’s `README.md` and `docs/` directory (it does
  ### Endpoints
  
 - `GET /healthz`
-- `GET /readyz` (true once the vector DB has chunks)
+- `GET /readyz` (true once the vector DB has chunks **and** the LLM is loaded)
  - `POST /chat` (retrieval + local LLM)
  - `POST /ingest` (rebuild index; useful for dev)
 
@@ -92,7 +92,7 @@ At runtime, **`POST /bootstrap`** only needs to **warm the LLM** if you ship a r
 fastapi deploy
 ```
 
-- **Startup defaults are conservative** (`RAG_AUTO_INGEST_ON_STARTUP` / `RAG_PRELOAD_MODELS_ON_STARTUP` default **off**). If you **do not** ship a prebuilt DB, call **`POST /bootstrap`** to ingest + warm the LLM (small instances may OOM; prefer the CI DB). Set **`HF_TOKEN`** on the host for Hugging Face.
+- The **Dockerfile** sets **`RAG_PRELOAD_MODELS_ON_STARTUP=true`** so `/readyz` can pass after the LLM loads (override to `false` if memory is tight). **`RAG_AUTO_INGEST_ON_STARTUP`** defaults **off** in code; ship the **CI-built DB** so the image includes **`data/pydantable_vectors.db`** (`.dockerignore` allows that file). If you deploy without a prebuilt DB, call **`POST /bootstrap`** to ingest + warm the LLM. Set **`HF_TOKEN`** on the host for Hugging Face.
 - Use a **writable** `RAG_DB_PATH` on **shared storage** if you run **multiple replicas**; otherwise prefer **one replica** for SQLite.
 - Typical env vars (many match built-in defaults):
 

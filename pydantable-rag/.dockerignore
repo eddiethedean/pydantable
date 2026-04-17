@@ -6,5 +6,6 @@ __pycache__
 .pytest_cache
 .ruff_cache
 htmlcov
+# Allow CI-built vector DB into the image; ignore other SQLite files.
 *.db
-data/
+!data/pydantable_vectors.db

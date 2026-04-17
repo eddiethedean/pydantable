@@ -11,16 +11,19 @@ WORKDIR /app
 COPY pyproject.toml README.md main.py ./
 COPY app ./app
 COPY scripts ./scripts
+COPY data/ /app/data/
 
 # Editable install pulls deps (torch from pytorch-cpu index per pyproject).
-# Vector index: copy a CI-built ``data/pydantable_vectors.db`` into the build
-# context (same path) before ``docker build``, or mount at runtime.
+# Vector index: CI workflow downloads ``data/pydantable_vectors.db`` before
+# ``fastapi deploy`` / ``docker build``; local builds can use an empty ``data/``.
 RUN mkdir -p /app/data \
     && uv venv /app/.venv \
     && uv pip install --python /app/.venv/bin/python -e .
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
+# Serve chat after cold start without manual ``POST /bootstrap`` (override if RAM is tight).
+ENV RAG_PRELOAD_MODELS_ON_STARTUP=true
 
 # Match platform listener; FastAPI Cloud and most hosts set ``PORT`` (default 8080).
 EXPOSE 8080
