@@ -20,7 +20,18 @@ version = "0.1.4"
  
  [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.8"]
- 
+
+# FastAPI Cloud installs deps with ``uv``. On Linux, plain ``torch`` from PyPI pulls the
+# CUDA wheel set (multi‑GB, many NVIDIA packages) and can fail during image export or
+# exceed platform limits. Pin ``torch`` to the official CPU wheel index instead.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
  [tool.ruff]
  line-length = 88
  target-version = "py310"
