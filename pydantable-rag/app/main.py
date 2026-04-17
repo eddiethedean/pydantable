@@ -3,15 +3,15 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from app.rag.ingest import ingest_repo_docs
 from app.rag.llm import ChatMessage, llm_is_loaded, llm_is_loading, warm_llm
 from app.rag.pipeline import rag_chat
-from app.rag.store import get_counts
+from app.rag.store import check_vector_backend, get_counts
 from app.settings import get_settings, resolve_db_path
+from app.version import app_version
 
 app = FastAPI(title="pydantable-rag")
 
@@ -30,12 +30,29 @@ class IngestRequest(BaseModel):
     paths: list[str] | None = None
 
 
+@app.post("/bootstrap")
+def bootstrap(background_tasks: BackgroundTasks) -> dict:
+    """
+    Kick off both ingestion and LLM warm-up without blocking the request.
+    Useful for hosted environments where cold-start work can trigger 502s.
+    """
+    s = get_settings()
+    repo_root = (Path(__file__).resolve().parents[2]).resolve()
+
+    background_tasks.add_task(
+        ingest_repo_docs, settings=s, repo_root=repo_root, paths=None
+    )
+    background_tasks.add_task(warm_llm, s.llm_model)
+    return {"ok": True, "started": ["ingest", "warm_llm"]}
+
+
 @app.get("/healthz")
 def healthz() -> dict:
     s = get_settings()
     dbp = resolve_db_path(s.db_path)
     return {
         "ok": True,
+        "version": app_version(),
         "db_path": str(dbp),
         "embed_model": s.embed_model,
         "llm_model": s.llm_model,
@@ -58,28 +75,42 @@ def readyz() -> dict:
     }
 
 
+@app.get("/diag")
+def diag() -> dict:
+    s = get_settings()
+    dbp = resolve_db_path(s.db_path)
+    return {
+        "version": app_version(),
+        "db_path": str(dbp),
+        "vector_backend": check_vector_backend(db_path=dbp),
+        "counts": get_counts(db_path=dbp),
+        "llm_loaded": llm_is_loaded(s.llm_model),
+    }
+
+
 @app.get("/health")
 def health_compat() -> dict:
     return healthz()
 
 
 @app.post("/ingest")
-def ingest(req: IngestRequest) -> dict:
+def ingest(req: IngestRequest, background_tasks: BackgroundTasks) -> dict:
     s = get_settings()
     repo_root = (Path(__file__).resolve().parents[2]).resolve()
-    res = ingest_repo_docs(settings=s, repo_root=repo_root, paths=req.paths)
-    return {"ok": True, "files": res.files, "chunks": res.chunks, "db_path": res.db_path}
+    background_tasks.add_task(
+        ingest_repo_docs, settings=s, repo_root=repo_root, paths=req.paths
+    )
+    return {"ok": True, "started": True}
 
 
 @app.post("/chat", response_model=ChatResponse)
-def chat(req: ChatRequest) -> ChatResponse:
+def chat(req: ChatRequest, background_tasks: BackgroundTasks) -> ChatResponse:
     s = get_settings()
     db_path = resolve_db_path(s.db_path)
 
     if not llm_is_loaded(s.llm_model):
         if not llm_is_loading(s.llm_model):
-            # Kick off warm-up in background; don't block the request.
-            asyncio.create_task(asyncio.to_thread(warm_llm, s.llm_model))
+            background_tasks.add_task(warm_llm, s.llm_model)
         raise HTTPException(
             status_code=503,
             detail="LLM is warming up. Retry in ~30-120s, or enable RAG_PRELOAD_MODELS_ON_STARTUP.",
