@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
 from fastapi import BackgroundTasks, Body, FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -15,7 +14,7 @@ from app.rag.ingest import ingest_repo_docs
 from app.rag.llm import ChatMessage, llm_is_loaded, llm_is_loading, warm_llm
 from app.rag.pipeline import rag_chat
 from app.rag.store import check_vector_backend, get_counts
-from app.settings import get_settings, resolve_db_path
+from app.settings import get_settings, resolve_db_path, resolve_ingest_repo_root
 from app.version import app_version
 
 app = FastAPI(title="pydantable-rag")
@@ -109,7 +108,7 @@ def bootstrap(background_tasks: BackgroundTasks) -> BootstrapResponse:
     Useful for hosted environments where cold-start work can trigger 502s.
     """
     s = get_settings()
-    repo_root = (Path(__file__).resolve().parents[2]).resolve()
+    repo_root = resolve_ingest_repo_root()
 
     background_tasks.add_task(
         ingest_repo_docs, settings=s, repo_root=repo_root, paths=None
@@ -191,7 +190,7 @@ def ingest(
     req: IngestRequest = _INGEST_BODY,
 ) -> IngestResponse:
     s = get_settings()
-    repo_root = (Path(__file__).resolve().parents[2]).resolve()
+    repo_root = resolve_ingest_repo_root()
     background_tasks.add_task(
         ingest_repo_docs, settings=s, repo_root=repo_root, paths=req.paths
     )
@@ -247,7 +246,7 @@ async def _startup_auto_ingest() -> None:
     if s.auto_ingest_if_db_empty and counts["docs"] > 0 and counts["vecs"] > 0:
         return
 
-    repo_root = (Path(__file__).resolve().parents[2]).resolve()
+    repo_root = resolve_ingest_repo_root()
     asyncio.create_task(
         asyncio.to_thread(ingest_repo_docs, settings=s, repo_root=repo_root, paths=None)
     )

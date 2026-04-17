@@ -64,3 +64,31 @@ def resolve_db_path(db_path: str) -> Path:
     if p.is_absolute():
         return p
     return (Path(__file__).resolve().parent.parent / p).resolve()
+
+
+def resolve_ingest_repo_root() -> Path:
+    """
+    Base directory for ingest default paths (``README.md``, ``docs/``).
+
+    - If ``RAG_REPO_ROOT`` is set, that path is used (expanded and resolved).
+    - Else, if the directory *above* the ``pydantable-rag`` folder contains a
+      ``docs/`` tree (typical monorepo checkout), use it so local dev ingests the
+      main library documentation.
+    - Otherwise use the parent of ``app/`` (the service / project root). On
+      FastAPI Cloud this is usually ``/app``, where ``README.md`` from the
+      deployed project lives. Using ``parents[2]`` from ``app/main.py`` instead
+      would incorrectly resolve to filesystem root ``/`` when only the service
+      is deployed.
+    """
+    import os
+
+    raw = os.getenv("RAG_REPO_ROOT")
+    if raw:
+        return Path(raw).expanduser().resolve()
+
+    here = Path(__file__).resolve()
+    service_root = here.parents[1]
+    upstream = here.parents[2]
+    if upstream != Path("/") and (upstream / "docs").is_dir():
+        return upstream
+    return service_root
