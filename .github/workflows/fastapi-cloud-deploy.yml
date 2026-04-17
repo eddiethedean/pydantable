@@ -18,7 +18,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -29,5 +29,5 @@ jobs:
         env:
           FASTAPI_CLOUD_TOKEN: ${{ secrets.FASTAPI_CLOUD_TOKEN }}
           FASTAPI_CLOUD_APP_ID: ${{ secrets.FASTAPI_CLOUD_APP_ID }}
-        run: fastapi deploy pydantable-rag --app-id "${FASTAPI_CLOUD_APP_ID}"
+        run: python -m fastapi_cloud_cli deploy pydantable-rag --app-id "${FASTAPI_CLOUD_APP_ID}"
 
