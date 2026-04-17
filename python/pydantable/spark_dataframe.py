@@ -66,6 +66,37 @@ class SparkDataFrame(DataFrame):
 
         return F.col(name)
 
+    def where_native(self, condition: Any) -> Any:
+        """Engine-native filter (alias for :meth:`filter`)."""
+        return self.filter(condition)
+
+    def select_native(self, *cols: Any) -> Any:
+        """Engine-native projection by Spark Columns (simple column refs only)."""
+        if not cols:
+            raise ValueError("select_native(...) requires at least one column.")
+        names: list[str] = []
+        for c in cols:
+            if isinstance(c, str):
+                names.append(c)
+                continue
+            jc = getattr(c, "_jc", None)
+            if jc is None:
+                raise TypeError(
+                    "select_native(...) expects pyspark Columns or strings."
+                )
+            s = jc.toString()
+            if not isinstance(s, str):
+                raise TypeError(
+                    "select_native(...) expects a Spark Column with a name."
+                )
+            s2 = s.strip("`")
+            if not s2.isidentifier():
+                raise TypeError(
+                    "select_native(...) only supports simple column references."
+                )
+            names.append(s2)
+        return self.select(*names)
+
     @classmethod
     def from_spark_dataframe(cls, df: Any, *, engine: Any | None = None) -> Any:
         """Lazy frame over an existing ``pyspark.sql.DataFrame`` root.

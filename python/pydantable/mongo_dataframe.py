@@ -55,6 +55,16 @@ class BeanieAsyncRoot:
     id_column: Literal["id", "_id"] = "id"
 
 
+@dataclass(frozen=True, slots=True)
+class MongoFindRoot:
+    """Mongo root with server-side filter/projection pushdown."""
+
+    collection: Any
+    fields: tuple[str, ...] | None = None
+    filter: dict[str, Any] | None = None
+    projection: dict[str, int] | None = None
+
+
 def _import_mongo_engine_types() -> tuple[Any, Any]:
     try:
         core = importlib.import_module("entei_core")
@@ -132,6 +142,87 @@ class MongoDataFrame(DataFrame):
             current_schema_type=st,
             rust_plan=plan,
             engine=eng,
+        )
+
+    def match(self, filter: dict[str, Any]) -> Any:
+        """Push down a Mongo `$match` (driver-level `find(filter=...)`)."""
+        if not isinstance(filter, dict):
+            raise TypeError("match(filter=...) expects a dict.")
+        unknown = sorted(set(filter) - set(self._current_field_types))
+        if unknown:
+            raise KeyError(
+                "match() referenced unknown columns: "
+                + ", ".join(repr(x) for x in unknown)
+            )
+        try:
+            core = importlib.import_module("entei_core")
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError(
+                "Mongo match() requires the optional stack. "
+                'Install with: pip install "pydantable[mongo]"'
+            ) from exc
+        MongoRoot = core.MongoRoot
+        if not isinstance(self._root_data, MongoRoot):
+            raise TypeError("match() is only supported on Mongo collection roots.")
+        root = self._root_data
+        wrapped = MongoFindRoot(
+            collection=root.collection,
+            fields=root.fields,
+            filter=filter,
+            projection=None,
+        )
+        return self._from_plan(
+            root_data=wrapped,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=self._rust_plan,
+            engine=self._engine,
+        )
+
+    def project(self, fields: Sequence[str] | dict[str, int]) -> Any:
+        """Push down a Mongo projection and update the typed schema."""
+        if isinstance(fields, dict):
+            d = cast("dict[str, int]", fields)
+            proj: dict[str, int] = d
+            wanted: list[str] = list(d.keys())
+        else:
+            seq = cast("Sequence[str]", fields)
+            wanted = list(seq)
+            proj = {k: 1 for k in wanted}
+        if not wanted:
+            raise ValueError("project(fields) requires at least one field.")
+        unknown = sorted(set(wanted) - set(self._current_field_types))
+        if unknown:
+            raise KeyError(
+                "project() referenced unknown columns: "
+                + ", ".join(repr(x) for x in unknown)
+            )
+        try:
+            core = importlib.import_module("entei_core")
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError(
+                "Mongo project() requires the optional stack. "
+                'Install with: pip install "pydantable[mongo]"'
+            ) from exc
+        MongoRoot = core.MongoRoot
+        if not isinstance(self._root_data, MongoRoot):
+            raise TypeError("project() is only supported on Mongo collection roots.")
+
+        # Apply a logical projection (typed) and also push down driver projection.
+        projected = self.select(*wanted)
+        root = projected._root_data
+        wrapped = MongoFindRoot(
+            collection=root.collection,
+            fields=tuple(wanted),
+            filter=None,
+            projection=proj,
+        )
+        return projected._from_plan(
+            root_data=wrapped,
+            root_schema_type=projected._root_schema_type,
+            current_schema_type=projected._current_schema_type,
+            rust_plan=projected._rust_plan,
+            engine=projected._engine,
         )
 
     @classmethod

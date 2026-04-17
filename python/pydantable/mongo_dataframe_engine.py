@@ -21,6 +21,29 @@ if TYPE_CHECKING:
 
 def _materialize_root_data(data: Any) -> Any:
     _mongo_roots = importlib.import_module("entei_core")
+    try:
+        from pydantable.mongo_dataframe import MongoFindRoot
+    except ImportError:
+        MongoFindRoot = None  # type: ignore[assignment]
+
+    if MongoFindRoot is not None and isinstance(data, MongoFindRoot):
+        coll = data.collection
+        cursor = coll.find(filter=data.filter or {}, projection=data.projection)
+        docs: list[dict[str, Any]] = list(cursor)
+        if not docs:
+            keys = list(data.fields) if data.fields is not None else []
+            return {k: [] for k in keys}
+        keys = (
+            list(data.fields)
+            if data.fields is not None
+            else sorted({k for d in docs for k in d})
+        )
+        out: dict[str, list[Any]] = {k: [] for k in keys}
+        for d in docs:
+            for k in keys:
+                out[k].append(d.get(k))
+        return out
+
     return _mongo_roots.materialize_root_data(data)
 
 

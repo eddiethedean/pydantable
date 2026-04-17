@@ -78,6 +78,125 @@ class SqlDataFrame(DataFrame):
     """
 
     @classmethod
+    def from_sql(
+        cls,
+        selectable: Any,
+        *,
+        sql_config: Any | None = None,
+        sql_engine: Any | None = None,
+        engine: Any | None = None,
+        name: str = "root",
+        **kwargs: Any,
+    ) -> Any:
+        """Lazy frame from an arbitrary SQLAlchemy selectable.
+
+        This is the typed-safe escape hatch for cases where you already have a
+        SQLAlchemy query/subquery. The selectable must expose ``.c`` with column
+        names that cover the schema fields.
+        """
+        moltres_engine = kwargs.pop("moltres_engine", None)
+        if kwargs:
+            raise TypeError(f"Unexpected keyword arguments: {sorted(kwargs)!r}")
+        if getattr(cls, "_schema_type", None) is None:
+            raise TypeError(
+                "Use SqlDataFrame[YourSchema].from_sql(selectable, ...) "
+                "with a concrete schema type."
+            )
+        _import_lazy_sql_engine_types()
+        from moltres_core import SqlRootData
+
+        resolved = _resolve_sql_execution_engine(
+            sql_config=sql_config,
+            sql_engine=sql_engine,
+            moltres_engine=moltres_engine,
+            engine=engine,
+        )
+        schema_type = cls._schema_type
+        assert schema_type is not None
+        fts = schema_field_types(schema_type)
+
+        # Project exactly the schema columns at the root, so engine-side transforms
+        # don't depend on extra columns present on the selectable.
+        try:
+            cols = (
+                selectable.subquery().c
+                if hasattr(selectable, "subquery")
+                else selectable.c
+            )
+        except Exception as exc:  # pragma: no cover
+            raise TypeError(
+                "from_sql(selectable) expects a SQLAlchemy selectable."
+            ) from exc
+        missing = [k for k in fts if not hasattr(cols, k)]
+        if missing:
+            raise ValueError(
+                "from_sql(selectable) missing schema columns: "
+                + ", ".join(repr(m) for m in missing)
+            )
+        try:
+            from sqlalchemy import select as _sa_select
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError(
+                "sqlalchemy is required for SqlDataFrame.from_sql()."
+            ) from exc
+        projected = _sa_select(*[getattr(cols, k) for k in fts]).subquery(name)
+
+        root = SqlRootData(table=projected, name=name)
+        plan = resolved.make_plan(field_types_for_rust(fts))
+        return cls._from_plan(
+            root_data=root,
+            root_schema_type=schema_type,
+            current_schema_type=schema_type,
+            rust_plan=plan,
+            engine=resolved,
+        )
+
+    def where(self, whereclause: Any) -> Any:
+        """Push down a SQLAlchemy WHERE clause to the lazy-SQL root."""
+        try:
+            from sqlalchemy import select as _sa_select
+            from sqlalchemy.sql import visitors as _visitors
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError(
+                "sqlalchemy is required for SqlDataFrame.where()."
+            ) from exc
+
+        try:
+            root_table = self._root_data.table
+        except Exception as exc:
+            raise TypeError("where() is only supported on SQL-backed roots.") from exc
+
+        # Best-effort validation: ensure referenced columns are in the schema.
+        referenced: set[str] = set()
+        for node in _visitors.iterate(whereclause):
+            name = getattr(node, "name", None)
+            if isinstance(name, str):
+                referenced.add(name)
+        unknown = sorted(referenced - set(self._current_field_types))
+        if unknown:
+            raise KeyError(
+                "where() referenced unknown columns: "
+                + ", ".join(repr(x) for x in unknown)
+            )
+
+        cols = root_table.c
+        projected = _sa_select(
+            *[getattr(cols, k) for k in self._current_field_types]
+        ).where(whereclause)
+        subq = projected.subquery(getattr(self._root_data, "name", "root"))
+        # Re-wrap root with the filtered subquery; plan/schema remain unchanged.
+        from moltres_core import SqlRootData
+
+        root2 = SqlRootData(table=subq, name=getattr(self._root_data, "name", "root"))
+        return self._from_plan(
+            root_data=root2,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=self._rust_plan,
+            engine=self._engine,
+        )
+
+    @classmethod
     def from_sql_table(
         cls,
         table: Any,
