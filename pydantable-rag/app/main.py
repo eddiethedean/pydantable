@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Body, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from app.rag.ingest import ingest_repo_docs
@@ -14,6 +14,49 @@ from app.settings import get_settings, resolve_db_path
 from app.version import app_version
 
 app = FastAPI(title="pydantable-rag")
+
+
+class BootstrapResponse(BaseModel):
+    ok: bool
+    started: list[str]
+
+
+class HealthzResponse(BaseModel):
+    ok: bool
+    version: str
+    db_path: str
+    embed_model: str
+    llm_model: str
+    llm_loaded: bool
+
+
+class VectorBackendStatus(BaseModel):
+    ok: bool
+    backend: str | None = None
+    error: str | None = None
+
+
+class CountsStatus(BaseModel):
+    docs: int
+    vecs: int
+    backend: str | None = None
+    uninitialized: bool | None = None
+    error: str | None = None
+
+
+class ReadyzResponse(BaseModel):
+    ok: bool
+    counts: CountsStatus
+    llm_loaded: bool
+    db_path: str
+
+
+class DiagResponse(BaseModel):
+    version: str
+    db_path: str
+    vector_backend: VectorBackendStatus
+    counts: CountsStatus
+    llm_loaded: bool
 
 
 class ChatRequest(BaseModel):
@@ -31,7 +74,7 @@ class IngestRequest(BaseModel):
 
 
 @app.post("/bootstrap")
-def bootstrap(background_tasks: BackgroundTasks) -> dict:
+def bootstrap(background_tasks: BackgroundTasks) -> BootstrapResponse:
     """
     Kick off both ingestion and LLM warm-up without blocking the request.
     Useful for hosted environments where cold-start work can trigger 502s.
@@ -43,64 +86,74 @@ def bootstrap(background_tasks: BackgroundTasks) -> dict:
         ingest_repo_docs, settings=s, repo_root=repo_root, paths=None
     )
     background_tasks.add_task(warm_llm, s.llm_model)
-    return {"ok": True, "started": ["ingest", "warm_llm"]}
+    return BootstrapResponse(ok=True, started=["ingest", "warm_llm"])
 
 
 @app.get("/healthz")
-def healthz() -> dict:
+def healthz() -> HealthzResponse:
     s = get_settings()
     dbp = resolve_db_path(s.db_path)
-    return {
-        "ok": True,
-        "version": app_version(),
-        "db_path": str(dbp),
-        "embed_model": s.embed_model,
-        "llm_model": s.llm_model,
-        "llm_loaded": llm_is_loaded(s.llm_model),
-    }
+    return HealthzResponse(
+        ok=True,
+        version=app_version(),
+        db_path=str(dbp),
+        embed_model=s.embed_model,
+        llm_model=s.llm_model,
+        llm_loaded=llm_is_loaded(s.llm_model),
+    )
 
 
 @app.get("/readyz")
-def readyz() -> dict:
+def readyz() -> ReadyzResponse:
     s = get_settings()
     dbp = resolve_db_path(s.db_path)
     counts = get_counts(db_path=dbp)
     docs_ready = counts["docs"] > 0 and counts["vecs"] > 0
     llm_ready = llm_is_loaded(s.llm_model)
-    return {
-        "ok": docs_ready and llm_ready,
-        "counts": counts,
-        "llm_loaded": llm_ready,
-        "db_path": str(dbp),
-    }
+    return ReadyzResponse(
+        ok=bool(docs_ready and llm_ready),
+        counts=CountsStatus.model_validate(counts),
+        llm_loaded=llm_ready,
+        db_path=str(dbp),
+    )
 
 
 @app.get("/diag")
-def diag() -> dict:
+def diag() -> DiagResponse:
     s = get_settings()
     dbp = resolve_db_path(s.db_path)
-    return {
-        "version": app_version(),
-        "db_path": str(dbp),
-        "vector_backend": check_vector_backend(db_path=dbp),
-        "counts": get_counts(db_path=dbp),
-        "llm_loaded": llm_is_loaded(s.llm_model),
-    }
+    return DiagResponse(
+        version=app_version(),
+        db_path=str(dbp),
+        vector_backend=VectorBackendStatus.model_validate(
+            check_vector_backend(db_path=dbp)
+        ),
+        counts=CountsStatus.model_validate(get_counts(db_path=dbp)),
+        llm_loaded=llm_is_loaded(s.llm_model),
+    )
 
 
 @app.get("/health")
-def health_compat() -> dict:
+def health_compat() -> HealthzResponse:
     return healthz()
 
 
-@app.post("/ingest")
-def ingest(req: IngestRequest, background_tasks: BackgroundTasks) -> dict:
+class IngestResponse(BaseModel):
+    ok: bool
+    started: bool
+
+
+@app.post("/ingest", response_model=IngestResponse)
+def ingest(
+    background_tasks: BackgroundTasks,
+    req: IngestRequest = Body(default_factory=IngestRequest),
+) -> IngestResponse:
     s = get_settings()
     repo_root = (Path(__file__).resolve().parents[2]).resolve()
     background_tasks.add_task(
         ingest_repo_docs, settings=s, repo_root=repo_root, paths=req.paths
     )
-    return {"ok": True, "started": True}
+    return IngestResponse(ok=True, started=True)
 
 
 @app.post("/chat", response_model=ChatResponse)

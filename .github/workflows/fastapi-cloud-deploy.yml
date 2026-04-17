@@ -1,0 +1,33 @@
+name: Deploy pydantable-rag (FastAPI Cloud)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "pydantable-rag/**"
+      - ".github/workflows/fastapi-cloud-deploy.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install FastAPI Cloud CLI
+        run: python -m pip install -U pip fastapi-cloud-cli
+
+      - name: Deploy to FastAPI Cloud
+        env:
+          FASTAPI_CLOUD_TOKEN: ${{ secrets.FASTAPI_CLOUD_TOKEN }}
+          FASTAPI_CLOUD_APP_ID: ${{ secrets.FASTAPI_CLOUD_APP_ID }}
+        run: fastapi deploy pydantable-rag --app-id "${FASTAPI_CLOUD_APP_ID}"
+
