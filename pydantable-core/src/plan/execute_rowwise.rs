@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
+use pyo3::IntoPyObjectExt;
 
 use crate::dtype::scaled_i128_to_py_decimal;
 use crate::expr::LiteralValue;
@@ -16,7 +17,7 @@ fn micros_to_py_datetime(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
     let dt = dt_mod.getattr("datetime")?;
     Ok(dt
         .call_method1("fromtimestamp", (micros as f64 / 1_000_000.0,))?
-        .into_py(py))
+        .unbind())
 }
 
 fn days_to_py_date(py: Python<'_>, days: i32) -> PyResult<PyObject> {
@@ -24,13 +25,13 @@ fn days_to_py_date(py: Python<'_>, days: i32) -> PyResult<PyObject> {
     let date = dt_mod.getattr("date")?;
     Ok(date
         .call_method1("fromordinal", (days + 719_163,))?
-        .into_py(py))
+        .unbind())
 }
 
 fn micros_to_py_timedelta(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
     let dt_mod = py.import("datetime")?;
     let td = dt_mod.getattr("timedelta")?;
-    Ok(td.call1((0, 0, micros))?.into_py(py))
+    Ok(td.call1((0, 0, micros))?.unbind())
 }
 
 fn row_key_for_subset(
@@ -55,7 +56,7 @@ fn nanos_to_py_time(py: Python<'_>, ns: i64) -> PyResult<PyObject> {
     let h = (secs / 3600) as i32;
     let m = ((secs % 3600) / 60) as i32;
     let s = (secs % 60) as i32;
-    Ok(time_cls.call1((h, m, s, micro))?.into_py(py))
+    Ok(time_cls.call1((h, m, s, micro))?.unbind())
 }
 
 pub(crate) fn execute_plan_rowwise(
@@ -412,21 +413,21 @@ pub(crate) fn execute_plan_rowwise(
     }
 
     // Convert context back to Python dict[str, list[Any]].
-    let out_dict = PyDict::new_bound(py);
+    let out_dict = PyDict::new(py);
     for (name, col) in ctx.iter() {
         let mut values: Vec<PyObject> = Vec::with_capacity(col.len());
         for item in col.iter() {
             match item {
                 None => values.push(py.None()),
-                Some(LiteralValue::Int(i)) => values.push(i.into_py(py)),
-                Some(LiteralValue::Float(f)) => values.push(f.into_py(py)),
-                Some(LiteralValue::Bool(b)) => values.push(b.into_py(py)),
-                Some(LiteralValue::Str(s)) => values.push(s.clone().into_py(py)),
-                Some(LiteralValue::EnumStr(s)) => values.push(s.clone().into_py(py)),
+                Some(LiteralValue::Int(i)) => values.push(i.into_py_any(py)?),
+                Some(LiteralValue::Float(f)) => values.push(f.into_py_any(py)?),
+                Some(LiteralValue::Bool(b)) => values.push(b.into_py_any(py)?),
+                Some(LiteralValue::Str(s)) => values.push(s.clone().into_py_any(py)?),
+                Some(LiteralValue::EnumStr(s)) => values.push(s.clone().into_py_any(py)?),
                 Some(LiteralValue::Uuid(s)) => {
                     let uuid_mod = py.import("uuid")?;
                     let ctor = uuid_mod.getattr("UUID")?;
-                    values.push(ctor.call1((s.as_str(),))?.into_py(py));
+                    values.push(ctor.call1((s.as_str(),))?.unbind());
                 }
                 Some(LiteralValue::Decimal(d)) => {
                     values.push(scaled_i128_to_py_decimal(py, *d)?);
@@ -440,13 +441,13 @@ pub(crate) fn execute_plan_rowwise(
                 }
                 Some(LiteralValue::TimeNanos(v)) => values.push(nanos_to_py_time(py, *v)?),
                 Some(LiteralValue::Binary(b)) => {
-                    values.push(PyBytes::new_bound(py, b.as_slice()).into_py(py));
+                    values.push(PyBytes::new(py, b.as_slice()).into_py_any(py)?);
                 }
             }
         }
-        let py_list = PyList::new_bound(py, values);
+        let py_list = PyList::new(py, values)?;
         out_dict.set_item(name, py_list)?;
     }
 
-    Ok(out_dict.into_py(py))
+    Ok(out_dict.unbind().into())
 }

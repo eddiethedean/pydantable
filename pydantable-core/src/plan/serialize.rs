@@ -2,6 +2,7 @@
 
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList};
+use pyo3::IntoPyObjectExt;
 
 use crate::expr::{exprnode_to_serializable, LiteralValue};
 
@@ -9,7 +10,7 @@ use super::ir::{PlanInner, PlanStep};
 use super::schema_py::schema_descriptors_as_py;
 
 pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<PyObject> {
-    let out = PyDict::new_bound(py);
+    let out = PyDict::new(py);
     out.set_item("version", 1)?;
 
     out.set_item(
@@ -21,9 +22,9 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
         schema_descriptors_as_py(py, &inner.root_schema)?,
     )?;
 
-    let steps = PyList::empty_bound(py);
+    let steps = PyList::empty(py);
     for step in inner.steps.iter() {
-        let step_out = PyDict::new_bound(py);
+        let step_out = PyDict::new(py);
         match step {
             PlanStep::Select { columns } => {
                 step_out.set_item("kind", "select")?;
@@ -31,7 +32,7 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
             }
             PlanStep::GlobalSelect { items } => {
                 step_out.set_item("kind", "global_select")?;
-                let cols = PyDict::new_bound(py);
+                let cols = PyDict::new(py);
                 for (name, expr) in items {
                     cols.set_item(name, exprnode_to_serializable(py, expr)?)?;
                 }
@@ -39,7 +40,7 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
             }
             PlanStep::WithColumns { columns } => {
                 step_out.set_item("kind", "with_columns")?;
-                let cols = PyDict::new_bound(py);
+                let cols = PyDict::new(py);
                 for (name, expr) in columns.iter() {
                     cols.set_item(name, exprnode_to_serializable(py, expr)?)?;
                 }
@@ -89,18 +90,18 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
                 step_out.set_item("subset", subset)?;
                 let value_obj = match value {
                     None => py.None(),
-                    Some(LiteralValue::Int(v)) => v.into_py(py),
-                    Some(LiteralValue::Float(v)) => v.into_py(py),
-                    Some(LiteralValue::Bool(v)) => v.into_py(py),
-                    Some(LiteralValue::Str(v)) => v.clone().into_py(py),
-                    Some(LiteralValue::Uuid(v)) => v.clone().into_py(py),
-                    Some(LiteralValue::Decimal(v)) => v.into_py(py),
-                    Some(LiteralValue::EnumStr(v)) => v.clone().into_py(py),
-                    Some(LiteralValue::DateTimeMicros(v)) => v.into_py(py),
-                    Some(LiteralValue::DateDays(v)) => v.into_py(py),
-                    Some(LiteralValue::DurationMicros(v)) => v.into_py(py),
-                    Some(LiteralValue::TimeNanos(v)) => v.into_py(py),
-                    Some(LiteralValue::Binary(b)) => PyBytes::new(py, b).into_py(py),
+                    Some(LiteralValue::Int(v)) => v.into_py_any(py)?,
+                    Some(LiteralValue::Float(v)) => v.into_py_any(py)?,
+                    Some(LiteralValue::Bool(v)) => v.into_py_any(py)?,
+                    Some(LiteralValue::Str(v)) => v.clone().into_py_any(py)?,
+                    Some(LiteralValue::Uuid(v)) => v.clone().into_py_any(py)?,
+                    Some(LiteralValue::Decimal(v)) => v.into_py_any(py)?,
+                    Some(LiteralValue::EnumStr(v)) => v.clone().into_py_any(py)?,
+                    Some(LiteralValue::DateTimeMicros(v)) => v.into_py_any(py)?,
+                    Some(LiteralValue::DateDays(v)) => v.into_py_any(py)?,
+                    Some(LiteralValue::DurationMicros(v)) => v.into_py_any(py)?,
+                    Some(LiteralValue::TimeNanos(v)) => v.into_py_any(py)?,
+                    Some(LiteralValue::Binary(b)) => PyBytes::new(py, b).into_py_any(py)?,
                 };
                 step_out.set_item("value", value_obj)?;
                 step_out.set_item("strategy", strategy)?;
@@ -162,5 +163,5 @@ pub fn planinner_to_serializable(py: Python<'_>, inner: &PlanInner) -> PyResult<
     }
 
     out.set_item("steps", steps)?;
-    Ok(out.into_py(py))
+    Ok(out.unbind().into())
 }

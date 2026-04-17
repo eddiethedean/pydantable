@@ -124,7 +124,7 @@ fn multiset_emit<'py>(
     right_counts: HashMap<Vec<u8>, usize>,
     op: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let out = PyDict::new_bound(py);
+    let out = PyDict::new(py);
     for c in cols {
         out.set_item(c, Vec::<PyObject>::new())?;
     }
@@ -201,11 +201,11 @@ pub fn execute_except_all_polars(
 
     let desc = schema_descriptors_as_py(py, &left_plan.schema)?;
     if as_python_lists {
-        return Ok((out_dict.into_py(py), desc));
+        return Ok((out_dict.unbind().into(), desc));
     }
     let pl = py.import("polars")?;
     let df_cls = pl.getattr("DataFrame")?;
-    Ok((df_cls.call1((out_dict,))?.into_py(py), desc))
+    Ok((df_cls.call1((out_dict,))?.unbind(), desc))
 }
 
 pub fn execute_intersect_all_polars(
@@ -229,9 +229,9 @@ pub fn execute_intersect_all_polars(
 
     let desc = schema_descriptors_as_py(py, &left_plan.schema)?;
     if as_python_lists {
-        return Ok((out_dict.into_py(py), desc));
+        return Ok((out_dict.unbind().into(), desc));
     }
     let pl = py.import("polars")?;
     let df_cls = pl.getattr("DataFrame")?;
-    Ok((df_cls.call1((out_dict,))?.into_py(py), desc))
+    Ok((df_cls.call1((out_dict,))?.unbind(), desc))
 }

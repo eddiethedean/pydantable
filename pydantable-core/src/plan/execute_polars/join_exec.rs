@@ -481,7 +481,7 @@ pub fn execute_join_polars(
         return Ok((py_df, desc));
     }
 
-    let out_dict = PyDict::new_bound(py);
+    let out_dict = PyDict::new(py);
     for (name, dtype) in out_schema.iter() {
         let col = out_df
             .column(name)
@@ -492,5 +492,5 @@ pub fn execute_join_polars(
         out_dict.set_item(name, py_list)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
-    Ok((out_dict.into_py(py), desc))
+    Ok((out_dict.unbind().into(), desc))
 }

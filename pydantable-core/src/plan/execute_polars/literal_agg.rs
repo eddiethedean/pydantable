@@ -7,6 +7,7 @@ use std::io::Cursor;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyList, PyTime};
+use pyo3::IntoPyObjectExt;
 
 use crate::dtype::{
     py_decimal_to_scaled_i128, py_enum_to_wire_string, scaled_i128_to_py_decimal, BaseType,
@@ -114,31 +115,33 @@ pub(super) fn py_dict_to_literal_ctx(
 }
 
 #[cfg(feature = "polars_engine")]
+#[allow(clippy::expect_used)]
 pub(super) fn literal_to_py(py: Python<'_>, v: &LiteralValue) -> PyObject {
     match v {
-        LiteralValue::Int(i) => i.into_py(py),
-        LiteralValue::Float(f) => f.into_py(py),
-        LiteralValue::Bool(b) => b.into_py(py),
-        LiteralValue::Str(s) => s.clone().into_py(py),
-        LiteralValue::EnumStr(s) => s.clone().into_py(py),
+        LiteralValue::Int(i) => i.into_py_any(py).expect("infallible"),
+        LiteralValue::Float(f) => f.into_py_any(py).expect("infallible"),
+        LiteralValue::Bool(b) => b.into_py_any(py).expect("infallible"),
+        LiteralValue::Str(s) => s.clone().into_py_any(py).expect("infallible"),
+        LiteralValue::EnumStr(s) => s.clone().into_py_any(py).expect("infallible"),
         LiteralValue::Uuid(s) => py
             .import("uuid")
             .and_then(|m| m.getattr("UUID"))
             .and_then(|c| c.call1((s.as_str(),)))
-            .map(|o| o.into_py(py))
-            .unwrap_or_else(|_| s.clone().into_py(py)),
-        LiteralValue::Decimal(v) => {
-            scaled_i128_to_py_decimal(py, *v).unwrap_or_else(|_| v.into_py(py))
+            .map(|o| o.unbind())
+            .unwrap_or_else(|_| s.clone().into_py_any(py).expect("infallible")),
+        LiteralValue::Decimal(v) => scaled_i128_to_py_decimal(py, *v)
+            .unwrap_or_else(|_| (*v).into_py_any(py).expect("infallible")),
+        LiteralValue::DateTimeMicros(v) => micros_to_py_datetime(py, *v)
+            .unwrap_or_else(|_| (*v).into_py_any(py).expect("infallible")),
+        LiteralValue::DateDays(v) => {
+            days_to_py_date(py, *v).unwrap_or_else(|_| (*v).into_py_any(py).expect("infallible"))
         }
-        LiteralValue::DateTimeMicros(v) => {
-            micros_to_py_datetime(py, *v).unwrap_or_else(|_| v.into_py(py))
+        LiteralValue::DurationMicros(v) => micros_to_py_timedelta(py, *v)
+            .unwrap_or_else(|_| (*v).into_py_any(py).expect("infallible")),
+        LiteralValue::TimeNanos(ns) => {
+            nanos_to_py_time(py, *ns).unwrap_or_else(|_| (*ns).into_py_any(py).expect("infallible"))
         }
-        LiteralValue::DateDays(v) => days_to_py_date(py, *v).unwrap_or_else(|_| v.into_py(py)),
-        LiteralValue::DurationMicros(v) => {
-            micros_to_py_timedelta(py, *v).unwrap_or_else(|_| v.into_py(py))
-        }
-        LiteralValue::TimeNanos(ns) => nanos_to_py_time(py, *ns).unwrap_or_else(|_| ns.into_py(py)),
-        LiteralValue::Binary(b) => PyBytes::new(py, b).into_py(py),
+        LiteralValue::Binary(b) => PyBytes::new(py, b).into_py_any(py).expect("infallible"),
     }
 }
 

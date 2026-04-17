@@ -183,10 +183,10 @@ mod polars_engine_tests {
             schema.insert("age".to_string(), DTypeDesc::scalar_nullable(BaseType::Int));
             let plan = make_plan(schema);
 
-            let root = PyDict::new_bound(py);
-            root.set_item("id", PyList::new_bound(py, [1_i64, 2_i64]))
+            let root = PyDict::new(py);
+            root.set_item("id", PyList::new(py, [1_i64, 2_i64]).unwrap())
                 .unwrap();
-            let ages = PyList::empty_bound(py);
+            let ages = PyList::empty(py);
             ages.append(20_i64).unwrap();
             ages.append(py.None()).unwrap();
             root.set_item("age", ages).unwrap();
@@ -230,10 +230,10 @@ mod polars_engine_tests {
             schema.insert("age".to_string(), DTypeDesc::scalar_nullable(BaseType::Int));
             let plan = make_plan(schema);
 
-            let root = PyDict::new_bound(py);
-            root.set_item("id", PyList::new_bound(py, [1_i64, 2_i64]))
+            let root = PyDict::new(py);
+            root.set_item("id", PyList::new(py, [1_i64, 2_i64]).unwrap())
                 .unwrap();
-            let ages = PyList::empty_bound(py);
+            let ages = PyList::empty(py);
             ages.append(20_i64).unwrap();
             ages.append(py.None()).unwrap();
             root.set_item("age", ages).unwrap();
@@ -268,10 +268,10 @@ mod polars_engine_tests {
         ensure_python_initialized();
         Python::with_gil(|py| {
             let plan = make_plan(sample_kv_schema());
-            let root = PyDict::new_bound(py);
-            root.set_item("k", PyList::new_bound(py, [1_i64, 1_i64, 2_i64]))
+            let root = PyDict::new(py);
+            root.set_item("k", PyList::new(py, [1_i64, 1_i64, 2_i64]).unwrap())
                 .unwrap();
-            let vs = PyList::empty_bound(py);
+            let vs = PyList::empty(py);
             vs.append(py.None()).unwrap();
             vs.append(py.None()).unwrap();
             vs.append(5_i64).unwrap();
@@ -305,10 +305,10 @@ mod polars_engine_tests {
         ensure_python_initialized();
         Python::with_gil(|py| {
             let plan = make_plan(sample_kv_schema());
-            let root = PyDict::new_bound(py);
-            root.set_item("k", PyList::new_bound(py, [1_i64, 1_i64, 2_i64]))
+            let root = PyDict::new(py);
+            root.set_item("k", PyList::new(py, [1_i64, 1_i64, 2_i64]).unwrap())
                 .unwrap();
-            let vs = PyList::empty_bound(py);
+            let vs = PyList::empty(py);
             vs.append(py.None()).unwrap();
             vs.append(py.None()).unwrap();
             vs.append(5_i64).unwrap();
@@ -327,11 +327,11 @@ mod polars_engine_tests {
             )
             .unwrap();
 
-            let root2 = PyDict::new_bound(py);
+            let root2 = PyDict::new(py);
             root2
-                .set_item("k", PyList::new_bound(py, [1_i64, 1_i64, 2_i64]))
+                .set_item("k", PyList::new(py, [1_i64, 1_i64, 2_i64]).unwrap())
                 .unwrap();
-            let vs2 = PyList::empty_bound(py);
+            let vs2 = PyList::empty(py);
             vs2.append(py.None()).unwrap();
             vs2.append(py.None()).unwrap();
             vs2.append(5_i64).unwrap();

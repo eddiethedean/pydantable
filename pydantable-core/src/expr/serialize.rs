@@ -2,6 +2,7 @@
 
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList};
+use pyo3::IntoPyObjectExt;
 
 use crate::dtype::{dtype_to_descriptor_py, BaseType};
 
@@ -52,7 +53,7 @@ fn cmp_op_to_str(op: &CmpOp) -> &'static str {
 }
 
 pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyObject> {
-    let dict = PyDict::new_bound(py);
+    let dict = PyDict::new(py);
 
     dict.set_item("dtype", dtype_to_descriptor_py(py, &node.dtype())?)?;
 
@@ -65,18 +66,18 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             dict.set_item("kind", "literal")?;
             let value_obj = match value {
                 None => py.None(),
-                Some(LiteralValue::Int(v)) => v.into_py(py),
-                Some(LiteralValue::Float(v)) => v.into_py(py),
-                Some(LiteralValue::Bool(v)) => v.into_py(py),
-                Some(LiteralValue::Str(v)) => v.clone().into_py(py),
-                Some(LiteralValue::Uuid(v)) => v.clone().into_py(py),
-                Some(LiteralValue::Decimal(v)) => v.into_py(py),
-                Some(LiteralValue::EnumStr(v)) => v.clone().into_py(py),
-                Some(LiteralValue::DateTimeMicros(v)) => v.into_py(py),
-                Some(LiteralValue::DateDays(v)) => v.into_py(py),
-                Some(LiteralValue::DurationMicros(v)) => v.into_py(py),
-                Some(LiteralValue::TimeNanos(v)) => v.into_py(py),
-                Some(LiteralValue::Binary(b)) => PyBytes::new(py, b).into_py(py),
+                Some(LiteralValue::Int(v)) => v.into_py_any(py)?,
+                Some(LiteralValue::Float(v)) => v.into_py_any(py)?,
+                Some(LiteralValue::Bool(v)) => v.into_py_any(py)?,
+                Some(LiteralValue::Str(v)) => v.clone().into_py_any(py)?,
+                Some(LiteralValue::Uuid(v)) => v.clone().into_py_any(py)?,
+                Some(LiteralValue::Decimal(v)) => v.into_py_any(py)?,
+                Some(LiteralValue::EnumStr(v)) => v.clone().into_py_any(py)?,
+                Some(LiteralValue::DateTimeMicros(v)) => v.into_py_any(py)?,
+                Some(LiteralValue::DateDays(v)) => v.into_py_any(py)?,
+                Some(LiteralValue::DurationMicros(v)) => v.into_py_any(py)?,
+                Some(LiteralValue::TimeNanos(v)) => v.into_py_any(py)?,
+                Some(LiteralValue::Binary(b)) => PyBytes::new(py, b).into_py_any(py)?,
             };
             dict.set_item("value", value_obj)?;
         }
@@ -116,7 +117,7 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
         }
         ExprNode::Coalesce { exprs, .. } => {
             dict.set_item("kind", "coalesce")?;
-            let list = PyList::empty_bound(py);
+            let list = PyList::empty(py);
             for e in exprs {
                 list.append(exprnode_to_serializable(py, e)?)?;
             }
@@ -126,9 +127,9 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             branches, else_, ..
         } => {
             dict.set_item("kind", "case_when")?;
-            let list = PyList::empty_bound(py);
+            let list = PyList::empty(py);
             for (c, t) in branches {
-                let br = PyDict::new_bound(py);
+                let br = PyDict::new(py);
                 br.set_item("condition", exprnode_to_serializable(py, c)?)?;
                 br.set_item("then", exprnode_to_serializable(py, t)?)?;
                 list.append(br)?;
@@ -139,21 +140,21 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
         ExprNode::InList { inner, values, .. } => {
             dict.set_item("kind", "in_list")?;
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
-            let list = PyList::empty_bound(py);
+            let list = PyList::empty(py);
             for v in values {
                 let pyv = match v {
-                    LiteralValue::Int(i) => i.into_py(py),
-                    LiteralValue::Float(f) => f.into_py(py),
-                    LiteralValue::Bool(b) => b.into_py(py),
-                    LiteralValue::Str(s) => s.clone().into_py(py),
-                    LiteralValue::Uuid(s) => s.clone().into_py(py),
-                    LiteralValue::Decimal(i) => i.into_py(py),
-                    LiteralValue::EnumStr(s) => s.clone().into_py(py),
-                    LiteralValue::DateTimeMicros(v) => v.into_py(py),
-                    LiteralValue::DateDays(v) => v.into_py(py),
-                    LiteralValue::DurationMicros(v) => v.into_py(py),
-                    LiteralValue::TimeNanos(v) => v.into_py(py),
-                    LiteralValue::Binary(b) => PyBytes::new(py, b).into_py(py),
+                    LiteralValue::Int(i) => i.into_py_any(py)?,
+                    LiteralValue::Float(f) => f.into_py_any(py)?,
+                    LiteralValue::Bool(b) => b.into_py_any(py)?,
+                    LiteralValue::Str(s) => s.clone().into_py_any(py)?,
+                    LiteralValue::Uuid(s) => s.clone().into_py_any(py)?,
+                    LiteralValue::Decimal(i) => i.into_py_any(py)?,
+                    LiteralValue::EnumStr(s) => s.clone().into_py_any(py)?,
+                    LiteralValue::DateTimeMicros(v) => v.into_py_any(py)?,
+                    LiteralValue::DateDays(v) => v.into_py_any(py)?,
+                    LiteralValue::DurationMicros(v) => v.into_py_any(py)?,
+                    LiteralValue::TimeNanos(v) => v.into_py_any(py)?,
+                    LiteralValue::Binary(b) => PyBytes::new(py, b).into_py_any(py)?,
                 };
                 list.append(pyv)?;
             }
@@ -169,7 +170,7 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
         }
         ExprNode::StringConcat { parts, .. } => {
             dict.set_item("kind", "string_concat")?;
-            let list = PyList::empty_bound(py);
+            let list = PyList::empty(py);
             for p in parts {
                 list.append(exprnode_to_serializable(py, p)?)?;
             }
@@ -250,9 +251,9 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
         ExprNode::StructWithFields { base, updates, .. } => {
             dict.set_item("kind", "struct_with_fields")?;
             dict.set_item("base", exprnode_to_serializable(py, base)?)?;
-            let upd = pyo3::types::PyList::empty_bound(py);
+            let upd = pyo3::types::PyList::empty(py);
             for (n, e) in updates {
-                let pair = pyo3::types::PyList::empty_bound(py);
+                let pair = pyo3::types::PyList::empty(py);
                 pair.append(n)?;
                 pair.append(exprnode_to_serializable(py, e.as_ref())?)?;
                 upd.append(pair)?;
@@ -575,14 +576,14 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             match frame {
                 None => dict.set_item("frame", py.None())?,
                 Some(WindowFrame::Rows { start, end }) => {
-                    let f = PyDict::new_bound(py);
+                    let f = PyDict::new(py);
                     f.set_item("kind", "rows")?;
                     f.set_item("start", *start)?;
                     f.set_item("end", *end)?;
                     dict.set_item("frame", f)?;
                 }
                 Some(WindowFrame::Range { start, end }) => {
-                    let f = PyDict::new_bound(py);
+                    let f = PyDict::new(py);
                     f.set_item("kind", "range")?;
                     f.set_item("start", *start)?;
                     f.set_item("end", *end)?;
@@ -592,17 +593,17 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             if let Some(op) = operand {
                 dict.set_item("operand", exprnode_to_serializable(py, op)?)?;
             }
-            dict.set_item("partition_by", partition_by.clone().into_py(py))?;
-            let ord_list = PyList::empty_bound(py);
+            dict.set_item("partition_by", partition_by.clone().into_py_any(py)?)?;
+            let ord_list = PyList::empty(py);
             for (name, asc, nulls_last) in order_by {
-                let t = PyList::new_bound(
+                let t = PyList::new(
                     py,
                     [
-                        name.into_py(py),
-                        (*asc).into_py(py),
-                        (*nulls_last).into_py(py),
+                        name.clone().into_py_any(py)?,
+                        (*asc).into_py_any(py)?,
+                        (*nulls_last).into_py_any(py)?,
                     ],
-                );
+                )?;
                 ord_list.append(t)?;
             }
             dict.set_item("order_by", ord_list)?;
@@ -626,5 +627,5 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
         }
     }
 
-    Ok(dict.into_py(py))
+    Ok(dict.unbind().into())
 }

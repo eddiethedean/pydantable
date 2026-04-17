@@ -21,14 +21,14 @@ fn polars_io_err(e: PolarsError) -> PyErr {
 }
 
 pub fn dataframe_to_column_dict(py: Python<'_>, df: &DataFrame) -> PyResult<PyObject> {
-    let d = PyDict::new_bound(py);
+    let d = PyDict::new(py);
     for col in df.columns() {
         let s = col.as_materialized_series();
         let dt = dtype_from_polars(s.dtype())?;
         let py_list = series_to_py_list(py, s, &dt)?;
         d.set_item(col.name().as_str(), py_list)?;
     }
-    Ok(d.into_py(py))
+    Ok(d.unbind().into())
 }
 
 /// Read Parquet at ``path`` into ``dict[str, list]`` (GIL released during scan/collect).

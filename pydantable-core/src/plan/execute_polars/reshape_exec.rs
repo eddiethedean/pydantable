@@ -161,7 +161,7 @@ pub fn execute_melt_polars(
         return Ok((py_df, desc));
     }
 
-    let out_dict = PyDict::new_bound(py);
+    let out_dict = PyDict::new(py);
     for (name, dtype) in out_schema.iter() {
         let col = out_df
             .column(name)
@@ -172,7 +172,7 @@ pub fn execute_melt_polars(
         out_dict.set_item(name, py_list)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
-    Ok((out_dict.into_py(py), desc))
+    Ok((out_dict.unbind().into(), desc))
 }
 
 #[cfg(feature = "polars_engine")]
@@ -501,17 +501,17 @@ pub fn execute_pivot_polars(
         }
     }
 
-    let out_dict = PyDict::new_bound(py);
+    let out_dict = PyDict::new(py);
     for (k, v) in out_cols {
-        out_dict.set_item(k, PyList::new_bound(py, v))?;
+        out_dict.set_item(k, PyList::new(py, v)?)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
     if !as_python_lists {
         let pl = py.import("polars")?;
         let df_obj = pl.getattr("DataFrame")?.call1((out_dict.as_ref(),))?;
-        return Ok((df_obj.into_py(py), desc));
+        return Ok((df_obj.unbind(), desc));
     }
-    Ok((out_dict.into_py(py), desc))
+    Ok((out_dict.unbind().into(), desc))
 }
 
 #[cfg(feature = "polars_engine")]
@@ -745,7 +745,7 @@ pub fn execute_groupby_dynamic_agg_polars(
                         "internal: group_by_dynamic missing index column '{index_column}'.",
                     ))
                 })?
-                .push(idx_val.into_py(py));
+                .push(idx_val.unbind());
 
             for c in by.iter() {
                 let v = ctx[c][first]
@@ -831,17 +831,17 @@ pub fn execute_groupby_dynamic_agg_polars(
         out_schema.insert(out_name.clone(), out_d);
     }
 
-    let out_dict = PyDict::new_bound(py);
+    let out_dict = PyDict::new(py);
     for (k, v) in out_cols {
-        out_dict.set_item(k, PyList::new_bound(py, v))?;
+        out_dict.set_item(k, PyList::new(py, v)?)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
     if !as_python_lists {
         let pl = py.import("polars")?;
         let df_obj = pl.getattr("DataFrame")?.call1((out_dict.as_ref(),))?;
-        return Ok((df_obj.into_py(py), desc));
+        return Ok((df_obj.unbind(), desc));
     }
-    Ok((out_dict.into_py(py), desc))
+    Ok((out_dict.unbind().into(), desc))
 }
 
 #[cfg(feature = "polars_engine")]
@@ -925,7 +925,7 @@ pub fn execute_explode_polars(
         }
     }
 
-    let out_dict = PyDict::new_bound(py);
+    let out_dict = PyDict::new(py);
     for (name, dtype) in out_schema.iter() {
         let s = out_df
             .column(name)
@@ -936,7 +936,7 @@ pub fn execute_explode_polars(
         out_dict.set_item(name, py_list)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
-    Ok((out_dict.into_py(py), desc))
+    Ok((out_dict.unbind().into(), desc))
 }
 
 #[cfg(feature = "polars_engine")]
@@ -1030,7 +1030,7 @@ pub fn execute_posexplode_polars(
     );
     out_schema.insert(value_name.clone(), inner_el);
 
-    let out_dict = PyDict::new_bound(py);
+    let out_dict = PyDict::new(py);
     for (name, dtype) in out_schema.iter() {
         let s = out_df
             .column(name)
@@ -1041,7 +1041,7 @@ pub fn execute_posexplode_polars(
         out_dict.set_item(name, py_list)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
-    Ok((out_dict.into_py(py), desc))
+    Ok((out_dict.unbind().into(), desc))
 }
 
 #[cfg(feature = "polars_engine")]
@@ -1115,7 +1115,7 @@ pub fn execute_unnest_polars(
         out_schema.insert(col_name_str.to_string(), out_desc);
     }
 
-    let out_dict = PyDict::new_bound(py);
+    let out_dict = PyDict::new(py);
     for (name, dtype) in out_schema.iter() {
         let s = out_df
             .column(name)
@@ -1126,5 +1126,5 @@ pub fn execute_unnest_polars(
         out_dict.set_item(name, py_list)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
-    Ok((out_dict.into_py(py), desc))
+    Ok((out_dict.unbind().into(), desc))
 }

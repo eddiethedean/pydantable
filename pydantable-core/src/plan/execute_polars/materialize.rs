@@ -7,6 +7,7 @@ use std::io::Cursor;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyList, PyTime};
+use pyo3::IntoPyObjectExt;
 
 use crate::dtype::{
     py_decimal_to_scaled_i128, py_enum_to_wire_string, scaled_i128_to_py_decimal, BaseType,
@@ -41,7 +42,7 @@ fn map_list_series_to_py_dict(
     s: &Series,
     val_dt: &DTypeDesc,
 ) -> PyResult<PyObject> {
-    let d = PyDict::new_bound(py);
+    let d = PyDict::new(py);
     let ca = s.struct_().map_err(|_| {
         PyErr::new::<pyo3::exceptions::PyTypeError, _>(
             "Map cells must be encoded as a struct list (key/value pairs).",
@@ -67,7 +68,7 @@ fn map_list_series_to_py_dict(
         let py_v = polars_anyvalue_to_py(py, v_av, val_dt)?;
         d.set_item(k, py_v)?;
     }
-    Ok(d.into_py(py))
+    Ok(d.unbind().into())
 }
 
 #[cfg(feature = "polars_engine")]
@@ -100,7 +101,7 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
                     ));
                 }
             };
-            Ok(i.into_py(py))
+            Ok(i.into_py_any(py)?)
         }
         DTypeDesc::Scalar {
             base: Some(BaseType::Float),
@@ -116,13 +117,13 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
                     ));
                 }
             };
-            Ok(f.into_py(py))
+            Ok(f.into_py_any(py)?)
         }
         DTypeDesc::Scalar {
             base: Some(BaseType::Bool),
             ..
         } => match av {
-            AnyValue::Boolean(b) => Ok(b.into_py(py)),
+            AnyValue::Boolean(b) => Ok(b.into_py_any(py)?),
             _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Expected bool AnyValue.",
             )),
@@ -131,8 +132,8 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             base: Some(BaseType::Str | BaseType::Enum),
             ..
         } => match av {
-            AnyValue::String(s) => Ok(s.into_py(py)),
-            AnyValue::StringOwned(s) => Ok(s.to_string().into_py(py)),
+            AnyValue::String(s) => Ok(s.into_py_any(py)?),
+            AnyValue::StringOwned(s) => Ok(s.to_string().into_py_any(py)?),
             _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Expected str AnyValue.",
             )),
@@ -144,12 +145,12 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             AnyValue::String(s) => {
                 let uuid_mod = py.import("uuid")?;
                 let ctor = uuid_mod.getattr("UUID")?;
-                Ok(ctor.call1((s.to_string(),))?.into_py(py))
+                Ok(ctor.call1((s.to_string(),))?.unbind())
             }
             AnyValue::StringOwned(s) => {
                 let uuid_mod = py.import("uuid")?;
                 let ctor = uuid_mod.getattr("UUID")?;
-                Ok(ctor.call1((s.to_string(),))?.into_py(py))
+                Ok(ctor.call1((s.to_string(),))?.unbind())
             }
             _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Expected str AnyValue for UUID column.",
@@ -162,12 +163,12 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             AnyValue::String(s) => {
                 let ip_mod = py.import("ipaddress")?;
                 let ctor = ip_mod.getattr("IPv4Address")?;
-                Ok(ctor.call1((s.to_string(),))?.into_py(py))
+                Ok(ctor.call1((s.to_string(),))?.unbind())
             }
             AnyValue::StringOwned(s) => {
                 let ip_mod = py.import("ipaddress")?;
                 let ctor = ip_mod.getattr("IPv4Address")?;
-                Ok(ctor.call1((s.to_string(),))?.into_py(py))
+                Ok(ctor.call1((s.to_string(),))?.unbind())
             }
             _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Expected str AnyValue for IPv4 column.",
@@ -180,12 +181,12 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             AnyValue::String(s) => {
                 let ip_mod = py.import("ipaddress")?;
                 let ctor = ip_mod.getattr("IPv6Address")?;
-                Ok(ctor.call1((s.to_string(),))?.into_py(py))
+                Ok(ctor.call1((s.to_string(),))?.unbind())
             }
             AnyValue::StringOwned(s) => {
                 let ip_mod = py.import("ipaddress")?;
                 let ctor = ip_mod.getattr("IPv6Address")?;
-                Ok(ctor.call1((s.to_string(),))?.into_py(py))
+                Ok(ctor.call1((s.to_string(),))?.unbind())
             }
             _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Expected str AnyValue for IPv6 column.",
@@ -263,8 +264,8 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             base: Some(BaseType::Binary),
             ..
         } => match av {
-            AnyValue::Binary(b) => Ok(PyBytes::new(py, b).into_py(py)),
-            AnyValue::BinaryOwned(b) => Ok(PyBytes::new(py, b.as_slice()).into_py(py)),
+            AnyValue::Binary(b) => Ok(PyBytes::new(py, b).into_py_any(py)?),
+            AnyValue::BinaryOwned(b) => Ok(PyBytes::new(py, b.as_slice()).into_py_any(py)?),
             _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Expected binary AnyValue.",
             )),
@@ -276,12 +277,12 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             AnyValue::Binary(b) => {
                 let types_mod = py.import("pydantable.types")?;
                 let ctor = types_mod.getattr("WKB")?;
-                Ok(ctor.call1((PyBytes::new(py, b),))?.into_py(py))
+                Ok(ctor.call1((PyBytes::new(py, b),))?.unbind())
             }
             AnyValue::BinaryOwned(b) => {
                 let types_mod = py.import("pydantable.types")?;
                 let ctor = types_mod.getattr("WKB")?;
-                Ok(ctor.call1((PyBytes::new(py, b.as_slice()),))?.into_py(py))
+                Ok(ctor.call1((PyBytes::new(py, b.as_slice()),))?.unbind())
             }
             _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "Expected binary AnyValue for WKB column.",
@@ -294,11 +295,11 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
                     "Expected list AnyValue.",
                 ));
             };
-            let py_inner = PyList::empty_bound(py);
+            let py_inner = PyList::empty(py);
             for sub_av in series.iter() {
                 py_inner.append(polars_anyvalue_to_py(py, sub_av, inner)?)?;
             }
-            Ok(py_inner.into_py(py))
+            Ok(py_inner.unbind().into())
         }
         DTypeDesc::Struct { fields, .. } => {
             let av_static = av.into_static();
@@ -308,12 +309,12 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
                 ));
             };
             let (vals, _) = payload.as_ref();
-            let d = PyDict::new_bound(py);
+            let d = PyDict::new(py);
             for ((name, fdt), inner) in fields.iter().zip(vals.iter()) {
                 let py_v = polars_anyvalue_to_py(py, inner.clone(), fdt)?;
                 d.set_item(name.as_str(), py_v)?;
             }
-            Ok(d.into_py(py))
+            Ok(d.unbind().into())
         }
         _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
             "Unsupported dtype in polars_anyvalue_to_py.",
@@ -343,11 +344,11 @@ pub(crate) fn series_to_py_list(
                 let py_v = match av {
                     AnyValue::Null => py.None(),
                     AnyValue::List(s) => {
-                        let py_inner = PyList::empty_bound(py);
+                        let py_inner = PyList::empty(py);
                         for sub_av in s.iter() {
                             py_inner.append(polars_anyvalue_to_py(py, sub_av, inner)?)?;
                         }
-                        py_inner.into_py(py)
+                        py_inner.unbind().into()
                     }
                     _ => {
                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -365,7 +366,7 @@ pub(crate) fn series_to_py_list(
             let casted = series.cast(&DataType::Int64).map_err(polars_err)?;
             for item in casted.i64().map_err(polars_err)?.into_iter() {
                 match item {
-                    Some(v) => values.push(v.into_py(py)),
+                    Some(v) => values.push(v.into_py_any(py)?),
                     None => values.push(py.None()),
                 }
             }
@@ -377,7 +378,7 @@ pub(crate) fn series_to_py_list(
             let casted = series.cast(&DataType::Float64).map_err(polars_err)?;
             for item in casted.f64().map_err(polars_err)?.into_iter() {
                 match item {
-                    Some(v) => values.push(v.into_py(py)),
+                    Some(v) => values.push(v.into_py_any(py)?),
                     None => values.push(py.None()),
                 }
             }
@@ -389,7 +390,7 @@ pub(crate) fn series_to_py_list(
             let casted = series.cast(&DataType::Boolean).map_err(polars_err)?;
             for item in casted.bool().map_err(polars_err)?.into_iter() {
                 match item {
-                    Some(v) => values.push(v.into_py(py)),
+                    Some(v) => values.push(v.into_py_any(py)?),
                     None => values.push(py.None()),
                 }
             }
@@ -401,7 +402,7 @@ pub(crate) fn series_to_py_list(
             let casted = series.cast(&DataType::String).map_err(polars_err)?;
             for item in casted.str().map_err(polars_err)?.into_iter() {
                 match item {
-                    Some(v) => values.push(v.into_py(py)),
+                    Some(v) => values.push(v.into_py_any(py)?),
                     None => values.push(py.None()),
                 }
             }
@@ -417,7 +418,7 @@ pub(crate) fn series_to_py_list(
                 match item {
                     Some(v) => {
                         let u = uuid_ctor.call1((v,))?;
-                        values.push(u.into_py(py));
+                        values.push(u.unbind());
                     }
                     None => values.push(py.None()),
                 }
@@ -434,7 +435,7 @@ pub(crate) fn series_to_py_list(
                 match item {
                     Some(v) => {
                         let u = ctor.call1((v,))?;
-                        values.push(u.into_py(py));
+                        values.push(u.unbind());
                     }
                     None => values.push(py.None()),
                 }
@@ -451,7 +452,7 @@ pub(crate) fn series_to_py_list(
                 match item {
                     Some(v) => {
                         let u = ctor.call1((v,))?;
-                        values.push(u.into_py(py));
+                        values.push(u.unbind());
                     }
                     None => values.push(py.None()),
                 }
@@ -533,8 +534,8 @@ pub(crate) fn series_to_py_list(
             for av in series.iter() {
                 let py_v = match av {
                     AnyValue::Null => py.None(),
-                    AnyValue::Binary(b) => PyBytes::new(py, b).into_py(py),
-                    AnyValue::BinaryOwned(b) => PyBytes::new(py, b.as_slice()).into_py(py),
+                    AnyValue::Binary(b) => PyBytes::new(py, b).into_py_any(py)?,
+                    AnyValue::BinaryOwned(b) => PyBytes::new(py, b.as_slice()).into_py_any(py)?,
                     _ => {
                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                             "Expected binary AnyValue.",
@@ -553,9 +554,9 @@ pub(crate) fn series_to_py_list(
             for av in series.iter() {
                 let py_v = match av {
                     AnyValue::Null => py.None(),
-                    AnyValue::Binary(b) => ctor.call1((PyBytes::new(py, b),))?.into_py(py),
+                    AnyValue::Binary(b) => ctor.call1((PyBytes::new(py, b),))?.unbind(),
                     AnyValue::BinaryOwned(b) => {
-                        ctor.call1((PyBytes::new(py, b.as_slice()),))?.into_py(py)
+                        ctor.call1((PyBytes::new(py, b.as_slice()),))?.unbind()
                     }
                     _ => {
                         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -581,7 +582,7 @@ pub(crate) fn series_to_py_list(
             ));
         }
     }
-    Ok(PyList::new_bound(py, values).into_py(py))
+    Ok(PyList::new(py, values)?.unbind().into())
 }
 
 #[cfg(feature = "polars_engine")]
@@ -606,7 +607,7 @@ pub(crate) fn execute_plan_polars(
         return polars_dataframe_to_python_via_ipc(py, &mut out_df);
     }
 
-    let out_dict = PyDict::new_bound(py);
+    let out_dict = PyDict::new(py);
     for (name, dtype) in plan.schema.iter() {
         let col = out_df
             .column(name)
@@ -616,7 +617,7 @@ pub(crate) fn execute_plan_polars(
         let py_list = series_to_py_list(py, &col, dtype)?;
         out_dict.set_item(name, py_list)?;
     }
-    Ok(out_dict.into_py(py))
+    Ok(out_dict.unbind().into())
 }
 
 #[cfg(feature = "polars_engine")]

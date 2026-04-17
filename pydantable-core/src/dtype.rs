@@ -3,6 +3,7 @@ use pyo3::types::{
     PyAny, PyBool, PyBytes, PyDate, PyDateTime, PyDelta, PyFloat, PyInt, PyString, PyTime, PyTuple,
     PyType,
 };
+use pyo3::IntoPyObjectExt;
 
 /// Polars precision for [`BaseType::Decimal`] columns and literals.
 #[cfg_attr(not(feature = "polars_engine"), allow(dead_code))]
@@ -794,18 +795,27 @@ fn literal_set_to_py_typing_literal(
 ) -> PyResult<PyObject> {
     let typing = py.import("typing")?;
     let literal = typing.getattr("Literal")?;
-    let tup: PyObject = match (ls, base) {
+    let tup = match (ls, base) {
         (LiteralSet::Str(v), BaseType::Str) => {
-            let items: Vec<PyObject> = v.iter().map(|s| s.clone().into_py(py)).collect();
-            PyTuple::new_bound(py, items).into_py(py)
+            let mut items = Vec::with_capacity(v.len());
+            for s in v {
+                items.push(s.clone().into_py_any(py)?);
+            }
+            PyTuple::new(py, items)?.unbind()
         }
         (LiteralSet::Int(v), BaseType::Int) => {
-            let items: Vec<PyObject> = v.iter().map(|i| (*i).into_py(py)).collect();
-            PyTuple::new_bound(py, items).into_py(py)
+            let mut items = Vec::with_capacity(v.len());
+            for i in v {
+                items.push((*i).into_py_any(py)?);
+            }
+            PyTuple::new(py, items)?.unbind()
         }
         (LiteralSet::Bool(v), BaseType::Bool) => {
-            let items: Vec<PyObject> = v.iter().map(|b| (*b).into_py(py)).collect();
-            PyTuple::new_bound(py, items).into_py(py)
+            let mut items = Vec::with_capacity(v.len());
+            for b in v {
+                items.push((*b).into_py_any(py)?);
+            }
+            PyTuple::new(py, items)?.unbind()
         }
         _ => {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -814,7 +824,7 @@ fn literal_set_to_py_typing_literal(
         }
     };
     let tup_b = tup.bind(py);
-    Ok(literal.call_method1("__getitem__", (tup_b,))?.into_py(py))
+    Ok(literal.call_method1("__getitem__", (tup_b,))?.unbind())
 }
 
 fn create_model_for_struct_dtype(
@@ -836,7 +846,7 @@ fn create_model_for_struct_dtype(
             if *nullable {
                 let typing = py.import("typing")?;
                 let opt = typing.getattr("Optional")?;
-                Ok(opt.get_item(t.bind(py))?.into_py(py))
+                Ok(opt.get_item(t.bind(py))?.unbind())
             } else {
                 Ok(t)
             }
@@ -854,25 +864,25 @@ fn create_model_for_struct_dtype(
             if *nullable {
                 let typing = py.import("typing")?;
                 let opt = typing.getattr("Optional")?;
-                Ok(opt.get_item(list_ann)?.into_py(py))
+                Ok(opt.get_item(list_ann)?.unbind())
             } else {
-                Ok(list_ann.into_py(py))
+                Ok(list_ann.unbind())
             }
         }
         DTypeDesc::Struct { fields, nullable } => {
             let pydantic = py.import("pydantic")?;
             let create_model = pydantic.getattr("create_model")?;
             let config_dict = pydantic.getattr("ConfigDict")?;
-            let extra = pyo3::types::PyDict::new_bound(py);
+            let extra = pyo3::types::PyDict::new(py);
             extra.set_item("extra", "forbid")?;
             let mc = config_dict.call1((extra,))?;
 
-            let kwargs = pyo3::types::PyDict::new_bound(py);
+            let kwargs = pyo3::types::PyDict::new(py);
             kwargs.set_item("model_config", &mc)?;
             for (fname, fd) in fields {
                 let ann = create_model_for_struct_dtype(py, fd, counter)?;
                 let ellipsis = pyo3::types::PyEllipsis::get(py);
-                let tup = pyo3::types::PyTuple::new_bound(py, [ann, ellipsis.into_py(py)]);
+                let tup = pyo3::types::PyTuple::new(py, [ann.bind(py), &ellipsis])?;
                 kwargs.set_item(fname, tup)?;
             }
             *counter += 1;
@@ -881,9 +891,9 @@ fn create_model_for_struct_dtype(
             if *nullable {
                 let typing = py.import("typing")?;
                 let opt = typing.getattr("Optional")?;
-                Ok(opt.get_item(model)?.into_py(py))
+                Ok(opt.get_item(model)?.unbind())
             } else {
-                Ok(model.into_py(py))
+                Ok(model.unbind())
             }
         }
         DTypeDesc::Map { value, nullable } => {
@@ -894,14 +904,14 @@ fn create_model_for_struct_dtype(
             let str_t = builtins.getattr("str")?;
             let val_ann = create_model_for_struct_dtype(py, value, counter)?;
             let val_b = val_ann.into_bound(py);
-            let tup = pyo3::types::PyTuple::new_bound(py, [str_t, val_b]);
+            let tup = pyo3::types::PyTuple::new(py, [str_t, val_b])?;
             let map_ann = generic_alias.call1((dict_cls, tup))?;
             if *nullable {
                 let typing = py.import("typing")?;
                 let opt = typing.getattr("Optional")?;
-                Ok(opt.get_item(map_ann)?.into_py(py))
+                Ok(opt.get_item(map_ann)?.unbind())
             } else {
-                Ok(map_ann.into_py(py))
+                Ok(map_ann.unbind())
             }
         }
     }
@@ -910,24 +920,39 @@ fn create_model_for_struct_dtype(
 fn scalar_base_to_py_type(py: Python<'_>, base: BaseType) -> PyResult<PyObject> {
     let builtins = py.import("builtins")?;
     Ok(match base {
-        BaseType::Int => builtins.getattr("int")?.into_py(py),
-        BaseType::Float => builtins.getattr("float")?.into_py(py),
-        BaseType::Bool => builtins.getattr("bool")?.into_py(py),
-        BaseType::Str => builtins.getattr("str")?.into_py(py),
-        BaseType::Uuid => py.import("uuid")?.getattr("UUID")?.into_py(py),
-        BaseType::Decimal => py.import("decimal")?.getattr("Decimal")?.into_py(py),
+        BaseType::Int => builtins.getattr("int")?.into_py_any(py)?,
+        BaseType::Float => builtins.getattr("float")?.into_py_any(py)?,
+        BaseType::Bool => builtins.getattr("bool")?.into_py_any(py)?,
+        BaseType::Str => builtins.getattr("str")?.into_py_any(py)?,
+        BaseType::Uuid => py.import("uuid")?.getattr("UUID")?.into_py_any(py)?,
+        BaseType::Decimal => py.import("decimal")?.getattr("Decimal")?.into_py_any(py)?,
         BaseType::Enum => {
             let typing = py.import("typing")?;
-            typing.getattr("Any")?.into_py(py)
+            typing.getattr("Any")?.into_py_any(py)?
         }
-        BaseType::DateTime => py.import("datetime")?.getattr("datetime")?.into_py(py),
-        BaseType::Date => py.import("datetime")?.getattr("date")?.into_py(py),
-        BaseType::Duration => py.import("datetime")?.getattr("timedelta")?.into_py(py),
-        BaseType::Time => py.import("datetime")?.getattr("time")?.into_py(py),
-        BaseType::Binary => builtins.getattr("bytes")?.into_py(py),
-        BaseType::Ipv4 => py.import("ipaddress")?.getattr("IPv4Address")?.into_py(py),
-        BaseType::Ipv6 => py.import("ipaddress")?.getattr("IPv6Address")?.into_py(py),
-        BaseType::Wkb => py.import("pydantable.types")?.getattr("WKB")?.into_py(py),
+        BaseType::DateTime => py
+            .import("datetime")?
+            .getattr("datetime")?
+            .into_py_any(py)?,
+        BaseType::Date => py.import("datetime")?.getattr("date")?.into_py_any(py)?,
+        BaseType::Duration => py
+            .import("datetime")?
+            .getattr("timedelta")?
+            .into_py_any(py)?,
+        BaseType::Time => py.import("datetime")?.getattr("time")?.into_py_any(py)?,
+        BaseType::Binary => builtins.getattr("bytes")?.into_py_any(py)?,
+        BaseType::Ipv4 => py
+            .import("ipaddress")?
+            .getattr("IPv4Address")?
+            .into_py_any(py)?,
+        BaseType::Ipv6 => py
+            .import("ipaddress")?
+            .getattr("IPv6Address")?
+            .into_py_any(py)?,
+        BaseType::Wkb => py
+            .import("pydantable.types")?
+            .getattr("WKB")?
+            .into_py_any(py)?,
     })
 }
 
@@ -937,7 +962,7 @@ pub fn dtype_to_python_type(py: Python<'_>, dtype: DTypeDesc) -> PyResult<PyObje
 }
 
 pub fn dtype_to_descriptor_py(py: Python<'_>, dtype: &DTypeDesc) -> PyResult<PyObject> {
-    let dict = pyo3::types::PyDict::new_bound(py);
+    let dict = pyo3::types::PyDict::new(py);
     match dtype {
         DTypeDesc::Scalar {
             base,
@@ -965,7 +990,7 @@ pub fn dtype_to_descriptor_py(py: Python<'_>, dtype: &DTypeDesc) -> PyResult<PyO
             dict.set_item("base", base_s)?;
             dict.set_item("nullable", *nullable)?;
             if let Some(ls) = literals {
-                let list = pyo3::types::PyList::empty_bound(py);
+                let list = pyo3::types::PyList::empty(py);
                 match ls {
                     LiteralSet::Str(vals) => {
                         for s in vals {
@@ -989,9 +1014,9 @@ pub fn dtype_to_descriptor_py(py: Python<'_>, dtype: &DTypeDesc) -> PyResult<PyO
         DTypeDesc::Struct { fields, nullable } => {
             dict.set_item("kind", "struct")?;
             dict.set_item("nullable", *nullable)?;
-            let field_list = pyo3::types::PyList::empty_bound(py);
+            let field_list = pyo3::types::PyList::empty(py);
             for (name, fd) in fields {
-                let fe = pyo3::types::PyDict::new_bound(py);
+                let fe = pyo3::types::PyDict::new(py);
                 fe.set_item("name", name)?;
                 fe.set_item("dtype", dtype_to_descriptor_py(py, fd)?)?;
                 field_list.append(fe)?;
@@ -1009,7 +1034,7 @@ pub fn dtype_to_descriptor_py(py: Python<'_>, dtype: &DTypeDesc) -> PyResult<PyO
             dict.set_item("value", dtype_to_descriptor_py(py, value)?)?;
         }
     }
-    Ok(dict.into_py(py))
+    Ok(dict.unbind().into())
 }
 
 /// Convert a Python `decimal.Decimal` to Polars `Decimal(`[`DECIMAL_PRECISION`], [`DECIMAL_SCALE`]`)` unscaled `i128`.
@@ -1047,7 +1072,7 @@ pub fn scaled_i128_to_py_decimal(py: Python<'_>, v: i128) -> PyResult<PyObject> 
     let denom_str = format!("1{}", "0".repeat(DECIMAL_SCALE));
     let denom = dec_cls.call1((denom_str.as_str(),))?;
     let out = numer.call_method1("__truediv__", (denom,))?;
-    Ok(out.into_py(py))
+    Ok(out.unbind())
 }
 
 /// Fixed-point string for a scaled `i128` (`Decimal(`[`DECIMAL_PRECISION`], [`DECIMAL_SCALE`]`)` cell).

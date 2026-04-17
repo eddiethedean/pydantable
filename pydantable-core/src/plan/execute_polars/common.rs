@@ -7,6 +7,7 @@ use std::io::Cursor;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyList, PyTime};
+use pyo3::IntoPyObjectExt;
 
 use crate::dtype::{
     py_decimal_to_scaled_i128, py_enum_to_wire_string, scaled_i128_to_py_decimal, BaseType,
@@ -137,7 +138,7 @@ pub(super) fn polars_dataframe_to_python_via_ipc(
     let bytes_io = io_mod.call_method1("BytesIO", (bytes,))?;
     let pl_mod = py.import("polars")?;
     let read_ipc = pl_mod.getattr("read_ipc")?;
-    Ok(read_ipc.call1((bytes_io,))?.into_py(py))
+    Ok(read_ipc.call1((bytes_io,))?.unbind())
 }
 
 #[cfg(feature = "polars_engine")]
@@ -195,7 +196,7 @@ pub(super) fn micros_to_py_datetime(py: Python<'_>, micros: i64) -> PyResult<PyO
     let dt = dt_mod.getattr("datetime")?;
     Ok(dt
         .call_method1("fromtimestamp", (micros as f64 / 1_000_000.0,))?
-        .into_py(py))
+        .unbind())
 }
 
 #[cfg(feature = "polars_engine")]
@@ -204,14 +205,14 @@ pub(super) fn days_to_py_date(py: Python<'_>, days: i32) -> PyResult<PyObject> {
     let date = dt_mod.getattr("date")?;
     Ok(date
         .call_method1("fromordinal", (days + 719_163,))?
-        .into_py(py))
+        .unbind())
 }
 
 #[cfg(feature = "polars_engine")]
 pub(super) fn micros_to_py_timedelta(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
     let dt_mod = py.import("datetime")?;
     let td = dt_mod.getattr("timedelta")?;
-    Ok(td.call1((0, 0, micros))?.into_py(py))
+    Ok(td.call1((0, 0, micros))?.unbind())
 }
 
 #[cfg(feature = "polars_engine")]
@@ -235,7 +236,7 @@ pub(super) fn nanos_to_py_time(py: Python<'_>, ns: i64) -> PyResult<PyObject> {
     let h = (secs / 3600) as i32;
     let m = ((secs % 3600) / 60) as i32;
     let s = (secs % 60) as i32;
-    Ok(time_cls.call1((h, m, s, micro))?.into_py(py))
+    Ok(time_cls.call1((h, m, s, micro))?.unbind())
 }
 
 fn py_row_get_field<'py>(item: &Bound<'py, PyAny>, fname: &str) -> PyResult<Bound<'py, PyAny>> {
@@ -547,8 +548,8 @@ fn py_list_to_series(
                     }
                     pairs.sort_by(|a, b| a.0.cmp(&b.0));
                     let n = pairs.len();
-                    let key_list = PyList::empty_bound(py);
-                    let val_list = PyList::empty_bound(py);
+                    let key_list = PyList::empty(py);
+                    let val_list = PyList::empty(py);
                     for (k, v) in pairs {
                         key_list.append(k)?;
                         val_list.append(v)?;
@@ -592,7 +593,7 @@ fn py_list_to_series(
         DTypeDesc::Struct { fields, .. } => {
             let mut field_series: Vec<Series> = Vec::with_capacity(fields.len());
             for (fname, fd) in fields {
-                let field_list = PyList::empty_bound(py);
+                let field_list = PyList::empty(py);
                 for item in list.iter() {
                     if item.is_none() {
                         field_list.append(py.None())?;
@@ -674,7 +675,7 @@ mod polars_err_format_tests {
         let e = PolarsError::ComputeError("synthetic".into());
         let err = polars_err_ctx("group_by().agg()", e);
         Python::with_gil(|py| {
-            let msg = err.value_bound(py).to_string();
+            let msg = err.value(py).to_string();
             assert!(
                 msg.contains("(group_by().agg())"),
                 "unexpected message: {msg}"
@@ -689,7 +690,7 @@ mod polars_err_format_tests {
         let e = PolarsError::ComputeError("x".into());
         let err = polars_err(e);
         Python::with_gil(|py| {
-            let msg = err.value_bound(py).to_string();
+            let msg = err.value(py).to_string();
             assert!(msg.contains("Polars execution error:"), "unexpected: {msg}");
             assert!(!msg.contains("(group_by().agg())"), "unexpected: {msg}");
         });

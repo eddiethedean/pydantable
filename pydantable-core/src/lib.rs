@@ -11,10 +11,9 @@
 //!
 //! Contributor setup and CI expectations: see the repo **Developer** guide (`docs/project/developer.md`).
 //!
-//! **Deprecation policy:** use `Python::import` (PyO3 0.24 rename from `import_bound`) for imports.
-//! Remaining PyO3 deprecations (`IntoPy`, `PyTuple::new_bound`, …) stay allowed until a full
-//! `IntoPyObject` migration — see <https://pyo3.rs/main/migration>.
-#![allow(deprecated)]
+//! **PyO3 conventions:** use `Python::import` (PyO3 0.24 rename from `import_bound`) for imports;
+//! prefer `IntoPyObject` / `IntoPyObjectExt::into_py_any` and `Bound::unbind` over deprecated
+//! `IntoPy` / `.into_py(py)` — see <https://pyo3.rs/main/migration>.
 
 mod dtype;
 mod expr;
