@@ -34,6 +34,9 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     # Make the app think the LLM is already warm.
     monkeypatch.setattr(main, "llm_is_loaded", lambda _m: True)
     monkeypatch.setattr(main, "llm_is_loading", lambda _m: False)
+    monkeypatch.setattr(main, "embedder_is_loaded", lambda _m, _d: True)
+    monkeypatch.setattr(main, "embedder_is_loading", lambda _m, _d: False)
+    monkeypatch.setattr(main, "embedding_compute_active", lambda: False)
     monkeypatch.setattr(main, "warm_llm", lambda _m: None)
 
     # Avoid touching the filesystem/docs during tests.
@@ -57,6 +60,11 @@ def test_healthz_has_version_and_config(client: TestClient) -> None:
     assert "embed_model" in body
     assert "llm_model" in body
     assert "llm_loaded" in body
+    assert body["llm_loading"] is False
+    assert "embed_dims" in body
+    assert body["embed_loaded"] is True
+    assert body["embed_loading"] is False
+    assert body["embed_computing"] is False
 
 
 def test_readyz_shape(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -70,6 +78,10 @@ def test_readyz_shape(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> No
     assert body["counts"]["docs"] == 0
     assert body["counts"]["vecs"] == 0
     assert body["llm_loaded"] is True
+    assert body["llm_loading"] is False
+    assert body["embed_loaded"] is True
+    assert body["embed_loading"] is False
+    assert body["embed_computing"] is False
 
 
 def test_chat_success(client: TestClient) -> None:
@@ -99,7 +111,26 @@ def test_chat_returns_503_when_llm_not_ready(monkeypatch: pytest.MonkeyPatch) ->
     c = TestClient(main.app)
     res = c.post("/chat", json={"message": "hello"})
     assert res.status_code == 503
-    assert "warming up" in res.json()["detail"].lower()
+    assert (
+        "not loaded" in res.json()["detail"].lower()
+        or "queued" in res.json()["detail"].lower()
+    )
+
+
+def test_chat_returns_503_with_loading_detail_when_llm_in_flight(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.main as main
+
+    monkeypatch.setattr(main, "llm_is_loaded", lambda _m: False)
+    monkeypatch.setattr(main, "llm_is_loading", lambda _m: True)
+    monkeypatch.setattr(main, "warm_llm", lambda _m: None)
+    monkeypatch.setattr(main, "rag_chat", lambda **_kwargs: _FakeRagResult("x"))
+
+    c = TestClient(main.app)
+    res = c.post("/chat", json={"message": "hello"})
+    assert res.status_code == 503
+    assert "loading" in res.json()["detail"].lower()
 
 
 def test_ingest_starts_background_job(client: TestClient) -> None:
@@ -127,3 +158,7 @@ def test_diag_has_backend_and_counts(
     assert "version" in body
     assert body["vector_backend"]["backend"] == "py"
     assert body["counts"]["docs"] == 1
+    assert body["llm_loading"] is False
+    assert body["embed_loaded"] is True
+    assert body["embed_loading"] is False
+    assert body["embed_computing"] is False

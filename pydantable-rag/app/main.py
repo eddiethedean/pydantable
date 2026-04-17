@@ -6,6 +6,11 @@ from pathlib import Path
 from fastapi import BackgroundTasks, Body, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from app.rag.embeddings import (
+    embedder_is_loaded,
+    embedder_is_loading,
+    embedding_compute_active,
+)
 from app.rag.ingest import ingest_repo_docs
 from app.rag.llm import ChatMessage, llm_is_loaded, llm_is_loading, warm_llm
 from app.rag.pipeline import rag_chat
@@ -26,8 +31,21 @@ class HealthzResponse(BaseModel):
     version: str
     db_path: str
     embed_model: str
+    embed_dims: int
     llm_model: str
     llm_loaded: bool
+    llm_loading: bool = Field(
+        description="True while the LLM is downloading or initializing in-process.",
+    )
+    embed_loaded: bool = Field(
+        description="True once the embedding model for this app is in memory.",
+    )
+    embed_loading: bool = Field(
+        description="True while the embedding model is downloading or initializing.",
+    )
+    embed_computing: bool = Field(
+        description="True while a forward pass is computing vectors (ingest or chat).",
+    )
 
 
 class VectorBackendStatus(BaseModel):
@@ -48,6 +66,10 @@ class ReadyzResponse(BaseModel):
     ok: bool
     counts: CountsStatus
     llm_loaded: bool
+    llm_loading: bool
+    embed_loaded: bool
+    embed_loading: bool
+    embed_computing: bool
     db_path: str
 
 
@@ -57,6 +79,10 @@ class DiagResponse(BaseModel):
     vector_backend: VectorBackendStatus
     counts: CountsStatus
     llm_loaded: bool
+    llm_loading: bool
+    embed_loaded: bool
+    embed_loading: bool
+    embed_computing: bool
 
 
 class ChatRequest(BaseModel):
@@ -101,8 +127,13 @@ def healthz() -> HealthzResponse:
         version=app_version(),
         db_path=str(dbp),
         embed_model=s.embed_model,
+        embed_dims=s.embed_dims,
         llm_model=s.llm_model,
         llm_loaded=llm_is_loaded(s.llm_model),
+        llm_loading=llm_is_loading(s.llm_model),
+        embed_loaded=embedder_is_loaded(s.embed_model, s.embed_dims),
+        embed_loading=embedder_is_loading(s.embed_model, s.embed_dims),
+        embed_computing=embedding_compute_active(),
     )
 
 
@@ -117,6 +148,10 @@ def readyz() -> ReadyzResponse:
         ok=bool(docs_ready and llm_ready),
         counts=CountsStatus.model_validate(counts),
         llm_loaded=llm_ready,
+        llm_loading=llm_is_loading(s.llm_model),
+        embed_loaded=embedder_is_loaded(s.embed_model, s.embed_dims),
+        embed_loading=embedder_is_loading(s.embed_model, s.embed_dims),
+        embed_computing=embedding_compute_active(),
         db_path=str(dbp),
     )
 
@@ -133,6 +168,10 @@ def diag() -> DiagResponse:
         ),
         counts=CountsStatus.model_validate(get_counts(db_path=dbp)),
         llm_loaded=llm_is_loaded(s.llm_model),
+        llm_loading=llm_is_loading(s.llm_model),
+        embed_loaded=embedder_is_loaded(s.embed_model, s.embed_dims),
+        embed_loading=embedder_is_loading(s.embed_model, s.embed_dims),
+        embed_computing=embedding_compute_active(),
     )
 
 
@@ -165,15 +204,18 @@ def chat(req: ChatRequest, background_tasks: BackgroundTasks) -> ChatResponse:
     db_path = resolve_db_path(s.db_path)
 
     if not llm_is_loaded(s.llm_model):
-        if not llm_is_loading(s.llm_model):
+        loading = llm_is_loading(s.llm_model)
+        if not loading:
             background_tasks.add_task(warm_llm, s.llm_model)
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "LLM is warming up. Retry in ~30-120s, or enable "
+        detail = (
+            "LLM is loading (download/initialize in progress). Retry shortly."
+            if loading
+            else (
+                "LLM not loaded yet; warm-up was queued. Retry in ~30-120s, or enable "
                 "RAG_PRELOAD_MODELS_ON_STARTUP."
-            ),
+            )
         )
+        raise HTTPException(status_code=503, detail=detail)
 
     result = rag_chat(
         question=req.message,
