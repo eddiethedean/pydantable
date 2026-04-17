@@ -158,9 +158,9 @@ fn plan_with_row_count(plan: &PyPlan, name: String, offset: i64) -> PyResult<PyP
 
 fn py_value_is_uuid(v: &Bound<'_, PyAny>) -> PyResult<bool> {
     let py = v.py();
-    let builtins = py.import_bound("builtins")?;
+    let builtins = py.import("builtins")?;
     let isinstance = builtins.getattr("isinstance")?;
-    let uuid_cls = py.import_bound("uuid")?.getattr("UUID")?;
+    let uuid_cls = py.import("uuid")?.getattr("UUID")?;
     Ok(isinstance
         .call1((v, &uuid_cls))?
         .extract::<bool>()
@@ -169,9 +169,9 @@ fn py_value_is_uuid(v: &Bound<'_, PyAny>) -> PyResult<bool> {
 
 fn py_value_is_decimal(v: &Bound<'_, PyAny>) -> PyResult<bool> {
     let py = v.py();
-    let builtins = py.import_bound("builtins")?;
+    let builtins = py.import("builtins")?;
     let isinstance = builtins.getattr("isinstance")?;
-    let dec_cls = py.import_bound("decimal")?.getattr("Decimal")?;
+    let dec_cls = py.import("decimal")?.getattr("Decimal")?;
     Ok(isinstance
         .call1((v, &dec_cls))?
         .extract::<bool>()
@@ -180,9 +180,9 @@ fn py_value_is_decimal(v: &Bound<'_, PyAny>) -> PyResult<bool> {
 
 fn py_value_is_enum(v: &Bound<'_, PyAny>) -> PyResult<bool> {
     let py = v.py();
-    let builtins = py.import_bound("builtins")?;
+    let builtins = py.import("builtins")?;
     let isinstance = builtins.getattr("isinstance")?;
-    let enum_cls = py.import_bound("enum")?.getattr("Enum")?;
+    let enum_cls = py.import("enum")?.getattr("Enum")?;
     Ok(isinstance
         .call1((v, &enum_cls))?
         .extract::<bool>()

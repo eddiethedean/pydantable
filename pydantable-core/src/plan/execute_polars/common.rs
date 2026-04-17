@@ -133,9 +133,9 @@ pub(super) fn polars_dataframe_to_python_via_ipc(
     let mut buf = Cursor::new(Vec::<u8>::new());
     IpcWriter::new(&mut buf).finish(df).map_err(polars_err)?;
     let bytes = buf.into_inner();
-    let io_mod = py.import_bound("io")?;
+    let io_mod = py.import("io")?;
     let bytes_io = io_mod.call_method1("BytesIO", (bytes,))?;
-    let pl_mod = py.import_bound("polars")?;
+    let pl_mod = py.import("polars")?;
     let read_ipc = pl_mod.getattr("read_ipc")?;
     Ok(read_ipc.call1((bytes_io,))?.into_py(py))
 }
@@ -158,7 +158,7 @@ fn try_python_polars_dataframe_to_native(
     if !module.starts_with("polars") {
         return Ok(None);
     }
-    let bytes_io = py.import_bound("io")?.call_method0("BytesIO")?;
+    let bytes_io = py.import("io")?.call_method0("BytesIO")?;
     root_data.call_method1("write_ipc", (bytes_io.as_ref(),))?;
     let bytes: Vec<u8> = bytes_io.call_method0("getvalue")?.extract()?;
     let cursor = Cursor::new(bytes);
@@ -191,7 +191,7 @@ pub(super) fn py_timedelta_to_micros(item: &Bound<'_, PyAny>) -> PyResult<i64> {
 
 #[cfg(feature = "polars_engine")]
 pub(super) fn micros_to_py_datetime(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
-    let dt_mod = py.import_bound("datetime")?;
+    let dt_mod = py.import("datetime")?;
     let dt = dt_mod.getattr("datetime")?;
     Ok(dt
         .call_method1("fromtimestamp", (micros as f64 / 1_000_000.0,))?
@@ -200,7 +200,7 @@ pub(super) fn micros_to_py_datetime(py: Python<'_>, micros: i64) -> PyResult<PyO
 
 #[cfg(feature = "polars_engine")]
 pub(super) fn days_to_py_date(py: Python<'_>, days: i32) -> PyResult<PyObject> {
-    let dt_mod = py.import_bound("datetime")?;
+    let dt_mod = py.import("datetime")?;
     let date = dt_mod.getattr("date")?;
     Ok(date
         .call_method1("fromordinal", (days + 719_163,))?
@@ -209,7 +209,7 @@ pub(super) fn days_to_py_date(py: Python<'_>, days: i32) -> PyResult<PyObject> {
 
 #[cfg(feature = "polars_engine")]
 pub(super) fn micros_to_py_timedelta(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
-    let dt_mod = py.import_bound("datetime")?;
+    let dt_mod = py.import("datetime")?;
     let td = dt_mod.getattr("timedelta")?;
     Ok(td.call1((0, 0, micros))?.into_py(py))
 }
@@ -226,7 +226,7 @@ pub(super) fn py_time_to_nanos(item: &Bound<'_, PyAny>) -> PyResult<i64> {
 
 #[cfg(feature = "polars_engine")]
 pub(super) fn nanos_to_py_time(py: Python<'_>, ns: i64) -> PyResult<PyObject> {
-    let dt_mod = py.import_bound("datetime")?;
+    let dt_mod = py.import("datetime")?;
     let time_cls = dt_mod.getattr("time")?;
     let nanos = ns.rem_euclid(86_400 * 1_000_000_000);
     let secs = nanos / 1_000_000_000;
@@ -248,7 +248,7 @@ fn py_row_get_field<'py>(item: &Bound<'py, PyAny>, fname: &str) -> PyResult<Boun
 /// Canonical IPv4 string (`ipaddress.IPv4Address` logical type).
 #[cfg(feature = "polars_engine")]
 pub(super) fn py_normalize_ipv4_cell(py: Python<'_>, item: &Bound<'_, PyAny>) -> PyResult<String> {
-    let ip_mod = py.import_bound("ipaddress")?;
+    let ip_mod = py.import("ipaddress")?;
     let cls = ip_mod.getattr("IPv4Address")?;
     let obj = cls.call1((item,))?;
     obj.str()?.extract()
@@ -257,7 +257,7 @@ pub(super) fn py_normalize_ipv4_cell(py: Python<'_>, item: &Bound<'_, PyAny>) ->
 /// Canonical IPv6 string (`ipaddress.IPv6Address` logical type).
 #[cfg(feature = "polars_engine")]
 pub(super) fn py_normalize_ipv6_cell(py: Python<'_>, item: &Bound<'_, PyAny>) -> PyResult<String> {
-    let ip_mod = py.import_bound("ipaddress")?;
+    let ip_mod = py.import("ipaddress")?;
     let cls = ip_mod.getattr("IPv6Address")?;
     let obj = cls.call1((item,))?;
     obj.str()?.extract()
@@ -270,9 +270,9 @@ pub(super) fn py_extract_uuid_canonical(item: &Bound<'_, PyAny>) -> PyResult<Str
         return Ok(s);
     }
     let py = item.py();
-    let builtins = py.import_bound("builtins")?;
+    let builtins = py.import("builtins")?;
     let isinstance = builtins.getattr("isinstance")?;
-    let uuid_cls = py.import_bound("uuid")?.getattr("UUID")?;
+    let uuid_cls = py.import("uuid")?.getattr("UUID")?;
     if isinstance
         .call1((item, &uuid_cls))?
         .extract::<bool>()

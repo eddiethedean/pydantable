@@ -19,13 +19,15 @@ use polars::prelude::{
 };
 use polars_core::series::ops::NullBehavior; // direct dep for diff(null_behavior); polars re-export is incomplete
 
-/// Polars lowering hook (dependency inversion / extension point for new variants).
-#[allow(dead_code)]
+/// Polars lowering hook for [`ExprNode`]: delegates to [`ExprNode::to_polars_expr`].
+///
+/// Third-party code can implement this for wrapper types; the native engine calls
+/// [`ExprNode::to_polars_expr`] directly. See the repo **ADR — engines** (`docs/project/adrs/engines.md`).
+#[allow(dead_code)] // Public extension surface; not yet referenced outside this blanket impl.
 pub trait LowerToPolars {
     fn lower_to_polars(&self) -> PyResult<PolarsExpr>;
 }
 
-#[allow(dead_code)]
 impl LowerToPolars for ExprNode {
     fn lower_to_polars(&self) -> PyResult<PolarsExpr> {
         self.to_polars_expr()

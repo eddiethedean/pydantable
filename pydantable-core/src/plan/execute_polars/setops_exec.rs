@@ -203,7 +203,7 @@ pub fn execute_except_all_polars(
     if as_python_lists {
         return Ok((out_dict.into_py(py), desc));
     }
-    let pl = py.import_bound("polars")?;
+    let pl = py.import("polars")?;
     let df_cls = pl.getattr("DataFrame")?;
     Ok((df_cls.call1((out_dict,))?.into_py(py), desc))
 }
@@ -231,7 +231,7 @@ pub fn execute_intersect_all_polars(
     if as_python_lists {
         return Ok((out_dict.into_py(py), desc));
     }
-    let pl = py.import_bound("polars")?;
+    let pl = py.import("polars")?;
     let df_cls = pl.getattr("DataFrame")?;
     Ok((df_cls.call1((out_dict,))?.into_py(py), desc))
 }

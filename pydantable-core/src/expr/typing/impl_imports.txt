@@ -1,0 +1,15 @@
+#[cfg(not(feature = "polars_engine"))]
+use std::collections::HashMap;
+use std::collections::HashSet;
+
+use pyo3::prelude::*;
+
+use crate::dtype::{
+    dtype_structural_eq, widen_scalar_drop_literals, BaseType, DTypeDesc, LiteralSet,
+};
+
+use super::ir::{
+    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, RowAccumOp,
+    StringPredicateKind, StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit,
+    WindowFrame, WindowOp, WindowOrderKey,
+};

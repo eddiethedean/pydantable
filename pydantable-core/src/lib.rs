@@ -1,3 +1,19 @@
+//! Native execution core for PydanTable: PyO3 extension `pydantable_native._core`.
+//!
+//! This crate is built as a **cdylib** (see [`pydantable-native`](../../pydantable-native)) and
+//! is not published on crates.io on its own.
+//!
+//! - **`polars_engine` (default):** Polars-backed plan execution, I/O helpers, and expression
+//!   lowering. Disable for minimal builds (`cargo check --no-default-features`).
+//! - **Python surface:** [`python_api::register`] binds classes and functions to the extension
+//!   module. [`async_fns`](python_api::async_fns) initializes the Tokio runtime via
+//!   `pyo3_async_runtimes` on module import.
+//!
+//! Contributor setup and CI expectations: see the repo **Developer** guide (`docs/project/developer.md`).
+//!
+//! **Deprecation policy:** use `Python::import` (PyO3 0.24 rename from `import_bound`) for imports.
+//! Remaining PyO3 deprecations (`IntoPy`, `PyTuple::new_bound`, …) stay allowed until a full
+//! `IntoPyObject` migration — see <https://pyo3.rs/main/migration>.
 #![allow(deprecated)]
 
 mod dtype;

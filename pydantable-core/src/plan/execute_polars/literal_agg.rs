@@ -85,14 +85,14 @@ pub(super) fn py_dict_to_literal_ctx(
                 }
                 Some(crate::dtype::BaseType::Ipv4) => {
                     let py = item.py();
-                    let ip_mod = py.import_bound("ipaddress")?;
+                    let ip_mod = py.import("ipaddress")?;
                     let cls = ip_mod.getattr("IPv4Address")?;
                     let obj = cls.call1((item,))?;
                     LiteralValue::Str(obj.str()?.extract()?)
                 }
                 Some(crate::dtype::BaseType::Ipv6) => {
                     let py = item.py();
-                    let ip_mod = py.import_bound("ipaddress")?;
+                    let ip_mod = py.import("ipaddress")?;
                     let cls = ip_mod.getattr("IPv6Address")?;
                     let obj = cls.call1((item,))?;
                     LiteralValue::Str(obj.str()?.extract()?)
@@ -122,7 +122,7 @@ pub(super) fn literal_to_py(py: Python<'_>, v: &LiteralValue) -> PyObject {
         LiteralValue::Str(s) => s.clone().into_py(py),
         LiteralValue::EnumStr(s) => s.clone().into_py(py),
         LiteralValue::Uuid(s) => py
-            .import_bound("uuid")
+            .import("uuid")
             .and_then(|m| m.getattr("UUID"))
             .and_then(|c| c.call1((s.as_str(),)))
             .map(|o| o.into_py(py))

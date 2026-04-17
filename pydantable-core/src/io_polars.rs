@@ -80,9 +80,9 @@ fn dict_to_dataframe_via_polars_py(
     py: Python<'_>,
     data: &Bound<'_, PyDict>,
 ) -> PyResult<DataFrame> {
-    let io_mod = py.import_bound("io")?;
+    let io_mod = py.import("io")?;
     let buf = io_mod.call_method0("BytesIO")?;
-    let polars = py.import_bound("polars").map_err(|_| {
+    let polars = py.import("polars").map_err(|_| {
         PyErr::new::<pyo3::exceptions::PyImportError, _>(
             "column-dict writes require the optional `polars` package \
              (pip install 'pydantable[polars]' or pip install polars).",

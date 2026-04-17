@@ -142,12 +142,12 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             ..
         } => match av {
             AnyValue::String(s) => {
-                let uuid_mod = py.import_bound("uuid")?;
+                let uuid_mod = py.import("uuid")?;
                 let ctor = uuid_mod.getattr("UUID")?;
                 Ok(ctor.call1((s.to_string(),))?.into_py(py))
             }
             AnyValue::StringOwned(s) => {
-                let uuid_mod = py.import_bound("uuid")?;
+                let uuid_mod = py.import("uuid")?;
                 let ctor = uuid_mod.getattr("UUID")?;
                 Ok(ctor.call1((s.to_string(),))?.into_py(py))
             }
@@ -160,12 +160,12 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             ..
         } => match av {
             AnyValue::String(s) => {
-                let ip_mod = py.import_bound("ipaddress")?;
+                let ip_mod = py.import("ipaddress")?;
                 let ctor = ip_mod.getattr("IPv4Address")?;
                 Ok(ctor.call1((s.to_string(),))?.into_py(py))
             }
             AnyValue::StringOwned(s) => {
-                let ip_mod = py.import_bound("ipaddress")?;
+                let ip_mod = py.import("ipaddress")?;
                 let ctor = ip_mod.getattr("IPv4Address")?;
                 Ok(ctor.call1((s.to_string(),))?.into_py(py))
             }
@@ -178,12 +178,12 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             ..
         } => match av {
             AnyValue::String(s) => {
-                let ip_mod = py.import_bound("ipaddress")?;
+                let ip_mod = py.import("ipaddress")?;
                 let ctor = ip_mod.getattr("IPv6Address")?;
                 Ok(ctor.call1((s.to_string(),))?.into_py(py))
             }
             AnyValue::StringOwned(s) => {
-                let ip_mod = py.import_bound("ipaddress")?;
+                let ip_mod = py.import("ipaddress")?;
                 let ctor = ip_mod.getattr("IPv6Address")?;
                 Ok(ctor.call1((s.to_string(),))?.into_py(py))
             }
@@ -274,12 +274,12 @@ fn polars_anyvalue_to_py(py: Python<'_>, av: AnyValue<'_>, fd: &DTypeDesc) -> Py
             ..
         } => match av {
             AnyValue::Binary(b) => {
-                let types_mod = py.import_bound("pydantable.types")?;
+                let types_mod = py.import("pydantable.types")?;
                 let ctor = types_mod.getattr("WKB")?;
                 Ok(ctor.call1((PyBytes::new(py, b),))?.into_py(py))
             }
             AnyValue::BinaryOwned(b) => {
-                let types_mod = py.import_bound("pydantable.types")?;
+                let types_mod = py.import("pydantable.types")?;
                 let ctor = types_mod.getattr("WKB")?;
                 Ok(ctor.call1((PyBytes::new(py, b.as_slice()),))?.into_py(py))
             }
@@ -411,7 +411,7 @@ pub(crate) fn series_to_py_list(
             ..
         } => {
             let casted = series.cast(&DataType::String).map_err(polars_err)?;
-            let uuid_mod = py.import_bound("uuid")?;
+            let uuid_mod = py.import("uuid")?;
             let uuid_ctor = uuid_mod.getattr("UUID")?;
             for item in casted.str().map_err(polars_err)?.into_iter() {
                 match item {
@@ -428,7 +428,7 @@ pub(crate) fn series_to_py_list(
             ..
         } => {
             let casted = series.cast(&DataType::String).map_err(polars_err)?;
-            let ip_mod = py.import_bound("ipaddress")?;
+            let ip_mod = py.import("ipaddress")?;
             let ctor = ip_mod.getattr("IPv4Address")?;
             for item in casted.str().map_err(polars_err)?.into_iter() {
                 match item {
@@ -445,7 +445,7 @@ pub(crate) fn series_to_py_list(
             ..
         } => {
             let casted = series.cast(&DataType::String).map_err(polars_err)?;
-            let ip_mod = py.import_bound("ipaddress")?;
+            let ip_mod = py.import("ipaddress")?;
             let ctor = ip_mod.getattr("IPv6Address")?;
             for item in casted.str().map_err(polars_err)?.into_iter() {
                 match item {
@@ -548,7 +548,7 @@ pub(crate) fn series_to_py_list(
             base: Some(BaseType::Wkb),
             ..
         } => {
-            let types_mod = py.import_bound("pydantable.types")?;
+            let types_mod = py.import("pydantable.types")?;
             let ctor = types_mod.getattr("WKB")?;
             for av in series.iter() {
                 let py_v = match av {

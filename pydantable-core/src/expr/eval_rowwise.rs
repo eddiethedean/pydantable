@@ -1,7 +1,7 @@
 //! Row-wise [`ExprNode`] evaluation when the Polars engine is disabled.
 //!
-//! Lives in a submodule of [`typing`](super) so helpers in `typing.rs` stay private
-//! while remaining callable via `super::`.
+//! Lives in a submodule of [`typing`](super) so helpers in the [`typing`](super) module stay
+//! private while remaining callable via `super::`.
 
 use std::collections::HashMap;
 

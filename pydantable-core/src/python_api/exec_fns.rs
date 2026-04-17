@@ -10,10 +10,39 @@ use crate::plan::PolarsExecutor;
 #[cfg(feature = "polars_engine")]
 use crate::plan::{
     collect_plan_batches_polars, sink_csv_polars, sink_ipc_polars, sink_ndjson_polars,
-    sink_parquet_polars,
+    sink_parquet_polars, PlanInner,
 };
 
 use super::types::PyPlan;
+
+/// Parameters for [`sink_parquet`](sink_parquet) after the plan/root handles are fixed.
+#[cfg(feature = "polars_engine")]
+struct ParquetSinkOptions<'py> {
+    path: String,
+    streaming: bool,
+    write_kwargs: Option<&'py Bound<'py, PyAny>>,
+    partition_by: Option<Vec<String>>,
+    mkdir: bool,
+}
+
+#[cfg(feature = "polars_engine")]
+fn sink_parquet_dispatch(
+    py: Python<'_>,
+    plan: &PlanInner,
+    root_data: &Bound<'_, PyAny>,
+    opts: ParquetSinkOptions<'_>,
+) -> PyResult<()> {
+    sink_parquet_polars(
+        py,
+        plan,
+        root_data,
+        opts.path,
+        opts.streaming,
+        opts.write_kwargs,
+        opts.partition_by,
+        opts.mkdir,
+    )
+}
 
 #[pyfunction]
 #[pyo3(signature = (plan, root_data, as_python_lists=false, streaming=false))]
@@ -41,15 +70,17 @@ fn sink_parquet(
     partition_by: Option<Vec<String>>,
     mkdir: bool,
 ) -> PyResult<()> {
-    sink_parquet_polars(
+    sink_parquet_dispatch(
         py,
         &plan.inner,
         root_data,
-        path,
-        streaming,
-        write_kwargs.as_ref(),
-        partition_by,
-        mkdir,
+        ParquetSinkOptions {
+            path,
+            streaming,
+            write_kwargs: write_kwargs.as_ref(),
+            partition_by,
+            mkdir,
+        },
     )
 }
 

@@ -254,9 +254,9 @@ pub fn execute_pivot_polars(
         if let Ok(f) = value.downcast::<PyFloat>() {
             return Ok(f.extract::<f64>()?.to_string());
         }
-        let builtins = py.import_bound("builtins")?;
+        let builtins = py.import("builtins")?;
         let isinstance = builtins.getattr("isinstance")?;
-        let uuid_mod = py.import_bound("uuid")?;
+        let uuid_mod = py.import("uuid")?;
         let uuid_cls = uuid_mod.getattr("UUID")?;
         if isinstance
             .call1((value, &uuid_cls))?
@@ -265,7 +265,7 @@ pub fn execute_pivot_polars(
         {
             return value.str()?.extract::<String>();
         }
-        let dec_mod = py.import_bound("decimal")?;
+        let dec_mod = py.import("decimal")?;
         let dec_cls = dec_mod.getattr("Decimal")?;
         if isinstance
             .call1((value, &dec_cls))?
@@ -274,7 +274,7 @@ pub fn execute_pivot_polars(
         {
             return Ok(py_decimal_to_scaled_i128(value)?.to_string());
         }
-        let enums = py.import_bound("enum")?;
+        let enums = py.import("enum")?;
         let enum_cls = enums.getattr("Enum")?;
         if isinstance
             .call1((value, &enum_cls))?
@@ -507,7 +507,7 @@ pub fn execute_pivot_polars(
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
     if !as_python_lists {
-        let pl = py.import_bound("polars")?;
+        let pl = py.import("polars")?;
         let df_obj = pl.getattr("DataFrame")?.call1((out_dict.as_ref(),))?;
         return Ok((df_obj.into_py(py), desc));
     }
@@ -527,7 +527,7 @@ fn py_index_value_to_seconds(item: &Bound<'_, PyAny>) -> PyResult<f64> {
     }
     if let Ok(d) = item.downcast::<PyDate>() {
         let py = item.py();
-        let dt_mod = py.import_bound("datetime")?;
+        let dt_mod = py.import("datetime")?;
         let datetime = dt_mod.getattr("datetime")?;
         let combine = datetime.getattr("combine")?;
         let min_time = datetime.getattr("min")?.getattr("time")?;
@@ -837,7 +837,7 @@ pub fn execute_groupby_dynamic_agg_polars(
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;
     if !as_python_lists {
-        let pl = py.import_bound("polars")?;
+        let pl = py.import("polars")?;
         let df_obj = pl.getattr("DataFrame")?.call1((out_dict.as_ref(),))?;
         return Ok((df_obj.into_py(py), desc));
     }

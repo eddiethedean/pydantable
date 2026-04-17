@@ -267,7 +267,7 @@ fn unwrap_annotated<'py>(
     py: Python<'py>,
     dtype_obj: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let typing = py.import_bound("typing")?;
+    let typing = py.import("typing")?;
     let annotated = typing.getattr("Annotated")?;
     let mut current = dtype_obj.clone();
     loop {
@@ -296,7 +296,7 @@ fn py_literal_values_to_dtype(py: Python<'_>, tuple: &Bound<'_, PyTuple>) -> PyR
     let mut strings: BTreeSet<String> = BTreeSet::new();
     let mut ints: BTreeSet<i64> = BTreeSet::new();
     let mut bools: BTreeSet<bool> = BTreeSet::new();
-    let builtins = py.import_bound("builtins")?;
+    let builtins = py.import("builtins")?;
 
     for i in 0..tuple.len() {
         let arg = tuple.get_item(i)?;
@@ -355,9 +355,9 @@ fn py_literal_values_to_dtype(py: Python<'_>, tuple: &Bound<'_, PyTuple>) -> PyR
 }
 
 fn is_py_enum_type(py: Python<'_>, py_type: &Bound<'_, PyType>) -> PyResult<bool> {
-    let enums = py.import_bound("enum")?;
+    let enums = py.import("enum")?;
     let enum_base = enums.getattr("Enum")?;
-    let builtins = py.import_bound("builtins")?;
+    let builtins = py.import("builtins")?;
     let issubclass = builtins.getattr("issubclass")?;
     issubclass.call1((py_type, enum_base))?.extract::<bool>()
 }
@@ -372,9 +372,9 @@ pub fn py_enum_to_wire_string(item: &Bound<'_, PyAny>) -> PyResult<String> {
 }
 
 fn is_pydantic_model_class(py: Python<'_>, py_type: &Bound<'_, PyType>) -> PyResult<bool> {
-    let pydantic = py.import_bound("pydantic")?;
+    let pydantic = py.import("pydantic")?;
     let base_model = pydantic.getattr("BaseModel")?;
-    let builtins = py.import_bound("builtins")?;
+    let builtins = py.import("builtins")?;
     let issubclass = builtins.getattr("issubclass")?;
     issubclass.call1((py_type, base_model))?.extract::<bool>()
 }
@@ -406,7 +406,7 @@ fn unwrap_optional_union<'py>(
     py: Python<'py>,
     dtype_obj: &Bound<'py, PyAny>,
 ) -> PyResult<(Bound<'py, PyAny>, bool)> {
-    let typing = py.import_bound("typing")?;
+    let typing = py.import("typing")?;
     let get_origin = typing.getattr("get_origin")?;
     let get_args = typing.getattr("get_args")?;
     let origin = get_origin.call1((dtype_obj,))?;
@@ -536,8 +536,8 @@ fn py_annotation_to_dtype_impl(
         }
     }
 
-    let typing = py.import_bound("typing")?;
-    let builtins = py.import_bound("builtins")?;
+    let typing = py.import("typing")?;
+    let builtins = py.import("builtins")?;
     let origin = typing.call_method1("get_origin", (dtype_obj,))?;
     let tuple_binding = typing.call_method1("get_args", (dtype_obj,))?;
     let tuple = tuple_binding.downcast::<PyTuple>()?;
@@ -546,7 +546,7 @@ fn py_annotation_to_dtype_impl(
         let literal_cls = typing.getattr("Literal").ok();
         let literal_cls = match literal_cls {
             Some(c) => c,
-            None => py.import_bound("typing_extensions")?.getattr("Literal")?,
+            None => py.import("typing_extensions")?.getattr("Literal")?,
         };
         if origin.eq(&literal_cls)? {
             if tuple.is_empty() {
@@ -710,9 +710,9 @@ pub fn py_value_to_dtype(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<D
     if value.downcast::<PyString>().is_ok() {
         return Ok(DTypeDesc::non_nullable(BaseType::Str));
     }
-    let builtins = py.import_bound("builtins")?;
+    let builtins = py.import("builtins")?;
     let isinstance = builtins.getattr("isinstance")?;
-    let uuid_mod = py.import_bound("uuid")?;
+    let uuid_mod = py.import("uuid")?;
     let uuid_cls = uuid_mod.getattr("UUID")?;
     if isinstance
         .call1((value, &uuid_cls))?
@@ -721,7 +721,7 @@ pub fn py_value_to_dtype(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<D
     {
         return Ok(DTypeDesc::non_nullable(BaseType::Uuid));
     }
-    let dec_mod = py.import_bound("decimal")?;
+    let dec_mod = py.import("decimal")?;
     let dec_cls = dec_mod.getattr("Decimal")?;
     if isinstance
         .call1((value, &dec_cls))?
@@ -730,7 +730,7 @@ pub fn py_value_to_dtype(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<D
     {
         return Ok(DTypeDesc::non_nullable(BaseType::Decimal));
     }
-    let enums = py.import_bound("enum")?;
+    let enums = py.import("enum")?;
     let enum_cls = enums.getattr("Enum")?;
     if isinstance
         .call1((value, &enum_cls))?
@@ -751,7 +751,7 @@ pub fn py_value_to_dtype(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<D
     if value.downcast::<PyTime>().is_ok() {
         return Ok(DTypeDesc::non_nullable(BaseType::Time));
     }
-    let ip_mod = py.import_bound("ipaddress")?;
+    let ip_mod = py.import("ipaddress")?;
     let v4_cls = ip_mod.getattr("IPv4Address")?;
     if isinstance
         .call1((value, &v4_cls))?
@@ -768,9 +768,7 @@ pub fn py_value_to_dtype(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<D
     {
         return Ok(DTypeDesc::non_nullable(BaseType::Ipv6));
     }
-    let wkb_cls = py
-        .import_bound("pydantable.types")
-        .and_then(|m| m.getattr("WKB"));
+    let wkb_cls = py.import("pydantable.types").and_then(|m| m.getattr("WKB"));
     if let Ok(cls) = wkb_cls {
         if isinstance
             .call1((value, &cls))?
@@ -794,7 +792,7 @@ fn literal_set_to_py_typing_literal(
     ls: &LiteralSet,
     base: BaseType,
 ) -> PyResult<PyObject> {
-    let typing = py.import_bound("typing")?;
+    let typing = py.import("typing")?;
     let literal = typing.getattr("Literal")?;
     let tup: PyObject = match (ls, base) {
         (LiteralSet::Str(v), BaseType::Str) => {
@@ -836,7 +834,7 @@ fn create_model_for_struct_dtype(
                 scalar_base_to_py_type(py, *b)?
             };
             if *nullable {
-                let typing = py.import_bound("typing")?;
+                let typing = py.import("typing")?;
                 let opt = typing.getattr("Optional")?;
                 Ok(opt.get_item(t.bind(py))?.into_py(py))
             } else {
@@ -849,12 +847,12 @@ fn create_model_for_struct_dtype(
             ))
         }
         DTypeDesc::List { inner, nullable } => {
-            let builtins = py.import_bound("builtins")?;
+            let builtins = py.import("builtins")?;
             let list_cls = builtins.getattr("list")?;
             let inner_ann = create_model_for_struct_dtype(py, inner, counter)?;
             let list_ann = list_cls.call_method1("__getitem__", (inner_ann,))?;
             if *nullable {
-                let typing = py.import_bound("typing")?;
+                let typing = py.import("typing")?;
                 let opt = typing.getattr("Optional")?;
                 Ok(opt.get_item(list_ann)?.into_py(py))
             } else {
@@ -862,7 +860,7 @@ fn create_model_for_struct_dtype(
             }
         }
         DTypeDesc::Struct { fields, nullable } => {
-            let pydantic = py.import_bound("pydantic")?;
+            let pydantic = py.import("pydantic")?;
             let create_model = pydantic.getattr("create_model")?;
             let config_dict = pydantic.getattr("ConfigDict")?;
             let extra = pyo3::types::PyDict::new_bound(py);
@@ -881,7 +879,7 @@ fn create_model_for_struct_dtype(
             let model_name = format!("PydantableStruct{}", counter);
             let model = create_model.call((model_name,), Some(&kwargs))?;
             if *nullable {
-                let typing = py.import_bound("typing")?;
+                let typing = py.import("typing")?;
                 let opt = typing.getattr("Optional")?;
                 Ok(opt.get_item(model)?.into_py(py))
             } else {
@@ -889,8 +887,8 @@ fn create_model_for_struct_dtype(
             }
         }
         DTypeDesc::Map { value, nullable } => {
-            let builtins = py.import_bound("builtins")?;
-            let types_mod = py.import_bound("types")?;
+            let builtins = py.import("builtins")?;
+            let types_mod = py.import("types")?;
             let generic_alias = types_mod.getattr("GenericAlias")?;
             let dict_cls = builtins.getattr("dict")?;
             let str_t = builtins.getattr("str")?;
@@ -899,7 +897,7 @@ fn create_model_for_struct_dtype(
             let tup = pyo3::types::PyTuple::new_bound(py, [str_t, val_b]);
             let map_ann = generic_alias.call1((dict_cls, tup))?;
             if *nullable {
-                let typing = py.import_bound("typing")?;
+                let typing = py.import("typing")?;
                 let opt = typing.getattr("Optional")?;
                 Ok(opt.get_item(map_ann)?.into_py(py))
             } else {
@@ -910,41 +908,26 @@ fn create_model_for_struct_dtype(
 }
 
 fn scalar_base_to_py_type(py: Python<'_>, base: BaseType) -> PyResult<PyObject> {
-    let builtins = py.import_bound("builtins")?;
+    let builtins = py.import("builtins")?;
     Ok(match base {
         BaseType::Int => builtins.getattr("int")?.into_py(py),
         BaseType::Float => builtins.getattr("float")?.into_py(py),
         BaseType::Bool => builtins.getattr("bool")?.into_py(py),
         BaseType::Str => builtins.getattr("str")?.into_py(py),
-        BaseType::Uuid => py.import_bound("uuid")?.getattr("UUID")?.into_py(py),
-        BaseType::Decimal => py.import_bound("decimal")?.getattr("Decimal")?.into_py(py),
+        BaseType::Uuid => py.import("uuid")?.getattr("UUID")?.into_py(py),
+        BaseType::Decimal => py.import("decimal")?.getattr("Decimal")?.into_py(py),
         BaseType::Enum => {
-            let typing = py.import_bound("typing")?;
+            let typing = py.import("typing")?;
             typing.getattr("Any")?.into_py(py)
         }
-        BaseType::DateTime => py
-            .import_bound("datetime")?
-            .getattr("datetime")?
-            .into_py(py),
-        BaseType::Date => py.import_bound("datetime")?.getattr("date")?.into_py(py),
-        BaseType::Duration => py
-            .import_bound("datetime")?
-            .getattr("timedelta")?
-            .into_py(py),
-        BaseType::Time => py.import_bound("datetime")?.getattr("time")?.into_py(py),
+        BaseType::DateTime => py.import("datetime")?.getattr("datetime")?.into_py(py),
+        BaseType::Date => py.import("datetime")?.getattr("date")?.into_py(py),
+        BaseType::Duration => py.import("datetime")?.getattr("timedelta")?.into_py(py),
+        BaseType::Time => py.import("datetime")?.getattr("time")?.into_py(py),
         BaseType::Binary => builtins.getattr("bytes")?.into_py(py),
-        BaseType::Ipv4 => py
-            .import_bound("ipaddress")?
-            .getattr("IPv4Address")?
-            .into_py(py),
-        BaseType::Ipv6 => py
-            .import_bound("ipaddress")?
-            .getattr("IPv6Address")?
-            .into_py(py),
-        BaseType::Wkb => py
-            .import_bound("pydantable.types")?
-            .getattr("WKB")?
-            .into_py(py),
+        BaseType::Ipv4 => py.import("ipaddress")?.getattr("IPv4Address")?.into_py(py),
+        BaseType::Ipv6 => py.import("ipaddress")?.getattr("IPv6Address")?.into_py(py),
+        BaseType::Wkb => py.import("pydantable.types")?.getattr("WKB")?.into_py(py),
     })
 }
 
@@ -1032,9 +1015,9 @@ pub fn dtype_to_descriptor_py(py: Python<'_>, dtype: &DTypeDesc) -> PyResult<PyO
 /// Convert a Python `decimal.Decimal` to Polars `Decimal(`[`DECIMAL_PRECISION`], [`DECIMAL_SCALE`]`)` unscaled `i128`.
 pub fn py_decimal_to_scaled_i128(item: &Bound<'_, PyAny>) -> PyResult<i128> {
     let py = item.py();
-    let dec_mod = py.import_bound("decimal")?;
+    let dec_mod = py.import("decimal")?;
     let dec_cls = dec_mod.getattr("Decimal")?;
-    let builtins = py.import_bound("builtins")?;
+    let builtins = py.import("builtins")?;
     let isinstance = builtins.getattr("isinstance")?;
     if !isinstance.call1((item, &dec_cls))?.extract::<bool>()? {
         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
@@ -1056,9 +1039,9 @@ pub fn py_decimal_to_scaled_i128(item: &Bound<'_, PyAny>) -> PyResult<i128> {
 
 /// Inverse of [`py_decimal_to_scaled_i128`].
 pub fn scaled_i128_to_py_decimal(py: Python<'_>, v: i128) -> PyResult<PyObject> {
-    let dec_mod = py.import_bound("decimal")?;
+    let dec_mod = py.import("decimal")?;
     let dec_cls = dec_mod.getattr("Decimal")?;
-    let builtins = py.import_bound("builtins")?;
+    let builtins = py.import("builtins")?;
     let int_cls = builtins.getattr("int")?;
     let numer = dec_cls.call1((int_cls.call1((v.to_string(),))?,))?;
     let denom_str = format!("1{}", "0".repeat(DECIMAL_SCALE));

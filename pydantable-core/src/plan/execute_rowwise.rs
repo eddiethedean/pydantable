@@ -12,7 +12,7 @@ use super::context::{ctx_len, root_data_to_ctx};
 use super::ir::{PlanInner, PlanStep};
 
 fn micros_to_py_datetime(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
-    let dt_mod = py.import_bound("datetime")?;
+    let dt_mod = py.import("datetime")?;
     let dt = dt_mod.getattr("datetime")?;
     Ok(dt
         .call_method1("fromtimestamp", (micros as f64 / 1_000_000.0,))?
@@ -20,7 +20,7 @@ fn micros_to_py_datetime(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
 }
 
 fn days_to_py_date(py: Python<'_>, days: i32) -> PyResult<PyObject> {
-    let dt_mod = py.import_bound("datetime")?;
+    let dt_mod = py.import("datetime")?;
     let date = dt_mod.getattr("date")?;
     Ok(date
         .call_method1("fromordinal", (days + 719_163,))?
@@ -28,7 +28,7 @@ fn days_to_py_date(py: Python<'_>, days: i32) -> PyResult<PyObject> {
 }
 
 fn micros_to_py_timedelta(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
-    let dt_mod = py.import_bound("datetime")?;
+    let dt_mod = py.import("datetime")?;
     let td = dt_mod.getattr("timedelta")?;
     Ok(td.call1((0, 0, micros))?.into_py(py))
 }
@@ -46,7 +46,7 @@ fn row_key_for_subset(
 }
 
 fn nanos_to_py_time(py: Python<'_>, ns: i64) -> PyResult<PyObject> {
-    let dt_mod = py.import_bound("datetime")?;
+    let dt_mod = py.import("datetime")?;
     let time_cls = dt_mod.getattr("time")?;
     let nanos = ns.rem_euclid(86_400 * 1_000_000_000);
     let secs = nanos / 1_000_000_000;
@@ -424,7 +424,7 @@ pub(crate) fn execute_plan_rowwise(
                 Some(LiteralValue::Str(s)) => values.push(s.clone().into_py(py)),
                 Some(LiteralValue::EnumStr(s)) => values.push(s.clone().into_py(py)),
                 Some(LiteralValue::Uuid(s)) => {
-                    let uuid_mod = py.import_bound("uuid")?;
+                    let uuid_mod = py.import("uuid")?;
                     let ctor = uuid_mod.getattr("UUID")?;
                     values.push(ctor.call1((s.as_str(),))?.into_py(py));
                 }

@@ -221,7 +221,7 @@ mod polars_engine_tests {
         Python::with_gil(|py| {
             // `polars` is an optional Python dependency; skip this IPC-shape test
             // when it is not installed in the active interpreter.
-            let Ok(polars) = py.import_bound("polars") else {
+            let Ok(polars) = py.import("polars") else {
                 return;
             };
             let mut schema = HashMap::new();
@@ -239,7 +239,7 @@ mod polars_engine_tests {
 
             let out = execute_plan(py, &plan, root.as_any(), false, false).unwrap();
             let df_class = polars.getattr("DataFrame").unwrap();
-            let builtins = py.import_bound("builtins").unwrap();
+            let builtins = py.import("builtins").unwrap();
             let isinstance = builtins.getattr("isinstance").unwrap();
             let is_df: bool = isinstance
                 .call1((out.bind(py), df_class.as_any()))
@@ -338,7 +338,7 @@ mod polars_engine_tests {
 
             // `polars` is an optional Python dependency; skip IPC path assertions
             // when it is not installed in the active interpreter.
-            if py.import_bound("polars").is_err() {
+            if py.import("polars").is_err() {
                 return;
             }
 
@@ -357,11 +357,11 @@ mod polars_engine_tests {
 
             // `polars` is an optional Python dependency; skip IPC-shape assertion
             // when it is not installed in the active interpreter.
-            let Ok(polars) = py.import_bound("polars") else {
+            let Ok(polars) = py.import("polars") else {
                 return;
             };
             let df_class = polars.getattr("DataFrame").unwrap();
-            let builtins = py.import_bound("builtins").unwrap();
+            let builtins = py.import("builtins").unwrap();
             let isinstance = builtins.getattr("isinstance").unwrap();
             assert!(isinstance
                 .call1((data_ipc.bind(py), df_class.as_any()))

@@ -1,4 +1,7 @@
 //! Expression AST, typing/evaluation, Polars lowering, and Python interop.
+//!
+//! The `typing` package splits the former monolithic `typing.rs` into `typing/mod.rs`,
+//! `typing/impl_expr_node.rs`, and `typing/helpers.rs` for navigation only.
 
 mod ir;
 #[cfg(feature = "polars_engine")]
