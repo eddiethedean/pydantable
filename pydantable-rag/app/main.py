@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import html
 import logging
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -48,46 +49,30 @@ async def lifespan(_app: FastAPI):
         if s.auto_ingest_if_db_empty and counts["docs"] > 0 and counts["vecs"] > 0:
             want_ingest = False
 
-    async def _warm_async() -> None:
+    def _warm_sync() -> None:
         rr = resolve_ingest_repo_root()
         try:
             if want_ingest and want_llm:
-                await asyncio.to_thread(
-                    _ingest_then_warm_llm,
-                    settings=s,
-                    repo_root=rr,
-                    paths=None,
-                )
+                _ingest_then_warm_llm(settings=s, repo_root=rr, paths=None)
             elif want_ingest:
-                await asyncio.to_thread(
-                    ingest_repo_docs, settings=s, repo_root=rr, paths=None
-                )
+                ingest_repo_docs(settings=s, repo_root=rr, paths=None)
             elif want_llm:
-                await asyncio.to_thread(warm_llm, s.llm_model)
+                warm_llm(s.llm_model)
         except Exception:
             _log.exception("pydantable-rag: startup background warmup failed")
 
     if want_ingest or want_llm:
         if s.blocking_startup_warmup:
             try:
-                rr = resolve_ingest_repo_root()
-                if want_ingest and want_llm:
-                    await asyncio.to_thread(
-                        _ingest_then_warm_llm,
-                        settings=s,
-                        repo_root=rr,
-                        paths=None,
-                    )
-                elif want_ingest:
-                    await asyncio.to_thread(
-                        ingest_repo_docs, settings=s, repo_root=rr, paths=None
-                    )
-                elif want_llm:
-                    await asyncio.to_thread(warm_llm, s.llm_model)
+                await asyncio.to_thread(_warm_sync)
             except Exception:
                 _log.exception("pydantable-rag: startup blocking warmup failed")
         else:
-            asyncio.create_task(_warm_async())
+            # Thread (not asyncio.create_task): some hosts defer or starve loop tasks;
+            # HF download + torch init are fully synchronous anyway.
+            threading.Thread(
+                target=_warm_sync, name="pydantable-rag-warmup", daemon=True
+            ).start()
 
     yield
 

@@ -16,16 +16,24 @@ COPY data/ /app/data/
 # Editable install pulls deps (torch from pytorch-cpu index per pyproject).
 # Vector index: CI workflow downloads ``data/pydantable_vectors.db`` before
 # ``fastapi deploy`` / ``docker build``; local builds can use an empty ``data/``.
-RUN mkdir -p /app/data \
+RUN mkdir -p /app/data /tmp/hf \
     && uv venv /app/.venv \
     && uv pip install --python /app/.venv/bin/python -e .
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
+# Writable Hugging Face cache (some runtimes have a read-only home directory).
+ENV HF_HOME=/tmp/hf
+ENV HF_HUB_CACHE=/tmp/hf
+ENV TRANSFORMERS_CACHE=/tmp/hf
 # Serve chat after cold start without manual ``POST /bootstrap`` (override if RAM is tight).
 ENV RAG_PRELOAD_MODELS_ON_STARTUP=true
-# Wait for LLM ingest before accepting traffic (avoids “never loaded” with async startup).
-ENV RAG_BLOCKING_STARTUP_WARMUP=true
+# Non-blocking: blocking warmup can exceed platform health-check / grace windows and
+# trigger restart loops before the LLM finishes downloading. Warm-up runs in a
+# background thread; ``POST /chat`` still awaits ``warm_llm`` until ready.
+ENV RAG_BLOCKING_STARTUP_WARMUP=false
+# Heroku-style stacks sometimes honor this; harmless elsewhere.
+ENV WEB_CONCURRENCY=1
 
 # Match platform listener; FastAPI Cloud and most hosts set ``PORT`` (default 8080).
 EXPOSE 8080
