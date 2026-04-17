@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 from fastapi import BackgroundTasks, Body, FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -14,10 +15,27 @@ from app.rag.ingest import ingest_repo_docs
 from app.rag.llm import ChatMessage, llm_is_loaded, llm_is_loading, warm_llm
 from app.rag.pipeline import rag_chat
 from app.rag.store import check_vector_backend, get_counts
-from app.settings import get_settings, resolve_db_path, resolve_ingest_repo_root
+from app.settings import (
+    Settings,
+    get_settings,
+    resolve_db_path,
+    resolve_ingest_repo_root,
+)
 from app.version import app_version
 
 app = FastAPI(title="pydantable-rag")
+
+
+def _ingest_then_warm_llm(
+    *, settings: Settings, repo_root: Path, paths: list[str] | None
+) -> None:
+    """
+    Run ingestion before loading the chat LLM so two large HF models are not
+    resident at once (avoids OOM on small cloud instances when both were
+    scheduled as separate background tasks).
+    """
+    ingest_repo_docs(settings=settings, repo_root=repo_root, paths=paths)
+    warm_llm(settings.llm_model)
 
 
 class BootstrapResponse(BaseModel):
@@ -111,9 +129,11 @@ def bootstrap(background_tasks: BackgroundTasks) -> BootstrapResponse:
     repo_root = resolve_ingest_repo_root()
 
     background_tasks.add_task(
-        ingest_repo_docs, settings=s, repo_root=repo_root, paths=None
+        _ingest_then_warm_llm,
+        settings=s,
+        repo_root=repo_root,
+        paths=None,
     )
-    background_tasks.add_task(warm_llm, s.llm_model)
     return BootstrapResponse(ok=True, started=["ingest", "warm_llm"])
 
 
@@ -236,25 +256,40 @@ def chat(req: ChatRequest, background_tasks: BackgroundTasks) -> ChatResponse:
 
 
 @app.on_event("startup")
-async def _startup_auto_ingest() -> None:
+async def _startup_background_warmup() -> None:
+    """
+    Optional ingest and/or LLM preload.
+    Ingest runs before LLM when both are enabled.
+    """
     s = get_settings()
-    if not s.auto_ingest_on_startup:
+    want_ingest = s.auto_ingest_on_startup
+    want_llm = s.preload_models_on_startup
+    if not want_ingest and not want_llm:
         return
 
-    dbp = resolve_db_path(s.db_path)
-    counts = get_counts(db_path=dbp)
-    if s.auto_ingest_if_db_empty and counts["docs"] > 0 and counts["vecs"] > 0:
+    if want_ingest:
+        dbp = resolve_db_path(s.db_path)
+        counts = get_counts(db_path=dbp)
+        if s.auto_ingest_if_db_empty and counts["docs"] > 0 and counts["vecs"] > 0:
+            want_ingest = False
+
+    if not want_ingest and not want_llm:
         return
 
-    repo_root = resolve_ingest_repo_root()
-    asyncio.create_task(
-        asyncio.to_thread(ingest_repo_docs, settings=s, repo_root=repo_root, paths=None)
-    )
+    async def _run() -> None:
+        rr = resolve_ingest_repo_root()
+        if want_ingest and want_llm:
+            await asyncio.to_thread(
+                _ingest_then_warm_llm,
+                settings=s,
+                repo_root=rr,
+                paths=None,
+            )
+        elif want_ingest:
+            await asyncio.to_thread(
+                ingest_repo_docs, settings=s, repo_root=rr, paths=None
+            )
+        elif want_llm:
+            await asyncio.to_thread(warm_llm, s.llm_model)
 
-
-@app.on_event("startup")
-async def _startup_preload_models() -> None:
-    s = get_settings()
-    if not s.preload_models_on_startup:
-        return
-    asyncio.create_task(asyncio.to_thread(warm_llm, s.llm_model))
+    asyncio.create_task(_run())
