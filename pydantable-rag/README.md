@@ -80,13 +80,14 @@ Pass the same env vars as production (e.g. `RAG_PRELOAD_MODELS_ON_STARTUP=true`)
 fastapi deploy
 ```
 
-- Set these env vars in FastAPI Cloud:
-  - `RAG_AUTO_INGEST_ON_STARTUP=true`
-  - `RAG_DB_PATH=data/pydantable_vectors.db` (default; must be writable)
+- Defaults **ingest + LLM preload on startup** so **each replica** warms itself (you do not rely on `POST /bootstrap` hitting one instance). Override with `RAG_AUTO_INGEST_ON_STARTUP` / `RAG_PRELOAD_MODELS_ON_STARTUP` if needed.
+- Use a **writable** `RAG_DB_PATH` on **shared storage** if you run **multiple replicas**; otherwise prefer **one replica** for SQLite. Set **`HF_TOKEN`** for Hugging Face Hub.
+- Typical env vars (many match built-in defaults):
+
+  - `RAG_DB_PATH=data/pydantable_vectors.db` (must be writable)
   - `RAG_EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2`
   - `RAG_EMBED_DIMS=384`
   - `RAG_LLM_MODEL=HuggingFaceTB/SmolLM2-135M-Instruct`
-  - `RAG_PRELOAD_MODELS_ON_STARTUP=true`
 
 - Health endpoints:
   - `GET /healthz`

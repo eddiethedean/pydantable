@@ -16,6 +16,7 @@ class ChatMessage(BaseModel):
 @lru_cache(maxsize=2)
 def _load_llm(model_name: str):
     import torch
+    import torch.nn as nn
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -25,7 +26,9 @@ def _load_llm(model_name: str):
         model_name, low_cpu_mem_usage=True, torch_dtype=dtype
     )
     mdl.eval()
-    mdl.to(device)
+    # Use unbound ``Module.to`` so static analysis does not confuse ``mdl.to`` with
+    # ``functools`` internals in ``transformers`` stubs.
+    nn.Module.to(mdl, device)
     _LOADED.add(model_name)
     return tok, mdl, device
 

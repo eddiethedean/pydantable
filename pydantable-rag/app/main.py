@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 
 from fastapi import BackgroundTasks, Body, FastAPI, HTTPException
@@ -25,6 +26,8 @@ from app.version import app_version
 
 app = FastAPI(title="pydantable-rag")
 
+_log = logging.getLogger(__name__)
+
 
 def _ingest_then_warm_llm(
     *, settings: Settings, repo_root: Path, paths: list[str] | None
@@ -36,6 +39,15 @@ def _ingest_then_warm_llm(
     """
     ingest_repo_docs(settings=settings, repo_root=repo_root, paths=paths)
     warm_llm(settings.llm_model)
+
+
+def _bootstrap_ingest_then_warm(
+    *, settings: Settings, repo_root: Path, paths: list[str] | None
+) -> None:
+    try:
+        _ingest_then_warm_llm(settings=settings, repo_root=repo_root, paths=paths)
+    except Exception:
+        _log.exception("pydantable-rag: POST /bootstrap background task failed")
 
 
 class BootstrapResponse(BaseModel):
@@ -129,7 +141,7 @@ def bootstrap(background_tasks: BackgroundTasks) -> BootstrapResponse:
     repo_root = resolve_ingest_repo_root()
 
     background_tasks.add_task(
-        _ingest_then_warm_llm,
+        _bootstrap_ingest_then_warm,
         settings=s,
         repo_root=repo_root,
         paths=None,
@@ -278,18 +290,21 @@ async def _startup_background_warmup() -> None:
 
     async def _run() -> None:
         rr = resolve_ingest_repo_root()
-        if want_ingest and want_llm:
-            await asyncio.to_thread(
-                _ingest_then_warm_llm,
-                settings=s,
-                repo_root=rr,
-                paths=None,
-            )
-        elif want_ingest:
-            await asyncio.to_thread(
-                ingest_repo_docs, settings=s, repo_root=rr, paths=None
-            )
-        elif want_llm:
-            await asyncio.to_thread(warm_llm, s.llm_model)
+        try:
+            if want_ingest and want_llm:
+                await asyncio.to_thread(
+                    _ingest_then_warm_llm,
+                    settings=s,
+                    repo_root=rr,
+                    paths=None,
+                )
+            elif want_ingest:
+                await asyncio.to_thread(
+                    ingest_repo_docs, settings=s, repo_root=rr, paths=None
+                )
+            elif want_llm:
+                await asyncio.to_thread(warm_llm, s.llm_model)
+        except Exception:
+            _log.exception("pydantable-rag: startup background warmup failed")
 
     asyncio.create_task(_run())
