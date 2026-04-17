@@ -44,3 +44,54 @@ def test_sql_dataframe_where_pushdown(tmp_path: Path) -> None:
     df = SqlDataFrame[Row].from_sql_table(t, sql_engine=eng)
     out = df.where(t.c.id > 1).to_dict()
     assert out == {"id": [2, 3], "label": ["b", "c"]}
+
+
+def test_sql_dataframe_where_rejects_unknown_column(tmp_path: Path) -> None:
+    from sqlalchemy import Column, Integer, MetaData, String, Table, column, insert
+
+    db_path = tmp_path / "where_unknown.db"
+    cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
+    eng = sql_engine_from_config(cfg)
+    cm = ConnectionManager(cfg)
+
+    md = MetaData()
+    t = Table(
+        "items",
+        md,
+        Column("id", Integer, primary_key=True),
+        Column("label", String(20)),
+    )
+    md.create_all(cm.engine)
+    with cm.engine.connect() as conn:
+        conn.execute(insert(t).values(id=1, label="a"))
+        conn.commit()
+
+    df = SqlDataFrame[Row].from_sql_table(t, sql_engine=eng)
+    with pytest.raises(KeyError, match="unknown columns"):
+        df.where(column("nope") > 1)
+
+
+def test_sql_dataframe_where_ignores_bindparam_names(tmp_path: Path) -> None:
+    from sqlalchemy import Column, Integer, MetaData, String, Table, bindparam, insert
+
+    db_path = tmp_path / "where_bindparam.db"
+    cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
+    eng = sql_engine_from_config(cfg)
+    cm = ConnectionManager(cfg)
+
+    md = MetaData()
+    t = Table(
+        "items",
+        md,
+        Column("id", Integer, primary_key=True),
+        Column("label", String(20)),
+    )
+    md.create_all(cm.engine)
+    with cm.engine.connect() as conn:
+        conn.execute(insert(t).values(id=1, label="a"))
+        conn.execute(insert(t).values(id=2, label="b"))
+        conn.commit()
+
+    df = SqlDataFrame[Row].from_sql_table(t, sql_engine=eng)
+    out = df.where(t.c.id > bindparam("threshold", 1)).to_dict()
+    assert out == {"id": [2], "label": ["b"]}

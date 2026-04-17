@@ -50,6 +50,27 @@ out = df.filter(df.spark_col("x") > 1).select("y").to_dict()
 - Parameterize the class: `SparkDataFrame[YourSchema].from_spark_dataframe(...)` — calling
   `SparkDataFrame.from_spark_dataframe` on the raw class raises `TypeError`.
 
+### Engine-native convenience methods (`where_native`, `select_native`)
+
+For readability (and to reduce confusion with the typed `Expr` world), `SparkDataFrame`
+also exposes explicitly named **native** entrypoints:
+
+- **`where_native(condition)`**: alias for `filter(condition)` where `condition` is a
+  PySpark `Column`.
+- **`select_native(*cols)`**: accepts PySpark `Column` objects (simple column references)
+  or plain strings, validates they map to schema field names, and returns a typed
+  projection.
+
+```python
+df = SparkDataFrame[Row].from_spark_dataframe(spark_df)
+
+out = (
+    df.where_native(df.spark_col("x") > 1)
+    .select_native("y")
+    .to_dict()
+)
+```
+
 ## SparkDantic (schemas from Pydantic)
 
 Import from **`pydantable.pyspark.sparkdantic`** (re-exports and thin wrappers around SparkDantic).

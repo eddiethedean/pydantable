@@ -196,6 +196,32 @@ Optional **`fields=`** limits which document keys are read (defaults to all keys
 in the schema’s field map). Optional **`engine=`** reuses a single
 **`MongoPydantableEngine`** across many frames.
 
+### Typed-safe pushdown helpers (`match`, `project`)
+
+`MongoDataFrame` adds small engine-specific helpers for Mongo collection roots:
+
+- **`match(filter: dict[str, Any])`**: validates filter keys against the schema, then
+  pushes the filter down to the collection scan.
+- **`project(fields: Sequence[str] | dict[str, int])`**: validates projected field
+  names against the schema and returns a frame whose **typed schema** only includes
+  those columns.
+
+```python
+df = MongoDataFrame[Row].from_collection(coll, fields=["x", "y"])
+
+# Push down a filter (driver-level find(filter=...))
+df2 = df.match({"x": 3})
+
+# Project down to a smaller typed schema
+slim = df.project(["x"])
+assert slim.to_dict().keys() == {"x"}
+```
+
+!!! note
+    `project(...)` is a **typed projection** (schema update + plan projection). Mongo
+    driver-level projection is not currently required for correctness and may be
+    applied opportunistically in future versions.
+
 Materialization (`collect`, `to_dict`, `acollect`, …) follows [EXECUTION](../../user-guide/execution.md) and
 uses the engine’s **`execute_plan`** / **`async_execute_plan`** entrypoints.
 

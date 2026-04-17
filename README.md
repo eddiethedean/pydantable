@@ -10,7 +10,7 @@
 
 PydanTable combines **Pydantic schemas** with a **Polars-backed Rust execution engine** to provide a typed, service-friendly DataFrame API (with optional integrations for FastAPI, SQL, MongoDB, Spark, and more).
 
-**Current release:** 1.18.1 — highlights in the [changelog](https://pydantable.readthedocs.io/en/latest/project/changelog/).
+**Current release:** 1.19.0 — highlights in the [changelog](https://pydantable.readthedocs.io/en/latest/project/changelog/).
 
 ## Documentation
 

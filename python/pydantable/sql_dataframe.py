@@ -156,6 +156,7 @@ class SqlDataFrame(DataFrame):
         try:
             from sqlalchemy import select as _sa_select
             from sqlalchemy.sql import visitors as _visitors
+            from sqlalchemy.sql.elements import BindParameter, ColumnClause
         except ImportError as exc:  # pragma: no cover
             raise ImportError(
                 "sqlalchemy is required for SqlDataFrame.where()."
@@ -167,11 +168,15 @@ class SqlDataFrame(DataFrame):
             raise TypeError("where() is only supported on SQL-backed roots.") from exc
 
         # Best-effort validation: ensure referenced columns are in the schema.
+        #
+        # Important: don't treat bindparam names (or other non-column nodes that
+        # happen to have a `.name`) as schema references.
         referenced: set[str] = set()
         for node in _visitors.iterate(whereclause):
-            name = getattr(node, "name", None)
-            if isinstance(name, str):
-                referenced.add(name)
+            if isinstance(node, BindParameter):
+                continue
+            if isinstance(node, ColumnClause):
+                referenced.add(node.name)
         unknown = sorted(referenced - set(self._current_field_types))
         if unknown:
             raise KeyError(

@@ -63,3 +63,18 @@ When you want a **consistent UI** across engines, prefer these wrappers:
 
 These wrappers exist to keep method names and (where feasible) expression types consistent.
 
+## Engine-specific typed methods (additive)
+
+Each engine may also expose **additive** methods that preserve PydanTable’s typing
+by validating against the schema and keeping raw-string escape hatches explicit.
+
+- **SQL** (`SqlDataFrame`):
+  - `from_sql(selectable, ...)`: build a lazy root from an existing SQLAlchemy selectable.
+  - `where(whereclause)`: push down a SQLAlchemy `WHERE` clause with schema validation.
+- **Mongo** (`MongoDataFrame`):
+  - `match(filter: dict[str, Any])`: `$match`-style filter pushdown with schema key validation.
+  - `project(fields: Sequence[str] | dict[str, int])`: typed projection (schema update).
+- **Spark** (`SparkDataFrame`):
+  - `where_native(condition)`: explicit engine-native filter (PySpark `Column`).
+  - `select_native(*cols)`: explicit engine-native projection for simple column refs.
+

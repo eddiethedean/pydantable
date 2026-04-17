@@ -43,3 +43,27 @@ def test_sql_dataframe_from_sql_selectable(tmp_path: Path) -> None:
     stmt = select(t.c.id, t.c.label)
     df = SqlDataFrame[Row].from_sql(stmt, sql_engine=eng)
     assert df.to_dict() == {"id": [1, 2], "label": ["a", "b"]}
+
+
+def test_sql_dataframe_from_sql_missing_schema_column(tmp_path: Path) -> None:
+    from sqlalchemy import Column, Integer, MetaData, Table, insert, select
+
+    db_path = tmp_path / "from_sql_missing.db"
+    cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
+    eng = sql_engine_from_config(cfg)
+    cm = ConnectionManager(cfg)
+
+    md = MetaData()
+    t = Table(
+        "items",
+        md,
+        Column("id", Integer, primary_key=True),
+    )
+    md.create_all(cm.engine)
+    with cm.engine.connect() as conn:
+        conn.execute(insert(t).values(id=1))
+        conn.commit()
+
+    stmt = select(t.c.id)
+    with pytest.raises(ValueError, match="missing schema columns"):
+        SqlDataFrame[Row].from_sql(stmt, sql_engine=eng)

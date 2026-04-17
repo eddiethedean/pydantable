@@ -180,15 +180,18 @@ class MongoDataFrame(DataFrame):
         )
 
     def project(self, fields: Sequence[str] | dict[str, int]) -> Any:
-        """Push down a Mongo projection and update the typed schema."""
+        """Typed projection with schema update.
+
+        Note: We currently keep the collection scan's materialized root columns
+        aligned with the root plan's expected schema. This preserves correctness
+        with the native planner; projection is applied via the typed plan.
+        """
         if isinstance(fields, dict):
             d = cast("dict[str, int]", fields)
-            proj: dict[str, int] = d
             wanted: list[str] = list(d.keys())
         else:
             seq = cast("Sequence[str]", fields)
             wanted = list(seq)
-            proj = {k: 1 for k in wanted}
         if not wanted:
             raise ValueError("project(fields) requires at least one field.")
         unknown = sorted(set(wanted) - set(self._current_field_types))
@@ -213,9 +216,9 @@ class MongoDataFrame(DataFrame):
         root = projected._root_data
         wrapped = MongoFindRoot(
             collection=root.collection,
-            fields=tuple(wanted),
+            fields=root.fields,
             filter=None,
-            projection=proj,
+            projection=None,
         )
         return projected._from_plan(
             root_data=wrapped,

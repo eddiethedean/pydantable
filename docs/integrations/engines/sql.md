@@ -185,6 +185,43 @@ df = SqlDataFrame[Row]({"id": [1, 2], "name": ["a", "b"]},
 Constructor flags (`trusted_mode`, `fill_missing_optional`, validation hooks,
 etc.) match `DataFrame` — see [DATAFRAMEMODEL](../../user-guide/dataframemodel.md) and [STRICTNESS](../../user-guide/strictness.md).
 
+### Lazy root from a SQLAlchemy selectable (`from_sql`)
+
+When you already have a SQLAlchemy **selectable** (a `Select`, subquery, or other
+`FromClause`-like object), use **`SqlDataFrame[Schema].from_sql(selectable, ...)`**.
+
+This constructor is **type-safe** in that it:
+
+- Requires a concrete schema type (`SqlDataFrame[MySchema]`).
+- Validates the selectable exposes the schema’s field names as columns.
+- Projects **exactly** the schema columns at the root (so extra columns on the
+  selectable don’t accidentally become part of the plan’s required root shape).
+
+```python
+from sqlalchemy import select
+
+from pydantable.sql_dataframe import SqlDataFrame
+
+
+# stmt is any SQLAlchemy selectable; field names must align with the schema fields.
+stmt = select(Item.__table__.c.id, Item.__table__.c.name)
+df = SqlDataFrame[Row].from_sql(stmt, sql_engine=eng)
+```
+
+### Typed-safe `WHERE` pushdown (`where`)
+
+**`SqlDataFrame.where(whereclause)`** wraps the lazy root so the SQL bridge emits a
+server-side `WHERE` clause.
+
+- Input is a SQLAlchemy boolean expression (e.g. `table.c.x > 1`).
+- Referenced column names are validated against the schema (unknown columns raise
+  `KeyError`).
+
+```python
+df = SqlDataFrame[Row].from_sql_table(Item.__table__, sql_engine=eng)
+out = df.where(Item.__table__.c.id > 1).select("name").to_dict()
+```
+
 ### DataFrame transformations (lazy-SQL engine)
 
 `SqlDataFrame` / `SqlDataFrameModel` use the same **method names** as [DATAFRAMEMODEL](../../user-guide/dataframemodel.md) / [EXECUTION](../../user-guide/execution.md), but the SQL bridge only implements a subset of the full Polars/Rust pipeline.
