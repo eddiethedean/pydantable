@@ -18,6 +18,6 @@ RUN uv venv /app/.venv \
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 
-# Match FastAPI Cloud listener.
+# Match platform listener; FastAPI Cloud and most hosts set ``PORT`` (default 8080).
 EXPOSE 8080
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]

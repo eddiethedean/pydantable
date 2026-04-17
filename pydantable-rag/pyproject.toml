@@ -45,6 +45,10 @@ torch = { index = "pytorch-cpu" }
 [tool.setuptools]
 packages = ["app"]
 
+# Explicit entrypoint for ``fastapi dev`` / FastAPI Cloud (root ``main.py`` re-exports ``app``).
+[tool.fastapi]
+entrypoint = "main:app"
+
 # Astral ``ty``: this subtree is excluded from the repo-root ``[tool.ty]`` includes;
 # project root is the directory that contains the ``app`` package (not ``app`` itself).
 [tool.ty.environment]
