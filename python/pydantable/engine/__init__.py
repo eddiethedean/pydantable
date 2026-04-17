@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 from pydantable._extension import MissingRustExtensionError
-from pydantable.errors import UnsupportedEngineOperationError
+from pydantable.errors import unsupported_engine_operation
 
 from .protocols import (
     EngineCapabilities,
@@ -80,10 +80,14 @@ def get_expression_runtime() -> Any:
     eng = get_default_engine()
     if NativePolarsEngine is not None and isinstance(eng, NativePolarsEngine):
         return eng.rust_core  # type: ignore[attr-defined]
-    raise UnsupportedEngineOperationError(
-        "Expression building requires the native engine (pydantable-native) or "
-        "set_expression_runtime(...); "
-        f"current default engine is {type(eng).__name__!r}."
+    raise unsupported_engine_operation(
+        backend=type(eng).__name__,
+        operation="expression_runtime",
+        required_capability="rust_expression_runtime",
+        hint=(
+            "Expression building requires the native engine (pydantable-native) or "
+            "set_expression_runtime(...)."
+        ),
     )
 
 

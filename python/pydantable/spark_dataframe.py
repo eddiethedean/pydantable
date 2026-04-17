@@ -32,6 +32,34 @@ def _import_spark_engine_types() -> tuple[Any, Any]:
 class SparkDataFrame(DataFrame):
     """Typed dataframe using a PySpark-backed execution engine (raikou-core)."""
 
+    def pyspark_ui(self) -> Any:
+        """Return a PySpark-shaped wrapper over this Spark-backed frame."""
+        from pydantable.pyspark.spark_dataframe import (
+            SparkDataFrame as PySparkSparkDataFrame,
+        )
+
+        return PySparkSparkDataFrame._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=self._rust_plan,
+            engine=self._engine,
+        )
+
+    def pandas_ui(self) -> Any:
+        """Return a pandas-shaped wrapper over this Spark-backed frame."""
+        from pydantable.pandas_spark_dataframe import (
+            SparkDataFrame as PandasSparkDataFrame,
+        )
+
+        return PandasSparkDataFrame._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=self._rust_plan,
+            engine=self._engine,
+        )
+
     def spark_col(self, name: str) -> Any:
         """Return a Spark Column for use with this engine."""
         from pyspark.sql import functions as F
@@ -103,6 +131,14 @@ class SparkDataFrameModel(DataFrameModel):
     """``DataFrameModel`` bound to the optional Spark execution engine."""
 
     _dataframe_cls = SparkDataFrame
+
+    def pyspark_ui(self) -> Any:
+        """Return a PySpark-shaped wrapper over this Spark-backed model."""
+        return self._wrap_inner_df(self._df.pyspark_ui())
+
+    def pandas_ui(self) -> Any:
+        """Return a pandas-shaped wrapper over this Spark-backed model."""
+        return self._wrap_inner_df(self._df.pandas_ui())
 
     @classmethod
     def from_spark_dataframe(cls, df: Any, *, engine: Any | None = None) -> Any:

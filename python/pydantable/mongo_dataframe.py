@@ -74,6 +74,34 @@ class MongoDataFrame(DataFrame):
     Prefer :meth:`from_beanie` when using Beanie ``Document`` models.
     """
 
+    def pyspark_ui(self) -> Any:
+        """Return a PySpark-shaped wrapper over this Mongo-backed frame."""
+        from pydantable.pyspark.mongo_dataframe import (
+            MongoDataFrame as PySparkMongoDataFrame,
+        )
+
+        return PySparkMongoDataFrame._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=self._rust_plan,
+            engine=self._engine,
+        )
+
+    def pandas_ui(self) -> Any:
+        """Return a pandas-shaped wrapper over this Mongo-backed frame."""
+        from pydantable.pandas_mongo_dataframe import (
+            MongoDataFrame as PandasMongoDataFrame,
+        )
+
+        return PandasMongoDataFrame._from_plan(
+            root_data=self._root_data,
+            root_schema_type=self._root_schema_type,
+            current_schema_type=self._current_schema_type,
+            rust_plan=self._rust_plan,
+            engine=self._engine,
+        )
+
     @classmethod
     def from_collection(
         cls,
@@ -197,6 +225,14 @@ class MongoDataFrameModel(DataFrameModel):
     """
 
     _dataframe_cls = MongoDataFrame
+
+    def pyspark_ui(self) -> Any:
+        """Return a PySpark-shaped wrapper over this Mongo-backed model."""
+        return self._wrap_inner_df(self._df.pyspark_ui())
+
+    def pandas_ui(self) -> Any:
+        """Return a pandas-shaped wrapper over this Mongo-backed model."""
+        return self._wrap_inner_df(self._df.pandas_ui())
 
     def __init__(
         self,

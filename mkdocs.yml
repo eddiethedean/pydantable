@@ -154,6 +154,7 @@ nav:
           - integrations/engines/sql.md
           - integrations/engines/mongo.md
           - integrations/engines/spark.md
+          - integrations/engines/engine-parity.md
           - integrations/engines/beanie.md
           - integrations/engines/custom-engine-package.md
       - Alternate surfaces:

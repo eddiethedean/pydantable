@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantable.errors import UnsupportedEngineOperationError
+from pydantable.errors import unsupported_engine_operation
 
 from .protocols import stub_engine_capabilities
 
@@ -56,8 +56,10 @@ _RAISE_METHODS = (
 
 
 def _raise(name: str) -> Any:
-    raise UnsupportedEngineOperationError(
-        f"StubExecutionEngine does not implement {name!r}"
+    raise unsupported_engine_operation(
+        backend="stub",
+        operation=name,
+        hint="Use NativePolarsEngine or set_default_engine(...) with a real backend.",
     )
 
 
@@ -68,9 +70,11 @@ class StubExecutionEngine:
 
     @property
     def rust_core(self) -> Any:
-        raise UnsupportedEngineOperationError(
-            "StubExecutionEngine has no Rust expression runtime; "
-            "use NativePolarsEngine or set_expression_runtime()."
+        raise unsupported_engine_operation(
+            backend="stub",
+            operation="expression_runtime",
+            required_capability="rust_expression_runtime",
+            hint="Use NativePolarsEngine or set_expression_runtime().",
         )
 
     @property

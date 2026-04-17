@@ -49,9 +49,34 @@ class UnsupportedEngineOperationError(
     """
 
 
+def unsupported_engine_operation(
+    *,
+    backend: str | None = None,
+    operation: str,
+    required_capability: str | None = None,
+    hint: str | None = None,
+) -> UnsupportedEngineOperationError:
+    """Build a consistent UnsupportedEngineOperationError message.
+
+    Use this when an operation is unsupported due to engine capabilities or
+    missing optional runtime components.
+    """
+
+    parts: list[str] = []
+    if backend is not None:
+        parts.append(f"Backend {backend!r}:")
+    parts.append(f"unsupported operation {operation!r}.")
+    if required_capability is not None:
+        parts.append(f"Requires capability {required_capability!r}.")
+    if hint is not None:
+        parts.append(hint)
+    return UnsupportedEngineOperationError(" ".join(parts))
+
+
 __all__ = [
     "ColumnLengthMismatchError",
     "MissingOptionalDependency",
     "PydantableUserError",
     "UnsupportedEngineOperationError",
+    "unsupported_engine_operation",
 ]
