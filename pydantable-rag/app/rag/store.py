@@ -111,3 +111,13 @@ def search(*, db_path: Path, query_embedding: np.ndarray, top_k: int) -> list[Re
         )
         for r in rows
     ]
+
+
+def get_counts(*, db_path: Path) -> dict:
+    try:
+        with _connect(db_path) as conn:
+            docs = conn.execute("SELECT COUNT(1) AS n FROM docs;").fetchone()["n"]
+            vecs = conn.execute("SELECT COUNT(1) AS n FROM docs_vec;").fetchone()["n"]
+        return {"docs": int(docs), "vecs": int(vecs)}
+    except Exception:
+        return {"docs": 0, "vecs": 0}

@@ -7,8 +7,7 @@
  ### Prereqs
  
  - **Python** 3.10+
- - **Ollama** installed and running
- - (Optional) Hugging Face access for EmbeddingGemma if you choose to use it
+ - Runs **natively in-process** using Transformers (no Ollama required).
  
  ### Setup
  
@@ -24,12 +23,13 @@
  
  ### Configure
  
- Create a `.env` in `pydantable-rag/` (or export env vars):
- 
- - `RAG_DB_PATH` (default: `data/pydantable_vectors.db`)
- - `RAG_OLLAMA_MODEL` (default: `qwen3:4b`)
- - `RAG_EMBED_MODEL` (default: `google/embeddinggemma-300m`)
- - `RAG_EMBED_DIMS` (default: `768`)
+Copy `.env.example` to `.env` and adjust (or export env vars):
+
+- `RAG_DB_PATH` (default: `data/pydantable_vectors.db`)
+- `RAG_EMBED_MODEL` (default: `sentence-transformers/all-MiniLM-L6-v2`)
+- `RAG_EMBED_DIMS` (default: `384`)
+- `RAG_LLM_MODEL` (default: `HuggingFaceTB/SmolLM2-135M-Instruct`)
+- `RAG_PRELOAD_MODELS_ON_STARTUP=true` (recommended for FastAPI Cloud to avoid 502s on cold start)
  
  ### Ingest docs into SQLite-vec
  
@@ -38,6 +38,8 @@
  ```bash
  python scripts/ingest.py
  ```
+
+By default this ingests your repo’s `README.md` and `docs/` directory (it does **not** ingest `posts/`).
  
  ### Run the API
  
@@ -47,6 +49,28 @@
  
  ### Endpoints
  
- - `GET /health`
+- `GET /healthz`
+- `GET /readyz` (true once the vector DB has chunks)
  - `POST /chat` (retrieval + local LLM)
  - `POST /ingest` (rebuild index; useful for dev)
+
+### FastAPI Cloud
+
+- This project includes `fastapi[standard]`, so the **FastAPI Cloud CLI** is available.
+- Deploy from the `pydantable-rag/` directory:
+
+```bash
+fastapi deploy
+```
+
+- Set these env vars in FastAPI Cloud:
+  - `RAG_AUTO_INGEST_ON_STARTUP=true`
+  - `RAG_DB_PATH=data/pydantable_vectors.db` (default; must be writable)
+  - `RAG_EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2`
+  - `RAG_EMBED_DIMS=384`
+  - `RAG_LLM_MODEL=HuggingFaceTB/SmolLM2-135M-Instruct`
+  - `RAG_PRELOAD_MODELS_ON_STARTUP=true`
+
+- Health endpoints:
+  - `GET /healthz`
+  - `GET /readyz`
