@@ -1,16 +1,16 @@
 //! JSON-ish serialization of [`ExprNode`] for planners / Python.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyList};
+use pyo3::types::{PyDict, PyList};
 use pyo3::IntoPyObjectExt;
 
 use crate::dtype::{dtype_to_descriptor_py, BaseType};
 
 use super::ir::{
-    ArithOp, CmpOp, ExprNode, GlobalAggOp, LiteralValue, LogicalOp, RowAccumOp,
-    StringPredicateKind, StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit,
-    WindowFrame, WindowOp,
+    ArithOp, CmpOp, ExprNode, GlobalAggOp, LogicalOp, RowAccumOp, StringPredicateKind,
+    StringUnaryOp, TemporalPart, UnaryNumericOp, UnixTimestampUnit, WindowFrame, WindowOp,
 };
+use super::literal_value_to_pyobject;
 
 fn base_type_json(b: BaseType) -> &'static str {
     match b {
@@ -66,18 +66,7 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             dict.set_item("kind", "literal")?;
             let value_obj = match value {
                 None => py.None(),
-                Some(LiteralValue::Int(v)) => v.into_py_any(py)?,
-                Some(LiteralValue::Float(v)) => v.into_py_any(py)?,
-                Some(LiteralValue::Bool(v)) => v.into_py_any(py)?,
-                Some(LiteralValue::Str(v)) => v.clone().into_py_any(py)?,
-                Some(LiteralValue::Uuid(v)) => v.clone().into_py_any(py)?,
-                Some(LiteralValue::Decimal(v)) => v.into_py_any(py)?,
-                Some(LiteralValue::EnumStr(v)) => v.clone().into_py_any(py)?,
-                Some(LiteralValue::DateTimeMicros(v)) => v.into_py_any(py)?,
-                Some(LiteralValue::DateDays(v)) => v.into_py_any(py)?,
-                Some(LiteralValue::DurationMicros(v)) => v.into_py_any(py)?,
-                Some(LiteralValue::TimeNanos(v)) => v.into_py_any(py)?,
-                Some(LiteralValue::Binary(b)) => PyBytes::new(py, b).into_py_any(py)?,
+                Some(v) => literal_value_to_pyobject(py, v)?,
             };
             dict.set_item("value", value_obj)?;
         }
@@ -142,21 +131,7 @@ pub fn exprnode_to_serializable(py: Python<'_>, node: &ExprNode) -> PyResult<PyO
             dict.set_item("inner", exprnode_to_serializable(py, inner)?)?;
             let list = PyList::empty(py);
             for v in values {
-                let pyv = match v {
-                    LiteralValue::Int(i) => i.into_py_any(py)?,
-                    LiteralValue::Float(f) => f.into_py_any(py)?,
-                    LiteralValue::Bool(b) => b.into_py_any(py)?,
-                    LiteralValue::Str(s) => s.clone().into_py_any(py)?,
-                    LiteralValue::Uuid(s) => s.clone().into_py_any(py)?,
-                    LiteralValue::Decimal(i) => i.into_py_any(py)?,
-                    LiteralValue::EnumStr(s) => s.clone().into_py_any(py)?,
-                    LiteralValue::DateTimeMicros(v) => v.into_py_any(py)?,
-                    LiteralValue::DateDays(v) => v.into_py_any(py)?,
-                    LiteralValue::DurationMicros(v) => v.into_py_any(py)?,
-                    LiteralValue::TimeNanos(v) => v.into_py_any(py)?,
-                    LiteralValue::Binary(b) => PyBytes::new(py, b).into_py_any(py)?,
-                };
-                list.append(pyv)?;
+                list.append(literal_value_to_pyobject(py, v)?)?;
             }
             dict.set_item("values", list)?;
         }

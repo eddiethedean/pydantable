@@ -15,7 +15,7 @@ use crate::dtype::{
     py_decimal_to_scaled_i128, py_enum_to_wire_string, scaled_i128_to_py_decimal, BaseType,
     DTypeDesc, DECIMAL_PRECISION, DECIMAL_SCALE,
 };
-use crate::expr::{ExprNode, LiteralValue, WindowFrame, WindowOp};
+use crate::expr::{literal_value_to_pyobject, ExprNode, LiteralValue, WindowFrame, WindowOp};
 
 use crate::plan::ir::{PlanInner, PlanStep};
 use crate::plan::schema_py::schema_descriptors_as_py;
@@ -36,7 +36,7 @@ use polars_io::prelude::{SerReader, SerWriter};
 use numpy::PyReadonlyArray1;
 
 use super::common::*;
-use super::literal_agg::{agg_literal, literal_to_py, py_dict_to_literal_ctx};
+use super::literal_agg::{agg_literal, py_dict_to_literal_ctx};
 use super::materialize::{dtype_from_polars, series_to_py_list};
 use super::root_lazy::{collect_lazyframe, plan_to_lazyframe};
 
@@ -433,9 +433,10 @@ pub fn execute_pivot_polars(
     for row_idx in groups.values() {
         let first = row_idx[0];
         for c in index.iter() {
-            let val = ctx[c][first]
-                .as_ref()
-                .map_or(py.None(), |x| literal_to_py(py, x));
+            let val = match ctx[c][first].as_ref() {
+                None => py.None(),
+                Some(x) => literal_value_to_pyobject(py, x)?,
+            };
             out_cols
                 .get_mut(c)
                 .ok_or_else(|| {
@@ -496,7 +497,10 @@ pub fn execute_pivot_polars(
                             "internal: pivot missing generated column '{name}'.",
                         ))
                     })?
-                    .push(lit.as_ref().map_or(py.None(), |x| literal_to_py(py, x)));
+                    .push(match lit.as_ref() {
+                        None => py.None(),
+                        Some(x) => literal_value_to_pyobject(py, x)?,
+                    });
             }
         }
     }
@@ -748,9 +752,10 @@ pub fn execute_groupby_dynamic_agg_polars(
                 .push(idx_val.unbind());
 
             for c in by.iter() {
-                let v = ctx[c][first]
-                    .as_ref()
-                    .map_or(py.None(), |x| literal_to_py(py, x));
+                let v = match ctx[c][first].as_ref() {
+                    None => py.None(),
+                    Some(x) => literal_value_to_pyobject(py, x)?,
+                };
                 out_cols
                     .get_mut(c)
                     .ok_or_else(|| {
@@ -782,7 +787,10 @@ pub fn execute_groupby_dynamic_agg_polars(
                             "internal: group_by_dynamic missing agg output column '{out_name}'.",
                         ))
                     })?
-                    .push(lit.as_ref().map_or(py.None(), |x| literal_to_py(py, x)));
+                    .push(match lit.as_ref() {
+                        None => py.None(),
+                        Some(x) => literal_value_to_pyobject(py, x)?,
+                    });
             }
         }
 

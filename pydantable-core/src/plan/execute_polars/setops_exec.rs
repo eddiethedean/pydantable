@@ -6,11 +6,11 @@ use std::collections::HashMap;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
-use crate::expr::LiteralValue;
+use crate::expr::{literal_value_to_pyobject, LiteralValue};
 use crate::plan::ir::PlanInner;
 use crate::plan::schema_py::schema_descriptors_as_py;
 
-use super::literal_agg::{literal_to_py, py_dict_to_literal_ctx};
+use super::literal_agg::py_dict_to_literal_ctx;
 
 fn validate_identical_schema(
     left: &PlanInner,
@@ -156,7 +156,10 @@ fn multiset_emit<'py>(
         })?;
         for _ in 0..n {
             for (c, cell) in cols.iter().zip(row.iter()) {
-                let py_val = cell.as_ref().map_or(py.None(), |x| literal_to_py(py, x));
+                let py_val = match cell.as_ref() {
+                    None => py.None(),
+                    Some(x) => literal_value_to_pyobject(py, x)?,
+                };
                 out_cols
                     .get_mut(c)
                     .ok_or_else(|| {

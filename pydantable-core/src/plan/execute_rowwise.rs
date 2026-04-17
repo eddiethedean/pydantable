@@ -3,36 +3,12 @@
 use std::collections::{HashMap, HashSet};
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
-use pyo3::IntoPyObjectExt;
+use pyo3::types::{PyAny, PyDict, PyList};
 
-use crate::dtype::scaled_i128_to_py_decimal;
-use crate::expr::LiteralValue;
+use crate::expr::{literal_value_to_pyobject, LiteralValue};
 
 use super::context::{ctx_len, root_data_to_ctx};
 use super::ir::{PlanInner, PlanStep};
-
-fn micros_to_py_datetime(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
-    let dt_mod = py.import("datetime")?;
-    let dt = dt_mod.getattr("datetime")?;
-    Ok(dt
-        .call_method1("fromtimestamp", (micros as f64 / 1_000_000.0,))?
-        .unbind())
-}
-
-fn days_to_py_date(py: Python<'_>, days: i32) -> PyResult<PyObject> {
-    let dt_mod = py.import("datetime")?;
-    let date = dt_mod.getattr("date")?;
-    Ok(date
-        .call_method1("fromordinal", (days + 719_163,))?
-        .unbind())
-}
-
-fn micros_to_py_timedelta(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
-    let dt_mod = py.import("datetime")?;
-    let td = dt_mod.getattr("timedelta")?;
-    Ok(td.call1((0, 0, micros))?.unbind())
-}
 
 fn row_key_for_subset(
     ctx: &HashMap<String, Vec<Option<LiteralValue>>>,
@@ -44,19 +20,6 @@ fn row_key_for_subset(
         sig.push_str(&format!("{:?}|", ctx[key][i]));
     }
     sig
-}
-
-fn nanos_to_py_time(py: Python<'_>, ns: i64) -> PyResult<PyObject> {
-    let dt_mod = py.import("datetime")?;
-    let time_cls = dt_mod.getattr("time")?;
-    let nanos = ns.rem_euclid(86_400 * 1_000_000_000);
-    let secs = nanos / 1_000_000_000;
-    let nsub = nanos % 1_000_000_000;
-    let micro = (nsub / 1000) as i32;
-    let h = (secs / 3600) as i32;
-    let m = ((secs % 3600) / 60) as i32;
-    let s = (secs % 60) as i32;
-    Ok(time_cls.call1((h, m, s, micro))?.unbind())
 }
 
 pub(crate) fn execute_plan_rowwise(
@@ -419,30 +382,7 @@ pub(crate) fn execute_plan_rowwise(
         for item in col.iter() {
             match item {
                 None => values.push(py.None()),
-                Some(LiteralValue::Int(i)) => values.push(i.into_py_any(py)?),
-                Some(LiteralValue::Float(f)) => values.push(f.into_py_any(py)?),
-                Some(LiteralValue::Bool(b)) => values.push(b.into_py_any(py)?),
-                Some(LiteralValue::Str(s)) => values.push(s.clone().into_py_any(py)?),
-                Some(LiteralValue::EnumStr(s)) => values.push(s.clone().into_py_any(py)?),
-                Some(LiteralValue::Uuid(s)) => {
-                    let uuid_mod = py.import("uuid")?;
-                    let ctor = uuid_mod.getattr("UUID")?;
-                    values.push(ctor.call1((s.as_str(),))?.unbind());
-                }
-                Some(LiteralValue::Decimal(d)) => {
-                    values.push(scaled_i128_to_py_decimal(py, *d)?);
-                }
-                Some(LiteralValue::DateTimeMicros(v)) => {
-                    values.push(micros_to_py_datetime(py, *v)?)
-                }
-                Some(LiteralValue::DateDays(v)) => values.push(days_to_py_date(py, *v)?),
-                Some(LiteralValue::DurationMicros(v)) => {
-                    values.push(micros_to_py_timedelta(py, *v)?)
-                }
-                Some(LiteralValue::TimeNanos(v)) => values.push(nanos_to_py_time(py, *v)?),
-                Some(LiteralValue::Binary(b)) => {
-                    values.push(PyBytes::new(py, b.as_slice()).into_py_any(py)?);
-                }
+                Some(v) => values.push(literal_value_to_pyobject(py, v)?),
             }
         }
         let py_list = PyList::new(py, values)?;

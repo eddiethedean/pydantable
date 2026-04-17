@@ -19,5 +19,5 @@ pub use ir::{
 };
 #[cfg(feature = "polars_engine")]
 pub use ir::{WindowFrame, WindowOp};
-pub use py_literal::{op_symbol_to_arith, op_symbol_to_cmp, ExprHandle};
+pub use py_literal::{literal_value_to_pyobject, op_symbol_to_arith, op_symbol_to_cmp, ExprHandle};
 pub use serialize::exprnode_to_serializable;

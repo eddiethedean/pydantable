@@ -2,12 +2,80 @@
 
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDate, PyDateTime, PyDelta, PyTime};
+use pyo3::IntoPyObjectExt;
 
 use crate::dtype::{
-    py_decimal_to_scaled_i128, py_enum_to_wire_string, py_value_to_dtype, BaseType,
+    py_decimal_to_scaled_i128, py_enum_to_wire_string, py_value_to_dtype,
+    scaled_i128_to_py_decimal, BaseType,
 };
 
 use super::ir::{ArithOp, CmpOp, ExprNode, LiteralValue};
+
+fn micros_to_py_datetime(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
+    let dt_mod = py.import("datetime")?;
+    let dt = dt_mod.getattr("datetime")?;
+    Ok(dt
+        .call_method1("fromtimestamp", (micros as f64 / 1_000_000.0,))?
+        .unbind())
+}
+
+fn days_to_py_date(py: Python<'_>, days: i32) -> PyResult<PyObject> {
+    let dt_mod = py.import("datetime")?;
+    let date = dt_mod.getattr("date")?;
+    Ok(date
+        .call_method1("fromordinal", (days + 719_163,))?
+        .unbind())
+}
+
+fn micros_to_py_timedelta(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
+    let dt_mod = py.import("datetime")?;
+    let td = dt_mod.getattr("timedelta")?;
+    Ok(td.call1((0, 0, micros))?.unbind())
+}
+
+fn nanos_to_py_time(py: Python<'_>, ns: i64) -> PyResult<PyObject> {
+    let dt_mod = py.import("datetime")?;
+    let time_cls = dt_mod.getattr("time")?;
+    let nanos = ns.rem_euclid(86_400 * 1_000_000_000);
+    let secs = nanos / 1_000_000_000;
+    let nsub = nanos % 1_000_000_000;
+    let micro = (nsub / 1000) as i32;
+    let h = (secs / 3600) as i32;
+    let m = ((secs % 3600) / 60) as i32;
+    let s = (secs % 60) as i32;
+    Ok(time_cls.call1((h, m, s, micro))?.unbind())
+}
+
+/// Convert a [`LiteralValue`] to a Python object (UUID, `datetime`, `Decimal`, etc. where applicable).
+pub fn literal_value_to_pyobject(py: Python<'_>, v: &LiteralValue) -> PyResult<PyObject> {
+    match v {
+        LiteralValue::Int(i) => i.into_py_any(py),
+        LiteralValue::Float(f) => f.into_py_any(py),
+        LiteralValue::Bool(b) => b.into_py_any(py),
+        LiteralValue::Str(s) => s.clone().into_py_any(py),
+        LiteralValue::EnumStr(s) => s.clone().into_py_any(py),
+        LiteralValue::Uuid(s) => match py
+            .import("uuid")
+            .and_then(|m| m.getattr("UUID"))
+            .and_then(|c| c.call1((s.as_str(),)))
+        {
+            Ok(o) => Ok(o.unbind()),
+            Err(_) => s.clone().into_py_any(py),
+        },
+        LiteralValue::Decimal(v) => {
+            scaled_i128_to_py_decimal(py, *v).or_else(|_| (*v).into_py_any(py))
+        }
+        LiteralValue::DateTimeMicros(v) => {
+            micros_to_py_datetime(py, *v).or_else(|_| (*v).into_py_any(py))
+        }
+        LiteralValue::DateDays(v) => days_to_py_date(py, *v).or_else(|_| (*v).into_py_any(py)),
+        LiteralValue::DurationMicros(v) => {
+            micros_to_py_timedelta(py, *v).or_else(|_| (*v).into_py_any(py))
+        }
+        LiteralValue::TimeNanos(ns) => nanos_to_py_time(py, *ns).or_else(|_| (*ns).into_py_any(py)),
+        LiteralValue::Binary(b) => PyBytes::new(py, b).into_py_any(py),
+    }
+}
 
 #[derive(Clone)]
 pub struct ExprHandle {
