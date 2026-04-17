@@ -12,7 +12,7 @@ import math
 import random
 import re
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import create_model
 from typing_extensions import Self
@@ -28,6 +28,11 @@ from .schema import Schema
 from .schema._impl import make_derived_schema_type, schema_field_types
 from .selectors import Selector
 from .window_spec import WindowSpec
+
+if TYPE_CHECKING:
+    from .pandas_mongo_dataframe import MongoDataFrame, MongoDataFrameModel
+    from .pandas_spark_dataframe import SparkDataFrame, SparkDataFrameModel
+    from .pandas_sql_dataframe import SqlDataFrame, SqlDataFrameModel
 
 
 def _is_pandas_series(value: object) -> bool:

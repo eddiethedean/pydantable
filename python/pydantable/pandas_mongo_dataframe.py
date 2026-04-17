@@ -25,4 +25,3 @@ class MongoDataFrameModel(CoreMongoDataFrameModel, PandasDataFrameModel):
 
 
 __all__ = ["MongoDataFrame", "MongoDataFrameModel"]
-

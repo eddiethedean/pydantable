@@ -57,4 +57,3 @@ def test_pyspark_spark_wrapper_accepts_typed_expr_filter_and_withcolumn() -> Non
     # the chained plan object is created and has the expected schema fields.
     assert "x" in out.schema_fields()
     assert "y" in out.schema_fields()
-

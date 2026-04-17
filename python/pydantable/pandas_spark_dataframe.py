@@ -25,4 +25,3 @@ class SparkDataFrameModel(CoreSparkDataFrameModel, PandasDataFrameModel):
 
 
 __all__ = ["SparkDataFrame", "SparkDataFrameModel"]
-

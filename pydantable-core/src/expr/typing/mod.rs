@@ -17,6 +17,10 @@ use rowwise_support::*;
 #[path = "../eval_rowwise.rs"]
 mod eval_rowwise;
 
+#[cfg(not(feature = "polars_engine"))]
+#[path = "../eval_rowwise_errors.rs"]
+mod eval_rowwise_errors;
+
 /// Used by [`eval_rowwise`](eval_rowwise) for `cast()` in row-wise mode.
 #[cfg(not(feature = "polars_engine"))]
 pub(crate) use helpers::cast_literal_value;

@@ -14,6 +14,8 @@ use crate::expr::ir::{
     TemporalPart, UnaryNumericOp,
 };
 
+use super::eval_rowwise_errors::{type_error, unknown_column};
+
 pub(super) fn eval_expr_node(
     node: &ExprNode,
     ctx: &HashMap<String, Vec<Option<LiteralValue>>>,
@@ -21,12 +23,7 @@ pub(super) fn eval_expr_node(
 ) -> PyResult<Vec<Option<LiteralValue>>> {
     match node {
         ExprNode::ColumnRef { name, .. } => {
-            let col = ctx.get(name).ok_or_else(|| {
-                PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
-                    "Unknown column '{}' during expression evaluation.",
-                    name
-                ))
-            })?;
+            let col = ctx.get(name).ok_or_else(|| unknown_column(name))?;
             Ok(col.clone())
         }
         ExprNode::Literal { value, .. } => {
@@ -50,9 +47,7 @@ pub(super) fn eval_expr_node(
             let result_base = match dtype {
                 DTypeDesc::Scalar { base: Some(b), .. } => *b,
                 _ => {
-                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                        "BinaryOp result dtype base cannot be unknown.",
-                    ));
+                    return Err(type_error("BinaryOp result dtype base cannot be unknown."));
                 }
             };
 
@@ -62,7 +57,7 @@ pub(super) fn eval_expr_node(
                     (Some(va), Some(vb)) => match result_base {
                         BaseType::Int => {
                             if *op == ArithOp::Div {
-                                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                return Err(type_error(
                                     "Unexpected division producing int result.",
                                 ));
                             }
@@ -70,7 +65,7 @@ pub(super) fn eval_expr_node(
                             let (ai, bi) = match (va, vb) {
                                 (LiteralValue::Int(ai), LiteralValue::Int(bi)) => (ai, bi),
                                 _ => {
-                                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                    return Err(type_error(
                                         "Typed arithmetic expected int operands for int result.",
                                     ));
                                 }
@@ -81,7 +76,7 @@ pub(super) fn eval_expr_node(
                                 ArithOp::Sub => ai - bi,
                                 ArithOp::Mul => ai * bi,
                                 ArithOp::Div => {
-                                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                    return Err(type_error(
                                         "internal error: division in integer arithmetic path.",
                                     ));
                                 }

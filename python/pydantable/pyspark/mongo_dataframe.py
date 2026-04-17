@@ -55,4 +55,3 @@ class MongoDataFrameModel(CoreMongoDataFrameModel, PySparkDataFrameModel):
 
 
 __all__ = ["MongoDataFrame", "MongoDataFrameModel"]
-

@@ -46,9 +46,7 @@ class SparkDataFrame(CoreSparkDataFrame, PySparkDataFrame):
         self, *exprs: Any, **columns: Any
     ) -> SparkDataFrame:
         # If the caller uses typed expressions, route to the core typed implementation.
-        if exprs or any(
-            isinstance(v, (Expr, AliasedExpr)) for v in columns.values()
-        ):
+        if exprs or any(isinstance(v, (Expr, AliasedExpr)) for v in columns.values()):
             return self._as_pyspark_df(
                 CoreDataFrame.with_columns(self, *exprs, **columns)
             )
@@ -83,4 +81,3 @@ class SparkDataFrameModel(CoreSparkDataFrameModel, PySparkDataFrameModel):
 
 
 __all__ = ["SparkDataFrame", "SparkDataFrameModel"]
-

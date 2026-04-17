@@ -1266,40 +1266,9 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
         Values are :class:`~pydantable.expressions.Expr` or plain literals.
         """
-        rust_columns: dict[str, Any] = {}
+        from ._ops import plan_with_columns
 
-        for item in exprs:
-            if not isinstance(item, AliasedExpr):
-                raise TypeError(
-                    "with_columns() positional args must be Expr.alias('name') "
-                    "(AliasedExpr)."
-                )
-            if item.name in rust_columns or item.name in new_columns:
-                raise ValueError(
-                    f"with_columns() duplicate output column {item.name!r}."
-                )
-            rust_columns[item.name] = item.expr._rust_expr
-
-        for name, value in new_columns.items():
-            if isinstance(value, Expr):
-                rust_columns[name] = value._rust_expr
-            else:
-                rust_columns[name] = self._engine.make_literal(value=value)
-
-        rust_plan = self._engine.plan_with_columns(self._rust_plan, rust_columns)
-        desc = rust_plan.schema_descriptors()
-        derived_fields = self._field_types_from_descriptors(desc)
-        derived_schema_type = make_derived_schema_type(
-            self._current_schema_type, derived_fields
-        )
-
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=derived_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
-        )
+        return plan_with_columns(self, *exprs, **new_columns)
 
     def with_columns_cast(
         self, selector: Selector, dtype: Any, *, strict: bool = True
@@ -1572,17 +1541,9 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
     def filter(self, condition: Expr) -> DataFrame[Any]:
         """Keep rows where the boolean ``condition`` is true."""
-        if not isinstance(condition, Expr):
-            raise TypeError("filter(condition) expects an Expr.")
+        from ._ops import plan_filter
 
-        rust_plan = self._engine.plan_filter(self._rust_plan, condition._rust_expr)
-        return self._from_plan(
-            root_data=self._root_data,
-            root_schema_type=self._root_schema_type,
-            current_schema_type=self._current_schema_type,
-            rust_plan=rust_plan,
-            engine=self._engine,
-        )
+        return plan_filter(self, condition)
 
     def sort(
         self,
@@ -4105,7 +4066,9 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             engine_streaming=engine_streaming,
             default=self._engine_streaming_default,
         )
-        if self._engine.has_async_collect_plan_batches():
+        from pydantable.engine._capability import prefer_native_async_collect_batches
+
+        if prefer_native_async_collect_batches(self._engine):
             pl_batches = await self._engine.async_collect_plan_batches(
                 self._rust_plan,
                 self._root_data,

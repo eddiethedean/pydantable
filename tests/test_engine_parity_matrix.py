@@ -69,4 +69,3 @@ def test_unsupported_engine_operation_helper_is_public() -> None:
 
     sig = inspect.signature(unsupported_engine_operation)
     assert "operation" in sig.parameters
-

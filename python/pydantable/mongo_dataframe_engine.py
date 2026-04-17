@@ -13,7 +13,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from pydantable.engine import NativePolarsEngine, native_engine_capabilities
-from pydantable.errors import UnsupportedEngineOperationError
+from pydantable.errors import unsupported_engine_operation
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -90,10 +90,14 @@ else:
             except ImportError:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(data, BeanieAsyncRoot):
-                raise UnsupportedEngineOperationError(
-                    "Beanie-backed Mongo roots require async materialization. "
-                    "Use `await df.acollect()` / `await df.ato_dict()` (or call "
-                    "MongoDataFrame.from_beanie(...) with a sync database)."
+                raise unsupported_engine_operation(
+                    backend="custom",
+                    operation="execute_plan",
+                    hint=(
+                        "Beanie-backed Mongo roots require async materialization. "
+                        "Use `await df.acollect()` / `await df.ato_dict()` (or call "
+                        "MongoDataFrame.from_beanie(...) with a sync database)."
+                    ),
                 )
             return super().execute_plan(
                 plan,
@@ -148,9 +152,13 @@ else:
             except ImportError:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
-                raise UnsupportedEngineOperationError(
-                    "Beanie-backed Mongo roots require async materialization. "
-                    "Use `await df.acollect()` / `await df.astream()`."
+                raise unsupported_engine_operation(
+                    backend="custom",
+                    operation="collect_batches",
+                    hint=(
+                        "Beanie-backed Mongo roots require async materialization. "
+                        "Use `await df.acollect()` / `await df.astream()`."
+                    ),
                 )
             return super().collect_batches(
                 plan,
@@ -175,11 +183,14 @@ else:
             except ImportError:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
-                raise UnsupportedEngineOperationError(
-                    "Beanie-backed Mongo roots require async materialization and "
-                    "do not support sync lazy sinks. Materialize async to a "
-                    "column dict, then "
-                    "export/write."
+                raise unsupported_engine_operation(
+                    backend="custom",
+                    operation="write_parquet",
+                    hint=(
+                        "Beanie-backed Mongo roots require async materialization and "
+                        "do not support sync lazy sinks. Materialize async to a "
+                        "column dict, then export/write."
+                    ),
                 )
             super().write_parquet(
                 plan,
@@ -206,11 +217,14 @@ else:
             except ImportError:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
-                raise UnsupportedEngineOperationError(
-                    "Beanie-backed Mongo roots require async materialization and "
-                    "do not support sync lazy sinks. Materialize async to a "
-                    "column dict, then "
-                    "export/write."
+                raise unsupported_engine_operation(
+                    backend="custom",
+                    operation="write_csv",
+                    hint=(
+                        "Beanie-backed Mongo roots require async materialization and "
+                        "do not support sync lazy sinks. Materialize async to a "
+                        "column dict, then export/write."
+                    ),
                 )
             super().write_csv(
                 plan,
@@ -236,11 +250,14 @@ else:
             except ImportError:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
-                raise UnsupportedEngineOperationError(
-                    "Beanie-backed Mongo roots require async materialization and "
-                    "do not support sync lazy sinks. Materialize async to a "
-                    "column dict, then "
-                    "export/write."
+                raise unsupported_engine_operation(
+                    backend="custom",
+                    operation="write_ipc",
+                    hint=(
+                        "Beanie-backed Mongo roots require async materialization and "
+                        "do not support sync lazy sinks. Materialize async to a "
+                        "column dict, then export/write."
+                    ),
                 )
             super().write_ipc(
                 plan,
@@ -265,11 +282,14 @@ else:
             except ImportError:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
-                raise UnsupportedEngineOperationError(
-                    "Beanie-backed Mongo roots require async materialization and "
-                    "do not support sync lazy sinks. Materialize async to a "
-                    "column dict, then "
-                    "export/write."
+                raise unsupported_engine_operation(
+                    backend="custom",
+                    operation="write_ndjson",
+                    hint=(
+                        "Beanie-backed Mongo roots require async materialization and "
+                        "do not support sync lazy sinks. Materialize async to a "
+                        "column dict, then export/write."
+                    ),
                 )
             super().write_ndjson(
                 plan,

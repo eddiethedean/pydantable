@@ -30,4 +30,3 @@ MATRIX: tuple[MethodParity, ...] = (
     MethodParity("explode", "typed", "typed", "typed", "typed"),
     MethodParity("concat", "typed", "typed", "typed", "typed"),
 )
-
