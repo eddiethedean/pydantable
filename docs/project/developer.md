@@ -438,6 +438,38 @@ Usually handled by `pip install -e .`. If you need a fresh wheel install:
 .venv/bin/python -m pip install --force-reinstall pydantable-core/target/wheels/*.whl
 ```
 
+### Performance benchmarking and profiling (pydantable-native)
+
+The Rust core (`pydantable-core`) ships a small **bench harness** intended for maintainers.
+
+**Run benches:**
+
+```bash
+cargo bench --manifest-path pydantable-core/Cargo.toml --features bench --bench materialize_series
+cargo bench --manifest-path pydantable-core/Cargo.toml --features bench --bench collect_lazyframe
+```
+
+**Include symbols (recommended for profiling):**
+
+```bash
+CARGO_PROFILE_BENCH_DEBUG=true \
+  cargo bench --manifest-path pydantable-core/Cargo.toml --features bench --bench materialize_series
+```
+
+**Flamegraphs:**
+
+- Install the helper: `cargo install flamegraph` (provides `cargo flamegraph`).
+- On macOS, system sampling typically requires elevated privileges (e.g. DTrace). If `cargo flamegraph`
+  prompts for `sudo`, prefer running it in a local terminal where you can authenticate, or use Xcode
+  **Instruments → Time Profiler** on the bench binary.
+
+**Python-side microbench (PyO3 + Python materialization included):**
+
+```bash
+python -m pip install pyperf
+python benchmarks/pyperf_native_materialize.py --fast
+```
+
 ## Contribution Guidelines
 
 - Keep Python wrappers thin; prefer Rust ownership for planner/typing logic.

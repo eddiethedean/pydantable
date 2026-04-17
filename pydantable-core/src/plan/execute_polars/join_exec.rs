@@ -486,9 +486,8 @@ pub fn execute_join_polars(
         let col = out_df
             .column(name)
             .map_err(polars_err)?
-            .as_materialized_series()
-            .clone();
-        let py_list = series_to_py_list(py, &col, dtype)?;
+            .as_materialized_series();
+        let py_list = series_to_py_list(py, col, dtype)?;
         out_dict.set_item(name, py_list)?;
     }
     let desc = schema_descriptors_as_py(py, &out_schema)?;

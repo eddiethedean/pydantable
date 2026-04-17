@@ -13,6 +13,8 @@ mod schema_py;
 mod serialize;
 
 pub use build::*;
+#[cfg(all(feature = "polars_engine", feature = "bench"))]
+pub use execute_polars::{bench_collect_lazyframe, bench_series_to_py_list};
 #[cfg(feature = "polars_engine")]
 pub(crate) use execute_polars::{
     collect_plan_batches_polars, sink_csv_polars, sink_ipc_polars, sink_ndjson_polars,

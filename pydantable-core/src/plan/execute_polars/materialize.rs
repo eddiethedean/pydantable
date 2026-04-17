@@ -363,11 +363,22 @@ pub(crate) fn series_to_py_list(
             base: Some(BaseType::Int),
             ..
         } => {
-            let casted = series.cast(&DataType::Int64).map_err(polars_err)?;
-            for item in casted.i64().map_err(polars_err)?.into_iter() {
-                match item {
-                    Some(v) => values.push(v.into_py_any(py)?),
-                    None => values.push(py.None()),
+            let casted = if matches!(series.dtype(), DataType::Int64) {
+                series.clone()
+            } else {
+                series.cast(&DataType::Int64).map_err(polars_err)?
+            };
+            let ca = casted.i64().map_err(polars_err)?;
+            if ca.null_count() == 0 {
+                for v in ca.into_no_null_iter() {
+                    values.push(v.into_py_any(py)?);
+                }
+            } else {
+                for item in ca.into_iter() {
+                    match item {
+                        Some(v) => values.push(v.into_py_any(py)?),
+                        None => values.push(py.None()),
+                    }
                 }
             }
         }
@@ -375,11 +386,22 @@ pub(crate) fn series_to_py_list(
             base: Some(BaseType::Float),
             ..
         } => {
-            let casted = series.cast(&DataType::Float64).map_err(polars_err)?;
-            for item in casted.f64().map_err(polars_err)?.into_iter() {
-                match item {
-                    Some(v) => values.push(v.into_py_any(py)?),
-                    None => values.push(py.None()),
+            let casted = if matches!(series.dtype(), DataType::Float64) {
+                series.clone()
+            } else {
+                series.cast(&DataType::Float64).map_err(polars_err)?
+            };
+            let ca = casted.f64().map_err(polars_err)?;
+            if ca.null_count() == 0 {
+                for v in ca.into_no_null_iter() {
+                    values.push(v.into_py_any(py)?);
+                }
+            } else {
+                for item in ca.into_iter() {
+                    match item {
+                        Some(v) => values.push(v.into_py_any(py)?),
+                        None => values.push(py.None()),
+                    }
                 }
             }
         }
@@ -387,11 +409,22 @@ pub(crate) fn series_to_py_list(
             base: Some(BaseType::Bool),
             ..
         } => {
-            let casted = series.cast(&DataType::Boolean).map_err(polars_err)?;
-            for item in casted.bool().map_err(polars_err)?.into_iter() {
-                match item {
-                    Some(v) => values.push(v.into_py_any(py)?),
-                    None => values.push(py.None()),
+            let casted = if matches!(series.dtype(), DataType::Boolean) {
+                series.clone()
+            } else {
+                series.cast(&DataType::Boolean).map_err(polars_err)?
+            };
+            let ca = casted.bool().map_err(polars_err)?;
+            if ca.null_count() == 0 {
+                for v in ca.into_no_null_iter() {
+                    values.push(v.into_py_any(py)?);
+                }
+            } else {
+                for item in ca.into_iter() {
+                    match item {
+                        Some(v) => values.push(v.into_py_any(py)?),
+                        None => values.push(py.None()),
+                    }
                 }
             }
         }
@@ -399,11 +432,22 @@ pub(crate) fn series_to_py_list(
             base: Some(BaseType::Str | BaseType::Enum),
             ..
         } => {
-            let casted = series.cast(&DataType::String).map_err(polars_err)?;
-            for item in casted.str().map_err(polars_err)?.into_iter() {
-                match item {
-                    Some(v) => values.push(v.into_py_any(py)?),
-                    None => values.push(py.None()),
+            let casted = if matches!(series.dtype(), DataType::String) {
+                series.clone()
+            } else {
+                series.cast(&DataType::String).map_err(polars_err)?
+            };
+            let ca = casted.str().map_err(polars_err)?;
+            if ca.null_count() == 0 {
+                for v in ca.into_no_null_iter() {
+                    values.push(v.into_py_any(py)?);
+                }
+            } else {
+                for item in ca.into_iter() {
+                    match item {
+                        Some(v) => values.push(v.into_py_any(py)?),
+                        None => values.push(py.None()),
+                    }
                 }
             }
         }
@@ -585,6 +629,16 @@ pub(crate) fn series_to_py_list(
     Ok(PyList::new(py, values)?.unbind().into())
 }
 
+// Bench-only wrapper (keeps `series_to_py_list` internal to the extension).
+#[cfg(all(feature = "polars_engine", feature = "bench"))]
+pub fn bench_series_to_py_list(
+    py: Python<'_>,
+    series: &Series,
+    dtype: &DTypeDesc,
+) -> PyResult<PyObject> {
+    series_to_py_list(py, series, dtype)
+}
+
 #[cfg(feature = "polars_engine")]
 pub(crate) fn execute_plan_polars(
     py: Python<'_>,
@@ -612,9 +666,8 @@ pub(crate) fn execute_plan_polars(
         let col = out_df
             .column(name)
             .map_err(polars_err)?
-            .as_materialized_series()
-            .clone();
-        let py_list = series_to_py_list(py, &col, dtype)?;
+            .as_materialized_series();
+        let py_list = series_to_py_list(py, col, dtype)?;
         out_dict.set_item(name, py_list)?;
     }
     Ok(out_dict.unbind().into())

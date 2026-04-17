@@ -120,6 +120,16 @@ pub(crate) fn collect_lazyframe(
     py.allow_threads(move || lf.collect_with_engine(engine).map_err(polars_err))
 }
 
+// Bench-only wrapper (keeps `collect_lazyframe` internal to the extension).
+#[cfg(all(feature = "polars_engine", feature = "bench"))]
+pub fn bench_collect_lazyframe(
+    py: Python<'_>,
+    lf: LazyFrame,
+    streaming: bool,
+) -> PyResult<DataFrame> {
+    collect_lazyframe(py, lf, streaming)
+}
+
 pub(crate) fn ipc_compression_from_str(s: Option<&str>) -> PyResult<Option<IpcCompression>> {
     let s = s.map(str::trim).filter(|x| !x.is_empty());
     match s {

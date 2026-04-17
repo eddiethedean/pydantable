@@ -391,15 +391,13 @@ impl PolarsPlanRunner {
             let val_col = df
                 .column(value_col_name.as_deref().unwrap_or(""))
                 .map_err(polars_err)?
-                .as_materialized_series()
-                .clone();
+                .as_materialized_series();
             // RANGE frame: sort uses all order_by keys (lexicographic); start/end offsets
             // compare only the first order column (same rule as PostgreSQL multi-column RANGE).
             let ord_series = df
                 .column(order_by[0].0.as_str())
                 .map_err(polars_err)?
-                .as_materialized_series()
-                .clone();
+                .as_materialized_series();
 
             for (pos, idx) in idxs.iter().enumerate() {
                 let mut frame_members: Vec<usize> = Vec::new();

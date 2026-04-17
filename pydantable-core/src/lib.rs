@@ -28,6 +28,12 @@ mod python_api;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
+// Bench-only re-exports (not part of the Python extension API).
+#[cfg(feature = "bench")]
+pub use crate::dtype::{BaseType, DTypeDesc};
+#[cfg(all(feature = "polars_engine", feature = "bench"))]
+pub use crate::plan::{bench_collect_lazyframe, bench_series_to_py_list};
+
 /// PyO3 extension module `pydantable_native._core` (built via maturin).
 #[pymodule]
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {

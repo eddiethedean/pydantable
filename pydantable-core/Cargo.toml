@@ -7,7 +7,7 @@ license = "MIT"
 
 [lib]
 name = "pydantable_core"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [features]
 # `polars_engine`: plan execution + `io_*` file helpers (Parquet/IPC/CSV/NDJSON).
@@ -15,6 +15,8 @@ crate-type = ["cdylib"]
 # Future packaging could add sub-features to trim Polars codec deps (wheel size); see docs/DEVELOPER.md.
 default = ["polars_engine"]
 polars_engine = ["dep:polars", "dep:polars-core", "dep:polars-io", "dep:polars-utils", "dep:numpy"]
+# Internal-only helpers for `cargo bench` (not part of the extension surface).
+bench = []
 
 [dependencies]
 pyo3 = { version = "0.24.1" }
@@ -29,6 +31,19 @@ numpy = { version = "0.24", optional = true }
 chrono = { version = "0.4.41", default-features = false, features = ["std"] }
 tokio = { version = "1", features = ["rt-multi-thread"] }
 pyo3-async-runtimes = { version = "0.24", features = ["tokio-runtime"] }
+
+[dev-dependencies]
+criterion = { version = "0.5", default-features = false }
+
+[[bench]]
+name = "materialize_series"
+harness = false
+required-features = ["bench", "polars_engine"]
+
+[[bench]]
+name = "collect_lazyframe"
+harness = false
+required-features = ["bench", "polars_engine"]
 
 [lints.clippy]
 # Panicking on unwrap/expect in library code is discouraged; tests allow these lints locally.
