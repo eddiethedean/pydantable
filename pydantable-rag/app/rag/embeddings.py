@@ -118,6 +118,28 @@ def embedding_compute_active() -> bool:
         return _compute_active > 0
 
 
+def release_embedder_models() -> None:
+    """
+    Drop cached embedding weights so only the chat LLM needs RAM next.
+
+    Ingest keeps a sentence-transformer in memory; loading SmolLM immediately
+    after can OOM small instances. Call this after ingest, before ``warm_llm``.
+    The embedder reloads on the next ``get_embedder`` / chat.
+    """
+    import gc
+
+    with _embed_lock:
+        _embedder_by_key.clear()
+    gc.collect()
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+
+
 def get_embedder(model_name: str, dims: int) -> Embedder:
     """
     Load (or return cached) sentence embedding model weights. Thread-safe.

@@ -13,6 +13,7 @@ from app.rag.embeddings import (
     embedder_is_loaded,
     embedder_is_loading,
     embedding_compute_active,
+    release_embedder_models,
 )
 from app.rag.ingest import ingest_repo_docs
 from app.rag.llm import ChatMessage, llm_is_loaded, llm_is_loading, warm_llm
@@ -40,6 +41,7 @@ def _ingest_then_warm_llm(
     scheduled as separate background tasks).
     """
     ingest_repo_docs(settings=settings, repo_root=repo_root, paths=paths)
+    release_embedder_models()
     warm_llm(settings.llm_model)
 
 

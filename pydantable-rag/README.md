@@ -80,7 +80,7 @@ Pass the same env vars as production (e.g. `RAG_PRELOAD_MODELS_ON_STARTUP=true`)
 fastapi deploy
 ```
 
-- **Startup defaults are conservative** (`RAG_AUTO_INGEST_ON_STARTUP` / `RAG_PRELOAD_MODELS_ON_STARTUP` default **off**): loading MiniLM + SmolLM on every cold replica can **exceed memory** on small instances and produce a **crash loop** (Cloudflare **502**). After deploy, call **`POST /bootstrap`** once (or set those env vars to `true` when you have enough RAM). Set **`HF_TOKEN`** (secret) for Hugging Face so downloads are faster and rate limits are higher.
+- **Startup defaults are conservative** (`RAG_AUTO_INGEST_ON_STARTUP` / `RAG_PRELOAD_MODELS_ON_STARTUP` default **off**): loading MiniLM + SmolLM on every cold replica can **exceed memory** on small instances and produce a **crash loop** (Cloudflare **502**). After deploy, call **`POST /bootstrap`** once: it ingests, **unloads the embedding model from RAM**, then loads the LLM so peak memory is roughly **one** large model at a time (the embedder reloads on first **`/chat`**). Or set those env vars to `true` when you have enough RAM. Set **`HF_TOKEN`** (secret) for Hugging Face so downloads are faster and rate limits are higher.
 - Use a **writable** `RAG_DB_PATH` on **shared storage** if you run **multiple replicas**; otherwise prefer **one replica** for SQLite.
 - Typical env vars (many match built-in defaults):
 
