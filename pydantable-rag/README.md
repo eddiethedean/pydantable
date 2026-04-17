@@ -54,6 +54,23 @@ By default this ingests your repo’s `README.md` and `docs/` directory (it does
  - `POST /chat` (retrieval + local LLM)
  - `POST /ingest` (rebuild index; useful for dev)
 
+### Local Docker (simulate cloud)
+
+The image uses **`/app`**, **`main:app`**, and port **8080** like FastAPI Cloud. First download is slow (HF models).
+
+```bash
+cd pydantable-rag
+docker compose build
+docker compose up
+# http://localhost:8080/healthz
+```
+
+Pass the same env vars as production (e.g. `RAG_PRELOAD_MODELS_ON_STARTUP=true`) via `docker compose run` / Compose `environment:` or a file. To ingest the **monorepo** `docs/` from the parent repo, bind-mount and set `RAG_REPO_ROOT`, for example:
+
+`docker compose run --rm -v "$(pwd)/../docs:/app/docs:ro" -e RAG_REPO_ROOT=/app rag`
+
+(Optional: uncomment `deploy.resources.limits.memory` in `docker-compose.yml` to mimic a small instance.)
+
 ### FastAPI Cloud
 
 - This project includes `fastapi[standard]`, so the **FastAPI Cloud CLI** is available.

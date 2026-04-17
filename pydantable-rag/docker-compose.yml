@@ -1,0 +1,25 @@
+# Local smoke test: similar paths to cloud (/app, port 8080).
+# Build: docker compose build
+# Run:   docker compose up
+# From monorepo root, mount library docs for ingest (optional):
+#   docker compose run --rm -v "$(pwd)/../docs:/app/docs:ro" -e RAG_REPO_ROOT=/app rag ...
+# Or set RAG_REPO_ROOT to a bind-mounted tree in .env.
+
+services:
+  rag:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      # Writable DB inside container; survives restarts via named volume.
+      RAG_DB_PATH: /app/data/pydantable_vectors.db
+    volumes:
+      - rag-data:/app/data
+    # Uncomment to cap RAM like a small cloud instance (Docker Desktop):
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 4G
+
+volumes:
+  rag-data:
