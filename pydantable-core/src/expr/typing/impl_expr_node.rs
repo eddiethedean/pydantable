@@ -22,4 +22,7 @@ enum ListAggKind {
     Sum,
 }
 
-include!("impl_body.inc");
+include!("impl_shard_analysis.inc");
+include!("impl_shard_infer.inc");
+include!("impl_shard_constructors.inc");
+include!("impl_shard_window_map_eval.inc");

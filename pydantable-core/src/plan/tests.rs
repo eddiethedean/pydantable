@@ -164,7 +164,8 @@ mod polars_engine_tests {
 
     use super::ensure_python_initialized;
     use crate::dtype::{BaseType, DTypeDesc};
-    use crate::plan::{execute_groupby_agg_polars, execute_plan, make_plan};
+    use crate::plan::execute_polars::execute_groupby_agg_polars;
+    use crate::plan::{execute_plan, make_plan};
 
     fn sample_kv_schema() -> HashMap<String, DTypeDesc> {
         let mut schema = HashMap::new();
