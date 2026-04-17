@@ -10,9 +10,13 @@ WORKDIR /app
 
 COPY pyproject.toml README.md main.py ./
 COPY app ./app
+COPY scripts ./scripts
 
 # Editable install pulls deps (torch from pytorch-cpu index per pyproject).
-RUN uv venv /app/.venv \
+# Vector index: copy a CI-built ``data/pydantable_vectors.db`` into the build
+# context (same path) before ``docker build``, or mount at runtime.
+RUN mkdir -p /app/data \
+    && uv venv /app/.venv \
     && uv pip install --python /app/.venv/bin/python -e .
 
 ENV PATH="/app/.venv/bin:$PATH"

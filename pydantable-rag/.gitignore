@@ -4,6 +4,10 @@ __pycache__/
 .python-version
 .env
 
-# Vector DB / local data
-data/
+# SQLite DBs (exception: CI-built vector index may be committed or copied for deploy)
 *.db
+!data/pydantable_vectors.db
+
+# Fetched from GitHub (see scripts/fetch_upstream_docs.py)
+bundled/
+.upstream_fetch_tmp/

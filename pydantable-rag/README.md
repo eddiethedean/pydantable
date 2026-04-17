@@ -71,16 +71,28 @@ Pass the same env vars as production (e.g. `RAG_PRELOAD_MODELS_ON_STARTUP=true`)
 
 (Optional: uncomment `deploy.resources.limits.memory` in `docker-compose.yml` to mimic a small instance.)
 
+### Production: CI-built vector database (recommended)
+
+Building the embedding index **on GitHub Actions** avoids doing heavy Hugging Face work on FastAPI Cloud (memory limits, cold start, multi-replica SQLite issues).
+
+- Workflow **`.github/workflows/rag-database.yml`** runs `pydantable-rag/scripts/build_index_ci.py`, which indexes the monorepo **`docs/`** tree and writes **`pydantable-rag/data/pydantable_vectors.db`**. It uploads that file as a workflow artifact.
+- **`.github/workflows/fastapi-cloud-deploy.yml`** builds the same DB, then **downloads it into `pydantable-rag/data/`** before `fastapi deploy`, so the uploaded package **includes the prebuilt SQLite file** (`.gitignore` allows this path when the file is present).
+- Add repository secret **`HF_TOKEN`** so CI can download embedding and (if needed) other models reliably.
+
+For **manual** deploys: run the **RAG vector database** workflow (or build locally with `uv run python scripts/build_index_ci.py` from `pydantable-rag/` with the monorepo checked out), download the artifact, place **`data/pydantable_vectors.db`** under `pydantable-rag/`, then `fastapi deploy`.
+
+At runtime, **`POST /bootstrap`** only needs to **warm the LLM** if you ship a ready DB (ingest can be skipped). Optional: set **`RAG_AUTO_INGEST_ON_STARTUP=false`** (default) and avoid re-ingesting on each boot.
+
 ### FastAPI Cloud
 
 - This project includes `fastapi[standard]`, so the **FastAPI Cloud CLI** is available.
-- Deploy from the `pydantable-rag/` directory:
+- Deploy from the `pydantable-rag/` directory (after placing a CI-built DB as above, or use the repo’s deploy workflow):
 
 ```bash
 fastapi deploy
 ```
 
-- **Startup defaults are conservative** (`RAG_AUTO_INGEST_ON_STARTUP` / `RAG_PRELOAD_MODELS_ON_STARTUP` default **off**): loading MiniLM + SmolLM on every cold replica can **exceed memory** on small instances and produce a **crash loop** (Cloudflare **502**). After deploy, call **`POST /bootstrap`** once: it ingests, **unloads the embedding model from RAM**, then loads the LLM so peak memory is roughly **one** large model at a time (the embedder reloads on first **`/chat`**). Or set those env vars to `true` when you have enough RAM. Set **`HF_TOKEN`** (secret) for Hugging Face so downloads are faster and rate limits are higher.
+- **Startup defaults are conservative** (`RAG_AUTO_INGEST_ON_STARTUP` / `RAG_PRELOAD_MODELS_ON_STARTUP` default **off**). If you **do not** ship a prebuilt DB, call **`POST /bootstrap`** to ingest + warm the LLM (small instances may OOM; prefer the CI DB). Set **`HF_TOKEN`** on the host for Hugging Face.
 - Use a **writable** `RAG_DB_PATH` on **shared storage** if you run **multiple replicas**; otherwise prefer **one replica** for SQLite.
 - Typical env vars (many match built-in defaults):
 

@@ -5,9 +5,15 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
+
 from app.rag.chunking import chunk_text, read_text_file
 from app.rag.embeddings import get_embedder
 from app.rag.store import reset_db, upsert_chunks
+from app.rag.upstream_fetch import (
+    bundled_pydantable_root,
+    ensure_upstream_bundle,
+)
 from app.settings import Settings, resolve_db_path
 
 
@@ -18,12 +24,45 @@ class IngestResult:
     db_path: str
 
 
-def default_ingest_roots(repo_root: Path) -> list[Path]:
+def default_ingest_roots(doc_root: Path) -> list[Path]:
     out: list[Path] = []
-    for p in [repo_root / "README.md", repo_root / "docs"]:
+    for p in (doc_root / "README.md", doc_root / "docs"):
         if p.exists():
             out.append(p)
     return out
+
+
+def _service_root() -> Path:
+    # app/rag/ingest.py -> parents[2] == pydantable-rag project root
+    return Path(__file__).resolve().parents[2]
+
+
+def _resolve_doc_root(
+    *,
+    service_root: Path,
+    repo_root: Path,
+    paths: list[str] | None,
+) -> tuple[Path, list[Path]]:
+    """
+    Choose markdown root and path list for ingest.
+
+    Prefer GitHub-bundled ``bundled/pydantable`` when present (or after fetch).
+    Otherwise use ``repo_root`` (monorepo parent ``docs/`` or service README).
+    """
+    if paths is not None:
+        roots = [repo_root / p for p in paths]
+        return repo_root, roots
+
+    if not (repo_root / "docs").is_dir():
+        ensure_upstream_bundle(service_root)
+
+    bundled = bundled_pydantable_root(service_root)
+    if (bundled / "docs").is_dir():
+        doc_root = bundled
+    else:
+        doc_root = repo_root
+
+    return doc_root, default_ingest_roots(doc_root)
 
 
 @contextlib.contextmanager
@@ -63,19 +102,20 @@ def ingest_repo_docs(
 ) -> IngestResult:
     db_path = resolve_db_path(settings.db_path)
 
-    roots = [repo_root / p for p in paths] if paths else default_ingest_roots(repo_root)
+    service_root = _service_root()
+    doc_root, roots = _resolve_doc_root(
+        service_root=service_root, repo_root=repo_root, paths=paths
+    )
     files = expand_paths(roots)
 
     with _ingest_lock(db_path):
         reset_db(db_path)
 
-        embedder = get_embedder(settings.embed_model, settings.embed_dims)
-
         all_rows: list[tuple[str, str, str]] = []
         all_texts: list[str] = []
 
         for fp in files:
-            rel = str(fp.relative_to(repo_root))
+            rel = str(fp.relative_to(doc_root))
             text = read_text_file(fp)
             chunks = chunk_text(
                 source=rel,
@@ -87,7 +127,14 @@ def ingest_repo_docs(
                 all_rows.append((c.chunk_id, c.source, c.text))
                 all_texts.append(c.text)
 
-        embeddings = embedder.embed(all_texts)
+        # Avoid loading sentence-transformers when there is nothing to embed (empty
+        # deploy or missing README/docs). Saves RAM so bootstrap can load the LLM.
+        if not all_texts:
+            embeddings = np.zeros((0, settings.embed_dims), dtype=np.float32)
+        else:
+            embedder = get_embedder(settings.embed_model, settings.embed_dims)
+            embeddings = embedder.embed(all_texts)
+
         upsert_chunks(
             db_path=db_path,
             dims=settings.embed_dims,
