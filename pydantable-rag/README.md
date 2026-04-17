@@ -92,7 +92,7 @@ At runtime, **`POST /bootstrap`** only needs to **warm the LLM** if you ship a r
 fastapi deploy
 ```
 
-- The **Dockerfile** sets **`RAG_PRELOAD_MODELS_ON_STARTUP=true`** so `/readyz` can pass after the LLM loads (override to `false` if memory is tight). **`RAG_AUTO_INGEST_ON_STARTUP`** defaults **off** in code; ship the **CI-built DB** so the image includes **`data/pydantable_vectors.db`** (`.dockerignore` allows that file). If you deploy without a prebuilt DB, call **`POST /bootstrap`** to ingest + warm the LLM. Set **`HF_TOKEN`** on the host for Hugging Face.
+- The **Dockerfile** sets **`RAG_PRELOAD_MODELS_ON_STARTUP=true`** so `/readyz` can pass after the LLM loads (override to `false` if memory is tight). **`RAG_AUTO_INGEST_ON_STARTUP`** defaults **off** in code; ship the **CI-built DB** so the image includes **`data/pydantable_vectors.db`** (`.dockerignore` allows that file). **`POST /bootstrap`** skips re-ingestion when the index already has rows (so it does not wipe SQLite on multi-replica hosts); it only warms the LLM then. If you deploy without a prebuilt DB, **`POST /bootstrap`** runs ingest + warm. Set **`HF_TOKEN`** on the host for Hugging Face. Use **`GET /diag`** (`llm_last_error`) if the LLM fails to load.
 - Use a **writable** `RAG_DB_PATH` on **shared storage** if you run **multiple replicas**; otherwise prefer **one replica** for SQLite.
 - Typical env vars (many match built-in defaults):
 

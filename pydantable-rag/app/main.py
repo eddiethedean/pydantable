@@ -16,7 +16,13 @@ from app.rag.embeddings import (
     release_embedder_models,
 )
 from app.rag.ingest import ingest_repo_docs
-from app.rag.llm import ChatMessage, llm_is_loaded, llm_is_loading, warm_llm
+from app.rag.llm import (
+    ChatMessage,
+    llm_is_loaded,
+    llm_is_loading,
+    llm_last_error,
+    warm_llm,
+)
 from app.rag.pipeline import rag_chat
 from app.rag.store import check_vector_backend, get_counts
 from app.settings import (
@@ -49,6 +55,17 @@ def _bootstrap_ingest_then_warm(
     *, settings: Settings, repo_root: Path, paths: list[str] | None
 ) -> None:
     try:
+        dbp = resolve_db_path(settings.db_path)
+        counts = get_counts(db_path=dbp)
+        # Do not re-ingest when the image already ships a populated index — full
+        # ingest starts with ``reset_db`` and would wipe SQLite on each replica.
+        if (
+            paths is None
+            and counts.get("docs", 0) > 0
+            and counts.get("vecs", 0) > 0
+        ):
+            warm_llm(settings.llm_model)
+            return
         _ingest_then_warm_llm(settings=settings, repo_root=repo_root, paths=paths)
     except Exception:
         _log.exception("pydantable-rag: POST /bootstrap background task failed")
@@ -113,6 +130,7 @@ class DiagResponse(BaseModel):
     counts: CountsStatus
     llm_loaded: bool
     llm_loading: bool
+    llm_last_error: str | None = None
     embed_loaded: bool
     embed_loading: bool
     embed_computing: bool
@@ -237,6 +255,10 @@ def bootstrap(background_tasks: BackgroundTasks) -> BootstrapResponse:
     """
     s = get_settings()
     repo_root = resolve_ingest_repo_root()
+    dbp = resolve_db_path(s.db_path)
+    counts = get_counts(db_path=dbp)
+    has_index = counts.get("docs", 0) > 0 and counts.get("vecs", 0) > 0
+    started = ["warm_llm"] if has_index else ["ingest", "warm_llm"]
 
     background_tasks.add_task(
         _bootstrap_ingest_then_warm,
@@ -244,7 +266,7 @@ def bootstrap(background_tasks: BackgroundTasks) -> BootstrapResponse:
         repo_root=repo_root,
         paths=None,
     )
-    return BootstrapResponse(ok=True, started=["ingest", "warm_llm"])
+    return BootstrapResponse(ok=True, started=started)
 
 
 @app.get("/healthz")
@@ -298,6 +320,7 @@ def diag() -> DiagResponse:
         counts=CountsStatus.model_validate(get_counts(db_path=dbp)),
         llm_loaded=llm_is_loaded(s.llm_model),
         llm_loading=llm_is_loading(s.llm_model),
+        llm_last_error=llm_last_error(s.llm_model),
         embed_loaded=embedder_is_loaded(s.embed_model, s.embed_dims),
         embed_loading=embedder_is_loading(s.embed_model, s.embed_dims),
         embed_computing=embedding_compute_active(),

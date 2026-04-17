@@ -169,6 +169,7 @@ def test_diag_has_backend_and_counts(
     assert body["vector_backend"]["backend"] == "py"
     assert body["counts"]["docs"] == 1
     assert body["llm_loading"] is False
+    assert body.get("llm_last_error") is None
     assert body["embed_loaded"] is True
     assert body["embed_loading"] is False
     assert body["embed_computing"] is False

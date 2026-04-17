@@ -107,6 +107,10 @@ def ingest_repo_docs(
         service_root=service_root, repo_root=repo_root, paths=paths
     )
     files = expand_paths(roots)
+    if not files:
+        # Do not reset an existing shipped index when there is nothing to ingest
+        # (e.g. minimal cloud image without monorepo ``docs/``).
+        return IngestResult(files=0, chunks=0, db_path=str(db_path))
 
     with _ingest_lock(db_path):
         reset_db(db_path)
