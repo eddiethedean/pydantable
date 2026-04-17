@@ -12,6 +12,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Maintenance
 
+- **pydantable-core (Rust / PyO3):** Migrated off deprecated **`IntoPy`** / **`.into_py(py)`** to **`IntoPyObject`** / **`into_py_any`**, updated tuple/list/dict constructors for PyO3 0.24, replaced **`PyErr::value_bound`** with **`value`**, and dropped crate-level **`allow(deprecated)`**. Introduced shared **`literal_value_to_pyobject`** for **`LiteralValue`** → Python and moved datetime construction helpers to **`py_datetime.rs`** (used from expression serialization and Polars execution).
 - Narrowed optional-import **`except`** clauses (**`ImportError`** / **`OSError`**) where appropriate; documented intentional broad catches in **I/O** materialization fallbacks, **`Expr` repr**, and **`io.mongo`**.
 
 ### Version bump
