@@ -121,26 +121,8 @@ def test_chat_returns_503_when_llm_not_ready(monkeypatch: pytest.MonkeyPatch) ->
     c = TestClient(main.app)
     res = c.post("/chat", json={"message": "hello"})
     assert res.status_code == 503
-    assert (
-        "not loaded" in res.json()["detail"].lower()
-        or "queued" in res.json()["detail"].lower()
-    )
-
-
-def test_chat_returns_503_with_loading_detail_when_llm_in_flight(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import app.main as main
-
-    monkeypatch.setattr(main, "llm_is_loaded", lambda _m: False)
-    monkeypatch.setattr(main, "llm_is_loading", lambda _m: True)
-    monkeypatch.setattr(main, "warm_llm", lambda _m: None)
-    monkeypatch.setattr(main, "rag_chat", lambda **_kwargs: _FakeRagResult("x"))
-
-    c = TestClient(main.app)
-    res = c.post("/chat", json={"message": "hello"})
-    assert res.status_code == 503
-    assert "loading" in res.json()["detail"].lower()
+    detail = res.json()["detail"].lower()
+    assert "load" in detail or "fail" in detail
 
 
 def test_ingest_starts_background_job(client: TestClient) -> None:

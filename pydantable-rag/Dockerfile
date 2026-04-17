@@ -24,7 +24,10 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 # Serve chat after cold start without manual ``POST /bootstrap`` (override if RAM is tight).
 ENV RAG_PRELOAD_MODELS_ON_STARTUP=true
+# Wait for LLM ingest before accepting traffic (avoids “never loaded” with async startup).
+ENV RAG_BLOCKING_STARTUP_WARMUP=true
 
 # Match platform listener; FastAPI Cloud and most hosts set ``PORT`` (default 8080).
 EXPOSE 8080
-CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]
+# Single worker: in-memory LLM state must not be split across processes.
+CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1"]

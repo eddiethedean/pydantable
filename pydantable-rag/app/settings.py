@@ -24,6 +24,10 @@ class Settings(BaseModel):
 
     auto_ingest_on_startup: bool = False
     auto_ingest_if_db_empty: bool = True
+    # When True, lifespan blocks until ingest/LLM warm-up finishes (single-process
+    # friendly; avoids serving before the model is usable). FastAPI Cloud Dockerfile
+    # sets this true with RAG_PRELOAD_MODELS_ON_STARTUP.
+    blocking_startup_warmup: bool = False
 
 
 def _getenv_bool(name: str, default: bool) -> bool:
@@ -58,6 +62,9 @@ def get_settings() -> Settings:
         ),
         auto_ingest_if_db_empty=_getenv_bool(
             "RAG_AUTO_INGEST_IF_DB_EMPTY", base.auto_ingest_if_db_empty
+        ),
+        blocking_startup_warmup=_getenv_bool(
+            "RAG_BLOCKING_STARTUP_WARMUP", base.blocking_startup_warmup
         ),
     )
 
