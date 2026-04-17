@@ -10,6 +10,8 @@ from .dataframe import GroupedDataFrame as CoreGroupedDataFrame
 from .dataframe_model import DataFrameModel as CoreDataFrameModel
 from .dataframe_model import GroupedDataFrameModel as CoreGroupedDataFrameModel
 from .expressions import ColumnRef, Expr
+from .pandas_mongo_dataframe import MongoDataFrame, MongoDataFrameModel
+from .pandas_spark_dataframe import SparkDataFrame, SparkDataFrameModel
 from .pandas_sql_dataframe import SqlDataFrame, SqlDataFrameModel
 from .schema import Schema
 from .selectors import Selector
@@ -563,6 +565,10 @@ __all__ = [
     "DataFrameModel",
     "Expr",
     "Schema",
+    "MongoDataFrame",
+    "MongoDataFrameModel",
+    "SparkDataFrame",
+    "SparkDataFrameModel",
     "SqlDataFrame",
     "SqlDataFrameModel",
 ]

@@ -3191,6 +3191,26 @@ def __getattr__(name: str) -> Any:
         )
 
         return _SqlDataFrameModel
+    if name == "SparkDataFrame":
+        from pydantable.pandas_spark_dataframe import SparkDataFrame as _SparkDataFrame
+
+        return _SparkDataFrame
+    if name == "SparkDataFrameModel":
+        from pydantable.pandas_spark_dataframe import (
+            SparkDataFrameModel as _SparkDataFrameModel,
+        )
+
+        return _SparkDataFrameModel
+    if name == "MongoDataFrame":
+        from pydantable.pandas_mongo_dataframe import MongoDataFrame as _MongoDataFrame
+
+        return _MongoDataFrame
+    if name == "MongoDataFrameModel":
+        from pydantable.pandas_mongo_dataframe import (
+            MongoDataFrameModel as _MongoDataFrameModel,
+        )
+
+        return _MongoDataFrameModel
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -3198,7 +3218,11 @@ __all__ = [
     "DataFrame",
     "DataFrameModel",
     "Expr",
+    "MongoDataFrame",
+    "MongoDataFrameModel",
     "Schema",
+    "SparkDataFrame",
+    "SparkDataFrameModel",
     "SqlDataFrame",
     "SqlDataFrameModel",
 ]

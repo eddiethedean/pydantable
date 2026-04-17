@@ -30,6 +30,30 @@ def __getattr__(name: str) -> Any:
         )
 
         return _SqlDataFrameModel
+    if name == "SparkDataFrame":
+        from pydantable.pyspark.spark_dataframe import (
+            SparkDataFrame as _SparkDataFrame,
+        )
+
+        return _SparkDataFrame
+    if name == "SparkDataFrameModel":
+        from pydantable.pyspark.spark_dataframe import (
+            SparkDataFrameModel as _SparkDataFrameModel,
+        )
+
+        return _SparkDataFrameModel
+    if name == "MongoDataFrame":
+        from pydantable.pyspark.mongo_dataframe import (
+            MongoDataFrame as _MongoDataFrame,
+        )
+
+        return _MongoDataFrame
+    if name == "MongoDataFrameModel":
+        from pydantable.pyspark.mongo_dataframe import (
+            MongoDataFrameModel as _MongoDataFrameModel,
+        )
+
+        return _MongoDataFrameModel
     if name == "sparkdantic":
         # Lazy: optional ``sparkdantic`` is only in ``pydantable[spark]``; the PySpark
         # façade (``DataFrame``, ``sql``, …) must import without it.
@@ -43,7 +67,11 @@ __all__ = [
     "DataFrame",
     "DataFrameModel",
     "Expr",
+    "MongoDataFrame",
+    "MongoDataFrameModel",
     "Schema",
+    "SparkDataFrame",
+    "SparkDataFrameModel",
     "SqlDataFrame",
     "SqlDataFrameModel",
     "sparkdantic",
