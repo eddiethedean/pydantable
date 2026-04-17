@@ -23,7 +23,7 @@ def _load_llm(model_name: str):
     dtype = torch.float16 if device == "cuda" else torch.float32
     tok = AutoTokenizer.from_pretrained(model_name)
     mdl = AutoModelForCausalLM.from_pretrained(
-        model_name, low_cpu_mem_usage=True, torch_dtype=dtype
+        model_name, low_cpu_mem_usage=True, dtype=dtype
     )
     mdl.eval()
     # Use unbound ``Module.to`` so static analysis does not confuse ``mdl.to`` with

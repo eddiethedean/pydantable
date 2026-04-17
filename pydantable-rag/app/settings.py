@@ -13,14 +13,16 @@ class Settings(BaseModel):
     embed_dims: int = 384
     # Keep the default LLM small to avoid 502s/timeouts on cold start.
     llm_model: str = "HuggingFaceTB/SmolLM2-135M-Instruct"
-    # True by default so each cloud replica warms itself (bootstrap hits one worker).
-    preload_models_on_startup: bool = True
+    # Off by default: loading embed + LLM on every replica can OOM small cloud
+    # instances and crash-loop (502). Enable via RAG_PRELOAD_MODELS_ON_STARTUP or
+    # warm with POST /bootstrap when you have enough RAM.
+    preload_models_on_startup: bool = False
 
     chunk_chars: int = 4000
     chunk_overlap_chars: int = 400
     top_k: int = 6
 
-    auto_ingest_on_startup: bool = True
+    auto_ingest_on_startup: bool = False
     auto_ingest_if_db_empty: bool = True
 
 

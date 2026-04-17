@@ -50,6 +50,16 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     return TestClient(main.app)
 
 
+def test_root_status_page(client: TestClient) -> None:
+    res = client.get("/")
+    assert res.status_code == 200
+    assert "text/html" in res.headers.get("content-type", "")
+    body = res.text
+    assert "pydantable-rag" in body
+    assert "Embedding model" in body
+    assert "/docs" in body
+
+
 def test_healthz_has_version_and_config(client: TestClient) -> None:
     res = client.get("/healthz")
     assert res.status_code == 200

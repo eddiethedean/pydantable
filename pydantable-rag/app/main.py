@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
 from pathlib import Path
 
 from fastapi import BackgroundTasks, Body, FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from app.rag.embeddings import (
@@ -129,6 +131,100 @@ class IngestRequest(BaseModel):
 
 
 _INGEST_BODY = Body(default_factory=IngestRequest)
+
+
+def _status_page_html() -> str:
+    """Human-readable loading / readiness view for ``GET /``."""
+    s = get_settings()
+    dbp = resolve_db_path(s.db_path)
+    counts = get_counts(db_path=dbp)
+    n_docs = int(counts.get("docs", 0) or 0)
+    n_vecs = int(counts.get("vecs", 0) or 0)
+    embed_load = embedder_is_loading(s.embed_model, s.embed_dims)
+    embed_ok = embedder_is_loaded(s.embed_model, s.embed_dims)
+    embed_busy = embedding_compute_active()
+    llm_load = llm_is_loading(s.llm_model)
+    llm_ok = llm_is_loaded(s.llm_model)
+    index_ok = n_docs > 0 and n_vecs > 0
+    chat_ready = index_ok and llm_ok
+
+    def row(label: str, ok: bool, loading: bool, detail: str) -> str:
+        if loading:
+            state = '<span class="load">Loading…</span>'
+        elif ok:
+            state = '<span class="ok">Ready</span>'
+        else:
+            state = '<span class="wait">Waiting</span>'
+        detail_e = html.escape(detail, quote=True)
+        return f"<tr><td>{label}</td><td>{state}</td><td>{detail_e}</td></tr>"
+
+    index_loading = (not index_ok) and (embed_busy or embed_load)
+
+    rows = [
+        row(
+            "Embedding model",
+            embed_ok,
+            embed_load,
+            f"{s.embed_model} ({s.embed_dims}d)",
+        ),
+        row("LLM (chat)", llm_ok, llm_load, s.llm_model),
+        row(
+            "Vector index",
+            index_ok,
+            index_loading,
+            f"{n_docs} doc chunks, {n_vecs} vectors",
+        ),
+    ]
+
+    overall = (
+        '<p class="ok"><strong>Ready for chat.</strong></p>'
+        if chat_ready
+        else '<p class="load"><strong>Still starting up.</strong> This page refreshes '
+        "every 5s.</p>"
+    )
+    if embed_busy and index_ok:
+        overall += '<p class="note">Embedding compute active (ingest or query).</p>'
+
+    ver = html.escape(app_version(), quote=True)
+    db_esc = html.escape(str(dbp), quote=True)
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta http-equiv="refresh" content="5"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>pydantable-rag status</title>
+  <style>
+    body {{ font-family: system-ui, sans-serif; max-width: 52rem; margin: 2rem auto;
+      padding: 0 1rem; line-height: 1.45; }}
+    table {{ border-collapse: collapse; width: 100%; }}
+    th, td {{ text-align: left; border-bottom: 1px solid #ccc;
+      padding: 0.5rem 0.4rem; }}
+    .ok {{ color: #0a0; }}
+    .load {{ color: #a60; }}
+    .wait {{ color: #666; }}
+    .note {{ color: #555; font-size: 0.95rem; }}
+    a {{ color: #06c; }}
+  </style>
+</head>
+<body>
+  <h1>pydantable-rag</h1>
+  {overall}
+  <table>
+    <thead><tr><th>Component</th><th>State</th><th>Detail</th></tr></thead>
+    <tbody>{"".join(rows)}</tbody>
+  </table>
+  <p class="note">Version {ver} · DB <code>{db_esc}</code></p>
+  <p><a href="/docs">OpenAPI docs</a> · <a href="/healthz">/healthz</a> ·
+  <a href="/readyz">/readyz</a> · <a href="/diag">/diag</a></p>
+</body>
+</html>"""
+
+
+@app.get("/", response_class=HTMLResponse)
+def root_status() -> str:
+    """Browser-friendly view of embed / LLM / index loading state (auto-refresh)."""
+    return _status_page_html()
 
 
 @app.post("/bootstrap")

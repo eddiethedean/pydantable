@@ -80,8 +80,8 @@ Pass the same env vars as production (e.g. `RAG_PRELOAD_MODELS_ON_STARTUP=true`)
 fastapi deploy
 ```
 
-- Defaults **ingest + LLM preload on startup** so **each replica** warms itself (you do not rely on `POST /bootstrap` hitting one instance). Override with `RAG_AUTO_INGEST_ON_STARTUP` / `RAG_PRELOAD_MODELS_ON_STARTUP` if needed.
-- Use a **writable** `RAG_DB_PATH` on **shared storage** if you run **multiple replicas**; otherwise prefer **one replica** for SQLite. Set **`HF_TOKEN`** for Hugging Face Hub.
+- **Startup defaults are conservative** (`RAG_AUTO_INGEST_ON_STARTUP` / `RAG_PRELOAD_MODELS_ON_STARTUP` default **off**): loading MiniLM + SmolLM on every cold replica can **exceed memory** on small instances and produce a **crash loop** (Cloudflare **502**). After deploy, call **`POST /bootstrap`** once (or set those env vars to `true` when you have enough RAM). Set **`HF_TOKEN`** (secret) for Hugging Face so downloads are faster and rate limits are higher.
+- Use a **writable** `RAG_DB_PATH` on **shared storage** if you run **multiple replicas**; otherwise prefer **one replica** for SQLite.
 - Typical env vars (many match built-in defaults):
 
   - `RAG_DB_PATH=data/pydantable_vectors.db` (must be writable)
