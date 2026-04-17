@@ -48,7 +48,9 @@ def warm_llm(model_name: str) -> None:
         _LOADING.discard(model_name)
 
 
-def generate_answer_hf(*, model: str, system_prompt: str, messages: list[ChatMessage]) -> str:
+def generate_answer_hf(
+    *, model: str, system_prompt: str, messages: list[ChatMessage]
+) -> str:
     import torch
 
     tok, mdl, device = _load_llm(model)

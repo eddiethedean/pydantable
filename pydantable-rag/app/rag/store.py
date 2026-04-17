@@ -85,14 +85,17 @@ def upsert_chunks(
         )
 
 
-def search(*, db_path: Path, query_embedding: np.ndarray, top_k: int) -> list[RetrievedChunk]:
+def search(
+    *, db_path: Path, query_embedding: np.ndarray, top_k: int
+) -> list[RetrievedChunk]:
     if query_embedding.ndim != 1:
         raise ValueError("query_embedding must be 1D")
 
     with _connect(db_path) as conn:
         rows = conn.execute(
             """
-            SELECT d.source AS source, d.chunk_id AS chunk_id, d.text AS text, e.embedding AS embedding
+            SELECT d.source AS source, d.chunk_id AS chunk_id, d.text AS text,
+                   e.embedding AS embedding
             FROM docs_emb e
             JOIN docs d ON d.chunk_id = e.chunk_id;
             """

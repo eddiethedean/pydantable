@@ -203,7 +203,15 @@ exclude = [
 [tool.ruff]
 target-version = "py310"
 line-length = 88
-exclude = ["notebooks", ".venv", ".venv310", ".venv-mypy-min", ".venv-ty-min"]
+exclude = [
+    "notebooks",
+    ".venv",
+    ".venv310",
+    ".venv-mypy-min",
+    ".venv-ty-min",
+    # Separate app tree; not part of the pydantable distribution checks.
+    "pydantable-rag",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "TID", "RUF"]

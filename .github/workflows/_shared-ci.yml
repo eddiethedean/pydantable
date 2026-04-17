@@ -123,6 +123,8 @@ jobs:
           .venv/bin/python -m pip install -e ".[docs]"
 
       - name: Build docs (warnings as errors)
+        env:
+          NO_MKDOCS_2_WARNING: "1"
         run: .venv/bin/mkdocs build --strict
 
   wheel-smoke:

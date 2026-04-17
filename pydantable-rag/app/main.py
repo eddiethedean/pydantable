@@ -73,6 +73,9 @@ class IngestRequest(BaseModel):
     paths: list[str] | None = None
 
 
+_INGEST_BODY = Body(default_factory=IngestRequest)
+
+
 @app.post("/bootstrap")
 def bootstrap(background_tasks: BackgroundTasks) -> BootstrapResponse:
     """
@@ -146,7 +149,7 @@ class IngestResponse(BaseModel):
 @app.post("/ingest", response_model=IngestResponse)
 def ingest(
     background_tasks: BackgroundTasks,
-    req: IngestRequest = Body(default_factory=IngestRequest),
+    req: IngestRequest = _INGEST_BODY,
 ) -> IngestResponse:
     s = get_settings()
     repo_root = (Path(__file__).resolve().parents[2]).resolve()
@@ -166,7 +169,10 @@ def chat(req: ChatRequest, background_tasks: BackgroundTasks) -> ChatResponse:
             background_tasks.add_task(warm_llm, s.llm_model)
         raise HTTPException(
             status_code=503,
-            detail="LLM is warming up. Retry in ~30-120s, or enable RAG_PRELOAD_MODELS_ON_STARTUP.",
+            detail=(
+                "LLM is warming up. Retry in ~30-120s, or enable "
+                "RAG_PRELOAD_MODELS_ON_STARTUP."
+            ),
         )
 
     result = rag_chat(

@@ -33,3 +33,26 @@ dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.8"]
 
 [tool.setuptools]
 packages = ["app"]
+
+# Astral ``ty``: this subtree is excluded from the repo-root ``[tool.ty]`` includes;
+# project root is the directory that contains the ``app`` package (not ``app`` itself).
+[tool.ty.environment]
+python-version = "3.11"
+root = ["."]
+
+[tool.ty.analysis]
+allowed-unresolved-imports = [
+    "torch.**",
+    "transformers.**",
+    "sqlite_vec.**",
+    "dotenv",
+]
+
+[tool.ty.rules]
+deprecated = "ignore"
+
+[tool.ty.src]
+include = [
+    "app/**/*.py",
+    "tests/**/*.py",
+]

@@ -35,7 +35,9 @@ def expand_paths(paths: list[Path]) -> list[Path]:
     return files
 
 
-def ingest_repo_docs(*, settings: Settings, repo_root: Path, paths: list[str] | None) -> IngestResult:
+def ingest_repo_docs(
+    *, settings: Settings, repo_root: Path, paths: list[str] | None
+) -> IngestResult:
     db_path = resolve_db_path(settings.db_path)
 
     roots = [repo_root / p for p in paths] if paths else default_ingest_roots(repo_root)
@@ -62,6 +64,10 @@ def ingest_repo_docs(*, settings: Settings, repo_root: Path, paths: list[str] | 
             all_texts.append(c.text)
 
     embeddings = embedder.embed(all_texts)
-    upsert_chunks(db_path=db_path, dims=settings.embed_dims, chunks=all_rows, embeddings=embeddings)
+    upsert_chunks(
+        db_path=db_path,
+        dims=settings.embed_dims,
+        chunks=all_rows,
+        embeddings=embeddings,
+    )
     return IngestResult(files=len(files), chunks=len(all_rows), db_path=str(db_path))
-

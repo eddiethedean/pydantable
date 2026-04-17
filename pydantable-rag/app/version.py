@@ -24,4 +24,3 @@ def app_version() -> str:
         return str(data["project"]["version"])
     except Exception:
         return "unknown"
-

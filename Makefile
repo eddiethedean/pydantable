@@ -60,8 +60,9 @@ pyright-check-strict:
 	$(PYRIGHT) --project pyrightconfig-strict.json
 
 # Matches CI "Docs (mkdocs --strict)" check.
+# Silence Material for MkDocs stderr banner about future MkDocs 2.0 (not actionable here).
 mkdocs-check:
-	$(PYTHON) -m mkdocs build --strict
+	NO_MKDOCS_2_WARNING=1 $(PYTHON) -m mkdocs build --strict
 
 gen-typing:
 	$(PYTHON) scripts/generate_typing_artifacts.py

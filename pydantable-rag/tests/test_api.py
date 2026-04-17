@@ -17,7 +17,9 @@ class _FakeRagResult:
     def __init__(self, answer: str):
         self.answer = answer
         self.retrieved = [
-            _FakeRetrieved(source="docs/intro.md", chunk_id="docs/intro.md::c0", distance=0.1)
+            _FakeRetrieved(
+                source="docs/intro.md", chunk_id="docs/intro.md::c0", distance=0.1
+            )
         ]
 
 
@@ -38,7 +40,9 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(main, "ingest_repo_docs", lambda **_kwargs: None)
 
     # Avoid embeddings / sqlite / transformers — return deterministic output.
-    monkeypatch.setattr(main, "rag_chat", lambda **_kwargs: _FakeRagResult("pydantable is ..."))
+    monkeypatch.setattr(
+        main, "rag_chat", lambda **_kwargs: _FakeRagResult("pydantable is ...")
+    )
 
     return TestClient(main.app)
 
@@ -105,11 +109,17 @@ def test_ingest_starts_background_job(client: TestClient) -> None:
     assert res.json()["started"] is True
 
 
-def test_diag_has_backend_and_counts(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_diag_has_backend_and_counts(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import app.main as main
 
-    monkeypatch.setattr(main, "check_vector_backend", lambda **_kwargs: {"ok": True, "backend": "py"})
-    monkeypatch.setattr(main, "get_counts", lambda **_kwargs: {"docs": 1, "vecs": 1, "backend": "py"})
+    monkeypatch.setattr(
+        main, "check_vector_backend", lambda **_kwargs: {"ok": True, "backend": "py"}
+    )
+    monkeypatch.setattr(
+        main, "get_counts", lambda **_kwargs: {"docs": 1, "vecs": 1, "backend": "py"}
+    )
 
     res = client.get("/diag")
     assert res.status_code == 200

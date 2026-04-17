@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Any
 
 import numpy as np
 
@@ -10,8 +11,8 @@ import numpy as np
 class Embedder:
     model_name: str
     dims: int
-    tokenizer: object
-    model: object
+    tokenizer: Any
+    model: Any
     device: str
 
     def embed(self, texts: list[str]) -> np.ndarray:
@@ -32,7 +33,9 @@ class Embedder:
         with torch.no_grad():
             out = self.model(**tok)
             last_hidden = out.last_hidden_state  # (B, T, H)
-            attn = tok["attention_mask"].unsqueeze(-1).expand(last_hidden.size()).float()
+            attn = (
+                tok["attention_mask"].unsqueeze(-1).expand(last_hidden.size()).float()
+            )
             pooled = (last_hidden * attn).sum(dim=1) / attn.sum(dim=1).clamp(min=1.0)
 
         emb = pooled.detach().cpu().to(torch.float32).numpy()
