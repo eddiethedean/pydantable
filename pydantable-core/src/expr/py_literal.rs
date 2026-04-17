@@ -8,43 +8,11 @@ use crate::dtype::{
     py_decimal_to_scaled_i128, py_enum_to_wire_string, py_value_to_dtype,
     scaled_i128_to_py_decimal, BaseType,
 };
+use crate::py_datetime::{
+    days_to_py_date, micros_to_py_datetime, micros_to_py_timedelta, nanos_to_py_time,
+};
 
 use super::ir::{ArithOp, CmpOp, ExprNode, LiteralValue};
-
-fn micros_to_py_datetime(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
-    let dt_mod = py.import("datetime")?;
-    let dt = dt_mod.getattr("datetime")?;
-    Ok(dt
-        .call_method1("fromtimestamp", (micros as f64 / 1_000_000.0,))?
-        .unbind())
-}
-
-fn days_to_py_date(py: Python<'_>, days: i32) -> PyResult<PyObject> {
-    let dt_mod = py.import("datetime")?;
-    let date = dt_mod.getattr("date")?;
-    Ok(date
-        .call_method1("fromordinal", (days + 719_163,))?
-        .unbind())
-}
-
-fn micros_to_py_timedelta(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
-    let dt_mod = py.import("datetime")?;
-    let td = dt_mod.getattr("timedelta")?;
-    Ok(td.call1((0, 0, micros))?.unbind())
-}
-
-fn nanos_to_py_time(py: Python<'_>, ns: i64) -> PyResult<PyObject> {
-    let dt_mod = py.import("datetime")?;
-    let time_cls = dt_mod.getattr("time")?;
-    let nanos = ns.rem_euclid(86_400 * 1_000_000_000);
-    let secs = nanos / 1_000_000_000;
-    let nsub = nanos % 1_000_000_000;
-    let micro = (nsub / 1000) as i32;
-    let h = (secs / 3600) as i32;
-    let m = ((secs % 3600) / 60) as i32;
-    let s = (secs % 60) as i32;
-    Ok(time_cls.call1((h, m, s, micro))?.unbind())
-}
 
 /// Convert a [`LiteralValue`] to a Python object (UUID, `datetime`, `Decimal`, etc. where applicable).
 pub fn literal_value_to_pyobject(py: Python<'_>, v: &LiteralValue) -> PyResult<PyObject> {

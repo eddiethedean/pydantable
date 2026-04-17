@@ -22,6 +22,7 @@ mod io_polars;
 mod plan;
 #[cfg(feature = "polars_engine")]
 mod polars_dtype;
+mod py_datetime;
 mod python_api;
 
 use pyo3::prelude::*;

@@ -191,29 +191,9 @@ pub(super) fn py_timedelta_to_micros(item: &Bound<'_, PyAny>) -> PyResult<i64> {
 }
 
 #[cfg(feature = "polars_engine")]
-pub(super) fn micros_to_py_datetime(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
-    let dt_mod = py.import("datetime")?;
-    let dt = dt_mod.getattr("datetime")?;
-    Ok(dt
-        .call_method1("fromtimestamp", (micros as f64 / 1_000_000.0,))?
-        .unbind())
-}
-
-#[cfg(feature = "polars_engine")]
-pub(super) fn days_to_py_date(py: Python<'_>, days: i32) -> PyResult<PyObject> {
-    let dt_mod = py.import("datetime")?;
-    let date = dt_mod.getattr("date")?;
-    Ok(date
-        .call_method1("fromordinal", (days + 719_163,))?
-        .unbind())
-}
-
-#[cfg(feature = "polars_engine")]
-pub(super) fn micros_to_py_timedelta(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
-    let dt_mod = py.import("datetime")?;
-    let td = dt_mod.getattr("timedelta")?;
-    Ok(td.call1((0, 0, micros))?.unbind())
-}
+pub(super) use crate::py_datetime::{
+    days_to_py_date, micros_to_py_datetime, micros_to_py_timedelta, nanos_to_py_time,
+};
 
 #[cfg(feature = "polars_engine")]
 pub(super) fn py_time_to_nanos(item: &Bound<'_, PyAny>) -> PyResult<i64> {
@@ -223,20 +203,6 @@ pub(super) fn py_time_to_nanos(item: &Bound<'_, PyAny>) -> PyResult<i64> {
     let s: i64 = t.getattr("second")?.extract()?;
     let micro: i64 = t.getattr("microsecond")?.extract()?;
     Ok(((h * 3600 + m * 60 + s) * 1_000_000_000) + micro * 1000)
-}
-
-#[cfg(feature = "polars_engine")]
-pub(super) fn nanos_to_py_time(py: Python<'_>, ns: i64) -> PyResult<PyObject> {
-    let dt_mod = py.import("datetime")?;
-    let time_cls = dt_mod.getattr("time")?;
-    let nanos = ns.rem_euclid(86_400 * 1_000_000_000);
-    let secs = nanos / 1_000_000_000;
-    let nsub = nanos % 1_000_000_000;
-    let micro = (nsub / 1000) as i32;
-    let h = (secs / 3600) as i32;
-    let m = ((secs % 3600) / 60) as i32;
-    let s = (secs % 60) as i32;
-    Ok(time_cls.call1((h, m, s, micro))?.unbind())
 }
 
 fn py_row_get_field<'py>(item: &Bound<'py, PyAny>, fname: &str) -> PyResult<Bound<'py, PyAny>> {
