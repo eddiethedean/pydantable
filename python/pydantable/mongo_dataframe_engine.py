@@ -28,7 +28,7 @@ async def _amaterialize_root_data(data: Any) -> Any:
     # Async Beanie root support lives in pydantable (no optional Mongo roots import).
     try:
         from pydantable.mongo_dataframe import BeanieAsyncRoot
-    except Exception:
+    except ImportError:
         BeanieAsyncRoot = None  # type: ignore[assignment]
     if BeanieAsyncRoot is not None and isinstance(data, BeanieAsyncRoot):
         from pydantable.io.beanie import afetch_beanie
@@ -87,7 +87,7 @@ else:
             # Async Beanie roots are async-only.
             try:
                 from pydantable.mongo_dataframe import BeanieAsyncRoot
-            except Exception:
+            except ImportError:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(data, BeanieAsyncRoot):
                 raise UnsupportedEngineOperationError(
@@ -145,7 +145,7 @@ else:
         ) -> list[Any]:
             try:
                 from pydantable.mongo_dataframe import BeanieAsyncRoot
-            except Exception:
+            except ImportError:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
                 raise UnsupportedEngineOperationError(
@@ -172,7 +172,7 @@ else:
         ) -> None:
             try:
                 from pydantable.mongo_dataframe import BeanieAsyncRoot
-            except Exception:
+            except ImportError:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
                 raise UnsupportedEngineOperationError(
@@ -203,7 +203,7 @@ else:
         ) -> None:
             try:
                 from pydantable.mongo_dataframe import BeanieAsyncRoot
-            except Exception:
+            except ImportError:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
                 raise UnsupportedEngineOperationError(
@@ -233,7 +233,7 @@ else:
         ) -> None:
             try:
                 from pydantable.mongo_dataframe import BeanieAsyncRoot
-            except Exception:
+            except ImportError:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
                 raise UnsupportedEngineOperationError(
@@ -262,7 +262,7 @@ else:
         ) -> None:
             try:
                 from pydantable.mongo_dataframe import BeanieAsyncRoot
-            except Exception:
+            except ImportError:
                 BeanieAsyncRoot = None  # type: ignore[assignment]
             if BeanieAsyncRoot is not None and isinstance(root_data, BeanieAsyncRoot):
                 raise UnsupportedEngineOperationError(

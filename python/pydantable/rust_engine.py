@@ -29,7 +29,7 @@ try:
         rust_has_async_collect_plan_batches,
         rust_has_async_execute_plan,
     )
-except Exception:  # pragma: no cover
+except (ImportError, OSError):  # pragma: no cover — optional native binding
     _MISSING_SYMBOL_PREFIX = (
         "The pydantable native extension is present but does not implement "
     )

@@ -59,7 +59,7 @@ def _rust_expr_ast_snippet(rust_expr: Any) -> str:
             return f"{s[: _MAX_EXPR_REPR_AST - 1]}…"
         return s
     except Exception:
-        # Any failure from Rust bridge or JSON: keep repr cheap for notebooks.
+        # Broad: repr must not raise; Rust/JSON can fail arbitrarily in notebooks.
         _LOG.debug("Expr repr snippet omitted (serialization failed)", exc_info=True)
         return "?"
 

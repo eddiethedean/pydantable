@@ -273,7 +273,7 @@ def read_parquet_url(
     try:
         return _scan_file_root(name, "parquet", columns=columns, scan_kwargs=None)
     except Exception:
-        # Scan setup can fail for many reasons; always remove the temp file.
+        # Broad: any scan/lazy-plan failure; always remove the temp file, then re-raise.
         with suppress(OSError):
             os.unlink(name)
         raise
@@ -371,7 +371,7 @@ def materialize_parquet(
                 try:
                     return rust_read_parquet_path(path)
                 except Exception:
-                    # PyO3/native may wrap diverse failures; fall back to PyArrow when auto.
+                    # Broad: PyO3/native may wrap diverse failures; fall back to PyArrow when auto.
                     _IO_LOG.debug(
                         "rust_read_parquet_path failed; trying PyArrow",
                         exc_info=True,
@@ -411,6 +411,7 @@ def materialize_ipc(
             try:
                 return rust_read_ipc_path(str(source))
             except Exception:
+                # Broad: same Rust→PyArrow fallback contract as materialize_parquet.
                 _IO_LOG.debug(
                     "rust_read_ipc_path failed; trying PyArrow", exc_info=True
                 )
@@ -461,6 +462,7 @@ def materialize_csv(
             try:
                 return rust_read_csv_path(str(path))
             except Exception:
+                # Broad: Rust CSV failure → stdlib csv when engine=auto.
                 _IO_LOG.debug(
                     "rust_read_csv_path failed; using stdlib csv", exc_info=True
                 )
@@ -494,6 +496,7 @@ def materialize_ndjson(
             try:
                 return rust_read_ndjson_path(str(path))
             except Exception:
+                # Broad: Rust NDJSON failure → pure Python JSON lines when engine=auto.
                 _IO_LOG.debug(
                     "rust_read_ndjson_path failed; using pure Python JSON lines",
                     exc_info=True,

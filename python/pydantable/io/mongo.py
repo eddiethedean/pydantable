@@ -36,6 +36,7 @@ def is_async_mongo_collection(collection: Any) -> bool:
     try:
         return type(collection).__module__.startswith("pymongo.asynchronous")
     except Exception:
+        # Broad: tolerate pathological proxies or broken __class__ / __module__.
         return False
 
 

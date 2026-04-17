@@ -35,14 +35,14 @@ def _is_pandas_series(value: object) -> bool:
     # is intentionally cheap for environments without pandas.
     try:
         import pandas as pd  # type: ignore[import-not-found]
-    except Exception:
+    except ImportError:
         pd = None
     if pd is not None:
         try:
             if isinstance(value, pd.Series):  # type: ignore[arg-type]
                 return True
         except Exception:
-            # If pandas is partially-imported or behaves unexpectedly, fall back.
+            # Broad: tolerate partially broken or monkeypatched pandas in optional envs.
             pass
     # Fallback heuristic also intentionally treats "Series-like" objects (used in
     # tests) as Series.

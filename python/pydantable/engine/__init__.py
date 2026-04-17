@@ -41,7 +41,7 @@ try:
     from pydantable_native.native import (  # type: ignore[import-not-found]
         NativePolarsEngine as _NativePolarsEngine,
     )
-except Exception:  # pragma: no cover
+except (ImportError, OSError):  # pragma: no cover — missing wheel or failed .so load
     pass
 else:
     NativePolarsEngine = _NativePolarsEngine

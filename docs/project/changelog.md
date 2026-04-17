@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.18.1] — 2026-04-16
+
+### Documentation
+
+- **Versioning:** Consolidated **2.0.0** migration pointers ( **`as_polars=`**, legacy SQL I/O names, **`moltres_engine=`**, **`Entei*`** → **`Mongo*`** ) in [VERSIONING](../semantics/versioning.md) **Planned removals**.
+
+### Maintenance
+
+- Narrowed optional-import **`except`** clauses (**`ImportError`** / **`OSError`**) where appropriate; documented intentional broad catches in **I/O** materialization fallbacks, **`Expr` repr**, and **`io.mongo`**.
+
+### Version bump
+
+- Align **pydantable**, **pydantable-protocol**, **pydantable-native**, **pydantable-core**, and published **`__version__`** values to **1.18.1**.
+
 ## [1.18.0] — 2026-04-15
 
 ### Added

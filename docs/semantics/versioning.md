@@ -75,6 +75,15 @@ The following **legacy string-SQL I/O** names are **deprecated** as of **v1.13.0
 
 - **`fetch_sql`**, **`iter_sql`**, **`write_sql`**, **`afetch_sql`**, **`aiter_sql`**, **`awrite_sql`**, **`write_sql_batches`**, **`awrite_sql_batches`**
 
+### Lazy SQL and Mongo façade names (preview)
+
+| Deprecated (remove in `2.0.0`) | Replacement |
+|--------------------------------|-------------|
+| **`moltres_engine=`** on **`SqlDataFrame`** / **`SqlDataFrameModel`** helpers | **`sql_engine=`** (same object; see [`SQL_ENGINE`](../integrations/engines/sql.md)) |
+| **`EnteiDataFrame`**, **`EnteiDataFrameModel`**, **`EnteiPydantableEngine`** (lazy imports / **`pydantable.mongo_entei`**) | **`MongoDataFrame`**, **`MongoDataFrameModel`**, **`MongoPydantableEngine`** from **`pydantable`** or **`pydantable.mongo_dataframe`** ([`MONGO_ENGINE`](../integrations/engines/mongo.md)) |
+
+After **`2.0.0`**, update imports and kwargs using the table above; run tests with **`PYTHONWARNINGS=error::DeprecationWarning`** before upgrading to catch stragglers.
+
 ## Related documentation
 
 - [INTERFACE_CONTRACT](../semantics/interface-contract.md) — guaranteed behavior for the typed API.

@@ -14,7 +14,7 @@ from pydantable_protocol.protocols import (
     stub_engine_capabilities,
 )
 
-__version__ = "1.18.0"
+__version__ = "1.18.1"
 
 __all__ = [
     "EngineCapabilities",
