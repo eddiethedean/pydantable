@@ -43,11 +43,17 @@ async def lifespan(_app: FastAPI):
     s = get_settings()
     want_ingest = s.auto_ingest_on_startup
     want_llm = s.preload_models_on_startup
+    dbp = resolve_db_path(s.db_path)
+    counts = get_counts(db_path=dbp)
     if want_ingest:
-        dbp = resolve_db_path(s.db_path)
-        counts = get_counts(db_path=dbp)
         if s.auto_ingest_if_db_empty and counts["docs"] > 0 and counts["vecs"] > 0:
             want_ingest = False
+    if (
+        s.warm_llm_when_index_ready
+        and counts.get("docs", 0) > 0
+        and counts.get("vecs", 0) > 0
+    ):
+        want_llm = True
 
     def _warm_sync() -> None:
         rr = resolve_ingest_repo_root()

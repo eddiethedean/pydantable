@@ -51,6 +51,9 @@ jobs:
           name: rag-db-for-deploy
           path: pydantable-rag/data/
 
+      - name: Show app version being deployed
+        run: grep -E '^version\s*=' pydantable-rag/pyproject.toml | head -1
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:

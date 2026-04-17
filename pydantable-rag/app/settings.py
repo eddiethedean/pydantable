@@ -17,6 +17,10 @@ class Settings(BaseModel):
     # instances and crash-loop (502). Enable via RAG_PRELOAD_MODELS_ON_STARTUP or
     # warm with POST /bootstrap when you have enough RAM.
     preload_models_on_startup: bool = False
+    # If the SQLite index already has rows (e.g. CI-built DB), warm the LLM on
+    # startup even when RAG_PRELOAD_MODELS_ON_STARTUP is false — hosted dashboards
+    # often override Dockerfile env and accidentally disable preload alone.
+    warm_llm_when_index_ready: bool = True
 
     chunk_chars: int = 4000
     chunk_overlap_chars: int = 400
@@ -51,6 +55,9 @@ def get_settings() -> Settings:
         llm_model=os.getenv("RAG_LLM_MODEL", base.llm_model),
         preload_models_on_startup=_getenv_bool(
             "RAG_PRELOAD_MODELS_ON_STARTUP", base.preload_models_on_startup
+        ),
+        warm_llm_when_index_ready=_getenv_bool(
+            "RAG_WARM_LLM_WHEN_INDEX_READY", base.warm_llm_when_index_ready
         ),
         chunk_chars=int(os.getenv("RAG_CHUNK_CHARS", str(base.chunk_chars))),
         chunk_overlap_chars=int(
