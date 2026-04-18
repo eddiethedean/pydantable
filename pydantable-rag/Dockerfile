@@ -12,20 +12,23 @@ COPY pyproject.toml README.md main.py ./
 COPY app ./app
 COPY scripts ./scripts
 COPY data/ /app/data/
+# Hub snapshots from CI (``scripts/prep_hf_cache_ci.py``). Local builds may only
+# ship ``hf_baked/.gitkeep``; runtimes then download from the Hub as before.
+COPY hf_baked/ /app/.cache/huggingface/
 
 # Editable install pulls deps (torch from pytorch-cpu index per pyproject).
 # Vector index: CI workflow downloads ``data/pydantable_vectors.db`` before
 # ``fastapi deploy`` / ``docker build``; local builds can use an empty ``data/``.
-RUN mkdir -p /app/data /tmp/hf \
+RUN mkdir -p /app/data \
     && uv venv /app/.venv \
     && uv pip install --python /app/.venv/bin/python -e .
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
-# Writable Hugging Face cache (some runtimes have a read-only home directory).
-ENV HF_HOME=/tmp/hf
-ENV HF_HUB_CACHE=/tmp/hf
-ENV TRANSFORMERS_CACHE=/tmp/hf
+# Baked Hub cache from image (see COPY hf_baked); avoids per-replica Hub downloads.
+ENV HF_HOME=/app/.cache/huggingface
+ENV HF_HUB_CACHE=/app/.cache/huggingface/hub
+ENV TRANSFORMERS_CACHE=/app/.cache/huggingface/hub
 # Do **not** auto-load the LLM at process start by default: PyTorch + SmolLM2 can
 # OOM small instances and crash-loop every replica (see platform logs). After
 # deploy, call ``POST /bootstrap`` once (per replica), or set the env vars below

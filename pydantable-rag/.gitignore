@@ -11,3 +11,7 @@ __pycache__/
 # Fetched from GitHub (see scripts/fetch_upstream_docs.py)
 bundled/
 .upstream_fetch_tmp/
+
+# CI-baked Hub cache (large); keep hf_baked/.gitkeep for Docker COPY
+hf_baked/*
+!hf_baked/.gitkeep

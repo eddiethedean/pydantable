@@ -14,6 +14,11 @@ jobs:
   build-rag-database:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      HF_HOME: ${{ github.workspace }}/pydantable-rag/hf_baked
+      HF_HUB_CACHE: ${{ github.workspace }}/pydantable-rag/hf_baked/hub
+      TRANSFORMERS_CACHE: ${{ github.workspace }}/pydantable-rag/hf_baked/hub
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -25,17 +30,21 @@ jobs:
         working-directory: pydantable-rag
         run: uv sync --all-extras
 
+      - name: Bake Hugging Face Hub cache (embed + LLM snapshots)
+        working-directory: pydantable-rag
+        run: uv run python scripts/prep_hf_cache_ci.py
+
       - name: Build vector database (from monorepo docs/)
         working-directory: pydantable-rag
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: uv run python scripts/build_index_ci.py
 
-      - name: Upload DB for deploy step
+      - name: Upload DB + Hub cache for deploy
         uses: actions/upload-artifact@v4
         with:
-          name: rag-db-for-deploy
-          path: pydantable-rag/data/pydantable_vectors.db
+          name: rag-deploy-bundle
+          path: |
+            pydantable-rag/data/pydantable_vectors.db
+            pydantable-rag/hf_baked
           if-no-files-found: error
 
   deploy:
@@ -45,11 +54,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Download prebuilt vector database
+      - name: Download prebuilt DB and Hugging Face cache
         uses: actions/download-artifact@v4
         with:
-          name: rag-db-for-deploy
-          path: pydantable-rag/data/
+          name: rag-deploy-bundle
+          path: .
 
       - name: Show app version being deployed
         run: grep -E '^version\s*=' pydantable-rag/pyproject.toml | head -1
