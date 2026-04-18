@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
  [project]
  name = "pydantable-rag"
-version = "0.2.10"
+version = "0.2.11"
  description = "FastAPI backend for chatting with a local RAG assistant about pydantable."
  readme = "README.md"
  requires-python = ">=3.10"

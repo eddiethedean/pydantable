@@ -86,7 +86,7 @@ At runtime, **`POST /bootstrap`** only needs to **warm the LLM** if you ship a r
 ### FastAPI Cloud
 
 - **Set `HF_TOKEN` on the app** (Dashboard → your app → Environment / variables) if you rely on **runtime** Hub access (e.g. missing baked cache, private models). The repo’s **Deploy pydantable-rag** workflow runs **`scripts/prep_hf_cache_ci.py`** in CI (with GitHub **`HF_TOKEN`**) and ships snapshots under **`hf_baked/`** inside the Docker image, so replicas load **`transformers`** weights from disk and do **not** re-download from Hugging Face on every boot. GitHub’s secret still only applies to CI unless you set **`HF_TOKEN`** on the app.
-- Prefer **one replica** (or shared storage for SQLite) until the LLM is cached and stable.
+- **Load balancing:** Each replica keeps its **own** LLM in RAM. With a shipped index, **`RAG_WARM_LLM_WHEN_INDEX_READY=true`** (Dockerfile default) starts a **background** `warm_llm` on **every** replica so **`GET /readyz`** and **`POST /chat`** behave the same on any instance. If you **OOM** or crash-loop, set **`RAG_WARM_LLM_WHEN_INDEX_READY=false`**, use **min replicas 1**, and warm via **`POST /bootstrap`** (single-replica path only). Prefer **one replica** with SQLite unless you use shared storage for the DB.
 - This project includes `fastapi[standard]`, so the **FastAPI Cloud CLI** is available.
 - Deploy from the `pydantable-rag/` directory (after placing a CI-built DB as above, or use the repo’s deploy workflow):
 
@@ -94,7 +94,7 @@ At runtime, **`POST /bootstrap`** only needs to **warm the LLM** if you ship a r
 fastapi deploy
 ```
 
-- The **Dockerfile** copies a **baked Hub cache** to **`HF_HOME=/app/.cache/huggingface`** (empty except **`.gitkeep`** unless you run **`prep_hf_cache_ci.py`**). It sets **`RAG_PRELOAD_MODELS_ON_STARTUP=false`** and **`RAG_WARM_LLM_WHEN_INDEX_READY=false`** so new replicas **do not** immediately **load** the LLM into RAM (that pattern **OOMs** small instances). Use **`POST /bootstrap`** after deploy (or set those two env vars to **`true`** when one replica has enough memory). **`RAG_BLOCKING_STARTUP_WARMUP=false`**, **`WEB_CONCURRENCY=1`**, **uvicorn `--workers 1`**. **`POST /chat`** returns **503** quickly if the LLM is not ready; poll **`GET /readyz`**. **`RAG_AUTO_INGEST_ON_STARTUP`** defaults **off**; ship the **CI-built DB** and **CI-baked `hf_baked/`** via the deploy workflow. **`POST /bootstrap`** skips re-ingestion when the index already has rows. Use **`GET /diag`** (`llm_last_error`) if the LLM fails to load.
+- The **Dockerfile** copies a **baked Hub cache** to **`HF_HOME=/app/.cache/huggingface`**. It sets **`RAG_PRELOAD_MODELS_ON_STARTUP=false`**, **`RAG_WARM_LLM_WHEN_INDEX_READY=true`**, and **`RAG_BLOCKING_STARTUP_WARMUP=false`**: when the image includes a **non-empty vector index**, each replica **backgrounds** LLM load from disk (no long **`POST /chat`** block; **`GET /readyz`** can turn **`ok: true`** on every replica after warm). **`WEB_CONCURRENCY=1`**, **uvicorn `--workers 1`**. **`POST /chat`** returns **503** until the LLM is ready on that replica. **`RAG_AUTO_INGEST_ON_STARTUP`** defaults **off**; ship the **CI-built DB** and **CI-baked `hf_baked/`**. **`POST /bootstrap`** remains useful for manual warm when startup warm is disabled. Use **`GET /diag`** (`llm_last_error`) if the LLM fails to load.
 - Use a **writable** `RAG_DB_PATH` on **shared storage** if you run **multiple replicas**; otherwise prefer **one replica** for SQLite.
 - Typical env vars (many match built-in defaults):
 

@@ -18,10 +18,11 @@ class Settings(BaseModel):
     # warm with POST /bootstrap when you have enough RAM.
     preload_models_on_startup: bool = False
     # If True and the SQLite index has rows, start a background LLM warm at
-    # process start. Default False: multi-replica + torch can OOM and crash-loop
-    # when hosts omit RAG_WARM_LLM_WHEN_INDEX_READY. Use POST /bootstrap or set
-    # RAG_PRELOAD_MODELS_ON_STARTUP / this flag explicitly when one replica has RAM.
-    warm_llm_when_index_ready: bool = False
+    # process start on **this** replica. Needed so load-balanced GET /readyz and
+    # POST /chat see a warmed LLM on every instance (bootstrap alone only warms
+    # one replica). Set RAG_WARM_LLM_WHEN_INDEX_READY=false if memory is too
+    # small for torch+model per replica (use min replicas 1 and POST /bootstrap).
+    warm_llm_when_index_ready: bool = True
 
     chunk_chars: int = 4000
     chunk_overlap_chars: int = 400

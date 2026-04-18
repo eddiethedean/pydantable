@@ -29,12 +29,12 @@ ENV PYTHONUNBUFFERED=1
 ENV HF_HOME=/app/.cache/huggingface
 ENV HF_HUB_CACHE=/app/.cache/huggingface/hub
 ENV TRANSFORMERS_CACHE=/app/.cache/huggingface/hub
-# Do **not** auto-load the LLM at process start by default: PyTorch + SmolLM2 can
-# OOM small instances and crash-loop every replica (see platform logs). After
-# deploy, call ``POST /bootstrap`` once (per replica), or set the env vars below
-# to ``true`` in FastAPI Cloud when using **one replica** and **enough RAM** (+ ``HF_TOKEN``).
+# ``RAG_PRELOAD_MODELS_ON_STARTUP`` stays off (avoid warming with an empty index).
+# ``RAG_WARM_LLM_WHEN_INDEX_READY=true``: each replica backgrounds warm_llm when
+# the shipped SQLite index has rows, so ``GET /readyz`` works behind a load
+# balancer. If replicas OOM, set this to ``false`` and use **min replicas 1**.
 ENV RAG_PRELOAD_MODELS_ON_STARTUP=false
-ENV RAG_WARM_LLM_WHEN_INDEX_READY=false
+ENV RAG_WARM_LLM_WHEN_INDEX_READY=true
 # Non-blocking: if you enable preload + warm-when-index, avoid blocking startup.
 ENV RAG_BLOCKING_STARTUP_WARMUP=false
 # Heroku-style stacks sometimes honor this; harmless elsewhere.
