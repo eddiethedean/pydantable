@@ -26,11 +26,13 @@ ENV PYTHONUNBUFFERED=1
 ENV HF_HOME=/tmp/hf
 ENV HF_HUB_CACHE=/tmp/hf
 ENV TRANSFORMERS_CACHE=/tmp/hf
-# Serve chat after cold start without manual ``POST /bootstrap`` (override if RAM is tight).
-ENV RAG_PRELOAD_MODELS_ON_STARTUP=true
-# Non-blocking: blocking warmup can exceed platform health-check / grace windows and
-# trigger restart loops before the LLM finishes downloading. Warm-up runs in a
-# background thread; ``POST /chat`` still awaits ``warm_llm`` until ready.
+# Do **not** auto-load the LLM at process start by default: PyTorch + SmolLM2 can
+# OOM small instances and crash-loop every replica (see platform logs). After
+# deploy, call ``POST /bootstrap`` once (per replica), or set the env vars below
+# to ``true`` in FastAPI Cloud when using **one replica** and **enough RAM** (+ ``HF_TOKEN``).
+ENV RAG_PRELOAD_MODELS_ON_STARTUP=false
+ENV RAG_WARM_LLM_WHEN_INDEX_READY=false
+# Non-blocking: if you enable preload + warm-when-index, avoid blocking startup.
 ENV RAG_BLOCKING_STARTUP_WARMUP=false
 # Heroku-style stacks sometimes honor this; harmless elsewhere.
 ENV WEB_CONCURRENCY=1
