@@ -17,10 +17,11 @@ class Settings(BaseModel):
     # instances and crash-loop (502). Enable via RAG_PRELOAD_MODELS_ON_STARTUP or
     # warm with POST /bootstrap when you have enough RAM.
     preload_models_on_startup: bool = False
-    # If the SQLite index already has rows (e.g. CI-built DB), warm the LLM on
-    # startup even when RAG_PRELOAD_MODELS_ON_STARTUP is false — hosted dashboards
-    # often override Dockerfile env and accidentally disable preload alone.
-    warm_llm_when_index_ready: bool = True
+    # If True and the SQLite index has rows, start a background LLM warm at
+    # process start. Default False: multi-replica + torch can OOM and crash-loop
+    # when hosts omit RAG_WARM_LLM_WHEN_INDEX_READY. Use POST /bootstrap or set
+    # RAG_PRELOAD_MODELS_ON_STARTUP / this flag explicitly when one replica has RAM.
+    warm_llm_when_index_ready: bool = False
 
     chunk_chars: int = 4000
     chunk_overlap_chars: int = 400
