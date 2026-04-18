@@ -419,17 +419,33 @@ def ingest(
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest) -> ChatResponse:
+def chat(req: ChatRequest, background_tasks: BackgroundTasks) -> ChatResponse:
     s = get_settings()
     db_path = resolve_db_path(s.db_path)
 
+    # Do not await warm_llm here: hosted gateways often time out (~5s) while HF
+    # downloads run for minutes → 502. Return fast 503; clients poll GET /readyz.
     if not llm_is_loaded(s.llm_model):
-        await asyncio.to_thread(warm_llm, s.llm_model)
-    if not llm_is_loaded(s.llm_model):
+        if llm_is_loading(s.llm_model):
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "LLM is loading (Hugging Face). Retry shortly or call GET /readyz "
+                    "until ok=true."
+                ),
+            )
+        background_tasks.add_task(warm_llm, s.llm_model)
         err = llm_last_error(s.llm_model)
         raise HTTPException(
             status_code=503,
-            detail=err or "LLM failed to load after warm-up",
+            detail=(
+                err
+                if err
+                else (
+                    "LLM load not finished; warm-up was queued. Retry or GET /readyz "
+                    "until ok=true (avoids gateway 502 on long HF downloads)."
+                )
+            ),
         )
 
     result = rag_chat(
