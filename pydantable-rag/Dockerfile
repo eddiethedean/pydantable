@@ -35,9 +35,10 @@ ENV TORCH_NUM_THREADS=1
 ENV HF_HOME=/app/.cache/huggingface
 ENV HF_HUB_CACHE=/app/.cache/huggingface/hub
 ENV TRANSFORMERS_CACHE=/app/.cache/huggingface/hub
-# Startup LLM warm off by default (per-replica torch+model often OOMs tiny instances).
-# Set ``RAG_WARM_LLM_WHEN_INDEX_READY=true`` in the dashboard when RAM per replica
-# is sufficient, or use **min replicas 1** and ``POST /bootstrap``.
+# Retrieval + MiniLM embeds only — no local ``transformers`` causal LM (avoids
+# PyTorch RAM on small plans). Set ``RAG_LLM_BACKEND=hf`` when the host has enough
+# memory for SmolLM2 (or another ``RAG_LLM_MODEL``).
+ENV RAG_LLM_BACKEND=extractive
 ENV RAG_PRELOAD_MODELS_ON_STARTUP=false
 ENV RAG_WARM_LLM_WHEN_INDEX_READY=false
 # Non-blocking: if you enable preload + warm-when-index, avoid blocking startup.

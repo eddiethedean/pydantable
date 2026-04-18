@@ -86,7 +86,7 @@ At runtime, **`POST /bootstrap`** only needs to **warm the LLM** if you ship a r
 ### FastAPI Cloud
 
 - **Set `HF_TOKEN` on the app** (Dashboard → your app → Environment / variables) if you rely on **runtime** Hub access (e.g. missing baked cache, private models). The repo’s **Deploy pydantable-rag** workflow runs **`scripts/prep_hf_cache_ci.py`** in CI (with GitHub **`HF_TOKEN`**) and ships snapshots under **`hf_baked/`** inside the Docker image, so replicas load **`transformers`** weights from disk and do **not** re-download from Hugging Face on every boot. GitHub’s secret still only applies to CI unless you set **`HF_TOKEN`** on the app.
-- **Replicas and RAM:** Each instance loads its **own** LLM in memory. The image defaults **`RAG_WARM_LLM_WHEN_INDEX_READY=false`** so small plans do not **OOM** and crash-loop when several replicas all start `torch` at once. Use **min replicas 1** and **`POST /bootstrap`** to warm the LLM, or set **`RAG_WARM_LLM_WHEN_INDEX_READY=true`** only when **each** replica has enough memory. The Dockerfile sets **`OMP_NUM_THREADS=1`** (and related) plus app **`configure_torch_cpu()`** to limit CPU thread overhead.
+- **Generative LLM vs retrieval-only:** A local **causal LM** (SmolLM2 + PyTorch) is heavy for small hosts. The **Dockerfile defaults `RAG_LLM_BACKEND=extractive`**: **`POST /chat`** returns **ranked doc chunks** with **no** generative model (only the **embedding** model runs — still `transformers`, but much smaller). To use a **local** generative model, set **`RAG_LLM_BACKEND=hf`** and ensure **enough RAM** per replica (see **`RAG_WARM_LLM_WHEN_INDEX_READY`**, **`POST /bootstrap`**). The image sets **`OMP_NUM_THREADS=1`** and **`configure_torch_cpu()`** to limit thread overhead when you do load torch.
 - This project includes `fastapi[standard]`, so the **FastAPI Cloud CLI** is available.
 - Deploy from the `pydantable-rag/` directory (after placing a CI-built DB as above, or use the repo’s deploy workflow):
 
@@ -94,14 +94,15 @@ At runtime, **`POST /bootstrap`** only needs to **warm the LLM** if you ship a r
 fastapi deploy
 ```
 
-- The **Dockerfile** copies a **baked Hub cache** to **`HF_HOME=/app/.cache/huggingface`**, sets **`RAG_PRELOAD_MODELS_ON_STARTUP=false`**, **`RAG_WARM_LLM_WHEN_INDEX_READY=false`**, **`RAG_BLOCKING_STARTUP_WARMUP=false`**, and single-thread BLAS/torch env vars. **`WEB_CONCURRENCY=1`**, **uvicorn `--workers 1`**. **`POST /chat`** returns **503** until the LLM is ready on that replica. Ship the **CI-built DB** and **CI-baked `hf_baked/`**. Use **`POST /bootstrap`** to queue a warm when startup warm is off. Use **`GET /diag`** (`llm_last_error`) if the LLM fails to load.
+- The **Dockerfile** copies a **baked Hub cache** (embed + optional LLM snapshots), sets **`RAG_LLM_BACKEND=extractive`**, **`RAG_PRELOAD_MODELS_ON_STARTUP=false`**, **`RAG_WARM_LLM_WHEN_INDEX_READY=false`**, **`RAG_BLOCKING_STARTUP_WARMUP=false`**, and single-thread env vars. **`WEB_CONCURRENCY=1`**, **uvicorn `--workers 1`**. With **`extractive`**, **`POST /chat`** does not wait on a generative LLM. With **`RAG_LLM_BACKEND=hf`**, **`POST /chat`** may return **503** until the model is loaded. Ship the **CI-built DB** and **CI-baked `hf_baked/`**. Use **`GET /diag`** if something fails to load.
 - Use a **writable** `RAG_DB_PATH` on **shared storage** if you run **multiple replicas**; otherwise prefer **one replica** for SQLite.
 - Typical env vars (many match built-in defaults):
 
   - `RAG_DB_PATH=data/pydantable_vectors.db` (must be writable)
   - `RAG_EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2`
   - `RAG_EMBED_DIMS=384`
-  - `RAG_LLM_MODEL=HuggingFaceTB/SmolLM2-135M-Instruct`
+  - `RAG_LLM_BACKEND=extractive` or `hf` (default in code is `hf`; Docker defaults **`extractive`**)
+  - `RAG_LLM_MODEL=HuggingFaceTB/SmolLM2-135M-Instruct` (only for **`hf`**)
 
 - Health endpoints:
   - `GET /healthz`

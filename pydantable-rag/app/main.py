@@ -40,19 +40,24 @@ from app.version import app_version
 _log = logging.getLogger(__name__)
 
 
+def _uses_hf_llm(s: Settings) -> bool:
+    return s.llm_backend == "hf"
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     configure_torch_cpu()
     s = get_settings()
     want_ingest = s.auto_ingest_on_startup
-    want_llm = s.preload_models_on_startup
+    want_llm = s.preload_models_on_startup and _uses_hf_llm(s)
     dbp = resolve_db_path(s.db_path)
     counts = get_counts(db_path=dbp)
     if want_ingest:
         if s.auto_ingest_if_db_empty and counts["docs"] > 0 and counts["vecs"] > 0:
             want_ingest = False
     if (
-        s.warm_llm_when_index_ready
+        _uses_hf_llm(s)
+        and s.warm_llm_when_index_ready
         and counts.get("docs", 0) > 0
         and counts.get("vecs", 0) > 0
     ):
@@ -118,7 +123,8 @@ def _ingest_then_warm_llm(
     """
     ingest_repo_docs(settings=settings, repo_root=repo_root, paths=paths)
     release_embedder_models()
-    warm_llm(settings.llm_model)
+    if _uses_hf_llm(settings):
+        warm_llm(settings.llm_model)
 
 
 def _bootstrap_ingest_then_warm(
@@ -134,7 +140,8 @@ def _bootstrap_ingest_then_warm(
             and counts.get("docs", 0) > 0
             and counts.get("vecs", 0) > 0
         ):
-            warm_llm(settings.llm_model)
+            if _uses_hf_llm(settings):
+                warm_llm(settings.llm_model)
             return
         _ingest_then_warm_llm(settings=settings, repo_root=repo_root, paths=paths)
     except Exception:
@@ -152,6 +159,9 @@ class HealthzResponse(BaseModel):
     db_path: str
     embed_model: str
     embed_dims: int
+    llm_backend: str = Field(
+        description="hf = transformers generative model; extractive = chunks only.",
+    )
     llm_model: str
     llm_loaded: bool
     llm_loading: bool = Field(
@@ -185,6 +195,7 @@ class CountsStatus(BaseModel):
 class ReadyzResponse(BaseModel):
     ok: bool
     counts: CountsStatus
+    llm_backend: str
     llm_loaded: bool
     llm_loading: bool
     embed_loaded: bool
@@ -198,6 +209,7 @@ class DiagResponse(BaseModel):
     db_path: str
     vector_backend: VectorBackendStatus
     counts: CountsStatus
+    llm_backend: str
     llm_loaded: bool
     llm_loading: bool
     llm_last_error: str | None = None
@@ -236,7 +248,8 @@ def _status_page_html() -> str:
     llm_load = llm_is_loading(s.llm_model)
     llm_ok = llm_is_loaded(s.llm_model)
     index_ok = n_docs > 0 and n_vecs > 0
-    chat_ready = index_ok and llm_ok
+    hf_llm = _uses_hf_llm(s)
+    chat_ready = index_ok and (not hf_llm or llm_ok)
 
     def row(label: str, ok: bool, loading: bool, detail: str) -> str:
         if loading:
@@ -257,7 +270,16 @@ def _status_page_html() -> str:
             embed_load,
             f"{s.embed_model} ({s.embed_dims}d)",
         ),
-        row("LLM (chat)", llm_ok, llm_load, s.llm_model),
+        (
+            row("LLM (chat)", llm_ok, llm_load, s.llm_model)
+            if hf_llm
+            else row(
+                "LLM (chat)",
+                True,
+                False,
+                "extractive mode — no local generative model",
+            )
+        ),
         row(
             "Vector index",
             index_ok,
@@ -328,7 +350,11 @@ def bootstrap(background_tasks: BackgroundTasks) -> BootstrapResponse:
     dbp = resolve_db_path(s.db_path)
     counts = get_counts(db_path=dbp)
     has_index = counts.get("docs", 0) > 0 and counts.get("vecs", 0) > 0
-    started = ["warm_llm"] if has_index else ["ingest", "warm_llm"]
+    started: list[str] = []
+    if not has_index:
+        started.append("ingest")
+    if _uses_hf_llm(s):
+        started.append("warm_llm")
 
     background_tasks.add_task(
         _bootstrap_ingest_then_warm,
@@ -349,6 +375,7 @@ def healthz() -> HealthzResponse:
         db_path=str(dbp),
         embed_model=s.embed_model,
         embed_dims=s.embed_dims,
+        llm_backend=s.llm_backend,
         llm_model=s.llm_model,
         llm_loaded=llm_is_loaded(s.llm_model),
         llm_loading=llm_is_loading(s.llm_model),
@@ -364,11 +391,12 @@ def readyz() -> ReadyzResponse:
     dbp = resolve_db_path(s.db_path)
     counts = get_counts(db_path=dbp)
     docs_ready = counts["docs"] > 0 and counts["vecs"] > 0
-    llm_ready = llm_is_loaded(s.llm_model)
+    llm_ready = (not _uses_hf_llm(s)) or llm_is_loaded(s.llm_model)
     return ReadyzResponse(
         ok=bool(docs_ready and llm_ready),
         counts=CountsStatus.model_validate(counts),
-        llm_loaded=llm_ready,
+        llm_backend=s.llm_backend,
+        llm_loaded=llm_is_loaded(s.llm_model),
         llm_loading=llm_is_loading(s.llm_model),
         embed_loaded=embedder_is_loaded(s.embed_model, s.embed_dims),
         embed_loading=embedder_is_loading(s.embed_model, s.embed_dims),
@@ -388,6 +416,7 @@ def diag() -> DiagResponse:
             check_vector_backend(db_path=dbp)
         ),
         counts=CountsStatus.model_validate(get_counts(db_path=dbp)),
+        llm_backend=s.llm_backend,
         llm_loaded=llm_is_loaded(s.llm_model),
         llm_loading=llm_is_loading(s.llm_model),
         llm_last_error=llm_last_error(s.llm_model),
@@ -427,28 +456,29 @@ def chat(req: ChatRequest, background_tasks: BackgroundTasks) -> ChatResponse:
 
     # Do not await warm_llm here: hosted gateways often time out (~5s) while HF
     # downloads run for minutes → 502. Return fast 503; clients poll GET /readyz.
-    if not llm_is_loaded(s.llm_model):
-        if llm_is_loading(s.llm_model):
+    if _uses_hf_llm(s):
+        if not llm_is_loaded(s.llm_model):
+            if llm_is_loading(s.llm_model):
+                raise HTTPException(
+                    status_code=503,
+                    detail=(
+                        "LLM is loading (Hugging Face). Retry shortly or call "
+                        "GET /readyz until ok=true."
+                    ),
+                )
+            background_tasks.add_task(warm_llm, s.llm_model)
+            err = llm_last_error(s.llm_model)
             raise HTTPException(
                 status_code=503,
                 detail=(
-                    "LLM is loading (Hugging Face). Retry shortly or call GET /readyz "
-                    "until ok=true."
+                    err
+                    if err
+                    else (
+                        "LLM load not finished; warm-up was queued. "
+                        "Retry or GET /readyz until ok=true (short gateway timeouts)."
+                    )
                 ),
             )
-        background_tasks.add_task(warm_llm, s.llm_model)
-        err = llm_last_error(s.llm_model)
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                err
-                if err
-                else (
-                    "LLM load not finished; warm-up was queued. Retry or GET /readyz "
-                    "until ok=true (avoids gateway 502 on long HF downloads)."
-                )
-            ),
-        )
 
     result = rag_chat(
         question=req.message,
@@ -457,6 +487,7 @@ def chat(req: ChatRequest, background_tasks: BackgroundTasks) -> ChatResponse:
         embed_dims=s.embed_dims,
         top_k=s.top_k,
         llm_model=s.llm_model,
+        llm_backend=s.llm_backend,
         chat_history=req.history,
     )
 

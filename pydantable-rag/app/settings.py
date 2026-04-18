@@ -13,6 +13,9 @@ class Settings(BaseModel):
     embed_dims: int = 384
     # Keep the default LLM small to avoid 502s/timeouts on cold start.
     llm_model: str = "HuggingFaceTB/SmolLM2-135M-Instruct"
+    # ``hf``: load ``transformers`` + causal LM (heavy CPU/RAM). ``extractive``:
+    # return retrieved chunks only — fits small hosts (e.g. FastAPI Cloud).
+    llm_backend: str = "hf"
     # Off by default: loading embed + LLM on every replica can OOM small cloud
     # instances and crash-loop (502). Enable via RAG_PRELOAD_MODELS_ON_STARTUP or
     # warm with POST /bootstrap when you have enough RAM.
@@ -45,6 +48,20 @@ def _getenv_bool(name: str, default: bool) -> bool:
     return v.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _getenv_llm_backend(default: str) -> str:
+    import os
+
+    v = os.getenv("RAG_LLM_BACKEND")
+    if v is None:
+        return default
+    x = v.strip().lower()
+    if x in {"hf", "transformers", "huggingface", "local"}:
+        return "hf"
+    if x in {"extractive", "chunks", "none", "retrieve"}:
+        return "extractive"
+    return default
+
+
 def get_settings() -> Settings:
     load_dotenv()
     import os
@@ -55,6 +72,7 @@ def get_settings() -> Settings:
         embed_model=os.getenv("RAG_EMBED_MODEL", base.embed_model),
         embed_dims=int(os.getenv("RAG_EMBED_DIMS", str(base.embed_dims))),
         llm_model=os.getenv("RAG_LLM_MODEL", base.llm_model),
+        llm_backend=_getenv_llm_backend(base.llm_backend),
         preload_models_on_startup=_getenv_bool(
             "RAG_PRELOAD_MODELS_ON_STARTUP", base.preload_models_on_startup
         ),
