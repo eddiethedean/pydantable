@@ -69,7 +69,7 @@ def test_healthz_has_version_and_config(client: TestClient) -> None:
     assert "db_path" in body
     assert "embed_model" in body
     assert "llm_model" in body
-    assert body.get("llm_backend") == "hf"
+    assert body.get("llm_backend") == "extractive"
     assert "llm_loaded" in body
     assert body["llm_loading"] is False
     assert "embed_dims" in body
@@ -93,7 +93,7 @@ def test_readyz_shape(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> No
     assert body["embed_loaded"] is True
     assert body["embed_loading"] is False
     assert body["embed_computing"] is False
-    assert body.get("llm_backend") == "hf"
+    assert body.get("llm_backend") == "extractive"
 
 
 def test_chat_success(client: TestClient) -> None:
@@ -113,13 +113,6 @@ def test_chat_validates_request_body(client: TestClient) -> None:
 def test_chat_extractive_skips_llm_gate(monkeypatch: pytest.MonkeyPatch) -> None:
     import app.main as main
 
-    real_get = main.get_settings
-
-    def fake_get() -> object:
-        s = real_get()
-        return s.model_copy(update={"llm_backend": "extractive"})
-
-    monkeypatch.setattr(main, "get_settings", fake_get)
     monkeypatch.setattr(main, "llm_is_loaded", lambda _m: False)
     monkeypatch.setattr(
         main, "rag_chat", lambda **_kwargs: _FakeRagResult("extractive ok")
@@ -134,6 +127,13 @@ def test_chat_extractive_skips_llm_gate(monkeypatch: pytest.MonkeyPatch) -> None
 def test_chat_returns_503_when_llm_not_ready(monkeypatch: pytest.MonkeyPatch) -> None:
     import app.main as main
 
+    real_get = main.get_settings
+
+    def fake_get() -> object:
+        s = real_get()
+        return s.model_copy(update={"llm_backend": "hf"})
+
+    monkeypatch.setattr(main, "get_settings", fake_get)
     monkeypatch.setattr(main, "llm_is_loaded", lambda _m: False)
     monkeypatch.setattr(main, "llm_is_loading", lambda _m: False)
     monkeypatch.setattr(main, "warm_llm", lambda _m: None)
@@ -175,7 +175,7 @@ def test_diag_has_backend_and_counts(
     assert body["counts"]["docs"] == 1
     assert body["llm_loading"] is False
     assert body.get("llm_last_error") is None
-    assert body.get("llm_backend") == "hf"
+    assert body.get("llm_backend") == "extractive"
     assert body["embed_loaded"] is True
     assert body["embed_loading"] is False
     assert body["embed_computing"] is False

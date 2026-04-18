@@ -56,7 +56,7 @@ def rag_chat(
     embed_dims: int,
     top_k: int,
     llm_model: str,
-    llm_backend: str = "hf",
+    llm_backend: str = "extractive",
     chat_history: list[ChatMessage] | None = None,
 ) -> RagResult:
     embedder = get_embedder(embed_model, embed_dims)

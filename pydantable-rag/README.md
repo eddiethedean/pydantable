@@ -85,6 +85,7 @@ At runtime, **`POST /bootstrap`** only needs to **warm the LLM** if you ship a r
 
 ### FastAPI Cloud
 
+- If **`GET /healthz`** shows **`llm_backend":"hf"`** but you want retrieval-only, remove **`RAG_LLM_BACKEND=hf`** from the app’s **Environment** (dashboard overrides the image). Redeploy after changing env. Default is **`extractive`**.
 - **Set `HF_TOKEN` on the app** (Dashboard → your app → Environment / variables) if you rely on **runtime** Hub access (e.g. missing baked cache, private models). The repo’s **Deploy pydantable-rag** workflow runs **`scripts/prep_hf_cache_ci.py`** in CI (with GitHub **`HF_TOKEN`**) and ships snapshots under **`hf_baked/`** inside the Docker image, so replicas load **`transformers`** weights from disk and do **not** re-download from Hugging Face on every boot. GitHub’s secret still only applies to CI unless you set **`HF_TOKEN`** on the app.
 - **Generative LLM vs retrieval-only:** A local **causal LM** (SmolLM2 + PyTorch) is heavy for small hosts. The **Dockerfile defaults `RAG_LLM_BACKEND=extractive`**: **`POST /chat`** returns **ranked doc chunks** with **no** generative model (only the **embedding** model runs — still `transformers`, but much smaller). To use a **local** generative model, set **`RAG_LLM_BACKEND=hf`** and ensure **enough RAM** per replica (see **`RAG_WARM_LLM_WHEN_INDEX_READY`**, **`POST /bootstrap`**). The image sets **`OMP_NUM_THREADS=1`** and **`configure_torch_cpu()`** to limit thread overhead when you do load torch.
 - This project includes `fastapi[standard]`, so the **FastAPI Cloud CLI** is available.
@@ -101,7 +102,7 @@ fastapi deploy
   - `RAG_DB_PATH=data/pydantable_vectors.db` (must be writable)
   - `RAG_EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2`
   - `RAG_EMBED_DIMS=384`
-  - `RAG_LLM_BACKEND=extractive` or `hf` (default in code is `hf`; Docker defaults **`extractive`**)
+  - `RAG_LLM_BACKEND=extractive` (default in code and Docker) or `hf` for a local generative model
   - `RAG_LLM_MODEL=HuggingFaceTB/SmolLM2-135M-Instruct` (only for **`hf`**)
 
 - Health endpoints:

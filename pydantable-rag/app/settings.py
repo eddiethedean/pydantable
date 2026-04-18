@@ -13,9 +13,9 @@ class Settings(BaseModel):
     embed_dims: int = 384
     # Keep the default LLM small to avoid 502s/timeouts on cold start.
     llm_model: str = "HuggingFaceTB/SmolLM2-135M-Instruct"
-    # ``hf``: load ``transformers`` + causal LM (heavy CPU/RAM). ``extractive``:
-    # return retrieved chunks only — fits small hosts (e.g. FastAPI Cloud).
-    llm_backend: str = "hf"
+    # Default ``extractive``: ranked chunks only (embed model still runs). ``hf``
+    # loads a local causal LM — needs RAM; set ``RAG_LLM_BACKEND=hf`` explicitly.
+    llm_backend: str = "extractive"
     # Off by default: loading embed + LLM on every replica can OOM small cloud
     # instances and crash-loop (502). Enable via RAG_PRELOAD_MODELS_ON_STARTUP or
     # warm with POST /bootstrap when you have enough RAM.
