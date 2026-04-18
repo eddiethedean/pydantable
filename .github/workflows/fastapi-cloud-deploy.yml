@@ -54,6 +54,10 @@ jobs:
       - name: Show app version being deployed
         run: grep -E '^version\s*=' pydantable-rag/pyproject.toml | head -1
 
+      - name: Reminder — runtime HF_TOKEN on FastAPI Cloud
+        run: |
+          echo "::notice title=FastAPI Cloud::Add HF_TOKEN to the app's environment in the FastAPI Cloud dashboard. GitHub HF_TOKEN only applies to CI; anonymous Hub access causes rate limits and replica churn."
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:

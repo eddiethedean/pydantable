@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import html
 import logging
+import os
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -54,6 +55,25 @@ async def lifespan(_app: FastAPI):
         and counts.get("vecs", 0) > 0
     ):
         want_llm = True
+
+    if want_ingest or want_llm:
+        _log.info(
+            "pydantable-rag: startup warmup want_ingest=%s want_llm=%s blocking=%s "
+            "docs=%s vecs=%s model=%s",
+            want_ingest,
+            want_llm,
+            s.blocking_startup_warmup,
+            counts.get("docs"),
+            counts.get("vecs"),
+            s.llm_model,
+        )
+        if not (os.getenv("HF_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN")):
+            _log.warning(
+                "pydantable-rag: HF_TOKEN is not set. The Hub uses anonymous rate "
+                "limits; LLM downloads may stall, fail, or cause repeated replica "
+                "restarts. Add HF_TOKEN to this app in FastAPI Cloud (Settings → "
+                "Environment), not only in GitHub Actions secrets."
+            )
 
     def _warm_sync() -> None:
         rr = resolve_ingest_repo_root()

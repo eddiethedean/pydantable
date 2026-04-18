@@ -85,6 +85,8 @@ At runtime, **`POST /bootstrap`** only needs to **warm the LLM** if you ship a r
 
 ### FastAPI Cloud
 
+- **Set `HF_TOKEN` on the app** (Dashboard → your app → Environment / variables). GitHub’s **`HF_TOKEN` secret** only affects CI builds; **runtime** still needs the token, or the Hub serves **anonymous rate limits** and logs *“unauthenticated requests”* — downloads can take forever, fail, or contribute to **replica restarts**. Create a read token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
+- Prefer **one replica** (or shared storage for SQLite) until the LLM is cached and stable.
 - This project includes `fastapi[standard]`, so the **FastAPI Cloud CLI** is available.
 - Deploy from the `pydantable-rag/` directory (after placing a CI-built DB as above, or use the repo’s deploy workflow):
 

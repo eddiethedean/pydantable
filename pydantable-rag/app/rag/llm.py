@@ -47,6 +47,7 @@ def _load_llm(model_name: str):
     # ``functools`` internals in ``transformers`` stubs.
     nn.Module.to(mdl, device)
     _LOADED.add(model_name)
+    _log.info("pydantable-rag: LLM ready: %s (%s)", model_name, device)
     return tok, mdl, device
 
 
