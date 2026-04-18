@@ -28,6 +28,7 @@ from app.rag.llm import (
 )
 from app.rag.pipeline import rag_chat
 from app.rag.store import check_vector_backend, get_counts
+from app.rag.torch_cpu import configure_torch_cpu
 from app.settings import (
     Settings,
     get_settings,
@@ -41,6 +42,7 @@ _log = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    configure_torch_cpu()
     s = get_settings()
     want_ingest = s.auto_ingest_on_startup
     want_llm = s.preload_models_on_startup

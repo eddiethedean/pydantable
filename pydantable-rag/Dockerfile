@@ -25,16 +25,21 @@ RUN mkdir -p /app/data \
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
+# Limit BLAS/OpenMP threads so PyTorch CPU init uses less peak RAM on small plans.
+ENV OMP_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+ENV OPENBLAS_NUM_THREADS=1
+ENV NUMEXPR_NUM_THREADS=1
+ENV TORCH_NUM_THREADS=1
 # Baked Hub cache from image (see COPY hf_baked); avoids per-replica Hub downloads.
 ENV HF_HOME=/app/.cache/huggingface
 ENV HF_HUB_CACHE=/app/.cache/huggingface/hub
 ENV TRANSFORMERS_CACHE=/app/.cache/huggingface/hub
-# ``RAG_PRELOAD_MODELS_ON_STARTUP`` stays off (avoid warming with an empty index).
-# ``RAG_WARM_LLM_WHEN_INDEX_READY=true``: each replica backgrounds warm_llm when
-# the shipped SQLite index has rows, so ``GET /readyz`` works behind a load
-# balancer. If replicas OOM, set this to ``false`` and use **min replicas 1**.
+# Startup LLM warm off by default (per-replica torch+model often OOMs tiny instances).
+# Set ``RAG_WARM_LLM_WHEN_INDEX_READY=true`` in the dashboard when RAM per replica
+# is sufficient, or use **min replicas 1** and ``POST /bootstrap``.
 ENV RAG_PRELOAD_MODELS_ON_STARTUP=false
-ENV RAG_WARM_LLM_WHEN_INDEX_READY=true
+ENV RAG_WARM_LLM_WHEN_INDEX_READY=false
 # Non-blocking: if you enable preload + warm-when-index, avoid blocking startup.
 ENV RAG_BLOCKING_STARTUP_WARMUP=false
 # Heroku-style stacks sometimes honor this; harmless elsewhere.
