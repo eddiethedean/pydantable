@@ -14,9 +14,10 @@ class Row(Schema):
 
 
 @pytest.mark.spark
-def test_spark_dataframe_where_native_accepts_spark_column() -> None:
+def test_spark_dataframe_where_native_accepts_spark_column(spark) -> None:
     # Minimal smoke: verify method accepts a Spark Column and returns a new frame.
-    df = SparkDataFrame[Row]({"x": [1, 2, 3]}, engine=None)
+    sdf = spark.createDataFrame([{"x": 1}, {"x": 2}, {"x": 3}])
+    df = SparkDataFrame[Row].from_spark_dataframe(sdf)
     cond = df.spark_col("x") > 1
     out = df.where_native(cond)
     assert out.to_dict() == {"x": [2, 3]}
