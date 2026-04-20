@@ -4,9 +4,9 @@
 
 **Explicit raw string SQL:** **`fetch_sql_raw`**, **`iter_sql_raw`**, **`write_sql_raw`**, **`afetch_sql_raw`**, **`aiter_sql_raw`**, **`awrite_sql_raw`** — use these when the query or destination is **not** a mapped **`SQLModel`** table (dynamic SQL, ad hoc reporting, migrations, string **`table_name`** writes). Same semantics as the deprecated unprefixed names, without **`DeprecationWarning`**.
 
-**Deprecated (compatibility):** **`fetch_sql`**, **`afetch_sql`**, **`iter_sql`**, **`aiter_sql`**, **`write_sql`**, **`awrite_sql`**, **`write_sql_batches`**, **`awrite_sql_batches`** emit **`DeprecationWarning`** (see [VERSIONING](../semantics/versioning.md)); migrate to **`*_raw`** or SQLModel APIs. For **app / service** code with a stable table schema, prefer **`fetch_sqlmodel` / `iter_sqlmodel` / `write_sqlmodel`** and the **`DataFrameModel`** mirrors below.
+**v2 note:** legacy unprefixed string-SQL helpers (`fetch_sql`, `iter_sql`, `write_sql`, async/batch variants) were removed in **2.0.0**. Use **`*_sql_raw`** (string SQL) or **`*_sqlmodel`** (SQLModel-first) APIs.
 
-**Write path:** **`write_sqlmodel`** / **`awrite_sqlmodel`** for schema-driven tables, **`MyModel.write_sqlmodel_data`** / **`await MyModel.awrite_sqlmodel_data`** for dict payloads, **`my_frame.write_sqlmodel(...)`** / **`await my_frame.awrite_sqlmodel(...)`** using the frame’s **`to_dict()`**, **`write_sql_raw`** / **`await awrite_sql_raw`** for string table names, or deprecated **`MyModel.write_sql`** / **`await MyModel.awrite_sql`** (same warning as the legacy **`pydantable.io`** entrypoints).
+**Write path:** **`write_sqlmodel`** / **`awrite_sqlmodel`** for schema-driven tables, **`MyModel.write_sqlmodel_data`** / **`await MyModel.awrite_sqlmodel_data`** for dict payloads, **`my_frame.write_sqlmodel(...)`** / **`await my_frame.awrite_sqlmodel(...)`** using the frame’s **`to_dict()`**, or **`write_sql_raw`** / **`await awrite_sql_raw`** for string table names.
 
 Install **`pydantable[sql]`** plus the **DB-API driver** your URL needs. SQLAlchemy supports many dialects; pydantable does not bundle drivers.
 
@@ -65,7 +65,7 @@ Use **`sqlmodel_columns`** (**``from pydantable import sqlmodel_columns``**) to 
 **Write to a database**
 
 - **SQLModel:** **`my_frame.write_sqlmodel(UserTable, bind, *, if_exists=..., ...)`** / **`await my_frame.awrite_sqlmodel(...)`**; or **`MyModel.write_sqlmodel_data(data, UserTable, bind, ...)`** / **`await MyModel.awrite_sqlmodel_data(...)`** for a column dict. **`MyModel.Async.write_sqlmodel`** matches **`awrite_sqlmodel_data`**.
-- **String table name:** **`MyModel.write_sql(...)`** / **`await MyModel.awrite_sql(...)`** (deprecated) or prefer **`write_sql_raw`** / **`awrite_sql_raw`** (**``from pydantable import …``**) in new code.
+- **String table name:** call **`write_sql_raw`** / **`awrite_sql_raw`** (**``from pydantable import …``**) and pass a column dict (typically `model.to_dict()`).
 
 **`data`** is **`dict[str, list]`** — typically **`model.to_dict()`** or the column dict from **`fetch_sql_raw`**. **`write_sql_raw`** is the same write path without a **`DataFrameModel`** class.
 
@@ -79,7 +79,7 @@ The following signatures are defined on **`pydantable.io`** for documentation an
 - **`iter_sql_raw(sql, bind, *, parameters=None, batch_size=None)`** → iterator of **`dict[str, list]`** batches (**streaming**)
 - **`afetch_sql_raw(..., *, executor=None)`** — **`asyncio.to_thread`** (optional **`Executor`**)
 - **`aiter_sql_raw(..., batch_size=65_536, executor=None)`** — async generator yielding batches (threaded sync SQLAlchemy)
-- Deprecated aliases **`fetch_sql`**, **`iter_sql`**, **`afetch_sql`**, **`aiter_sql`** — same signatures; emit **`DeprecationWarning`**.
+- (Legacy unprefixed aliases were removed in **2.0.0**.)
 
 ### When to use `iter_sql_raw` / `aiter_sql_raw`
 
@@ -110,8 +110,7 @@ Set these before importing callers if you want process-wide defaults (invalid va
 
 - **`write_sql_raw(data, table_name, bind, *, schema=None, if_exists="append", chunk_size=None)`**
 - **`awrite_sql_raw(..., chunk_size=None, executor=None)`**
-- **`write_sql_batches`** / **`awrite_sql_batches`** — deprecated; call **`write_sql_raw`** / **`awrite_sql_raw`** per batch or use **`write_sqlmodel_batches`**
-- Deprecated **`write_sql`**, **`awrite_sql`** — same behavior; warn once per call.
+- (Legacy batch helpers and unprefixed write aliases were removed in **2.0.0**; call **`write_sql_raw`** / **`awrite_sql_raw`** per batch or use **`write_sqlmodel_batches`**.)
 
 **`data`** is **`dict[str, list]`**. **`if_exists="append"`** requires the table to exist already. **`if_exists="replace"`** drops the table if present, recreates it with inferred column types, then inserts (**`table_name`** / **`schema`** must be trusted identifiers, not user-controlled strings).
 

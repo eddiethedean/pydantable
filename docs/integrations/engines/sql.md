@@ -146,43 +146,58 @@ Use **`SqlDataFrame[Schema].from_sql_table(table, sql_config=…)`** (or **`sql_
 For **SQLite in-memory** (`sqlite:///:memory:`), each new SQLAlchemy connection pool is an **empty** database unless you share one **`sql_engine`** for both DDL and the frame. Prefer a **file** URL (`sqlite:///…/app.db`) while wiring this up, or build tables using the same **`ConnectionManager`** / engine you pass as **`sql_engine=`**.
 
 ```python
+from datetime import datetime, timezone
 from pathlib import Path
 import tempfile
 
-from pydantic import BaseModel
 from moltres_core import ConnectionManager, EngineConfig
 from sqlmodel import Field, SQLModel, Session
 
+from pydantable import Schema
 from pydantable.sql_dataframe import SqlDataFrame, sql_engine_from_config
 
 
-class Row(BaseModel):
-    """Pydantable row schema; field names align with the SQL table."""
+class OrderLine(Schema):
+    """Typed view schema; names align with the SQL table."""
 
-    id: int
-    name: str
+    order_id: int
+    sku: str
+    qty: int
+    unit_price_usd: float
+    ordered_at: datetime
 
 
-class Item(SQLModel, table=True):
-    """Physical table; use ``Item.__table__`` for ``from_sql_table``."""
+class OrderLineRow(SQLModel, table=True):
+    """Physical table; pass ``OrderLineRow.__table__`` to ``from_sql_table``."""
 
-    id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(max_length=40)
+    order_id: int = Field(primary_key=True)
+    sku: str = Field(primary_key=True, max_length=64)
+    qty: int
+    unit_price_usd: float
+    ordered_at: datetime
 
 
 with tempfile.TemporaryDirectory() as td:
-    db_file = Path(td) / "app.db"
+    db_file = Path(td) / "orders.db"
     cfg = EngineConfig(dsn=f"sqlite:///{db_file}")
-    eng = sql_engine_from_config(cfg)
+    sql_eng = sql_engine_from_config(cfg)
     cm = ConnectionManager(cfg)
 
     SQLModel.metadata.create_all(cm.engine)
     with Session(cm.engine) as session:
-        session.add(Item(id=1, name="a"))
+        session.add(
+            OrderLineRow(
+                order_id=1001,
+                sku="SKU-RED-TSHIRT",
+                qty=2,
+                unit_price_usd=19.99,
+                ordered_at=datetime(2026, 4, 20, 12, 0, tzinfo=timezone.utc),
+            )
+        )
         session.commit()
 
-    df = SqlDataFrame[Row].from_sql_table(Item.__table__, sql_engine=eng)  # lazy
-    cols = df.to_dict()  # runs SELECT here
+    df = SqlDataFrame[OrderLine].from_sql_table(OrderLineRow.__table__, sql_engine=sql_eng)  # lazy
+    cols = df.select("sku", "qty").sort("qty", descending=True).to_dict()
 ```
 
 You can define a single **SQLModel** class and use it both as the **table** definition and as the **dataframe** schema type (**`SqlDataFrame[ThatModel]`**) when the shapes match; the split above shows how **`Row`** (view schema) and **`Item`** (DDL) line up by column name.
@@ -220,8 +235,8 @@ from pydantable.sql_dataframe import SqlDataFrame
 
 
 # stmt is any SQLAlchemy selectable; field names must align with the schema fields.
-stmt = select(Item.__table__.c.id, Item.__table__.c.name)
-df = SqlDataFrame[Row].from_sql(stmt, sql_engine=eng)
+stmt = select(OrderLineRow.__table__.c.order_id, OrderLineRow.__table__.c.sku)
+df = SqlDataFrame[OrderLine].from_sql(stmt, sql_engine=sql_eng)
 ```
 
 ### Typed-safe `WHERE` pushdown (`where`)
@@ -234,8 +249,8 @@ server-side `WHERE` clause.
   `KeyError`).
 
 ```python
-df = SqlDataFrame[Row].from_sql_table(Item.__table__, sql_engine=eng)
-out = df.where(Item.__table__.c.id > 1).select("name").to_dict()
+df = SqlDataFrame[OrderLine].from_sql_table(OrderLineRow.__table__, sql_engine=sql_eng)
+out = df.where(OrderLineRow.__table__.c.qty >= 2).select("sku").to_dict()
 ```
 
 ### DataFrame transformations (lazy-SQL engine)

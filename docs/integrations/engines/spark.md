@@ -31,15 +31,20 @@ Pulls in:
 from pydantable import Schema, SparkDataFrame
 
 
-class Row(Schema):
-    x: int
-    y: str
+class SessionEvent(Schema):
+    user_id: int
+    country: str
+    revenue_usd: float | None
 
 
 # spark_df is a pyspark.sql.DataFrame
-df = SparkDataFrame[Row].from_spark_dataframe(spark_df)
+df = SparkDataFrame[SessionEvent].from_spark_dataframe(spark_df)
 
-out = df.filter(df.spark_col("x") > 1).select("y").to_dict()
+out = (
+    df.filter(df.spark_col("country") == "US")
+    .select("user_id", "revenue_usd")
+    .to_dict()
+)
 ```
 
 ### v2 engine selection policy (`engine_mode`)
@@ -73,9 +78,9 @@ Use:
 Spark → native transforms:
 
 ```python
-df = SparkDataFrame[Row].from_spark_dataframe(spark_df)
+df = SparkDataFrame[SessionEvent].from_spark_dataframe(spark_df)
 native_df = df.to_native()
-out = native_df.select("x").to_dict()
+out = native_df.select("user_id").to_dict()
 ```
 
 If you start from a **native** `DataFrame` / `DataFrameModel` and want to explicitly
@@ -85,11 +90,11 @@ re-root into the Spark execution engine, use **`to_spark_engine()`**:
 from pydantable import DataFrame, Schema
 
 
-class Row(Schema):
-    x: int
+class Tiny(Schema):
+    user_id: int
 
 
-df = DataFrame[Row]({"x": [2, 1]})
+df = DataFrame[Tiny]({"user_id": [101, 202]})
 spark_df = df.to_spark_engine()  # requires `pydantable[spark]`
 ```
 

@@ -31,7 +31,7 @@ Same logical work as blocking, but invoked with **`await`**. When the wheel expo
 
 ## Related
 
-- **Eager file I/O** on **`DataFrameModel`** (**`materialize_*`**, **`fetch_sql`**, …) is **not** a fifth plan mode: it loads external data into a typed frame (backed by **`dict[str, list]`**), then you run transforms and terminal materialization as usual ([IO_OVERVIEW](../io/overview.md)).
+- **Eager file I/O** on **`DataFrameModel`** (**`materialize_*`**, **`fetch_sql_raw`**, …) is **not** a fifth plan mode: it loads external data into a typed frame (backed by **`dict[str, list]`**), then you run transforms and terminal materialization as usual ([IO_OVERVIEW](../io/overview.md)).
 - **Engine streaming** (**`streaming=True`** / **`Engine::Streaming`**) is a **Polars collect** option, orthogonal to the four modes above ([EXECUTION](../user-guide/execution.md)).
 
 ### v2 engine handoff uses materialization

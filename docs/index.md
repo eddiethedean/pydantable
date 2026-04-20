@@ -13,15 +13,31 @@
 ## Minimal example
 
 ```python
+from datetime import datetime, timezone
+
 from pydantable import DataFrame, Schema
 
 
-class Row(Schema):
-    id: int
-    score: float
+class ApiRequest(Schema):
+    request_id: str
+    route: str
+    status_code: int
+    duration_ms: int
+    occurred_at: datetime
 
 
-df = DataFrame[Row]({"id": [1, 2], "score": [10.0, 20.5]})
+df = DataFrame[ApiRequest](
+    {
+        "request_id": ["req_001", "req_002"],
+        "route": ["/health", "/users/101"],
+        "status_code": [200, 200],
+        "duration_ms": [3, 47],
+        "occurred_at": [
+            datetime(2026, 4, 20, 12, 0, tzinfo=timezone.utc),
+            datetime(2026, 4, 20, 12, 1, tzinfo=timezone.utc),
+        ],
+    }
+)
 ```
 
 ## Choose your path

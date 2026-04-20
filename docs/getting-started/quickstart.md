@@ -17,22 +17,32 @@ It uses the same steps: build a typed `DataFrame`, inspect it, summarize, filter
 ## 1. Schema and data
 
 ```python
-from pydantic import BaseModel
+from datetime import datetime, timezone
 
-from pydantable import DataFrame
-
-
-class Row(BaseModel):
-    id: int
-    score: float
-    label: str
+from pydantable import DataFrame, Schema
 
 
-df = DataFrame[Row]({
-        "id": [1, 2, 3],
-        "score": [10.0, 20.5, 7.0],
-        "label": ["a", "b", "a"],
-    })
+class UserEvent(Schema):
+    event_id: str
+    user_id: int
+    event_name: str
+    occurred_at: datetime
+    latency_ms: int | None
+
+
+df = DataFrame[UserEvent](
+    {
+        "event_id": ["evt_001", "evt_002", "evt_003"],
+        "user_id": [101, 101, 202],
+        "event_name": ["page_view", "purchase", "page_view"],
+        "occurred_at": [
+            datetime(2026, 4, 20, 12, 0, tzinfo=timezone.utc),
+            datetime(2026, 4, 20, 12, 5, tzinfo=timezone.utc),
+            datetime(2026, 4, 20, 12, 7, tzinfo=timezone.utc),
+        ],
+        "latency_ms": [12, 220, None],
+    }
+)
 ```
 
 ## 2. String repr and HTML (Jupyter)
@@ -67,7 +77,7 @@ python docs/examples/getting_started/quickstart_discovery_helpers.py
 ## 4. Filter and materialize
 
 ```python
-filtered = df.filter(df.score > 8.0)
+filtered = df.filter((df.event_name == "page_view") & (df.latency_ms.is_not_null()))
 rows = filtered.collect()  # list[Pydantic row models]
 cols = filtered.to_dict()  # dict[str, list]
 ```

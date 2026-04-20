@@ -18,7 +18,7 @@ inside the native extension. Python does **not** require the `polars` package fo
 
 Cancelling an **`await acollect()`** (etc.) does **not** cancel in-flight native work. The **GIL** still serializes some Python callbacks; **`ato_polars()`** and **`ato_arrow()`** both build their respective outputs from a materialized columnar **`dict`** (extra allocation vs calling Polars or PyArrow alone on raw buffers).
 
-**File / I/O:** use **`DataFrameModel`** / **`DataFrame[Schema]`** for lazy **`read_*`** / **`aread_*`** and SQL (**`write_sqlmodel`** / **`awrite_sqlmodel`**, or deprecated **`write_sql`** / **`awrite_sql`**). Eager **`materialize_*`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`iter_sqlmodel`** / **`iter_sql_raw`**, … are imported **from `pydantable`** — pass **`dict[str, list]`** into **`MyModel(...)`** for typed frames. **`ScanFileRoot`** and other untyped scan handles are internal to **`pydantable.io`** — see [IO_OVERVIEW](../io/overview.md). **Which entrypoint?** [IO_DECISION_TREE](../io/decision-tree.md).
+**File / I/O:** use **`DataFrameModel`** / **`DataFrame[Schema]`** for lazy **`read_*`** / **`aread_*`** and SQL (**`write_sqlmodel`** / **`awrite_sqlmodel`**, or raw-string SQL via **`write_sql_raw`** / **`awrite_sql_raw`**). Eager **`materialize_*`**, **`fetch_sqlmodel`** / **`fetch_sql_raw`**, **`iter_sqlmodel`** / **`iter_sql_raw`**, … are imported **from `pydantable`** — pass **`dict[str, list]`** into **`MyModel(...)`** for typed frames. **`ScanFileRoot`** and other untyped scan handles are internal to **`pydantable.io`** — see [IO_OVERVIEW](../io/overview.md). **Which entrypoint?** [IO_DECISION_TREE](../io/decision-tree.md).
 
 - **`read_*` / `aread_*`:** return a native **`ScanFileRoot`** (local path + format). Use **`MyModel.read_parquet(...)`** / **`await MyModel.aread_parquet(...)`** so transforms run on a Polars **`LazyFrame`** without loading the whole file into **`dict[str, list]`** first. **`DataFrame.write_parquet`**, **`write_csv`**, **`write_ipc`**, and **`write_ndjson`** write the lazy result from Rust (no giant Python column dict on those paths). **`read_parquet_url`** / **`aread_parquet_url`** download HTTP(S) Parquet to a **temp file** you should delete — **`read_parquet_url_ctx`** / **`aread_parquet_url_ctx`** ([IO_HTTP](../io/http.md), [DATA_IO_SOURCES](../io/data-io-sources.md)) unlink it when the block exits. For **large local NDJSON** logs, prefer **`read_ndjson`** / **`read_json`** roots and optional **`streaming=True`** on **`collect()`** / **`write_*`** — patterns in [IO_JSON](../io/json.md).
 -  For typed lazy reads (**`DataFrame[Schema].read_*` / `aread_*`**, **`DataFrameModel.read_*` / `aread_*`**), ingest validation options (`trusted_mode`, `fill_missing_optional`, `ignore_errors`, `on_validation_errors`) are applied at **materialization time** (after the engine produces columns, before returning dicts/rows). By default (`fill_missing_optional=True`), missing optional fields (`Optional[T]` / `T | None`) are filled with `None` values; with `fill_missing_optional=False`, missing optionals raise unless the schema field has an explicit default (in which case that default is filled).
@@ -37,7 +37,11 @@ Service patterns: [FASTAPI](../integrations/fastapi/fastapi.md) and [ROADMAP](..
 
 Two key rules for multi-engine workflows:
 
-1. **Engine selection** is reader-specific: engine-backed frames default to a matching engine when available.\n   Escape hatch: `engine_mode="default"`. Explicit `engine=` wins.\n2. **Engine handoff** is an explicit boundary: plans are engine-defined, so switching engines requires\n+   materialization + re-root via `to_native()` / `to_engine(...)` (and convenience helpers like\n+   `to_sql_engine()` / `to_mongo_engine()` / `to_spark_engine()`).
+1. **Engine selection** is reader-specific: engine-backed frames default to a matching engine when available.
+   Escape hatch: `engine_mode="default"`. Explicit `engine=` wins.
+2. **Engine handoff** is an explicit boundary: plans are engine-defined, so switching engines requires
+   materialization + re-root via `to_native()` / `to_engine(...)` (and convenience helpers like
+   `to_sql_engine()` / `to_mongo_engine()` / `to_spark_engine()`).
 
 Eager SQL/Mongo helpers (`fetch_*`, `write_*`, etc.) still materialize **column dicts** and do not change `DataFrame._engine`.
 

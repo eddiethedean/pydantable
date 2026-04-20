@@ -57,33 +57,55 @@ Beanie uses PyMongo’s **async** API (`AsyncMongoClient`, `AsyncDatabase`, …)
 At runtime, `sync_pymongo_collection` only needs **pymongo** (or **mongomock** in tests); it does **not** import Beanie—it only calls **`get_collection_name()`** on your class.
 
 ```python
+from datetime import datetime, timezone
+
 from pymongo import MongoClient
 
-from beanie import Document, init_beanie
+from beanie import Document, Indexed, init_beanie
 from pydantic import Field
 
-from pydantable import MongoDataFrame, Schema, fetch_mongo, sync_pymongo_collection, write_mongo
+from pydantable import (
+    MongoDataFrame,
+    Schema,
+    fetch_mongo,
+    sync_pymongo_collection,
+    write_mongo,
+)
 
 
-class Item(Document):
-    x: int = Field(...)
-    label: str | None = None
+class InventoryItem(Document):
+    sku: Indexed(str)  # indexed field in Mongo
+    warehouse: str
+    on_hand: int = Field(ge=0)
+    updated_at: datetime
 
 
-class Row(Schema):
-    """Pydantic schema for the ``DataFrame`` row type (align fields with ``Item``)."""
+class InventoryRow(Schema):
+    """Typed view schema; align field names with the document shape."""
 
-    x: int
-    label: str | None = None
+    sku: str
+    warehouse: str
+    on_hand: int
+    updated_at: datetime
 
 
 async def setup(async_client, sync_uri: str) -> None:
-    await init_beanie(database=async_client.myapp, document_models=[Item])
-    # sync client for pydantable — same DB name as ``async_client.myapp``
-    sync_db = MongoClient(sync_uri).myapp
-    df = MongoDataFrame[Row].from_beanie(Item, database=sync_db)
-    cols = fetch_mongo(sync_pymongo_collection(Item, sync_db))
-    _ = write_mongo(sync_pymongo_collection(Item, sync_db), {"x": [1], "label": ["a"]})
+    await init_beanie(database=async_client.myapp, document_models=[InventoryItem])
+    sync_db = MongoClient(sync_uri).myapp  # same DB name as async_client.myapp
+
+    coll = sync_pymongo_collection(InventoryItem, sync_db)
+    _ = write_mongo(
+        coll,
+        {
+            "sku": ["SKU-RED-TSHIRT"],
+            "warehouse": ["us-east-1"],
+            "on_hand": [42],
+            "updated_at": [datetime(2026, 4, 20, 12, 0, tzinfo=timezone.utc)],
+        },
+    )
+
+    df = MongoDataFrame[InventoryRow].from_beanie(InventoryItem, database=sync_db)
+    cols = fetch_mongo(coll, fields=["sku", "on_hand"])
 ```
 
 ### `MongoDataFrameModel` with Beanie
