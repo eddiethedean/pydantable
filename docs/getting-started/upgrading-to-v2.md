@@ -61,9 +61,14 @@ native_df = df.to_native()
 out = native_df.select("x").to_dict()
 ```
 
+## Execution policy and observability (v2)
+
+- Terminals such as **`collect()`** / **`to_dict()`** accept **`execution_policy=`** (`"fallback_to_native"` default, `"pushdown"` / `"error_on_fallback"` for strict behavior). See [Engine policy](../user-guide/engine-policy.md).
+- **`engine_report()`** and **`explain_execution()`** on **`DataFrame`** / **`DataFrameModel`** summarize the active engine and capabilities for logging.
+
 ## 2.0.0 removals (breaking)
 
-The following removals are documented in [Versioning](../semantics/versioning.md) under **Planned removals (2.0.0)**:
+The following removals are documented in [Versioning](../semantics/versioning.md) under **Removed in 2.0.0**:
 
 - `as_polars=` on `collect()` / `acollect()` (use `to_polars()` / `ato_polars()` instead).
 - Legacy string-SQL I/O aliases (`fetch_sql`, `iter_sql`, `write_sql`, async variants, batch variants).\n  Use `*_sql_raw` / `*_sqlmodel` instead.

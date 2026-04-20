@@ -1,6 +1,6 @@
-# Versioning and stability (0.x and 1.x)
+# Versioning and stability (0.x, 1.x, and 2.x)
 
-PydanTable is **1.x** today. This page states how maintainers use **semver** on the stable train. **Behavioral** guarantees for transforms, nulls, joins, windows, materialization, and interchange live in [INTERFACE_CONTRACT](../semantics/interface-contract.md)—treat that document as the semantics source of truth.
+PydanTable is **2.x** today (**2.0.0+**). This page states how maintainers use **semver** on the stable train. **Behavioral** guarantees for transforms, nulls, joins, windows, materialization, and interchange live in [INTERFACE_CONTRACT](../semantics/interface-contract.md)—treat that document as the semantics source of truth.
 
 ## 0.x.y releases (historical)
 
@@ -65,24 +65,24 @@ Major releases are required for breaking changes, including:
 - **Minor:** add `DataFrame.read_foo(...)` with default-off behavior and docs/tests.
 - **Major:** change `collect()` default return shape or remove a long-standing method.
 
-## Planned removals (`2.0.0`)
+## Removed in `2.0.0`
 
-The following deprecated parameters are scheduled for removal in **`2.0.0`** (a **major** release per the policy above):
+The following **breaking removals** shipped in **`2.0.0`**:
 
 - **`as_polars=`** on **`DataFrame.collect`**, **`DataFrame.acollect`**, and the **`DataFrameModel`** collection shims — use **`to_polars()`** / **`ato_polars()`** (and **`collect(as_lists=True)`** / **`to_dict()`** for columnar dicts).
 
-The following **legacy string-SQL I/O** names are **deprecated** as of **v1.13.0**; they emit **`DeprecationWarning`** at runtime. Use **`fetch_sql_raw`**, **`iter_sql_raw`**, **`write_sql_raw`**, **`afetch_sql_raw`**, **`aiter_sql_raw`**, **`awrite_sql_raw`**, or SQLModel-first **`fetch_sqlmodel`** / **`iter_sqlmodel`** / **`write_sqlmodel`** (and **`DataFrameModel`** mirrors) instead. These aliases are scheduled for removal in **`2.0.0`** (exact timeline subject to [SQLMODEL_SQL_ROADMAP](../project/sqlmodel-sql-roadmap.md)):
+The following **legacy string-SQL I/O** names were **removed** (they were deprecated since **v1.13.0**). Use **`fetch_sql_raw`**, **`iter_sql_raw`**, **`write_sql_raw`**, **`afetch_sql_raw`**, **`aiter_sql_raw`**, **`awrite_sql_raw`**, or SQLModel-first **`fetch_sqlmodel`** / **`iter_sqlmodel`** / **`write_sqlmodel`** (and **`DataFrameModel`** mirrors) instead:
 
 - **`fetch_sql`**, **`iter_sql`**, **`write_sql`**, **`afetch_sql`**, **`aiter_sql`**, **`awrite_sql`**, **`write_sql_batches`**, **`awrite_sql_batches`**
 
-### Lazy SQL and Mongo façade names (preview)
+### Lazy SQL and Mongo façade names
 
-| Deprecated (remove in `2.0.0`) | Replacement |
+| Removed in `2.0.0` | Replacement |
 |--------------------------------|-------------|
 | **`moltres_engine=`** on **`SqlDataFrame`** / **`SqlDataFrameModel`** helpers | **`sql_engine=`** (same object; see [`SQL_ENGINE`](../integrations/engines/sql.md)) |
-| **`EnteiDataFrame`**, **`EnteiDataFrameModel`**, **`EnteiPydantableEngine`** (lazy imports / **`pydantable.mongo_entei`**) | **`MongoDataFrame`**, **`MongoDataFrameModel`**, **`MongoPydantableEngine`** from **`pydantable`** or **`pydantable.mongo_dataframe`** ([`MONGO_ENGINE`](../integrations/engines/mongo.md)) |
+| **`EnteiDataFrame`**, **`EnteiDataFrameModel`**, **`EnteiPydantableEngine`**, module paths such as **`pydantable.mongo_entei`** | **`MongoDataFrame`**, **`MongoDataFrameModel`**, **`MongoPydantableEngine`** from **`pydantable`** or **`pydantable.mongo_dataframe`** ([`MONGO_ENGINE`](../integrations/engines/mongo.md)) |
 
-After **`2.0.0`**, update imports and kwargs using the table above; run tests with **`PYTHONWARNINGS=error::DeprecationWarning`** before upgrading to catch stragglers.
+Migration guide: [UPGRADING_TO_V2](../getting-started/upgrading-to-v2.md). On **v1.x**, run tests with **`PYTHONWARNINGS=error::DeprecationWarning`** to catch stragglers before upgrading.
 
 ## Related documentation
 

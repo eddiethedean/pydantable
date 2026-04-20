@@ -6,9 +6,28 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Added
 
-The following items are **v2-focused** and describe upcoming behavior (this branch prepares the docs and APIs).
+(nothing yet)
 
-- **Engine selection policy (`engine_mode`)**: SQL/Mongo/Spark constructors accept `engine_mode="auto"|"default"` so you can force use of the process-wide default engine (`"default"`) or keep the source-matching engine (`"auto"`). Explicit `engine=` still wins.\n  See: [SQL engine](../integrations/engines/sql.md), [Mongo engine](../integrations/engines/mongo.md), [Spark engine](../integrations/engines/spark.md).\n- **Engine handoff helpers**: `to_engine(...)` / `to_native()` (plus `to_sql_engine()` / `to_mongo_engine()` / `to_spark_engine()`) materialize a frame and re-root it under a target engine for multi-engine workflows.\n  See: [Execution](../user-guide/execution.md) and the engine guides above.
+## [2.0.0] — 2026-04-20
+
+### Added
+
+- **Multi-engine defaults:** SQL / Mongo / Spark readers respect **`engine_mode="auto"|"default"`** (explicit **`engine=`** still wins). See [SQL engine](../integrations/engines/sql.md), [Mongo engine](../integrations/engines/mongo.md), [Spark engine](../integrations/engines/spark.md), and [Upgrading to v2](../getting-started/upgrading-to-v2.md).
+- **Engine handoff:** **`to_engine(...)`**, **`to_native()`**, plus **`to_sql_engine()`** / **`to_mongo_engine()`** / **`to_spark_engine()`** for explicit materialize-and-re-root workflows ([Execution](../user-guide/execution.md)).
+- **Execution policy:** **`execution_policy=`** on **`collect()`** / **`to_dict()`** / **`acollect()`** / **`ato_dict()`** / **`submit()`**; exported **`ExecutionPolicy`**, **`EngineMode`**, **`HandoffMaterialize`** ([Engine policy](../user-guide/engine-policy.md)).
+- **Observability:** **`engine_report()`** and **`explain_execution()`** on **`DataFrame`** and **`DataFrameModel`**.
+- **Protocol:** **`EngineCapabilities`** extended with optional **`expression_dialect`**, transform/sink category tuples for third-party engines ([pydantable-protocol](https://pypi.org/project/pydantable-protocol/)).
+
+### Removed
+
+- Legacy string-SQL I/O aliases (**`fetch_sql`**, **`write_sql`**, …) — use **`*_sql_raw`** or **`*_sqlmodel`** ([IO_SQL](../io/sql.md)).
+- **`as_polars=`** on collection APIs — use **`to_polars()`** / **`ato_polars()`**.
+- **`moltres_engine=`** on lazy SQL frames — use **`sql_engine=`**.
+- **`Entei*`** Mongo compatibility names and **`pydantable.mongo_entei`** — use **`Mongo*`** ([Versioning](../semantics/versioning.md)).
+
+### Version bump
+
+- Align **pydantable**, **pydantable-protocol**, **pydantable-native**, **pydantable-core**, and published **`__version__`** values to **2.0.0**.
 
 ## [1.19.0] — 2026-04-20
 

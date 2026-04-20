@@ -7,7 +7,7 @@
 
 
 !!! note
-    **Current release:** see [CHANGELOG](project/changelog.md) — stable **1.x** under [VERSIONING](semantics/versioning.md). Roadmap: [ROADMAP](project/roadmap.md); SQLModel milestones: [SQLMODEL_SQL_ROADMAP](project/sqlmodel-sql-roadmap.md).
+    **Current release:** **2.0.0** — see [CHANGELOG](project/changelog.md). Upgrade notes for multi-engine behavior and removals: [UPGRADING_TO_V2](getting-started/upgrading-to-v2.md). Execution policy and observability: [ENGINE_POLICY](user-guide/engine-policy.md). Semver policy: [VERSIONING](semantics/versioning.md). Roadmap: [ROADMAP](project/roadmap.md); SQLModel milestones: [SQLMODEL_SQL_ROADMAP](project/sqlmodel-sql-roadmap.md).
 
 
 ## Minimal example
@@ -86,7 +86,7 @@ df = DataFrame[ApiRequest](
 
 ## Guide map
 
-- **Services:** [GOLDEN_PATH_FASTAPI](integrations/fastapi/golden-path.md) → [FASTAPI](integrations/fastapi/fastapi.md) → [FASTAPI_ADVANCED](integrations/fastapi/advanced.md) → [FASTAPI_ENHANCEMENTS](integrations/fastapi/enhancements.md) → [DATAFRAMEMODEL](user-guide/dataframemodel.md) → [EXECUTION](user-guide/execution.md). Cookbooks: [fastapi_columnar_bodies](cookbook/fastapi_columnar_bodies.md), [fastapi_observability](cookbook/fastapi_observability.md), [fastapi_background_tasks](cookbook/fastapi_background_tasks.md), [async_lazy_pipeline](cookbook/async_lazy_pipeline.md). Layout: `docs/examples/fastapi/service_layout/`.
+- **Services:** [GOLDEN_PATH_FASTAPI](integrations/fastapi/golden-path.md) → [FASTAPI](integrations/fastapi/fastapi.md) → [FASTAPI_ADVANCED](integrations/fastapi/advanced.md) → [FASTAPI_ENHANCEMENTS](integrations/fastapi/enhancements.md) → [DATAFRAMEMODEL](user-guide/dataframemodel.md) → [EXECUTION](user-guide/execution.md) → [ENGINE_POLICY](user-guide/engine-policy.md). Cookbooks: [fastapi_columnar_bodies](cookbook/fastapi_columnar_bodies.md), [fastapi_observability](cookbook/fastapi_observability.md), [fastapi_background_tasks](cookbook/fastapi_background_tasks.md), [async_lazy_pipeline](cookbook/async_lazy_pipeline.md). Layout: `docs/examples/fastapi/service_layout/`.
 - **Data workflows:** [DATAFRAMEMODEL](user-guide/dataframemodel.md) → [IO_DECISION_TREE](io/decision-tree.md) → [IO_OVERVIEW](io/overview.md).
 - **Typing:** [TYPING](user-guide/typing.md) — mypy plugin vs **Pyright** / **Pylance** / Astral **`ty`**, and **`as_model(...)`** on transform chains.
 - **Third-party execution:** [CUSTOM_ENGINE_PACKAGE](integrations/engines/custom-engine-package.md). **Mongo** helpers and **Beanie** reads/writes: [IO_DECISION_TREE](io/decision-tree.md) and [BEANIE](integrations/engines/beanie.md).

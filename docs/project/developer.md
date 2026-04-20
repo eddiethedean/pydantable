@@ -527,4 +527,4 @@ Pushing a git tag matching **`v*`** (for example **`v1.18.1`**) runs `.github/wo
 
 **GNU manylinux wheels** are built with **`PyO3/maturin-action`** inside the default **manylinux Docker** images (`manylinux: 2_17` / `2_28`). Avoid **`container: off`** plus **`--zig`** on the host for those targets: linker failures and **OOM** are common with a Polars-sized dependency tree. **musllinux** jobs still use **`--zig`** in `release.yml` as needed.
 
-Tag the same commit for all distributions: **`v` + version** (for example **`v1.19.0`**). **`pip install pydantable==1.19.0`** resolves **`pydantable-protocol==1.19.0`** and **`pydantable-native==1.19.0`** from PyPI.
+Tag the same commit for all distributions: **`v` + version** (for example **`v2.0.0`**). **`pip install pydantable==2.0.0`** resolves **`pydantable-protocol==2.0.0`** and **`pydantable-native==2.0.0`** from PyPI.

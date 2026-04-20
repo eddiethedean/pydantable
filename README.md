@@ -16,6 +16,8 @@ PydanTable combines **Pydantic schemas** with a **Polars-backed Rust execution e
 
 - **Docs (latest):** [pydantable.readthedocs.io](https://pydantable.readthedocs.io/en/latest/)
 - **Quickstart:** [Getting started → Quickstart](https://pydantable.readthedocs.io/en/latest/getting-started/quickstart/)
+- **Upgrading to v2 (2.0.0):** [Getting started → Upgrading to v2](https://pydantable.readthedocs.io/en/latest/getting-started/upgrading-to-v2/)
+- **Engine policy (execution / fallback):** [User guide → Engine policy](https://pydantable.readthedocs.io/en/latest/user-guide/engine-policy/)
 - **Docs map:** [Getting started → Docs map](https://pydantable.readthedocs.io/en/latest/getting-started/docs-map/)
 - **Documentation chat (RAG):** [pydantable-rag/README.md](https://github.com/eddiethedean/pydantable/blob/main/pydantable-rag/README.md) — backend and deployment for the docs assistant; the chat widget is on the hosted docs above.
 
@@ -24,12 +26,14 @@ PydanTable combines **Pydantic schemas** with a **Polars-backed Rust execution e
 - **Typed tables** via Pydantic models: `DataFrameModel` or `DataFrame[Schema]`
 - **Typed expressions + lazy plans** validated/lowered in Rust
 - **Explicit materialization**: `collect()` (rows) or `to_dict()` (columns), plus optional Arrow/Polars exports
+- **Optional execution engines** (SQL / Mongo / Spark) with source-aware defaults, explicit handoff (`to_native()`, `to_engine()`, …), and **`execution_policy=`** on terminals plus **`engine_report()`** / **`explain_execution()`** for visibility ([engine policy docs](https://pydantable.readthedocs.io/en/latest/user-guide/engine-policy/))
 - **File / HTTP / SQL I/O** helpers and integration patterns for services
 
 Key references:
 
 - **DataFrameModel:** [User guide → DataFrameModel](https://pydantable.readthedocs.io/en/latest/user-guide/dataframemodel/)
 - **Execution:** [User guide → Execution](https://pydantable.readthedocs.io/en/latest/user-guide/execution/)
+- **Engine policy (v2):** [User guide → Engine policy](https://pydantable.readthedocs.io/en/latest/user-guide/engine-policy/)
 - **Materialization:** [User guide → Materialization](https://pydantable.readthedocs.io/en/latest/user-guide/materialization/)
 - **Interface contract:** [Semantics → Interface contract](https://pydantable.readthedocs.io/en/latest/semantics/interface-contract/)
 - **I/O overview:** [I/O → Overview](https://pydantable.readthedocs.io/en/latest/io/overview/)
@@ -86,7 +90,7 @@ Output (one run):
 - **Typing guide:** [User guide → Typing](https://pydantable.readthedocs.io/en/latest/user-guide/typing/)
 - **I/O decision tree:** [I/O → Decision tree](https://pydantable.readthedocs.io/en/latest/io/decision-tree/)
 - **FastAPI golden path:** [Integrations → FastAPI → Golden path](https://pydantable.readthedocs.io/en/latest/integrations/fastapi/golden-path/)
-- **Engines:** [SQL](https://pydantable.readthedocs.io/en/latest/integrations/engines/sql/) · [Mongo](https://pydantable.readthedocs.io/en/latest/integrations/engines/mongo/) · [Spark](https://pydantable.readthedocs.io/en/latest/integrations/engines/spark/)
+- **Engines:** [SQL](https://pydantable.readthedocs.io/en/latest/integrations/engines/sql/) · [Mongo](https://pydantable.readthedocs.io/en/latest/integrations/engines/mongo/) · [Spark](https://pydantable.readthedocs.io/en/latest/integrations/engines/spark/) · [Upgrading to v2](https://pydantable.readthedocs.io/en/latest/getting-started/upgrading-to-v2/)
 
 ## Development
 

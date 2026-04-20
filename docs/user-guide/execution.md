@@ -45,6 +45,8 @@ Two key rules for multi-engine workflows:
 
 Eager SQL/Mongo helpers (`fetch_*`, `write_*`, etc.) still materialize **column dicts** and do not change `DataFrame._engine`.
 
+**Policy and visibility (v2):** `execution_policy=` on terminals, plus `engine_report()` / `explain_execution()` — [ENGINE_POLICY](engine-policy.md).
+
 ## Streaming / engine `collect` (Polars)
 
 **Default:** the Rust engine runs Polars **`LazyFrame.collect_with_engine(Engine::InMemory)`** (in-process).
