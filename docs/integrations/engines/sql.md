@@ -123,14 +123,21 @@ but you **must** provide a SQL execution backend via one of:
 
 Precedence is **exactly** that order: explicit **`engine=`** wins.
 
-### `engine_mode`: force default engine (escape hatch)
+### v2 engine selection policy (`engine_mode`)
 
 `SqlDataFrame` / `SqlDataFrameModel` constructors also accept **`engine_mode="auto"|"default"`**:
 
 - **`"auto"`** (default): use the SQL execution engine (`sql_engine=` / `sql_config=`).
 - **`"default"`**: force the process-wide default engine (`pydantable.engine.get_default_engine()`).
 
-This is mainly useful as an explicit “do not use the SQL engine” escape hatch in shared code paths.
+This exists for **multi-engine code paths** where the reader matches the source engine by default,
+but you want an explicit escape hatch to force the native/default engine.
+
+**Precedence (v2):**
+
+1. **`engine=`** (explicit) wins.
+2. Else if **`engine_mode="default"`**, use `get_default_engine()`.
+3. Else (**`engine_mode="auto"`**), use the SQL engine resolved from `sql_engine=` / `sql_config=`.
 
 ### Lazy read from a SQL table
 
@@ -267,7 +274,18 @@ assert df.sort("id").to_dict() == {"id": [1, 2, 3], "name": ["a", "b", "c"]}
 
 **Not supported today:** `filter` / `with_columns` / other paths that require the **native** `Expr` runtime raise **`UnsupportedEngineOperationError`** (see **Expressions** below). For **Expr**-heavy work, use the default **Polars/Rust** engine or materialize with [IO_SQL](../../io/sql.md) helpers first.
 
-If you want to **start in SQL** and then switch to local Rust-backed transforms, use the handoff helpers:
+## v2 engine handoff (explicit boundary)
+
+In pydantable v2, **plans are engine-defined**, so switching engines is an explicit
+boundary: you **materialize** (usually to a column dict) and then **re-root** the
+frame under a different engine.
+
+Use:
+
+- **`to_native()`**: materialize and re-root under the native Rust/Polars engine.
+- **`to_engine(target_engine, ...)`**: materialize and re-root under an explicit engine instance.
+
+If you want to **start in SQL** and then switch to local Rust-backed transforms:
 
 ```python
 sql_df = SqlDataFrame[Row].from_sql_table(Item.__table__, sql_engine=eng)
@@ -299,6 +317,17 @@ out = sql_df.sort("id").to_dict()
 
 This helper is just a convenience wrapper: it materializes the current frame
 (`to_dict()` by default) and constructs a `SqlDataFrame` with the resolved SQL engine.
+
+### Multi-engine workflow (cookbook)
+
+SQL → SQL transforms → materialize → native transforms:
+
+```python
+sql_df = SqlDataFrame[Row].from_sql_table(Item.__table__, sql_engine=eng).sort("id")
+
+native_df = sql_df.to_native()
+out = native_df.with_columns(id2=native_df.id * 2).select("id2").to_dict()
+```
 
 ## `SqlDataFrameModel`
 

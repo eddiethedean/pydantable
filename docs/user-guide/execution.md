@@ -29,7 +29,17 @@ Cancelling an **`await acollect()`** (etc.) does **not** cancel in-flight native
 
 Service patterns: [FASTAPI](../integrations/fastapi/fastapi.md) and [ROADMAP](../project/roadmap.md). Transport table: [DATA_IO_SOURCES](../io/data-io-sources.md).
 
-**Optional engines (1.17.0+):** you can swap **`ExecutionEngine`** implementations while keeping the **`DataFrame`** / **`DataFrameModel`** API — SQL plans via **`pydantable[sql]`** ([SQL_ENGINE](../integrations/engines/sql.md)), Mongo collection-backed frames via **`pydantable[mongo]`** ([MONGO_ENGINE](../integrations/engines/mongo.md): **`MongoPydantableEngine`** subclasses **`NativePolarsEngine`**; the Mongo plan stack supplies **`MongoRoot`** / materialization only). Physical execution remains the **native** Rust core; the lazy-SQL bridge affects SQL compilation, not Mongo. Eager Mongo column-dict helpers (**`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`**, **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`**) do **not** use **`DataFrame._engine`** — same pattern as **`fetch_sqlmodel`** (sync collections run under **`asyncio.to_thread`** in async helpers unless the collection is **`pymongo.asynchronous.AsyncCollection`** — see **PyMongo surface area** in [MONGO_ENGINE](../integrations/engines/mongo.md)).
+**Optional engines (v2):** you can swap **`ExecutionEngine`** implementations while keeping the **`DataFrame`** / **`DataFrameModel`** API:
+
+- **SQL**: [SQL_ENGINE](../integrations/engines/sql.md) (`pydantable[sql]`)
+- **Mongo**: [MONGO_ENGINE](../integrations/engines/mongo.md) (`pydantable[mongo]`)
+- **Spark**: [SPARK_ENGINE](../integrations/engines/spark.md) (`pydantable[spark]`)
+
+Two key rules for multi-engine workflows:
+
+1. **Engine selection** is reader-specific: engine-backed frames default to a matching engine when available.\n   Escape hatch: `engine_mode="default"`. Explicit `engine=` wins.\n2. **Engine handoff** is an explicit boundary: plans are engine-defined, so switching engines requires\n+   materialization + re-root via `to_native()` / `to_engine(...)` (and convenience helpers like\n+   `to_sql_engine()` / `to_mongo_engine()` / `to_spark_engine()`).
+
+Eager SQL/Mongo helpers (`fetch_*`, `write_*`, etc.) still materialize **column dicts** and do not change `DataFrame._engine`.
 
 ## Streaming / engine `collect` (Polars)
 

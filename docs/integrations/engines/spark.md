@@ -42,12 +42,41 @@ df = SparkDataFrame[Row].from_spark_dataframe(spark_df)
 out = df.filter(df.spark_col("x") > 1).select("y").to_dict()
 ```
 
-`SparkDataFrame` / `SparkDataFrameModel` also accept **`engine_mode="auto"|"default"`**:
+### v2 engine selection policy (`engine_mode`)
+
+`SparkDataFrame` / `SparkDataFrameModel` accept **`engine_mode="auto"|"default"`**:
 
 - **`"auto"`** (default): use the Spark execution engine (`raikou-core`).
 - **`"default"`**: force the process-wide default engine (`pydantable.engine.get_default_engine()`).
 
-To move results from Spark into local Rust-backed transforms, use **`to_native()`** / **`to_engine(...)`** after materializing.
+This exists for **multi-engine code paths** where the reader matches the source engine by default,
+but you want an explicit escape hatch to force the native/default engine.
+
+**Precedence (v2):**
+
+1. **`engine=`** (explicit) wins.
+2. Else if **`engine_mode="default"`**, use `get_default_engine()`.
+3. Else (**`engine_mode="auto"`**), use the Spark engine resolved by the integration (raikou-core).
+
+## v2 engine handoff (explicit boundary)
+
+In pydantable v2, **plans are engine-defined**, so switching engines is an explicit
+boundary: you **materialize** (usually to a column dict) and then **re-root** the
+frame under a different engine.
+
+Use:
+
+- **`to_native()`**: materialize and re-root under the native Rust/Polars engine.
+- **`to_engine(target_engine, ...)`**: materialize and re-root under an explicit engine instance.
+- **`to_spark_engine(...)`**: convenience wrapper to materialize and re-root under the Spark engine.
+
+Spark → native transforms:
+
+```python
+df = SparkDataFrame[Row].from_spark_dataframe(spark_df)
+native_df = df.to_native()
+out = native_df.select("x").to_dict()
+```
 
 If you start from a **native** `DataFrame` / `DataFrameModel` and want to explicitly
 re-root into the Spark execution engine, use **`to_spark_engine()`**:

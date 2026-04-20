@@ -101,6 +101,13 @@ pydantable also supports optional engines that keep the DataFrame API but use di
 - [Spark engine](../integrations/engines/spark.md)
 - [Engine parity](../integrations/engines/engine-parity.md)
 
+### v2 engine selection + handoff (reader-matched engines)
+
+In pydantable v2, there are two related “engine” concepts:
+
+- **Engine selection**: when you create a frame from an engine-specific source (SQL table, Mongo collection, Spark DataFrame), the frame will **auto-match** to a source-appropriate engine when available.\n  Each integration exposes **`engine_mode="auto"|"default"`** so shared code can force the process-wide default engine.\n  **Explicit `engine=` always wins.**
+- **Engine handoff**: switching engines is an **explicit boundary**.\n  Plans are engine-defined, so to move between backends you **materialize** and then **re-root** under a different engine using **`to_native()`** / **`to_engine(...)`** (and convenience helpers like **`to_sql_engine()`**, **`to_mongo_engine()`**, **`to_spark_engine()`**).
+
 ### I/O is a separate story (choose an entrypoint)
 
 Even if you stay on the default execution engine, you still need to choose I/O entrypoints:

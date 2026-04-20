@@ -196,12 +196,41 @@ Optional **`fields=`** limits which document keys are read (defaults to all keys
 in the schema’s field map). Optional **`engine=`** reuses a single
 **`MongoPydantableEngine`** across many frames.
 
-`MongoDataFrame` / `MongoDataFrameModel` constructors also accept **`engine_mode="auto"|"default"`**:
+### v2 engine selection policy (`engine_mode`)
+
+`MongoDataFrame` / `MongoDataFrameModel` constructors accept **`engine_mode="auto"|"default"`**:
 
 - **`"auto"`** (default): use the Mongo execution engine (`MongoPydantableEngine`).
 - **`"default"`**: force the process-wide default engine (`pydantable.engine.get_default_engine()`).
 
-To flow from a Mongo-backed lazy frame into local Rust-backed transforms, use **`to_native()`** / **`to_engine(...)`**.
+This exists for **multi-engine code paths** where the reader matches the source engine by default,
+but you want an explicit escape hatch to force the native/default engine.
+
+**Precedence (v2):**
+
+1. **`engine=`** (explicit) wins.
+2. Else if **`engine_mode="default"`**, use `get_default_engine()`.
+3. Else (**`engine_mode="auto"`**), use `MongoPydantableEngine()`.
+
+## v2 engine handoff (explicit boundary)
+
+In pydantable v2, **plans are engine-defined**, so switching engines is an explicit
+boundary: you **materialize** (usually to a column dict) and then **re-root** the
+frame under a different engine.
+
+Use:
+
+- **`to_native()`**: materialize and re-root under the native Rust/Polars engine.
+- **`to_engine(target_engine, ...)`**: materialize and re-root under an explicit engine instance.
+- **`to_mongo_engine(...)`**: convenience wrapper to materialize and re-root under the Mongo engine.
+
+Mongo → native transforms:
+
+```python
+df = MongoDataFrame[Row].from_collection(coll).sort("x")
+native_df = df.to_native()
+out = native_df.with_columns(x2=native_df.x * 2).select("x2").to_dict()
+```
 
 If you start from a **native** `DataFrame` / `DataFrameModel` and want to explicitly
 re-root into the Mongo execution engine, use **`to_mongo_engine()`**:
