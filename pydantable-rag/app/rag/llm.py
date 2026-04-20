@@ -40,11 +40,19 @@ def generate_answer_openai(
     for m in messages:
         api_messages.append({"role": m.role, "content": m.content.strip()})
 
+    # GPT-5 / o-series reject ``max_tokens``; use ``max_completion_tokens`` instead.
+    mlow = model.lower()
+    token_kw = (
+        {"max_completion_tokens": 1024}
+        if mlow.startswith(("gpt-5", "o1", "o3", "o4"))
+        else {"max_tokens": 1024}
+    )
+
     resp = client.chat.completions.create(
         model=model,
         messages=api_messages,
         temperature=0.2,
-        max_tokens=1024,
+        **token_kw,
     )
     choice = resp.choices[0].message.content
     return (choice or "").strip()
