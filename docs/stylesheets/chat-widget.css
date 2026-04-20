@@ -1,10 +1,13 @@
-/* Floating pydantable-rag chat launcher (MkDocs Material) */
+/* Floating pydantable-rag chat launcher (MkDocs Material + Read the Docs). */
+/* RTD pins a version/flyout control along the bottom; lift the FAB so it sits */
+/* visually above that bar, with z-index high enough to paint on top. */
 
 #pydantable-chat-fab {
   position: fixed;
   right: 1rem;
-  bottom: 1rem;
-  z-index: 200;
+  /* Clear RTD’s bottom version widget (~3rem) + breathing room */
+  bottom: calc(1rem + 3.25rem);
+  z-index: 4999999;
   width: 3.25rem;
   height: 3.25rem;
   padding: 0;
@@ -39,7 +42,7 @@
 #pydantable-chat-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 240;
+  z-index: 5000000;
   background: rgba(15, 23, 42, 0.55);
   backdrop-filter: blur(2px);
   display: none;
@@ -128,6 +131,6 @@
 
   #pydantable-chat-fab {
     right: 0.65rem;
-    bottom: 0.65rem;
+    bottom: calc(0.75rem + 3.25rem);
   }
 }
