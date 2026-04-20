@@ -28,21 +28,14 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     """
     Realistic HTTP tests (routing/validation/serialization) without heavy model loads.
     """
-    # Import inside fixture so monkeypatches apply per-test.
     import app.main as main
 
-    # Make the app think the LLM is already warm.
-    monkeypatch.setattr(main, "llm_is_loaded", lambda _m: True)
-    monkeypatch.setattr(main, "llm_is_loading", lambda _m: False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("RAG_LLM_BACKEND", "extractive")
     monkeypatch.setattr(main, "embed_deployment_ready", lambda _m, _d: True)
     monkeypatch.setattr(main, "embedder_is_loading", lambda _m, _d: False)
     monkeypatch.setattr(main, "embedding_compute_active", lambda: False)
-    monkeypatch.setattr(main, "warm_llm", lambda _m: None)
-
-    # Avoid touching the filesystem/docs during tests.
     monkeypatch.setattr(main, "ingest_repo_docs", lambda **_kwargs: None)
-
-    # Avoid embeddings / sqlite / transformers — return deterministic output.
     monkeypatch.setattr(
         main, "rag_chat", lambda **_kwargs: _FakeRagResult("pydantable is ...")
     )
@@ -117,7 +110,7 @@ def test_chat_validates_request_body(client: TestClient) -> None:
 def test_chat_extractive_skips_llm_gate(monkeypatch: pytest.MonkeyPatch) -> None:
     import app.main as main
 
-    monkeypatch.setattr(main, "llm_is_loaded", lambda _m: False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setattr(
         main, "rag_chat", lambda **_kwargs: _FakeRagResult("extractive ok")
     )
@@ -128,28 +121,18 @@ def test_chat_extractive_skips_llm_gate(monkeypatch: pytest.MonkeyPatch) -> None
     assert res.json()["answer"] == "extractive ok"
 
 
-def test_chat_returns_503_when_llm_not_ready(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_chat_returns_503_without_openai_key(monkeypatch: pytest.MonkeyPatch) -> None:
     import app.main as main
 
-    real_get = main.get_settings
-
-    def fake_get() -> object:
-        s = real_get()
-        return s.model_copy(update={"llm_backend": "hf"})
-
-    monkeypatch.setattr(main, "get_settings", fake_get)
-    monkeypatch.setattr(main, "llm_is_loaded", lambda _m: False)
-    monkeypatch.setattr(main, "llm_is_loading", lambda _m: False)
-    monkeypatch.setattr(main, "warm_llm", lambda _m: None)
-
-    # Avoid any real work if warm-up is triggered.
-    monkeypatch.setattr(main, "rag_chat", lambda **_kwargs: _FakeRagResult("x"))
+    monkeypatch.setattr(main, "openai_api_key_configured", lambda: False)
+    monkeypatch.setattr(
+        main, "rag_chat", lambda **_kwargs: _FakeRagResult("should not run")
+    )
 
     c = TestClient(main.app)
     res = c.post("/chat", json={"message": "hello"})
     assert res.status_code == 503
-    detail = res.json()["detail"].lower()
-    assert "load" in detail or "fail" in detail
+    assert "OPENAI_API_KEY" in res.json()["detail"]
 
 
 def test_ingest_starts_background_job(client: TestClient) -> None:

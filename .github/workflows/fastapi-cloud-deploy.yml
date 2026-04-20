@@ -14,11 +14,6 @@ jobs:
   build-rag-database:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      HF_HOME: ${{ github.workspace }}/pydantable-rag/hf_baked
-      HF_HUB_CACHE: ${{ github.workspace }}/pydantable-rag/hf_baked/hub
-      TRANSFORMERS_CACHE: ${{ github.workspace }}/pydantable-rag/hf_baked/hub
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -30,21 +25,18 @@ jobs:
         working-directory: pydantable-rag
         run: uv sync --all-extras
 
-      - name: Bake Hugging Face Hub cache (embed + LLM snapshots)
-        working-directory: pydantable-rag
-        run: uv run python scripts/prep_hf_cache_ci.py
-
       - name: Build vector database (from monorepo docs/)
         working-directory: pydantable-rag
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: uv run python scripts/build_index_ci.py
 
-      - name: Upload DB + Hub cache for deploy
+      - name: Upload DB for deploy
         uses: actions/upload-artifact@v4
         with:
           name: rag-deploy-bundle
           path: |
             pydantable-rag/data/pydantable_vectors.db
-            pydantable-rag/hf_baked
           if-no-files-found: error
 
   deploy:
@@ -54,7 +46,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Download prebuilt DB and Hugging Face cache
+      - name: Download prebuilt DB
         uses: actions/download-artifact@v4
         with:
           name: rag-deploy-bundle
@@ -63,9 +55,9 @@ jobs:
       - name: Show app version being deployed
         run: grep -E '^version\s*=' pydantable-rag/pyproject.toml | head -1
 
-      - name: Reminder — runtime HF_TOKEN on FastAPI Cloud
+      - name: Reminder — runtime OPENAI_API_KEY on FastAPI Cloud
         run: |
-          echo "::notice title=FastAPI Cloud::Add HF_TOKEN to the app's environment in the FastAPI Cloud dashboard. GitHub HF_TOKEN only applies to CI; anonymous Hub access causes rate limits and replica churn."
+          echo "::notice title=FastAPI Cloud::Set OPENAI_API_KEY on the app (embeddings + optional chat). GitHub OPENAI_API_KEY only applies to CI builds."
 
       - name: Set up Python
         uses: actions/setup-python@v6

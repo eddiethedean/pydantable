@@ -1,4 +1,4 @@
-# Build the pydantable-rag vector SQLite DB from monorepo docs/ (CPU models).
+# Build the pydantable-rag vector SQLite DB from monorepo docs/ (OpenAI embeddings).
 # Uploads an artifact you can download or that FastAPI Cloud deploy reuses.
 
 name: RAG vector database
@@ -35,7 +35,7 @@ jobs:
       - name: Build vector database
         working-directory: pydantable-rag
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: uv run python scripts/build_index_ci.py
 
       - name: Upload database artifact

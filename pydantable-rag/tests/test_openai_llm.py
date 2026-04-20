@@ -16,11 +16,11 @@ def test_chat_openai_returns_503_when_api_key_missing(
     def fake_get() -> object:
         s = real_get()
         return s.model_copy(
-            update={"llm_backend": "openai", "llm_model": "gpt-4o-mini"}
+            update={"llm_backend": "openai", "llm_model": "gpt-5.4-nano"}
         )
 
     monkeypatch.setattr(main, "get_settings", fake_get)
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(main, "openai_api_key_configured", lambda: False)
 
     c = TestClient(main.app)
     res = c.post("/chat", json={"message": "hello"})
@@ -36,7 +36,7 @@ def test_readyz_openai_ok_when_key_set(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_get() -> object:
         s = real_get()
         return s.model_copy(
-            update={"llm_backend": "openai", "llm_model": "gpt-4o-mini"}
+            update={"llm_backend": "openai", "llm_model": "gpt-5.4-nano"}
         )
 
     monkeypatch.setattr(main, "get_settings", fake_get)

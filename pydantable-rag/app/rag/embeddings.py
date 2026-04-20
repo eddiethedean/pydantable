@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import os
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+
+from app.openai_env import openai_api_key_configured
 
 # Match previous ``lru_cache(maxsize=2)`` behavior: at most two embedders in memory.
 _MAX_EMBEDDERS = 2
@@ -21,51 +24,42 @@ _compute_active = 0
 class Embedder:
     model_name: str
     dims: int
-    tokenizer: Any
-    model: Any
-    device: str
 
     def embed(self, texts: list[str]) -> np.ndarray:
         global _compute_active
-        import torch
+        from openai import OpenAI
+
+        if not texts:
+            return np.zeros((0, self.dims), dtype=np.float32)
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY is not set (required for embeddings)")
+
+        base_url = os.getenv("OPENAI_BASE_URL", "").strip() or None
+        client = OpenAI(api_key=api_key, base_url=base_url)
 
         with _embed_lock:
             _compute_active += 1
         try:
-            if not texts:
-                return np.zeros((0, self.dims), dtype=np.float32)
-
-            tok = self.tokenizer(
-                texts,
-                padding=True,
-                truncation=True,
-                max_length=512,
-                return_tensors="pt",
-            )
-            tok = {k: v.to(self.device) for k, v in tok.items()}
-
-            with torch.no_grad():
-                out = self.model(**tok)
-                last_hidden = out.last_hidden_state  # (B, T, H)
-                attn = (
-                    tok["attention_mask"]
-                    .unsqueeze(-1)
-                    .expand(last_hidden.size())
-                    .float()
-                )
-                pooled = (last_hidden * attn).sum(dim=1) / attn.sum(dim=1).clamp(
-                    min=1.0
-                )
-
-            emb = pooled.detach().cpu().to(torch.float32).numpy()
-            emb = emb / (np.linalg.norm(emb, axis=1, keepdims=True) + 1e-12)
-
-            if emb.shape[1] != self.dims:
-                raise ValueError(
-                    f"Embedding dim mismatch: got {emb.shape[1]} expected {self.dims} "
-                    f"for model={self.model_name}"
-                )
-            return emb.astype(np.float32, copy=False)
+            out_rows: list[np.ndarray] = []
+            batch_size = 100
+            for start in range(0, len(texts), batch_size):
+                chunk = texts[start : start + batch_size]
+                kwargs: dict[str, Any] = {"model": self.model_name, "input": chunk}
+                if self.model_name.startswith("text-embedding-3"):
+                    kwargs["dimensions"] = self.dims
+                resp = client.embeddings.create(**kwargs)
+                for item in resp.data:
+                    v = np.array(item.embedding, dtype=np.float32)
+                    if v.shape[0] != self.dims:
+                        raise ValueError(
+                            f"Embedding length {v.shape[0]} != expected {self.dims} "
+                            f"for model={self.model_name}"
+                        )
+                    out_rows.append(v)
+            embs = np.vstack(out_rows)
+            embs = embs / (np.linalg.norm(embs, axis=1, keepdims=True) + 1e-12)
+            return embs.astype(np.float32, copy=False)
         finally:
             with _embed_lock:
                 _compute_active -= 1
@@ -84,50 +78,15 @@ def _init_lock_for(key: tuple[str, int]) -> threading.Lock:
 
 
 def _build_embedder(model_name: str, dims: int) -> Embedder:
-    import torch
-    from transformers import AutoModel, AutoTokenizer
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModel.from_pretrained(model_name)
-    model.eval()
-    model.to(device)
-    return Embedder(
-        model_name=model_name,
-        dims=dims,
-        tokenizer=tokenizer,
-        model=model,
-        device=device,
-    )
-
-
-def embed_model_snapshot_cached(model_name: str) -> bool:
-    """
-    True if a Hub snapshot for ``model_name`` exists on disk (``HF_HUB_CACHE`` /
-    baked image). Does not load torch. Used so health/diag stay consistent across
-    workers: cold processes still report ready when weights are shipped in the image.
-    """
-    import os
-
-    try:
-        from huggingface_hub import try_to_load_from_cache
-    except Exception:
-        return False
-    try:
-        p = try_to_load_from_cache(repo_id=model_name, filename="config.json")
-    except Exception:
-        return False
-    return isinstance(p, str) and os.path.isfile(p)
+    return Embedder(model_name=model_name, dims=dims)
 
 
 def embed_deployment_ready(model_name: str, dims: int) -> bool:
     """
-    True if this deployment can serve embeddings without a fresh Hub download:
-    weights are resident in this process, or the snapshot is present locally.
+    True when ``OPENAI_API_KEY`` is set (OpenAI embeddings API; no local weights).
     """
-    if embedder_is_loaded(model_name, dims):
-        return True
-    return embed_model_snapshot_cached(model_name)
+    del model_name, dims  # API-only; key is what matters for readiness.
+    return openai_api_key_configured()
 
 
 def embedder_is_loaded(model_name: str, dims: int) -> bool:
@@ -148,30 +107,14 @@ def embedding_compute_active() -> bool:
 
 
 def release_embedder_models() -> None:
-    """
-    Drop cached embedding weights so only the chat LLM needs RAM next.
-
-    Ingest keeps a sentence-transformer in memory; loading SmolLM immediately
-    after can OOM small instances. Call this after ingest, before ``warm_llm``.
-    The embedder reloads on the next ``get_embedder`` / chat.
-    """
-    import gc
-
+    """Drop cached embedder handles (lightweight; no GPU memory)."""
     with _embed_lock:
         _embedder_by_key.clear()
-    gc.collect()
-    try:
-        import torch
-
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-    except Exception:
-        pass
 
 
 def get_embedder(model_name: str, dims: int) -> Embedder:
     """
-    Load (or return cached) sentence embedding model weights. Thread-safe.
+    Return a cached OpenAI embedding handle. Thread-safe.
     """
     key = (model_name, dims)
     with _embed_lock:

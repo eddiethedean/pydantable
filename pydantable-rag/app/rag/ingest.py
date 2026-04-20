@@ -131,7 +131,7 @@ def ingest_repo_docs(
                 all_rows.append((c.chunk_id, c.source, c.text))
                 all_texts.append(c.text)
 
-        # Avoid loading sentence-transformers when there is nothing to embed (empty
+        # Avoid calling the embedding API when there is nothing to embed (empty
         # deploy or missing README/docs). Saves RAM so bootstrap can load the LLM.
         if not all_texts:
             embeddings = np.zeros((0, settings.embed_dims), dtype=np.float32)

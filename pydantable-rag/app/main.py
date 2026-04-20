@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import html
 import logging
-import os
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -12,25 +11,17 @@ from fastapi import BackgroundTasks, Body, FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
+from app.openai_env import openai_api_key_configured
 from app.rag.embeddings import (
     embed_deployment_ready,
-    embedder_is_loaded,
     embedder_is_loading,
     embedding_compute_active,
     release_embedder_models,
 )
 from app.rag.ingest import ingest_repo_docs
-from app.rag.llm import (
-    ChatMessage,
-    llm_is_loaded,
-    llm_is_loading,
-    llm_last_error,
-    openai_api_configured,
-    warm_llm,
-)
+from app.rag.llm import ChatMessage
 from app.rag.pipeline import rag_chat
 from app.rag.store import check_vector_backend, get_counts
-from app.rag.torch_cpu import configure_torch_cpu
 from app.rtd_links import source_to_readthedocs_url
 from app.settings import (
     Settings,
@@ -43,93 +34,59 @@ from app.version import app_version
 _log = logging.getLogger(__name__)
 
 
-def _uses_hf_llm(s: Settings) -> bool:
-    return s.llm_backend == "hf"
-
-
 def _uses_openai_llm(s: Settings) -> bool:
     return s.llm_backend == "openai"
 
 
 def _generative_llm_ready(s: Settings) -> bool:
-    """Whether chat can run without blocking on model load (HF) or missing API key."""
-    if _uses_hf_llm(s):
-        return llm_is_loaded(s.llm_model)
+    """Generative chat ready (OpenAI) or not needed (extractive)."""
     if _uses_openai_llm(s):
-        return openai_api_configured()
+        return openai_api_key_configured()
     return True
 
 
 def _healthz_llm_loaded(s: Settings) -> bool:
-    """Health ``llm_loaded``: HF weights, OpenAI key, or extractive (no gen)."""
-    if _uses_hf_llm(s):
-        return llm_is_loaded(s.llm_model)
+    """``llm_loaded``: OpenAI chat key present when using generative backend."""
     if _uses_openai_llm(s):
-        return openai_api_configured()
+        return openai_api_key_configured()
     return True
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    configure_torch_cpu()
     s = get_settings()
     want_ingest = s.auto_ingest_on_startup
-    want_llm = s.preload_models_on_startup and _uses_hf_llm(s)
     dbp = resolve_db_path(s.db_path)
     counts = get_counts(db_path=dbp)
     if want_ingest:
         if s.auto_ingest_if_db_empty and counts["docs"] > 0 and counts["vecs"] > 0:
             want_ingest = False
-    if (
-        _uses_hf_llm(s)
-        and s.warm_llm_when_index_ready
-        and counts.get("docs", 0) > 0
-        and counts.get("vecs", 0) > 0
-    ):
-        want_llm = True
 
-    if want_ingest or want_llm:
+    if want_ingest:
         _log.info(
-            "pydantable-rag: startup warmup want_ingest=%s want_llm=%s blocking=%s "
-            "docs=%s vecs=%s model=%s",
+            "pydantable-rag: startup ingest want_ingest=%s blocking=%s docs=%s vecs=%s",
             want_ingest,
-            want_llm,
             s.blocking_startup_warmup,
             counts.get("docs"),
             counts.get("vecs"),
-            s.llm_model,
         )
-        if not (os.getenv("HF_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN")):
-            _log.warning(
-                "pydantable-rag: HF_TOKEN is not set. The Hub uses anonymous rate "
-                "limits; LLM downloads may stall, fail, or cause repeated replica "
-                "restarts. Add HF_TOKEN to this app in FastAPI Cloud (Settings → "
-                "Environment), not only in GitHub Actions secrets."
-            )
 
-    def _warm_sync() -> None:
+    def _ingest_sync() -> None:
         rr = resolve_ingest_repo_root()
         try:
-            if want_ingest and want_llm:
-                _ingest_then_warm_llm(settings=s, repo_root=rr, paths=None)
-            elif want_ingest:
-                ingest_repo_docs(settings=s, repo_root=rr, paths=None)
-            elif want_llm:
-                warm_llm(s.llm_model)
+            ingest_repo_docs(settings=s, repo_root=rr, paths=None)
         except Exception:
-            _log.exception("pydantable-rag: startup background warmup failed")
+            _log.exception("pydantable-rag: startup ingest failed")
 
-    if want_ingest or want_llm:
+    if want_ingest:
         if s.blocking_startup_warmup:
             try:
-                await asyncio.to_thread(_warm_sync)
+                await asyncio.to_thread(_ingest_sync)
             except Exception:
-                _log.exception("pydantable-rag: startup blocking warmup failed")
+                _log.exception("pydantable-rag: startup blocking ingest failed")
         else:
-            # Thread (not asyncio.create_task): some hosts defer or starve loop tasks;
-            # HF download + torch init are fully synchronous anyway.
             threading.Thread(
-                target=_warm_sync, name="pydantable-rag-warmup", daemon=True
+                target=_ingest_sync, name="pydantable-rag-ingest", daemon=True
             ).start()
 
     yield
@@ -138,21 +95,14 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="pydantable-rag", lifespan=lifespan)
 
 
-def _ingest_then_warm_llm(
+def _ingest_then_release_embedder(
     *, settings: Settings, repo_root: Path, paths: list[str] | None
 ) -> None:
-    """
-    Run ingestion before loading the chat LLM so two large HF models are not
-    resident at once (avoids OOM on small cloud instances when both were
-    scheduled as separate background tasks).
-    """
     ingest_repo_docs(settings=settings, repo_root=repo_root, paths=paths)
     release_embedder_models()
-    if _uses_hf_llm(settings):
-        warm_llm(settings.llm_model)
 
 
-def _bootstrap_ingest_then_warm(
+def _bootstrap_ingest(
     *, settings: Settings, repo_root: Path, paths: list[str] | None
 ) -> None:
     try:
@@ -165,10 +115,10 @@ def _bootstrap_ingest_then_warm(
             and counts.get("docs", 0) > 0
             and counts.get("vecs", 0) > 0
         ):
-            if _uses_hf_llm(settings):
-                warm_llm(settings.llm_model)
             return
-        _ingest_then_warm_llm(settings=settings, repo_root=repo_root, paths=paths)
+        _ingest_then_release_embedder(
+            settings=settings, repo_root=repo_root, paths=paths
+        )
     except Exception:
         _log.exception("pydantable-rag: POST /bootstrap background task failed")
 
@@ -185,10 +135,7 @@ class HealthzResponse(BaseModel):
     embed_model: str
     embed_dims: int
     llm_backend: str = Field(
-        description=(
-            "hf = local transformers model; openai = OpenAI API; "
-            "extractive = chunks only."
-        ),
+        description="openai = OpenAI chat API; extractive = chunks only.",
     )
     llm_model: str
     llm_loaded: bool
@@ -196,11 +143,7 @@ class HealthzResponse(BaseModel):
         description="True while the LLM is downloading or initializing in-process.",
     )
     embed_loaded: bool = Field(
-        description=(
-            "True when embedding weights are in this worker's RAM, or when a Hub "
-            "snapshot exists on disk (e.g. baked image) so the first request need "
-            "not download from the Hub."
-        ),
+        description="True when OPENAI_API_KEY is set (OpenAI embeddings API).",
     )
     embed_loading: bool = Field(
         description="True while the embedding model is downloading or initializing.",
@@ -285,14 +228,17 @@ def _status_page_html() -> str:
     n_docs = int(counts.get("docs", 0) or 0)
     n_vecs = int(counts.get("vecs", 0) or 0)
     embed_load = embedder_is_loading(s.embed_model, s.embed_dims)
-    embed_ok = embedder_is_loaded(s.embed_model, s.embed_dims)
+    embed_ok = embed_deployment_ready(s.embed_model, s.embed_dims)
     embed_busy = embedding_compute_active()
-    llm_load = llm_is_loading(s.llm_model)
+    llm_load = False
     llm_ok = _healthz_llm_loaded(s)
     index_ok = n_docs > 0 and n_vecs > 0
-    hf_llm = _uses_hf_llm(s)
     oai_llm = _uses_openai_llm(s)
-    chat_ready = index_ok and _generative_llm_ready(s)
+    chat_ready = (
+        index_ok
+        and openai_api_key_configured()
+        and _generative_llm_ready(s)
+    )
 
     def row(label: str, ok: bool, loading: bool, detail: str) -> str:
         if loading:
@@ -314,22 +260,18 @@ def _status_page_html() -> str:
             f"{s.embed_model} ({s.embed_dims}d)",
         ),
         (
-            row("LLM (chat)", llm_ok, llm_load, s.llm_model)
-            if hf_llm
-            else (
-                row(
-                    "LLM (chat)",
-                    llm_ok,
-                    False,
-                    f"OpenAI API · {s.llm_model}",
-                )
-                if oai_llm
-                else row(
-                    "LLM (chat)",
-                    True,
-                    False,
-                    "extractive mode — no local generative model",
-                )
+            row(
+                "LLM (chat)",
+                llm_ok,
+                llm_load,
+                f"OpenAI API · {s.llm_model}",
+            )
+            if oai_llm
+            else row(
+                "LLM (chat)",
+                True,
+                False,
+                "extractive mode — no generative chat model",
             )
         ),
         row(
@@ -1011,8 +953,7 @@ def chat_app() -> str:
 @app.post("/bootstrap")
 def bootstrap(background_tasks: BackgroundTasks) -> BootstrapResponse:
     """
-    Kick off both ingestion and LLM warm-up without blocking the request.
-    Useful for hosted environments where cold-start work can trigger 502s.
+    Kick off ingestion without blocking the request (hosted cold starts).
     """
     s = get_settings()
     repo_root = resolve_ingest_repo_root()
@@ -1022,11 +963,8 @@ def bootstrap(background_tasks: BackgroundTasks) -> BootstrapResponse:
     started: list[str] = []
     if not has_index:
         started.append("ingest")
-    if _uses_hf_llm(s):
-        started.append("warm_llm")
-
     background_tasks.add_task(
-        _bootstrap_ingest_then_warm,
+        _bootstrap_ingest,
         settings=s,
         repo_root=repo_root,
         paths=None,
@@ -1047,7 +985,7 @@ def healthz() -> HealthzResponse:
         llm_backend=s.llm_backend,
         llm_model=s.llm_model,
         llm_loaded=_healthz_llm_loaded(s),
-        llm_loading=llm_is_loading(s.llm_model),
+        llm_loading=False,
         embed_loaded=embed_deployment_ready(s.embed_model, s.embed_dims),
         embed_loading=embedder_is_loading(s.embed_model, s.embed_dims),
         embed_computing=embedding_compute_active(),
@@ -1060,13 +998,13 @@ def readyz() -> ReadyzResponse:
     dbp = resolve_db_path(s.db_path)
     counts = get_counts(db_path=dbp)
     docs_ready = counts["docs"] > 0 and counts["vecs"] > 0
-    llm_ready = _generative_llm_ready(s)
+    api_ready = openai_api_key_configured()
     return ReadyzResponse(
-        ok=bool(docs_ready and llm_ready),
+        ok=bool(docs_ready and api_ready),
         counts=CountsStatus.model_validate(counts),
         llm_backend=s.llm_backend,
         llm_loaded=_healthz_llm_loaded(s),
-        llm_loading=llm_is_loading(s.llm_model),
+        llm_loading=False,
         embed_loaded=embed_deployment_ready(s.embed_model, s.embed_dims),
         embed_loading=embedder_is_loading(s.embed_model, s.embed_dims),
         embed_computing=embedding_compute_active(),
@@ -1087,8 +1025,8 @@ def diag() -> DiagResponse:
         counts=CountsStatus.model_validate(get_counts(db_path=dbp)),
         llm_backend=s.llm_backend,
         llm_loaded=_healthz_llm_loaded(s),
-        llm_loading=llm_is_loading(s.llm_model),
-        llm_last_error=llm_last_error(s.llm_model),
+        llm_loading=False,
+        llm_last_error=None,
         embed_loaded=embed_deployment_ready(s.embed_model, s.embed_dims),
         embed_loading=embedder_is_loading(s.embed_model, s.embed_dims),
         embed_computing=embedding_compute_active(),
@@ -1123,38 +1061,12 @@ def chat(req: ChatRequest, background_tasks: BackgroundTasks) -> ChatResponse:
     s = get_settings()
     db_path = resolve_db_path(s.db_path)
 
-    # Do not await warm_llm here: hosted gateways often time out (~5s) while HF
-    # downloads run for minutes → 502. Return fast 503; clients poll GET /readyz.
-    if _uses_hf_llm(s):
-        if not llm_is_loaded(s.llm_model):
-            if llm_is_loading(s.llm_model):
-                raise HTTPException(
-                    status_code=503,
-                    detail=(
-                        "LLM is loading (Hugging Face). Retry shortly or call "
-                        "GET /readyz until ok=true."
-                    ),
-                )
-            background_tasks.add_task(warm_llm, s.llm_model)
-            err = llm_last_error(s.llm_model)
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    err
-                    if err
-                    else (
-                        "LLM load not finished; warm-up was queued. "
-                        "Retry or GET /readyz until ok=true (short gateway timeouts)."
-                    )
-                ),
-            )
-
-    if _uses_openai_llm(s) and not openai_api_configured():
+    if not openai_api_key_configured():
         raise HTTPException(
             status_code=503,
             detail=(
-                "OPENAI_API_KEY is not set. Add it in the deployment environment "
-                "(e.g. FastAPI Cloud → Environment)."
+                "OPENAI_API_KEY is not set. Retrieval embeddings and optional "
+                "generative chat use the OpenAI API. Set the key in the environment."
             ),
         )
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
  [project]
  name = "pydantable-rag"
-version = "0.2.17"
+version = "0.3.0"
  description = "FastAPI backend for chatting with a local RAG assistant about pydantable."
  readme = "README.md"
  requires-python = ">=3.10"
@@ -15,24 +15,10 @@ version = "0.2.17"
    "sqlite-vec>=0.1.6",
    "numpy>=1.24",
   "openai>=1.40",
-  "transformers>=4.41",
-  "huggingface-hub>=0.23",
-  "torch>=2.2",
  ]
  
  [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.8"]
-
-# FastAPI Cloud installs deps with ``uv``. On Linux, plain ``torch`` from PyPI pulls the
-# CUDA wheel set (multi‑GB, many NVIDIA packages) and can fail during image export or
-# exceed platform limits. Pin ``torch`` to the official CPU wheel index instead.
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
-
-[tool.uv.sources]
-torch = { index = "pytorch-cpu" }
 
  [tool.ruff]
  line-length = 88
@@ -60,8 +46,6 @@ root = ["."]
 [tool.ty.analysis]
 allowed-unresolved-imports = [
     "openai.**",
-    "torch.**",
-    "transformers.**",
     "sqlite_vec.**",
     "dotenv",
     "pytest",

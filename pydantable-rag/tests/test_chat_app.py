@@ -34,12 +34,11 @@ def chat_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     """Same lightweight stubs as ``test_api.client`` so app import stays cheap."""
     import app.main as main
 
-    monkeypatch.setattr(main, "llm_is_loaded", lambda _m: True)
-    monkeypatch.setattr(main, "llm_is_loading", lambda _m: False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("RAG_LLM_BACKEND", "extractive")
     monkeypatch.setattr(main, "embed_deployment_ready", lambda _m, _d: True)
     monkeypatch.setattr(main, "embedder_is_loading", lambda _m, _d: False)
     monkeypatch.setattr(main, "embedding_compute_active", lambda: False)
-    monkeypatch.setattr(main, "warm_llm", lambda _m: None)
     monkeypatch.setattr(main, "ingest_repo_docs", lambda **_kwargs: None)
     return TestClient(main.app)
 

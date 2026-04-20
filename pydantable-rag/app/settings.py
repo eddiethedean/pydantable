@@ -10,26 +10,14 @@ from app.rtd_links import RTD_DEFAULT_BASE
 
 class Settings(BaseModel):
     db_path: str = "data/pydantable_vectors.db"
-    # Small, fast default embeddings for CPU deployments.
-    embed_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    embed_dims: int = 384
-    # Keep the default LLM small to avoid 502s/timeouts on cold start.
-    # ``hf``: Hugging Face id. ``openai``: API model id (e.g. ``gpt-4o-mini``).
-    llm_model: str = "HuggingFaceTB/SmolLM2-135M-Instruct"
-    # Default ``extractive``: ranked chunks only (embed model still runs). ``hf``
-    # loads a local causal LM — needs RAM. ``openai`` calls the OpenAI HTTP API
-    # (set ``OPENAI_API_KEY``); no local generative weights.
+    # OpenAI embeddings (``OPENAI_API_KEY``). Use ``text-embedding-3-*`` with
+    # ``RAG_EMBED_DIMS`` in the allowed range for that model (e.g. 1536 for full small).
+    embed_model: str = "text-embedding-3-small"
+    embed_dims: int = 1536
+    # Chat model when ``RAG_LLM_BACKEND=openai``; ignored for ``extractive``.
+    llm_model: str = "gpt-5.4-nano"
+    # ``extractive`` = ranked chunks only; ``openai`` = OpenAI chat completions.
     llm_backend: str = "extractive"
-    # Off by default: loading embed + LLM on every replica can OOM small cloud
-    # instances and crash-loop (502). Enable via RAG_PRELOAD_MODELS_ON_STARTUP or
-    # warm with POST /bootstrap when you have enough RAM.
-    preload_models_on_startup: bool = False
-    # If True and the SQLite index has rows, start a background LLM warm at
-    # process start on **this** replica. Default False: on small hosts, enabling
-    # this for every replica often OOM-kills the process (crash-loop in logs).
-    # For load-balanced /readyz, either use enough RAM per replica and set True,
-    # or min replicas 1 and POST /bootstrap / per-replica warm via traffic.
-    warm_llm_when_index_ready: bool = False
 
     chunk_chars: int = 4000
     chunk_overlap_chars: int = 400
@@ -39,9 +27,7 @@ class Settings(BaseModel):
 
     auto_ingest_on_startup: bool = False
     auto_ingest_if_db_empty: bool = True
-    # When True, lifespan blocks until ingest/LLM warm-up finishes (single-process
-    # friendly; avoids serving before the model is usable). FastAPI Cloud Dockerfile
-    # sets this true with RAG_PRELOAD_MODELS_ON_STARTUP.
+    # When True, lifespan blocks until ingest finishes (single-process friendly).
     blocking_startup_warmup: bool = False
 
 
@@ -61,8 +47,9 @@ def _getenv_llm_backend(default: str) -> str:
     if v is None:
         return default
     x = v.strip().lower()
+    # Legacy ``hf`` / Hugging Face local LM — no longer supported; treat as extractive.
     if x in {"hf", "transformers", "huggingface", "local"}:
-        return "hf"
+        return "extractive"
     if x in {"openai", "gpt", "chatgpt"}:
         return "openai"
     if x in {"extractive", "chunks", "none", "retrieve"}:
@@ -81,12 +68,6 @@ def get_settings() -> Settings:
         embed_dims=int(os.getenv("RAG_EMBED_DIMS", str(base.embed_dims))),
         llm_model=os.getenv("RAG_LLM_MODEL", base.llm_model),
         llm_backend=_getenv_llm_backend(base.llm_backend),
-        preload_models_on_startup=_getenv_bool(
-            "RAG_PRELOAD_MODELS_ON_STARTUP", base.preload_models_on_startup
-        ),
-        warm_llm_when_index_ready=_getenv_bool(
-            "RAG_WARM_LLM_WHEN_INDEX_READY", base.warm_llm_when_index_ready
-        ),
         chunk_chars=int(os.getenv("RAG_CHUNK_CHARS", str(base.chunk_chars))),
         chunk_overlap_chars=int(
             os.getenv("RAG_CHUNK_OVERLAP_CHARS", str(base.chunk_overlap_chars))
