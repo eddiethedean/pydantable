@@ -5,14 +5,14 @@ import warnings
 import pytest
 from pydantable import AwaitableDataFrameModel, DataFrame, DataFrameModel, Schema
 from pydantable.io import (
-    aiter_sql,
+    aiter_sql_raw,
     amaterialize_parquet,
     export_ipc,
     export_json,
     export_ndjson,
     export_parquet,
-    fetch_sql,
-    iter_sql,
+    fetch_sql_raw,
+    iter_sql_raw,
     materialize_csv,
     materialize_ipc,
     materialize_json,
@@ -451,7 +451,7 @@ def test_dataframe_model_constructor_from_fetch_sql(tmp_path) -> None:
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE t (id INTEGER, age INTEGER)"))
         conn.execute(text("INSERT INTO t VALUES (7, 8)"))
-    cols = fetch_sql("SELECT id, age FROM t", eng)
+    cols = fetch_sql_raw("SELECT id, age FROM t", eng)
     df = UserDF(cols, trusted_mode="shape_only")
     assert df.collect(as_lists=True) == {"id": [7], "age": [8]}
 
@@ -468,7 +468,7 @@ def test_dataframe_model_iter_sql_batches_via_io_and_constructor(tmp_path) -> No
 
     batches = [
         UserDF(cols, trusted_mode="shape_only")
-        for cols in iter_sql(
+        for cols in iter_sql_raw(
             "SELECT id, age FROM t ORDER BY id",
             eng,
             batch_size=1,
@@ -495,7 +495,7 @@ async def test_dataframe_model_aiter_sql_batches_via_io(tmp_path) -> None:
         conn.execute(text("INSERT INTO t VALUES (3, 30), (4, 40)"))
 
     out: list[UserDF] = []
-    async for cols in aiter_sql(
+    async for cols in aiter_sql_raw(
         "SELECT id, age FROM t ORDER BY id",
         eng,
         batch_size=2,

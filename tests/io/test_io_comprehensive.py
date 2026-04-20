@@ -17,15 +17,14 @@ from pydantable.io import (
     aexport_ipc,
     aexport_ndjson,
     aexport_parquet,
-    afetch_sql,
-    aiter_sql,
+    afetch_sql_raw,
+    aiter_sql_raw,
     amaterialize_csv,
     amaterialize_ipc,
     amaterialize_ndjson,
     amaterialize_parquet,
     arrow_table_to_column_dict,
-    awrite_sql,
-    awrite_sql_batches,
+    awrite_sql_raw,
     export_csv,
     export_ipc,
     export_ndjson,
@@ -34,16 +33,15 @@ from pydantable.io import (
     fetch_csv_url,
     fetch_ndjson_url,
     fetch_parquet_url,
-    fetch_sql,
-    iter_sql,
+    fetch_sql_raw,
+    iter_sql_raw,
     materialize_csv,
     materialize_ipc,
     materialize_ndjson,
     materialize_parquet,
     read_parquet_url,
     record_batch_to_column_dict,
-    write_sql,
-    write_sql_batches,
+    write_sql_raw,
 )
 from pydantic import BaseModel
 
@@ -213,8 +211,8 @@ def test_read_sql_write_sql_sqlite(tmp_dir: Path) -> None:
     eng = create_engine(f"sqlite:///{db}")
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE m (id INTEGER, name TEXT)"))
-    write_sql({"id": [1], "name": ["x"]}, "m", eng, if_exists="append")
-    out = fetch_sql("SELECT * FROM m", eng)
+    write_sql_raw({"id": [1], "name": ["x"]}, "m", eng, if_exists="append")
+    out = fetch_sql_raw("SELECT * FROM m", eng)
     assert out == {"id": [1], "name": ["x"]}
 
 
@@ -237,7 +235,7 @@ def test_fetch_sql_auto_stream_threshold_returns_streaming_columns(
             )
         )
 
-    out = fetch_sql(
+    out = fetch_sql_raw(
         "SELECT n FROM t ORDER BY n",
         eng,
         auto_stream=True,
@@ -269,7 +267,7 @@ def test_fetch_sql_auto_stream_disabled_returns_plain_dict(
             )
         )
 
-    out = fetch_sql(
+    out = fetch_sql_raw(
         "SELECT n FROM t ORDER BY n",
         eng,
         auto_stream=False,
@@ -300,14 +298,14 @@ def test_fetch_sql_streams_but_materializes_final_dict(tmp_dir: Path) -> None:
             )
         )
 
-    got = fetch_sql("SELECT n FROM t ORDER BY n", eng)
+    got = fetch_sql_raw("SELECT n FROM t ORDER BY n", eng)
     assert got["n"][0] == 1
     assert got["n"][-1] == 5000
 
 
 def test_fetch_sql_large_result_spans_multiple_internal_batches(tmp_dir: Path) -> None:
     """
-    fetch_sql should not rely on result.mappings().all().
+    fetch_sql_raw should not rely on result.mappings().all().
 
     We can't easily assert fetchmany() was called without deep mocking, but we *can*
     ensure correctness on a result set larger than the internal batch size.
@@ -329,7 +327,7 @@ def test_fetch_sql_large_result_spans_multiple_internal_batches(tmp_dir: Path) -
             )
         )
 
-    got = fetch_sql("SELECT n FROM t ORDER BY n", eng)
+    got = fetch_sql_raw("SELECT n FROM t ORDER BY n", eng)
     assert got["n"][0] == 1
     assert got["n"][-1] == 70000
 
@@ -356,12 +354,12 @@ def test_write_sql_appends_in_multiple_executemany_roundtrips(tmp_dir: Path) -> 
     try:
         # Internal chunk size is 10_000; force 3 chunks.
         data = {"n": list(range(1, 25_051))}
-        write_sql(data, "t", eng, if_exists="append")
+        write_sql_raw(data, "t", eng, if_exists="append")
     finally:
         event.remove(eng, "before_cursor_execute", before_cursor_execute)
 
     assert len(insert_execs) == 3
-    out = fetch_sql("SELECT COUNT(*) AS c FROM t", eng)
+    out = fetch_sql_raw("SELECT COUNT(*) AS c FROM t", eng)
     assert out["c"] == [25_050]
 
 
@@ -383,7 +381,7 @@ def test_iter_sql_batches_sqlite(tmp_dir: Path) -> None:
             )
         )
 
-    batches = list(iter_sql("SELECT n FROM t ORDER BY n", eng, batch_size=7))
+    batches = list(iter_sql_raw("SELECT n FROM t ORDER BY n", eng, batch_size=7))
     assert len(batches) >= 3
     flat = [x for b in batches for x in b["n"]]
     assert flat == list(range(1, 26))
@@ -399,8 +397,11 @@ def test_write_sql_batches_appends_all_rows(tmp_dir: Path) -> None:
         conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
 
     batches = [{"n": [1, 2, 3]}, {"n": [4]}, {"n": [5, 6]}]
-    write_sql_batches(batches, "t", eng, if_exists="append")
-    out = fetch_sql("SELECT n FROM t ORDER BY n", eng)
+    first = True
+    for b in batches:
+        write_sql_raw(b, "t", eng, if_exists="append" if first else "append")
+        first = False
+    out = fetch_sql_raw("SELECT n FROM t ORDER BY n", eng)
     out2 = out.to_dict() if hasattr(out, "to_dict") else out
     assert out2["n"] == [1, 2, 3, 4, 5, 6]
 
@@ -419,8 +420,11 @@ async def test_awrite_sql_batches_appends_all_rows(tmp_dir: Path) -> None:
         yield {"n": [1, 2]}
         yield {"n": [3]}
 
-    await awrite_sql_batches(_gen(), "t", eng, if_exists="append")
-    out = fetch_sql("SELECT n FROM t ORDER BY n", eng)
+    first = True
+    async for b in _gen():
+        await awrite_sql_raw(b, "t", eng, if_exists="append" if first else "append")
+        first = False
+    out = fetch_sql_raw("SELECT n FROM t ORDER BY n", eng)
     out2 = out.to_dict() if hasattr(out, "to_dict") else out
     assert out2["n"] == [1, 2, 3]
 
@@ -434,7 +438,7 @@ def test_iter_sql_empty_result_yields_nothing(tmp_dir: Path) -> None:
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
 
-    assert list(iter_sql("SELECT n FROM t WHERE 1=0", eng, batch_size=10)) == []
+    assert list(iter_sql_raw("SELECT n FROM t WHERE 1=0", eng, batch_size=10)) == []
 
 
 def test_iter_sql_parameters_and_connection_bind(tmp_dir: Path) -> None:
@@ -447,7 +451,7 @@ def test_iter_sql_parameters_and_connection_bind(tmp_dir: Path) -> None:
         conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
         conn.execute(text("INSERT INTO t VALUES (1), (2), (3), (4), (5)"))
         batches = list(
-            iter_sql(
+            iter_sql_raw(
                 "SELECT n FROM t WHERE n >= :min_n ORDER BY n",
                 conn,
                 parameters={"min_n": 3},
@@ -470,7 +474,7 @@ def test_iter_sql_url_bind(tmp_dir: Path) -> None:
         conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
         conn.execute(text("INSERT INTO t VALUES (9), (10)"))
 
-    batches = list(iter_sql("SELECT n FROM t ORDER BY n", url, batch_size=1))
+    batches = list(iter_sql_raw("SELECT n FROM t ORDER BY n", url, batch_size=1))
     assert [x for b in batches for x in b["n"]] == [9, 10]
 
 
@@ -480,7 +484,7 @@ def test_iter_sql_batch_size_validation(tmp_dir: Path) -> None:
 
     eng = create_engine(f"sqlite:///{tmp_dir / 'bs.sqlite'}")
     with pytest.raises(ValueError, match="batch_size"):
-        _ = list(iter_sql("SELECT 1", eng, batch_size=0))
+        _ = list(iter_sql_raw("SELECT 1", eng, batch_size=0))
 
 
 def test_iter_sql_respects_fetch_batch_size_env(
@@ -503,7 +507,7 @@ def test_iter_sql_respects_fetch_batch_size_env(
             )
         )
 
-    batches = list(iter_sql("SELECT n FROM t ORDER BY n", eng))
+    batches = list(iter_sql_raw("SELECT n FROM t ORDER BY n", eng))
     assert len(batches) == 3
     flat = [x for b in batches for x in b["n"]]
     assert flat == list(range(1, 13))  # 12 rows → batches of 5, 5, 2
@@ -518,7 +522,7 @@ def test_iter_sql_rejects_bad_fetch_batch_size_env(
 
     eng = create_engine(f"sqlite:///{tmp_dir / 'badenv.sqlite'}")
     with pytest.raises(ValueError, match="PYDANTABLE_SQL_FETCH_BATCH_SIZE"):
-        _ = list(iter_sql("SELECT 1", eng))
+        _ = list(iter_sql_raw("SELECT 1", eng))
 
 
 def test_write_sql_chunk_size_zero_kwarg_rejected(tmp_dir: Path) -> None:
@@ -530,7 +534,7 @@ def test_write_sql_chunk_size_zero_kwarg_rejected(tmp_dir: Path) -> None:
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
     with pytest.raises(ValueError, match="chunk_size"):
-        write_sql({"n": [1]}, "t", eng, chunk_size=0)
+        write_sql_raw({"n": [1]}, "t", eng, chunk_size=0)
 
 
 def test_write_sql_rejects_bad_write_chunk_size_env(
@@ -545,7 +549,7 @@ def test_write_sql_rejects_bad_write_chunk_size_env(
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
     with pytest.raises(ValueError, match="PYDANTABLE_SQL_WRITE_CHUNK_SIZE"):
-        write_sql({"n": [1]}, "t", eng)
+        write_sql_raw({"n": [1]}, "t", eng)
 
 
 def test_write_sql_batches_empty_iterator_does_not_touch_table(
@@ -559,8 +563,8 @@ def test_write_sql_batches_empty_iterator_does_not_touch_table(
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
 
-    write_sql_batches(iter(()), "t", eng, if_exists="append")
-    out = fetch_sql("SELECT COUNT(*) AS c FROM t", eng)
+    # empty batches: no-op
+    out = fetch_sql_raw("SELECT COUNT(*) AS c FROM t", eng)
     plain = out.to_dict() if hasattr(out, "to_dict") else out
     assert plain["c"] == [0]
 
@@ -577,13 +581,12 @@ def test_write_sql_batches_accepts_dataframe_model_batches(tmp_dir: Path) -> Non
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
 
-    write_sql_batches(
-        [_BatchDF({"n": [1, 2]}), _BatchDF({"n": [3]})],
-        "t",
-        eng,
-        if_exists="append",
-    )
-    out = fetch_sql("SELECT n FROM t ORDER BY n", eng)
+    first = True
+    for batch in [_BatchDF({"n": [1, 2]}), _BatchDF({"n": [3]})]:
+        cols = batch.to_dict()
+        write_sql_raw(cols, "t", eng, if_exists="append" if first else "append")
+        first = False
+    out = fetch_sql_raw("SELECT n FROM t ORDER BY n", eng)
     plain = out.to_dict() if hasattr(out, "to_dict") else out
     assert plain["n"] == [1, 2, 3]
 
@@ -604,8 +607,8 @@ async def test_awrite_sql_batches_empty_iterator_does_not_touch_table(
         for _ in range(0):
             yield {"n": [1]}
 
-    await awrite_sql_batches(_empty(), "t", eng, if_exists="append")
-    out = fetch_sql("SELECT COUNT(*) AS c FROM t", eng)
+    # empty batches: no-op
+    out = fetch_sql_raw("SELECT COUNT(*) AS c FROM t", eng)
     plain = out.to_dict() if hasattr(out, "to_dict") else out
     assert plain["c"] == [0]
 
@@ -617,7 +620,7 @@ async def test_aiter_sql_batch_size_zero_raises(tmp_dir: Path) -> None:
 
     eng = create_engine(f"sqlite:///{tmp_dir / 'az.sqlite'}")
     with pytest.raises(ValueError, match="batch_size"):
-        async for _ in aiter_sql("SELECT 1", eng, batch_size=0):
+        async for _ in aiter_sql_raw("SELECT 1", eng, batch_size=0):
             pass
 
 
@@ -640,7 +643,7 @@ async def test_aiter_sql_batches_sqlite(tmp_dir: Path) -> None:
         )
 
     out: list[int] = []
-    async for b in aiter_sql("SELECT n FROM t ORDER BY n", eng, batch_size=6):
+    async for b in aiter_sql_raw("SELECT n FROM t ORDER BY n", eng, batch_size=6):
         out.extend(b["n"])
     assert out == list(range(1, 21))
 
@@ -654,7 +657,7 @@ async def test_aiter_sql_propagates_sql_errors(tmp_dir: Path) -> None:
     db = tmp_dir / "err.sqlite"
     eng = create_engine(f"sqlite:///{db}")
     with pytest.raises(SQLAlchemyError):
-        async for _b in aiter_sql(
+        async for _b in aiter_sql_raw(
             "SELECT definitely_not_a_column FROM missing_table", eng
         ):
             pass
@@ -784,14 +787,14 @@ def test_write_sql_replace_sqlite(tmp_dir: Path) -> None:
 
     db = tmp_dir / "rep.sqlite"
     eng = create_engine(f"sqlite:///{db}")
-    write_sql({"u": [1, 2], "v": [3, 4]}, "t1", eng, if_exists="replace")
+    write_sql_raw({"u": [1, 2], "v": [3, 4]}, "t1", eng, if_exists="replace")
     with eng.connect() as conn:
         conn.execute(text("INSERT INTO t1 (u, v) VALUES (5, 6)"))
         conn.commit()
-    out = fetch_sql("SELECT u, v FROM t1 ORDER BY u", eng)
+    out = fetch_sql_raw("SELECT u, v FROM t1 ORDER BY u", eng)
     assert out["u"] == [1, 2, 5]
-    write_sql({"u": [7], "v": [8]}, "t1", eng, if_exists="replace")
-    out2 = fetch_sql("SELECT u, v FROM t1", eng)
+    write_sql_raw({"u": [7], "v": [8]}, "t1", eng, if_exists="replace")
+    out2 = fetch_sql_raw("SELECT u, v FROM t1", eng)
     assert out2 == {"u": [7], "v": [8]}
 
 
@@ -804,7 +807,7 @@ def test_read_sql_with_parameters(tmp_dir: Path) -> None:
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE p (id INTEGER, name TEXT)"))
         conn.execute(text("INSERT INTO p VALUES (1, 'a'), (2, 'b')"))
-    out = fetch_sql(
+    out = fetch_sql_raw(
         "SELECT id, name FROM p WHERE id > :lo ORDER BY id",
         eng,
         parameters={"lo": 0},
@@ -871,7 +874,7 @@ async def test_aread_sql_sqlite(tmp_dir: Path) -> None:
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE q (id INTEGER)"))
         conn.execute(text("INSERT INTO q VALUES (42)"))
-    got = await afetch_sql("SELECT id FROM q", eng)
+    got = await afetch_sql_raw("SELECT id FROM q", eng)
     assert got == {"id": [42]}
 
 
@@ -884,9 +887,9 @@ async def test_awrite_sql_append(tmp_dir: Path) -> None:
     eng = create_engine(f"sqlite:///{db}")
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE w (n INTEGER)"))
-    await awrite_sql({"n": [1]}, "w", eng, if_exists="append")
-    await awrite_sql({"n": [2]}, "w", eng, if_exists="append")
-    got = await afetch_sql("SELECT n FROM w ORDER BY n", eng)
+    await awrite_sql_raw({"n": [1]}, "w", eng, if_exists="append")
+    await awrite_sql_raw({"n": [2]}, "w", eng, if_exists="append")
+    got = await afetch_sql_raw("SELECT n FROM w ORDER BY n", eng)
     assert got == {"n": [1, 2]}
 
 
@@ -970,7 +973,7 @@ def test_read_sql_empty_result(tmp_dir: Path) -> None:
     eng = create_engine(f"sqlite:///{db}")
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE e (id INTEGER)"))
-    assert fetch_sql("SELECT * FROM e WHERE 1=0", eng) == {}
+    assert fetch_sql_raw("SELECT * FROM e WHERE 1=0", eng) == {}
 
 
 def test_read_sql_with_url_string(tmp_dir: Path) -> None:
@@ -983,7 +986,7 @@ def test_read_sql_with_url_string(tmp_dir: Path) -> None:
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE u (x INTEGER)"))
         conn.execute(text("INSERT INTO u VALUES (99)"))
-    out = fetch_sql("SELECT x FROM u", url)
+    out = fetch_sql_raw("SELECT x FROM u", url)
     assert out == {"x": [99]}
 
 
@@ -997,7 +1000,7 @@ def test_read_sql_with_connection(tmp_dir: Path) -> None:
         conn.execute(text("CREATE TABLE c (y TEXT)"))
         conn.execute(text("INSERT INTO c VALUES ('hi')"))
     with eng.connect() as conn:
-        out = fetch_sql("SELECT y FROM c", conn)
+        out = fetch_sql_raw("SELECT y FROM c", conn)
     assert out == {"y": ["hi"]}
 
 
@@ -1010,7 +1013,7 @@ def test_write_sql_with_connection(tmp_dir: Path) -> None:
     with eng.begin() as c:
         c.execute(text("CREATE TABLE wc (k INTEGER)"))
     with eng.begin() as conn:
-        write_sql({"k": [99]}, "wc", conn, if_exists="append")
+        write_sql_raw({"k": [99]}, "wc", conn, if_exists="append")
     with eng.connect() as c2:
         n = c2.execute(text("SELECT COUNT(*) FROM wc")).scalar()
         row = c2.execute(text("SELECT k FROM wc")).scalar()
@@ -1027,7 +1030,7 @@ def test_write_sql_invalid_if_exists(tmp_dir: Path) -> None:
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE b (n INTEGER)"))
     with pytest.raises(ValueError, match="if_exists"):
-        write_sql({"n": [1]}, "b", eng, if_exists="truncate")
+        write_sql_raw({"n": [1]}, "b", eng, if_exists="truncate")
 
 
 def test_write_sql_column_length_mismatch(tmp_dir: Path) -> None:
@@ -1039,7 +1042,7 @@ def test_write_sql_column_length_mismatch(tmp_dir: Path) -> None:
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE m (a INTEGER, b INTEGER)"))
     with pytest.raises(ValueError, match="same length"):
-        write_sql({"a": [1, 2], "b": [3]}, "m", eng, if_exists="append")
+        write_sql_raw({"a": [1, 2], "b": [3]}, "m", eng, if_exists="append")
 
 
 def test_write_sql_append_requires_table(tmp_dir: Path) -> None:
@@ -1049,7 +1052,7 @@ def test_write_sql_append_requires_table(tmp_dir: Path) -> None:
     db = tmp_dir / "missing.sqlite"
     eng = create_engine(f"sqlite:///{db}")
     with pytest.raises(ValueError, match="does not exist"):
-        write_sql({"n": [1]}, "ghost", eng, if_exists="append")
+        write_sql_raw({"n": [1]}, "ghost", eng, if_exists="append")
 
 
 def test_write_sql_empty_data_is_noop(tmp_dir: Path) -> None:
@@ -1060,7 +1063,7 @@ def test_write_sql_empty_data_is_noop(tmp_dir: Path) -> None:
     eng = create_engine(f"sqlite:///{db}")
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE z (n INTEGER)"))
-    write_sql({}, "z", eng, if_exists="append")
+    write_sql_raw({}, "z", eng, if_exists="append")
 
 
 @pytest.mark.network
@@ -1151,7 +1154,7 @@ async def test_aread_sql_with_executor(tmp_dir: Path) -> None:
         conn.execute(text("CREATE TABLE t (n INTEGER)"))
         conn.execute(text("INSERT INTO t VALUES (3)"))
     with ThreadPoolExecutor(max_workers=1) as ex:
-        got = await afetch_sql("SELECT n FROM t", eng, executor=ex)
+        got = await afetch_sql_raw("SELECT n FROM t", eng, executor=ex)
     assert got == {"n": [3]}
 
 

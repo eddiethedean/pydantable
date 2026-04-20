@@ -113,6 +113,7 @@ nav:
   - Getting started:
       - getting-started/index.md
       - getting-started/quickstart.md
+      - getting-started/upgrading-to-v2.md
       - getting-started/troubleshooting.md
       - getting-started/docs-map.md
   - Positioning:

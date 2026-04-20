@@ -21,7 +21,6 @@ import logging
 import random
 import statistics
 import threading
-import warnings
 from datetime import date, datetime, timedelta
 from typing import (
     TYPE_CHECKING,
@@ -3418,7 +3417,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         *,
         as_lists: bool = False,
         as_numpy: bool = False,
-        as_polars: bool | None = None,
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
     ) -> Any:
@@ -3443,20 +3441,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         ``streaming`` is omitted), Polars uses its streaming engine for
         ``collect`` where supported (best-effort; some plans fall back or error).
 
-        The ``as_polars`` argument is deprecated: use :meth:`to_polars` for a
-        Polars ``DataFrame`` when the optional ``polars`` package is installed.
         """
-        if as_polars is not None:
-            warnings.warn(
-                "as_polars is deprecated and will be removed in pydantable 2.0.0; "
-                "use to_polars() for a Polars DataFrame, or collect(as_lists=True) "
-                "/ to_dict() for columnar dicts.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            if as_polars:
-                return self.to_polars(streaming=streaming)
-            return self.to_dict(streaming=streaming)
         if as_numpy and as_lists:
             raise ValueError(
                 "collect() cannot specify both as_numpy=True and as_lists=True."
@@ -3640,8 +3625,9 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             engine_streaming=engine_streaming,
         )
 
-        # Construct via the concrete class so `ty` can see the extra SQL kwargs.
-        return SqlDataFrame(
+        # Construct via SqlDataFrame[Schema] so the new frame is typed.
+        df_cls: Any = SqlDataFrame[self._current_schema_type]  # type: ignore[valid-type, index]
+        return df_cls(
             cols,
             sql_config=sql_config,
             sql_engine=sql_engine,
@@ -4112,7 +4098,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         *,
         as_lists: bool = False,
         as_numpy: bool = False,
-        as_polars: bool | None = None,
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         executor: Executor | None = None,
@@ -4128,25 +4113,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         Cancelling the awaiting task does **not** cancel in-flight Rust/Polars
         execution.
         """
-        if as_polars is not None:
-            warnings.warn(
-                "as_polars is deprecated and will be removed in pydantable 2.0.0; "
-                "use to_polars() for a Polars DataFrame, or collect(as_lists=True) "
-                "/ to_dict() for columnar dicts.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            if as_polars:
-                return await self.ato_polars(
-                    streaming=streaming,
-                    engine_streaming=engine_streaming,
-                    executor=executor,
-                )
-            return await self.ato_dict(
-                streaming=streaming,
-                engine_streaming=engine_streaming,
-                executor=executor,
-            )
         if as_numpy and as_lists:
             raise ValueError(
                 "collect() cannot specify both as_numpy=True and as_lists=True."
@@ -4250,7 +4216,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         *,
         as_lists: bool = False,
         as_numpy: bool = False,
-        as_polars: bool | None = None,
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         executor: Executor | None = None,
@@ -4261,7 +4226,6 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             return self.collect(
                 as_lists=as_lists,
                 as_numpy=as_numpy,
-                as_polars=as_polars,
                 streaming=streaming,
                 engine_streaming=engine_streaming,
             )

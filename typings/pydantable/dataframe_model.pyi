@@ -33,7 +33,6 @@ class DataFrameModelAsyncIO(Generic[RowT]):
     ) -> AwaitableDataFrameModel[RowT]: ...
     def read_json(self, *args: Any, **kwargs: Any) -> AwaitableDataFrameModel[RowT]: ...
     def read_parquet_url_ctx(self, *args: Any, **kwargs: Any) -> Any: ...
-    def write_sql(self, *args: Any, **kwargs: Any) -> Any: ...
     def write_sqlmodel(self, *args: Any, **kwargs: Any) -> Any: ...
     def export_parquet(self, *args: Any, **kwargs: Any) -> Any: ...
     def export_csv(self, *args: Any, **kwargs: Any) -> Any: ...
@@ -279,27 +278,6 @@ class DataFrameModel(Generic[RowT]):
         data: dict[str, list[Any]],
         *,
         indent: int | None = None,
-        executor: Executor | None = None,
-    ) -> None: ...
-    @classmethod
-    def write_sql(
-        cls,
-        data: dict[str, list[Any]],
-        table_name: str,
-        bind: Any,
-        *,
-        schema: str | None = None,
-        if_exists: str = "append",
-    ) -> None: ...
-    @classmethod
-    async def awrite_sql(
-        cls,
-        data: dict[str, list[Any]],
-        table_name: str,
-        bind: Any,
-        *,
-        schema: str | None = None,
-        if_exists: str = "append",
         executor: Executor | None = None,
     ) -> None: ...
     @classmethod
@@ -650,7 +628,6 @@ class DataFrameModel(Generic[RowT]):
         *,
         as_lists: bool = False,
         as_numpy: bool = False,
-        as_polars: bool | None = None,
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
     ) -> Any: ...
@@ -751,7 +728,6 @@ class DataFrameModel(Generic[RowT]):
         *,
         as_lists: bool = False,
         as_numpy: bool = False,
-        as_polars: bool | None = None,
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         executor: Executor | None = None,
@@ -782,7 +758,6 @@ class DataFrameModel(Generic[RowT]):
         *,
         as_lists: bool = False,
         as_numpy: bool = False,
-        as_polars: bool | None = None,
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         executor: Executor | None = None,

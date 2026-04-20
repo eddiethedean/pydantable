@@ -73,7 +73,6 @@ _FORBIDDEN_SYNC: frozenset[str] = frozenset(
         "export_ndjson",
         "export_ipc",
         "export_json",
-        "write_sql",
     }
 )
 
@@ -233,7 +232,6 @@ class AwaitableDataFrameModel(Generic[RowT]):
         *,
         as_lists: bool = False,
         as_numpy: bool = False,
-        as_polars: bool | None = None,
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         executor: Executor | None = None,
@@ -243,7 +241,6 @@ class AwaitableDataFrameModel(Generic[RowT]):
             return await df.acollect(
                 as_lists=as_lists,
                 as_numpy=as_numpy,
-                as_polars=as_polars,
                 streaming=streaming,
                 engine_streaming=engine_streaming,
                 executor=executor,
@@ -378,7 +375,6 @@ class AwaitableDataFrameModel(Generic[RowT]):
         *,
         as_lists: bool = False,
         as_numpy: bool = False,
-        as_polars: bool | None = None,
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         executor: Executor | None = None,
@@ -388,7 +384,6 @@ class AwaitableDataFrameModel(Generic[RowT]):
             return df.submit(
                 as_lists=as_lists,
                 as_numpy=as_numpy,
-                as_polars=as_polars,
                 streaming=streaming,
                 engine_streaming=engine_streaming,
                 executor=executor,

@@ -59,15 +59,7 @@ from .mongo import (
     write_mongo,
 )
 from .rap_support import aread_csv_rap, rap_csv_available
-from .sql import (
-    StreamingColumns,
-    fetch_sql,
-    fetch_sql_raw,
-    iter_sql,
-    iter_sql_raw,
-    write_sql,
-    write_sql_raw,
-)
+from .sql import StreamingColumns, fetch_sql_raw, iter_sql_raw, write_sql_raw
 from .sqlmodel_read import fetch_sqlmodel, iter_sqlmodel
 from .sqlmodel_schema import sqlmodel_columns
 from .sqlmodel_write import write_sqlmodel
@@ -275,16 +267,6 @@ async def aexport_json(
     indent: int | None = None,
     executor: Executor | None = None,
 ) -> None: ...
-async def afetch_sql(
-    sql: str,
-    bind: str | Any,
-    *,
-    parameters: Mapping[str, Any] | None = None,
-    batch_size: int | None = None,
-    auto_stream: bool = True,
-    auto_stream_threshold_rows: int | None = None,
-    executor: Executor | None = None,
-) -> dict[str, list[Any]] | StreamingColumns: ...
 async def afetch_sql_raw(
     sql: str,
     bind: str | Any,
@@ -296,14 +278,6 @@ async def afetch_sql_raw(
     executor: Executor | None = None,
 ) -> dict[str, list[Any]] | StreamingColumns: ...
 async def aiter_sql_raw(
-    sql: str,
-    bind: str | Any,
-    *,
-    parameters: Mapping[str, Any] | None = None,
-    batch_size: int = 65536,
-    executor: Executor | None = None,
-): ...
-async def aiter_sql(
     sql: str,
     bind: str | Any,
     *,
@@ -416,37 +390,8 @@ async def awrite_mongo(
     session: Any | None = None,
     executor: Executor | None = None,
 ) -> int: ...
-async def awrite_sql(
-    data: dict[str, list[Any]],
-    table_name: str,
-    bind: str | Any,
-    *,
-    schema: str | None = None,
-    if_exists: str = "append",
-    chunk_size: int | None = None,
-    executor: Executor | None = None,
-) -> None: ...
 async def awrite_sql_raw(
     data: dict[str, list[Any]],
-    table_name: str,
-    bind: str | Any,
-    *,
-    schema: str | None = None,
-    if_exists: str = "append",
-    chunk_size: int | None = None,
-    executor: Executor | None = None,
-) -> None: ...
-def write_sql_batches(
-    batches: Any,
-    table_name: str,
-    bind: str | Any,
-    *,
-    schema: str | None = None,
-    if_exists: str = "append",
-    chunk_size: int | None = None,
-) -> None: ...
-async def awrite_sql_batches(
-    batches: Any,
     table_name: str,
     bind: str | Any,
     *,
@@ -502,7 +447,6 @@ __all__ = [
     "afetch_beanie",
     "afetch_mongo",
     "afetch_mongo_async",
-    "afetch_sql",
     "afetch_sql_raw",
     "afetch_sqlmodel",
     "aiter_beanie",
@@ -514,7 +458,6 @@ __all__ = [
     "aiter_mongo_async",
     "aiter_ndjson",
     "aiter_parquet",
-    "aiter_sql",
     "aiter_sql_raw",
     "aiter_sqlmodel",
     "amaterialize_csv",
@@ -534,8 +477,6 @@ __all__ = [
     "awrite_beanie",
     "awrite_mongo",
     "awrite_mongo_async",
-    "awrite_sql",
-    "awrite_sql_batches",
     "awrite_sql_raw",
     "awrite_sqlmodel",
     "awrite_sqlmodel_batches",
@@ -550,7 +491,6 @@ __all__ = [
     "fetch_mongo",
     "fetch_ndjson_url",
     "fetch_parquet_url",
-    "fetch_sql",
     "fetch_sql_raw",
     "fetch_sqlmodel",
     "http",
@@ -570,7 +510,6 @@ __all__ = [
     "iter_orc",
     "iter_parquet",
     "iter_snowflake",
-    "iter_sql",
     "iter_sql_raw",
     "iter_sqlmodel",
     "materialize_csv",
@@ -603,8 +542,6 @@ __all__ = [
     "write_mongo",
     "write_ndjson_batches",
     "write_parquet_batches",
-    "write_sql",
-    "write_sql_batches",
     "write_sql_raw",
     "write_sqlmodel",
     "write_sqlmodel_batches",

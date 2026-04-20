@@ -1,8 +1,7 @@
 """SQLAlchemy-backed raw string SQL I/O (optional ``[sql]`` extra).
 
 Use :func:`fetch_sql_raw`, :func:`iter_sql_raw`, and :func:`write_sql_raw` for explicit
-string-SQL access. The unprefixed names :func:`fetch_sql`, :func:`iter_sql`, and
-:func:`write_sql` remain as deprecated aliases.
+string-SQL access.
 
 Works with **any database URL and dialect** SQLAlchemy supports (PostgreSQL, MySQL,
 SQLite, SQL Server, Oracle, etc.). Install the matching **DBAPI driver** for your URL
@@ -12,7 +11,6 @@ SQLite, SQL Server, Oracle, etc.). Install the matching **DBAPI driver** for you
 from __future__ import annotations
 
 import os
-import warnings
 from collections.abc import Iterator, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -132,15 +130,6 @@ def _to_engine(bind: str | Engine | Connection) -> Engine:
     return create_engine(bind)
 
 
-def _warn_legacy_sql(name: str, *, raw: str, sqlmodel: str) -> None:
-    warnings.warn(
-        f"{name} is deprecated and will be removed in a future major version; "
-        f"for mapped tables use {sqlmodel}, for string SQL use {raw}.",
-        DeprecationWarning,
-        stacklevel=3,
-    )
-
-
 def iter_sql_raw(
     sql: str,
     bind: str | Engine | Connection,
@@ -229,55 +218,6 @@ def fetch_sql_raw(
         for k in keys:
             out[k].extend(b.get(k, []))
     return out
-
-
-def iter_sql(
-    sql: str,
-    bind: str | Engine | Connection,
-    *,
-    parameters: Mapping[str, Any] | None = None,
-    batch_size: int | None = None,
-) -> Iterator[dict[str, list[Any]]]:
-    """
-    Deprecated: use :func:`iter_sql_raw` or :func:`iter_sqlmodel`.
-
-    Execute ``sql`` and yield results in batches as ``dict[column_name, list]``.
-    """
-    _warn_legacy_sql(
-        "iter_sql",
-        raw="iter_sql_raw(...)",
-        sqlmodel="iter_sqlmodel(...)",
-    )
-    return iter_sql_raw(sql, bind, parameters=parameters, batch_size=batch_size)
-
-
-def fetch_sql(
-    sql: str,
-    bind: str | Engine | Connection,
-    *,
-    parameters: Mapping[str, Any] | None = None,
-    batch_size: int | None = None,
-    auto_stream: bool = True,
-    auto_stream_threshold_rows: int | None = None,
-) -> dict[str, list[Any]] | StreamingColumns:
-    """
-    Deprecated: use :func:`fetch_sql_raw` or :func:`fetch_sqlmodel`.
-
-    Execute ``sql`` and return rows as ``dict[column_name, list]`` (materialized).
-    """
-    _warn_legacy_sql(
-        "fetch_sql",
-        raw="fetch_sql_raw(...)",
-        sqlmodel="fetch_sqlmodel(...)",
-    )
-    return fetch_sql_raw(
-        sql,
-        bind,
-        parameters=parameters,
-        batch_size=batch_size,
-        auto_stream=auto_stream,
-        auto_stream_threshold_rows=auto_stream_threshold_rows,
-    )
 
 
 def _infer_columns(data: dict[str, list[Any]]) -> list[Any]:
@@ -370,32 +310,3 @@ def write_sql_raw(
         tbl = Table(table_name, md, schema=schema, autoload_with=conn)
         for chunk in _row_chunks():
             conn.execute(insert(tbl), chunk)
-
-
-def write_sql(
-    data: dict[str, list[Any]],
-    table_name: str,
-    bind: str | Engine | Connection,
-    *,
-    schema: str | None = None,
-    if_exists: str = "append",
-    chunk_size: int | None = None,
-) -> None:
-    """
-    Deprecated: use :func:`write_sql_raw` or :func:`write_sqlmodel`.
-
-    Insert ``data`` (column dict) into ``table_name``.
-    """
-    _warn_legacy_sql(
-        "write_sql",
-        raw="write_sql_raw(...)",
-        sqlmodel="write_sqlmodel(...)",
-    )
-    write_sql_raw(
-        data,
-        table_name,
-        bind,
-        schema=schema,
-        if_exists=if_exists,
-        chunk_size=chunk_size,
-    )

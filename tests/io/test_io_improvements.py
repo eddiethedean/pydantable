@@ -16,12 +16,14 @@ import pytest
 from pydantable import DataFrame, DataFrameModel, MissingRustExtensionError
 from pydantable.io import (
     aexport_json,
-    afetch_sql,
+    afetch_sql_raw,
     amaterialize_json,
     aread_parquet_url_ctx,
+    awrite_sql_raw,
     export_json,
     export_parquet,
     fetch_bytes,
+    write_sql_raw,
     materialize_csv,
     materialize_json,
     materialize_parquet,
@@ -258,7 +260,7 @@ def test_dataframe_model_export_write_sql_sqlite(tmp_path: Path) -> None:
         conn.execute(text("CREATE TABLE t2 (k INTEGER)"))
     out_pq = tmp_path / "e.pq"
     _Mini.export_parquet(out_pq, {"k": [2]})
-    _Mini.write_sql({"k": [3]}, "t2", eng, if_exists="append")
+    write_sql_raw({"k": [3]}, "t2", eng, if_exists="append")
     with eng.connect() as c:
         n = c.execute(text("SELECT COUNT(*) FROM t2")).scalar()
     assert n == 1
@@ -274,10 +276,10 @@ async def test_afetch_sql_awrite_sql_sqlite(tmp_path: Path) -> None:
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE t_async (k INTEGER)"))
         conn.execute(text("INSERT INTO t_async VALUES (5)"))
-    cols = await afetch_sql("SELECT k FROM t_async", eng)
+    cols = await afetch_sql_raw("SELECT k FROM t_async", eng)
     m = _Mini(cols)
     assert m.collect()[0].k == 5
-    await _Mini.awrite_sql({"k": [6]}, "t_async", eng, if_exists="append")
+    await awrite_sql_raw({"k": [6]}, "t_async", eng, if_exists="append")
     with eng.connect() as c:
         rows = c.execute(text("SELECT k FROM t_async ORDER BY k")).fetchall()
     assert [r[0] for r in rows] == [5, 6]

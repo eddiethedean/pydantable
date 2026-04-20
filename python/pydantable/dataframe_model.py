@@ -255,9 +255,6 @@ class _AsyncIOMethods(Generic[RowT]):
     def read_parquet_url_ctx(self, *args: Any, **kwargs: Any) -> Any:
         return self._cls.aread_parquet_url_ctx(*args, **kwargs)
 
-    def write_sql(self, *args: Any, **kwargs: Any) -> Any:
-        return self._cls.awrite_sql(*args, **kwargs)
-
     def write_sqlmodel(self, *args: Any, **kwargs: Any) -> Any:
         return self._cls.awrite_sqlmodel_data(*args, **kwargs)
 
@@ -291,10 +288,11 @@ class DataFrameModel(Generic[RowT]):
     (same as ``aread_parquet``) and unprefixed terminals on
     :class:`~pydantable.awaitable_dataframe_model.AwaitableDataFrameModel` (e.g.
     ``await …collect()``). Eager file/SQL column loads belong in
-    :mod:`pydantable.io` (``materialize_*``, ``fetch_sql``, ``fetch_sqlmodel``) — pass
+    :mod:`pydantable.io` (``materialize_*``, ``fetch_sql_raw``, ``fetch_sqlmodel``)
+    — pass
     the resulting ``dict[str, list]`` to the constructor if you need an in-memory
     table first.
-    **``export_*``** / **``aexport_*``**, **``write_sql``** / **``awrite_sql``**,
+    **``export_*``** / **``aexport_*``**,
     **``write_sqlmodel_data``** / **``awrite_sqlmodel_data``**, **instance**
     **``write_sqlmodel``** / **``awrite_sqlmodel``**,
     **``read_parquet_url_ctx``** / **``aread_parquet_url_ctx``** delegate to
@@ -994,46 +992,6 @@ class DataFrameModel(Generic[RowT]):
         from .io import aexport_json as _aej
 
         await _aej(path, data, indent=indent, executor=executor)
-
-    @classmethod
-    def write_sql(
-        cls,
-        data: dict[str, list[Any]],
-        table_name: str,
-        bind: str | Engine | Connection,
-        *,
-        schema: str | None = None,
-        if_exists: str = "append",
-    ) -> None:
-        """Append/replace rows via :func:`pydantable.io.write_sql` (``[sql]`` extra)."""
-        cls._dfm_require_subclass_with_schema()
-        from .io import write_sql as _ws
-
-        _ws(data, table_name, bind, schema=schema, if_exists=if_exists)
-
-    @classmethod
-    async def awrite_sql(
-        cls,
-        data: dict[str, list[Any]],
-        table_name: str,
-        bind: str | Engine | Connection,
-        *,
-        schema: str | None = None,
-        if_exists: str = "append",
-        executor: Executor | None = None,
-    ) -> None:
-        """Async :func:`pydantable.io.awrite_sql`."""
-        cls._dfm_require_subclass_with_schema()
-        from .io import awrite_sql as _aws
-
-        await _aws(
-            data,
-            table_name,
-            bind,
-            schema=schema,
-            if_exists=if_exists,
-            executor=executor,
-        )
 
     @classmethod
     def write_sqlmodel_data(
@@ -1965,14 +1923,12 @@ class DataFrameModel(Generic[RowT]):
         *,
         as_lists: bool = False,
         as_numpy: bool = False,
-        as_polars: bool | None = None,
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
     ) -> Any:
         return self._df.collect(
             as_lists=as_lists,
             as_numpy=as_numpy,
-            as_polars=as_polars,
             streaming=streaming,
             engine_streaming=engine_streaming,
         )
@@ -2167,7 +2123,6 @@ class DataFrameModel(Generic[RowT]):
         *,
         as_lists: bool = False,
         as_numpy: bool = False,
-        as_polars: bool | None = None,
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         executor: Executor | None = None,
@@ -2176,7 +2131,6 @@ class DataFrameModel(Generic[RowT]):
         return await self._df.acollect(
             as_lists=as_lists,
             as_numpy=as_numpy,
-            as_polars=as_polars,
             streaming=streaming,
             engine_streaming=engine_streaming,
             executor=executor,
@@ -2223,7 +2177,6 @@ class DataFrameModel(Generic[RowT]):
         *,
         as_lists: bool = False,
         as_numpy: bool = False,
-        as_polars: bool | None = None,
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         executor: Executor | None = None,
@@ -2232,7 +2185,6 @@ class DataFrameModel(Generic[RowT]):
         return self._df.submit(
             as_lists=as_lists,
             as_numpy=as_numpy,
-            as_polars=as_polars,
             streaming=streaming,
             engine_streaming=engine_streaming,
             executor=executor,

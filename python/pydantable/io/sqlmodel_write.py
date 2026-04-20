@@ -1,7 +1,7 @@
 """SQLModel-first SQL writes (optional ``sqlmodel`` / ``pydantable[sql]``).
 
 Uses :class:`sqlmodel.SQLModel` ``__table__`` for DDL on **replace** (no type inference).
-Mirrors :func:`pydantable.io.write_sql` chunking and transactions.
+Mirrors :func:`pydantable.io.write_sql_raw` chunking and transactions.
 """
 
 from __future__ import annotations

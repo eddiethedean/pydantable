@@ -128,7 +128,7 @@ def fetch_sqlmodel(
     """
     Load rows for ``model`` into ``dict[column_name, list]`` (or :class:`StreamingColumns`).
 
-    Semantics match :func:`pydantable.io.fetch_sql` for ``batch_size``,
+    Semantics match :func:`pydantable.io.fetch_sql_raw` for ``batch_size``,
     ``auto_stream``, and ``auto_stream_threshold_rows``.
     """
     bs = _fetch_batch_size(batch_size)

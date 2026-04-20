@@ -11,7 +11,6 @@ object from the same optional stack (see the **Lazy SQL DataFrame** guide).
 
 from __future__ import annotations
 
-import warnings
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal, cast
 
@@ -47,19 +46,9 @@ def _resolve_sql_execution_engine(
     *,
     sql_config: Any | None,
     sql_engine: Any | None,
-    moltres_engine: Any | None,
     engine: Any | None,
     engine_mode: Literal["auto", "default"] = "auto",
 ) -> Any:
-    if moltres_engine is not None:
-        warnings.warn(
-            "moltres_engine= is deprecated; use sql_engine= instead.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-        if sql_engine is not None:
-            raise TypeError("Pass only one of sql_engine= or moltres_engine=")
-        sql_engine = moltres_engine
     if engine is not None:
         return engine
     if engine_mode == "default":
@@ -99,7 +88,6 @@ class SqlDataFrame(DataFrame):
         SQLAlchemy query/subquery. The selectable must expose ``.c`` with column
         names that cover the schema fields.
         """
-        moltres_engine = kwargs.pop("moltres_engine", None)
         if kwargs:
             raise TypeError(f"Unexpected keyword arguments: {sorted(kwargs)!r}")
         if getattr(cls, "_schema_type", None) is None:
@@ -113,7 +101,6 @@ class SqlDataFrame(DataFrame):
         resolved = _resolve_sql_execution_engine(
             sql_config=sql_config,
             sql_engine=sql_engine,
-            moltres_engine=moltres_engine,
             engine=engine,
             engine_mode=engine_mode,
         )
@@ -232,7 +219,6 @@ class SqlDataFrame(DataFrame):
 
         Use ``SqlDataFrame[YourSchema].from_sql_table(...)``.
         """
-        moltres_engine = kwargs.pop("moltres_engine", None)
         if kwargs:
             raise TypeError(f"Unexpected keyword arguments: {sorted(kwargs)!r}")
         if getattr(cls, "_schema_type", None) is None:
@@ -246,7 +232,6 @@ class SqlDataFrame(DataFrame):
         resolved = _resolve_sql_execution_engine(
             sql_config=sql_config,
             sql_engine=sql_engine,
-            moltres_engine=moltres_engine,
             engine=engine,
             engine_mode=engine_mode,
         )
@@ -283,13 +268,11 @@ class SqlDataFrame(DataFrame):
         engine_mode: Literal["auto", "default"] = "auto",
         **kwargs: Any,
     ) -> None:
-        moltres_engine = kwargs.pop("moltres_engine", None)
         if kwargs:
             raise TypeError(f"Unexpected keyword arguments: {sorted(kwargs)!r}")
         resolved = _resolve_sql_execution_engine(
             sql_config=sql_config,
             sql_engine=sql_engine,
-            moltres_engine=moltres_engine,
             engine=engine,
             engine_mode=engine_mode,
         )
@@ -325,13 +308,11 @@ class SqlDataFrameModel(DataFrameModel):
         engine_mode: Literal["auto", "default"] = "auto",
         **kwargs: Any,
     ) -> None:
-        moltres_engine = kwargs.pop("moltres_engine", None)
         if kwargs:
             raise TypeError(f"Unexpected keyword arguments: {sorted(kwargs)!r}")
         resolved = _resolve_sql_execution_engine(
             sql_config=sql_config,
             sql_engine=sql_engine,
-            moltres_engine=moltres_engine,
             engine=engine,
             engine_mode=engine_mode,
         )
@@ -358,7 +339,6 @@ class SqlDataFrameModel(DataFrameModel):
         **kwargs: Any,
     ) -> Any:
         """Lazy read from a SQLAlchemy table — same engine rules as the constructor."""
-        moltres_engine = kwargs.pop("moltres_engine", None)
         if kwargs:
             raise TypeError(f"Unexpected keyword arguments: {sorted(kwargs)!r}")
         cls._dfm_require_subclass_with_schema()
@@ -367,7 +347,6 @@ class SqlDataFrameModel(DataFrameModel):
             table,
             sql_config=sql_config,
             sql_engine=sql_engine,
-            moltres_engine=moltres_engine,
             engine=engine,
             engine_mode=engine_mode,
             name=name,

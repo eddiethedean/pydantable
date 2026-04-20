@@ -59,7 +59,6 @@ class SupportsLazyAsyncMaterialize(Protocol[_RowT_co]):
         *,
         as_lists: bool = False,
         as_numpy: bool = False,
-        as_polars: bool | None = None,
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         executor: Executor | None = None,

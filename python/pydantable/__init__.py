@@ -33,7 +33,6 @@ from .io import (
     afetch_beanie,
     afetch_mongo,
     afetch_mongo_async,
-    afetch_sql,
     afetch_sql_raw,
     afetch_sqlmodel,
     aiter_beanie,
@@ -45,7 +44,6 @@ from .io import (
     aiter_mongo_async,
     aiter_ndjson,
     aiter_parquet,
-    aiter_sql,
     aiter_sql_raw,
     aiter_sqlmodel,
     amaterialize_json,
@@ -60,7 +58,6 @@ from .io import (
     awrite_sqlmodel_batches,
     export_parquet,
     fetch_mongo,
-    fetch_sql,
     fetch_sql_raw,
     fetch_sqlmodel,
     is_async_mongo_collection,
@@ -114,8 +111,6 @@ if TYPE_CHECKING:
 
 
 def __getattr__(name: str) -> Any:
-    import warnings
-
     if name == "SqlDataFrame":
         from pydantable.sql_dataframe import SqlDataFrame
 
@@ -145,24 +140,6 @@ def __getattr__(name: str) -> Any:
         import pydantable.mongo_dataframe as mongo_df
 
         return getattr(mongo_df, name)
-    if name in (
-        "EnteiDataFrame",
-        "EnteiDataFrameModel",
-        "EnteiPydantableEngine",
-    ):
-        from pydantable import mongo_entei
-
-        _mongo_rename = {
-            "EnteiDataFrame": "MongoDataFrame",
-            "EnteiDataFrameModel": "MongoDataFrameModel",
-            "EnteiPydantableEngine": "MongoPydantableEngine",
-        }
-        warnings.warn(
-            f"{name} is deprecated; use {_mongo_rename[name]} instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return getattr(mongo_entei, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -190,7 +167,6 @@ __all__ = [
     "afetch_beanie",
     "afetch_mongo",
     "afetch_mongo_async",
-    "afetch_sql",
     "afetch_sql_raw",
     "afetch_sqlmodel",
     "aiter_beanie",
@@ -202,7 +178,6 @@ __all__ = [
     "aiter_mongo_async",
     "aiter_ndjson",
     "aiter_parquet",
-    "aiter_sql",
     "aiter_sql_raw",
     "aiter_sqlmodel",
     "amaterialize_json",
@@ -217,7 +192,6 @@ __all__ = [
     "awrite_sqlmodel_batches",
     "export_parquet",
     "fetch_mongo",
-    "fetch_sql",
     "fetch_sql_raw",
     "fetch_sqlmodel",
     "get_observer",
@@ -264,4 +238,4 @@ __all__ = [
     "write_sqlmodel",
     "write_sqlmodel_batches",
 ]
-__version__ = "1.19.0"
+__version__ = "2.0.0"

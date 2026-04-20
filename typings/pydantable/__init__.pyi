@@ -26,7 +26,6 @@ from .io import (
     afetch_beanie,
     afetch_mongo,
     afetch_mongo_async,
-    afetch_sql,
     afetch_sql_raw,
     afetch_sqlmodel,
     aiter_beanie,
@@ -38,7 +37,6 @@ from .io import (
     aiter_mongo_async,
     aiter_ndjson,
     aiter_parquet,
-    aiter_sql,
     aiter_sql_raw,
     aiter_sqlmodel,
     amaterialize_json,
@@ -53,7 +51,6 @@ from .io import (
     awrite_sqlmodel_batches,
     export_parquet,
     fetch_mongo,
-    fetch_sql,
     fetch_sql_raw,
     fetch_sqlmodel,
     is_async_mongo_collection,
@@ -94,7 +91,7 @@ from .observe import get_observer, set_observer
 from .schema import DtypeDriftWarning, Schema
 from .types import WKB
 
-__version__ = "1.19.0"
+__version__ = "2.0.0"
 
 __all__ = [
     "WKB",
@@ -120,7 +117,6 @@ __all__ = [
     "afetch_beanie",
     "afetch_mongo",
     "afetch_mongo_async",
-    "afetch_sql",
     "afetch_sql_raw",
     "afetch_sqlmodel",
     "aiter_beanie",
@@ -132,7 +128,6 @@ __all__ = [
     "aiter_mongo_async",
     "aiter_ndjson",
     "aiter_parquet",
-    "aiter_sql",
     "aiter_sql_raw",
     "aiter_sqlmodel",
     "amaterialize_json",
@@ -147,7 +142,6 @@ __all__ = [
     "awrite_sqlmodel_batches",
     "export_parquet",
     "fetch_mongo",
-    "fetch_sql",
     "fetch_sql_raw",
     "fetch_sqlmodel",
     "get_observer",

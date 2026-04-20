@@ -332,17 +332,11 @@ async def test_acollect_rejects_numpy_and_lists_together() -> None:
 
 @pytest.mark.asyncio
 async def test_acollect_deprecated_as_polars_branch() -> None:
-    pl = pytest.importorskip("polars")
     df = Tiny({"x": [7]})
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        pl_out = await df.acollect(as_polars=True)
-        dict_out = await df.acollect(as_polars=False)
-    assert any("as_polars is deprecated" in str(x.message) for x in w)
-    assert any("2.0.0" in str(x.message) for x in w)
-    assert isinstance(pl_out, pl.DataFrame)
-    assert pl_out.to_dict(as_series=False) == {"x": [7]}
-    assert dict_out == {"x": [7]}
+    with pytest.raises(TypeError, match="unexpected keyword argument"):
+        await df.acollect(as_polars=True)  # type: ignore[call-arg]
+    with pytest.raises(TypeError, match="unexpected keyword argument"):
+        await df.acollect(as_polars=False)  # type: ignore[call-arg]
 
 
 @pytest.mark.asyncio
