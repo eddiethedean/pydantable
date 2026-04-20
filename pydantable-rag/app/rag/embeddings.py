@@ -101,6 +101,35 @@ def _build_embedder(model_name: str, dims: int) -> Embedder:
     )
 
 
+def embed_model_snapshot_cached(model_name: str) -> bool:
+    """
+    True if a Hub snapshot for ``model_name`` exists on disk (``HF_HUB_CACHE`` /
+    baked image). Does not load torch. Used so health/diag stay consistent across
+    workers: cold processes still report ready when weights are shipped in the image.
+    """
+    import os
+
+    try:
+        from huggingface_hub import try_to_load_from_cache
+    except Exception:
+        return False
+    try:
+        p = try_to_load_from_cache(repo_id=model_name, filename="config.json")
+    except Exception:
+        return False
+    return isinstance(p, str) and os.path.isfile(p)
+
+
+def embed_deployment_ready(model_name: str, dims: int) -> bool:
+    """
+    True if this deployment can serve embeddings without a fresh Hub download:
+    weights are resident in this process, or the snapshot is present locally.
+    """
+    if embedder_is_loaded(model_name, dims):
+        return True
+    return embed_model_snapshot_cached(model_name)
+
+
 def embedder_is_loaded(model_name: str, dims: int) -> bool:
     key = (model_name, dims)
     with _embed_lock:

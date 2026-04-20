@@ -34,7 +34,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     # Make the app think the LLM is already warm.
     monkeypatch.setattr(main, "llm_is_loaded", lambda _m: True)
     monkeypatch.setattr(main, "llm_is_loading", lambda _m: False)
-    monkeypatch.setattr(main, "embedder_is_loaded", lambda _m, _d: True)
+    monkeypatch.setattr(main, "embed_deployment_ready", lambda _m, _d: True)
     monkeypatch.setattr(main, "embedder_is_loading", lambda _m, _d: False)
     monkeypatch.setattr(main, "embedding_compute_active", lambda: False)
     monkeypatch.setattr(main, "warm_llm", lambda _m: None)

@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from app.rag.embeddings import (
+    embed_deployment_ready,
     embedder_is_loaded,
     embedder_is_loading,
     embedding_compute_active,
@@ -168,7 +169,11 @@ class HealthzResponse(BaseModel):
         description="True while the LLM is downloading or initializing in-process.",
     )
     embed_loaded: bool = Field(
-        description="True once the embedding model for this app is in memory.",
+        description=(
+            "True when embedding weights are in this worker's RAM, or when a Hub "
+            "snapshot exists on disk (e.g. baked image) so the first request need "
+            "not download from the Hub."
+        ),
     )
     embed_loading: bool = Field(
         description="True while the embedding model is downloading or initializing.",
@@ -379,7 +384,7 @@ def healthz() -> HealthzResponse:
         llm_model=s.llm_model,
         llm_loaded=llm_is_loaded(s.llm_model),
         llm_loading=llm_is_loading(s.llm_model),
-        embed_loaded=embedder_is_loaded(s.embed_model, s.embed_dims),
+        embed_loaded=embed_deployment_ready(s.embed_model, s.embed_dims),
         embed_loading=embedder_is_loading(s.embed_model, s.embed_dims),
         embed_computing=embedding_compute_active(),
     )
@@ -398,7 +403,7 @@ def readyz() -> ReadyzResponse:
         llm_backend=s.llm_backend,
         llm_loaded=llm_is_loaded(s.llm_model),
         llm_loading=llm_is_loading(s.llm_model),
-        embed_loaded=embedder_is_loaded(s.embed_model, s.embed_dims),
+        embed_loaded=embed_deployment_ready(s.embed_model, s.embed_dims),
         embed_loading=embedder_is_loading(s.embed_model, s.embed_dims),
         embed_computing=embedding_compute_active(),
         db_path=str(dbp),
@@ -420,7 +425,7 @@ def diag() -> DiagResponse:
         llm_loaded=llm_is_loaded(s.llm_model),
         llm_loading=llm_is_loading(s.llm_model),
         llm_last_error=llm_last_error(s.llm_model),
-        embed_loaded=embedder_is_loaded(s.embed_model, s.embed_dims),
+        embed_loaded=embed_deployment_ready(s.embed_model, s.embed_dims),
         embed_loading=embedder_is_loading(s.embed_model, s.embed_dims),
         embed_computing=embedding_compute_active(),
     )
