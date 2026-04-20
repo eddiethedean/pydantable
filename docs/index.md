@@ -62,6 +62,12 @@ df = DataFrame[Row]({"id": [1, 2], "score": [10.0, 20.5]})
 
 </div>
 
+## Where pydantable fits
+
+- **New here?** Start with the [Five-minute tour](getting-started/quickstart.md), then read the [Mental model](concepts/mental-model.md).
+- **Deciding between tools?** Start with [Why pydantable?](positioning/why-pydantable.md) and the [Comparisons](positioning/comparisons/index.md) (Polars + pandas).
+- **Looking for recipes by intent?** See [Workflows (cookbook)](cookbook/workflows/index.md).
+
 ## Guide map
 
 - **Services:** [GOLDEN_PATH_FASTAPI](integrations/fastapi/golden-path.md) → [FASTAPI](integrations/fastapi/fastapi.md) → [FASTAPI_ADVANCED](integrations/fastapi/advanced.md) → [FASTAPI_ENHANCEMENTS](integrations/fastapi/enhancements.md) → [DATAFRAMEMODEL](user-guide/dataframemodel.md) → [EXECUTION](user-guide/execution.md). Cookbooks: [fastapi_columnar_bodies](cookbook/fastapi_columnar_bodies.md), [fastapi_observability](cookbook/fastapi_observability.md), [fastapi_background_tasks](cookbook/fastapi_background_tasks.md), [async_lazy_pipeline](cookbook/async_lazy_pipeline.md). Layout: `docs/examples/fastapi/service_layout/`.

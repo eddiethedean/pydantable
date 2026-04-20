@@ -7,6 +7,12 @@ It uses the same steps: build a typed `DataFrame`, inspect it, summarize, filter
 !!! note
     Requires a working `pydantable` install with the Rust extension (`pip install .` or wheels).
 
+!!! tip "If you’re deciding between tools"
+    If you’re choosing between pydantable and a general-purpose DataFrame library, start here:
+
+    - [Why pydantable?](../positioning/why-pydantable.md)
+    - [Comparisons (Polars + pandas)](../positioning/comparisons/index.md)
+    - [Mental model](../concepts/mental-model.md)
 
 ## 1. Schema and data
 

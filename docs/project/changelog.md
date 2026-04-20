@@ -4,6 +4,32 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.19.0] — 2026-04-20
+
+### Added
+
+- **Engine pushdown methods (typed):** SQL, Mongo, and Spark DataFrame surfaces add typed “native/pushdown” methods (and explicit guardrails) so engine-specific operations are available when the frame is backed by that engine, with clear errors when not supported.
+- **Engine parity matrix + tests:** a dedicated engine parity table plus tests/guardrails to keep engine capabilities and error messages consistent.
+- **UI wrappers (optional engines):** pandas- and PySpark-shaped wrapper modules for the Spark and Mongo DataFrame surfaces.
+- **pydantable-rag:** FastAPI backend for a documentation-grounded assistant (RAG), including a `/chat-app` UI, extractive mode, optional OpenAI-backed generation, and a committed SQLite vector index for deployment.
+
+### Documentation
+
+- **Engines:** updated SQL/Mongo/Spark engine docs plus new parity/guardrails documentation.
+- **Docs assistant:** floating docs chat launcher (MkDocs overrides + CSS/JS) and README pointers for the RAG backend and deployment.
+
+### Performance
+
+- **Native engine (Rust / Polars execution):** reduced materialization overhead and added benchmarks for native materialization hot paths.
+
+### CI / deployment
+
+- **Docs assistant workflows:** FastAPI Cloud deploy workflow for `pydantable-rag`, plus a workflow to verify the committed vector index and optionally rebuild it in CI when `OPENAI_API_KEY` is configured.
+
+### Version bump
+
+- Align **pydantable**, **pydantable-protocol**, **pydantable-native**, **pydantable-core**, and published **`__version__`** values to **1.19.0**.
+
 ## [1.18.1] — 2026-04-16
 
 ### Documentation

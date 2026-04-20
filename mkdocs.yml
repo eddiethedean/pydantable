@@ -115,6 +115,14 @@ nav:
       - getting-started/quickstart.md
       - getting-started/troubleshooting.md
       - getting-started/docs-map.md
+  - Positioning:
+      - positioning/why-pydantable.md
+      - Comparisons:
+          - positioning/comparisons/index.md
+          - positioning/comparisons/polars.md
+          - positioning/comparisons/pandas.md
+  - Concepts:
+      - concepts/mental-model.md
   - User guide:
       - user-guide/index.md
       - user-guide/dataframemodel.md
@@ -170,6 +178,7 @@ nav:
       - integrations/streamlit.md
   - Cookbook:
       - cookbook/index.md
+      - cookbook/workflows/index.md
       - cookbook/async_lazy_pipeline.md
       - cookbook/fastapi_columnar_bodies.md
       - cookbook/fastapi_async_materialization.md
