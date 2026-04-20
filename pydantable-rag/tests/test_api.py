@@ -58,6 +58,15 @@ def test_root_status_page(client: TestClient) -> None:
     assert "pydantable-rag" in body
     assert "Embedding model" in body
     assert "/docs" in body
+    assert "/chat-app" in body
+
+
+def test_chat_app_page(client: TestClient) -> None:
+    res = client.get("/chat-app")
+    assert res.status_code == 200
+    assert "text/html" in res.headers.get("content-type", "")
+    assert "POST /chat" in res.text
+    assert 'id="q"' in res.text
 
 
 def test_healthz_has_version_and_config(client: TestClient) -> None:

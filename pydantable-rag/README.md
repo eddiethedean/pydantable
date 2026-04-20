@@ -108,4 +108,5 @@ fastapi deploy
 - Health endpoints:
   - `GET /healthz`
   - `GET /readyz`
+  - `GET /chat-app` — browser chat UI (uses `POST /chat`)
   - On **`embed_loaded`**: true if the sentence-transformer is **in RAM on that worker** *or* its Hub snapshot is **on disk** (e.g. baked `hf_baked/`). That avoids misleading `true`/`false` mismatches between `/healthz` and `/diag` when a load balancer hits different cold workers.

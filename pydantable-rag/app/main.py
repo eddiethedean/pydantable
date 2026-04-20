@@ -332,16 +332,526 @@ def _status_page_html() -> str:
     <tbody>{"".join(rows)}</tbody>
   </table>
   <p class="note">Version {ver} · DB <code>{db_esc}</code></p>
-  <p><a href="/docs">OpenAPI docs</a> · <a href="/healthz">/healthz</a> ·
+  <p><a href="/chat-app">Chat</a> · <a href="/docs">OpenAPI docs</a> ·
+  <a href="/healthz">/healthz</a> ·
   <a href="/readyz">/readyz</a> · <a href="/diag">/diag</a></p>
 </body>
 </html>"""
+
+
+_CHAT_APP_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="color-scheme" content="dark"/>
+  <title>pydantable-rag · Chat</title>
+  <style>
+    :root {
+      --bg: #212121;
+      --surface: #2f2f2f;
+      --surface-hover: #3a3a3a;
+      --border: rgba(255,255,255,0.1);
+      --text: #ececec;
+      --text-muted: #9b9b9b;
+      --accent: #10a37f;
+      --accent-dim: #0d8c6d;
+      --user-bubble: #2f2f2f;
+      --assistant-fg: #d1d5db;
+      --danger: #f87171;
+      --radius: 1.25rem;
+      --radius-sm: 0.75rem;
+      --font: "Söhne", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+        Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: var(--font);
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+    #app {
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+      max-width: 48rem;
+      margin: 0 auto;
+    }
+    .topbar {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(33,33,33,0.85);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .brand {
+      font-weight: 600;
+      font-size: 0.95rem;
+      letter-spacing: -0.02em;
+    }
+    .topbar a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+    }
+    .topbar a:hover { color: var(--text); }
+    .topbar-actions { display: flex; align-items: center; gap: 0.85rem; }
+    #clear {
+      font: inherit;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 0.4rem;
+      padding: 0.35rem 0.65rem;
+      cursor: pointer;
+    }
+    #clear:hover {
+      color: var(--text);
+      background: var(--surface);
+    }
+    #thread {
+      flex: 1;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+      padding: 1.25rem 1rem 0.5rem;
+    }
+    #thread.has-chat #empty { display: none; }
+    #messages { padding-bottom: 0.25rem; }
+    #empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: min(42vh, 320px);
+      text-align: center;
+      padding: 1rem;
+    }
+    #empty h2 {
+      margin: 0 0 0.35rem;
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      color: var(--text);
+    }
+    #empty p {
+      margin: 0 0 1.25rem;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      max-width: 22rem;
+    }
+    .starters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+      max-width: 36rem;
+    }
+    .starter {
+      padding: 0.55rem 0.85rem;
+      font: inherit;
+      font-size: 0.82rem;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .starter:hover {
+      background: var(--surface-hover);
+      border-color: rgba(255,255,255,0.15);
+    }
+    .turn {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.35rem;
+      animation: fadeIn 0.25s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: none; }
+    }
+    .turn.user { flex-direction: row-reverse; }
+    .avatar {
+      flex-shrink: 0;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 0.35rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .turn.user .avatar {
+      background: linear-gradient(145deg, #5b8cff, #3b5bdb);
+      color: #fff;
+    }
+    .turn.assistant .avatar {
+      background: var(--accent);
+      color: #fff;
+    }
+    .block {
+      flex: 1;
+      min-width: 0;
+      max-width: 100%;
+    }
+    .turn.user .block { display: flex; justify-content: flex-end; }
+    .bubble {
+      display: inline-block;
+      max-width: min(100%, 34rem);
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .turn.user .bubble {
+      background: var(--user-bubble);
+      border: 1px solid var(--border);
+      border-radius: var(--radius) var(--radius-sm) var(--radius-sm) var(--radius);
+    }
+    .turn.assistant .bubble {
+      padding-left: 0;
+      color: var(--assistant-fg);
+      line-height: 1.65;
+    }
+    .sources {
+      margin-top: 0.65rem;
+      padding: 0.65rem 0.75rem;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      background: rgba(0,0,0,0.25);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+    .sources strong { color: var(--text-muted); font-weight: 600; }
+    .sources ul { margin: 0.35rem 0 0 1rem; padding: 0; }
+    .sources li { margin-bottom: 0.2rem; }
+    .err {
+      color: var(--danger);
+      font-size: 0.88rem;
+      padding: 0.5rem 0.75rem;
+      background: rgba(248,113,113,0.08);
+      border-radius: var(--radius-sm);
+      margin-bottom: 0.75rem;
+    }
+    .composer-wrap {
+      flex-shrink: 0;
+      padding: 0.65rem 1rem 1rem;
+      background: linear-gradient(to top, var(--bg) 70%, transparent);
+    }
+    .composer {
+      display: flex;
+      align-items: flex-end;
+      gap: 0.5rem;
+      padding: 0.45rem 0.55rem 0.45rem 0.85rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+    }
+    .composer:focus-within {
+      border-color: rgba(255,255,255,0.18);
+    }
+    #q {
+      flex: 1;
+      min-height: 2.5rem;
+      max-height: 12rem;
+      padding: 0.5rem 0;
+      font: inherit;
+      color: var(--text);
+      background: transparent;
+      border: none;
+      outline: none;
+      resize: none;
+      line-height: 1.5;
+    }
+    #q::placeholder { color: var(--text-muted); }
+    #send {
+      flex-shrink: 0;
+      width: 2.35rem;
+      height: 2.35rem;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 0.5rem;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    #send:hover:not(:disabled) { background: var(--accent-dim); }
+    #send:active:not(:disabled) { transform: scale(0.96); }
+    #send:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    .fineprint {
+      margin: 0.65rem 0 0;
+      text-align: center;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+    .fineprint code { font-size: 0.7rem; opacity: 0.9; }
+    .fineprint a { color: var(--text-muted); }
+    .fineprint a:hover { color: var(--text); }
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; padding: 0;
+      margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <span class="brand">pydantable-rag</span>
+      <div class="topbar-actions">
+        <button type="button" id="clear" title="New chat">New chat</button>
+        <a href="/">Status</a>
+        <a href="/docs">API</a>
+      </div>
+    </header>
+    <main id="thread">
+      <div id="empty">
+        <h2>Ask about pydantable</h2>
+        <p>Documentation-grounded answers. Follow-up questions use your thread
+        history with <code style="color:var(--text-muted)">POST /chat</code>.</p>
+        <div class="starters" id="starters"></div>
+      </div>
+      <div id="messages" aria-live="polite"></div>
+    </main>
+    <footer class="composer-wrap">
+      <label class="visually-hidden" for="q">Message</label>
+      <div class="composer">
+        <textarea id="q" rows="1" placeholder="Message pydantable-rag…"></textarea>
+        <button type="button" id="send" aria-label="Send message" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            aria-hidden="true">
+            <path d="M12 19V5M5 12l7-7 7 7"/>
+          </svg>
+        </button>
+      </div>
+      <p class="fineprint">__VERSION__ · Retrieval RAG ·
+      <a href="/docs">OpenAPI</a></p>
+    </footer>
+  </div>
+  <script>
+(function () {
+  var thread = document.getElementById("thread");
+  var messages = document.getElementById("messages");
+  var input = document.getElementById("q");
+  var sendBtn = document.getElementById("send");
+  var history = [];
+  var starterQs = [
+    "What is pydantable?",
+    "How do I create a DataFrame?",
+    "Explain Schema validation",
+    "What is Expr used for?"
+  ];
+
+  function wireStarters() {
+    var startersEl = document.getElementById("starters");
+    if (!startersEl) return;
+    startersEl.innerHTML = "";
+    starterQs.forEach(function (q) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "starter";
+      b.textContent = q;
+      b.addEventListener("click", function () {
+        input.value = q;
+        input.focus();
+        autosize();
+        updateSendState();
+      });
+      startersEl.appendChild(b);
+    });
+  }
+  wireStarters();
+
+  function autosize() {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 192) + "px";
+  }
+  input.addEventListener("input", function () {
+    autosize();
+    updateSendState();
+  });
+
+  function updateSendState() {
+    sendBtn.disabled = input.value.trim().length === 0;
+  }
+
+  function esc(t) {
+    var d = document.createElement("div");
+    d.textContent = t;
+    return d.innerHTML;
+  }
+
+  function scrollToBottom() {
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  function appendToThread(node) {
+    messages.appendChild(node);
+  }
+
+  function setHasChat() {
+    thread.classList.add("has-chat");
+  }
+
+  function addBubble(role, text, sources) {
+    setHasChat();
+    var turn = document.createElement("div");
+    turn.className = "turn " + (role === "user" ? "user" : "assistant");
+    var av = document.createElement("div");
+    av.className = "avatar";
+    av.setAttribute("aria-hidden", "true");
+    av.textContent = role === "user" ? "You" : "AI";
+    var block = document.createElement("div");
+    block.className = "block";
+    var bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerHTML = esc(text).replace(/\\n/g, "<br/>");
+    if (role === "user") {
+      var inner = document.createElement("div");
+      inner.appendChild(bubble);
+      block.appendChild(inner);
+    } else {
+      block.appendChild(bubble);
+    }
+    if (sources && sources.length) {
+      var src = document.createElement("div");
+      src.className = "sources";
+      var parts = ["<strong>Sources</strong><ul>"];
+      for (var i = 0; i < sources.length; i++) {
+        var s = sources[i];
+        var dist = typeof s.distance === "number" ? s.distance.toFixed(4) : "";
+        parts.push("<li>" + esc(s.source || "") + (dist ? " · " + dist : "") +
+          "</li>");
+      }
+      parts.push("</ul>");
+      src.innerHTML = parts.join("");
+      block.appendChild(src);
+    }
+    turn.appendChild(av);
+    turn.appendChild(block);
+    appendToThread(turn);
+    scrollToBottom();
+  }
+
+  function addError(msg) {
+    setHasChat();
+    var e = document.createElement("p");
+    e.className = "err";
+    e.textContent = msg;
+    appendToThread(e);
+    scrollToBottom();
+  }
+
+  async function sendMessage() {
+    var text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    autosize();
+    updateSendState();
+    addBubble("user", text);
+    sendBtn.disabled = true;
+    try {
+      var res = await fetch("/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ message: text, history: history }),
+      });
+      var ct = res.headers.get("content-type") || "";
+      var data = null;
+      if (ct.indexOf("application/json") !== -1) {
+        data = await res.json();
+      } else {
+        addError((await res.text()) || res.statusText);
+        return;
+      }
+      if (!res.ok) {
+        var detail =
+          data && data.detail
+            ? typeof data.detail === "string"
+              ? data.detail
+              : JSON.stringify(data.detail)
+            : res.status + " " + res.statusText;
+        addError(detail);
+        return;
+      }
+      history.push({ role: "user", content: text });
+      history.push({ role: "assistant", content: data.answer });
+      if (history.length > 24) history = history.slice(-24);
+      addBubble("assistant", data.answer, data.sources);
+    } catch (err) {
+      addError(err && err.message ? err.message : "Request failed");
+    } finally {
+      updateSendState();
+    }
+  }
+
+  document.getElementById("send").addEventListener("click", sendMessage);
+  document.getElementById("clear").addEventListener("click", function () {
+    history = [];
+    thread.classList.remove("has-chat");
+    messages.innerHTML = "";
+    wireStarters();
+    input.focus();
+  });
+  input.addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter" && !ev.shiftKey) {
+      ev.preventDefault();
+      if (!sendBtn.disabled) sendMessage();
+    }
+  });
+  updateSendState();
+  input.focus();
+})();
+  </script>
+</body>
+</html>
+"""
+
+
+def _chat_app_html() -> str:
+    return _CHAT_APP_HTML.replace(
+        "__VERSION__",
+        html.escape(app_version(), quote=True),
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
 def root_status() -> str:
     """Browser-friendly view of embed / LLM / index loading state (auto-refresh)."""
     return _status_page_html()
+
+
+@app.get("/chat-app", response_class=HTMLResponse)
+def chat_app() -> str:
+    """Minimal browser UI that calls ``POST /chat``."""
+    return _chat_app_html()
 
 
 @app.post("/bootstrap")
