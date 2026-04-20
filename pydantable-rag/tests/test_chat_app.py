@@ -25,6 +25,10 @@ _CHAT_APP_REQUIRED_SUBSTRINGS: tuple[str, ...] = (
     "wireStarters",
     "aria-live",
     "renderAssistantMarkdown",
+    "wrapCodeBlocksInBubble",
+    "copyToClipboard",
+    "applySyntaxHighlight",
+    "highlight.min.js",
     "marked.min.js",
 )
 

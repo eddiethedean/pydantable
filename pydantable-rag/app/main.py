@@ -6,10 +6,16 @@ import logging
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import cast
 
 from fastapi import BackgroundTasks, Body, FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
+from starlette.requests import Request
 
 from app.openai_env import openai_api_key_configured
 from app.rag.embeddings import (
@@ -92,7 +98,24 @@ async def lifespan(_app: FastAPI):
     yield
 
 
+# Per-IP limits (``slowapi`` / ``limits`` syntax). Tunable via ``.env``:
+# ``RATELIMIT_ENABLED``, ``RATELIMIT_DEFAULT``, ``RATELIMIT_HEADERS_ENABLED``.
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["100/minute"],
+    headers_enabled=True,
+)
+
 app = FastAPI(title="pydantable-rag", lifespan=lifespan)
+app.state.limiter = limiter
+
+
+async def _rate_limit_handler(request: Request, exc: Exception) -> Response:
+    return _rate_limit_exceeded_handler(request, cast(RateLimitExceeded, exc))
+
+
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 
 def _ingest_then_release_embedder(
@@ -335,6 +358,15 @@ _CHAT_APP_HTML = """<!DOCTYPE html>
     src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"
     crossorigin="anonymous"
   ></script>
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/styles/github-dark.min.css"
+    crossorigin="anonymous"
+  />
+  <script
+    src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/highlight.min.js"
+    crossorigin="anonymous"
+  ></script>
   <style>
     :root {
       --bg: #212121;
@@ -547,6 +579,10 @@ _CHAT_APP_HTML = """<!DOCTYPE html>
       padding: 0;
       font-size: inherit;
     }
+    /* highlight.js (fenced blocks): keep our pre shell; spans carry token colors */
+    .turn.assistant .bubble.md pre code.hljs {
+      background: transparent !important;
+    }
     .turn.assistant .bubble.md ul,
     .turn.assistant .bubble.md ol {
       padding-left: 1.25rem;
@@ -602,6 +638,73 @@ _CHAT_APP_HTML = """<!DOCTYPE html>
       background: rgba(248,113,113,0.08);
       border-radius: var(--radius-sm);
       margin-bottom: 0.75rem;
+    }
+    .assistant-actions {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 0.35rem;
+      margin: 0 0 0.35rem;
+      min-height: 1.5rem;
+    }
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font: inherit;
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      border-radius: 0.4rem;
+      padding: 0.3rem 0.5rem;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .copy-btn:hover {
+      color: var(--text);
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,255,255,0.14);
+    }
+    .copy-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .copy-btn svg {
+      flex-shrink: 0;
+      opacity: 0.9;
+    }
+    .copy-btn.copied {
+      color: #6ee7b7;
+      border-color: rgba(110,231,183,0.35);
+    }
+    .copy-reply .copy-label {
+      line-height: 1;
+    }
+    .code-block-wrap {
+      position: relative;
+      margin: 0 0 0.65rem;
+    }
+    .turn.assistant .bubble.md .code-block-wrap pre {
+      margin-bottom: 0;
+    }
+    .code-block-wrap .copy-code {
+      position: absolute;
+      top: 0.45rem;
+      right: 0.45rem;
+      z-index: 2;
+      padding: 0.3rem;
+      opacity: 0.85;
+    }
+    @media (hover: hover) {
+      .code-block-wrap .copy-code {
+        opacity: 0;
+      }
+      .code-block-wrap:hover .copy-code,
+      .code-block-wrap:focus-within .copy-code {
+        opacity: 1;
+      }
     }
     .composer-wrap {
       flex-shrink: 0;
@@ -780,6 +883,92 @@ _CHAT_APP_HTML = """<!DOCTYPE html>
     }
   }
 
+  function applySyntaxHighlight(root) {
+    if (typeof hljs === "undefined" || !hljs.highlightElement) return;
+    root.querySelectorAll("pre code").forEach(function (el) {
+      try {
+        hljs.highlightElement(el);
+      } catch (e) {}
+    });
+  }
+
+  function clipboardIconSvg() {
+    return (
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+      'stroke-linejoin="round" aria-hidden="true">' +
+      '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>' +
+      '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>' +
+      "</svg>"
+    );
+  }
+
+  function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        if (document.execCommand("copy")) resolve();
+        else reject(new Error("copy failed"));
+      } catch (err) {
+        reject(err);
+      } finally {
+        document.body.removeChild(ta);
+      }
+    });
+  }
+
+  function flashCopyButton(btn) {
+    var prev = btn.getAttribute("aria-label") || "";
+    btn.setAttribute("aria-label", "Copied!");
+    btn.classList.add("copied");
+    window.setTimeout(function () {
+      if (prev) btn.setAttribute("aria-label", prev);
+      btn.classList.remove("copied");
+    }, 2000);
+  }
+
+  function wrapCodeBlocksInBubble(bubble) {
+    var pres = bubble.querySelectorAll("pre");
+    for (var i = 0; i < pres.length; i++) {
+      var pre = pres[i];
+      if (pre.closest(".code-block-wrap")) continue;
+      var wrap = document.createElement("div");
+      wrap.className = "code-block-wrap";
+      pre.parentNode.insertBefore(wrap, pre);
+      wrap.appendChild(pre);
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "copy-btn copy-code";
+      btn.setAttribute("aria-label", "Copy code");
+      btn.title = "Copy code";
+      btn.innerHTML = clipboardIconSvg();
+      btn.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        var w = ev.currentTarget.closest(".code-block-wrap");
+        if (!w) return;
+        var p = w.querySelector("pre");
+        var code = p ? p.querySelector("code") : null;
+        var t = code ? code.innerText : p ? p.innerText : "";
+        copyToClipboard(t).then(
+          function () {
+            flashCopyButton(ev.currentTarget);
+          },
+          function () {}
+        );
+      });
+      wrap.appendChild(btn);
+    }
+  }
+
   function scrollToBottom() {
     thread.scrollTop = thread.scrollHeight;
   }
@@ -811,6 +1000,27 @@ _CHAT_APP_HTML = """<!DOCTYPE html>
       block.appendChild(inner);
     } else {
       bubble.innerHTML = renderAssistantMarkdown(text);
+      applySyntaxHighlight(bubble);
+      wrapCodeBlocksInBubble(bubble);
+      var actions = document.createElement("div");
+      actions.className = "assistant-actions";
+      var copyReply = document.createElement("button");
+      copyReply.type = "button";
+      copyReply.className = "copy-btn copy-reply";
+      copyReply.setAttribute("aria-label", "Copy response");
+      copyReply.title = "Copy response";
+      copyReply.innerHTML =
+        clipboardIconSvg() + '<span class="copy-label">Copy</span>';
+      copyReply.addEventListener("click", function () {
+        copyToClipboard(text).then(
+          function () {
+            flashCopyButton(copyReply);
+          },
+          function () {}
+        );
+      });
+      actions.appendChild(copyReply);
+      block.appendChild(actions);
       block.appendChild(bubble);
     }
     if (sources && sources.length) {
@@ -943,7 +1153,8 @@ def chat_app() -> str:
 
 
 @app.post("/bootstrap")
-def bootstrap(background_tasks: BackgroundTasks) -> BootstrapResponse:
+@limiter.limit("20/minute")
+def bootstrap(background_tasks: BackgroundTasks, request: Request) -> BootstrapResponse:
     """
     Kick off ingestion without blocking the request (hosted cold starts).
     """
@@ -1036,8 +1247,10 @@ class IngestResponse(BaseModel):
 
 
 @app.post("/ingest", response_model=IngestResponse)
+@limiter.limit("10/minute")
 def ingest(
     background_tasks: BackgroundTasks,
+    request: Request,
     req: IngestRequest = _INGEST_BODY,
 ) -> IngestResponse:
     s = get_settings()
@@ -1049,7 +1262,8 @@ def ingest(
 
 
 @app.post("/chat", response_model=ChatResponse)
-def chat(req: ChatRequest, background_tasks: BackgroundTasks) -> ChatResponse:
+@limiter.limit("30/minute")
+def chat(req: ChatRequest, request: Request) -> ChatResponse:
     s = get_settings()
     db_path = resolve_db_path(s.db_path)
 

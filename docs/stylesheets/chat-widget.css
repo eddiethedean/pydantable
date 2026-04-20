@@ -1,0 +1,133 @@
+/* Floating pydantable-rag chat launcher (MkDocs Material) */
+
+#pydantable-chat-fab {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 200;
+  width: 3.25rem;
+  height: 3.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, #0d9488, #0f766e);
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(15, 118, 110, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+#pydantable-chat-fab:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 22px rgba(15, 118, 110, 0.55);
+}
+
+#pydantable-chat-fab:focus-visible {
+  outline: 3px solid #5eead4;
+  outline-offset: 3px;
+}
+
+#pydantable-chat-fab svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+}
+
+#pydantable-chat-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(2px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+#pydantable-chat-backdrop[aria-hidden="false"] {
+  display: flex;
+}
+
+#pydantable-chat-dialog {
+  position: relative;
+  width: min(100%, 32rem);
+  height: min(85vh, 40rem);
+  max-height: 90vh;
+  background: var(--md-default-bg-color, #fff);
+  border-radius: 0.75rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+[data-md-color-scheme="slate"] #pydantable-chat-dialog {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+#pydantable-chat-dialog header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  background: linear-gradient(90deg, #0f766e, #0d9488);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+#pydantable-chat-close {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#pydantable-chat-close:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+#pydantable-chat-frame-wrap {
+  flex: 1;
+  min-height: 0;
+  background: #212121;
+}
+
+#pydantable-chat-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 18rem;
+  border: 0;
+  display: block;
+}
+
+@media (max-width: 44rem) {
+  #pydantable-chat-dialog {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  #pydantable-chat-fab {
+    right: 0.65rem;
+    bottom: 0.65rem;
+  }
+}

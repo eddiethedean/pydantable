@@ -10,12 +10,13 @@ version = "0.3.0"
  requires-python = ">=3.10"
  dependencies = [
   "fastapi[standard]>=0.110",
-   "pydantic>=2.0,<3",
-   "python-dotenv>=1.0",
-   "sqlite-vec>=0.1.6",
-   "numpy>=1.24",
+  "pydantic>=2.0,<3",
+  "python-dotenv>=1.0",
+  "sqlite-vec>=0.1.6",
+  "numpy>=1.24",
   "openai>=1.40",
- ]
+  "slowapi>=0.1.9",
+]
  
  [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.8"]
@@ -47,6 +48,8 @@ root = ["."]
 allowed-unresolved-imports = [
     "openai.**",
     "sqlite_vec.**",
+    "slowapi.**",
+    "limits.**",
     "dotenv",
     "pytest",
 ]

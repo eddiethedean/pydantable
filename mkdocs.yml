@@ -24,6 +24,7 @@ exclude_docs: |
 
 theme:
   name: material
+  custom_dir: docs/overrides
   language: en
   palette:
     - media: "(prefers-color-scheme: light)"
@@ -102,6 +103,10 @@ markdown_extensions:
 
 extra_css:
   - stylesheets/extra.css
+  - stylesheets/chat-widget.css
+
+extra_javascript:
+  - javascripts/chat-launcher.js
 
 nav:
   - Home: index.md
@@ -218,7 +223,9 @@ nav:
       - expressions.coalesce: api/coalesce.md
       - expressions.concat: api/concat.md
 
+# pydantable-rag chat UI URL (…/chat-app). Prefer RTD env RAG_CHAT_APP_URL for production.
 extra:
+  chat_app_url: ""
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/eddiethedean/pydantable

@@ -8,6 +8,7 @@ imports ``pydantable``. The SQLAlchemy ``Engine`` / ``Connection`` patch matches
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -19,6 +20,12 @@ def _project_paths(config) -> tuple[Path, Path]:
 
 
 def on_config(config, **kwargs):
+    """Merge optional ``RAG_CHAT_APP_URL`` into ``extra.chat_app_url`` for the chat widget."""
+    url = os.environ.get("RAG_CHAT_APP_URL", "").strip()
+    if url:
+        extra = config.setdefault("extra", {})
+        extra["chat_app_url"] = url
+
     repo_root, _docs = _project_paths(config)
     py = repo_root / "python"
     proto = repo_root / "pydantable-protocol" / "python"

@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+  {{ super() }}
+  {% if config.extra and config.extra.chat_app_url %}
+  <meta name="pydantable-chat-app-url" content="{{ config.extra.chat_app_url | e }}" />
+  {% endif %}
+{% endblock %}
