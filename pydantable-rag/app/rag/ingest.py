@@ -24,11 +24,28 @@ class IngestResult:
     db_path: str
 
 
-def default_ingest_roots(doc_root: Path) -> list[Path]:
+def default_ingest_roots(doc_root: Path, *, service_root: Path) -> list[Path]:
+    """
+    Default paths to index: library ``README.md`` + ``docs/``, and—when this service
+    lives in a monorepo—``pydantable-rag/README.md`` (not the same file as the
+    repo root README).
+    """
     out: list[Path] = []
     for p in (doc_root / "README.md", doc_root / "docs"):
         if p.exists():
             out.append(p)
+
+    svc_readme = service_root / "README.md"
+    if not svc_readme.is_file():
+        return out
+    try:
+        svc_resolved = svc_readme.resolve()
+        svc_resolved.relative_to(doc_root.resolve())
+    except ValueError:
+        return out
+    if svc_resolved == (doc_root / "README.md").resolve():
+        return out
+    out.append(svc_readme)
     return out
 
 
@@ -62,7 +79,7 @@ def _resolve_doc_root(
     else:
         doc_root = repo_root
 
-    return doc_root, default_ingest_roots(doc_root)
+    return doc_root, default_ingest_roots(doc_root, service_root=service_root)
 
 
 @contextlib.contextmanager

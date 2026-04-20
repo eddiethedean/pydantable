@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .python-version
 .env
+.rag_ingest.lock
 
 # SQLite DBs (exception: CI-built vector index may be committed or copied for deploy)
 *.db

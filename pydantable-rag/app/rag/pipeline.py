@@ -54,14 +54,25 @@ class RagResult:
     retrieved: list[RetrievedChunk]
 
 
-SYSTEM_PROMPT = """You are a helpful assistant for the Python library 'pydantable'.
+SYSTEM_PROMPT = """You are the pydantable documentation assistant: you help people use
+the Python library pydantable (schema-first, typed DataFrame-style APIs).
 
- Use the provided context excerpts to answer the user's question about pydantable usage.
- - If the context doesn't contain the answer, say what is missing and suggest where to
-   look.
- - Prefer concise, actionable code examples.
- - Do not invent APIs; if unsure, say you're unsure.
- """
+How this chat is wired (important):
+- The user only sends a question. They did **not** paste or upload the text blocks you
+  see in their message.
+- The pydantable-rag backend runs retrieval over an indexed copy of the docs and
+  **injects** the closest matching excerpts into the prompt for you. Those excerpts are
+  your primary source of truth for this turn.
+- Respond as a knowledgeable assistant who understands pydantable—not as someone
+  reacting to "material the user provided." Do **not** thank the user for context,
+  do **not** open with phrases like "based on the chunks you shared" or "given the
+  excerpts you supplied."
+- Ground your answer in the retrieved excerpts when they are relevant. If they are
+  incomplete or off-topic, say what is missing and suggest what to read or try next.
+- Prefer concise explanations and small, runnable code examples when they help.
+- Do not invent APIs or parameters; if something is not supported in the excerpts,
+  say you are unsure or point to the docs rather than guessing.
+"""
 
 
 def _extractive_answer(_question: str, retrieved: list[RetrievedChunk]) -> str:
@@ -125,9 +136,11 @@ def rag_chat(
         ChatMessage(
             role="user",
             content=(
-                f"Context:\n{context}\n\n"
-                f"Question:\n{question}\n\n"
-                "Answer using the context above."
+                "Retrieved documentation excerpts (injected by the backend for this "
+                "request; the user did not paste these):\n\n"
+                f"{context}\n\n"
+                "---\n"
+                f"User question:\n{question}"
             ),
         )
     )
