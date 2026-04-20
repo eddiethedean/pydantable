@@ -14,9 +14,11 @@ class Settings(BaseModel):
     embed_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     embed_dims: int = 384
     # Keep the default LLM small to avoid 502s/timeouts on cold start.
+    # ``hf``: Hugging Face id. ``openai``: API model id (e.g. ``gpt-4o-mini``).
     llm_model: str = "HuggingFaceTB/SmolLM2-135M-Instruct"
     # Default ``extractive``: ranked chunks only (embed model still runs). ``hf``
-    # loads a local causal LM — needs RAM; set ``RAG_LLM_BACKEND=hf`` explicitly.
+    # loads a local causal LM — needs RAM. ``openai`` calls the OpenAI HTTP API
+    # (set ``OPENAI_API_KEY``); no local generative weights.
     llm_backend: str = "extractive"
     # Off by default: loading embed + LLM on every replica can OOM small cloud
     # instances and crash-loop (502). Enable via RAG_PRELOAD_MODELS_ON_STARTUP or
@@ -61,6 +63,8 @@ def _getenv_llm_backend(default: str) -> str:
     x = v.strip().lower()
     if x in {"hf", "transformers", "huggingface", "local"}:
         return "hf"
+    if x in {"openai", "gpt", "chatgpt"}:
+        return "openai"
     if x in {"extractive", "chunks", "none", "retrieve"}:
         return "extractive"
     return default

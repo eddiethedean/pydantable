@@ -14,6 +14,7 @@ version = "0.2.17"
    "python-dotenv>=1.0",
    "sqlite-vec>=0.1.6",
    "numpy>=1.24",
+  "openai>=1.40",
   "transformers>=4.41",
   "huggingface-hub>=0.23",
   "torch>=2.2",
@@ -58,6 +59,7 @@ root = ["."]
 
 [tool.ty.analysis]
 allowed-unresolved-imports = [
+    "openai.**",
     "torch.**",
     "transformers.**",
     "sqlite_vec.**",

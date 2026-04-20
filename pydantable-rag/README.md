@@ -83,6 +83,21 @@ For **manual** deploys: run the **RAG vector database** workflow (or build local
 
 At runtime, **`POST /bootstrap`** only needs to **warm the LLM** if you ship a ready DB (ingest can be skipped). Optional: set **`RAG_AUTO_INGEST_ON_STARTUP=false`** (default) and avoid re-ingesting on each boot.
 
+### OpenAI API (cloud-friendly generation)
+
+Use the **OpenAI HTTP API** so the container does not load a local causal LM (often easier on **small or free** hosts than `RAG_LLM_BACKEND=hf`).
+
+1. Sign in at [OpenAI Platform](https://platform.openai.com/) (API access is separate from a consumer ChatGPT subscription—add a payment method and create an **API key** under **API keys**).
+2. Copy the key (starts with `sk-`).
+3. Set environment variables (FastAPI Cloud → **Environment**, or your local `.env`):
+   - `RAG_LLM_BACKEND=openai`
+   - `RAG_LLM_MODEL=gpt-4o-mini` (or another [chat-capable model](https://platform.openai.com/docs/models) your account can use)
+   - `OPENAI_API_KEY=sk-...`
+4. Redeploy or restart. With a populated vector DB, `GET /readyz` should return `ok=true` when the key is present (no local “warm LLM” step).
+5. Use `POST /chat` or `/chat-app`. **You pay OpenAI** per token; the app only stores the key in the host environment.
+
+Optional: `OPENAI_BASE_URL` for HTTP proxies or compatible gateways.
+
 ### FastAPI Cloud
 
 - If **`GET /healthz`** shows **`llm_backend":"hf"`** but you want retrieval-only, remove **`RAG_LLM_BACKEND=hf`** from the app’s **Environment** (dashboard overrides the image). Redeploy after changing env. Default is **`extractive`**.
@@ -102,8 +117,9 @@ fastapi deploy
   - `RAG_DB_PATH=data/pydantable_vectors.db` (must be writable)
   - `RAG_EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2`
   - `RAG_EMBED_DIMS=384`
-  - `RAG_LLM_BACKEND=extractive` (default in code and Docker) or `hf` for a local generative model
-  - `RAG_LLM_MODEL=HuggingFaceTB/SmolLM2-135M-Instruct` (only for **`hf`**)
+  - `RAG_LLM_BACKEND=extractive` (default in code and Docker), `hf` for a local generative model, or `openai` for OpenAI’s API
+  - `RAG_LLM_MODEL` — HF model id when using `hf`, or OpenAI model id (e.g. `gpt-4o-mini`) when using `openai`
+  - `OPENAI_API_KEY` — required when `RAG_LLM_BACKEND=openai`
 
 - Health endpoints:
   - `GET /healthz`

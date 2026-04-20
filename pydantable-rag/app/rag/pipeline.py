@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.rag.embeddings import get_embedder
-from app.rag.llm import ChatMessage, generate_answer_hf
+from app.rag.llm import ChatMessage, generate_answer_hf, generate_answer_openai
 from app.rag.store import RetrievedChunk, search
 
 _MAX_CHARS_PER_CHUNK = 4000
@@ -69,7 +69,8 @@ def _extractive_answer(_question: str, retrieved: list[RetrievedChunk]) -> str:
     if not retrieved:
         return (
             "No matching documentation chunks were found. Try different keywords "
-            "or enable a generative backend (RAG_LLM_BACKEND=hf) on a larger host."
+            "or set RAG_LLM_BACKEND=openai with OPENAI_API_KEY, or RAG_LLM_BACKEND=hf "
+            "on a larger host."
         )
     filtered = [c for c in retrieved if not _skip_chunk_source(c.source)]
     chunks = filtered if filtered else retrieved
@@ -131,6 +132,14 @@ def rag_chat(
             ),
         )
     )
+
+    if llm_backend == "openai":
+        answer = generate_answer_openai(
+            model=llm_model,
+            system_prompt=SYSTEM_PROMPT,
+            messages=msgs,
+        )
+        return RagResult(answer=answer, retrieved=retrieved)
 
     answer = generate_answer_hf(
         model=llm_model,

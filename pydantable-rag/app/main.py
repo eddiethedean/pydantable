@@ -25,6 +25,7 @@ from app.rag.llm import (
     llm_is_loaded,
     llm_is_loading,
     llm_last_error,
+    openai_api_configured,
     warm_llm,
 )
 from app.rag.pipeline import rag_chat
@@ -44,6 +45,28 @@ _log = logging.getLogger(__name__)
 
 def _uses_hf_llm(s: Settings) -> bool:
     return s.llm_backend == "hf"
+
+
+def _uses_openai_llm(s: Settings) -> bool:
+    return s.llm_backend == "openai"
+
+
+def _generative_llm_ready(s: Settings) -> bool:
+    """Whether chat can run without blocking on model load (HF) or missing API key."""
+    if _uses_hf_llm(s):
+        return llm_is_loaded(s.llm_model)
+    if _uses_openai_llm(s):
+        return openai_api_configured()
+    return True
+
+
+def _healthz_llm_loaded(s: Settings) -> bool:
+    """Health ``llm_loaded``: HF weights, OpenAI key, or extractive (no gen)."""
+    if _uses_hf_llm(s):
+        return llm_is_loaded(s.llm_model)
+    if _uses_openai_llm(s):
+        return openai_api_configured()
+    return True
 
 
 @asynccontextmanager
@@ -162,7 +185,10 @@ class HealthzResponse(BaseModel):
     embed_model: str
     embed_dims: int
     llm_backend: str = Field(
-        description="hf = transformers generative model; extractive = chunks only.",
+        description=(
+            "hf = local transformers model; openai = OpenAI API; "
+            "extractive = chunks only."
+        ),
     )
     llm_model: str
     llm_loaded: bool
@@ -262,10 +288,11 @@ def _status_page_html() -> str:
     embed_ok = embedder_is_loaded(s.embed_model, s.embed_dims)
     embed_busy = embedding_compute_active()
     llm_load = llm_is_loading(s.llm_model)
-    llm_ok = llm_is_loaded(s.llm_model)
+    llm_ok = _healthz_llm_loaded(s)
     index_ok = n_docs > 0 and n_vecs > 0
     hf_llm = _uses_hf_llm(s)
-    chat_ready = index_ok and (not hf_llm or llm_ok)
+    oai_llm = _uses_openai_llm(s)
+    chat_ready = index_ok and _generative_llm_ready(s)
 
     def row(label: str, ok: bool, loading: bool, detail: str) -> str:
         if loading:
@@ -289,11 +316,20 @@ def _status_page_html() -> str:
         (
             row("LLM (chat)", llm_ok, llm_load, s.llm_model)
             if hf_llm
-            else row(
-                "LLM (chat)",
-                True,
-                False,
-                "extractive mode — no local generative model",
+            else (
+                row(
+                    "LLM (chat)",
+                    llm_ok,
+                    False,
+                    f"OpenAI API · {s.llm_model}",
+                )
+                if oai_llm
+                else row(
+                    "LLM (chat)",
+                    True,
+                    False,
+                    "extractive mode — no local generative model",
+                )
             )
         ),
         row(
@@ -1010,7 +1046,7 @@ def healthz() -> HealthzResponse:
         embed_dims=s.embed_dims,
         llm_backend=s.llm_backend,
         llm_model=s.llm_model,
-        llm_loaded=llm_is_loaded(s.llm_model),
+        llm_loaded=_healthz_llm_loaded(s),
         llm_loading=llm_is_loading(s.llm_model),
         embed_loaded=embed_deployment_ready(s.embed_model, s.embed_dims),
         embed_loading=embedder_is_loading(s.embed_model, s.embed_dims),
@@ -1024,12 +1060,12 @@ def readyz() -> ReadyzResponse:
     dbp = resolve_db_path(s.db_path)
     counts = get_counts(db_path=dbp)
     docs_ready = counts["docs"] > 0 and counts["vecs"] > 0
-    llm_ready = (not _uses_hf_llm(s)) or llm_is_loaded(s.llm_model)
+    llm_ready = _generative_llm_ready(s)
     return ReadyzResponse(
         ok=bool(docs_ready and llm_ready),
         counts=CountsStatus.model_validate(counts),
         llm_backend=s.llm_backend,
-        llm_loaded=llm_is_loaded(s.llm_model),
+        llm_loaded=_healthz_llm_loaded(s),
         llm_loading=llm_is_loading(s.llm_model),
         embed_loaded=embed_deployment_ready(s.embed_model, s.embed_dims),
         embed_loading=embedder_is_loading(s.embed_model, s.embed_dims),
@@ -1050,7 +1086,7 @@ def diag() -> DiagResponse:
         ),
         counts=CountsStatus.model_validate(get_counts(db_path=dbp)),
         llm_backend=s.llm_backend,
-        llm_loaded=llm_is_loaded(s.llm_model),
+        llm_loaded=_healthz_llm_loaded(s),
         llm_loading=llm_is_loading(s.llm_model),
         llm_last_error=llm_last_error(s.llm_model),
         embed_loaded=embed_deployment_ready(s.embed_model, s.embed_dims),
@@ -1112,6 +1148,15 @@ def chat(req: ChatRequest, background_tasks: BackgroundTasks) -> ChatResponse:
                     )
                 ),
             )
+
+    if _uses_openai_llm(s) and not openai_api_configured():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "OPENAI_API_KEY is not set. Add it in the deployment environment "
+                "(e.g. FastAPI Cloud → Environment)."
+            ),
+        )
 
     result = rag_chat(
         question=req.message,
