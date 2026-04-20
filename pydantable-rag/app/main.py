@@ -110,11 +110,7 @@ def _bootstrap_ingest(
         counts = get_counts(db_path=dbp)
         # Do not re-ingest when the image already ships a populated index — full
         # ingest starts with ``reset_db`` and would wipe SQLite on each replica.
-        if (
-            paths is None
-            and counts.get("docs", 0) > 0
-            and counts.get("vecs", 0) > 0
-        ):
+        if paths is None and counts.get("docs", 0) > 0 and counts.get("vecs", 0) > 0:
             return
         _ingest_then_release_embedder(
             settings=settings, repo_root=repo_root, paths=paths
@@ -234,11 +230,7 @@ def _status_page_html() -> str:
     llm_ok = _healthz_llm_loaded(s)
     index_ok = n_docs > 0 and n_vecs > 0
     oai_llm = _uses_openai_llm(s)
-    chat_ready = (
-        index_ok
-        and openai_api_key_configured()
-        and _generative_llm_ready(s)
-    )
+    chat_ready = index_ok and openai_api_key_configured() and _generative_llm_ready(s)
 
     def row(label: str, ok: bool, loading: bool, detail: str) -> str:
         if loading:

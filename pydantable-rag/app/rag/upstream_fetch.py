@@ -107,9 +107,7 @@ def fetch_upstream_docs(*, repo_root: Path, url: str | None = None) -> bool:
                 shutil.rmtree(tmp, ignore_errors=True)
                 return False
             if not readme_ok:
-                _log.info(
-                    "pydantable-rag: archive had no README.md; docs only"
-                )
+                _log.info("pydantable-rag: archive had no README.md; docs only")
 
             if dest.exists():
                 shutil.rmtree(dest)

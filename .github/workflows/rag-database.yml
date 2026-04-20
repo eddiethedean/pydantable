@@ -1,5 +1,5 @@
-# Build the pydantable-rag vector SQLite DB from monorepo docs/ (OpenAI embeddings).
-# Uploads an artifact you can download or that FastAPI Cloud deploy reuses.
+# Committed ``pydantable-rag/data/pydantable_vectors.db`` is the default index (built locally).
+# Optional manual job: rebuild in CI with OpenAI and download the artifact.
 
 name: RAG vector database
 
@@ -18,7 +18,40 @@ on:
       - ".github/workflows/rag-database.yml"
 
 jobs:
-  build:
+  verify-committed-index:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Verify committed vector database
+        run: |
+          f=pydantable-rag/data/pydantable_vectors.db
+          if [ ! -f "$f" ]; then
+            echo "::error::Missing $f. From pydantable-rag: uv run python scripts/build_index_ci.py (OPENAI_API_KEY), then git add and commit."
+            exit 1
+          fi
+          sz=$(wc -c < "$f" | tr -d ' ')
+          if [ "$sz" -lt 1024 ]; then
+            echo "::error::Vector DB too small (${sz} bytes)."
+            exit 1
+          fi
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync pydantable-rag
+        working-directory: pydantable-rag
+        run: uv sync --all-extras
+
+      - name: Run pydantable-rag tests
+        working-directory: pydantable-rag
+        run: uv run pytest -q
+
+  rebuild-with-openai:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -31,6 +64,15 @@ jobs:
       - name: Sync pydantable-rag
         working-directory: pydantable-rag
         run: uv sync --all-extras
+
+      - name: Require OPENAI_API_KEY (CI rebuild only)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::Set repository secret OPENAI_API_KEY to rebuild the index in CI, or build locally and commit data/pydantable_vectors.db."
+            exit 1
+          fi
 
       - name: Build vector database
         working-directory: pydantable-rag

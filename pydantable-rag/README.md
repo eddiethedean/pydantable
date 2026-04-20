@@ -56,10 +56,19 @@ Set `OPENAI_API_KEY` (and optional `RAG_*`) via Compose `environment` or an env 
 
 ### CI and FastAPI Cloud
 
-- **`.github/workflows/rag-database.yml`** builds `data/pydantable_vectors.db` using **`OPENAI_API_KEY`** from repository secrets.
-- **`.github/workflows/fastapi-cloud-deploy.yml`** builds the same DB and deploys with **`fastapi deploy`**.
+The **vector index** is the committed file **`data/pydantable_vectors.db`**. Rebuild it locally when docs change (one-time cost for embeddings), then commit:
 
-Set **`OPENAI_API_KEY`** on the FastAPI Cloud app for runtime (embeddings on every query + chat if enabled).
+```bash
+cd pydantable-rag
+# from repo root; needs OPENAI_API_KEY in the environment
+uv run python scripts/build_index_ci.py
+git add data/pydantable_vectors.db && git commit -m "chore(rag): refresh vector index"
+```
+
+- **`.github/workflows/fastapi-cloud-deploy.yml`** checks that the DB is present and deploys with **`fastapi deploy`** (no OpenAI call in GitHub Actions).
+- **`.github/workflows/rag-database.yml`** verifies the committed DB on push/PR; use **Actions → RAG vector database → Run workflow** if you ever want a **CI rebuild** (requires repository secret **`OPENAI_API_KEY`**) and download the artifact.
+
+Set **`OPENAI_API_KEY`** on the FastAPI Cloud app for **runtime** (query embeddings on every request, and chat if `RAG_LLM_BACKEND=openai`).
 
 ### Generative vs extractive
 

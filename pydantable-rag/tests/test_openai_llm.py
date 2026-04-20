@@ -41,9 +41,7 @@ def test_readyz_openai_ok_when_key_set(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(main, "get_settings", fake_get)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    monkeypatch.setattr(
-        main, "get_counts", lambda **_kwargs: {"docs": 1, "vecs": 1}
-    )
+    monkeypatch.setattr(main, "get_counts", lambda **_kwargs: {"docs": 1, "vecs": 1})
 
     c = TestClient(main.app)
     res = c.get("/readyz")

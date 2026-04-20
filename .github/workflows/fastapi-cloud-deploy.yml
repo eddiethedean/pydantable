@@ -11,53 +11,33 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-rag-database:
+  deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-
-      - name: Sync pydantable-rag
-        working-directory: pydantable-rag
-        run: uv sync --all-extras
-
-      - name: Build vector database (from monorepo docs/)
-        working-directory: pydantable-rag
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: uv run python scripts/build_index_ci.py
-
-      - name: Upload DB for deploy
-        uses: actions/upload-artifact@v4
-        with:
-          name: rag-deploy-bundle
-          path: |
-            pydantable-rag/data/pydantable_vectors.db
-          if-no-files-found: error
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: [build-rag-database]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Download prebuilt DB
-        uses: actions/download-artifact@v4
-        with:
-          name: rag-deploy-bundle
-          path: .
+      - name: Verify committed vector database
+        run: |
+          f=pydantable-rag/data/pydantable_vectors.db
+          if [ ! -f "$f" ]; then
+            echo "::error::Missing $f. Build once locally (needs OPENAI_API_KEY): cd pydantable-rag && uv run python scripts/build_index_ci.py — then commit the DB."
+            exit 1
+          fi
+          sz=$(wc -c < "$f" | tr -d ' ')
+          if [ "$sz" -lt 1024 ]; then
+            echo "::error::Vector DB looks too small (${sz} bytes)."
+            exit 1
+          fi
+          echo "Vector DB present (${sz} bytes)."
 
       - name: Show app version being deployed
         run: grep -E '^version\s*=' pydantable-rag/pyproject.toml | head -1
 
       - name: Reminder — runtime OPENAI_API_KEY on FastAPI Cloud
         run: |
-          echo "::notice title=FastAPI Cloud::Set OPENAI_API_KEY on the app (embeddings + optional chat). GitHub OPENAI_API_KEY only applies to CI builds."
+          echo "::notice title=FastAPI Cloud::Set OPENAI_API_KEY on the app for query embeddings (and chat if RAG_LLM_BACKEND=openai). Deploy does not rebuild the index; commit data/pydantable_vectors.db after local ingest."
 
       - name: Set up Python
         uses: actions/setup-python@v6

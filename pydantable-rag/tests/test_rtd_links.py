@@ -28,9 +28,7 @@ def test_skips_build_mirrors() -> None:
 
 
 def test_skips_non_doc_files() -> None:
-    assert (
-        source_to_readthedocs_url("docs/examples/foo.py.out.txt") is None
-    )
+    assert source_to_readthedocs_url("docs/examples/foo.py.out.txt") is None
 
 
 def test_custom_base() -> None:

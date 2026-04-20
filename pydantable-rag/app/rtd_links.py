@@ -16,9 +16,9 @@ def _docs_relative_to_page(rel: str) -> str | None:
         return None
     lower = rel.lower()
     if lower.endswith(".md"):
-        page = rel[: -3]
+        page = rel[:-3]
     elif lower.endswith(".rst"):
-        page = rel[: -4]
+        page = rel[:-4]
     else:
         return None
 
