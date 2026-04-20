@@ -20,7 +20,10 @@ def _project_paths(config) -> tuple[Path, Path]:
 
 
 def on_config(config, **kwargs):
-    """Merge optional ``RAG_CHAT_APP_URL`` into ``extra.chat_app_url`` for the chat widget."""
+    """Merge optional ``RAG_CHAT_APP_URL`` into ``extra.chat_app_url``.
+
+    This is used by the docs chat widget.
+    """
     url = os.environ.get("RAG_CHAT_APP_URL", "").strip()
     if url:
         extra = config.setdefault("extra", {})

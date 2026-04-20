@@ -17,6 +17,7 @@ PydanTable combines **Pydantic schemas** with a **Polars-backed Rust execution e
 - **Docs (latest):** [pydantable.readthedocs.io](https://pydantable.readthedocs.io/en/latest/)
 - **Quickstart:** [Getting started → Quickstart](https://pydantable.readthedocs.io/en/latest/getting-started/quickstart/)
 - **Docs map:** [Getting started → Docs map](https://pydantable.readthedocs.io/en/latest/getting-started/docs-map/)
+- **Documentation chat (RAG):** [pydantable-rag/README.md](https://github.com/eddiethedean/pydantable/blob/main/pydantable-rag/README.md) — backend and deployment for the docs assistant; the chat widget is on the hosted docs above.
 
 ## What you get
 
