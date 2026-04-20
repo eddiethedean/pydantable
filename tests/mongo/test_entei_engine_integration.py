@@ -7,8 +7,11 @@ import asyncio
 import pydantable
 import pytest
 from pydantable import Schema
-from pydantable.engine import get_default_engine
-from pydantable.engine import NativePolarsEngine, native_engine_capabilities
+from pydantable.engine import (
+    NativePolarsEngine,
+    get_default_engine,
+    native_engine_capabilities,
+)
 from pydantable.engine.protocols import ExecutionEngine, PlanExecutor, SinkWriter
 from pydantable.schema import field_types_for_rust, schema_field_types
 from typing_extensions import get_protocol_members

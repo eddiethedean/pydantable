@@ -312,11 +312,12 @@ def test_from_sql_table_accepts_sql_config_instead_of_engine(
     assert df.to_dict() == {"id": [9], "label": ["cfg"]}
 
 
-def test_from_sql_table_engine_mode_default_forces_default_engine(tmp_path: Path) -> None:
-    """engine_mode='default' uses get_default_engine() even with sql_config/sql_engine."""
-    from sqlalchemy import Column, Integer, MetaData, String, Table
-
+def test_from_sql_table_engine_mode_default_forces_default_engine(
+    tmp_path: Path,
+) -> None:
+    """engine_mode='default' uses get_default_engine() with sql_config/sql_engine."""
     from pydantable.engine import get_default_engine
+    from sqlalchemy import Column, Integer, MetaData, String, Table
 
     db_path = tmp_path / "engine_mode_default.db"
     cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
@@ -402,10 +403,11 @@ def test_read_sql_table_accepts_sql_config(tmp_path: Path) -> None:
     assert m.select("label").to_dict() == {"label": ["m"]}
 
 
-def test_read_sql_table_engine_mode_default_forces_default_engine(tmp_path: Path) -> None:
-    from sqlalchemy import Column, Integer, MetaData, String, Table
-
+def test_read_sql_table_engine_mode_default_forces_default_engine(
+    tmp_path: Path,
+) -> None:
     from pydantable.engine import get_default_engine
+    from sqlalchemy import Column, Integer, MetaData, String, Table
 
     db_path = tmp_path / "read_engine_mode_default.db"
     cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
@@ -460,7 +462,9 @@ def test_to_sql_engine_dataframe_roundtrip(tmp_path: Path) -> None:
     assert sql_df.sort("id").to_dict() == {"id": [1, 2], "label": ["a", "b"]}
 
 
-def test_to_sql_engine_engine_mode_default_forces_default_engine(tmp_path: Path) -> None:
+def test_to_sql_engine_engine_mode_default_forces_default_engine(
+    tmp_path: Path,
+) -> None:
     from pydantable import DataFrame
     from pydantable.engine import get_default_engine
 
@@ -491,10 +495,9 @@ def test_to_sql_engine_dataframe_model_roundtrip(tmp_path: Path) -> None:
 
 
 def test_multi_engine_workflow_sql_write_then_native(tmp_path: Path) -> None:
-    """Cookbook flow: SQL read → SQL write → SQL read → to_native → native transforms."""
-    from sqlalchemy import Column, Integer, MetaData, String, Table, insert
-
+    """Cookbook flow: SQL read → write → read → to_native → native transforms."""
     from pydantable.io.sql import write_sql_raw
+    from sqlalchemy import Column, Integer, MetaData, String, Table, insert
 
     db_path = tmp_path / "multi_engine.db"
     cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
@@ -525,6 +528,7 @@ def test_multi_engine_workflow_sql_write_then_native(tmp_path: Path) -> None:
     native = df2.to_native()
     out = native.with_columns(id2=native.id * 2).select("id2").to_dict()
     assert out == {"id2": [2, 4]}
+
 
 @pytest.mark.asyncio
 async def test_sql_dataframe_model_async_chain_select(tmp_path: Path) -> None:

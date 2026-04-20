@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 from pydantable import DataFrame, Schema
 from pydantable.engine.stub import StubExecutionEngine
 
@@ -23,4 +22,3 @@ def test_to_native_requires_native_extension_installed() -> None:
     df = DataFrame[Row]({"x": [1]})
     out = df.to_native()
     assert out._engine is not StubExecutionEngine()
-

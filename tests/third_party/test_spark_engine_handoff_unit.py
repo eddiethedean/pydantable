@@ -27,4 +27,3 @@ def test_to_spark_engine_explicit_engine_wins_over_engine_mode_default() -> None
     df = DataFrame[Row]({"x": [1]})
     out = df.to_spark_engine(engine=explicit, engine_mode="default")
     assert out._engine is explicit
-

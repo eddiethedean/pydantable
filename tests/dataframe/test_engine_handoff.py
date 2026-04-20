@@ -33,4 +33,3 @@ def test_to_engine_roundtrips_columns_into_target_engine() -> None:
     df2 = df.to_engine(eng)
     assert df2._engine is eng
     assert df2.to_dict() == {"x": [2]}
-

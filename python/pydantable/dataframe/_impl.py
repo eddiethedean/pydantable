@@ -3516,7 +3516,9 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             return self.to_dict(streaming=streaming, engine_streaming=engine_streaming)
         if materialize == "rows":
             rows = cast("list[Any]", self.collect(streaming=streaming))
-            cols: dict[str, list[Any]] = {name: [] for name in self._current_field_types}
+            cols: dict[str, list[Any]] = {
+                name: [] for name in self._current_field_types
+            }
             for r in rows:
                 if hasattr(r, "model_dump"):
                     d = r.model_dump()
@@ -3581,8 +3583,8 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
     ) -> DataFrame[Any]:
         """Materialize and re-root under the native Rust/Polars engine."""
-        from pydantable.engine import NativePolarsEngine, get_default_engine
         from pydantable._extension import MissingRustExtensionError
+        from pydantable.engine import NativePolarsEngine, get_default_engine
 
         if NativePolarsEngine is None:
             raise MissingRustExtensionError(
@@ -3592,7 +3594,11 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         # Reuse the process-wide default native engine when it's already native
         # (reduces extra engine allocations and keeps caches consistent).
         default_eng = get_default_engine()
-        target = default_eng if isinstance(default_eng, NativePolarsEngine) else NativePolarsEngine()
+        target = (
+            default_eng
+            if isinstance(default_eng, NativePolarsEngine)
+            else NativePolarsEngine()
+        )
         return self.to_engine(
             target,
             materialize=materialize,
@@ -3628,16 +3634,14 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         # Lazy import: keep optional `[sql]` stack out of import-time costs.
         from pydantable.sql_dataframe import SqlDataFrame
 
-        schema_t = self._current_schema_type
-        df_cls: Any = SqlDataFrame[schema_t]  # type: ignore[valid-type, index]
-
         cols = self._materialize_for_engine_handoff(
             materialize=materialize,
             streaming=streaming,
             engine_streaming=engine_streaming,
         )
 
-        return df_cls(
+        # Construct via the concrete class so `ty` can see the extra SQL kwargs.
+        return SqlDataFrame(
             cols,
             sql_config=sql_config,
             sql_engine=sql_engine,
@@ -3668,8 +3672,11 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         the current frame (columnar by default) and constructs a `MongoDataFrame`
         with the resolved engine.
         """
-        from pydantable.mongo_dataframe import MongoDataFrame, _import_mongo_engine_types
         from pydantable.engine import get_default_engine
+        from pydantable.mongo_dataframe import (
+            MongoDataFrame,
+            _import_mongo_engine_types,
+        )
 
         MongoPydantableEngine, _MongoRoot = _import_mongo_engine_types()
         if engine is not None:
@@ -3710,7 +3717,10 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
     ) -> Any:
         """Materialize and re-root under the Spark execution engine (raikou-core)."""
         from pydantable.engine import get_default_engine
-        from pydantable.spark_dataframe import SparkDataFrame, _import_spark_engine_types
+        from pydantable.spark_dataframe import (
+            SparkDataFrame,
+            _import_spark_engine_types,
+        )
 
         SparkExecutionEngine, _SparkRoot = _import_spark_engine_types()
         if engine is not None:
