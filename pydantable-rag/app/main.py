@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import cast
 
 from fastapi import BackgroundTasks, Body, FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -1154,7 +1154,7 @@ def chat_app() -> str:
 
 @app.post("/bootstrap")
 @limiter.limit("20/minute")
-def bootstrap(background_tasks: BackgroundTasks, request: Request) -> BootstrapResponse:
+def bootstrap(background_tasks: BackgroundTasks, request: Request) -> JSONResponse:
     """
     Kick off ingestion without blocking the request (hosted cold starts).
     """
@@ -1172,7 +1172,9 @@ def bootstrap(background_tasks: BackgroundTasks, request: Request) -> BootstrapR
         repo_root=repo_root,
         paths=None,
     )
-    return BootstrapResponse(ok=True, started=started)
+    body = BootstrapResponse(ok=True, started=started)
+    # slowapi needs a Starlette Response to inject rate-limit headers.
+    return JSONResponse(content=body.model_dump(mode="json"))
 
 
 @app.get("/healthz")
@@ -1252,18 +1254,19 @@ def ingest(
     background_tasks: BackgroundTasks,
     request: Request,
     req: IngestRequest = _INGEST_BODY,
-) -> IngestResponse:
+) -> JSONResponse:
     s = get_settings()
     repo_root = resolve_ingest_repo_root()
     background_tasks.add_task(
         ingest_repo_docs, settings=s, repo_root=repo_root, paths=req.paths
     )
-    return IngestResponse(ok=True, started=True)
+    body = IngestResponse(ok=True, started=True)
+    return JSONResponse(content=body.model_dump(mode="json"))
 
 
 @app.post("/chat", response_model=ChatResponse)
 @limiter.limit("30/minute")
-def chat(req: ChatRequest, request: Request) -> ChatResponse:
+def chat(req: ChatRequest, request: Request) -> JSONResponse:
     s = get_settings()
     db_path = resolve_db_path(s.db_path)
 
@@ -1288,7 +1291,7 @@ def chat(req: ChatRequest, request: Request) -> ChatResponse:
     )
 
     rtd_base = s.readthedocs_base_url
-    return ChatResponse(
+    body = ChatResponse(
         answer=result.answer,
         sources=[
             ChatSourceItem(
@@ -1300,3 +1303,4 @@ def chat(req: ChatRequest, request: Request) -> ChatResponse:
             for c in result.retrieved
         ],
     )
+    return JSONResponse(content=body.model_dump(mode="json"))
