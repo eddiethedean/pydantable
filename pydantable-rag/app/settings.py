@@ -5,6 +5,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
+from app.rtd_links import RTD_DEFAULT_BASE
+
 
 class Settings(BaseModel):
     db_path: str = "data/pydantable_vectors.db"
@@ -30,6 +32,8 @@ class Settings(BaseModel):
     chunk_chars: int = 4000
     chunk_overlap_chars: int = 400
     top_k: int = 6
+    # Published MkDocs site (used to link chat ``sources`` to Read the Docs).
+    readthedocs_base_url: str = RTD_DEFAULT_BASE
 
     auto_ingest_on_startup: bool = False
     auto_ingest_if_db_empty: bool = True
@@ -84,6 +88,9 @@ def get_settings() -> Settings:
             os.getenv("RAG_CHUNK_OVERLAP_CHARS", str(base.chunk_overlap_chars))
         ),
         top_k=int(os.getenv("RAG_TOP_K", str(base.top_k))),
+        readthedocs_base_url=os.getenv(
+            "RAG_READTHEDOCS_BASE", base.readthedocs_base_url
+        ),
         auto_ingest_on_startup=_getenv_bool(
             "RAG_AUTO_INGEST_ON_STARTUP", base.auto_ingest_on_startup
         ),

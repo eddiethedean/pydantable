@@ -30,6 +30,7 @@ from app.rag.llm import (
 from app.rag.pipeline import rag_chat
 from app.rag.store import check_vector_backend, get_counts
 from app.rag.torch_cpu import configure_torch_cpu
+from app.rtd_links import source_to_readthedocs_url
 from app.settings import (
     Settings,
     get_settings,
@@ -228,9 +229,19 @@ class ChatRequest(BaseModel):
     history: list[ChatMessage] | None = None
 
 
+class ChatSourceItem(BaseModel):
+    source: str
+    chunk_id: str
+    distance: float
+    url: str | None = Field(
+        default=None,
+        description="Read the Docs page when the ingest path maps to MkDocs HTML.",
+    )
+
+
 class ChatResponse(BaseModel):
     answer: str
-    sources: list[dict]
+    sources: list[ChatSourceItem]
 
 
 class IngestRequest(BaseModel):
@@ -346,6 +357,14 @@ _CHAT_APP_HTML = """<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="color-scheme" content="dark"/>
   <title>pydantable-rag · Chat</title>
+  <script
+    src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"
+    crossorigin="anonymous"
+  ></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"
+    crossorigin="anonymous"
+  ></script>
   <style>
     :root {
       --bg: #212121;
@@ -528,6 +547,66 @@ _CHAT_APP_HTML = """<!DOCTYPE html>
       color: var(--assistant-fg);
       line-height: 1.65;
     }
+    .turn.assistant .bubble.md {
+      white-space: normal;
+    }
+    .turn.assistant .bubble.md :where(p, ul, ol, pre, h3, h4) {
+      margin: 0 0 0.65rem;
+    }
+    .turn.assistant .bubble.md pre {
+      background: rgba(0,0,0,0.35);
+      border: 1px solid var(--border);
+      border-radius: 0.55rem;
+      padding: 0.75rem 0.85rem;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+    .turn.assistant .bubble.md code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.84em;
+    }
+    .turn.assistant .bubble.md p > code,
+    .turn.assistant .bubble.md li > code {
+      background: rgba(0,0,0,0.35);
+      padding: 0.12rem 0.35rem;
+      border-radius: 0.3rem;
+    }
+    .turn.assistant .bubble.md pre code {
+      background: transparent;
+      padding: 0;
+      font-size: inherit;
+    }
+    .turn.assistant .bubble.md ul,
+    .turn.assistant .bubble.md ol {
+      padding-left: 1.25rem;
+    }
+    .turn.assistant .bubble.md h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 1rem 0 0.5rem;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+    .turn.assistant .bubble.md h3:first-child {
+      margin-top: 0;
+    }
+    .turn.assistant .bubble.md hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0.85rem 0;
+    }
+    .turn.assistant .bubble.md blockquote {
+      margin: 0 0 0.65rem;
+      padding-left: 0.75rem;
+      border-left: 3px solid var(--border);
+      color: var(--text-muted);
+    }
+    .turn.assistant .bubble.md a {
+      color: #6ee7b7;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
     .sources {
       margin-top: 0.65rem;
       padding: 0.65rem 0.75rem;
@@ -540,6 +619,12 @@ _CHAT_APP_HTML = """<!DOCTYPE html>
     .sources strong { color: var(--text-muted); font-weight: 600; }
     .sources ul { margin: 0.35rem 0 0 1rem; padding: 0; }
     .sources li { margin-bottom: 0.2rem; }
+    .sources a {
+      color: #6ee7b7;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .sources a:hover { color: #a7f3d0; }
     .err {
       color: var(--danger);
       font-size: 0.88rem;
@@ -705,6 +790,26 @@ _CHAT_APP_HTML = """<!DOCTYPE html>
     return d.innerHTML;
   }
 
+  function escAttr(t) {
+    return String(t)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;");
+  }
+
+  function renderAssistantMarkdown(raw) {
+    if (typeof marked === "undefined" || typeof DOMPurify === "undefined") {
+      return esc(raw).replace(/\\n/g, "<br/>");
+    }
+    try {
+      marked.setOptions({ gfm: true, breaks: false });
+      var html = marked.parse(raw, { async: false });
+      return DOMPurify.sanitize(html);
+    } catch (e) {
+      return esc(raw).replace(/\\n/g, "<br/>");
+    }
+  }
+
   function scrollToBottom() {
     thread.scrollTop = thread.scrollHeight;
   }
@@ -728,13 +833,14 @@ _CHAT_APP_HTML = """<!DOCTYPE html>
     var block = document.createElement("div");
     block.className = "block";
     var bubble = document.createElement("div");
-    bubble.className = "bubble";
-    bubble.innerHTML = esc(text).replace(/\\n/g, "<br/>");
+    bubble.className = "bubble" + (role === "assistant" ? " md" : "");
     if (role === "user") {
+      bubble.innerHTML = esc(text).replace(/\\n/g, "<br/>");
       var inner = document.createElement("div");
       inner.appendChild(bubble);
       block.appendChild(inner);
     } else {
+      bubble.innerHTML = renderAssistantMarkdown(text);
       block.appendChild(bubble);
     }
     if (sources && sources.length) {
@@ -744,8 +850,20 @@ _CHAT_APP_HTML = """<!DOCTYPE html>
       for (var i = 0; i < sources.length; i++) {
         var s = sources[i];
         var dist = typeof s.distance === "number" ? s.distance.toFixed(4) : "";
-        parts.push("<li>" + esc(s.source || "") + (dist ? " · " + dist : "") +
-          "</li>");
+        var label = esc(s.source || "");
+        var line;
+        if (s.url) {
+          line =
+            '<a href="' +
+            escAttr(s.url) +
+            '" target="_blank" rel="noopener noreferrer">' +
+            label +
+            "</a>";
+        } else {
+          line = label;
+        }
+        if (dist) line += " · " + dist;
+        parts.push("<li>" + line + "</li>");
       }
       parts.push("</ul>");
       src.innerHTML = parts.join("");
@@ -1006,10 +1124,16 @@ def chat(req: ChatRequest, background_tasks: BackgroundTasks) -> ChatResponse:
         chat_history=req.history,
     )
 
+    rtd_base = s.readthedocs_base_url
     return ChatResponse(
         answer=result.answer,
         sources=[
-            {"source": c.source, "chunk_id": c.chunk_id, "distance": c.distance}
+            ChatSourceItem(
+                source=c.source,
+                chunk_id=c.chunk_id,
+                distance=c.distance,
+                url=source_to_readthedocs_url(c.source, base=rtd_base),
+            )
             for c in result.retrieved
         ],
     )

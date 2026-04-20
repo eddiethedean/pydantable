@@ -104,6 +104,9 @@ def test_chat_success(client: TestClient) -> None:
     assert "answer" in body
     assert isinstance(body["sources"], list)
     assert body["sources"][0]["source"] == "docs/intro.md"
+    assert body["sources"][0]["url"] == (
+        "https://pydantable.readthedocs.io/en/latest/intro/"
+    )
 
 
 def test_chat_validates_request_body(client: TestClient) -> None:

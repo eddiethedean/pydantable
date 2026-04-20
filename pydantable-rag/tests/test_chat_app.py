@@ -24,6 +24,8 @@ _CHAT_APP_REQUIRED_SUBSTRINGS: tuple[str, ...] = (
     "What is pydantable?",
     "wireStarters",
     "aria-live",
+    "renderAssistantMarkdown",
+    "marked.min.js",
 )
 
 

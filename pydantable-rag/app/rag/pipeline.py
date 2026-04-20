@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -8,6 +9,43 @@ from app.rag.llm import ChatMessage, generate_answer_hf
 from app.rag.store import RetrievedChunk, search
 
 _MAX_CHARS_PER_CHUNK = 4000
+
+
+def _skip_chunk_source(source: str) -> bool:
+    """Drop RTD/MkDocs build mirrors — they duplicate real ``docs/`` files."""
+    s = source.replace("\\", "/")
+    return "/_build/" in s
+
+
+def _display_source_label(source: str) -> str:
+    s = source.replace("\\", "/")
+    if len(s) > 80:
+        return "…" + s[-79:]
+    return s
+
+
+def _clean_chunk_text(text: str) -> str:
+    """
+    Light cleanup so mkdocstrings / MyST directives read ok in Markdown chat UI.
+    """
+    out_lines: list[str] = []
+    for line in text.splitlines():
+        s = line.rstrip()
+        stripped = s.strip()
+        if stripped.startswith(":::"):
+            rest = stripped[3:].strip()
+            if rest:
+                out_lines.append(
+                    f"*API reference (see the official docs for full signatures): "
+                    f"`{rest}`*"
+                )
+            else:
+                out_lines.append("*API reference embed (see official docs).*")
+            continue
+        out_lines.append(s)
+    joined = "\n".join(out_lines)
+    joined = re.sub(r"\n{4,}", "\n\n\n", joined)
+    return joined.strip()
 
 
 @dataclass(frozen=True)
@@ -26,26 +64,32 @@ SYSTEM_PROMPT = """You are a helpful assistant for the Python library 'pydantabl
  """
 
 
-def _extractive_answer(question: str, retrieved: list[RetrievedChunk]) -> str:
+def _extractive_answer(_question: str, retrieved: list[RetrievedChunk]) -> str:
     """No generative model — return ranked excerpts (for low-RAM hosts)."""
     if not retrieved:
         return (
             "No matching documentation chunks were found. Try different keywords "
             "or enable a generative backend (RAG_LLM_BACKEND=hf) on a larger host."
         )
-    parts: list[str] = [
-        (
-            f"**{c.source}** (chunk {c.chunk_id}, distance {c.distance:.4f})\n\n"
-            f"{c.text[:_MAX_CHARS_PER_CHUNK]}"
-            + ("…" if len(c.text) > _MAX_CHARS_PER_CHUNK else "")
-        )
-        for c in retrieved
-    ]
-    header = (
-        "Retrieval-only mode (no local generative model). "
-        f"Question: {question!r}\n\n---\n\n"
+    filtered = [c for c in retrieved if not _skip_chunk_source(c.source)]
+    chunks = filtered if filtered else retrieved
+
+    intro = (
+        "Here are the **closest matching excerpts** from the indexed pydantable "
+        "documentation.\n\n"
+        "*No local generative model is running* — this answer is extractive. "
+        "Use the **Sources** list under the reply for per-chunk match scores."
     )
-    return header + "\n\n---\n\n".join(parts)
+
+    sections: list[str] = [intro]
+    for i, c in enumerate(chunks, start=1):
+        label = _display_source_label(c.source)
+        body = _clean_chunk_text(c.text)
+        if len(body) > _MAX_CHARS_PER_CHUNK:
+            body = body[:_MAX_CHARS_PER_CHUNK].rstrip() + "\n\n…"
+        sections.append(f"### {i}. `{label}`\n\n{body}")
+
+    return "\n\n".join(sections)
 
 
 def rag_chat(
