@@ -49,6 +49,21 @@ out = df.filter(df.spark_col("x") > 1).select("y").to_dict()
 
 To move results from Spark into local Rust-backed transforms, use **`to_native()`** / **`to_engine(...)`** after materializing.
 
+If you start from a **native** `DataFrame` / `DataFrameModel` and want to explicitly
+re-root into the Spark execution engine, use **`to_spark_engine()`**:
+
+```python
+from pydantable import DataFrame, Schema
+
+
+class Row(Schema):
+    x: int
+
+
+df = DataFrame[Row]({"x": [2, 1]})
+spark_df = df.to_spark_engine()  # requires `pydantable[spark]`
+```
+
 **Rules:**
 
 - Pass **PySpark `Column`** expressions to `filter` / `with_columns` (`df.spark_col("x") > 1`,

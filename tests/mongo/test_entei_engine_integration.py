@@ -108,6 +108,32 @@ def test_mongo_dataframe_model_to_native_handoff_allows_native_transforms() -> N
     assert out == {"x2": [2, 4]}
 
 
+def test_to_mongo_engine_dataframe_roundtrip() -> None:
+    """Native frame → to_mongo_engine (in-memory root) → Mongo engine execution."""
+    from pydantable import DataFrame
+
+    df = DataFrame[Row]({"x": [3, 1, 2], "y": ["a", None, "c"]})
+    mongo_df = df.to_mongo_engine()
+    assert mongo_df.sort("x").to_dict() == {"x": [1, 2, 3], "y": [None, "c", "a"]}
+
+
+def test_to_mongo_engine_engine_mode_default_forces_default_engine() -> None:
+    from pydantable import DataFrame
+
+    df = DataFrame[Row]({"x": [1], "y": ["a"]})
+    out = df.to_mongo_engine(engine_mode="default")
+    assert out._engine is get_default_engine()
+
+
+def test_to_mongo_engine_explicit_engine_wins_over_engine_mode_default() -> None:
+    from pydantable import DataFrame
+
+    explicit = MongoPydantableEngine()
+    df = DataFrame[Row]({"x": [1], "y": ["a"]})
+    out = df.to_mongo_engine(engine=explicit, engine_mode="default")
+    assert out._engine is explicit
+
+
 def test_entei_async_flags_match_instance_methods() -> None:
     eng = MongoPydantableEngine()
     caps = native_engine_capabilities()

@@ -20,12 +20,13 @@ def _run_pyright_snippet(tmp_path: Path, code: str) -> subprocess.CompletedProce
     # fall back to CI's `.venv` (see workflow).
     root = repo_root()
     venv = ".venv310" if (root / ".venv310").is_dir() else ".venv"
+    py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
     cfg.write_text(
         json.dumps(
             {
                 "venvPath": str(root),
                 "venv": venv,
-                "pythonVersion": "3.10",
+                "pythonVersion": py_ver,
             }
         ),
         encoding="utf-8",

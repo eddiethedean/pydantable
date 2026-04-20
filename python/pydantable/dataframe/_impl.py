@@ -3505,6 +3505,33 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         raw = self._apply_io_validation_if_configured(raw)
         return self._column_dict_in_schema_order(raw)
 
+    def _materialize_for_engine_handoff(
+        self,
+        *,
+        materialize: Literal["columns", "rows"],
+        streaming: bool | None,
+        engine_streaming: bool | None,
+    ) -> dict[str, list[Any]]:
+        if materialize == "columns":
+            return self.to_dict(streaming=streaming, engine_streaming=engine_streaming)
+        if materialize == "rows":
+            rows = cast("list[Any]", self.collect(streaming=streaming))
+            cols: dict[str, list[Any]] = {name: [] for name in self._current_field_types}
+            for r in rows:
+                if hasattr(r, "model_dump"):
+                    d = r.model_dump()
+                elif isinstance(r, dict):
+                    d = r
+                else:
+                    raise TypeError(
+                        "materialize='rows' requires row objects that are "
+                        "Pydantic models or dicts."
+                    )
+                for name in cols:
+                    cols[name].append(d.get(name))
+            return cols
+        raise ValueError("materialize must be 'columns' or 'rows'.")
+
     def to_engine(
         self,
         target_engine: Any,
@@ -3525,32 +3552,14 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         if target_engine is None:
             raise TypeError("to_engine(target_engine=...) requires a target engine.")
 
-        # Default to the columnar dict shape because it round-trips through the
-        # DataFrame constructor and keeps validation semantics consistent.
-        if materialize == "columns":
-            cols = self.to_dict(streaming=streaming, engine_streaming=engine_streaming)
-        elif materialize == "rows":
-            # Note: this path is primarily for ergonomic parity; columnar is the
-            # preferred materialization for engine handoff.
-            rows = cast("list[Any]", self.collect(streaming=streaming))
-            cols = {name: [] for name in self._current_field_types}
-            for r in rows:
-                if hasattr(r, "model_dump"):
-                    d = r.model_dump()
-                elif isinstance(r, dict):
-                    d = r
-                else:
-                    raise TypeError(
-                        "to_engine(materialize='rows') requires row objects that are "
-                        "Pydantic models or dicts."
-                    )
-                for name in cols:
-                    cols[name].append(d.get(name))
-        else:  # pragma: no cover
-            raise ValueError("to_engine(materialize=...) must be 'columns' or 'rows'.")
+        cols = self._materialize_for_engine_handoff(
+            materialize=materialize,
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+        )
 
         schema_t = self._current_schema_type
-        df_cls = DataFrame[schema_t]  # type: ignore[index]
+        df_cls: Any = DataFrame[schema_t]  # type: ignore[valid-type, index]
         return df_cls(
             cols,
             trusted_mode=trusted_mode,
@@ -3620,29 +3629,13 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         from pydantable.sql_dataframe import SqlDataFrame
 
         schema_t = self._current_schema_type
-        df_cls = SqlDataFrame[schema_t]  # type: ignore[index]
+        df_cls: Any = SqlDataFrame[schema_t]  # type: ignore[valid-type, index]
 
-        if materialize == "columns":
-            cols = self.to_dict(streaming=streaming, engine_streaming=engine_streaming)
-        elif materialize == "rows":
-            rows = cast("list[Any]", self.collect(streaming=streaming))
-            cols = {name: [] for name in self._current_field_types}
-            for r in rows:
-                if hasattr(r, "model_dump"):
-                    d = r.model_dump()
-                elif isinstance(r, dict):
-                    d = r
-                else:
-                    raise TypeError(
-                        "to_sql_engine(materialize='rows') requires row objects that are "
-                        "Pydantic models or dicts."
-                    )
-                for name in cols:
-                    cols[name].append(d.get(name))
-        else:  # pragma: no cover
-            raise ValueError(
-                "to_sql_engine(materialize=...) must be 'columns' or 'rows'."
-            )
+        cols = self._materialize_for_engine_handoff(
+            materialize=materialize,
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+        )
 
         return df_cls(
             cols,
@@ -3654,6 +3647,93 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             fill_missing_optional=fill_missing_optional,
             ignore_errors=ignore_errors,
             on_validation_errors=on_validation_errors,
+        )
+
+    def to_mongo_engine(
+        self,
+        *,
+        engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
+        materialize: Literal["columns", "rows"] = "columns",
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Any:
+        """Materialize and re-root under the Mongo execution engine.
+
+        This is a convenience wrapper for multi-engine workflows. It materializes
+        the current frame (columnar by default) and constructs a `MongoDataFrame`
+        with the resolved engine.
+        """
+        from pydantable.mongo_dataframe import MongoDataFrame, _import_mongo_engine_types
+        from pydantable.engine import get_default_engine
+
+        MongoPydantableEngine, _MongoRoot = _import_mongo_engine_types()
+        if engine is not None:
+            resolved = engine
+        elif engine_mode == "default":
+            resolved = get_default_engine()
+        else:
+            resolved = MongoPydantableEngine()
+
+        schema_t = self._current_schema_type
+        df_cls: Any = MongoDataFrame[schema_t]  # type: ignore[valid-type, index]
+        cols = self._materialize_for_engine_handoff(
+            materialize=materialize,
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+        )
+        return df_cls(
+            cols,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+            engine=resolved,
+        )
+
+    def to_spark_engine(
+        self,
+        *,
+        engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
+        materialize: Literal["columns", "rows"] = "columns",
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Any:
+        """Materialize and re-root under the Spark execution engine (raikou-core)."""
+        from pydantable.engine import get_default_engine
+        from pydantable.spark_dataframe import SparkDataFrame, _import_spark_engine_types
+
+        SparkExecutionEngine, _SparkRoot = _import_spark_engine_types()
+        if engine is not None:
+            resolved = engine
+        elif engine_mode == "default":
+            resolved = get_default_engine()
+        else:
+            resolved = SparkExecutionEngine()
+
+        schema_t = self._current_schema_type
+        df_cls: Any = SparkDataFrame[schema_t]  # type: ignore[valid-type, index]
+        cols = self._materialize_for_engine_handoff(
+            materialize=materialize,
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+        )
+        return df_cls(
+            cols,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+            engine=resolved,
         )
 
     def null_count(self) -> dict[str, int]:

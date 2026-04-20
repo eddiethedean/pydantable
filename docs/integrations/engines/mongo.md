@@ -203,6 +203,23 @@ in the schema’s field map). Optional **`engine=`** reuses a single
 
 To flow from a Mongo-backed lazy frame into local Rust-backed transforms, use **`to_native()`** / **`to_engine(...)`**.
 
+If you start from a **native** `DataFrame` / `DataFrameModel` and want to explicitly
+re-root into the Mongo execution engine, use **`to_mongo_engine()`**:
+
+```python
+from pydantable import DataFrame, Schema
+
+
+class Row(Schema):
+    x: int
+    y: str | None
+
+
+df = DataFrame[Row]({"x": [2, 1], "y": ["b", "a"]})
+mongo_df = df.to_mongo_engine()
+out = mongo_df.sort("x").to_dict()
+```
+
 ### Typed-safe pushdown helpers (`match`, `project`)
 
 `MongoDataFrame` adds small engine-specific helpers for Mongo collection roots:

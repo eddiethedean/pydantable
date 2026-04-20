@@ -460,6 +460,18 @@ def test_to_sql_engine_dataframe_roundtrip(tmp_path: Path) -> None:
     assert sql_df.sort("id").to_dict() == {"id": [1, 2], "label": ["a", "b"]}
 
 
+def test_to_sql_engine_engine_mode_default_forces_default_engine(tmp_path: Path) -> None:
+    from pydantable import DataFrame
+    from pydantable.engine import get_default_engine
+
+    db_path = tmp_path / "to_sql_engine_default_engine.db"
+    cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
+
+    df = DataFrame[_W]({"id": [1], "label": ["a"]})
+    out = df.to_sql_engine(sql_config=cfg, engine_mode="default")
+    assert out._engine is get_default_engine()
+
+
 def test_to_sql_engine_dataframe_model_roundtrip(tmp_path: Path) -> None:
     from pydantable import DataFrameModel
 
