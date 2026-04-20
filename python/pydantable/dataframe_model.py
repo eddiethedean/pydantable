@@ -1758,6 +1758,12 @@ class DataFrameModel(Generic[RowT]):
     def schema_fields(self) -> dict[str, Any]:
         return self._df.schema_fields()
 
+    def engine_report(self) -> dict[str, Any]:
+        return self._df.engine_report()
+
+    def explain_execution(self) -> dict[str, Any]:
+        return self._df.explain_execution()
+
     @staticmethod
     def _expected_schema_fields(model: type[DataFrameModel[Any]]) -> dict[str, Any]:
         """

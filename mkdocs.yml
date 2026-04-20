@@ -133,6 +133,7 @@ nav:
       - user-guide/strictness.md
       - user-guide/service-ergonomics.md
       - user-guide/execution.md
+      - user-guide/engine-policy.md
       - user-guide/materialization.md
       - user-guide/selectors.md
       - user-guide/plan-and-plugins.md

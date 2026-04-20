@@ -35,6 +35,18 @@ class EngineCapabilities:
     has_execute_join: bool
     has_execute_groupby_agg: bool
 
+    # Optional, higher-level capability descriptors (v2). These are used for
+    # pushdown decisions and user-facing execution reporting.
+    supported_transform_categories: tuple[str, ...] = ()
+    supported_sink_kinds: tuple[str, ...] = ()
+    expression_dialect: Literal[
+        "rust_expr",
+        "sqlalchemy",
+        "spark_column",
+        "mongo_query",
+        "unknown",
+    ] = "unknown"
+
 
 def stub_engine_capabilities() -> EngineCapabilities:
     """Capabilities for minimal stub / test-double execution engines."""

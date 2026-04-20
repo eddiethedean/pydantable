@@ -37,6 +37,7 @@ from pydantic import BaseModel
 
 from pydantable.display import get_repr_html_limits
 from pydantable.engine import get_default_engine
+from pydantable.engine_policy import ExecutionPolicy
 from pydantable.expressions import AliasedExpr, ColumnRef, Expr
 from pydantable.schema import (
     _is_polars_dataframe,
@@ -756,8 +757,16 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
                 out[k] = v
         return out
 
+    def _engine_capabilities_has_execute_plan(self) -> bool:
+        """True when the engine advertises ``has_execute_plan`` on :attr:`capabilities`."""
+        caps = getattr(self._engine, "capabilities", None)
+        return bool(caps is not None and getattr(caps, "has_execute_plan", False))
+
     def _materialize_columns_with_missing_optional_fallback(
-        self, *, streaming: bool
+        self,
+        *,
+        streaming: bool,
+        execution_policy: ExecutionPolicy | None,
     ) -> dict[str, list[Any]]:
         """
         Materialize columns via the Rust engine, with a fallback for scan roots
@@ -767,6 +776,55 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         schema fields, we treat missing columns as all-null and retry execution
         with those columns omitted, then fill them with `None` during validation.
         """
+        from pydantable.errors import UnsupportedEngineOperationError
+
+        policy = execution_policy or "fallback_to_native"
+        if not self._engine_capabilities_has_execute_plan():
+            if policy in ("pushdown", "error_on_fallback"):
+                raise UnsupportedEngineOperationError(
+                    "Current engine cannot execute plans. "
+                    "To allow fallback, pass execution_policy='fallback_to_native' "
+                    "or call to_native()/to_engine(...) explicitly."
+                )
+
+            # Only attempt native fallback when the root data is compatible with the
+            # native engine (in-memory columns or a native scan root). For engine-specific
+            # roots (e.g. async Mongo roots), callers must use the appropriate terminals
+            # or explicit handoff APIs.
+            from collections.abc import Mapping
+
+            if not (_is_scan_file_root(self._root_data) or isinstance(self._root_data, Mapping)):
+                raise UnsupportedEngineOperationError(
+                    "Current engine cannot execute plans, and this frame's root data "
+                    f"({type(self._root_data).__name__}) cannot be executed by the native engine. "
+                    "Use the engine's supported terminals (often async), or materialize with the "
+                    "source engine then hand off via to_native()/to_engine(...)."
+                )
+
+            from pydantable.engine import NativePolarsEngine, get_default_engine
+
+            default_eng = get_default_engine()
+            if NativePolarsEngine is None or isinstance(default_eng, NativePolarsEngine):
+                native_eng = default_eng
+            else:
+                native_eng = NativePolarsEngine()
+
+            logging.getLogger(__name__).warning(
+                "Falling back to native execution. engine=%s policy=%s",
+                type(self._engine).__name__,
+                policy,
+            )
+            return materialize_with_optional_scan_fallback_sync(
+                native_eng,
+                plan=self._rust_plan,
+                root_data=self._root_data,
+                field_types=dict(self._current_field_types),
+                current_schema_type=self._current_schema_type,
+                io_validation_fill_missing_optional=self._io_validation_fill_missing_optional,
+                streaming=streaming,
+                error_context=self._materialize_error_context(),
+            )
+
         return materialize_with_optional_scan_fallback_sync(
             self._engine,
             plan=self._rust_plan,
@@ -779,8 +837,58 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         )
 
     async def _materialize_columns_with_missing_optional_fallback_async(
-        self, *, streaming: bool, executor: Executor | None
+        self,
+        *,
+        streaming: bool,
+        executor: Executor | None,
+        execution_policy: ExecutionPolicy | None,
     ) -> dict[str, list[Any]]:
+        from pydantable.errors import UnsupportedEngineOperationError
+
+        policy = execution_policy or "fallback_to_native"
+        if not self._engine_capabilities_has_execute_plan():
+            if policy in ("pushdown", "error_on_fallback"):
+                raise UnsupportedEngineOperationError(
+                    "Current engine cannot execute plans. "
+                    "To allow fallback, pass execution_policy='fallback_to_native' "
+                    "or call to_native()/to_engine(...) explicitly."
+                )
+
+            from collections.abc import Mapping
+
+            if not (_is_scan_file_root(self._root_data) or isinstance(self._root_data, Mapping)):
+                raise UnsupportedEngineOperationError(
+                    "Current engine cannot execute plans, and this frame's root data "
+                    f"({type(self._root_data).__name__}) cannot be executed by the native engine. "
+                    "Use the engine's supported terminals (often async), or materialize with the "
+                    "source engine then hand off via to_native()/to_engine(...)."
+                )
+
+            from pydantable.engine import NativePolarsEngine, get_default_engine
+
+            default_eng = get_default_engine()
+            if NativePolarsEngine is None or isinstance(default_eng, NativePolarsEngine):
+                native_eng = default_eng
+            else:
+                native_eng = NativePolarsEngine()
+
+            logging.getLogger(__name__).warning(
+                "Falling back to native execution (async). engine=%s policy=%s",
+                type(self._engine).__name__,
+                policy,
+            )
+            return await materialize_with_optional_scan_fallback_async(
+                native_eng,
+                plan=self._rust_plan,
+                root_data=self._root_data,
+                field_types=dict(self._current_field_types),
+                current_schema_type=self._current_schema_type,
+                io_validation_fill_missing_optional=self._io_validation_fill_missing_optional,
+                streaming=streaming,
+                error_context=self._materialize_error_context(),
+                executor=executor,
+            )
+
         return await materialize_with_optional_scan_fallback_async(
             self._engine,
             plan=self._rust_plan,
@@ -797,7 +905,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         self, *, streaming: bool, executor: Executor | None
     ) -> dict[str, list[Any]]:
         raw = await self._materialize_columns_with_missing_optional_fallback_async(
-            streaming=streaming, executor=executor
+            streaming=streaming, executor=executor, execution_policy=None
         )
         raw = _coerce_enum_columns(raw, self._current_field_types)
         return self._apply_io_validation_if_configured(raw)
@@ -808,6 +916,35 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
     def schema_fields(self) -> dict[str, Any]:
         return dict(self._current_field_types)
+
+    def engine_report(self) -> dict[str, Any]:
+        """Return a small, stable summary of engine + root state (v2)."""
+        eng = self._engine
+        rd = self._root_data
+
+        root_name = getattr(rd, "name", None) or getattr(rd, "_name", None)
+
+        return {
+            "engine_type": type(eng).__name__,
+            "engine_backend": getattr(getattr(eng, "capabilities", None), "backend", None),
+            "root_kind": type(rd).__name__,
+            "root_name": root_name,
+            "root_schema": getattr(self._root_schema_type, "__qualname__", None),
+            "current_schema": getattr(self._current_schema_type, "__qualname__", None),
+        }
+
+    def explain_execution(self) -> dict[str, Any]:
+        """Explain where execution will run for terminals on this frame (v2)."""
+        eng = self._engine
+        caps = getattr(eng, "capabilities", None)
+        cap_dict: dict[str, Any] | None = None
+        if caps is not None:
+            cap_dict = {k: getattr(caps, k) for k in dir(caps) if k.startswith("has_")}
+
+        return {
+            "engine_report": self.engine_report(),
+            "engine_capabilities": cap_dict,
+        }
 
     @staticmethod
     def _expected_schema_fields(schema: type[BaseModel]) -> dict[str, Any]:
@@ -3419,6 +3556,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         as_numpy: bool = False,
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
+        execution_policy: ExecutionPolicy | None = None,
     ) -> Any:
         """
         Materialize this typed logical DataFrame.
@@ -3452,7 +3590,8 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             default=self._engine_streaming_default,
         )
         column_dict = self._materialize_columns_with_missing_optional_fallback(
-            streaming=use_streaming
+            streaming=use_streaming,
+            execution_policy=execution_policy,
         )
         column_dict = _coerce_enum_columns(column_dict, self._current_field_types)
         column_dict = self._apply_io_validation_if_configured(column_dict)
@@ -3471,6 +3610,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         *,
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
+        execution_policy: ExecutionPolicy | None = None,
     ) -> dict[str, list[Any]]:
         """Columnar materialization (alias for ``collect(as_lists=True)`` shape).
 
@@ -3484,7 +3624,8 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             default=self._engine_streaming_default,
         )
         raw = self._materialize_columns_with_missing_optional_fallback(
-            streaming=use_streaming
+            streaming=use_streaming,
+            execution_policy=execution_policy,
         )
         raw = _coerce_enum_columns(raw, self._current_field_types)
         raw = self._apply_io_validation_if_configured(raw)
@@ -4101,6 +4242,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         executor: Executor | None = None,
+        execution_policy: ExecutionPolicy | None = None,
     ) -> Any:
         """
         Async version of :meth:`collect`: same semantics.
@@ -4122,8 +4264,10 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             engine_streaming=engine_streaming,
             default=self._engine_streaming_default,
         )
-        column_dict = await self._materialize_columns_async(
-            streaming=use_streaming, executor=executor
+        column_dict = await self._materialize_columns_with_missing_optional_fallback_async(
+            streaming=use_streaming,
+            executor=executor,
+            execution_policy=execution_policy,
         )
         column_dict = self._column_dict_in_schema_order(column_dict)
         if as_lists:
@@ -4140,6 +4284,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         streaming: bool | None = None,
         engine_streaming: bool | None = None,
         executor: Executor | None = None,
+        execution_policy: ExecutionPolicy | None = None,
     ) -> dict[str, list[Any]]:
         """Async version of :meth:`to_dict` (see :meth:`acollect`)."""
         use_streaming = _resolve_engine_streaming(
@@ -4147,9 +4292,13 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             engine_streaming=engine_streaming,
             default=self._engine_streaming_default,
         )
-        raw = await self._materialize_columns_async(
-            streaming=use_streaming, executor=executor
+        raw = await self._materialize_columns_with_missing_optional_fallback_async(
+            streaming=use_streaming,
+            executor=executor,
+            execution_policy=execution_policy,
         )
+        raw = _coerce_enum_columns(raw, self._current_field_types)
+        raw = self._apply_io_validation_if_configured(raw)
         return self._column_dict_in_schema_order(raw)
 
     async def ato_polars(

@@ -24,6 +24,7 @@ def native_engine_capabilities() -> EngineCapabilities:
             has_collect_plan_batches=False,
             has_execute_join=False,
             has_execute_groupby_agg=False,
+            expression_dialect="rust_expr",
         )
     return EngineCapabilities(
         backend="native",
@@ -38,4 +39,5 @@ def native_engine_capabilities() -> EngineCapabilities:
         has_collect_plan_batches=hasattr(rc, "collect_plan_batches"),
         has_execute_join=hasattr(rc, "execute_join"),
         has_execute_groupby_agg=hasattr(rc, "execute_groupby_agg"),
+        expression_dialect="rust_expr",
     )
