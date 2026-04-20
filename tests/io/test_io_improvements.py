@@ -23,7 +23,6 @@ from pydantable.io import (
     export_json,
     export_parquet,
     fetch_bytes,
-    write_sql_raw,
     materialize_csv,
     materialize_json,
     materialize_parquet,
@@ -32,6 +31,7 @@ from pydantable.io import (
     read_ndjson,
     read_parquet_url,
     read_parquet_url_ctx,
+    write_sql_raw,
 )
 
 from tests._support.paths import repo_root

@@ -37,7 +37,6 @@ from pydantic import BaseModel
 
 from pydantable.display import get_repr_html_limits
 from pydantable.engine import get_default_engine
-from pydantable.engine_policy import ExecutionPolicy
 from pydantable.expressions import AliasedExpr, ColumnRef, Expr
 from pydantable.schema import (
     _is_polars_dataframe,
@@ -72,6 +71,8 @@ from .grouped import DynamicGroupedDataFrame, GroupedDataFrame, _DataFrameForGro
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping, Sequence
     from concurrent.futures import Executor
+
+    from pydantable.engine_policy import ExecutionPolicy
 
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
@@ -758,7 +759,7 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         return out
 
     def _engine_capabilities_has_execute_plan(self) -> bool:
-        """True when the engine advertises ``has_execute_plan`` on :attr:`capabilities`."""
+        """True when ``capabilities.has_execute_plan`` is true for this engine."""
         caps = getattr(self._engine, "capabilities", None)
         return bool(caps is not None and getattr(caps, "has_execute_plan", False))
 
@@ -788,23 +789,29 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
                 )
 
             # Only attempt native fallback when the root data is compatible with the
-            # native engine (in-memory columns or a native scan root). For engine-specific
-            # roots (e.g. async Mongo roots), callers must use the appropriate terminals
-            # or explicit handoff APIs.
+            # native engine (in-memory columns or a native scan root). For
+            # engine-specific roots (e.g. async Mongo roots), callers must use the
+            # appropriate terminals or explicit handoff APIs.
             from collections.abc import Mapping
 
-            if not (_is_scan_file_root(self._root_data) or isinstance(self._root_data, Mapping)):
+            if not (
+                _is_scan_file_root(self._root_data)
+                or isinstance(self._root_data, Mapping)
+            ):
                 raise UnsupportedEngineOperationError(
                     "Current engine cannot execute plans, and this frame's root data "
-                    f"({type(self._root_data).__name__}) cannot be executed by the native engine. "
-                    "Use the engine's supported terminals (often async), or materialize with the "
-                    "source engine then hand off via to_native()/to_engine(...)."
+                    f"({type(self._root_data).__name__}) cannot be executed by the "
+                    "native engine. Use the engine's supported terminals "
+                    "(often async), or materialize with the source engine "
+                    "then hand off via to_native()/to_engine(...)."
                 )
 
             from pydantable.engine import NativePolarsEngine, get_default_engine
 
             default_eng = get_default_engine()
-            if NativePolarsEngine is None or isinstance(default_eng, NativePolarsEngine):
+            if NativePolarsEngine is None or isinstance(
+                default_eng, NativePolarsEngine
+            ):
                 native_eng = default_eng
             else:
                 native_eng = NativePolarsEngine()
@@ -856,18 +863,24 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
             from collections.abc import Mapping
 
-            if not (_is_scan_file_root(self._root_data) or isinstance(self._root_data, Mapping)):
+            if not (
+                _is_scan_file_root(self._root_data)
+                or isinstance(self._root_data, Mapping)
+            ):
                 raise UnsupportedEngineOperationError(
                     "Current engine cannot execute plans, and this frame's root data "
-                    f"({type(self._root_data).__name__}) cannot be executed by the native engine. "
-                    "Use the engine's supported terminals (often async), or materialize with the "
-                    "source engine then hand off via to_native()/to_engine(...)."
+                    f"({type(self._root_data).__name__}) cannot be executed by the "
+                    "native engine. Use the engine's supported terminals "
+                    "(often async), or materialize with the source engine "
+                    "then hand off via to_native()/to_engine(...)."
                 )
 
             from pydantable.engine import NativePolarsEngine, get_default_engine
 
             default_eng = get_default_engine()
-            if NativePolarsEngine is None or isinstance(default_eng, NativePolarsEngine):
+            if NativePolarsEngine is None or isinstance(
+                default_eng, NativePolarsEngine
+            ):
                 native_eng = default_eng
             else:
                 native_eng = NativePolarsEngine()
@@ -926,7 +939,9 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
 
         return {
             "engine_type": type(eng).__name__,
-            "engine_backend": getattr(getattr(eng, "capabilities", None), "backend", None),
+            "engine_backend": getattr(
+                getattr(eng, "capabilities", None), "backend", None
+            ),
             "root_kind": type(rd).__name__,
             "root_name": root_name,
             "root_schema": getattr(self._root_schema_type, "__qualname__", None),
@@ -3766,9 +3781,13 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             engine_streaming=engine_streaming,
         )
 
-        # Construct via SqlDataFrame[Schema] so the new frame is typed.
-        df_cls: Any = SqlDataFrame[self._current_schema_type]  # type: ignore[valid-type, index]
-        return df_cls(
+        # Construct via SqlDataFrame[Schema] so the new frame is typed. Cast so static
+        # analyzers use SqlDataFrame.__init__ (sql_config=, …), not DataFrame.__init__.
+        ctor = cast(
+            "Any",
+            SqlDataFrame[self._current_schema_type],  # type: ignore[valid-type, index]
+        )
+        return ctor(
             cols,
             sql_config=sql_config,
             sql_engine=sql_engine,
@@ -4264,10 +4283,12 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
             engine_streaming=engine_streaming,
             default=self._engine_streaming_default,
         )
-        column_dict = await self._materialize_columns_with_missing_optional_fallback_async(
-            streaming=use_streaming,
-            executor=executor,
-            execution_policy=execution_policy,
+        column_dict = (
+            await self._materialize_columns_with_missing_optional_fallback_async(
+                streaming=use_streaming,
+                executor=executor,
+                execution_policy=execution_policy,
+            )
         )
         column_dict = self._column_dict_in_schema_order(column_dict)
         if as_lists:

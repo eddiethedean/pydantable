@@ -397,10 +397,8 @@ def test_write_sql_batches_appends_all_rows(tmp_dir: Path) -> None:
         conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
 
     batches = [{"n": [1, 2, 3]}, {"n": [4]}, {"n": [5, 6]}]
-    first = True
     for b in batches:
-        write_sql_raw(b, "t", eng, if_exists="append" if first else "append")
-        first = False
+        write_sql_raw(b, "t", eng, if_exists="append")
     out = fetch_sql_raw("SELECT n FROM t ORDER BY n", eng)
     out2 = out.to_dict() if hasattr(out, "to_dict") else out
     assert out2["n"] == [1, 2, 3, 4, 5, 6]
@@ -420,10 +418,8 @@ async def test_awrite_sql_batches_appends_all_rows(tmp_dir: Path) -> None:
         yield {"n": [1, 2]}
         yield {"n": [3]}
 
-    first = True
     async for b in _gen():
-        await awrite_sql_raw(b, "t", eng, if_exists="append" if first else "append")
-        first = False
+        await awrite_sql_raw(b, "t", eng, if_exists="append")
     out = fetch_sql_raw("SELECT n FROM t ORDER BY n", eng)
     out2 = out.to_dict() if hasattr(out, "to_dict") else out
     assert out2["n"] == [1, 2, 3]
@@ -581,11 +577,9 @@ def test_write_sql_batches_accepts_dataframe_model_batches(tmp_dir: Path) -> Non
     with eng.begin() as conn:
         conn.execute(text("CREATE TABLE t (n INTEGER NOT NULL)"))
 
-    first = True
     for batch in [_BatchDF({"n": [1, 2]}), _BatchDF({"n": [3]})]:
         cols = batch.to_dict()
-        write_sql_raw(cols, "t", eng, if_exists="append" if first else "append")
-        first = False
+        write_sql_raw(cols, "t", eng, if_exists="append")
     out = fetch_sql_raw("SELECT n FROM t ORDER BY n", eng)
     plain = out.to_dict() if hasattr(out, "to_dict") else out
     assert plain["n"] == [1, 2, 3]

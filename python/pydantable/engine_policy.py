@@ -15,7 +15,7 @@ EngineMode = Literal["auto", "default"]
 ExecutionPolicy = Literal[
     # Prefer staying on the current engine; error if a fallback would be required.
     "pushdown",
-    # Allow fallback boundaries; the library may materialize + re-root (typically to native).
+    # Allow fallback boundaries; materialize + re-root (often to native).
     "fallback_to_native",
     # Error if any fallback would occur (alias-like but explicit).
     "error_on_fallback",
@@ -23,4 +23,3 @@ ExecutionPolicy = Literal[
 
 # How to materialize when crossing an engine boundary.
 HandoffMaterialize = Literal["columns", "rows"]
-

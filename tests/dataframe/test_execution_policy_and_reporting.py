@@ -31,7 +31,6 @@ def test_execution_policy_strict_modes_raise_actionable_error() -> None:
 
     with pytest.raises(Exception) as ei:
         _ = df.to_dict(execution_policy="pushdown")
-    assert "execution_policy='fallback_to_native'" in str(ei.value) or "To allow fallback" in str(
+    assert "execution_policy='fallback_to_native'" in str(
         ei.value
-    )
-
+    ) or "To allow fallback" in str(ei.value)

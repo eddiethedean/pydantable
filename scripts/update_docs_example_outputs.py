@@ -40,7 +40,7 @@ def _discover_from_docs(docs_dir: Path) -> list[Example]:
     for out_rel in sorted(outs):
         script_rel = out_rel[: -len(".out.txt")]
         if script_rel not in scripts:
-            # Allow output-only files that aren’t embedded on a page right now.
+            # Allow output-only files that are not embedded on a page right now.
             continue
         examples.append(Example(script_rel=script_rel, out_rel=out_rel))
 
@@ -115,4 +115,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
