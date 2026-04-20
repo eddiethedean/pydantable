@@ -30,6 +30,7 @@ from typing import Any, Literal, cast
 
 from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
+from .engine import get_default_engine
 from .schema import field_types_for_rust, schema_field_types
 
 
@@ -119,6 +120,7 @@ class MongoDataFrame(DataFrame):
         *,
         fields: Sequence[str] | None = None,
         engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
     ) -> Any:
         """Lazy frame over a MongoDB collection (documents loaded at materialization).
 
@@ -130,7 +132,12 @@ class MongoDataFrame(DataFrame):
                 "Use MongoDataFrame[Schema].from_collection(...) with a schema."
             )
         MongoPydantableEngine, MongoRoot = _import_mongo_engine_types()
-        eng = engine if engine is not None else MongoPydantableEngine()
+        if engine is not None:
+            eng = engine
+        elif engine_mode == "default":
+            eng = get_default_engine()
+        else:
+            eng = MongoPydantableEngine()
         st = cls._schema_type
         fts = schema_field_types(st)
         plan = eng.make_plan(field_types_for_rust(fts))
@@ -236,6 +243,7 @@ class MongoDataFrame(DataFrame):
         database: Any,
         fields: Sequence[str] | None = None,
         engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
     ) -> Any:
         """Lazy frame for a Beanie ``Document`` collection (preferred Mongo path).
 
@@ -252,7 +260,9 @@ class MongoDataFrame(DataFrame):
         from pydantable.mongo_beanie import sync_pymongo_collection
 
         coll = sync_pymongo_collection(document_cls, database)
-        return cls.from_collection(coll, fields=fields, engine=engine)
+        return cls.from_collection(
+            coll, fields=fields, engine=engine, engine_mode=engine_mode
+        )
 
     @classmethod
     def from_beanie_async(
@@ -267,6 +277,7 @@ class MongoDataFrame(DataFrame):
         flatten: bool = True,
         id_column: Literal["id", "_id"] = "id",
         engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
     ) -> Any:
         """Async-first lazy frame over Beanie reads (``afetch_beanie`` entrypoints).
 
@@ -285,7 +296,12 @@ class MongoDataFrame(DataFrame):
                 "Use MongoDataFrame[Schema].from_beanie_async(...) with a schema."
             )
         MongoPydantableEngine, _MongoRoot = _import_mongo_engine_types()
-        eng = engine if engine is not None else MongoPydantableEngine()
+        if engine is not None:
+            eng = engine
+        elif engine_mode == "default":
+            eng = get_default_engine()
+        else:
+            eng = MongoPydantableEngine()
         st = cls._schema_type
         fts = schema_field_types(st)
         plan = eng.make_plan(field_types_for_rust(fts))
@@ -338,9 +354,15 @@ class MongoDataFrameModel(DataFrameModel):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         validation_profile: str | None = None,
         engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
     ) -> None:
         MongoPydantableEngine, _ = _import_mongo_engine_types()
-        resolved = engine if engine is not None else MongoPydantableEngine()
+        if engine is not None:
+            resolved = engine
+        elif engine_mode == "default":
+            resolved = get_default_engine()
+        else:
+            resolved = MongoPydantableEngine()
         super().__init__(
             data,
             trusted_mode=trusted_mode,
@@ -358,6 +380,7 @@ class MongoDataFrameModel(DataFrameModel):
         *,
         fields: Sequence[str] | None = None,
         engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
     ) -> Any:
         """Build from a pymongo collection (``MongoDataFrame.from_collection``)."""
         cls._dfm_require_subclass_with_schema()
@@ -366,6 +389,7 @@ class MongoDataFrameModel(DataFrameModel):
             collection,
             fields=fields,
             engine=engine,
+            engine_mode=engine_mode,
         )
         return cls._wrap_inner_df(inner)
 
@@ -377,6 +401,7 @@ class MongoDataFrameModel(DataFrameModel):
         database: Any,
         fields: Sequence[str] | None = None,
         engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
     ) -> Any:
         """Build from Beanie (see :meth:`MongoDataFrame.from_beanie`)."""
         cls._dfm_require_subclass_with_schema()
@@ -386,6 +411,7 @@ class MongoDataFrameModel(DataFrameModel):
             database=database,
             fields=fields,
             engine=engine,
+            engine_mode=engine_mode,
         )
         return cls._wrap_inner_df(inner)
 
@@ -402,6 +428,7 @@ class MongoDataFrameModel(DataFrameModel):
         flatten: bool = True,
         id_column: Literal["id", "_id"] = "id",
         engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
     ) -> Any:
         cls._dfm_require_subclass_with_schema()
         dataframe_cls = cast("Any", cls._dataframe_cls)
@@ -415,6 +442,7 @@ class MongoDataFrameModel(DataFrameModel):
             flatten=flatten,
             id_column=id_column,
             engine=engine,
+            engine_mode=engine_mode,
         )
         return cls._wrap_inner_df(inner)
 

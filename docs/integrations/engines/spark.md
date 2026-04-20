@@ -42,6 +42,13 @@ df = SparkDataFrame[Row].from_spark_dataframe(spark_df)
 out = df.filter(df.spark_col("x") > 1).select("y").to_dict()
 ```
 
+`SparkDataFrame` / `SparkDataFrameModel` also accept **`engine_mode="auto"|"default"`**:
+
+- **`"auto"`** (default): use the Spark execution engine (`raikou-core`).
+- **`"default"`**: force the process-wide default engine (`pydantable.engine.get_default_engine()`).
+
+To move results from Spark into local Rust-backed transforms, use **`to_native()`** / **`to_engine(...)`** after materializing.
+
 **Rules:**
 
 - Pass **PySpark `Column`** expressions to `filter` / `with_columns` (`df.spark_col("x") > 1`,

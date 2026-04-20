@@ -5,6 +5,7 @@ import sys
 
 import pytest
 from pydantable import Schema
+from pydantable.engine import get_default_engine
 
 # SparkDataFrame needs raikou-core (``pydantable[spark]``), not only pyspark.
 pytest.importorskip(
@@ -51,6 +52,14 @@ def test_from_spark_dataframe_select_filter(spark) -> None:
     df = SparkDataFrame[Row].from_spark_dataframe(sdf)
     out = df.filter(df.spark_col("x") > 1).select("y").to_dict()
     assert out == {"y": ["b"]}
+
+
+def test_from_spark_dataframe_engine_mode_default_forces_default_engine(spark) -> None:
+    from pydantable import SparkDataFrame
+
+    sdf = spark.createDataFrame([{"x": 1, "y": "a"}])
+    df = SparkDataFrame[Row].from_spark_dataframe(sdf, engine_mode="default")
+    assert df._engine is get_default_engine()
 
 
 def test_spark_col_returns_pyspark_column(spark) -> None:

@@ -79,6 +79,28 @@ def test_sql_dataframe_engine_kwarg_wins_over_sql_config() -> None:
     assert df.to_dict() == {"id": [7]}
 
 
+def test_sql_dataframe_engine_mode_default_forces_default_engine() -> None:
+    from pydantable.engine import get_default_engine
+
+    df = SqlDataFrame[_S](
+        {"id": [1]},
+        sql_config=_sync_config(),
+        engine_mode="default",
+    )
+    assert df._engine is get_default_engine()
+
+
+def test_sql_dataframe_explicit_engine_wins_over_engine_mode_default() -> None:
+    eng = sql_engine_from_config(_sync_config())
+    df = SqlDataFrame[_S](
+        {"id": [1]},
+        sql_config=_sync_config(),
+        engine=eng,
+        engine_mode="default",
+    )
+    assert df._engine is eng
+
+
 def test_sql_dataframe_requires_engine_args() -> None:
     with pytest.raises(TypeError, match="sql_config"):
         SqlDataFrame[_S]({"id": [1]})
@@ -290,6 +312,74 @@ def test_from_sql_table_accepts_sql_config_instead_of_engine(
     assert df.to_dict() == {"id": [9], "label": ["cfg"]}
 
 
+def test_from_sql_table_engine_mode_default_forces_default_engine(tmp_path: Path) -> None:
+    """engine_mode='default' uses get_default_engine() even with sql_config/sql_engine."""
+    from sqlalchemy import Column, Integer, MetaData, String, Table
+
+    from pydantable.engine import get_default_engine
+
+    db_path = tmp_path / "engine_mode_default.db"
+    cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
+    md = MetaData()
+    t = Table(
+        "items",
+        md,
+        Column("id", Integer, primary_key=True),
+        Column("label", String(20)),
+    )
+
+    df = SqlDataFrame[_W].from_sql_table(t, sql_config=cfg, engine_mode="default")
+    assert df._engine is get_default_engine()
+
+
+def test_from_sql_table_engine_explicit_wins_over_engine_mode_default(
+    tmp_path: Path,
+) -> None:
+    from sqlalchemy import Column, Integer, MetaData, String, Table
+
+    db_path = tmp_path / "engine_mode_explicit.db"
+    cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
+    explicit = sql_engine_from_config(cfg)
+    md = MetaData()
+    t = Table(
+        "items",
+        md,
+        Column("id", Integer, primary_key=True),
+        Column("label", String(20)),
+    )
+
+    df = SqlDataFrame[_W].from_sql_table(
+        t, sql_config=cfg, engine=explicit, engine_mode="default"
+    )
+    assert df._engine is explicit
+
+
+def test_sql_to_native_handoff_allows_native_transforms(tmp_path: Path) -> None:
+    """SQL engine → materialize → native engine transforms."""
+    from sqlalchemy import Column, Integer, MetaData, String, Table, insert
+
+    db_path = tmp_path / "handoff.db"
+    cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
+    eng = sql_engine_from_config(cfg)
+    cm = ConnectionManager(cfg)
+    md = MetaData()
+    t = Table(
+        "items",
+        md,
+        Column("id", Integer, primary_key=True),
+        Column("label", String(20)),
+    )
+    md.create_all(cm.engine)
+    with cm.engine.connect() as conn:
+        conn.execute(insert(t).values(id=2, label="b"))
+        conn.commit()
+
+    sql_df = SqlDataFrame[_W].from_sql_table(t, sql_engine=eng).select("id", "label")
+    native_df = sql_df.to_native()
+    out = native_df.with_columns(id2=native_df.id * 2).select("id2").to_dict()
+    assert out == {"id2": [4]}
+
+
 def test_read_sql_table_accepts_sql_config(tmp_path: Path) -> None:
     from sqlalchemy import Column, Integer, MetaData, String, Table, insert
 
@@ -311,6 +401,118 @@ def test_read_sql_table_accepts_sql_config(tmp_path: Path) -> None:
     m = _MW.read_sql_table(t, sql_config=cfg)
     assert m.select("label").to_dict() == {"label": ["m"]}
 
+
+def test_read_sql_table_engine_mode_default_forces_default_engine(tmp_path: Path) -> None:
+    from sqlalchemy import Column, Integer, MetaData, String, Table
+
+    from pydantable.engine import get_default_engine
+
+    db_path = tmp_path / "read_engine_mode_default.db"
+    cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
+    cm = ConnectionManager(cfg)
+    md = MetaData()
+    t = Table(
+        "items",
+        md,
+        Column("id", Integer, primary_key=True),
+        Column("label", String(20)),
+    )
+    md.create_all(cm.engine)
+
+    m = _MW.read_sql_table(t, sql_config=cfg, engine_mode="default")
+    assert m._df._engine is get_default_engine()
+
+
+def test_sql_dataframe_model_to_native_handoff(tmp_path: Path) -> None:
+    from sqlalchemy import Column, Integer, MetaData, String, Table, insert
+
+    db_path = tmp_path / "dfm_to_native.db"
+    cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
+    eng = sql_engine_from_config(cfg)
+    cm = ConnectionManager(cfg)
+    md = MetaData()
+    t = Table(
+        "items",
+        md,
+        Column("id", Integer, primary_key=True),
+        Column("label", String(20)),
+    )
+    md.create_all(cm.engine)
+    with cm.engine.connect() as conn:
+        conn.execute(insert(t).values(id=2, label="b"))
+        conn.commit()
+
+    m = _MW.read_sql_table(t, sql_engine=eng)
+    native = m.to_native()
+    out = native._df.with_columns(id2=native._df.id * 2).select("id2").to_dict()
+    assert out == {"id2": [4]}
+
+
+def test_to_sql_engine_dataframe_roundtrip(tmp_path: Path) -> None:
+    """Native frame → to_sql_engine (in-memory root) → SQL engine execution."""
+    from pydantable import DataFrame
+
+    db_path = tmp_path / "to_sql_engine.db"
+    cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
+
+    df = DataFrame[_W]({"id": [2, 1], "label": ["b", "a"]})
+    sql_df = df.to_sql_engine(sql_config=cfg)
+    assert sql_df.sort("id").to_dict() == {"id": [1, 2], "label": ["a", "b"]}
+
+
+def test_to_sql_engine_dataframe_model_roundtrip(tmp_path: Path) -> None:
+    from pydantable import DataFrameModel
+
+    class M(DataFrameModel):
+        id: int
+        label: str
+
+    db_path = tmp_path / "to_sql_engine_model.db"
+    cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
+
+    m = M({"id": [2, 1], "label": ["b", "a"]})
+    sql_m = m.to_sql_engine(sql_config=cfg)
+    # Keep the sort key in the projection: the SQL engine sorts over row dicts
+    # during execution, so dropping the key would be ambiguous.
+    out = sql_m.sort("id").select("id", "label").to_dict()
+    assert out == {"id": [1, 2], "label": ["a", "b"]}
+
+
+def test_multi_engine_workflow_sql_write_then_native(tmp_path: Path) -> None:
+    """Cookbook flow: SQL read → SQL write → SQL read → to_native → native transforms."""
+    from sqlalchemy import Column, Integer, MetaData, String, Table, insert
+
+    from pydantable.io.sql import write_sql_raw
+
+    db_path = tmp_path / "multi_engine.db"
+    cfg = EngineConfig(dsn=f"sqlite:///{db_path}")
+    eng = sql_engine_from_config(cfg)
+    cm = ConnectionManager(cfg)
+
+    md = MetaData()
+    src = Table(
+        "src_items",
+        md,
+        Column("id", Integer, primary_key=True),
+        Column("label", String(20)),
+    )
+    md.create_all(cm.engine)
+    with cm.engine.connect() as conn:
+        conn.execute(insert(src).values(id=2, label="b"))
+        conn.execute(insert(src).values(id=1, label="a"))
+        conn.commit()
+
+    df = SqlDataFrame[_W].from_sql_table(src, sql_engine=eng).sort("id")
+    cols = df.to_dict()
+    # SQL write path (I/O helper), then re-read as a lazy SQL root.
+    write_sql_raw(cols, "dst_items", cm.engine, if_exists="replace")
+
+    md2 = MetaData()
+    dst = Table("dst_items", md2, autoload_with=cm.engine)
+    df2 = SqlDataFrame[_W].from_sql_table(dst, sql_engine=eng)
+    native = df2.to_native()
+    out = native.with_columns(id2=native.id * 2).select("id2").to_dict()
+    assert out == {"id2": [2, 4]}
 
 @pytest.mark.asyncio
 async def test_sql_dataframe_model_async_chain_select(tmp_path: Path) -> None:

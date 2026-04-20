@@ -17,6 +17,7 @@ from typing import Any, Literal, cast
 
 from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
+from .engine import get_default_engine
 from .schema import field_types_for_rust, schema_field_types
 
 
@@ -48,6 +49,7 @@ def _resolve_sql_execution_engine(
     sql_engine: Any | None,
     moltres_engine: Any | None,
     engine: Any | None,
+    engine_mode: Literal["auto", "default"] = "auto",
 ) -> Any:
     if moltres_engine is not None:
         warnings.warn(
@@ -60,6 +62,8 @@ def _resolve_sql_execution_engine(
         sql_engine = moltres_engine
     if engine is not None:
         return engine
+    if engine_mode == "default":
+        return get_default_engine()
     if sql_engine is not None:
         return sql_engine
     if sql_config is not None:
@@ -85,6 +89,7 @@ class SqlDataFrame(DataFrame):
         sql_config: Any | None = None,
         sql_engine: Any | None = None,
         engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
         name: str = "root",
         **kwargs: Any,
     ) -> Any:
@@ -110,6 +115,7 @@ class SqlDataFrame(DataFrame):
             sql_engine=sql_engine,
             moltres_engine=moltres_engine,
             engine=engine,
+            engine_mode=engine_mode,
         )
         schema_type = cls._schema_type
         assert schema_type is not None
@@ -209,6 +215,7 @@ class SqlDataFrame(DataFrame):
         sql_config: Any | None = None,
         sql_engine: Any | None = None,
         engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
         name: str = "root",
         **kwargs: Any,
     ) -> Any:
@@ -241,6 +248,7 @@ class SqlDataFrame(DataFrame):
             sql_engine=sql_engine,
             moltres_engine=moltres_engine,
             engine=engine,
+            engine_mode=engine_mode,
         )
         root = SqlRootData(table=table, name=name)
         schema_type = cls._schema_type
@@ -272,6 +280,7 @@ class SqlDataFrame(DataFrame):
             "inherit", "coerce", "strict", "off"
         ] = "inherit",
         engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
         **kwargs: Any,
     ) -> None:
         moltres_engine = kwargs.pop("moltres_engine", None)
@@ -282,6 +291,7 @@ class SqlDataFrame(DataFrame):
             sql_engine=sql_engine,
             moltres_engine=moltres_engine,
             engine=engine,
+            engine_mode=engine_mode,
         )
         super().__init__(
             data,
@@ -312,6 +322,7 @@ class SqlDataFrameModel(DataFrameModel):
         on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
         validation_profile: str | None = None,
         engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
         **kwargs: Any,
     ) -> None:
         moltres_engine = kwargs.pop("moltres_engine", None)
@@ -322,6 +333,7 @@ class SqlDataFrameModel(DataFrameModel):
             sql_engine=sql_engine,
             moltres_engine=moltres_engine,
             engine=engine,
+            engine_mode=engine_mode,
         )
         super().__init__(
             data,
@@ -341,6 +353,7 @@ class SqlDataFrameModel(DataFrameModel):
         sql_config: Any | None = None,
         sql_engine: Any | None = None,
         engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
         name: str = "root",
         **kwargs: Any,
     ) -> Any:
@@ -356,6 +369,7 @@ class SqlDataFrameModel(DataFrameModel):
             sql_engine=sql_engine,
             moltres_engine=moltres_engine,
             engine=engine,
+            engine_mode=engine_mode,
             name=name,
         )
         return cls._wrap_inner_df(inner)

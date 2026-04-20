@@ -9,10 +9,11 @@ This facade mirrors :mod:`pydantable.sql_dataframe` and
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from .dataframe import DataFrame
 from .dataframe_model import DataFrameModel
+from .engine import get_default_engine
 from .expressions import Expr
 from .schema import field_types_for_rust, schema_field_types
 
@@ -98,7 +99,13 @@ class SparkDataFrame(DataFrame):
         return self.select(*names)
 
     @classmethod
-    def from_spark_dataframe(cls, df: Any, *, engine: Any | None = None) -> Any:
+    def from_spark_dataframe(
+        cls,
+        df: Any,
+        *,
+        engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
+    ) -> Any:
         """Lazy frame over an existing ``pyspark.sql.DataFrame`` root.
 
         Call on a concrete parametrized class, e.g.
@@ -109,7 +116,12 @@ class SparkDataFrame(DataFrame):
                 "Use SparkDataFrame[Schema].from_spark_dataframe(df) with a schema."
             )
         SparkExecutionEngine, SparkRoot = _import_spark_engine_types()
-        eng = engine if engine is not None else SparkExecutionEngine()
+        if engine is not None:
+            eng = engine
+        elif engine_mode == "default":
+            eng = get_default_engine()
+        else:
+            eng = SparkExecutionEngine()
         st = cls._schema_type
         assert st is not None
         fts = schema_field_types(st)
@@ -172,10 +184,18 @@ class SparkDataFrameModel(DataFrameModel):
         return self._wrap_inner_df(self._df.pandas_ui())
 
     @classmethod
-    def from_spark_dataframe(cls, df: Any, *, engine: Any | None = None) -> Any:
+    def from_spark_dataframe(
+        cls,
+        df: Any,
+        *,
+        engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
+    ) -> Any:
         cls._dfm_require_subclass_with_schema()
         dataframe_cls = cast("Any", cls._dataframe_cls)
-        inner = dataframe_cls[cls._SchemaModel].from_spark_dataframe(df, engine=engine)
+        inner = dataframe_cls[cls._SchemaModel].from_spark_dataframe(
+            df, engine=engine, engine_mode=engine_mode
+        )
         return cls._wrap_inner_df(inner)
 
 

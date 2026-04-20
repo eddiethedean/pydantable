@@ -3505,6 +3505,157 @@ class DataFrame(_DataFrameForGroupBy, Generic[SchemaT]):
         raw = self._apply_io_validation_if_configured(raw)
         return self._column_dict_in_schema_order(raw)
 
+    def to_engine(
+        self,
+        target_engine: Any,
+        *,
+        materialize: Literal["columns", "rows"] = "columns",
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> DataFrame[Any]:
+        """Materialize this frame and re-root it under *target_engine*.
+
+        This is the supported way to flow between backends (e.g. SQL → native):
+        plans are engine-defined, so switching engines is an explicit boundary.
+        """
+        if target_engine is None:
+            raise TypeError("to_engine(target_engine=...) requires a target engine.")
+
+        # Default to the columnar dict shape because it round-trips through the
+        # DataFrame constructor and keeps validation semantics consistent.
+        if materialize == "columns":
+            cols = self.to_dict(streaming=streaming, engine_streaming=engine_streaming)
+        elif materialize == "rows":
+            # Note: this path is primarily for ergonomic parity; columnar is the
+            # preferred materialization for engine handoff.
+            rows = cast("list[Any]", self.collect(streaming=streaming))
+            cols = {name: [] for name in self._current_field_types}
+            for r in rows:
+                if hasattr(r, "model_dump"):
+                    d = r.model_dump()
+                elif isinstance(r, dict):
+                    d = r
+                else:
+                    raise TypeError(
+                        "to_engine(materialize='rows') requires row objects that are "
+                        "Pydantic models or dicts."
+                    )
+                for name in cols:
+                    cols[name].append(d.get(name))
+        else:  # pragma: no cover
+            raise ValueError("to_engine(materialize=...) must be 'columns' or 'rows'.")
+
+        schema_t = self._current_schema_type
+        df_cls = DataFrame[schema_t]  # type: ignore[index]
+        return df_cls(
+            cols,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+            engine=target_engine,
+        )
+
+    def to_native(
+        self,
+        *,
+        materialize: Literal["columns", "rows"] = "columns",
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> DataFrame[Any]:
+        """Materialize and re-root under the native Rust/Polars engine."""
+        from pydantable.engine import NativePolarsEngine, get_default_engine
+        from pydantable._extension import MissingRustExtensionError
+
+        if NativePolarsEngine is None:
+            raise MissingRustExtensionError(
+                "Native execution is not installed. Reinstall `pydantable` "
+                "(it should pull `pydantable-native`)."
+            )
+        # Reuse the process-wide default native engine when it's already native
+        # (reduces extra engine allocations and keeps caches consistent).
+        default_eng = get_default_engine()
+        target = default_eng if isinstance(default_eng, NativePolarsEngine) else NativePolarsEngine()
+        return self.to_engine(
+            target,
+            materialize=materialize,
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
+    def to_sql_engine(
+        self,
+        *,
+        sql_config: Any | None = None,
+        sql_engine: Any | None = None,
+        engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
+        materialize: Literal["columns", "rows"] = "columns",
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Any:
+        """Materialize and re-root under the lazy-SQL execution engine.
+
+        Convenience helper for multi-engine workflows. This is equivalent to
+        materializing to columns and constructing a `SqlDataFrame[Schema](...)`
+        with the resolved SQL engine (or `engine_mode="default"`).
+        """
+        # Lazy import: keep optional `[sql]` stack out of import-time costs.
+        from pydantable.sql_dataframe import SqlDataFrame
+
+        schema_t = self._current_schema_type
+        df_cls = SqlDataFrame[schema_t]  # type: ignore[index]
+
+        if materialize == "columns":
+            cols = self.to_dict(streaming=streaming, engine_streaming=engine_streaming)
+        elif materialize == "rows":
+            rows = cast("list[Any]", self.collect(streaming=streaming))
+            cols = {name: [] for name in self._current_field_types}
+            for r in rows:
+                if hasattr(r, "model_dump"):
+                    d = r.model_dump()
+                elif isinstance(r, dict):
+                    d = r
+                else:
+                    raise TypeError(
+                        "to_sql_engine(materialize='rows') requires row objects that are "
+                        "Pydantic models or dicts."
+                    )
+                for name in cols:
+                    cols[name].append(d.get(name))
+        else:  # pragma: no cover
+            raise ValueError(
+                "to_sql_engine(materialize=...) must be 'columns' or 'rows'."
+            )
+
+        return df_cls(
+            cols,
+            sql_config=sql_config,
+            sql_engine=sql_engine,
+            engine=engine,
+            engine_mode=engine_mode,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+
     def null_count(self) -> dict[str, int]:
         """Count nulls per column (materializes via :meth:`to_dict`)."""
         d = self.to_dict()

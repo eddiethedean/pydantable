@@ -1982,6 +1982,82 @@ class DataFrameModel(Generic[RowT]):
     ) -> dict[str, list[Any]]:
         return self._df.to_dict(streaming=streaming, engine_streaming=engine_streaming)
 
+    def to_engine(
+        self,
+        target_engine: Any,
+        *,
+        materialize: Literal["columns", "rows"] = "columns",
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        inner = self._df.to_engine(
+            target_engine,
+            materialize=materialize,
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+        return self._from_dataframe(inner)
+
+    def to_native(
+        self,
+        *,
+        materialize: Literal["columns", "rows"] = "columns",
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        inner = self._df.to_native(
+            materialize=materialize,
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+        return self._from_dataframe(inner)
+
+    def to_sql_engine(
+        self,
+        *,
+        sql_config: Any | None = None,
+        sql_engine: Any | None = None,
+        engine: Any | None = None,
+        engine_mode: Literal["auto", "default"] = "auto",
+        materialize: Literal["columns", "rows"] = "columns",
+        streaming: bool | None = None,
+        engine_streaming: bool | None = None,
+        trusted_mode: Literal["off", "shape_only", "strict"] | None = None,
+        fill_missing_optional: bool = True,
+        ignore_errors: bool = False,
+        on_validation_errors: Callable[[list[dict[str, Any]]], None] | None = None,
+    ) -> Self:
+        inner = self._df.to_sql_engine(
+            sql_config=sql_config,
+            sql_engine=sql_engine,
+            engine=engine,
+            engine_mode=engine_mode,
+            materialize=materialize,
+            streaming=streaming,
+            engine_streaming=engine_streaming,
+            trusted_mode=trusted_mode,
+            fill_missing_optional=fill_missing_optional,
+            ignore_errors=ignore_errors,
+            on_validation_errors=on_validation_errors,
+        )
+        return self._from_dataframe(inner)
+
     def to_polars(
         self, *, streaming: bool | None = None, engine_streaming: bool | None = None
     ) -> Any:

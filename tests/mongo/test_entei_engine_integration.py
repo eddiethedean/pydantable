@@ -7,6 +7,7 @@ import asyncio
 import pydantable
 import pytest
 from pydantable import Schema
+from pydantable.engine import get_default_engine
 from pydantable.engine import NativePolarsEngine, native_engine_capabilities
 from pydantable.engine.protocols import ExecutionEngine, PlanExecutor, SinkWriter
 from pydantable.schema import field_types_for_rust, schema_field_types
@@ -73,6 +74,38 @@ def test_entei_rust_core_is_native_binding() -> None:
     entei = MongoPydantableEngine()
     native = NativePolarsEngine()
     assert entei.rust_core is native.rust_core
+
+
+def test_mongo_dataframe_engine_mode_default_forces_default_engine() -> None:
+    coll = mongomock.MongoClient().db.items
+    df = MongoDataFrame[Row].from_collection(coll, engine_mode="default")
+    assert df._engine is get_default_engine()
+
+
+def test_mongo_dataframe_explicit_engine_wins_over_engine_mode_default() -> None:
+    coll = mongomock.MongoClient().db.items
+    explicit = MongoPydantableEngine()
+    df = MongoDataFrame[Row].from_collection(
+        coll, engine=explicit, engine_mode="default"
+    )
+    assert df._engine is explicit
+
+
+def test_mongo_dataframe_model_engine_mode_default_forces_default_engine() -> None:
+    coll = mongomock.MongoClient().db.items
+    m = RowMongoModel.from_collection(coll, engine_mode="default")
+    assert m._df._engine is get_default_engine()
+
+
+def test_mongo_dataframe_model_to_native_handoff_allows_native_transforms() -> None:
+    client = mongomock.MongoClient()
+    coll = client.db.items
+    coll.insert_many([{"x": 1, "y": "a"}, {"x": 2, "y": "b"}])
+
+    m = RowMongoModel.from_collection(coll).select("x")
+    native = m.to_native()
+    out = native._df.with_columns(x2=native._df.x * 2).select("x2").to_dict()
+    assert out == {"x2": [2, 4]}
 
 
 def test_entei_async_flags_match_instance_methods() -> None:

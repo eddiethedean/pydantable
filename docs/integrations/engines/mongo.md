@@ -196,6 +196,13 @@ Optional **`fields=`** limits which document keys are read (defaults to all keys
 in the schema’s field map). Optional **`engine=`** reuses a single
 **`MongoPydantableEngine`** across many frames.
 
+`MongoDataFrame` / `MongoDataFrameModel` constructors also accept **`engine_mode="auto"|"default"`**:
+
+- **`"auto"`** (default): use the Mongo execution engine (`MongoPydantableEngine`).
+- **`"default"`**: force the process-wide default engine (`pydantable.engine.get_default_engine()`).
+
+To flow from a Mongo-backed lazy frame into local Rust-backed transforms, use **`to_native()`** / **`to_engine(...)`**.
+
 ### Typed-safe pushdown helpers (`match`, `project`)
 
 `MongoDataFrame` adds small engine-specific helpers for Mongo collection roots:

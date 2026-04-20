@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+### Added
+
+- **Engine selection policy (`engine_mode`)**: SQL/Mongo/Spark lazy constructors accept `engine_mode="auto"|"default"` so you can force use of the process-wide default engine (`"default"`) or keep the source-matching engine (`"auto"`). Explicit `engine=` still wins.
+- **Engine handoff helpers**: `DataFrame.to_engine(...)` and `DataFrame.to_native()` (plus `DataFrameModel` equivalents) materialize a frame and re-root it under a target engine for multi-engine workflows (e.g. SQL → native transforms → file sinks).
+
 ## [1.19.0] — 2026-04-20
 
 ### Added
