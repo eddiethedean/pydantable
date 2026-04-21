@@ -1,7 +1,40 @@
 //! Shared helpers to build Python `datetime`, `date`, `time`, and `timedelta` values from scalar
 //! encodings used across expression literals and Polars materialization.
+//!
+//! Type checks use ``isinstance`` against ``datetime`` module classes so the extension can be built
+//! with PyO3's **abi3** (limited API), where ``PyDateTime`` / ``PyDate`` / … are unavailable.
 
 use pyo3::prelude::*;
+use pyo3::types::PyAny;
+
+/// ``isinstance(obj, datetime.datetime)`` (abi3-safe).
+pub(crate) fn is_py_datetime(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<bool> {
+    let dt_mod = py.import("datetime")?;
+    let cls = dt_mod.getattr("datetime")?;
+    obj.is_instance(&cls)
+}
+
+/// Plain ``datetime.date`` instance, excluding ``datetime.datetime`` subclasses.
+pub(crate) fn is_py_date_only(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<bool> {
+    let dt_mod = py.import("datetime")?;
+    let date_cls = dt_mod.getattr("date")?;
+    let datetime_cls = dt_mod.getattr("datetime")?;
+    Ok(obj.is_instance(&date_cls)? && !obj.is_instance(&datetime_cls)?)
+}
+
+/// ``isinstance(obj, datetime.timedelta)``.
+pub(crate) fn is_py_timedelta(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<bool> {
+    let dt_mod = py.import("datetime")?;
+    let cls = dt_mod.getattr("timedelta")?;
+    obj.is_instance(&cls)
+}
+
+/// ``isinstance(obj, datetime.time)``.
+pub(crate) fn is_py_time(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<bool> {
+    let dt_mod = py.import("datetime")?;
+    let cls = dt_mod.getattr("time")?;
+    obj.is_instance(&cls)
+}
 
 pub(crate) fn micros_to_py_datetime(py: Python<'_>, micros: i64) -> PyResult<PyObject> {
     let dt_mod = py.import("datetime")?;

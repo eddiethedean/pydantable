@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Cursor;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyList, PyTime};
+use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
 
 use crate::dtype::{
     py_decimal_to_scaled_i128, py_enum_to_wire_string, scaled_i128_to_py_decimal, BaseType,

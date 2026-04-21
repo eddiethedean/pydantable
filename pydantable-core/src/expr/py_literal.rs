@@ -1,7 +1,9 @@
 //! Python literal parsing and operator symbol helpers.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyBytes, PyDate, PyDateTime, PyDelta, PyTime};
+use pyo3::types::{PyAny, PyBytes};
+
+use crate::py_datetime::{is_py_date_only, is_py_datetime, is_py_time, is_py_timedelta};
 use pyo3::IntoPyObjectExt;
 
 use crate::dtype::{
@@ -110,35 +112,55 @@ impl ExprHandle {
                 base: Some(BaseType::DateTime),
                 ..
             } => {
-                let dt = value.downcast::<PyDateTime>()?;
-                let secs: f64 = dt.call_method0("timestamp")?.extract()?;
+                let py = value.py();
+                if !is_py_datetime(py, value)? {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "expected datetime.datetime",
+                    ));
+                }
+                let secs: f64 = value.call_method0("timestamp")?.extract()?;
                 LiteralValue::DateTimeMicros((secs * 1_000_000.0).round() as i64)
             }
             crate::dtype::DTypeDesc::Scalar {
                 base: Some(BaseType::Date),
                 ..
             } => {
-                let d = value.downcast::<PyDate>()?;
-                let ordinal: i32 = d.call_method0("toordinal")?.extract()?;
+                let py = value.py();
+                if !is_py_date_only(py, value)? {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "expected datetime.date (not datetime)",
+                    ));
+                }
+                let ordinal: i32 = value.call_method0("toordinal")?.extract()?;
                 LiteralValue::DateDays(ordinal - 719_163)
             }
             crate::dtype::DTypeDesc::Scalar {
                 base: Some(BaseType::Duration),
                 ..
             } => {
-                let td = value.downcast::<PyDelta>()?;
-                let secs: f64 = td.call_method0("total_seconds")?.extract()?;
+                let py = value.py();
+                if !is_py_timedelta(py, value)? {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "expected datetime.timedelta",
+                    ));
+                }
+                let secs: f64 = value.call_method0("total_seconds")?.extract()?;
                 LiteralValue::DurationMicros((secs * 1_000_000.0).round() as i64)
             }
             crate::dtype::DTypeDesc::Scalar {
                 base: Some(BaseType::Time),
                 ..
             } => {
-                let t = value.downcast::<PyTime>()?;
-                let h: i64 = t.getattr("hour")?.extract()?;
-                let m: i64 = t.getattr("minute")?.extract()?;
-                let s: i64 = t.getattr("second")?.extract()?;
-                let micro: i64 = t.getattr("microsecond")?.extract()?;
+                let py = value.py();
+                if !is_py_time(py, value)? {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "expected datetime.time",
+                    ));
+                }
+                let h: i64 = value.getattr("hour")?.extract()?;
+                let m: i64 = value.getattr("minute")?.extract()?;
+                let s: i64 = value.getattr("second")?.extract()?;
+                let micro: i64 = value.getattr("microsecond")?.extract()?;
                 let ns = ((h * 3600 + m * 60 + s) * 1_000_000_000i64) + micro * 1000;
                 LiteralValue::TimeNanos(ns)
             }

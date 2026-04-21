@@ -3,9 +3,10 @@
 use std::collections::HashMap;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyList, PyTime};
+use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
 
 use crate::dtype::{py_decimal_to_scaled_i128, py_enum_to_wire_string, BaseType, DTypeDesc};
+use crate::py_datetime::{is_py_date_only, is_py_datetime, is_py_time, is_py_timedelta};
 use crate::expr::LiteralValue;
 
 #[cfg(not(feature = "polars_engine"))]
@@ -19,7 +20,7 @@ pub(crate) fn ctx_len(ctx: &HashMap<String, Vec<Option<LiteralValue>>>) -> PyRes
 
 #[cfg(not(feature = "polars_engine"))]
 pub fn root_data_to_ctx(
-    _py: Python<'_>,
+    py: Python<'_>,
     root_schema: &HashMap<String, DTypeDesc>,
     root_data: &Bound<'_, PyAny>,
 ) -> PyResult<HashMap<String, Vec<Option<LiteralValue>>>> {
@@ -104,35 +105,51 @@ pub fn root_data_to_ctx(
                         base: Some(BaseType::DateTime),
                         ..
                     } => {
-                        let dt = item.downcast::<PyDateTime>()?;
-                        let secs: f64 = dt.call_method0("timestamp")?.extract()?;
+                        if !is_py_datetime(py, &item)? {
+                            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                "expected datetime.datetime",
+                            ));
+                        }
+                        let secs: f64 = item.call_method0("timestamp")?.extract()?;
                         LiteralValue::DateTimeMicros((secs * 1_000_000.0).round() as i64)
                     }
                     DTypeDesc::Scalar {
                         base: Some(BaseType::Date),
                         ..
                     } => {
-                        let d = item.downcast::<PyDate>()?;
-                        let ordinal: i32 = d.call_method0("toordinal")?.extract()?;
+                        if !is_py_date_only(py, &item)? {
+                            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                "expected datetime.date (not datetime)",
+                            ));
+                        }
+                        let ordinal: i32 = item.call_method0("toordinal")?.extract()?;
                         LiteralValue::DateDays(ordinal - 719_163)
                     }
                     DTypeDesc::Scalar {
                         base: Some(BaseType::Duration),
                         ..
                     } => {
-                        let td = item.downcast::<PyDelta>()?;
-                        let secs: f64 = td.call_method0("total_seconds")?.extract()?;
+                        if !is_py_timedelta(py, &item)? {
+                            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                "expected datetime.timedelta",
+                            ));
+                        }
+                        let secs: f64 = item.call_method0("total_seconds")?.extract()?;
                         LiteralValue::DurationMicros((secs * 1_000_000.0).round() as i64)
                     }
                     DTypeDesc::Scalar {
                         base: Some(BaseType::Time),
                         ..
                     } => {
-                        let t = item.downcast::<PyTime>()?;
-                        let h: i64 = t.getattr("hour")?.extract()?;
-                        let m: i64 = t.getattr("minute")?.extract()?;
-                        let s: i64 = t.getattr("second")?.extract()?;
-                        let micro: i64 = t.getattr("microsecond")?.extract()?;
+                        if !is_py_time(py, &item)? {
+                            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                                "expected datetime.time",
+                            ));
+                        }
+                        let h: i64 = item.getattr("hour")?.extract()?;
+                        let m: i64 = item.getattr("minute")?.extract()?;
+                        let s: i64 = item.getattr("second")?.extract()?;
+                        let micro: i64 = item.getattr("microsecond")?.extract()?;
                         let nanos = ((h * 3600 + m * 60 + s) * 1_000_000_000) + micro * 1000;
                         LiteralValue::TimeNanos(nanos)
                     }

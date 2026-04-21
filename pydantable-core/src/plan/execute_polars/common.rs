@@ -6,7 +6,9 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Cursor;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyList, PyTime};
+use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
+
+use crate::py_datetime::{is_py_date_only, is_py_datetime, is_py_time, is_py_timedelta};
 use pyo3::IntoPyObjectExt;
 
 use crate::dtype::{
@@ -171,22 +173,37 @@ fn try_python_polars_dataframe_to_native(
 
 #[cfg(feature = "polars_engine")]
 pub(super) fn py_datetime_to_micros(item: &Bound<'_, PyAny>) -> PyResult<i64> {
-    let dt = item.downcast::<PyDateTime>()?;
-    let secs: f64 = dt.call_method0("timestamp")?.extract()?;
+    let py = item.py();
+    if !is_py_datetime(py, item)? {
+        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "expected datetime.datetime",
+        ));
+    }
+    let secs: f64 = item.call_method0("timestamp")?.extract()?;
     Ok((secs * 1_000_000.0).round() as i64)
 }
 
 #[cfg(feature = "polars_engine")]
 pub(super) fn py_date_to_days(item: &Bound<'_, PyAny>) -> PyResult<i32> {
-    let d = item.downcast::<PyDate>()?;
-    let ordinal: i32 = d.call_method0("toordinal")?.extract()?;
+    let py = item.py();
+    if !is_py_date_only(py, item)? {
+        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "expected datetime.date (not datetime)",
+        ));
+    }
+    let ordinal: i32 = item.call_method0("toordinal")?.extract()?;
     Ok(ordinal - 719_163)
 }
 
 #[cfg(feature = "polars_engine")]
 pub(super) fn py_timedelta_to_micros(item: &Bound<'_, PyAny>) -> PyResult<i64> {
-    let td = item.downcast::<PyDelta>()?;
-    let secs: f64 = td.call_method0("total_seconds")?.extract()?;
+    let py = item.py();
+    if !is_py_timedelta(py, item)? {
+        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "expected datetime.timedelta",
+        ));
+    }
+    let secs: f64 = item.call_method0("total_seconds")?.extract()?;
     Ok((secs * 1_000_000.0).round() as i64)
 }
 
@@ -197,11 +214,16 @@ pub(super) use crate::py_datetime::{
 
 #[cfg(feature = "polars_engine")]
 pub(super) fn py_time_to_nanos(item: &Bound<'_, PyAny>) -> PyResult<i64> {
-    let t = item.downcast::<PyTime>()?;
-    let h: i64 = t.getattr("hour")?.extract()?;
-    let m: i64 = t.getattr("minute")?.extract()?;
-    let s: i64 = t.getattr("second")?.extract()?;
-    let micro: i64 = t.getattr("microsecond")?.extract()?;
+    let py = item.py();
+    if !is_py_time(py, item)? {
+        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "expected datetime.time",
+        ));
+    }
+    let h: i64 = item.getattr("hour")?.extract()?;
+    let m: i64 = item.getattr("minute")?.extract()?;
+    let s: i64 = item.getattr("second")?.extract()?;
+    let micro: i64 = item.getattr("microsecond")?.extract()?;
     Ok(((h * 3600 + m * 60 + s) * 1_000_000_000) + micro * 1000)
 }
 

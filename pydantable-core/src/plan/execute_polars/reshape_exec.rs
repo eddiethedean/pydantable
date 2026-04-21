@@ -6,11 +6,9 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Cursor;
 
 use pyo3::prelude::*;
-use pyo3::types::{
-    PyAny, PyBool, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFloat, PyInt, PyList, PyString,
-    PyTime,
-};
+use pyo3::types::{PyAny, PyBool, PyBytes, PyDict, PyFloat, PyInt, PyList, PyString};
 
+use crate::py_datetime::{is_py_date_only, is_py_datetime, is_py_time, is_py_timedelta};
 use crate::dtype::{
     py_decimal_to_scaled_i128, py_enum_to_wire_string, scaled_i128_to_py_decimal, BaseType,
     DTypeDesc, DECIMAL_PRECISION, DECIMAL_SCALE,
@@ -282,23 +280,23 @@ pub fn execute_pivot_polars(
         {
             return py_enum_to_wire_string(value);
         }
-        if let Ok(dt) = value.downcast::<PyDateTime>() {
-            let secs: f64 = dt.call_method0("timestamp")?.extract()?;
+        if is_py_datetime(py, value)? {
+            let secs: f64 = value.call_method0("timestamp")?.extract()?;
             return Ok(((secs * 1_000_000.0).round() as i64).to_string());
         }
-        if let Ok(d) = value.downcast::<PyDate>() {
-            let ordinal: i32 = d.call_method0("toordinal")?.extract()?;
+        if is_py_date_only(py, value)? {
+            let ordinal: i32 = value.call_method0("toordinal")?.extract()?;
             return Ok((ordinal - 719_163).to_string());
         }
-        if let Ok(td) = value.downcast::<PyDelta>() {
-            let secs: f64 = td.call_method0("total_seconds")?.extract()?;
+        if is_py_timedelta(py, value)? {
+            let secs: f64 = value.call_method0("total_seconds")?.extract()?;
             return Ok(((secs * 1_000_000.0).round() as i64).to_string());
         }
-        if let Ok(t) = value.downcast::<PyTime>() {
-            let h: i64 = t.getattr("hour")?.extract()?;
-            let m: i64 = t.getattr("minute")?.extract()?;
-            let s: i64 = t.getattr("second")?.extract()?;
-            let micro: i64 = t.getattr("microsecond")?.extract()?;
+        if is_py_time(py, value)? {
+            let h: i64 = value.getattr("hour")?.extract()?;
+            let m: i64 = value.getattr("minute")?.extract()?;
+            let s: i64 = value.getattr("second")?.extract()?;
+            let micro: i64 = value.getattr("microsecond")?.extract()?;
             let ns = ((h * 3600 + m * 60 + s) * 1_000_000_000i64) + micro * 1000;
             return Ok(ns.to_string());
         }
@@ -524,22 +522,22 @@ fn py_index_value_to_seconds(item: &Bound<'_, PyAny>) -> PyResult<f64> {
             "group_by_dynamic index column must be time-like or numeric.",
         ));
     }
-    if let Ok(dt) = item.downcast::<PyDateTime>() {
-        let secs: f64 = dt.call_method0("timestamp")?.extract()?;
+    let py = item.py();
+    if is_py_datetime(py, item)? {
+        let secs: f64 = item.call_method0("timestamp")?.extract()?;
         return Ok(secs);
     }
-    if let Ok(d) = item.downcast::<PyDate>() {
-        let py = item.py();
+    if is_py_date_only(py, item)? {
         let dt_mod = py.import("datetime")?;
         let datetime = dt_mod.getattr("datetime")?;
         let combine = datetime.getattr("combine")?;
         let min_time = datetime.getattr("min")?.getattr("time")?;
-        let dt_obj = combine.call1((d, min_time))?;
+        let dt_obj = combine.call1((item, min_time))?;
         let secs: f64 = dt_obj.call_method0("timestamp")?.extract()?;
         return Ok(secs);
     }
-    if let Ok(td) = item.downcast::<PyDelta>() {
-        let secs: f64 = td.call_method0("total_seconds")?.extract()?;
+    if is_py_timedelta(py, item)? {
+        let secs: f64 = item.call_method0("total_seconds")?.extract()?;
         return Ok(secs);
     }
     if let Ok(i) = item.extract::<i64>() {

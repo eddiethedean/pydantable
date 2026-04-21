@@ -85,9 +85,10 @@ jobs:
           working-directory: pydantable-native
           target: x86_64-unknown-linux-gnu
           command: build
+          # ``abi3`` (``pydantable-core``): one ``cp39-abi3`` wheel per platform; one interpreter is enough.
           args: >-
             --release --sdist --compatibility pypi -o ../dist
-            -i python3.10 -i python3.11 -i python3.12 -i python3.13
+            -i python3.9
           manylinux: "2_17"
 
       - name: Publish to PyPI (twine)
@@ -114,7 +115,7 @@ jobs:
           command: build
           args: >-
             --release --compatibility pypi -o ../dist
-            -i python3.10 -i python3.11 -i python3.12 -i python3.13
+            -i python3.9
           manylinux: "2_28"
 
       - name: Publish to PyPI (twine)
@@ -145,7 +146,7 @@ jobs:
           command: build
           args: >-
             --release --compatibility pypi
-            -i 3.10 -i 3.11 -i 3.12 -i 3.13 -o ../dist
+            -i 3.9 -o ../dist
 
       - name: Publish to PyPI (twine)
         shell: bash
@@ -176,7 +177,7 @@ jobs:
           command: build
           args: >-
             --release --zig --compatibility musllinux_1_2 -o ../dist
-            -i python3.10 -i python3.11 -i python3.12 -i python3.13
+            -i python3.9
 
       - name: Publish to PyPI (twine)
         shell: bash
@@ -207,7 +208,7 @@ jobs:
           command: build
           args: >-
             --release --zig --compatibility musllinux_1_2 -o ../dist
-            -i python3.10 -i python3.11 -i python3.12 -i python3.13
+            -i python3.9
 
       - name: Publish to PyPI (twine)
         shell: bash
@@ -219,20 +220,16 @@ jobs:
           python -m twine upload --skip-existing dist/pydantable_native-*.whl
 
   publish-pypi-windows-x86_64:
-    name: PyPI Windows x86_64 py${{ matrix.python-version }} (pydantable-native)
+    name: PyPI Windows x86_64 (pydantable-native, cp39-abi3)
     runs-on: windows-latest
     needs: [shared-ci, publish-pypi-protocol]
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.9"
 
       - name: Build wheels (maturin)
         uses: PyO3/maturin-action@v1
@@ -251,22 +248,18 @@ jobs:
           python -m pip install --upgrade pip "twine>=5,<6" "pkginfo>=1.12.1.2"
           python -m twine upload --skip-existing dist/pydantable_native-*.whl
 
-  # ``actions/setup-python`` does not ship CPython 3.10 for Windows ARM64 (see versions-manifest).
+  # ``actions/setup-python`` does not ship CPython 3.9/3.10 for Windows ARM64 (see versions-manifest).
   publish-pypi-windows-arm64:
-    name: PyPI Windows aarch64 py${{ matrix.python-version }} (pydantable-native)
+    name: PyPI Windows aarch64 (pydantable-native, cp39-abi3)
     runs-on: windows-11-arm
     needs: [shared-ci, publish-pypi-protocol]
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
 
       - name: Build wheels (maturin)
         uses: PyO3/maturin-action@v1

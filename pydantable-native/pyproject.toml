@@ -8,7 +8,7 @@ version = "2.0.0"
 description = "Native execution engine for pydantable (Rust + Polars)."
 readme = "README.md"
 license = { text = "MIT" }
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 dependencies = [
   "pydantable-protocol==2.0.0",
 ]
@@ -17,6 +17,8 @@ dependencies = [
 manifest-path = "../pydantable-core/Cargo.toml"
 module-name = "pydantable_native._core"
 python-source = "python"
+# PyO3 ``abi3-py39`` is enabled on the ``pyo3`` dependency in ``pydantable-core/Cargo.toml``.
+# ``pyo3/extension-module`` is enabled here so wheel builds use extension-module linking.
 features = ["pyo3/extension-module", "polars_engine"]
 include = [
   "python/pydantable_native/py.typed",

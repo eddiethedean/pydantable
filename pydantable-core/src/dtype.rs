@@ -1,8 +1,7 @@
 use pyo3::prelude::*;
-use pyo3::types::{
-    PyAny, PyBool, PyBytes, PyDate, PyDateTime, PyDelta, PyFloat, PyInt, PyString, PyTime, PyTuple,
-    PyType,
-};
+use pyo3::types::{PyAny, PyBool, PyBytes, PyFloat, PyInt, PyString, PyTuple, PyType};
+
+use crate::py_datetime::{is_py_date_only, is_py_datetime, is_py_time, is_py_timedelta};
 use pyo3::IntoPyObjectExt;
 
 /// Polars precision for [`BaseType::Decimal`] columns and literals.
@@ -740,16 +739,16 @@ pub fn py_value_to_dtype(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<D
     {
         return Ok(DTypeDesc::non_nullable(BaseType::Enum));
     }
-    if value.downcast::<PyDateTime>().is_ok() {
+    if is_py_datetime(py, value)? {
         return Ok(DTypeDesc::non_nullable(BaseType::DateTime));
     }
-    if value.downcast::<PyDate>().is_ok() {
+    if is_py_date_only(py, value)? {
         return Ok(DTypeDesc::non_nullable(BaseType::Date));
     }
-    if value.downcast::<PyDelta>().is_ok() {
+    if is_py_timedelta(py, value)? {
         return Ok(DTypeDesc::non_nullable(BaseType::Duration));
     }
-    if value.downcast::<PyTime>().is_ok() {
+    if is_py_time(py, value)? {
         return Ok(DTypeDesc::non_nullable(BaseType::Time));
     }
     let ip_mod = py.import("ipaddress")?;
