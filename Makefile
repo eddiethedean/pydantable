@@ -3,7 +3,7 @@
 #
 # Quick start (from repo root, with a venv activated or ``.venv`` present):
 #   make dev-setup              # protocol + maturin develop + editable pydantable
-#   make install-dev            # same as dev-setup but with pip install -e ".[dev]"
+#   make install-dev            # dev-setup + ".[dev]" + engine bridges (--no-deps) + pyspark
 #
 # Or step by step:
 #   pip install -e ./pydantable-protocol && make native-develop && pip install -e .
@@ -130,7 +130,7 @@ help:
 	@echo ""
 	@echo "Setup:"
 	@echo "  dev-setup          Install protocol, build native (release), pip install -e ."
-	@echo "  install-dev        Like dev-setup but pip install -e \".[dev]\""
+	@echo "  install-dev        Like dev-setup + \".[dev]\" + bridges (--no-deps) + pyspark"
 	@echo "  install-editable   pip install -e protocol + root package (no Rust build)"
 	@echo "  native-develop     pip install -e protocol + maturin develop --release"
 	@echo "  native-develop-fast  maturin develop without --release (faster iteration)"
@@ -150,8 +150,12 @@ install-editable:
 dev-setup: native-develop install-editable
 
 # Same as dev-setup but with test/lint/docs extras from pyproject.toml.
+# Engine bridges are installed with --no-deps (PyPI metadata caps pydantable-protocol<2).
 install-dev: native-develop
 	$(PYTHON) -m pip install -q -e ".[dev]"
+	$(PYTHON) -m pip install -q --no-deps \
+		"moltres-core>=1.0.0,<2" "entei-core>=0.2.0,<0.3" "raikou-core==0.1.0"
+	$(PYTHON) -m pip install -q "pyspark>=3.4,<4"
 
 native-develop:
 	$(PYTHON) -m pip install -q "maturin>=1.4,<2.0"

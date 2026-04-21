@@ -50,11 +50,19 @@ Optional extras:
 pip install "pydantable[polars]"   # to_polars
 pip install "pydantable[arrow]"    # to_arrow / Arrow constructors
 pip install "pydantable[io]"       # full file I/O convenience (arrow + polars)
-pip install "pydantable[sql]"      # SQLModel + SQLAlchemy + moltres-core lazy SqlDataFrame; add a DB-API driver for your URL
+pip install "pydantable[sql]"      # SQLModel + SQLAlchemy (+ greenlet); add a DB-API driver for your URL
 pip install "pydantable[pandas]"   # pandas-flavored façade (pandas UI doc)
 pip install "pydantable[fastapi]"  # FastAPI integration (pydantable.fastapi)
-pip install "pydantable[mongo]"    # pymongo + Beanie + Mongo plan stack (lazy MongoDataFrame + I/O + from_beanie)
-pip install "pydantable[spark]"    # SparkDataFrame / SparkDataFrameModel (raikou-core + pyspark + sparkdantic)
+pip install "pydantable[mongo]"    # pymongo + Beanie (lazy Mongo engines need entei-core — see below)
+pip install "pydantable[spark]"    # pyspark + sparkdantic (Spark bridge needs raikou-core — see below)
+```
+
+**Lazy engine bridges (SQL / Mongo / Spark):** PyPI releases of `moltres-core`, `entei-core`, and `raikou-core` still declare `pydantable-protocol<2`, while pydantable 2.x depends on **pydantable-protocol 2.x**. Until those packages publish compatible pins, install them **after** pydantable with `--no-deps` so pip does not reject the stack:
+
+```bash
+pip install "pydantable[sql]"   # or [mongo] / [spark] as needed
+pip install --no-deps \
+  "moltres-core>=1.0.0,<2" "entei-core>=0.2.0,<0.3" "raikou-core==0.1.0"
 ```
 
 ## Quick start

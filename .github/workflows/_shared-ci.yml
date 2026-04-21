@@ -121,6 +121,10 @@ jobs:
           .venv/bin/python -m pip install -e ./pydantable-protocol
           (cd pydantable-native && ../.venv/bin/python -m maturin develop --release)
           .venv/bin/python -m pip install -e ".[docs]"
+          # Engine bridges on PyPI still declare ``pydantable-protocol<2``; pydantable 2.x
+          # needs protocol 2.x — install bridges without pulling their protocol pin.
+          .venv/bin/python -m pip install --no-deps \
+            "moltres-core>=1.0.0,<2" "entei-core>=0.2.0,<0.3" "raikou-core==0.1.0"
 
       - name: Build docs (warnings as errors)
         env:
@@ -396,14 +400,18 @@ jobs:
           fi
 
       # Use ``[dev]`` from ``pyproject.toml`` so CI matches local ``make install-dev`` / ``pip install -e ".[dev]"``.
-      # JVM Spark engine tests also need ``raikou-core`` + ``pyspark`` (not listed in ``[dev]``).
+      # Engine bridges (moltres / entei / raikou) are installed with ``--no-deps`` because PyPI metadata
+      # still caps ``pydantable-protocol<2`` while pydantable 2.x requires protocol 2.x.
       - name: Install maturin, native extension, and dev test dependencies
         run: |
           $PY -m pip install -U pip
           $PY -m pip install "maturin>=1.4,<2.0"
           $PY -m pip install -e ./pydantable-protocol
           (cd pydantable-native && $PY -m maturin develop --release)
-          $PY -m pip install -e ".[dev]" "raikou-core==0.1.0" "pyspark>=3.4,<4"
+          $PY -m pip install -e ".[dev]"
+          $PY -m pip install --no-deps \
+            "moltres-core>=1.0.0,<2" "entei-core>=0.2.0,<0.3" "raikou-core==0.1.0"
+          $PY -m pip install "pyspark>=3.4,<4"
         env:
           VIRTUAL_ENV: ${{ github.workspace }}/.venv
 
@@ -485,7 +493,10 @@ jobs:
           $PY -m pip install "maturin>=1.4,<2.0"
           $PY -m pip install -e ./pydantable-protocol
           (cd pydantable-native && $PY -m maturin develop --release)
-          $PY -m pip install -e ".[dev]" "raikou-core==0.1.0" "pyspark>=3.4,<4"
+          $PY -m pip install -e ".[dev]"
+          $PY -m pip install --no-deps \
+            "moltres-core>=1.0.0,<2" "entei-core>=0.2.0,<0.3" "raikou-core==0.1.0"
+          $PY -m pip install "pyspark>=3.4,<4"
         env:
           VIRTUAL_ENV: ${{ github.workspace }}/.venv
 

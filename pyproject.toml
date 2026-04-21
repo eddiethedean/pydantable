@@ -32,10 +32,11 @@ io = ["pyarrow>=14.0", "polars>=1.0.0,<2"]
 # fetch_sqlmodel / iter_sqlmodel require SQLModel. Same extra includes lazy ``SqlDataFrame`` /
 # ``SqlDataFrameModel`` (moltres-core bridge) + ``greenlet`` for SQLAlchemy async helpers.
 # Install DB-API drivers for your URLs separately (``psycopg``, ``aiosqlite``, optional ``rapsqlite``, …).
+# ``moltres-core`` is installed separately (see README): PyPI still caps
+# ``pydantable-protocol<2`` while pydantable 2.x requires protocol 2.x.
 sql = [
     "sqlalchemy>=2.0,<3",
     "sqlmodel>=0.0.22,<0.1",
-    "moltres-core>=1.0.0,<2",
     "greenlet>=3.0",
 ]
 cloud = ["fsspec>=2023.0"]
@@ -46,12 +47,11 @@ snowflake = ["snowflake-connector-python>=3.0"]
 rap = ["rapcsv>=0.2", "rapfiles>=0.1", "rapsqlite>=0.1"]
 # FastAPI integration helpers (pydantable.fastapi); optional at runtime.
 fastapi = ["fastapi>=0.100"]
-# MongoDB: PyMongo + Beanie + optional Mongo plan roots (``sync_pymongo_collection``, ``MongoDataFrame.from_beanie``).
-mongo = ["entei-core>=0.2.0,<0.3", "pymongo>=4.6", "beanie>=1.24,<3"]
-# Spark: `SparkDataFrame` / `SparkDataFrameModel` (raikou-core bridge) + SparkDantic schemas.
+# MongoDB: PyMongo + Beanie. Install ``entei-core`` separately (see README) for lazy Mongo engines.
+mongo = ["pymongo>=4.6", "beanie>=1.24,<3"]
+# Spark: PySpark + SparkDantic. Install ``raikou-core`` separately (see README) for the bridge.
 # NOTE: Spark 4.x requires newer Java; we pin <4 for broad compatibility.
 spark = [
-    "raikou-core==0.1.0",
     "pyspark>=3.4,<4",
     "sparkdantic>=2.0,<3",
 ]
@@ -94,12 +94,8 @@ dev = [
     "rapfiles>=0.1",
     "rapsqlite>=0.1",
     "snowflake-connector-python>=3.0",
-    # Mongo: entei-core + pymongo (``tests/mongo/``; same pin as ``[mongo]``).
-    "entei-core>=0.2.0,<0.3",
     # Beanie — bundled in ``[mongo]``; listed for dev installs that do not use ``-e ".[mongo]"``.
     "beanie>=1.24,<3",
-    # SqlDataFrame / SqlDataFrameModel tests (same pin as optional ``[sql]``).
-    "moltres-core>=1.0.0,<2",
     # SQLAlchemy ``create_async_engine`` (rapsqlite smoke test in ``tests/sql/test_sql_moltres.py``).
     "greenlet>=3.0",
     # SparkDantic (same pin as optional ``[spark]``); JVM schema helpers in ``pydantable.pyspark.sparkdantic``.
@@ -120,12 +116,10 @@ docs = [
     # SQLAlchemy forward refs on DataFrameModel I/O methods (matches CI docs job and RTD).
     "sqlalchemy>=2.0,<3",
     "sqlmodel>=0.0.22,<0.1",
-    # Mongo modules (``mongo_dataframe`` / ``mongo_dataframe_engine`` / ``mongo_beanie``) for mkdocstrings (CI ``docs`` job and RTD; same pins as ``[mongo]``).
-    "entei-core>=0.2.0,<0.3",
+    # Mongo modules (``mongo_dataframe`` / …) for mkdocstrings — ``entei-core`` is installed in CI with ``--no-deps`` (see ``_shared-ci.yml``).
     "pymongo>=4.6",
     "beanie>=1.24,<3",
-    # Spark modules (``spark_dataframe``) for mkdocstrings / RTD imports (same pins as ``[spark]``).
-    "raikou-core==0.1.0",
+    # Spark modules for mkdocstrings / RTD — ``raikou-core`` is installed in CI with ``--no-deps``.
     "pyspark>=3.4,<4",
     "sparkdantic>=2.0,<3",
 ]
