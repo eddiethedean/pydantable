@@ -11,7 +11,6 @@ from typing import IO, TYPE_CHECKING, Any, BinaryIO, TextIO
 from .batches import ensure_rectangular
 
 if TYPE_CHECKING:
-    from _csv import _writer as _CsvWriter
     from collections.abc import Iterable
 
 _PathLike = str | Path
@@ -60,7 +59,7 @@ def write_csv_batches(
             )
         return
 
-    writer: _CsvWriter | None = None
+    writer = None
     header: list[str] | None = None
     first = True
     for batch in batches:

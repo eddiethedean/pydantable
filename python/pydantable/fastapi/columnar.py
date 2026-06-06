@@ -262,5 +262,5 @@ def rows_dependency(
         )
 
     # Dynamic annotation uses runtime ``row_model`` (not a static type alias).
-    dep.__annotations__ = {"rows": list[row_model], "return": model_cls}  # type: ignore[valid-type]
+    dep.__annotations__ = {"rows": list[row_model], "return": model_cls}  # type: ignore[valid-type]  # ty: ignore[invalid-type-form]
     return dep
