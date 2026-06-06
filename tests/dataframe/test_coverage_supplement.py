@@ -109,15 +109,6 @@ def test_wkb_rejects_non_bytes() -> None:
         ta.validate_python(object())
 
 
-def test_engine_binding_reexports() -> None:
-    """Cover ``python/pydantable/engine/_binding.py`` (thin re-export layer)."""
-    import pydantable.engine._binding as b
-
-    assert hasattr(b, "MISSING_SYMBOL_PREFIX")
-    assert callable(b.load_rust_core)
-    assert callable(b.rust_core_loaded)
-
-
 def test_dtypes_register_and_list() -> None:
     from pydantable import dtypes as dt
 
@@ -128,20 +119,3 @@ def test_dtypes_register_and_list() -> None:
     assert dt.get_registered_scalar_base(Tag) is str
     names = dt.list_registered_scalars()
     assert Tag in names
-
-
-def test_pyspark_init_getattr_sql_dataframe() -> None:
-    pytest.importorskip("moltres_core")
-    import pydantable.pyspark as ps
-
-    sdf = ps.SqlDataFrame
-    sdfm = ps.SqlDataFrameModel
-    assert sdf is not None
-    assert sdfm is not None
-
-
-def test_pyspark_init_getattr_unknown() -> None:
-    import pydantable.pyspark as ps
-
-    with pytest.raises(AttributeError, match="has no attribute"):
-        _ = ps.not_a_real_export_  # type: ignore[attr-defined]

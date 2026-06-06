@@ -22,6 +22,11 @@ class N(Schema):
     s: str
 
 
+class OptFlag(Schema):
+    flag: bool | None
+    s: str
+
+
 def test_expr_repr_truncates_large_ast() -> None:
     class _HugeAst:
         dtype = "bool"
@@ -57,14 +62,16 @@ def test_expr_over_with_no_partition_or_order_is_identity_in_pipeline() -> None:
     assert out["same"] == [True]
 
 
-def test_logical_rand_ror_and_invert() -> None:
-    df = DataFrame[R]({"flag": [True, False], "s": ["a", "b"]})
-    a = True & df.flag
-    b = df.flag & True
-    c = False | df.flag
-    d = df.flag | False
-    e = ~df.flag
-    assert all(isinstance(x, Expr) for x in (a, b, c, d, e))
+def test_logical_ops_materialize_kleene_values() -> None:
+    df = DataFrame[OptFlag]({"flag": [True, False, None], "s": ["a", "b", "c"]})
+    out = df.with_columns(
+        and_true=df.flag & True,
+        or_false=df.flag | False,
+        inv=~df.flag,
+    ).collect(as_lists=True)
+    assert out["and_true"] == [True, False, None]
+    assert out["or_false"] == [True, False, None]
+    assert out["inv"] == [False, True, None]
 
 
 def test_when_chain_type_errors() -> None:

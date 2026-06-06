@@ -23,8 +23,13 @@ def test_mongo_dataframe_match_pushdown_filters_documents() -> None:
         ]
     )
     df = MongoDataFrame[Row].from_collection(coll, fields=["id", "label"])
-    out = df.match({"id": 2}).to_dict()
-    assert out == {"id": [2], "label": ["b"]}
+    matched = df.match({"id": 2})
+    from pydantable.mongo_dataframe import MongoFindRoot
+
+    root = matched._root_data
+    assert isinstance(root, MongoFindRoot)
+    assert root.filter == {"id": 2}
+    assert matched.to_dict() == {"id": [2], "label": ["b"]}
 
 
 def test_mongo_dataframe_project_pushdown_updates_schema_and_values() -> None:

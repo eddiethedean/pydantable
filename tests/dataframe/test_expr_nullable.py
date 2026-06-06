@@ -48,6 +48,23 @@ def test_logical_and_null_kleene() -> None:
     assert out["x"][2] is None
 
 
+def test_logical_or_and_not_kleene_truth_table() -> None:
+    df = DataFrame[_OptBool](
+        {
+            "a": [True, False, None, None],
+            "b": [True, True, True, None],
+        }
+    )
+    out = df.with_columns(
+        and_=df.a & df.b,
+        or_=df.a | df.b,
+        not_=~df.a,
+    ).collect(as_lists=True)
+    assert out["and_"] == [True, False, None, None]
+    assert out["or_"] == [True, True, True, None]
+    assert out["not_"] == [False, True, None, None]
+
+
 def test_list_len_null_list_cell() -> None:
     df = DataFrame[_OptList]({"items": [[1, 2], None, []]})
     out = df.with_columns(n=df.items.list_len()).collect(as_lists=True)

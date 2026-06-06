@@ -134,7 +134,7 @@ def test_join_join_nulls_controls_null_key_matching() -> None:
     assert out_eq["w"] == [100, 200]
 
 
-def test_join_maintain_order_accepts_none_left_right() -> None:
+def test_join_maintain_order_preserves_left_and_right_sequences() -> None:
     class L(Schema):
         k: int
         v: int
@@ -146,21 +146,27 @@ def test_join_maintain_order_accepts_none_left_right() -> None:
     left = DataFrame[L]({"k": [2, 1, 3], "v": [20, 10, 30]})
     right = DataFrame[R]({"k": [1, 2, 3], "w": [100, 200, 300]})
 
-    # Ensure the argument is accepted and materializes.
     out_left = left.join(right, on="k", how="inner", maintain_order="left").collect(
         as_lists=True
     )
     assert out_left["k"] == [2, 1, 3]
+    assert out_left["v"] == [20, 10, 30]
+    assert out_left["w"] == [200, 100, 300]
 
     out_right = left.join(right, on="k", how="inner", maintain_order="right").collect(
         as_lists=True
     )
-    assert set(out_right["k"]) == {1, 2, 3}
+    assert out_right["k"] == [1, 2, 3]
+    assert out_right["v"] == [10, 20, 30]
+    assert out_right["w"] == [100, 200, 300]
 
     out_none = left.join(right, on="k", how="inner", maintain_order="none").collect(
         as_lists=True
     )
+    assert len(out_none["k"]) == 3
     assert set(out_none["k"]) == {1, 2, 3}
+    assert set(out_none["v"]) == {10, 20, 30}
+    assert set(out_none["w"]) == {100, 200, 300}
 
 
 def test_join_parallel_flags_not_implemented() -> None:
@@ -340,7 +346,7 @@ def test_join_validate_one_to_one_rejects_duplicates() -> None:
         left.join(right, on="id", how="inner", validate="one_to_one").to_dict()
 
 
-def test_join_validate_not_supported_on_scan_roots(tmp_path) -> None:
+def test_join_validate_one_to_one_on_scan_roots_happy_path(tmp_path) -> None:
     left_csv = tmp_path / "left.csv"
     right_csv = tmp_path / "right.csv"
     left_csv.write_text("id,age,score\n1,10,10\n", encoding="utf-8")
@@ -349,7 +355,23 @@ def test_join_validate_not_supported_on_scan_roots(tmp_path) -> None:
     left = DataFrame[LeftSchema].read_csv(str(left_csv))
     right = DataFrame[RightSchema].read_csv(str(right_csv))
     out = left.join(right, on="id", how="inner", validate="one_to_one").to_dict()
-    assert set(out.keys()) >= {"id", "age", "score", "country", "score_right"}
+    assert out["id"] == [1]
+    assert out["age"] == [10]
+    assert out["score"] == [10]
+    assert out["country"] == ["US"]
+    assert out["score_right"] == [100]
+
+
+def test_join_validate_one_to_one_rejects_duplicates_on_scan_roots(tmp_path) -> None:
+    left_csv = tmp_path / "left.csv"
+    right_csv = tmp_path / "right.csv"
+    left_csv.write_text("id,age,score\n1,10,10\n1,20,20\n", encoding="utf-8")
+    right_csv.write_text("id,age,country,score\n1,10,US,100\n", encoding="utf-8")
+
+    left = DataFrame[LeftSchema].read_csv(str(left_csv))
+    right = DataFrame[RightSchema].read_csv(str(right_csv))
+    with pytest.raises(ValueError, match="one_to_one"):
+        left.join(right, on="id", how="inner", validate="one_to_one").to_dict()
 
 
 def test_join_validate_scan_roots_multi_key_and_side_specific(tmp_path) -> None:

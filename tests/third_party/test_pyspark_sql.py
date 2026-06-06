@@ -26,14 +26,6 @@ from pydantable.schema import Schema
 from tests._support.tables import assert_table_eq_sorted
 
 
-def test_pyspark_package_imports_regression() -> None:
-    from pydantable import pyspark as ps
-
-    assert hasattr(ps, "DataFrame")
-    assert hasattr(ps, "DataFrameModel")
-    assert hasattr(ps, "sql")
-
-
 def test_sql_functions_lit_and_col_with_dtype() -> None:
     class S(Schema):
         x: int

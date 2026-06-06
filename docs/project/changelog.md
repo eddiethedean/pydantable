@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.19.1] — 2026-06-06
+
+### Maintenance
+
+- Align **pydantable**, **pydantable-protocol**, **pydantable-native**, **pydantable-core**, and published **`__version__`** values to **1.19.1**.
+- Strengthen the test suite: native `rust_engine` roundtrips, cross-engine behavioral parity checks, join validation/order assertions, and targeted coverage cleanup.
+
 ## [1.19.0] — 2026-04-20
 
 ### Added

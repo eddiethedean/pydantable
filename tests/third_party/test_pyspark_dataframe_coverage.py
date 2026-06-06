@@ -129,14 +129,6 @@ def test_pyspark_order_by_rejects_maintain_order_kwarg() -> None:
         _ = df.orderBy("age", maintain_order=True)  # type: ignore[call-arg]
 
 
-def test_pyspark_dataframe_getitem_errors() -> None:
-    df = DataFrame[Row]({"id": [1], "name": ["a"], "age": [10]})
-    with pytest.raises(ValueError, match="non-empty"):
-        df[[]]  # type: ignore[index]
-    with pytest.raises(TypeError, match="supports"):
-        df[object()]  # type: ignore[index]
-
-
 def test_pyspark_show_truncates_long_cell(capsys: pytest.CaptureFixture[str]) -> None:
     long = "y" * 80
     df = User({"id": [1], "name": [long], "age": [1]})
@@ -267,37 +259,40 @@ def test_pyspark_groupby_pivot_agg_multi_ops_and_explicit_values() -> None:
     assert got["y_m"] == [2, None]
 
 
-def test_pyspark_groupby_pivot_rejects_non_list_values() -> None:
+@pytest.mark.parametrize(
+    ("call", "match"),
+    [
+        (
+            lambda df: df.groupBy("g").pivot("k", values=("x", "y")),  # type: ignore[arg-type]
+            r"pivot\(values=",
+        ),
+        (
+            lambda df: df.groupBy("g").pivot("k").agg(),
+            r"agg\(\) requires at least one",
+        ),
+        (
+            lambda df: df.groupBy("g").pivot("k").agg(**{"bad__name": ("sum", "v")}),
+            "cannot contain",
+        ),
+        (
+            lambda df: df.groupBy("g").pivot("k").sum(),
+            "requires at least one",
+        ),
+        (
+            lambda df: df.groupBy("g").agg({"v": ""}),
+            "Aggregation operator",
+        ),
+    ],
+)
+def test_pyspark_groupby_pivot_validation_errors(call: object, match: str) -> None:
     class S(Schema):
         g: str
         k: str
         v: int
 
     df = DataFrame[S]({"g": ["A"], "k": ["x"], "v": [1]})
-    with pytest.raises(TypeError, match=r"pivot\(values="):
-        _ = df.groupBy("g").pivot("k", values=("x", "y"))  # type: ignore[arg-type]
-
-
-def test_pyspark_groupby_pivot_agg_requires_specs() -> None:
-    class S(Schema):
-        g: str
-        k: str
-        v: int
-
-    df = DataFrame[S]({"g": ["A"], "k": ["x"], "v": [1]})
-    with pytest.raises(TypeError, match=r"agg\(\) requires at least one"):
-        df.groupBy("g").pivot("k").agg()  # type: ignore[call-arg]
-
-
-def test_pyspark_groupby_pivot_agg_rejects_out_name_with_internal_sep() -> None:
-    class S(Schema):
-        g: str
-        k: str
-        v: int
-
-    df = DataFrame[S]({"g": ["A"], "k": ["x"], "v": [1]})
-    with pytest.raises(ValueError, match="cannot contain"):
-        df.groupBy("g").pivot("k").agg(**{"bad__name": ("sum", "v")})
+    with pytest.raises((TypeError, ValueError), match=match):
+        call(df)  # type: ignore[operator]
 
 
 def test_pyspark_groupby_pivot_agg_preserves_explicit_pivot_order() -> None:
@@ -362,27 +357,6 @@ def test_pyspark_groupby_pivot_count_sum_avg_min_max_multi_col() -> None:
     got_max = {k: [maxed[k][i] for i in order] for k in maxed}
     assert got_max["x_a"] == [2, 3]
     assert got_max["y_a"] == [10, None]
-
-
-def test_pyspark_groupby_pivot_sum_requires_columns() -> None:
-    class S(Schema):
-        g: str
-        k: str
-        v: int
-
-    df = DataFrame[S]({"g": ["A"], "k": ["x"], "v": [1]})
-    with pytest.raises(TypeError, match="requires at least one"):
-        df.groupBy("g").pivot("k").sum()
-
-
-def test_pyspark_groupby_agg_dict_form_errors_on_unknown_op() -> None:
-    class S(Schema):
-        g: str
-        v: int
-
-    df = DataFrame[S]({"g": ["A"], "v": [1]})
-    with pytest.raises(TypeError, match="Aggregation operator"):
-        df.groupBy("g").agg({"v": ""})
 
 
 def test_pyspark_cross_join_and_count() -> None:

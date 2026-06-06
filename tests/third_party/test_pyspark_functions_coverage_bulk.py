@@ -73,8 +73,18 @@ def test_functions_global_agg_specs_and_typeerrors() -> None:
     with pytest.raises(TypeError):
         F.count(())  # type: ignore[arg-type]
 
-    s = F.sum("n")
-    assert s._op == "sum" and s._col == "n"  # type: ignore[attr-defined]
+    df = DataFrame[_Mix](
+        {
+            "s": ["x"],
+            "n": [3],
+            "n2": [4],
+            "items_str": [["a"]],
+            "items_int": [[1]],
+            "ts": [datetime(2024, 1, 1)],
+        }
+    )
+    out = df.groupBy("s").agg(F.sum("n").alias("total")).collect(as_lists=True)
+    assert out["total"] == [3]
     assert F.count() is not None
 
 

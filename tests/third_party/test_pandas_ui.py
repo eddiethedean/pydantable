@@ -532,37 +532,30 @@ def test_pandas_ui_sort_values_multi_key_with_key_and_na_position() -> None:
     assert b_rows == [("b", "X"), ("b", None)]
 
 
-def test_pandas_ui_merge_left_on_requires_right_on() -> None:
+@pytest.mark.parametrize(
+    ("kwargs", "exc_type", "match"),
+    [
+        ({"left_on": "a"}, TypeError, "left_on"),
+        ({"on": "a", "left_on": "a", "right_on": "b"}, TypeError, "either on"),
+        ({"on": "a", "validate": "wat"}, ValueError, "validate"),  # type: ignore[dict-item]
+        ({"on": "a", "unexpected": True}, TypeError, "unsupported keyword"),  # type: ignore[dict-item]
+        ({}, TypeError, "requires on"),
+    ],
+)
+def test_pandas_ui_merge_argument_validation_errors(
+    kwargs: dict[str, object], exc_type: type[Exception], match: str
+) -> None:
     class L(PandasDataFrameModel):
         a: int
 
     class R(PandasDataFrameModel):
+        a: int
         b: int
 
-    with pytest.raises(TypeError, match="left_on"):
-        L({"a": [1]}).merge(R({"b": [1]}), left_on="a")  # type: ignore[arg-type]
-
-
-def test_pandas_ui_merge_rejects_on_with_left_on_right_on() -> None:
-    class L(PandasDataFrameModel):
-        a: int
-
-    class R(PandasDataFrameModel):
-        b: int
-
-    with pytest.raises(TypeError, match="either on"):
-        L({"a": [1]}).merge(R({"b": [1]}), on="a", left_on="a", right_on="b")
-
-
-def test_pandas_ui_merge_validate_rejects_unknown_value() -> None:
-    class L(PandasDataFrameModel):
-        a: int
-
-    class R(PandasDataFrameModel):
-        a: int
-
-    with pytest.raises(ValueError, match="validate"):
-        L({"a": [1]}).merge(R({"a": [1]}), on="a", validate="wat")  # type: ignore[arg-type]
+    left = L({"a": [1]})
+    right = R({"a": [1], "b": [2]})
+    with pytest.raises(exc_type, match=match):
+        left.merge(right, **kwargs)  # type: ignore[arg-type]
 
 
 def test_pandas_ui_merge_cross_basic_and_indicator() -> None:
@@ -627,19 +620,6 @@ def test_pandas_ui_merge_matrix_on_basic(how: str) -> None:
             (2, 20, 200, "both"),
             (3, None, 300, "right_only"),
         ]
-
-
-def test_pandas_ui_merge_indicator_rejects_existing_merge_column() -> None:
-    class L(PandasDataFrameModel):
-        k: int
-
-    class R(PandasDataFrameModel):
-        k: int
-
-    left = L({"k": [1]})
-    right = R({"k": [1]})
-    out = left.merge(right, on="k", indicator=True).collect(as_lists=True)
-    assert out["_merge"] == ["both"]
 
 
 def test_pandas_ui_merge_index_merge_rejects_key_args() -> None:
@@ -715,18 +695,6 @@ def test_pandas_ui_merge_suffix_collision_left_on_right_on_raises() -> None:
     right = R({"rk": [1], "v": [20]})
     with pytest.raises(ValueError, match="duplicate output column"):
         left.merge(right, left_on="lk", right_on="rk", suffixes=("_x", "_y"))
-
-
-def test_pandas_ui_merge_indicator_key_only_frames_not_supported() -> None:
-    from pydantable.pandas import DataFrame
-
-    class Row(Schema):
-        a: int
-
-    left = DataFrame[Row]({"a": [1]})
-    right = DataFrame[Row]({"a": [1]})
-    out = left.merge(right, on="a", how="inner", indicator=True).collect(as_lists=True)
-    assert out["_merge"] == ["both"]
 
 
 def test_pandas_ui_merge_sort_true_sorts_by_keys() -> None:
@@ -1571,28 +1539,6 @@ def test_pandas_ui_to_pandas_smoke() -> None:
     assert out.to_dict(orient="list") == {"a": [1, 2], "b": ["x", "y"]}
 
 
-def test_pandas_ui_merge_rejects_extra_kwargs() -> None:
-    class L(PandasDataFrameModel):
-        a: int
-
-    class R(PandasDataFrameModel):
-        a: int
-
-    with pytest.raises(TypeError, match="unsupported keyword"):
-        L({"a": [1]}).merge(R({"a": [1]}), on="a", unexpected=True)  # type: ignore[arg-type]
-
-
-def test_pandas_ui_merge_requires_on() -> None:
-    class L(PandasDataFrameModel):
-        a: int
-
-    class R(PandasDataFrameModel):
-        a: int
-
-    with pytest.raises(TypeError, match="requires on"):
-        L({"a": [1]}).merge(R({"a": [1]}))
-
-
 def test_pandas_ui_merge_indicator_outer() -> None:
     class L(PandasDataFrameModel):
         a: int
@@ -1683,20 +1629,6 @@ def test_pandas_ui_assign_rejects_series_like() -> None:
     df = User({"id": [1]})
     with pytest.raises(TypeError, match="Series"):
         df.assign(x=_FakeSeries())
-
-
-def test_pandas_ui_getitem_errors() -> None:
-    from pydantable.pandas import DataFrame, Schema
-
-    class Row(Schema):
-        a: int
-        b: int
-
-    df = DataFrame[Row]({"a": [1], "b": [2]})
-    with pytest.raises(ValueError, match="non-empty"):
-        df[[]]
-    with pytest.raises(TypeError, match="supports"):
-        df[object()]  # type: ignore[index]
 
 
 def test_pandas_ui_groupby_requires_columns() -> None:

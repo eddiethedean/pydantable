@@ -42,8 +42,10 @@ def test_sql_dataframe_where_pushdown(tmp_path: Path) -> None:
         conn.commit()
 
     df = SqlDataFrame[Row].from_sql_table(t, sql_engine=eng)
-    out = df.where(t.c.id > 1).to_dict()
-    assert out == {"id": [2, 3], "label": ["b", "c"]}
+    filtered = df.where(t.c.id > 1)
+    compiled = str(filtered._root_data.table.compile()).upper()
+    assert "WHERE" in compiled
+    assert filtered.to_dict() == {"id": [2, 3], "label": ["b", "c"]}
 
 
 def test_sql_dataframe_where_rejects_unknown_column(tmp_path: Path) -> None:

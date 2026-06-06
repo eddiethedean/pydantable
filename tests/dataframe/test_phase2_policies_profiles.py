@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import ClassVar
 
+import pytest
 from pydantable import DataFrameModel
 from pydantable.validation_profiles import (
     get_validation_profile,
@@ -62,8 +63,5 @@ def test_validation_profile_registry_can_override() -> None:
 
 def test_validation_profile_unknown_raises_keyerror() -> None:
     reset_validation_profiles_for_tests()
-    try:
+    with pytest.raises(KeyError):
         get_validation_profile("does_not_exist")
-        raise AssertionError("expected KeyError")
-    except KeyError:
-        pass

@@ -89,3 +89,17 @@ def test_annotation_to_data_type_optional_struct_and_array() -> None:
     opt_arr = annotation_to_data_type(list[int] | None)
     assert isinstance(opt_arr, ArrayType)
     assert opt_arr.nullable is True
+
+
+def test_fallback_annotation_becomes_string() -> None:
+    class Opaque:
+        pass
+
+    assert annotation_to_data_type(Opaque).typeName == "string"
+
+
+def test_data_type_base_to_annotation_not_implemented() -> None:
+    from pydantable.pyspark.sql.types import DataType
+
+    with pytest.raises(NotImplementedError):
+        DataType().to_annotation()
