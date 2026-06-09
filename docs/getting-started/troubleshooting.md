@@ -1,5 +1,23 @@
 # Troubleshooting / FAQ
 
+## When should I use pydantable vs Polars or pandas?
+
+Use **pydantable** when you need **Pydantic-validated tables**, **service contracts** (FastAPI), and **documented semantics** on top of a DataFrame API. Use **Polars** or **pandas** alone for notebook-first analytics without a typed service boundary. See [Why pydantable?](../positioning/why-pydantable.md) and [Comparisons](../positioning/comparisons/index.md).
+
+## Do I need Polars installed?
+
+**No** for core transforms and **`collect()`** / **`to_dict()`**. Install **`pydantable[polars]`** only for **`to_polars()`**, some **`stream`** paths, and lazy **`write_*`** convenience documented in [Execution](../user-guide/execution.md).
+
+## When does validation run?
+
+- **Eager constructors** (`MyModel(cols)`) validate on build (per **`trusted_mode`**).
+- **Lazy `read_*`** defers validation until **materialization** (`collect`, `to_dict`, etc.).
+- Details: [DataFrameModel](../user-guide/dataframemodel.md), [Best practices](../user-guide/best-practices.md).
+
+## Deprecated API names
+
+**`Entei*`**, unprefixed **`fetch_sql`**, and **`as_polars=`** on **`collect`** emit **`DeprecationWarning`** — see [Migration](migration.md).
+
 ## `MissingRustExtensionError`
 
 **Symptom:** you see `MissingRustExtensionError` (a `NotImplementedError` subclass).
@@ -26,7 +44,7 @@ maturin develop --manifest-path pydantable-core/Cargo.toml
 pip install pydantable
 ```
 
-See [DEVELOPER](../project/developer.md) for contributor setup.
+See [Installation](installation.md) and [Developer guide](../project/developer.md).
 
 ## Pandas UI: `ImportError` / `ModuleNotFoundError` for **`pandas`**
 

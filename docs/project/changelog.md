@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is inspired 
 
 ## [Unreleased]
 
+## [1.19.2] — 2026-06-09
+
+### Documentation
+
+- **Adoption-focused docs overhaul:** installation guide with verify snippet and platform matrix, migration guide, glossary, best practices, expanded API reference (I/O, engines, FastAPI, errors), `CONTRIBUTING.md` and `SECURITY.md`, restructured MkDocs navigation (Get started / Guides / Recipes / Reference / Internals), forward-looking roadmap split from history, unified quickstart on `DataFrameModel`, and core analytics example.
+
+### Maintenance
+
+- Align **pydantable**, **pydantable-protocol**, **pydantable-native**, **pydantable-core**, and published **`__version__`** values to **1.19.2**.
+
 ## [1.19.1] — 2026-06-06
 
 ### Maintenance
@@ -204,7 +214,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Docs
 
-- **README / site index / I/O guides:** align **current release** (**1.13.0**), SQL I/O naming (**`fetch_sqlmodel`**, **`fetch_sql_raw`**, deprecations), and pointers to [IO_SQL](../io/sql.md) / [SQLMODEL_SQL_ROADMAP](../project/sqlmodel-sql-roadmap.md) across **README**, [index](../index.md), [IO_OVERVIEW](../io/overview.md), [IO_DECISION_TREE](../io/decision-tree.md), [EXECUTION](../user-guide/execution.md), [DATA_IO_SOURCES](../io/data-io-sources.md), [DOCS_MAP](../getting-started/docs-map.md), [POLARS_TRANSFORMATIONS_ROADMAP](../user-guide/polars-alignment/transformations-roadmap.md), [ROADMAP](../project/roadmap.md), and the SQLModel roadmap introduction.
+- **README / site index / I/O guides:** align **current release** (**1.13.0**), SQL I/O naming (**`fetch_sqlmodel`**, **`fetch_sql_raw`**, deprecations), and pointers to [IO_SQL](../io/sql.md) / [SQLMODEL_SQL_ROADMAP](../project/sqlmodel-sql-roadmap.md) across **README**, [index](../index.md), [IO_OVERVIEW](../io/overview.md), [IO_DECISION_TREE](../io/decision-tree.md), [EXECUTION](../user-guide/execution.md), [DATA_IO_SOURCES](../io/data-io-sources.md), [DOCS_MAP](../getting-started/docs-map.md), [POLARS_TRANSFORMATIONS_ROADMAP](../project/polars-alignment/transformations-roadmap.md), [ROADMAP](../project/roadmap.md), and the SQLModel roadmap introduction.
 - **SQL I/O:** [IO_SQL](../io/sql.md), [SQLMODEL_SQL_ROADMAP](../project/sqlmodel-sql-roadmap.md), [VERSIONING](../semantics/versioning.md) — SQLModel-first default, **`*_raw`** for explicit string SQL, deprecation policy. Runnable examples: raw **`sql_sqlite_roundtrip.py`** / **`sql_sqlite_streaming.py`** and SQLModel-first **`sql_sqlite_sqlmodel_*.py`** (see [IO_SQL](../io/sql.md)).
 
 ### Changed
@@ -249,7 +259,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Changed
 
-- **Versioning:** Python package metadata and Rust crate aligned at **1.11.0** for this release; docs “current release” strings ([index](../index.md), [CHANGELOG](../project/changelog.md), [ROADMAP](../project/roadmap.md), [POLARS_TRANSFORMATIONS_ROADMAP](../user-guide/polars-alignment/transformations-roadmap.md)) aligned.
+- **Versioning:** Python package metadata and Rust crate aligned at **1.11.0** for this release; docs “current release” strings ([index](../index.md), [CHANGELOG](../project/changelog.md), [ROADMAP](../project/roadmap.md), [POLARS_TRANSFORMATIONS_ROADMAP](../project/polars-alignment/transformations-roadmap.md)) aligned.
 
 ## [1.10.0] — 2026-04-01
 
@@ -284,17 +294,17 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Docs / tooling
 
-- **Versioning:** bump to **1.9.0** across Python package metadata, Rust crate, and shipped stubs; docs “current release” strings ([index](../index.md), [ROADMAP](../project/roadmap.md), [POLARS_TRANSFORMATIONS_ROADMAP](../user-guide/polars-alignment/transformations-roadmap.md)) aligned.
-- **Docs:** **`describe()`** / **`summary()`**, **`SUPPORTED_TYPES`** temporal helpers, **[INTERFACE_CONTRACT](../semantics/interface-contract.md)**, **[EXECUTION](../user-guide/execution.md)**, **[PYSPARK_PARITY](../integrations/alternate-surfaces/pyspark-parity.md)**, **[PARITY_SCORECARD](../user-guide/polars-alignment/parity-scorecard.md)**, **[DEVELOPER](../project/developer.md)**, **[PANDAS_UI](../integrations/alternate-surfaces/pandas-ui.md)**, and **[POLARS_TRANSFORMATIONS_ROADMAP](../user-guide/polars-alignment/transformations-roadmap.md)** updated for **1.9.0** behavior.
+- **Versioning:** bump to **1.9.0** across Python package metadata, Rust crate, and shipped stubs; docs “current release” strings ([index](../index.md), [ROADMAP](../project/roadmap.md), [POLARS_TRANSFORMATIONS_ROADMAP](../project/polars-alignment/transformations-roadmap.md)) aligned.
+- **Docs:** **`describe()`** / **`summary()`**, **`SUPPORTED_TYPES`** temporal helpers, **[INTERFACE_CONTRACT](../semantics/interface-contract.md)**, **[EXECUTION](../user-guide/execution.md)**, **[PYSPARK_PARITY](../integrations/alternate-surfaces/pyspark-parity.md)**, **[PARITY_SCORECARD](../project/polars-alignment/parity-scorecard.md)**, **[DEVELOPER](../project/developer.md)**, **[PANDAS_UI](../integrations/alternate-surfaces/pandas-ui.md)**, and **[POLARS_TRANSFORMATIONS_ROADMAP](../project/polars-alignment/transformations-roadmap.md)** updated for **1.9.0** behavior.
 
 ## [1.8.0] — 2026-03-31
 
 ### Added
 
 - **Selectors:** selector-driven column and rename helpers (see `pydantable.selectors` and [SELECTORS](../user-guide/selectors.md)).
-- **Core DataFrame ergonomics:** `row_count`, `clip`, and `drop_nulls` arguments and convenience behavior aligned with the 1.8 parity push (see [POLARS_PARITY_1_8](../user-guide/polars-alignment/polars-parity-1-8.md) and [PARITY_SCORECARD](../user-guide/polars-alignment/parity-scorecard.md)).
+- **Core DataFrame ergonomics:** `row_count`, `clip`, and `drop_nulls` arguments and convenience behavior aligned with the 1.8 parity push (see [POLARS_PARITY_1_8](../project/polars-alignment/polars-parity-1-8.md) and [PARITY_SCORECARD](../project/polars-alignment/parity-scorecard.md)).
 - **Joins:** additional join argument parity including `join_nulls` and `maintain_order` (typed contract preserved; see [INTERFACE_CONTRACT](../semantics/interface-contract.md)).
-- **Reshape:** `pivot_longer` / `pivot_wider` and related reshape ergonomics (see [POLARS_WORKFLOWS](../user-guide/polars-alignment/workflows.md) and [INTERFACE_CONTRACT](../semantics/interface-contract.md) reshape notes).
+- **Reshape:** `pivot_longer` / `pivot_wider` and related reshape ergonomics (see [POLARS_WORKFLOWS](../project/polars-alignment/workflows.md) and [INTERFACE_CONTRACT](../semantics/interface-contract.md) reshape notes).
 
 ### Docs
 
@@ -304,7 +314,7 @@ All notable changes to this project are documented here. The format is inspired 
 
 ### Added
 
-- **Pandas UI (schema-first):** `duplicated` / `drop_duplicates(keep=False)` backed by engine plan steps where Polars is enabled; typed **`get_dummies`** with cardinality guard; eager **`cut`** / **`qcut`**, **`factorize_column`**, narrow **`ewm(...).mean()`** (may require pandas at runtime); façade **`pivot`** delegating to core. See [PANDAS_UI](../integrations/alternate-surfaces/pandas-ui.md) and [PARITY_SCORECARD](../user-guide/polars-alignment/parity-scorecard.md).
+- **Pandas UI (schema-first):** `duplicated` / `drop_duplicates(keep=False)` backed by engine plan steps where Polars is enabled; typed **`get_dummies`** with cardinality guard; eager **`cut`** / **`qcut`**, **`factorize_column`**, narrow **`ewm(...).mean()`** (may require pandas at runtime); façade **`pivot`** delegating to core. See [PANDAS_UI](../integrations/alternate-surfaces/pandas-ui.md) and [PARITY_SCORECARD](../project/polars-alignment/parity-scorecard.md).
 - **Tests:** `tests/test_pandas_ui_popular_features.py` — extended coverage for duplicates, dummies, binning, factorize, ewm, and pivot.
 
 ### Docs
@@ -538,7 +548,7 @@ Summary: **FastAPI** helpers (columnar OpenAPI bodies, NDJSON, **`register_excep
 - **Debugging:** **`PYDANTABLE_VERBOSE_ERRORS=1`** appends schema context to **`ValueError`** from **`execute_plan`**.
 - **Expressions:** **`Expr`**, **`ColumnRef`**, **`WhenChain`**, and pending window helpers implement readable **`__repr__`**. Tests: **`tests/test_expr_repr.py`**.
 - **PySpark façade:** **`DataFrame.show()`** and **`summary()`** (alias of **`describe()`**). See [PYSPARK_UI](../integrations/alternate-surfaces/pyspark-ui.md), [PYSPARK_PARITY](../integrations/alternate-surfaces/pyspark-parity.md).
-- **Documentation:** [README](../project/repository-readme.md), [index](../index.md), [ROADMAP](../project/roadmap.md), [PARITY_SCORECARD](../user-guide/polars-alignment/parity-scorecard.md), [PANDAS_UI](../integrations/alternate-surfaces/pandas-ui.md), [DEVELOPER](../project/developer.md).
+- **Documentation:** [README](../project/repository-readme.md), [index](../index.md), [ROADMAP](../project/roadmap.md), [PARITY_SCORECARD](../project/polars-alignment/parity-scorecard.md), [PANDAS_UI](../integrations/alternate-surfaces/pandas-ui.md), [DEVELOPER](../project/developer.md).
 
 ### Details
 
@@ -552,7 +562,7 @@ Summary: **FastAPI** helpers (columnar OpenAPI bodies, NDJSON, **`register_excep
 
 - **Pre-1.0 consolidation:** [VERSIONING](../semantics/versioning.md) documents **0.x** patch vs minor expectations; [INTERFACE_CONTRACT](../semantics/interface-contract.md) links there for semver scope while staying the behavioral source of truth.
 - **Roadmap to 1.0:** [ROADMAP](../project/roadmap.md) **Shipped in 0.19.0** replaces the planned checklist; **Planned v1.0.0** items that belong on the **1.0.0** tag (full **1.x** semver policy, SBOM, comms) remain explicitly deferred there with rationale below.
-- **Parity docs:** [POLARS_TRANSFORMATIONS_ROADMAP](../user-guide/polars-alignment/transformations-roadmap.md), [PARITY_SCORECARD](../user-guide/polars-alignment/parity-scorecard.md), [PYSPARK_PARITY](../integrations/alternate-surfaces/pyspark-parity.md), [README](../project/repository-readme.md), and [index](../index.md) updated for **current release** and **0.19 → 1.0** clarity—no new table methods or PySpark `functions` rows.
+- **Parity docs:** [POLARS_TRANSFORMATIONS_ROADMAP](../project/polars-alignment/transformations-roadmap.md), [PARITY_SCORECARD](../project/polars-alignment/parity-scorecard.md), [PYSPARK_PARITY](../integrations/alternate-surfaces/pyspark-parity.md), [README](../project/repository-readme.md), and [index](../index.md) updated for **current release** and **0.19 → 1.0** clarity—no new table methods or PySpark `functions` rows.
 - **Performance:** [PERFORMANCE](../project/performance.md) adds an **0.19.0 validation** note (key scripts spot-checked; no headline number refresh vs **0.18.x** paths).
 - **CI / tests:** Grouped output comparisons in **`tests/test_v018_features.py`** sort by group key where row order is not API-guaranteed (stable **`pytest-xdist`** on Linux).
 
@@ -568,7 +578,7 @@ See [ROADMAP](../project/roadmap.md) **Shipped in 0.19.0**. Release hygiene: **`
 
 - **Grouped execution errors:** Polars **`collect()`** failures during **`group_by().agg()`** may include **`(group_by().agg())`** in the **`ValueError`** text (via **`polars_err_ctx`**) so they are identifiable as grouped aggregation runtime errors. See [EXECUTION](../user-guide/execution.md).
 - **Maps:** **Non-string** map keys (**`dict[int, T]`**, non-UTF-8 Arrow map keys) remain **unsupported** and are **explicitly deferred** for this release ([SUPPORTED_TYPES](../user-guide/supported-types.md), [ROADMAP](../project/roadmap.md) **Later**).
-- **Documentation:** Post–**P7** note in [POLARS_TRANSFORMATIONS_ROADMAP](../user-guide/polars-alignment/transformations-roadmap.md) (phases complete; further parity is additive). [PARITY_SCORECARD](../user-guide/polars-alignment/parity-scorecard.md), [PYSPARK_PARITY](../integrations/alternate-surfaces/pyspark-parity.md), [DEVELOPER](../project/developer.md), [ROADMAP](../project/roadmap.md) updated. **No** new PySpark **`sql.functions`** wrappers or table API changes.
+- **Documentation:** Post–**P7** note in [POLARS_TRANSFORMATIONS_ROADMAP](../project/polars-alignment/transformations-roadmap.md) (phases complete; further parity is additive). [PARITY_SCORECARD](../project/polars-alignment/parity-scorecard.md), [PYSPARK_PARITY](../integrations/alternate-surfaces/pyspark-parity.md), [DEVELOPER](../project/developer.md), [ROADMAP](../project/roadmap.md) updated. **No** new PySpark **`sql.functions`** wrappers or table API changes.
 - **Tests:** Hypothesis + integration coverage for **`group_by`** / **`join`** (`tests/test_hypothesis_properties.py`, **`tests/test_v018_features.py`**); Rust **`polars_err_ctx`** message format (`execute_polars/common.rs`, **`polars_err_format_tests`**).
 
 ### Details
@@ -581,7 +591,7 @@ See [ROADMAP](../project/roadmap.md) **Shipped in 0.18.0**. [INTERFACE_CONTRACT]
 
 - **Maps (string keys):** Documented and tested **Expr** behavior for **`map_get`** / **`map_contains_key`** on columns ingested from PyArrow **`map<utf8, …>`** (missing key → null). **Non-string** Python **`dict[int, T]`** map keys remain **unsupported** (deferred); see [ROADMAP](../project/roadmap.md) **Later**.
 - **PySpark façade:** [`PYSPARK_PARITY.md`](../integrations/alternate-surfaces/pyspark-parity.md) — new thin **`pydantable.pyspark.sql.functions`** wrappers: **`str_replace`**, **`regexp_replace`** (alias, literal replace), **`strip_prefix`**, **`strip_suffix`**, **`strip_chars`**, **`strptime`**, **`binary_len`**, **`list_len`**, **`list_get`**, **`list_contains`**, **`list_min`**, **`list_max`**, **`list_sum`** (core **`Expr`** / Rust lowering unchanged). Tests: **`tests/test_pyspark_sql.py`**.
-- **Docs:** Refreshed [`PARITY_SCORECARD.md`](../user-guide/polars-alignment/parity-scorecard.md), [`POLARS_TRANSFORMATIONS_ROADMAP.md`](../user-guide/polars-alignment/transformations-roadmap.md), [`SUPPORTED_TYPES.md`](../user-guide/supported-types.md) (map + Arrow ingest note).
+- **Docs:** Refreshed [`PARITY_SCORECARD.md`](../project/polars-alignment/parity-scorecard.md), [`POLARS_TRANSFORMATIONS_ROADMAP.md`](../project/polars-alignment/transformations-roadmap.md), [`SUPPORTED_TYPES.md`](../user-guide/supported-types.md) (map + Arrow ingest note).
 
 ### Details
 
@@ -654,7 +664,7 @@ See [ROADMAP](../project/roadmap.md) **Shipped in 0.14.0**.
 - **Window semantics (docs):** null ordering and **`CURRENT ROW`** / peer framing in [WINDOW_SQL_SEMANTICS](../semantics/window-sql-semantics.md) and [INTERFACE_CONTRACT](../semantics/interface-contract.md); `Window` docstring in `window_spec.py`. (**User-facing `NULLS FIRST` / `LAST`** shipped in **0.14.0**.)
 - **Trusted `strict` + PyArrow:** `isinstance(..., pa.Array | pa.ChunkedArray)` in trusted buffers (concrete array types such as `Int64Array`); stricter scalars for **int**, **float**, **decimal**, **enum**, **uuid**, and temporal Arrow types. Tests in `tests/test_trusted_strict_pyarrow.py`; **`pyarrow>=14`** in **`[dev]`** and CI. (**`shape_only` drift warnings** shipped in **0.14.0**.)
 - **Performance:** `benchmarks/framed_window_bench.py`, `benchmarks/trusted_polars_ingest_bench.py`; [PERFORMANCE](../project/performance.md) table and cross-links.
-- **Discoverability:** [index](../index.md), [README](../project/repository-readme.md) roadmap table, and cross-links across [INTERFACE_CONTRACT](../semantics/interface-contract.md), [WINDOW_SQL_SEMANTICS](../semantics/window-sql-semantics.md), [POLARS_TRANSFORMATIONS_ROADMAP](../user-guide/polars-alignment/transformations-roadmap.md).
+- **Discoverability:** [index](../index.md), [README](../project/repository-readme.md) roadmap table, and cross-links across [INTERFACE_CONTRACT](../semantics/interface-contract.md), [WINDOW_SQL_SEMANTICS](../semantics/window-sql-semantics.md), [POLARS_TRANSFORMATIONS_ROADMAP](../project/polars-alignment/transformations-roadmap.md).
 - **CI:** **`RUSTSEC-2025-0141`** audit-step comment; GitHub Actions versions reviewed (**`actions/cache@v4`**, etc.).
 - **Examples:** `scripts/verify_doc_examples.py` covers new FastAPI patterns (trusted ingest + columnar body).
 
@@ -677,7 +687,7 @@ See [FASTAPI](../integrations/fastapi/fastapi.md), [EXECUTION](../user-guide/exe
 
 ### Details
 
-See [INTERFACE_CONTRACT](../semantics/interface-contract.md), [PYSPARK_PARITY](../integrations/alternate-surfaces/pyspark-parity.md), [PARITY_SCORECARD](../user-guide/polars-alignment/parity-scorecard.md), [WINDOW_SQL_SEMANTICS](../semantics/window-sql-semantics.md), and [ROADMAP](../project/roadmap.md).
+See [INTERFACE_CONTRACT](../semantics/interface-contract.md), [PYSPARK_PARITY](../integrations/alternate-surfaces/pyspark-parity.md), [PARITY_SCORECARD](../project/polars-alignment/parity-scorecard.md), [WINDOW_SQL_SEMANTICS](../semantics/window-sql-semantics.md), and [ROADMAP](../project/roadmap.md).
 
 ## [0.11.0] — 2026-03-23
 
@@ -741,7 +751,7 @@ See [SUPPORTED_TYPES](../user-guide/supported-types.md), [PYSPARK_PARITY](../int
 
 ### Documentation
 
-- README feature bullets; [INTERFACE_CONTRACT](../semantics/interface-contract.md) (global `select`); [POLARS_WORKFLOWS](../user-guide/polars-alignment/workflows.md) (single-row globals example); [index](../index.md), [EXECUTION](../user-guide/execution.md), [PYSPARK_UI](../integrations/alternate-surfaces/pyspark-ui.md), [PYSPARK_PARITY](../integrations/alternate-surfaces/pyspark-parity.md), [PYSPARK_INTERFACE](../integrations/alternate-surfaces/pyspark-interface.md).
+- README feature bullets; [INTERFACE_CONTRACT](../semantics/interface-contract.md) (global `select`); [POLARS_WORKFLOWS](../project/polars-alignment/workflows.md) (single-row globals example); [index](../index.md), [EXECUTION](../user-guide/execution.md), [PYSPARK_UI](../integrations/alternate-surfaces/pyspark-ui.md), [PYSPARK_PARITY](../integrations/alternate-surfaces/pyspark-parity.md), [PYSPARK_INTERFACE](../integrations/alternate-surfaces/pyspark-interface.md).
 
 ## [0.7.0] — 2026-03-23
 
@@ -785,4 +795,4 @@ See [SUPPORTED_TYPES](../user-guide/supported-types.md), [PYSPARK_PARITY](../int
 
 ### Details
 
-For phase history and future direction, see [ROADMAP](../project/roadmap.md) and [POLARS_TRANSFORMATIONS_ROADMAP](../user-guide/polars-alignment/transformations-roadmap.md).
+For phase history and future direction, see [ROADMAP](../project/roadmap.md) and [POLARS_TRANSFORMATIONS_ROADMAP](../project/polars-alignment/transformations-roadmap.md).

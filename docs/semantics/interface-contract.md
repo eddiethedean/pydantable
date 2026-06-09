@@ -1,5 +1,13 @@
 # PydanTable Interface Contract (Polars-style)
 
+??? summary "TL;DR for adopters"
+    - **Row order** is not guaranteed after many ops — sort by keys in tests ([Ordering](#ordering)).
+    - **`df.shape`** may not match executed row count after lazy transforms — use **`collect()`** / **`to_dict()`** ([Introspection](#introspection-shape-columns-dtypes-info-describe) section).
+    - **Nulls** follow SQL-style rules for joins and aggregates ([Null semantics](#null-semantics)).
+    - **`collect()`** returns validated Pydantic rows; **`to_dict()`** returns column lists.
+    - **Async cancel** does not stop in-flight native work ([Troubleshooting](../getting-started/troubleshooting.md)).
+    - Full guarantees live in the sections below; versioning policy: [Versioning](versioning.md).
+
 This document records the behavior contract that the typed DataFrame API guarantees.
 It is intended to be independent of Python import style (default vs `pandas` / `pyspark` UI)
 at the *type/semantics* level, while allowing implementation-specific physical ordering

@@ -1,61 +1,69 @@
 # Docs map
 
-Use this page when you know **what you need to do**, but not **where it is documented**.
+Find documentation by **what you want to do**.
 
-## Start here (by goal)
+## Build typed tables and transforms
 
-- **Model a table schema and do typed transforms**: [DATAFRAMEMODEL](../user-guide/dataframemodel.md) (primary user guide).
-- **Build an API with FastAPI**: [GOLDEN_PATH_FASTAPI](../integrations/fastapi/golden-path.md) (shortest runnable path), then [FASTAPI](../integrations/fastapi/fastapi.md) (common patterns + reference tables), and [FASTAPI_ADVANCED](../integrations/fastapi/advanced.md) (less-common async/I/O patterns). Roadmap → [FASTAPI_ENHANCEMENTS](../integrations/fastapi/enhancements.md); observability → [fastapi_observability](../cookbook/fastapi_observability.md); background **`submit`** → [fastapi_background_tasks](../cookbook/fastapi_background_tasks.md); lazy async scans → [async_lazy_pipeline](../cookbook/async_lazy_pipeline.md). **Example layout:** `docs/examples/fastapi/service_layout/`. **Integration tests:** **`pydantable.testing.fastapi`** (**`fastapi_test_client`**, **`fastapi_app_with_executor`**).
-- **Understand what pydantable is (mental model / ecosystem fit)**: [MENTAL_MODEL](../concepts/mental-model.md), [WHY_PYDANTABLE](../positioning/why-pydantable.md), and [COMPARISONS](../positioning/comparisons/index.md) (Polars + pandas).
-- **Understand execution/materialization costs**: [EXECUTION](../user-guide/execution.md); **four plan materialization modes** (blocking / async / deferred / chunked): [MATERIALIZATION](../user-guide/materialization.md).
-- **Choose an I/O entrypoint**: [IO_DECISION_TREE](../io/decision-tree.md), then the per-format pages under [IO_OVERVIEW](../io/overview.md).
-- **Optional swap-in engines (keep the `DataFrame` API; different backends)**: [SQL_ENGINE](../integrations/engines/sql.md) (**`pydantable[sql]`**, SQL), [MONGO_ENGINE](../integrations/engines/mongo.md) (**`pydantable[mongo]`** — **PyMongo**, **Beanie**, Mongo plan stack; lazy **`MongoDataFrame`** via **`from_beanie`** / **`from_beanie_async`** / **`from_collection`**; eager **`dict[str, list]`** via **`fetch_mongo`** / **`write_mongo`** and async mirrors — see **PyMongo surface area** there), [SPARK_ENGINE](../integrations/engines/spark.md) (**`pydantable[spark]`** — **raikou-core** `SparkDataFrame` / `SparkDataFrameModel`, **SparkDantic** schema helpers under **`pydantable.pyspark.sparkdantic`**, troubleshooting vs [PYSPARK_UI](../integrations/alternate-surfaces/pyspark-ui.md) façade), [CUSTOM_ENGINE_PACKAGE](../integrations/engines/custom-engine-package.md) (ship your own **`ExecutionEngine`**).
-- **Beanie-first Mongo** (ODM queries, projections, links, hooks, **`afetch_beanie`** / **`awrite_beanie`**): [BEANIE](../integrations/engines/beanie.md).
-- **Know what behavior is guaranteed (joins/nulls/windows/order)**: [INTERFACE_CONTRACT](../semantics/interface-contract.md).
-- **Understand versioning/semver expectations**: [VERSIONING](../semantics/versioning.md).
-- **Learn supported dtypes and edge cases**: [SUPPORTED_TYPES](../user-guide/supported-types.md).
-- **Debug plans / observe runtime / discover extension points**: [PLAN_AND_PLUGINS](../user-guide/plan-and-plugins.md).
+| I want to… | Start here |
+|------------|------------|
+| Install and verify the native extension | [Installation](installation.md) |
+| Run my first pipeline in 5 minutes | [Quickstart](quickstart.md) |
+| Define schemas and validation rules | [DataFrameModel](../user-guide/dataframemodel.md) |
+| Understand plans, lazy vs eager, and costs | [Execution](../user-guide/execution.md), [Materialization](../user-guide/materialization.md) |
+| Pick dtypes and edge cases | [Supported types](../user-guide/supported-types.md) |
+| Fix typing in my editor | [Typing](../user-guide/typing.md) |
 
-## Reference paths (by topic)
+## Ship a FastAPI service
 
-### Data I/O
+| I want to… | Start here |
+|------------|------------|
+| Shortest runnable async app | [Golden path](../integrations/fastapi/golden-path.md) |
+| Request/response patterns and errors | [FastAPI guide](../integrations/fastapi/fastapi.md) |
+| Columnar JSON bodies | [fastapi_columnar_bodies](../cookbook/fastapi_columnar_bodies.md) |
+| Production settings and observability | [fastapi_settings](../cookbook/fastapi_settings.md), [fastapi_observability](../cookbook/fastapi_observability.md) |
 
-- **Overview**: [IO_OVERVIEW](../io/overview.md)
-- **Decision tree**: [IO_DECISION_TREE](../io/decision-tree.md)
-- **Formats**: [IO_PARQUET](../io/parquet.md), [IO_CSV](../io/csv.md), [IO_NDJSON](../io/ndjson.md), [IO_JSON](../io/json.md), [IO_IPC](../io/ipc.md)
-- **Transports**: [IO_SQL](../io/sql.md) (**SQLModel:** **`fetch_sqlmodel`** / **`write_sqlmodel`**, runnable **`docs/examples/io/sql_sqlite_sqlmodel_*.py`**; **`sqlmodel_columns`**, **`DataFrameModel.assert_sqlmodel_compatible`**; **string SQL:** **`fetch_sql_raw`** / **`write_sql_raw`**; deprecated **`fetch_sql`** / **`write_sql`**; **`DataFrameModel`** SQLModel helpers), [IO_HTTP](../io/http.md), [IO_EXTRAS](../io/extras.md)
-- **SQLModel-first SQL I/O roadmap (phases 0–6; shipped in v1.13.0)**: [SQLMODEL_SQL_ROADMAP](../project/sqlmodel-sql-roadmap.md)
-- **Planning transports and async stacks**: [DATA_IO_SOURCES](../io/data-io-sources.md)
+## Read and write data
 
-### Semantics and contracts
+| I want to… | Start here |
+|------------|------------|
+| Choose lazy vs eager I/O | [I/O decision tree](../io/decision-tree.md) |
+| Format-specific guides (Parquet, CSV, SQL, …) | [I/O overview](../io/overview.md) |
+| SQLModel database round-trips | [SQL I/O](../io/sql.md), [SQL engine](../integrations/engines/sql.md) |
+| MongoDB / Beanie | [Mongo engine](../integrations/engines/mongo.md), [Beanie](../integrations/engines/beanie.md) |
 
-- **Behavior contract**: [INTERFACE_CONTRACT](../semantics/interface-contract.md)
-- **Windows**: [WINDOW_SQL_SEMANTICS](../semantics/window-sql-semantics.md)
-- **Why pydantable vs native Polars**: [WHY_NOT_POLARS](../semantics/why-not-polars.md)
+## Optional engines and facades
 
-### Alternate import surfaces
+| I want to… | Start here |
+|------------|------------|
+| Lazy SQL transforms | [SQL engine](../integrations/engines/sql.md) |
+| Lazy Mongo transforms | [Mongo engine](../integrations/engines/mongo.md) |
+| Spark / PySpark compatibility | [Spark engine](../integrations/engines/spark.md), [PySpark UI](../integrations/alternate-surfaces/pyspark-ui.md) |
+| Pandas-shaped method names | [Pandas UI](../integrations/alternate-surfaces/pandas-ui.md) |
+| Custom execution backend | [Custom engine package](../integrations/engines/custom-engine-package.md) |
 
-- **Pandas-shaped names**: [PANDAS_UI](../integrations/alternate-surfaces/pandas-ui.md) (includes **`assign`/`merge`**, duplicate masks, **`get_dummies`**, **`cut`/`qcut`**, **`factorize_column`**, **`ewm().mean()`**, typed **`pivot`**). Integration tests: **`tests/test_pandas_ui.py`**, **`tests/test_pandas_ui_popular_features.py`**.
-- **PySpark-shaped names**: [PYSPARK_UI](../integrations/alternate-surfaces/pyspark-ui.md), [PYSPARK_INTERFACE](../integrations/alternate-surfaces/pyspark-interface.md), [PYSPARK_PARITY](../integrations/alternate-surfaces/pyspark-parity.md)
+## Guarantees, upgrades, and help
 
-### Project & contribution
+| I want to… | Start here |
+|------------|------------|
+| Know what behavior is guaranteed | [Interface contract](../semantics/interface-contract.md) |
+| Upgrade or migrate from pandas/Polars | [Migration](migration.md) |
+| Understand semver | [Versioning](../semantics/versioning.md) |
+| Fix errors | [Troubleshooting](troubleshooting.md) |
+| Look up a term | [Glossary](../concepts/glossary.md) |
 
-- **Roadmap**: [ROADMAP](../project/roadmap.md)
-- **SQLModel-first SQL I/O roadmap**: [SQLMODEL_SQL_ROADMAP](../project/sqlmodel-sql-roadmap.md)
-- **Custom dtypes**: [CUSTOM_DTYPES](../user-guide/custom-dtypes.md) — semantic scalar types via Pydantic v2 CoreSchema + `pydantable.dtypes.register_scalar`.
-- **Strictness**: [STRICTNESS](../user-guide/strictness.md) — per-column and nested validation strictness (Phase 4).
-- **Service ergonomics**: [SERVICE_ERGONOMICS](../user-guide/service-ergonomics.md) — OpenAPI enrichments, alias ingestion, and redaction defaults (Phase 5).
-- **JSON & structs (1.10.0) and local I/O (1.11.0):** release narratives in [CHANGELOG](../project/changelog.md) **1.10.0** / **1.11.0**; ongoing work in [ROADMAP](../project/roadmap.md); NDJSON cookbook [json_logs_unnest_export](../cookbook/json_logs_unnest_export.md); lazy scan audit: [Polars 0.53 vs pydantable scan audit](../io/data-io-sources.md#audit-polars-053x-vs-pydantable-1110-phase-a); entrypoints [IO_OVERVIEW](../io/overview.md), [IO_DECISION_TREE](../io/decision-tree.md), [DATA_IO_SOURCES](../io/data-io-sources.md).
-- **Developer guide**: [DEVELOPER](../project/developer.md)
-- **Execution engine abstraction (ADR)**: [ADR-engines](../project/adrs/engines.md)
-- **Custom engine package (third-party backends)**: [CUSTOM_ENGINE_PACKAGE](../integrations/engines/custom-engine-package.md)
-- **Lazy SQL DataFrame (`SqlDataFrame` / `SqlDataFrameModel`, optional `pydantable[sql]`)**: [SQL_ENGINE](../integrations/engines/sql.md)
-- **Mongo engine (`pydantable[mongo]` + Beanie `Document` preferred)**: [MONGO_ENGINE](../integrations/engines/mongo.md) (**`MongoPydantableEngine`**, **`MongoRoot`** from the Mongo plan stack; **`from_beanie`** / **`from_beanie_async`** / **`sync_pymongo_collection`**; eager **`fetch_mongo`** / **`iter_mongo`** / **`write_mongo`**, **`afetch_mongo`** / **`aiter_mongo`** / **`awrite_mongo`**, optional **`is_async_mongo_collection`** / **`*_mongo_async`**).
-- **Performance notes**: [PERFORMANCE](../project/performance.md)
-- **Changelog**: [CHANGELOG](../project/changelog.md)
-- **Troubleshooting / FAQ**: [TROUBLESHOOTING](../getting-started/troubleshooting.md)
+## Decide whether to adopt
 
-### Errors and HTTP mapping (services)
+| I want to… | Start here |
+|------------|------------|
+| See where pydantable fits | [Why pydantable?](../positioning/why-pydantable.md), [Mental model](../concepts/mental-model.md) |
+| Compare to Polars or pandas | [Comparisons](../positioning/comparisons/index.md) |
+| Review security for services | [Security considerations](../project/security.md) |
 
-- **`pydantable.errors`**: **`ColumnLengthMismatchError`**, **`PydantableUserError`** — used by strict column validation and mapped by **`register_exception_handlers`** in [FASTAPI](../integrations/fastapi/fastapi.md) (see [HTTP errors and exception handlers](../integrations/fastapi/fastapi.md#http-errors-and-exception-handlers) there).
+## Contribute or extend
 
+| I want to… | Start here |
+|------------|------------|
+| Set up a dev environment | [Developer guide](../project/developer.md) |
+| Run tests like CI | [Testing](../project/testing.md) |
+| Edit documentation | [Docs style guide](../project/contributing/docs-style-guide.md) |
+| See what ships next | [Roadmap](../project/roadmap.md) |

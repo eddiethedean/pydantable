@@ -14,26 +14,28 @@ It uses the same steps: build a typed `DataFrame`, inspect it, summarize, filter
     - [Comparisons (Polars + pandas)](../positioning/comparisons/index.md)
     - [Mental model](../concepts/mental-model.md)
 
-## 1. Schema and data
+## 1. Define a table model
 
 ```python
-from pydantic import BaseModel
-
-from pydantable import DataFrame
+from pydantable import DataFrameModel
 
 
-class Row(BaseModel):
+class Sales(DataFrameModel):
     id: int
     score: float
     label: str
 
 
-df = DataFrame[Row]({
-        "id": [1, 2, 3],
-        "score": [10.0, 20.5, 7.0],
-        "label": ["a", "b", "a"],
-    })
+df = Sales({
+    "id": [1, 2, 3],
+    "score": [10.0, 20.5, 7.0],
+    "label": ["a", "b", "a"],
+})
 ```
+
+!!! tip "Other patterns"
+    - **`DataFrame[Schema]`** — same engine, generic API ([Typing guide](../user-guide/typing.md))
+    - Avoid plain **`pydantic.BaseModel`** unless you intentionally skip **`DataFrameModel`** helpers
 
 ## 2. String repr and HTML (Jupyter)
 
@@ -74,9 +76,17 @@ cols = filtered.to_dict()  # dict[str, list]
 
 Use `to_polars()` / `to_arrow()` when the optional extras are installed ([EXECUTION](../user-guide/execution.md) **Copy as / interchange**).
 
+## 5. Join, group, and window (optional)
+
+For a longer analytics walkthrough (join + groupby + window), run:
+
+```bash
+python docs/examples/core/join_groupby_window.py
+```
+
 ## Where to read next
 
-- [DATAFRAMEMODEL](../user-guide/dataframemodel.md) — `DataFrameModel`, validation, transforms
+- [DataFrameModel](../user-guide/dataframemodel.md) — validation, transforms, service patterns
 - [PANDAS_UI](../integrations/alternate-surfaces/pandas-ui.md) — optional **`pydantable.pandas`** import (`assign`, `merge`, cleaning helpers)
 - [EXECUTION](../user-guide/execution.md) — materialization cost, async, display limits
 - [INTERFACE_CONTRACT](../semantics/interface-contract.md) — semantics (joins, nulls, `shape` vs executed rows)

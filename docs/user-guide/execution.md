@@ -1,5 +1,20 @@
 # Execution (Rust engine)
 
+## 90-second execution model
+
+1. **Build** a typed table: **`MyModel({...})`** or **`MyModel.read_parquet(path)`** (lazy).
+2. **Transform** with **`filter`**, **`select`**, **`with_columns`**, **`join`**, etc. — these extend a **lazy plan** (no full table in Python yet).
+3. **Materialize** when you need results:
+   - **`collect()`** → list of Pydantic row models
+   - **`to_dict()`** → **`dict[str, list]`**
+   - **`to_polars()`** / **`to_arrow()`** → optional extras (see costs below)
+
+Everything in step 3 runs through the **Rust extension** (Polars inside). You do **not** need **`import polars`** for steps 1–3 unless you call **`to_polars()`**.
+
+Advanced topics (async **`acollect`**, **`submit`**, **`stream`**, env vars, I/O vocabulary) are below.
+
+---
+
 All materialization — `collect()`, joins, group-by, reshape, etc. — runs through the
 **compiled Rust extension** (`pydantable_native._core`, shipped by `pydantable-native`), which uses Polars for physical execution
 inside the native extension. Python does **not** require the `polars` package for core use.

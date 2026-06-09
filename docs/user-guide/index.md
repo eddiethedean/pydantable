@@ -8,5 +8,6 @@ Concepts and how-to guides for building typed pipelines: schemas, expressions, e
 - [Materialization](materialization.md)
 - [Selectors](selectors.md)
 - [Plans and plugins](plan-and-plugins.md)
-- [Polars alignment](polars-alignment/workflows.md)
+- [Best practices](best-practices.md)
+- [Polars alignment](../project/polars-alignment/workflows.md) (maintainer / migration reference)
 

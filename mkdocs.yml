@@ -11,6 +11,8 @@ docs_dir: docs
 
 # Allow links to repo files outside ``docs/`` (``../``) used in ROADMAP / PERFORMANCE.
 validation:
+  nav:
+    omitted_files: ignore
   links:
     unrecognized_links: ignore
     not_found: ignore
@@ -21,6 +23,7 @@ hooks:
 exclude_docs: |
   async_ideas/**
   examples/fastapi/service_layout/README.md
+  project/repository-readme.md
 
 theme:
   name: material
@@ -110,20 +113,16 @@ extra_javascript:
 
 nav:
   - Home: index.md
-  - Getting started:
+  - Get started:
       - getting-started/index.md
+      - getting-started/installation.md
       - getting-started/quickstart.md
+      - positioning/why-pydantable.md
+      - getting-started/migration.md
       - getting-started/troubleshooting.md
       - getting-started/docs-map.md
-  - Positioning:
-      - positioning/why-pydantable.md
-      - Comparisons:
-          - positioning/comparisons/index.md
-          - positioning/comparisons/polars.md
-          - positioning/comparisons/pandas.md
-  - Concepts:
-      - concepts/mental-model.md
-  - User guide:
+      - concepts/glossary.md
+  - Guides:
       - user-guide/index.md
       - user-guide/dataframemodel.md
       - user-guide/typing.md
@@ -135,16 +134,28 @@ nav:
       - user-guide/materialization.md
       - user-guide/selectors.md
       - user-guide/plan-and-plugins.md
-      - Polars alignment:
-          - user-guide/polars-alignment/workflows.md
-          - user-guide/polars-alignment/parity-scorecard.md
-          - user-guide/polars-alignment/transformations-roadmap.md
-          - user-guide/polars-alignment/polars-parity-1-8.md
-          - user-guide/polars-alignment/polars-parity-next.md
+      - user-guide/best-practices.md
+      - concepts/mental-model.md
+      - io/decision-tree.md
+  - Recipes:
+      - cookbook/index.md
+      - cookbook/workflows/index.md
+      - integrations/fastapi/golden-path.md
+      - cookbook/async_lazy_pipeline.md
+      - cookbook/fastapi_columnar_bodies.md
+      - cookbook/fastapi_async_materialization.md
+      - cookbook/fastapi_end_to_end_examples.md
+      - cookbook/fastapi_background_tasks.md
+      - cookbook/fastapi_observability.md
+      - cookbook/fastapi_settings.md
+      - cookbook/io_lazy_pipeline_write.md
+      - cookbook/io_http_parquet_ctx.md
+      - cookbook/json_logs_unnest_export.md
+      - cookbook/transforms_join_groupby.md
+      - cookbook/windows_framing_primer.md
   - I/O:
       - io/index.md
       - io/overview.md
-      - io/decision-tree.md
       - Formats:
           - io/parquet.md
           - io/csv.md
@@ -159,7 +170,6 @@ nav:
   - Integrations:
       - integrations/index.md
       - FastAPI:
-          - integrations/fastapi/golden-path.md
           - integrations/fastapi/fastapi.md
           - integrations/fastapi/advanced.md
           - integrations/fastapi/enhancements.md
@@ -176,37 +186,67 @@ nav:
           - integrations/alternate-surfaces/pyspark-interface.md
           - integrations/alternate-surfaces/pyspark-parity.md
       - integrations/streamlit.md
-  - Cookbook:
-      - cookbook/index.md
-      - cookbook/workflows/index.md
-      - cookbook/async_lazy_pipeline.md
-      - cookbook/fastapi_columnar_bodies.md
-      - cookbook/fastapi_async_materialization.md
-      - cookbook/fastapi_end_to_end_examples.md
-      - cookbook/fastapi_background_tasks.md
-      - cookbook/fastapi_observability.md
-      - cookbook/fastapi_settings.md
-      - cookbook/io_lazy_pipeline_write.md
-      - cookbook/io_http_parquet_ctx.md
-      - cookbook/json_logs_unnest_export.md
-      - cookbook/transforms_join_groupby.md
-      - cookbook/windows_framing_primer.md
+  - Positioning:
+      - positioning/comparisons/index.md
+      - positioning/comparisons/polars.md
+      - positioning/comparisons/pandas.md
   - Semantics & contracts:
       - semantics/index.md
       - semantics/interface-contract.md
       - semantics/window-sql-semantics.md
       - semantics/versioning.md
       - semantics/why-not-polars.md
-  - Project:
+  - Reference:
+      - api/index.md
+      - Core:
+          - api/dataframe.md
+          - api/dataframemodel.md
+          - api/expr.md
+          - api/schema.md
+          - api/plan_materialization.md
+          - api/plan_materialization_summary.md
+      - Modules:
+          - api/io.md
+          - api/errors.md
+          - api/engine.md
+          - api/fastapi.md
+          - api/selectors.md
+          - api/observe.md
+          - api/display.md
+          - api/pandas_ui.md
+          - api/pyspark_ui.md
+      - Engines:
+          - api/sql_dataframe.md
+          - api/mongo_dataframe.md
+          - api/spark_dataframe.md
+      - Expressions:
+          - api/column_ref.md
+          - api/when.md
+          - api/coalesce.md
+          - api/concat.md
+      - Beanie:
+          - api/afetch_beanie.md
+          - api/aiter_beanie.md
+          - api/awrite_beanie.md
+          - api/beanie_write_options.md
+  - Internals:
       - project/index.md
       - project/roadmap.md
+      - project/history.md
       - project/changelog.md
       - project/architecture.md
       - project/developer.md
       - project/testing.md
       - project/performance.md
+      - project/security.md
+      - project/support.md
       - project/sqlmodel-sql-roadmap.md
-      - Repository README: project/repository-readme.md
+      - Polars alignment:
+          - project/polars-alignment/workflows.md
+          - project/polars-alignment/parity-scorecard.md
+          - project/polars-alignment/transformations-roadmap.md
+          - project/polars-alignment/polars-parity-1-8.md
+          - project/polars-alignment/polars-parity-next.md
       - project/design/pydantable-plan.md
       - ADRs:
           - project/adrs/engines.md
@@ -215,22 +255,6 @@ nav:
       - Contributing:
           - project/contributing/docs-style-guide.md
       - project/coverage-backlog.md
-  - Reference:
-      - api/index.md
-      - DataFrame: api/dataframe.md
-      - DataFrameModel: api/dataframemodel.md
-      - Expr: api/expr.md
-      - PlanMaterialization: api/plan_materialization.md
-      - plan_materialization_summary: api/plan_materialization_summary.md
-      - Schema: api/schema.md
-      - afetch_beanie: api/afetch_beanie.md
-      - aiter_beanie: api/aiter_beanie.md
-      - awrite_beanie: api/awrite_beanie.md
-      - BeanieWriteOptions: api/beanie_write_options.md
-      - ColumnRef: api/column_ref.md
-      - expressions.when: api/when.md
-      - expressions.coalesce: api/coalesce.md
-      - expressions.concat: api/concat.md
 
 # pydantable-rag chat UI URL (…/chat-app). Prefer RTD env RAG_CHAT_APP_URL for production.
 extra:

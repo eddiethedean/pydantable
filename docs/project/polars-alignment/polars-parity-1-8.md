@@ -8,8 +8,8 @@ PydanTable **1.8.0**, focused on the **core** API:
 
 It complements:
 
-- The current-state table: [PARITY_SCORECARD](../../user-guide/polars-alignment/parity-scorecard.md)
-- The long-horizon parity history: [POLARS_TRANSFORMATIONS_ROADMAP](../../user-guide/polars-alignment/transformations-roadmap.md)
+- The current-state table: [PARITY_SCORECARD](parity-scorecard.md)
+- The long-horizon parity history: [POLARS_TRANSFORMATIONS_ROADMAP](transformations-roadmap.md)
 - The behavioral guarantees: [INTERFACE_CONTRACT](../../semantics/interface-contract.md)
 
 ## Scope and constraints
@@ -48,7 +48,7 @@ The table below is the **deliverable checklist**. Each row should land with:
 - API behavior in Python
 - engine wiring (Rust) when required
 - contract tests
-- docs updates (this page + [PARITY_SCORECARD](../../user-guide/polars-alignment/parity-scorecard.md) and sometimes [INTERFACE_CONTRACT](../../semantics/interface-contract.md))
+- docs updates (this page + [PARITY_SCORECARD](parity-scorecard.md) and sometimes [INTERFACE_CONTRACT](../../semantics/interface-contract.md))
 
 | Area | Target | Arguments / details | Implementation notes |
 |---|---|---|---|
@@ -74,6 +74,6 @@ The table below is the **deliverable checklist**. Each row should land with:
 
 When features land:
 
-- Update [PARITY_SCORECARD](../../user-guide/polars-alignment/parity-scorecard.md) (status + notes).
-- Add or refresh examples in [POLARS_WORKFLOWS](../../user-guide/polars-alignment/workflows.md) for newly-added common patterns.
+- Update [PARITY_SCORECARD](parity-scorecard.md) (status + notes).
+- Add or refresh examples in [POLARS_WORKFLOWS](workflows.md) for newly-added common patterns.
 

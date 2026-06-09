@@ -10,7 +10,7 @@
 
 PydanTable combines **Pydantic schemas** with a **Polars-backed Rust execution engine** to provide a typed, service-friendly DataFrame API (with optional integrations for FastAPI, SQL, MongoDB, Spark, and more).
 
-**Current release:** 1.19.1 — highlights in the [changelog](https://pydantable.readthedocs.io/en/latest/project/changelog/).
+**Current release:** 1.19.2 — highlights in the [changelog](https://pydantable.readthedocs.io/en/latest/project/changelog/).
 
 ## Documentation
 
@@ -39,6 +39,20 @@ Key references:
 ```bash
 pip install pydantable
 ```
+
+Requires **Python 3.10+**. Wheels include the Rust extension (`pydantable-native`).
+
+### Verify your install
+
+```python
+import pydantable
+pydantable.DataFrameModel  # import check
+from pydantable.engine import native_engine_capabilities
+caps = native_engine_capabilities()
+assert caps.extension_loaded, "Native extension missing — see Troubleshooting in the docs"
+```
+
+If verification fails, see [Troubleshooting](https://pydantable.readthedocs.io/en/latest/getting-started/troubleshooting/) or the [Installation guide](https://pydantable.readthedocs.io/en/latest/getting-started/installation/).
 
 Optional extras:
 
@@ -82,6 +96,7 @@ Output (one run):
 
 ## Next steps
 
+- **Install & verify:** [Installation guide](https://pydantable.readthedocs.io/en/latest/getting-started/installation/)
 - **Start here:** [Quickstart](https://pydantable.readthedocs.io/en/latest/getting-started/quickstart/)
 - **Typing guide:** [User guide → Typing](https://pydantable.readthedocs.io/en/latest/user-guide/typing/)
 - **I/O decision tree:** [I/O → Decision tree](https://pydantable.readthedocs.io/en/latest/io/decision-tree/)
@@ -90,7 +105,7 @@ Output (one run):
 
 ## Development
 
-Use a virtual environment at **`.venv`** in the repo root (the `Makefile` defaults to `.venv/bin/python`). Full contributor setup, native builds, and contributor notes: [Project → Developer](https://pydantable.readthedocs.io/en/latest/project/developer/).
+Use a virtual environment at **`.venv`** in the repo root (the `Makefile` defaults to `.venv/bin/python`). See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Developer guide](https://pydantable.readthedocs.io/en/latest/project/developer/).
 
 ```bash
 make check-full      # ruff, ty, pyright, typing snippet tests, MkDocs, Rust

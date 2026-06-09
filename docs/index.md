@@ -1,6 +1,10 @@
 # PydanTable
 
-**Strongly-typed DataFrame layer for FastAPI and Pydantic services**, with a Rust execution core (Polars-backed inside the native extension). This site is the **full manual**; the repository **README** is the short entrypoint for install one-liners.
+PydanTable gives you **Pydantic-validated tables** with a **DataFrame API** (filter, join, groupby)
+and a **Rust/Polars execution core** — so FastAPI services can accept, transform, and return
+typed columnar data without maintaining parallel pandas and schema definitions.
+
+This site is the **full manual**; the repository **README** is the short entrypoint for install one-liners.
 
 !!! abstract "See also"
     Execution builds on [Polars](https://docs.pola.rs/) (see their [user guide](https://docs.pola.rs/user-guide/)) and ships as a native Rust extension. PydanTable adds **Pydantic-first** schemas, **SQLModel**-style tabular models, and **service / data** I/O patterns on top.
@@ -13,15 +17,15 @@
 ## Minimal example
 
 ```python
-from pydantable import DataFrame, Schema
+from pydantable import DataFrameModel
 
 
-class Row(Schema):
+class Sales(DataFrameModel):
     id: int
     score: float
 
 
-df = DataFrame[Row]({"id": [1, 2], "score": [10.0, 20.5]})
+df = Sales({"id": [1, 2], "score": [10.0, 20.5]})
 ```
 
 ## Choose your path
@@ -64,7 +68,7 @@ df = DataFrame[Row]({"id": [1, 2], "score": [10.0, 20.5]})
 
 ## Where pydantable fits
 
-- **New here?** Start with the [Five-minute tour](getting-started/quickstart.md), then read the [Mental model](concepts/mental-model.md).
+- **New here?** [Install](getting-started/installation.md) → [Five-minute tour](getting-started/quickstart.md) → [Mental model](concepts/mental-model.md).
 - **Deciding between tools?** Start with [Why pydantable?](positioning/why-pydantable.md) and the [Comparisons](positioning/comparisons/index.md) (Polars + pandas).
 - **Looking for recipes by intent?** See [Workflows (cookbook)](cookbook/workflows/index.md).
 

@@ -4,8 +4,8 @@ This page lays out a roadmap for the **highest-signal remaining Polars parity ga
 
 It complements:
 
-- Current-state tracking: [PARITY_SCORECARD](../../user-guide/polars-alignment/parity-scorecard.md)
-- 1.8.0 roadmap history: [POLARS_PARITY_1_8](../../user-guide/polars-alignment/polars-parity-1-8.md)
+- Current-state tracking: [PARITY_SCORECARD](parity-scorecard.md)
+- 1.8.0 roadmap history: [POLARS_PARITY_1_8](polars-parity-1-8.md)
 - Behavior contract: [INTERFACE_CONTRACT](../../semantics/interface-contract.md)
 
 ## Principles
@@ -33,7 +33,7 @@ Support `join(validate=...)` for scan roots **without forcing Python materializa
 
 ### Deliverables
 - Extend join execution to accept `validate` and enforce:\n  - `one_to_one`, `one_to_many`, `many_to_one`, `many_to_many`\n  - also accept `1:1`, `1:m`, `m:1`, `m:m`
-- Contract tests:\n  - scan-root join validation succeeds/fails correctly\n  - error messages include which side violates uniqueness\n  - coverage for multi-key joins\n- Docs:\n  - update [INTERFACE_CONTRACT](../../semantics/interface-contract.md) join validation section with scan-root support + cost model\n  - update [PARITY_SCORECARD](../../user-guide/polars-alignment/parity-scorecard.md) status from Partial → Implemented (or “Partial: scan-root supported for …” if any constraints remain)\n+
+- Contract tests:\n  - scan-root join validation succeeds/fails correctly\n  - error messages include which side violates uniqueness\n  - coverage for multi-key joins\n- Docs:\n  - update [INTERFACE_CONTRACT](../../semantics/interface-contract.md) join validation section with scan-root support + cost model\n  - update [PARITY_SCORECARD](parity-scorecard.md) status from Partial → Implemented (or “Partial: scan-root supported for …” if any constraints remain)\n+
 ### Acceptance criteria
 - `join(validate=...)` behaves the same for in-memory and scan roots (modulo documented performance/streaming constraints).
 
@@ -43,7 +43,7 @@ Support `join(validate=...)` for scan roots **without forcing Python materializa
 Bring `coalesce=` behavior in line with Polars expectations (within schema-first constraints).
 
 ### Deliverables
-- Define and implement explicit semantics for:\n  - same-named key joins vs `left_on`/`right_on`\n  - output key columns when inputs differ\n- Add tests that pin:\n  - output columns present/absent\n  - nullability rules\n  - name collision behavior\n- Docs:\n  - clarify coalesce semantics in [INTERFACE_CONTRACT](../../semantics/interface-contract.md)\n  - update [PARITY_SCORECARD](../../user-guide/polars-alignment/parity-scorecard.md)\n+
+- Define and implement explicit semantics for:\n  - same-named key joins vs `left_on`/`right_on`\n  - output key columns when inputs differ\n- Add tests that pin:\n  - output columns present/absent\n  - nullability rules\n  - name collision behavior\n- Docs:\n  - clarify coalesce semantics in [INTERFACE_CONTRACT](../../semantics/interface-contract.md)\n  - update [PARITY_SCORECARD](parity-scorecard.md)\n+
 ## Phase 3 — Selector DSL expansion (targeted, schema-first)
 
 ### Goal
@@ -66,4 +66,4 @@ Implement additional high-usage Polars DataFrame methods and arguments that map 
 - **Reshape**: additional melt/unpivot/pivot conveniences (naming options, column selection ergonomics).\n- **Join**: more join argument parity beyond validate/coalesce (where it doesn’t break typing).\n- **Core ergonomics**: small helpers that reduce verbosity in schema-first workflows.\n+
 ## Tracking
 
-- Update [PARITY_SCORECARD](../../user-guide/polars-alignment/parity-scorecard.md) for every delivered item.\n- Add a “shipped in X.Y.Z” note to the relevant changelog section when released.\n+
+- Update [PARITY_SCORECARD](parity-scorecard.md) for every delivered item.\n- Add a “shipped in X.Y.Z” note to the relevant changelog section when released.\n+
